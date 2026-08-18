@@ -916,6 +916,32 @@ can answer *"what did we agree in March"*.
   it in my calendar" twice must not make two entries, and the row is the only place
   that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing;
   Google holding two copies of one meeting is not the same kind of harmless).
+- **The `google_*` columns are a MIRROR of the diary entry** (team migration
+  `0035_calendar_depth_and_file_shares`): the join link, the organiser, the guest
+  list and what each person answered (`google_attendees_json`), whatever is
+  attached (`google_attachments_json`), the status, the zone, the repeat rule, and
+  `google_synced_at` saying when all of that was last true. They exist because the
+  alternative is that a meeting can only say who was in the room to the one person
+  whose connection pushed it, live, one call per meeting — a record of a
+  conversation with the conversation left out. **Nothing writes to Google through
+  them**; the four calendar doors do that against the live entry, so there is no
+  direction in which the mirror can disagree with Google and win.
+- **`from_calendar` decides what a re-sync may overwrite.** Two kinds of meeting
+  carry an event id and they are not the same record: one was typed here and
+  pushed out, the other was read IN off somebody's diary. Google owns the words of
+  a row it authored, kwapso owns the words of a row it authored, and `notes` is
+  never touched by any sync — it is the one column in this module that only a
+  person writes.
+- **`transcript_text` is what was SAID, kept here rather than fetched.** That is
+  what makes it readable by every colleague whose role can read meetings instead
+  of only by whoever holds the Drive connection — and it is what makes it
+  answerable **without a second ingestion path**: text in a column is swept by the
+  ordinary `meeting` ingest kind, on the cron, in the client's own compartment,
+  with no Google token in sight. It is cut to what one row may hold and
+  `transcript_note` says so when it was, the same rule (and the same words) a
+  knowledge file uses. `transcript_found_by` records which of the three hunts
+  found it — the calendar entry's own attachment, a shared Drive folder, or a
+  notice from Google in the mail — because the three do not prove the same thing.
 
 **Why it is its own permission module and not four more rights on `delivery`.**
 `meeting_purposes` is a TAXONOMY of why we meet, a settled list somebody curates
@@ -1022,13 +1048,21 @@ folder" about a folder full of things), the two token columns, `last_used_at`,
   (CONCURRENCY rule 2). Partial, so disconnecting and connecting again, the
   ordinary way somebody fixes a broken grant, is still allowed.
 
-**`google_sources`**, the Drive FOLDERS and Chat SPACES one person named. Drive
-is not "your Drive" and Chat is not "your Chat": both are reached only through
-rows here, so the unnamed rest is out of reach by construction rather than by a
-filter somebody has to remember to write. Gmail and Calendar have no rows here
-because there is nothing to name, mail is narrowed to a **known contact** (an
-address on one of the team's `accounts`) and the calendar is the person's own
-diary.
+**`google_sources`**, the Drive FOLDERS, the individual Drive FILES, and the Chat
+SPACES one person named. Drive is not "your Drive" and Chat is not "your Chat":
+both are reached only through rows here, so the unnamed rest is out of reach by
+construction rather than by a filter somebody has to remember to write. Gmail and
+Calendar have no rows here because there is nothing to name, mail is narrowed to
+a **known contact** (an address on one of the team's `accounts`) and the calendar
+is the person's own diary.
+
+- **`kind`** (`folder` / `file` / `space`, migration
+  `0035_calendar_depth_and_file_shares`) splits what used to be one word. Sharing
+  was folder-wise only, which meant sharing one contract meant sharing everything
+  filed beside it. The fence does not change shape — what is named is the only
+  thing readable — and a named file is exactly one file, ignored by the search
+  term because somebody who shared one document has already narrowed it as far as
+  narrowing goes.
 
 - **`shelf`** (`private` / `team`) is the answer to the question the design round
   said we must answer at the moment of sharing: who will be able to read this?

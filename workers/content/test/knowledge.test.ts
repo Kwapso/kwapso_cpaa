@@ -637,7 +637,18 @@ describe("the sweep — the app's own rows become material, and stay in step", (
     const { ingest } = (await res.json()) as {
       ingest: { kind: string; lastOkAt: string | null; lastError: string | null; sourcesIndexed: number }[]
     }
-    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "app", "sprint", "story", "ticket"])
+        // `meeting` joined the list the day a transcript needed somewhere to be
+    // answerable from. See the kind's own note in lib/knowledge-ingest.ts for
+    // why the WORDS of a call belong to the team through this kind rather than
+    // to one person through a Google one.
+    expect(ingest.map((i) => i.kind).sort()).toEqual([
+      "account",
+      "app",
+      "meeting",
+      "sprint",
+      "story",
+      "ticket",
+    ])
     for (const row of ingest) {
       expect(row.lastOkAt).not.toBeNull()
       expect(row.lastError).toBeNull()

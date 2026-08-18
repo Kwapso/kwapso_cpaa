@@ -75,6 +75,10 @@ const DESCRIPTION_VOCABULARY: Record<string, string> = {
     "the triage door's answer to 'is this caller the one on duty?' (CHECKLIST 5.11). It is a real key on the response and it is written as a SHORTHAND property (`json({ onDuty, yours, … })`), which the json-literal derivation reads as a variable rather than a field name. Named here rather than spelled out longhand at the door, because the shorthand is what a reader of that handler should see.",
   export_too_large:
     "the refusal code a too-big export answers with, thrown by the one CSV seam (shared/workers/csv.ts) — R14's posture applied to files: the export is whole or it is an error, never a silently short CSV. An error VALUE rather than a response key, so no door's own source names it.",
+  memberUserId:
+    "who on a meeting's invitation is one of OUR OWN people. It is a real field on every `links` row `get_meeting_people` returns, and it is derivable from nothing this census can read: `linkGuests` (workers/content/src/lib/meetings.ts) builds it from a users row in the GLOBAL core database, over `env.DB.prepare` rather than the team's REST door, so the row-mapper derivation — which reads a module's libs mapping off a team-database row — never sees the statement at all. The shape it belongs to is `MeetingPersonLink` in shared/types.ts.",
+  memberName:
+    "the name beside `memberUserId`, and underivable for exactly the same reason — it is assembled in code from the core database's `first_name` and `last_name`, so there is no column being copied for the derivation to find. Named beside its sibling because a description that promised the id and not the name would describe half a row.",
 }
 
 /* --------------------------- the judged universe --------------------------- */

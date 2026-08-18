@@ -325,6 +325,21 @@ export function meetingsKey(teamId: string): string {
   return `meetings:${teamId}`
 }
 
+/** WHICH OF ONE MEETING'S GUESTS WE KNOW — its own key because it is its own
+ * read: who was invited is on the row, and who they are TO US is a question with
+ * a different lifetime (a contact added next week should light up on a meeting
+ * held last week). */
+export function meetingPeopleKey(id: string): string {
+  return `meeting:people:${id}`
+}
+
+/** ONE MEETING'S TRANSCRIPT — its own key because it is its own read, and that
+ * is a size decision: a page of the diary is fifty meetings and a transcript is
+ * up to a megabyte. */
+export function meetingTranscriptKey(id: string): string {
+  return `meeting:transcript:${id}`
+}
+
 /** The triage strip: whose week it is, and the requests nobody has read. One
  * key, because the screen asks them as one question. */
 export function triageKey(teamId: string): string {
@@ -721,7 +736,17 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.meetingOne(id),
     fetchList: (t) => listFetch.meetings(t),
-    deps: (_t, id) => [`activity:record:meetings:${id}`],
+    // THE THREE READS A MEETING'S DETAIL SCREEN MAKES BESIDE THE ROW. Its
+    // activity feed, who on the invitation we know, and what was said. All three
+    // hang off the meeting rather than being fetched with it — a page of the
+    // diary is fifty meetings and a transcript is up to a megabyte — so a ping
+    // about this row has to drop them too, or a re-synced guest list would sit
+    // stale behind a record that had visibly just changed (R15).
+    deps: (_t, id) => [
+      `activity:record:meetings:${id}`,
+      meetingPeopleKey(id),
+      meetingTranscriptKey(id),
+    ],
     // THE PER-OWNER SLICES OF THE DIARY — a contact's Meetings tab
     // (`meetings-account-of:`) and an app's (`meetings-app-of:`). One prefix
     // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and

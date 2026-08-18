@@ -13,6 +13,24 @@
 // and pressing it twice makes ONE entry — the door claims the event id on the row
 // under a `google_event_id IS NULL` predicate, so the second press is answered
 // with the entry that already exists.
+//
+// AND THERE IS A FOURTH TAB NOW: the diary entry itself. The owner asked for the
+// link that opens the meeting in Google Calendar and for "location, stakeholders,
+// or any other calendar data or metadata… pulled in and organised correctly", and
+// this is where organised correctly lands. It is a TAB rather than more rows on
+// Overview because it is a different KIND of fact: everything on Overview is
+// something one of us decided, and everything here is something Google is telling
+// us, with a stamp saying when it last did.
+//
+// THE STAKEHOLDERS ARE TWO READS DELIBERATELY. Who was invited and what they
+// answered is on the meeting row, mirrored by the sweep; which of those addresses
+// belongs to a colleague or a client is asked separately, because that second
+// fact has a different lifetime — a contact added next week should light up on a
+// meeting held last week, and a link frozen at sync time never would.
+//
+// AND THE TRANSCRIPT SITS UNDER THE NOTES, not in a tab of its own, because the
+// agenda, the notes and what was actually said are the same question asked three
+// ways and a person reads them in that order.
 
 import * as React from "react"
 
@@ -22,9 +40,10 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
-import { CalendarPlus, CheckCheck, FileText, Pencil, Power } from "lucide-react"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { CalendarPlus, CheckCheck, ExternalLink, FileText, Pencil, Power, Video } from "lucide-react"
 
-import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
+import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -36,7 +55,7 @@ import {
   STICKY_TABS,
   type RecordAction,
 } from "@/components/record-chrome"
-import { appsKey, listFetch, meetingsKey } from "@/lib/live-resources"
+import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
@@ -44,6 +63,10 @@ import { RichText } from "@shared/web/rich-text-view"
 import { richTextValue } from "@shared/web/rich-text"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+// Every URL bound to an attribute goes through the seam, Google's included —
+// see the note in google-source-dialog.tsx for why "it came from Google" is not
+// a reason to skip it.
+import { safeHref, safeSrc } from "@/lib/rich-text"
 import { useT } from "@shared/web/language"
 
 export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; meetingId: string }) {
@@ -62,6 +85,20 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   // The generic record feed (R5) + the exact server total its tab badges (R8 for
   // the place, R16 for the number — never the loaded page's length).
   const activity = useRecordActivity("meetings", meetingId)
+
+  // THE TWO READS THE LIST NEVER MAKES. Both are keyed off this meeting and both
+  // are asked only when there is something to ask about: a meeting that was never
+  // in a calendar has no guests to resolve, and one with nothing captured has no
+  // words to fetch. Their keys hang off the meetings live registry entry, so a
+  // ping about this row drops them with it.
+  const peopleQ = useCached<MeetingPersonLink[]>(
+    item?.googleGuests.length ? meetingPeopleKey(meetingId) : null,
+    () => content.meetingPeople(meetingId).then((r) => r.links)
+  )
+  const transcriptQ = useCached<{ text: string; note: string | null; url: string | null }>(
+    item?.transcriptCapturedAt ? meetingTranscriptKey(meetingId) : null,
+    () => content.meetingTranscript(meetingId)
+  )
 
   const { can } = usePermissions(teamId)
   const canEdit = can("meetings", "edit")
@@ -244,6 +281,25 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     variant: "line" as const,
     tabs: [
       { value: "notes", label: t("Agenda & notes"), icon: "notebook-pen", badge: "", badgeVariant: "" as const },
+      // ONLY WHEN THERE IS ONE. A meeting nobody put in a calendar has nothing
+      // to show here, and an empty tab is a promise the record cannot keep.
+      ...(item.googleEventId
+        ? [
+            {
+              value: "calendar",
+              label: t("In the calendar"),
+              icon: "calendar",
+              // NO BADGE, and the rule caught this rather than a reviewer: the
+              // mirrored guest list is CAPPED by the calendar read that produced
+              // it, so its length is a ceiling and not a count (R16). An
+              // invitation with sixty people on it would badge fifty, which is
+              // the one number that is certainly wrong. The tab lists them, and
+              // a list you can see the end of does not need a number on it.
+              badge: "",
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
@@ -338,11 +394,23 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "overview")
+        // NAMED `panel`, not `t` — the shadowing bit once. Everything a person
+        // reads on this screen goes through the translate function called `t`
+        // (R28), and a panel renderer that takes the same letter silently turns
+        // every sentence inside it into a call on a tab object.
+        renderPanel={(panel) => {
+          if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (t.value === "activity")
+          if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
+          if (panel.value === "calendar")
+            return (
+              <CalendarPanel
+                meeting={item}
+                links={peopleQ.data ?? null}
+                loadingLinks={peopleQ.data === undefined && item.googleGuests.length > 0}
+              />
+            )
           return (
             <div className="flex flex-col gap-6">
               <section className="flex flex-col gap-2">
@@ -394,6 +462,61 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   </p>
                 )}
               </section>
+              {/* WHAT WAS ACTUALLY SAID. Third, under the agenda and the notes,
+                  because that is the order the three were written in and the
+                  order a person reads them: what we meant to cover, what we took
+                  down, and then the record of the whole thing.
+                  It is a SEPARATE READ (a transcript is up to a megabyte and the
+                  diary list is fifty meetings), and it is scrollable rather than
+                  laid out down the page: an hour of talking is a very long
+                  column, and a record whose other tabs are a scroll away is a
+                  record nobody uses. */}
+              {item.transcriptCapturedAt && (
+                <section className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-muted-foreground text-sm font-medium">{t("What was said")}</h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* HOW WE KNOW THIS IS THE RIGHT TRANSCRIPT. The three
+                          hunts do not prove the same thing — one is a fact
+                          Google recorded against this entry, the other two are
+                          matches — so the record says which one found it rather
+                          than presenting all three as equally certain. */}
+                      <Badge variant="outline" className="text-[10px]">
+                        {FOUND_BY[item.transcriptFoundBy ?? ""] ?? t("Found in Google")}
+                      </Badge>
+                      {item.transcriptUrl && (
+                        <a
+                          href={safeHref(item.transcriptUrl)}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+                        >
+                          <ExternalLink className="size-3" aria-hidden /> {t("Open the document")}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {transcriptQ.data === undefined ? (
+                    <Skeleton variant="list" lines={3} />
+                  ) : transcriptQ.data.text ? (
+                    <>
+                      <div className="max-h-96 overflow-y-auto rounded-xl border p-3">
+                        <p className="text-sm whitespace-pre-wrap">{transcriptQ.data.text}</p>
+                      </div>
+                      {/* NEVER SILENTLY TRIMMED. A transcript longer than one
+                          row may hold is cut and says so, in the same words a
+                          knowledge file uses. */}
+                      {transcriptQ.data.note && (
+                        <p className="text-muted-foreground text-xs">{transcriptQ.data.note}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      {t("The document was found but we couldn't read any words out of it. Open it in Google to read it there.")}
+                    </p>
+                  )}
+                </section>
+              )}
             </div>
           )
         }}
@@ -428,5 +551,213 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         }}
       />
     </RecordScreen>
+  )
+}
+
+/* ─────────────────────── THE DIARY ENTRY, ORGANISED ────────────────────────
+ *
+ * Everything below is Google's fact about this meeting, mirrored onto the row by
+ * the calendar sweep. It is a tab of its own rather than more lines on Overview
+ * because it is a different KIND of fact — Overview is what one of us decided,
+ * this is what Google is telling us — and because it carries a stamp saying when
+ * it was last true, which nothing on Overview needs.
+ *
+ * THE ORDER IS THE ORDER SOMEBODY NEEDS IT IN. The two things a person opens a
+ * meeting to DO are at the top (join it, open it in their calendar); who is
+ * coming is next, because it is the question the rest of the tab exists to
+ * answer; and the facts that rarely change — where, which zone, how often it
+ * repeats — sit under them.
+ */
+
+/** WHICH HUNT FOUND THE TRANSCRIPT, in words. The three do not prove the same
+ * thing, and a record that said only "transcript" would be presenting a name
+ * match with the same confidence as a file Google itself filed against this
+ * entry. */
+const FOUND_BY: Record<string, string> = {
+  attachment: "On the calendar entry",
+  drive: "In a shared folder",
+  mail: "From a Google notice",
+}
+
+/** What each guest ANSWERED, in the words a person uses. Google's own four are
+ * `accepted`, `declined`, `tentative` and `needsAction`, and the last of those
+ * is the one worth translating hardest: "needsAction" is machine for "they have
+ * not replied", which is the single most useful thing on a guest list. */
+const RESPONSE: Record<string, string> = {
+  accepted: "Coming",
+  declined: "Not coming",
+  tentative: "Maybe",
+  needsAction: "No reply yet",
+}
+
+function CalendarPanel({
+  meeting,
+  links,
+  loadingLinks,
+}: {
+  meeting: Meeting
+  links: MeetingPersonLink[] | null
+  loadingLinks: boolean
+}) {
+  const t = useT()
+  const linkFor = new Map((links ?? []).map((l) => [l.email, l]))
+  // ROOMS ARE NOT STAKEHOLDERS. Google puts meeting rooms on the same attendee
+  // list as people, and a room shown as a stakeholder is a stakeholder nobody
+  // can ring — so they are separated rather than dropped, because "which room"
+  // is a real fact about a meeting.
+  const people = meeting.googleGuests.filter((g) => !g.resource)
+  const rooms = meeting.googleGuests.filter((g) => g.resource)
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* THE TWO THINGS A PERSON CAME HERE TO DO. The owner asked for the first
+          of them by name: "there should be a calendar link, like a link that I
+          can open the meeting within my calendar." */}
+      <div className="flex flex-wrap gap-2">
+        {meeting.googleJoinUrl && (
+          <Button asChild size="sm" className="gap-1.5">
+            <a href={safeHref(meeting.googleJoinUrl)} target="_blank" rel="noreferrer noopener">
+              <Video className="size-3.5" aria-hidden /> {t("Join the call")}
+            </a>
+          </Button>
+        )}
+        {meeting.googleEventUrl && (
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <a href={safeHref(meeting.googleEventUrl)} target="_blank" rel="noreferrer noopener">
+              <ExternalLink className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
+            </a>
+          </Button>
+        )}
+      </div>
+
+      {/* WHO IS COMING — the "stakeholders" the owner asked for, and the reason
+          this tab is worth having. An address that matches one of our own people
+          or a contact on one of our accounts is shown as that RECORD; everybody
+          else is shown as themselves, which is the honest answer for most people
+          on most invitations. */}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-muted-foreground text-sm font-medium">{t("Who was invited")}</h2>
+        {people.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("Nobody else is on the invitation.")}</p>
+        ) : (
+          <div className="flex flex-col rounded-xl border">
+            {people.map((g) => {
+              const known = linkFor.get(g.email)
+              return (
+                <div
+                  key={g.email}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b p-3 text-sm last:border-0"
+                >
+                  <span className="font-medium">{g.name || g.email}</span>
+                  {g.name && <span className="text-muted-foreground text-xs">{g.email}</span>}
+                  {g.organizer && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {t("Organiser")}
+                    </Badge>
+                  )}
+                  {g.optional && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {t("Optional")}
+                    </Badge>
+                  )}
+                  {/* WHO THEY ARE TO US. Two different badges because they are
+                      two different relationships, and somebody can be neither —
+                      which is what an empty row here honestly says. */}
+                  {known?.memberName && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {t("One of us")}
+                    </Badge>
+                  )}
+                  {known?.accountName && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {known.accountName}
+                    </Badge>
+                  )}
+                  {loadingLinks && !known && (
+                    <span className="text-muted-foreground text-[10px]">{t("…")}</span>
+                  )}
+                  <span className="text-muted-foreground ml-auto text-xs">
+                    {RESPONSE[g.response] ?? g.response}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* FILES HANGING OFF THE ENTRY — the agenda doc, the deck, and the one this
+          whole lane turns on: the transcript Google Meet files here once the call
+          is over. Each carries Google's own icon for its type, which is a static
+          unauthenticated link and therefore the one piece of Drive chrome that
+          can go straight into a page. */}
+      {meeting.googleAttachments.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-muted-foreground text-sm font-medium">{t("Attached to the entry")}</h2>
+          <div className="flex flex-col rounded-xl border">
+            {meeting.googleAttachments.map((a) => (
+              <a
+                key={a.fileId || a.url || a.title}
+                href={safeHref(a.url)}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="hover:bg-muted/50 flex items-center gap-2 border-b p-3 text-sm last:border-0"
+              >
+                {a.iconUrl && (
+                  <img src={safeSrc(a.iconUrl)} alt="" width={16} height={16} className="shrink-0" />
+                )}
+                <span className="min-w-0 flex-1 truncate">{a.title || a.fileId}</span>
+                <ExternalLink className="text-muted-foreground size-3 shrink-0" aria-hidden />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* THE FACTS THAT RARELY CHANGE. An OverviewList so it reads exactly like
+          the tab beside it — the shape of a record's facts should not depend on
+          which tab they are on. */}
+      <OverviewList
+        items={[
+          { label: t("Where"), value: meeting.location ?? "—" },
+          {
+            label: t("Time zone"),
+            // AN HOUR IS NOT A FACT WITHOUT ONE. The same stamp read in two
+            // places is two different meetings to the people reading it.
+            value: meeting.googleTimeZone ?? "—",
+          },
+          { label: t("Organiser"), value: meeting.googleOrganizer ?? "—" },
+          {
+            label: t("Repeats"),
+            // Google's own RRULE is not a sentence anybody reads, so it is shown
+            // as a yes with the rule beside it rather than as the rule alone.
+            value: meeting.googleRecurrence ?? (meeting.recurringEventId ? "Yes, one of a series" : "No"),
+          },
+          {
+            label: t("In Google"),
+            value:
+              meeting.googleStatus === "cancelled"
+                ? "Called off"
+                : meeting.googleStatus === "tentative"
+                  ? "Not confirmed"
+                  : meeting.googleStatus === "confirmed"
+                    ? "Confirmed"
+                    : "—",
+          },
+          {
+            label: t("Rooms"),
+            value: rooms.length ? rooms.map((r) => r.name || r.email).join(", ") : "—",
+          },
+        ]}
+      />
+
+      {/* WHEN THIS WAS LAST TRUE. A mirror that does not say how old it is is a
+          mirror somebody will one day trust over the thing it reflects. */}
+      <p className="text-muted-foreground text-xs">
+        {meeting.googleSyncedAt
+          ? `${t("Read from your calendar")} ${formatDateTime(meeting.googleSyncedAt)}`
+          : t("This hasn't been read from a calendar yet.")}
+      </p>
+    </div>
   )
 }

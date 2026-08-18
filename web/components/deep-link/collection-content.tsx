@@ -40,6 +40,8 @@ import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, knowledgeKey } from "@/lib/live-resources"
+import { invalidate } from "@shared/web/store"
+import { GoogleSyncButton } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
@@ -473,6 +475,16 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <div className="flex flex-col gap-4">
         <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+        {/* THE SYNC AFFORDANCE, on the screen most obviously made of Google
+            material. The owner: "we should have this button everywhere, wherever
+            we're showing data coming from Google sources." It is the SAME
+            component Settings and Meetings carry — one implementation, one
+            sentence about when it last ran, one honest nothing. */}
+        <GoogleSyncButton
+          teamId={teamId as string}
+          scope="knowledge"
+          onSynced={() => invalidate(knowledgeKey(teamId as string))}
+        />
         {/* ASK IT, HERE. The list answers "what does it know?"; this answers
             "what does it know about X?", which is the question somebody actually
             came with. It sits ABOVE the list because a page whose first control

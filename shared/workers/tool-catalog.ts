@@ -1138,9 +1138,27 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
+    name: "get_meeting_transcript",
+    summary:
+      "What was SAID in a meeting, by `id` — the transcript's own words, kept on the record rather than fetched from Google, so any colleague who may read meetings can read it. `text` is empty when none has been captured yet and `capturedAt` is then null; `foundBy` says which of the three hunts found it, `url` opens the document where it lives, and `note` is present only when the transcript was longer than one record may hold and says so in words. Use `read_meeting_transcript` first to go and find one.",
+    binding: "CONTENT", method: "GET", path: "/api/content/meetings/transcript",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: () => "Read what was said in a meeting" },
+  },
+  {
+    name: "get_meeting_people",
+    summary:
+      "Which of the people on a meeting's invitation we already know, by `id`. Every address on the entry comes back once in `links`, with `memberUserId` and `memberName` set when it is one of our own team members, and `accountId` and `accountName` set when it is a contact on one of our accounts, resolved to the client the contact sits under rather than the contact's own row. Both halves are null for an address that is neither, which is most of them. Nothing is looked up anywhere outside this team. Who was INVITED, and what each of them answered, is on the meeting record itself.",
+    binding: "CONTENT", method: "GET", path: "/api/content/meetings/people",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: () => "Look up who was at a meeting" },
+  },
+  {
     name: "sync_calendar_series",
     summary:
-      "Bring the caller's REPEATING calendar entries into the diary. Every repeating instance in the next four weeks that has no record yet becomes one, so there is a month to prepare its notes; the instances further out come back in `ahead` as read-only, because an entry six months away can still be moved or called off in Google. `created` counts the records it made. One-off entries are never imported, somebody's own diary is not the agency's record of a client conversation. Safe to call twice: an instance that already has a record cannot get a second one.",
+      "Bring the caller's calendar and the diary into step, over a window that reaches back a fortnight and forward four weeks. Three things happen. Every REPEATING instance in that window with no record yet becomes one, so there is a month to prepare its notes and last week's calls are records too; `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the guest list and what each person answered, the organiser, the join link, the attachments, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. The instances beyond the horizon come back in `ahead` as read-only, because an entry six months away can still be moved or called off in Google. One-off entries are never imported, somebody's own diary is not the agency's record of a client conversation, though a one-off already in the diary is kept up to date like any other. Safe to call twice: an instance that already has a record cannot get a second one, and an entry Google has not touched since the last call is skipped without a write.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
     schema: obj({}),
     buildBody: () => ({}),
@@ -1153,7 +1171,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "read_meeting_transcript",
     summary:
-      "Read the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It looks only in the Drive folders the caller has shared, first by the meeting's title and then by its Meet code. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time.",
+      "Find and keep the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It hunts three ways in order of proof, the file Google attached to the calendar entry itself, then a document in a Drive folder the caller has shared, then a notice from Google in the caller's mail naming the document it made, and `foundBy` says which of the three found it. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time. The words themselves are read back with `get_meeting_transcript`.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/transcript",
     schema: obj({ id: S }, ["id"]),
     buildBody: (i) => ({ id: str(i, "id") }),

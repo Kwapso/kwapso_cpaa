@@ -1324,6 +1324,52 @@ export type TaskViewName = (typeof TASK_VIEWS)[number]
 export const MEETING_STATUSES = ["scheduled", "held"] as const
 export type MeetingStatus = (typeof MEETING_STATUSES)[number]
 
+/** ONE PERSON ON A DIARY ENTRY — the "stakeholders" a meeting record carries.
+ *
+ * As Google states them and nothing more: this is the MIRROR of the invitation,
+ * so it says who was asked and what they answered, and it deliberately does not
+ * say who they are to us. That second question is a different fact with a
+ * different lifetime — a contact added to an account next week should light up
+ * on a meeting held last week — so it is answered by a read (`meetingPeople`)
+ * rather than frozen into the row at sync time. */
+export type MeetingGuest = {
+  email: string
+  name: string
+  /** Google's own word: `needsAction`, `declined`, `tentative` or `accepted`. */
+  response: string
+  organizer: boolean
+  optional: boolean
+  /** a meeting ROOM rather than a person — Google puts both on one list. */
+  resource: boolean
+}
+
+/** A file hanging off a diary entry: an agenda, a deck, or the transcript Google
+ * Meet files against the event once the call is over. */
+export type MeetingAttachment = {
+  fileId: string
+  title: string
+  mimeType: string
+  iconUrl: string | null
+  url: string | null
+}
+
+/** WHO ON AN INVITATION WE ALREADY KNOW. The answer to the second half of the
+ * owner's "stakeholders" ask: an address that matches one of our own people, or
+ * a contact on one of our accounts, is a RECORD rather than a string.
+ *
+ * Both halves can be null — most addresses on most invitations are neither, and
+ * saying so plainly is better than a screen that implies every guest is filed
+ * somewhere. */
+export type MeetingPersonLink = {
+  email: string
+  /** one of our own team members. */
+  memberUserId: string | null
+  memberName: string | null
+  /** a contact on one of our accounts, and the client it sits under. */
+  accountId: string | null
+  accountName: string | null
+}
+
 /** A CONVERSATION WE HAD, or are about to have — the record Glide never kept.
  * Its 350 meetings were folded into work logs, which kept the hours and lost the
  * agenda; these two fields are why this is a record of its own. */
@@ -1356,12 +1402,55 @@ export type Meeting = {
    * pressing the button twice cannot make a second entry. */
   googleEventId: string | null
   googleEventUrl: string | null
+  /* ── THE REST OF THE DIARY ENTRY, MIRRORED ────────────────────────────────
+   * Everything below is Google's fact about the same entry, copied onto the row
+   * by the calendar sweep so that a meeting can SAY who was in the room, where
+   * to join and what was attached — without every reader holding a connection
+   * and every list costing fifty calls to Google.
+   *
+   * The direction is one-way and the mirror never wins: the four calendar doors
+   * write to Google, this is only ever read back. `googleSyncedAt` says when it
+   * was last true, which is the honest thing a mirror can offer. */
+  /** the join link — Meet, or whatever conferencing system is on the entry. */
+  googleJoinUrl: string | null
+  /** who called the meeting. Often not on the guest list at all. */
+  googleOrganizer: string | null
+  /** Google's own word: `confirmed`, `tentative` or `cancelled`. */
+  googleStatus: string | null
+  /** the IANA zone the entry is written in — an hour is not a fact without it. */
+  googleTimeZone: string | null
+  /** the repeat rule as Google states it (`RRULE:FREQ=WEEKLY;BYDAY=MO`). */
+  googleRecurrence: string | null
+  googleGuests: MeetingGuest[]
+  googleAttachments: MeetingAttachment[]
+  /** when the mirror above was last brought into step with Google. */
+  googleSyncedAt: string | null
+  /** TRUE when this row was read IN off somebody's diary rather than typed here
+   * and pushed out. It decides what a re-sync may overwrite: Google owns the
+   * words of a row it authored, kwapso owns the words of a row it authored, and
+   * the notes belong to a person either way. */
+  fromCalendar: boolean
   /** WHICH TRANSCRIPT WAS READ, and WHEN (CHECKLIST 9.2 + 9.4). The timestamp is
    * the idempotence predicate as much as it is a fact: reading a transcript
    * ticks the meeting held and writes a work log for every one of OUR people who
    * was in the room, and both of those must happen exactly once. */
   transcriptFileId: string | null
   transcriptCapturedAt: string | null
+  /** the document itself, in Google — so "read the transcript" has somewhere to
+   * go on any screen, whoever is looking. */
+  transcriptUrl: string | null
+  /** WHICH OF THE THREE HUNTS FOUND IT: `attachment` (Google put it on the
+   * calendar entry itself), `drive` (a document in a folder somebody shared) or
+   * `mail` (a notice from Google naming the document). They do not prove the
+   * same thing — the first is a fact and the other two are matches — so the
+   * screen says which. Null until one is captured. */
+  transcriptFoundBy: string | null
+  /* THE WORDS THEMSELVES ARE NOT HERE, and that is deliberate. A page of the
+   * diary is fifty meetings; a transcript is up to a megabyte. Putting one on
+   * the other would make the list read the heaviest response in the app to show
+   * a column nobody scrolls. The text has its own door
+   * (`GET /api/content/meetings/transcript`), read once, by the one screen that
+   * displays it. */
   /** THE GOOGLE SERIES this entry belongs to, when it is one of a repeating set
    * (9.7). Null on a one-off. */
   recurringEventId: string | null
@@ -1497,7 +1586,20 @@ export type GoogleConnection = {
   editorName: string | null
 }
 
-/** A Drive folder or a Chat space one person named for kwapso. */
+/** WHAT WAS SHARED. Two of these are Drive, and the difference between them is
+ * the owner's own question — "In Drive, why is it that it's only folder-wise?
+ * What if it had to be file-wise, or does that file have to be in a folder?" It
+ * did not have to. A folder is a place to look inside; a file is the thing
+ * itself, and sharing one no longer means sharing everything filed beside it.
+ *
+ * A Chat share is always a space, which is why this is one word rather than a
+ * boolean on the Drive rows: three shapes, three names, and no row that has to
+ * be read together with its service to know what it is. */
+export const GOOGLE_SHARE_KINDS = ["folder", "file", "space"] as const
+export type GoogleSourceKind = (typeof GOOGLE_SHARE_KINDS)[number]
+
+/** A Drive folder, a single Drive file, or a Chat space one person named for
+ * kwapso. */
 export type GoogleSource = {
   id: string
   connectionId: string
@@ -1507,6 +1609,7 @@ export type GoogleSource = {
   externalId: string
   name: string
   shelf: GoogleShelf
+  kind: GoogleSourceKind
   /** WHICH CLIENT this folder or space is about — the compartment everything
    * inside it is filed under when the knowledge base reads it. Null means the
    * agency's own, exactly as it does on a knowledge source. Asked at the moment
@@ -1519,6 +1622,31 @@ export type GoogleSource = {
   creatorName: string | null
   updatedAt: string | null
   editorName: string | null
+}
+
+/** ONE DRIVE FILE, AS A SCREEN SEES IT — the metadata that makes a list of
+ * documents look like documents rather than like a list of strings.
+ *
+ * `iconUrl` is Google's own small type icon (the Docs blue, the Sheets green): a
+ * static, unauthenticated, cacheable link, so it goes straight into a page.
+ * `hasThumbnail` is the opposite kind of fact and is deliberately a boolean —
+ * Google's preview link is authenticated and expires, so the ADDRESS never
+ * leaves the worker and a screen asks our own door for the bytes instead
+ * (`googleDriveThumbnailUrl`). */
+export type DriveFileRow = {
+  id: string
+  name: string
+  mimeType: string
+  modifiedTime: string | null
+  webViewLink: string | null
+  /** which named folder it came out of, or "" when the FILE itself was named. */
+  folderId: string
+  iconUrl: string | null
+  hasThumbnail: boolean
+  ownerName: string
+  /** bytes, when Google states one. A Google Doc has no size in the ordinary
+   * sense, so this is null more often than not. */
+  sizeBytes: number | null
 }
 
 /** One thing read out of Google, in the shape the retrieval lane wants it. See

@@ -143,11 +143,13 @@ import {
   postUploadKnowledgeFile,
 } from "./routes/knowledge"
 import {
+  getMeetingPeople,
   getMeetings,
+  getMeetingTranscript,
   postCreateMeeting,
   postMeetingHeld,
   postMeetingTranscript,
-  postSyncCalendarSeries,
+  postSyncCalendar,
   postSetMeetingActive,
   postUpdateMeeting,
 } from "./routes/meetings"
@@ -186,6 +188,7 @@ import {
   getGoogleConnections,
   getGoogleDriveFile,
   getGoogleDriveFiles,
+  getGoogleDriveThumbnail,
   getGoogleEvents,
   getGoogleEventTranscript,
   getGoogleMail,
@@ -406,9 +409,18 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // ticks "held" and writes a work log for every one of OUR people who was in
   // the room (9.4 + 9.2). One door, because it is one moment.
   "POST /api/content/meetings/transcript": { handler: postMeetingTranscript, kind: "mutation" },
-  // A repeating calendar entry becomes a real record four weeks ahead, and the
-  // instances beyond that come back read-only (9.7).
-  "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendarSeries, kind: "mutation" },
+  // The WORDS, and WHO WAS THERE — two reads the detail screen makes and no list
+  // ever does. Their own doors because of what each costs: a transcript is up to
+  // a megabyte, and resolving an invitation against the address book is two
+  // databases. See routes/meetings.ts for why neither belongs on the row.
+  "GET /api/content/meetings/transcript": { handler: getMeetingTranscript, kind: "read" },
+  "GET /api/content/meetings/people": { handler: getMeetingPeople, kind: "read" },
+  // The diary, brought into step BOTH WAYS: a repeating entry becomes a real
+  // record four weeks ahead (9.7), every entry in the window has its Google
+  // facts refreshed, and one cancelled in Google is called off here. The
+  // backward half is why a transcript that lands an hour after the call is found
+  // at all.
+  "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendar, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
@@ -469,6 +481,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // in ours would be the one write in the base with no audit block.
   "GET /api/content/google/drive/files": { handler: getGoogleDriveFiles, kind: "read" },
   "GET /api/content/google/drive/file": { handler: getGoogleDriveFile, kind: "read" },
+  // A PICTURE of a file, fetched with the caller's own token and never stored —
+  // Google's own preview link is authenticated and expires, so it cannot be put
+  // in a page. routes/google.ts says why this is a proxy rather than a copy.
+  "GET /api/content/google/drive/thumbnail": { handler: getGoogleDriveThumbnail, kind: "read" },
   "POST /api/content/google/drive/upload": { handler: postGoogleDriveUpload, kind: "mutation" },
   // WRITING is not just putting a file in. Rewriting one, making a folder to put
   // it in, filing a conversation as a document — and the bin, without which the
