@@ -127,7 +127,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
     },
     {
       id: "people",
-      label: t("People on it"),
+      label: t("Members on it"),
       value: formatCount(summary.peopleTotal) || "0",
       delta: "",
       trend: "flat" as const,

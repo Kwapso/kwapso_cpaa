@@ -133,10 +133,10 @@ export function ContactLinkDialog({
               rows.filter((r) => !exclude.has(r.value))
             )
           }
-          searchKey={pickerKey("people", teamId)}
+          searchKey={pickerKey("contacts", teamId)}
           placeholder={t("Choose a person")}
-          searchPlaceholder={t("Search people…")}
-          emptyText={t("No people found.")}
+          searchPlaceholder={t("Search contacts…")}
+          emptyText={t("No contacts found.")}
           disabled={busy}
         />
       </Field>

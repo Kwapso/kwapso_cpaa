@@ -145,7 +145,7 @@ export function StaffProfileDialog({
       {text("personalityType", "Personality type", "From whichever test you use. Myers-Briggs, DISC, Enneagram")}
       {prose("strengths", "What they are best at", "The work you would give them first.")}
       {prose("weaknesses", "What they find hard", "Written kindly, this is here to help people work together.")}
-      {text("roleModels", "Who they look up to", "People, or ways of working")}
+      {text("roleModels", "Who they look up to", "Someone, or a way of working")}
       {prose("about", "Anything else", "The rest of the picture.")}
       {/* THE PHOTO ITSELF. This field used to ask for "a link, or the URL of a
           file you uploaded" — with nowhere in the app to upload one, so the

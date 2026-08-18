@@ -42,7 +42,7 @@ import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { assignableMembers } from "@/lib/people"
+import { assignableMembers } from "@/lib/members"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
@@ -124,7 +124,7 @@ export function useStoryFormOptions(teamId: string) {
     // as its word (UI-RULEBOOK G2). The words above stay because a picker wants
     // words; a header band wants the glyph beside them.
     selectableValues: selectableQ.data,
-    // Our people only — a story is internal work (lib/people).
+    // Our people only — a story is internal work (lib/members).
     members: assignableMembers(membersQ.data),
     // WHO IS ON EACH APP (CHECKLIST 6.6). The staff set rides the app row, so
     // the picker narrows without a second read — and the DOOR enforces the same

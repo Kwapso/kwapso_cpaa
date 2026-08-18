@@ -67,7 +67,7 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
         <div className="min-w-0">
           <h1 className="text-2xl font-medium tracking-tight">{team.name}</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {t("Who we are: our material, our people, and the details that go on a contract.")}
+            {t("Who we are: our material, our team, and the details that go on a contract.")}
           </p>
         </div>
         {can("teams", "edit") && (

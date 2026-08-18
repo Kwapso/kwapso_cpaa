@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import type { TeamMember } from "@shared/types"
-import { assignableMembers } from "@/lib/people"
+import { assignableMembers } from "@/lib/members"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
@@ -116,7 +116,7 @@ const NOT_A_WORK_PICKER: Record<string, string> = {
 }
 
 describe("one seam decides it, and every picker uses that seam", () => {
-  it("no screen builds its own people list", () => {
+  it("no screen builds its own members list", () => {
     const files = sourceFiles([join(WEB, "components")], { extensions: [".tsx"], skipTests: true })
     expect(files.length, "the component walk found nothing — it has gone blind").toBeGreaterThan(40)
 
@@ -137,7 +137,7 @@ describe("one seam decides it, and every picker uses that seam", () => {
       })
     expect(
       offenders,
-      `these screens turn the members list into people to pick without going through lib/people — call assignableMembers(), or add a reasoned NOT_A_WORK_PICKER entry: ${offenders.join(", ")}`
+      `these screens turn the members list into members to pick without going through lib/members — call assignableMembers(), or add a reasoned NOT_A_WORK_PICKER entry: ${offenders.join(", ")}`
     ).toEqual([])
 
     // ROT CHECK: an exemption for a screen that no longer reads members is a
@@ -150,11 +150,11 @@ describe("one seam decides it, and every picker uses that seam", () => {
   it("the hook every app screen uses is the filtered one", () => {
     // The four app screens ask a hook rather than the raw cache. It lives beside
     // the filter so it cannot answer a different question from it.
-    const people = sourceFiles([join(WEB, "lib")], { extensions: [".ts"], skipTests: true }).find(
-      (f) => f.rel === "people.ts"
+    const members = sourceFiles([join(WEB, "lib")], { extensions: [".ts"], skipTests: true }).find(
+      (f) => f.rel === "members.ts"
     )
-    expect(people, "web/lib/people.ts is the seam and it is not there").toBeTruthy()
-    expect(stripComments(people?.source ?? "")).toContain("return assignableMembers(membersQ.data)")
+    expect(members, "web/lib/members.ts is the seam and it is not there").toBeTruthy()
+    expect(stripComments(members?.source ?? "")).toContain("return assignableMembers(membersQ.data)")
 
     const users = sourceFiles([join(WEB, "components")], { extensions: [".tsx"], skipTests: true }).filter(
       (f) => /useAssignableMembers\s*\(/.test(stripComments(f.source))

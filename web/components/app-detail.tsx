@@ -23,7 +23,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 import { Pencil, Power } from "lucide-react"
 
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
-import { useAssignableMembers } from "@/lib/people"
+import { useAssignableMembers } from "@/lib/members"
 import { ProcessFormDialog } from "@/components/process-form-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
@@ -283,7 +283,7 @@ export function AppDetailScreen({
     // under the audit block: "who do I ask about this?" is the question a person
     // opens an app record to answer.
     { label: t("Who is on it"), value: staffLine },
-    { label: t("Their people"), value: stakeholderLine },
+    { label: t("Their contacts"), value: stakeholderLine },
     { label: t("Address"), value: app.url || "—" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]

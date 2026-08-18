@@ -164,7 +164,7 @@ export function KnowledgeDetailScreen({
         item.visibility === "private"
           ? "Only you"
           : item.visibility === "app"
-            ? `Only the people on ${item.visibleToAppName ?? "one app"}`
+            ? `Only the members on ${item.visibleToAppName ?? "one app"}`
             : "Anyone who can read the knowledge base",
     },
     {

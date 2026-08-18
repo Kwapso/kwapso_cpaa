@@ -23,7 +23,7 @@ import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { triageKey } from "@/lib/live-resources"
 import type { TeamMember } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
-import { assignableMembers } from "@/lib/people"
+import { assignableMembers } from "@/lib/members"
 
 type Triage = Awaited<ReturnType<typeof contentApi.triage>>
 
@@ -33,7 +33,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
     tenancy.members().then((r) => r.members)
   )
   // Triage duty is OURS to be on — the one seam decides who can hold it
-  // (lib/people), so a client login never appears in this list.
+  // (lib/members), so a client login never appears in this list.
   const onDutyCandidates = assignableMembers(membersQ.data)
   const [picking, setPicking] = React.useState(false)
 

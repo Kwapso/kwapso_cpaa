@@ -79,7 +79,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
 
       <section>
         {/* R16: the door's exact server total, not the number of rows on screen. */}
-        <CollectionHeading label={t("People")} total={linksTotal} />
+        <CollectionHeading label={t("Contacts")} total={linksTotal} />
         {contacts.length === 0 ? (
           <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
             {t("Just you, for now.")}

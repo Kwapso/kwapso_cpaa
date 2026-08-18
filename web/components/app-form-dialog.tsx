@@ -112,7 +112,7 @@ const staffField = {
   ...defaultFieldConfig,
   label: "Who is on it",
   required: false,
-  hint: "Our people. Only they and an admin open this app's page.",
+  hint: "Our team. Only they and an admin open this app's page.",
 }
 const leadField = {
   ...defaultFieldConfig,
@@ -122,7 +122,7 @@ const leadField = {
 }
 const stakeholderField = {
   ...defaultFieldConfig,
-  label: "Their people",
+  label: "Their contacts",
   required: false,
   hint: "The client's own contacts for this system.",
 }
@@ -460,13 +460,13 @@ export function AppFormDialog({
               .map((m) => ({ value: m.id, label: m.name }))}
             emptyOption={{ value: NOBODY, label: t("Nobody yet") }}
             placeholder={t("Nobody yet")}
-            searchPlaceholder={t("Search people…")}
+            searchPlaceholder={t("Search members…")}
             emptyText={t("Nobody here matched.")}
             disabled={busy}
           />
         </Field>
       )}
-      {/* THEIR PEOPLE (8.5), from the client's own contacts. Absent entirely on
+      {/* THEIR CONTACTS (8.5), from the client's own contacts. Absent entirely on
           one of our own systems, which has no client to have contacts at. */}
       {clientId && (
         <Field config={stakeholderField} shape="group" htmlFor="app-stakeholders" className={fieldSpacing}>
@@ -511,7 +511,7 @@ export function AppFormDialog({
               .map((c) => ({ value: c.id, label: c.name }))}
             emptyOption={{ value: NOBODY, label: t("Not said") }}
             placeholder={t("Not said")}
-            searchPlaceholder={t("Search people…")}
+            searchPlaceholder={t("Search contacts…")}
             emptyText={t("Nobody here matched.")}
             disabled={busy}
           />

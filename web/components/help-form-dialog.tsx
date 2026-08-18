@@ -54,7 +54,7 @@ const accountField = {
   ...defaultFieldConfig,
   label: "Client",
   required: false,
-  hint: "The company this is for. Their people see it in their portal; leave it off for our own questions.",
+  hint: "The company this is for. Their contacts see it in their portal; leave it off for our own questions.",
 }
 // CHECKLIST 5.8 and 5.9. Neither is `required: true` on the FORM, and that is
 // deliberate rather than a shortcut: the agency's own housekeeping questions are
@@ -310,7 +310,7 @@ export function HelpFormDialog({
               }))}
             emptyOption={{ value: NONE, label: t("Not said") }}
             placeholder={t("Not said")}
-            searchPlaceholder={t("Search people…")}
+            searchPlaceholder={t("Search contacts…")}
             emptyText={t("Nobody here matched.")}
             disabled={busy}
           />

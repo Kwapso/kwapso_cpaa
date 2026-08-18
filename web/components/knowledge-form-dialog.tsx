@@ -52,7 +52,7 @@ const bodyField = { ...defaultFieldConfig, label: "What should the assistant kno
 const linkField = { ...defaultFieldConfig, label: "Link (optional)", required: false }
 const filedField = { ...defaultFieldConfig, label: "Filed under", required: false }
 const visibilityField = { ...defaultFieldConfig, label: "Who can use it", required: false }
-const appField = { ...defaultFieldConfig, label: "Which app's people", required: true }
+const appField = { ...defaultFieldConfig, label: "Which app's members", required: true }
 
 /** Radix Select can't hold an empty value, so "the agency's own" uses a sentinel. */
 const AGENCY = "__agency__"
@@ -245,7 +245,7 @@ export function KnowledgeFormDialog({
                 app, the door refuses any other, so a picker with nothing in it
                 would be an option that can only end in a refusal. */}
             {appOptions.length > 0 && (
-              <SelectItem value="app">{t("Only the people on one app")}</SelectItem>
+              <SelectItem value="app">{t("Only the members on one app")}</SelectItem>
             )}
             <SelectItem value="private">{t("Only me")}</SelectItem>
           </SelectContent>

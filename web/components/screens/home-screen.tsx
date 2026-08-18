@@ -66,7 +66,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
     { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: ListTodo, href: "/tasks" },
     { need: "work", title: t("Work logs"), desc: t("Time logged, and the timers running"), icon: Timer, href: "/time" },
     { need: "meetings", title: t("Meetings"), desc: t("The diary"), icon: CalendarClock, href: "/meetings" },
-    { need: "accounts", title: t("Accounts"), desc: t("The companies and people we work with"), icon: Building2, href: "/accounts" },
+    { need: "accounts", title: t("Accounts"), desc: t("The companies and contacts we work with"), icon: Building2, href: "/accounts" },
   ].filter((l) => can(l.need, "read"))
 
   const ADMIN = [

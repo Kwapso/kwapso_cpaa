@@ -13,7 +13,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { UserPlus } from "lucide-react"
 
 import type { HelpStakeholder } from "@shared/types"
-import type { PickablePerson } from "@/lib/people"
+import type { PickablePerson } from "@/lib/members"
 import { ApiFailure } from "@/lib/api"
 import { letterMark } from "@/lib/identity"
 import { useT } from "@shared/web/language"
@@ -35,7 +35,7 @@ export function HelpStakeholders({
 }: {
   stakeholders: HelpStakeholder[]
   /** Our own staff only — the caller narrows through the one people seam, so a
-   * client contact can never be offered here (web/lib/people.ts). */
+   * client contact can never be offered here (web/lib/members.ts). */
   members: PickablePerson[]
   canAdd: boolean
   onAdd: (userId: string) => Promise<void>
@@ -96,7 +96,7 @@ export function HelpStakeholders({
             onChange={setPicked}
             options={addable.map((m) => ({ value: m.id, label: m.name }))}
             placeholder={t("Pick someone to keep in the loop")}
-            searchPlaceholder={t("Search people…")}
+            searchPlaceholder={t("Search members…")}
             emptyText={t("Nobody here matched.")}
             disabled={busy}
             className="w-full sm:w-64"
@@ -106,7 +106,7 @@ export function HelpStakeholders({
       )}
 
       <p className="text-muted-foreground text-xs">
-        {t("You can add people, but no one is ever removed.")}
+        {t("You can add members, but no one is ever removed.")}
       </p>
     </div>
   )

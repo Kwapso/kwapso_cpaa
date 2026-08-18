@@ -226,7 +226,7 @@ export function TaskFormDialog({
           "task-assignee",
           values.assigneeId,
           "Nobody yet",
-          t("Search people…"),
+          t("Search members…"),
           members.map((m) => ({ id: m.id, label: m.name })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}

@@ -38,7 +38,7 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
-import { assignableMembers } from "@/lib/people"
+import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
@@ -359,7 +359,7 @@ export function HelpDetailScreen({
   // ordinary team member and used to be offered here, which would have put a
   // "you were mentioned" email in a client's inbox about our internal note —
   // and the portal has never offered mentions in the other direction, on
-  // purpose. The one seam decides (lib/people).
+  // purpose. The one seam decides (lib/members).
   const mentionableMembers: TicketMember[] = assignableMembers(membersQ.data).filter(
     (m) => m.id !== myUserId
   )
