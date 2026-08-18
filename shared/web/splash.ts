@@ -129,6 +129,39 @@ export const SPLASH_TOTAL_MS = SPLASH_MARK_MS
  * It picks the animation up at the spin-up instead. */
 export const MARK_INAPP_START_MS = Math.round((SCENES[0].played + SCENES[1].played) * 1000)
 
+/** HOW MUCH EXPOSURE A SCREEN GETS, and the one thing in this file that is a
+ * judgement about a DEVICE rather than about the composition.
+ *
+ * `[shortest viewport side below which this tier applies, shutter samples,
+ * swept sub-arcs]`, first match wins. The pool the animator allocates is
+ * `samples × 3 + sweeps × 3 + 1`, so the tiers are 31, 52 and 64 elements.
+ *
+ * WHY THE VIEWPORT AND NOT THE MARK'S OWN SIZE, which is what actually costs a
+ * rasteriser. Because they do not discriminate. `min(56vmin,320px)` renders the
+ * mark at 320px on an iPad AND on a laptop — measured, both engines — so an
+ * iPad and a laptop draw a pixel-identical picture and the only difference
+ * between them is the machine. A layout-derived tier therefore cannot separate
+ * the two, and the viewport's shortest side is the only signal in the room that
+ * can. It is a proxy, and it is named as one.
+ *
+ * The thresholds are chosen so that a phone (375) takes the first tier, an iPad
+ * takes the second in BOTH orientations (its short side is 768 either way), and
+ * a laptop (900 on a 1440×900) takes the authored composition untouched. 820
+ * rather than 800 because a 1366×768 laptop is rarer than an iPad and the
+ * middle tier costs it nothing anyone can see.
+ *
+ * WHY THE MIDDLE TIER CUTS ONLY THE SHUTTER. The stacked samples are the
+ * regime that runs while the mark is SLOW, where twelve near-identical copies
+ * of the same three arcs buy very little; the swept arcs are the regime that
+ * runs while it is fast, and thinning those is what makes a trail band. So the
+ * tablet loses four samples and no sweeps, and only the phone — which is also
+ * the only screen the composition does not fit on — gives up trail resolution. */
+export const DETAIL_TIERS = [
+  [600, 6, 4],
+  [820, 8, 9],
+  [1e9, 12, 9],
+] as const
+
 /* ------------------------------- the source ------------------------------- */
 
 /** What plays. `mark` is the built-in composition (no request of any kind);
@@ -416,6 +449,11 @@ function markLoopBody(): string {
     'return "M "+f(a0)+" A "+MIDR+" "+MIDR+" 0 "+(a1-a0>180?1:0)+" 1 "+f(a1)}' +
     'var PATH=[arc(PC[0][0],PC[0][1]),arc(PC[1][0],PC[1][1]),arc(PC[2][0],PC[2][1])];' +
     'var FULL=arc(0,180)+arc(180,359.999);' +
+    // Spliced for the same reason the score is: the alternative is two copies of
+    // the tiers, and one of them would be the one nobody edits.
+    'var DT=' +
+    JSON.stringify(DETAIL_TIERS) +
+    ';' +
     'var SC=' +
     JSON.stringify(SCENES.map((s) => [s.authored, s.played])) +
     ',PS=[],AS=[],ps=0,as=0,i;' +
@@ -467,35 +505,111 @@ function markLoopBody(): string {
     'var cast=svg.querySelector(".ks-cast");if(!cast)return noop;' +
     'try{if(W.matchMedia&&W.matchMedia("(prefers-reduced-motion: reduce)").matches)return noop}catch(_){}' +
     'var NS="http://www.w3.org/2000/svg",cr=[],sw=[],n,i,g=document.createElementNS(NS,"g");' +
+    // The tier, and the entry radius, resolved ONCE per run — never per frame.
+    // Both read layout, and a layout read inside the frame loop is the thing a
+    // loader must never do while the browser is parsing the bundle behind it.
+    'var SS=mn(W.innerWidth||1280,W.innerHeight||800),TI=DT[DT.length-1];' +
+    'for(n=0;n<DT.length;n++)if(SS<DT[n][0]){TI=DT[n];break}' +
+    'var NSA=TI[1],NSW=TI[2],d0=D0;' +
+    // THE PIECES ARRIVE FROM OFF-FRAME, NOT FROM OFF-PHONE. D0 is in viewBox
+    // units, so what it means on screen depends entirely on how big the box
+    // was drawn — and `min(56vmin,320px)` draws it at 210px on a 375px phone
+    // and 320px everywhere wider. Sampled with getBBox across the whole
+    // Coalesce, in both engines, the fly-in's ink reaches 456 CSS px on a phone
+    // whose screen is 375 — 72px off the left edge and 9px off the right at
+    // once — against 676px inside a 768px iPad and 691px inside a 1440 laptop.
+    // So on a phone, and only on a phone, the first beat happens partly off the
+    // screen. This pulls the farthest piece (the 1.14× eye) back to 92% of the
+    // half-width, with a floor that keeps it well outside the mark's own circle
+    // so it is still an arrival. It can only ever pull IN: on an iPad the limit
+    // works out at 1046 and on a laptop 1961, both above D0, so both are left
+    // at exactly the number the composition was authored with — measured
+    // afterwards at 673px and 690px, unchanged.
+    'try{var bw=svg.getBoundingClientRect().width/1080,vw=W.innerWidth||0;' +
+    'if(bw>0&&vw>0)d0=mn(D0,mx(560,vw*.46/(1.14*bw)))}catch(_){}' +
     'function mk(d){var e=document.createElementNS(NS,"path");if(d)e.setAttribute("d",d);' +
     'e.style.display="none";e.__k=false;g.appendChild(e);return e}' +
-    'for(n=0;n<12;n++)for(i=0;i<3;i++)cr.push(mk(PATH[i]));' +
-    'for(n=0;n<27;n++)sw.push(mk(""));' +
+    'for(n=0;n<NSA;n++)for(i=0;i<3;i++)cr.push(mk(PATH[i]));' +
+    'for(n=0;n<NSW*3;n++)sw.push(mk(""));' +
     'var rim=document.createElementNS(NS,"circle");rim.setAttribute("fill","none");' +
     'rim.setAttribute("stroke","var(--ks-mark)");rim.style.display="none";rim.__k=false;' +
-    'g.appendChild(rim);cast.textContent="";cast.appendChild(g);' +
-    'var amb=svg.querySelector(".ks-amb");' +
+    // TAKING THE CAST OVER IS SOMETHING THIS HAS TO BE ABLE TO DO TWICE.
+    //
+    // `SplashScreen` hands the mark to React through `dangerouslySetInnerHTML`,
+    // and React re-applies that on the first update after hydration even when
+    // the string has not changed. It replaces the whole <svg>, which throws
+    // away the pool this just installed AND detaches every node cached below —
+    // and it is measured, on the real export, on both front doors, at 286ms on
+    // a laptop and 348ms on a phone: the mark stopped a third of a second in
+    // and stood at the resting pose for the remaining three seconds. Every
+    // boot, on every device, since the animator was written. It is the same
+    // fault mark-loader.tsx documents at length, and the comment there — that
+    // the splash is not exposed to it because it is server-rendered and never
+    // re-renders — is the assumption that turned out to be false. Nothing
+    // errored, which is why nothing caught it.
+    //
+    // So the animator does not assume it owns the subtree: it re-acquires and
+    // re-installs whenever its own group has been detached. `isConnected===false`
+    // rather than `!isConnected`, so a browser that has never heard of the
+    // property re-installs never rather than every frame. The cost of the guard
+    // is one property read per frame; the cost of not having it is the whole
+    // animation. It is also the general answer — an extension, a second render,
+    // anything that re-writes this subtree loses one frame instead of all of them.
+    'var amb,room,halo,rimg,hair;' +
     'var qs=function(c){return amb?amb.querySelector(c):null};' +
-    'var room=qs(".ks-room"),halo=qs(".ks-halo"),rimg=qs(".ks-rim"),hair=qs(".ks-hair");' +
+    'function take(){var s=host.querySelector("svg");if(!s)return;' +
+    'var c=s.querySelector(".ks-cast");if(!c)return;' +
+    'c.textContent="";c.appendChild(g);amb=s.querySelector(".ks-amb");' +
+    'room=qs(".ks-room");halo=qs(".ks-halo");rimg=qs(".ks-rim");hair=qs(".ks-hair")}' +
+    'g.appendChild(rim);take();' +
     'var op=function(e,v){if(e)e.setAttribute("opacity",v.toFixed(4))};' +
     'var ctr=function(e,x,y){if(e){e.setAttribute("cx",(CTR+x).toFixed(2));' +
     'e.setAttribute("cy",(CTR+y).toFixed(2))}};' +
+    // THE SHUTTER IS THE FRAME, NOT A CONSTANT. This is the fix for what the
+    // owner actually saw, and it is worth being precise about the mechanism.
+    //
+    // The authored smear is a function of SPEED alone — `w*.042` — which is
+    // right only if the frames arrive at the rate it was tuned against. They do
+    // not. Through the spin-up the mark turns 43°–103° between two 60Hz frames
+    // while that formula draws at most 65° of blur, so even a perfect phone is
+    // already drawing a trail shorter than the gap it has to cover; at the ~30
+    // frames a second a phone actually gets while it is parsing 700KB of
+    // bundle, the step is 87°–258° against the same 32°–65°. A long-exposure
+    // ring whose exposures do not touch is not a ring, it is a strobe — which
+    // is exactly "glitching very badly", and exactly why it looks fine on a
+    // laptop that never drops a frame.
+    //
+    // So the exposure covers the angle actually travelled since the previous
+    // drawn frame. A dropped frame now produces a LONGER streak instead of a
+    // jump, which is what a real shutter does, and the piece degrades into
+    // itself rather than into a stutter. It also gets CHEAPER as it slows: a
+    // wider smear crosses `rmx` sooner, and past that the whole cast collapses
+    // to the one uniform rim circle.
+    //
+    // Only the unlocked share catches up. During the lock the visible angle is
+    // pinned to one frozen pose on purpose, so `w` is no longer what the eye
+    // sees turning and covering it would erase the strobe the composition is
+    // built around. `.35` authored seconds is the outer edge of a gap worth
+    // covering — beyond that the mark has not blurred, it has been away, and
+    // the honest thing is to re-expose from where it now is.
+    'var pT=-1;' +
     'function draw(T){var w=om(T),L=lock(T),ex=cl(exp(T),0,1),vb=vib(T);' +
+    'var dt=(pT>=0&&T>pT&&T-pT<.35)?T-pT:0;pT=T;' +
     'var vx=(si(T*58.3)*1.05+si(T*121.7+2)*.42)*vb,vy=(co(T*67.1+1)*1.05+si(T*103.3)*.38)*vb;' +
-    'var sm=(1-L)*mn(372,w*.042)+L*cl(4+w*.0035,4,19);' +
+    'var sm=mx((1-L)*mn(372,w*.042)+L*cl(4+w*.0035,4,19),(1-L)*mn(372,w*dt));' +
     'var rmx=cl((sm-62)/44,0,1),smx=cl((sm-14)/20,0,1),spx=smx*(1-rmx),cmx=1-smx;' +
     'var nc=0,ns=0,i,k,j,p,s,inv,d,sg,tu,A,sc,e;' +
-    'if(cmx>.002){var M=cl(Math.ceil(sm/3.2),1,12),st=sm>.2?sm/mx(w,40):0;' +
+    'if(cmx>.002){var M=cl(Math.ceil(sm/3.2),1,NSA),st=sm>.2?sm/mx(w,40):0;' +
     'var al=(1-pw(1-.985*ex,1/M))*cmx;' +
     'for(k=0;k<M;k++){var tk=T-(M>1?st*k/(M-1):0);A=ang(tk);sc=scl(tk);' +
     'for(i=0;i<3;i++){p=PC[i];s=seat(cl((tk-p[6])/(tSeat-p[6]),0,1));inv=1-s;' +
-    'd=D0*p[3]*inv+ct(tk)*s;sg=-SWIRL*p[5]*pw(inv,1.35);tu=-p[4]*inv;e=cr[nc++];' +
+    'd=d0*p[3]*inv+ct(tk)*s;sg=-SWIRL*p[5]*pw(inv,1.35);tu=-p[4]*inv;e=cr[nc++];' +
     'e.setAttribute("transform",xf(p[2],A,sg,tu,d,sc,vx,vy));op(e,al);sh(e,true)}}}' +
-    'if(spx>.002){A=ang(T);sc=scl(T);var a9=(1-pw(1-.9*ex,1/9))*spx;' +
+    'if(spx>.002){A=ang(T);sc=scl(T);var a9=(1-pw(1-.9*ex,1/NSW))*spx;' +
     'for(i=0;i<3;i++){p=PC[i];s=seat(cl((T-p[6])/(tSeat-p[6]),0,1));inv=1-s;' +
-    'd=D0*p[3]*inv+ct(T)*s;sg=-SWIRL*p[5]*pw(inv,1.35);tu=-p[4]*inv;' +
+    'd=d0*p[3]*inv+ct(T)*s;sg=-SWIRL*p[5]*pw(inv,1.35);tu=-p[4]*inv;' +
     'var t2=xf(p[2],A,sg,tu,d,sc,vx,vy),wd=p[1]-p[0];' +
-    'for(j=1;j<=9;j++){var s9=mn(359.9,wd+sm*j/9);e=sw[ns++];' +
+    'for(j=1;j<=NSW;j++){var s9=mn(359.9,wd+sm*j/NSW);e=sw[ns++];' +
     'e.setAttribute("d",s9>=359.4?FULL:arc(p[0],p[0]+s9));' +
     'e.setAttribute("transform",t2);op(e,a9);sh(e,true)}}}' +
     'for(k=nc;k<cr.length;k++)sh(cr[k],false);' +
@@ -503,13 +617,22 @@ function markLoopBody(): string {
     'if(rmx>.002){sc=scl(T);ctr(rim,vx,vy);rim.setAttribute("r",(MIDR*sc).toFixed(2));' +
     'rim.setAttribute("stroke-width",(BANDW*sc).toFixed(2));' +
     'op(rim,.82*ex*rmx);sh(rim,true)}else sh(rim,false);' +
-    'if(amb){s=seat(cl(T/tSeat,0,1));var nr=cl(1-(D0*.92*(1-s)+ct(T)*s)/140,0,1);' +
+    'if(amb){s=seat(cl(T/tSeat,0,1));var nr=cl(1-(d0*.92*(1-s)+ct(T)*s)/140,0,1);' +
     'op(room,ex);op(halo,(.1+cl(sm/260,0,1)*.34)*nr*ex);' +
     'ctr(rimg,vx,vy);op(rimg,cl(sm/120,0,1)*.16*nr*ex);' +
     'ctr(hair,vx,vy);op(hair,L*cl((w-2600)/3000,0,1)*.05*ex)}}' +
     'var t0=(o.at||0)/1000,live=1,id=0,' +
     'base=(W.performance&&performance.now?performance.now():Date.now());' +
     'function tick(now){if(!live)return;var el=(now-base)/1000+t0;' +
+    // Heal on the RESTING MARK, not merely on being detached — that narrowness
+    // is the whole safety of it. `.ks-rest` is in `splashInner` and in nothing
+    // else, so its presence says precisely "somebody re-applied the server
+    // markup", which is the one fault this repairs. A run that is detached
+    // because ANOTHER run took the host finds a pool instead, no `.ks-rest`,
+    // and quietly does nothing — where a bare "if detached, take it back" would
+    // have had the two of them tearing the cast apart every frame forever.
+    'if(g.isConnected===false){var c2=host.querySelector(".ks-cast");' +
+    'if(c2&&c2.querySelector(".ks-rest"))take()}' +
     'var pl=o.loop?el%PLAY:mn(el,PLAY);draw(warp(pl));' +
     'if(!o.loop&&el>=PLAY){live=0;return}id=W.requestAnimationFrame(tick)}' +
     'id=W.requestAnimationFrame(tick);' +

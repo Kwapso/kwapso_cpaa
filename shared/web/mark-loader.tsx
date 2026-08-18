@@ -40,6 +40,16 @@
 // re-apply, and it is one fewer dangerouslySetInnerHTML in a client component.
 // The cost is one frame of an empty box on mount, inside a container that is
 // already full height, so nothing moves.
+//
+// AND THE SPLASH WAS EXPOSED TO IT AFTER ALL. This note used to end by saying
+// the splash could not be caught by any of the above, being server-rendered and
+// never re-rendered. That was an assumption, and it was wrong: on the built app
+// React re-applied `#ks-splash`'s markup at 286ms on a laptop and 348ms on a
+// phone, throwing the animator's pool away and leaving a frozen logo for the
+// rest of the boot — every boot, on every device. The splash cannot render
+// empty the way this component does (it has to be painted by the parser, before
+// React exists), so it takes the other route: the animator notices its own
+// group has been detached and takes the cast back. See `take()` in splash.ts.
 
 import * as React from "react"
 
