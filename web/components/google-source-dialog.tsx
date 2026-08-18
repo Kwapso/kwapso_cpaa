@@ -435,8 +435,8 @@ export function GoogleSourceDialog({
           options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
           emptyOption={{ value: AGENCY, label: t("Ours, not a client's") }}
           placeholder={t("Ours, not a client's")}
-          searchPlaceholder={t("Search clients…")}
-          emptyText={t("No client matched.")}
+          searchPlaceholder={t("Search accounts…")}
+          emptyText={t("No account matched.")}
           disabled={busy}
         />
         <p className="text-muted-foreground mt-1.5 text-xs">

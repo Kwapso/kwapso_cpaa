@@ -639,7 +639,7 @@ export function AccountDetailScreen({
                 {canSeeApps && (
                   <div className="flex flex-col gap-2">
                     <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                      {t("Total impact")}
+                      {t("What this has been worth")}
                     </p>
                     <ValuePanel view={valueQ.data} />
                     {/* THE SAME HOURS, IN MONEY. Not a second calculation — it is

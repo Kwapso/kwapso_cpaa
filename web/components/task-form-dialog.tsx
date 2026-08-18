@@ -281,8 +281,8 @@ export function TaskFormDialog({
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             emptyOption={{ value: NONE, label: t("Which client is it for?") }}
             placeholder={t("Which client is it for?")}
-            searchPlaceholder={t("Search clients…")}
-            emptyText={t("No client matched.")}
+            searchPlaceholder={t("Search accounts…")}
+            emptyText={t("No account matched.")}
             disabled={busy}
           />
         </Field>

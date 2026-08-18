@@ -111,9 +111,9 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       primeCache(`role-perms:${roleId}`, fresh)
       serverRef.current = { roleId, value: fresh.value }
       setDraft(fresh.value)
-      toast.success(t("Permissions saved."))
+      toast.success(t("Access rights saved."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save permissions.")
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save access rights.")
     } finally {
       setSaving(false)
     }
@@ -163,7 +163,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "permissions", label: t("Permissions"), icon: "shield-check", badge: "", badgeVariant: "" as const },
+      { value: "permissions", label: t("Access rights"), icon: "shield-check", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",

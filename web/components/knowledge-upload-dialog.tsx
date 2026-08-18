@@ -254,8 +254,8 @@ export function KnowledgeUploadDialog({
           options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
           emptyOption={{ value: AGENCY, label: t("The agency's own") }}
           placeholder={t("The agency's own")}
-          searchPlaceholder={t("Search clients…")}
-          emptyText={t("No client matched.")}
+          searchPlaceholder={t("Search accounts…")}
+          emptyText={t("No account matched.")}
           disabled={busy}
         />
         <p className="text-muted-foreground mt-1 text-xs">

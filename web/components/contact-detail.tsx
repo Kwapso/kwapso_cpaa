@@ -283,7 +283,7 @@ export function ContactDetailScreen({
         ? [
             {
               value: "portal",
-              label: t("Portal login"),
+              label: t("Portal access"),
               icon: CONCEPT_ICON.portal,
               badge: formatCount(detail.portalUsersTotal),
               badgeVariant: "" as const,

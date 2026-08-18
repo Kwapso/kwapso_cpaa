@@ -175,11 +175,11 @@ export function TicketStagesCard({ teamId }: { teamId: string }) {
   const rows = tickets.byStage.map((s) => ({ label: t(HELP_STATUS[s.stage]), count: s.count }))
   const total = rows.reduce((n, r) => n + r.count, 0)
   return (
-    <BandCard title={t("Where the requests are sitting")}>
+    <BandCard title={t("Where the tickets are sitting")}>
       {total === 0 ? (
         <NothingYet
           what={t("Nothing is open right now.")}
-          how={t("Every request a client raises shows here while it is being worked on.")}
+          how={t("Every ticket a client raises shows here while it is being worked on.")}
         />
       ) : (
         <StageChart rows={rows} label={t("Tickets")} />

@@ -114,8 +114,8 @@ export function TodoFormDialog({
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
           placeholder={t("Pick the client")}
-          searchPlaceholder={t("Search clients…")}
-          emptyText={t("No client matched.")}
+          searchPlaceholder={t("Search accounts…")}
+          emptyText={t("No account matched.")}
           disabled={busy}
         />
       </Field>

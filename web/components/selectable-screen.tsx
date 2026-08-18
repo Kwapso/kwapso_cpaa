@@ -95,7 +95,7 @@ export function SelectableScreen({
       setEditingId(null)
       toast.success(t("Renamed."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't rename that option.")
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't rename that value.")
     }
   }
 
@@ -108,7 +108,7 @@ export function SelectableScreen({
       primeCache(`selectable:${teamId}`, list)
       toast.success(next ? `Activated "${v.value}".` : `Deactivated "${v.value}".`)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update that option.")
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update that value.")
     }
   }
 
@@ -141,7 +141,7 @@ export function SelectableScreen({
             )}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {t("The options behind your team's dropdowns. Ticket types, Learning categories and more. Pick a group, or start a new one.")}
+            {t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
           </p>
         </div>
         {/* Actions — New value / Import / Export. flex-wrap so the buttons never
@@ -210,7 +210,7 @@ export function SelectableScreen({
       {grouped.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {values.length === 0
-            ? "No options yet. Add your first above."
+            ? "No values yet. Add your first above."
             : "No values match your search or filter."}
         </p>
       ) : (

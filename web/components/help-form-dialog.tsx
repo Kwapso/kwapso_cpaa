@@ -276,8 +276,8 @@ export function HelpFormDialog({
             searchKey={pickerKey("companies", teamId)}
             emptyOption={{ value: NONE, label: t("Ours, no client") }}
             placeholder={t("Ours, no client")}
-            searchPlaceholder={t("Search clients…")}
-            emptyText={t("No client matched.")}
+            searchPlaceholder={t("Search companies…")}
+            emptyText={t("No company matched.")}
             disabled={busy}
           />
         )}

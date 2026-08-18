@@ -333,8 +333,8 @@ export function AppFormDialog({
           searchKey={pickerKey("companies", teamId)}
           options={accounts.map((a) => ({ value: a.id, label: a.name }))}
           placeholder={t("One of ours")}
-          searchPlaceholder={t("Search clients…")}
-          emptyText={t("No client matched.")}
+          searchPlaceholder={t("Search companies…")}
+          emptyText={t("No company matched.")}
           disabled={busy}
         />
       </Field>

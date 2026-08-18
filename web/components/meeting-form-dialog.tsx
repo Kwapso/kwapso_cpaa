@@ -200,8 +200,8 @@ export function MeetingFormDialog({
           options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
           emptyOption={{ value: NONE, label: t("Nobody, it is ours") }}
           placeholder={t("Nobody, it is ours")}
-          searchPlaceholder={t("Search clients…")}
-          emptyText={t("No client matched.")}
+          searchPlaceholder={t("Search accounts…")}
+          emptyText={t("No account matched.")}
           disabled={busy}
         />
       </Field>

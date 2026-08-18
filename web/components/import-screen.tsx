@@ -141,7 +141,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   if (!canImport)
     return (
       <p className="text-muted-foreground text-sm">
-        {t("There's nothing here you can import into yet. You can import once you're allowed to create Roles, Learning articles or Dropdown values.")}
+        {t("There's nothing here you can import into yet. You can import once you're allowed to create Accounts, Roles or Dropdown values.")}
       </p>
     )
 
