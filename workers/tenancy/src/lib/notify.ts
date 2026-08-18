@@ -10,22 +10,39 @@
 
 import { brand } from "@shared/brand"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
+import { type Audience, recordLink } from "@shared/workers/record-link"
 import type { Env } from "../env"
 
-/** A member's role was changed by someone else. */
+/** A member's role was changed by someone else.
+ *
+ * `member` is who it happened to and which front door they read us through — the
+ * caller has already asked, because it is the caller that holds the team database
+ * this answer lives in. A STAFF member gets a link to their own membership, which
+ * is the record this email is about; a CLIENT login gets none, and that is the
+ * point of carrying the audience at all. The portal has no members screen, so the
+ * only link that could exist for them is an agency URL, which is a door they may
+ * not pass and a door an email must never advertise (R21). */
 export async function notifyRoleChanged(
   env: Env,
   teamId: string,
   to: string,
   actorName: string,
-  roleTitle: string
+  roleTitle: string,
+  member: { userId: string; audience: Audience }
 ): Promise<void> {
   if (!to) return
   try {
     const name = await teamName(env, teamId)
+    const link = recordLink(env, member.audience, {
+      kind: "member",
+      teamId,
+      id: member.userId,
+    })
     await send(env, to, `Your role in ${name} changed`, {
       heading: `Your role in ${name} changed`,
       intro: `${actorName || "An admin"} changed your role in ${name} on ${brand.name} to ${roleTitle}.`,
+      ctaLabel: link?.label,
+      ctaUrl: link?.url,
       footnote: "If you weren't expecting this, reach out to a team admin.",
     })
   } catch (e) {

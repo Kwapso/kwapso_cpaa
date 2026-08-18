@@ -35,8 +35,14 @@ export type Env = {
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */
   CF_ACCOUNT_ID: string
-  /** The app's public origin — the only way an email's logo can be absolute. */
+  /** The AGENCY app's public origin — an email's logo, and the link back to a
+   * record for a STAFF recipient. */
   PUBLIC_APP_URL?: string
+  /** The CLIENT PORTAL's public origin. The other half of the same job: this
+   * worker's emails reach clients as well as staff, and the same ticket has a
+   * different address on each front door (R21 · R29). Unset means no button,
+   * never an agency link in a client's inbox. */
+  PUBLIC_PORTAL_URL?: string
 
   // Secrets (wrangler secret put):
   /** API token scoped to Account → D1 → Edit. Without it, team databases

@@ -8,6 +8,7 @@ import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { sendBrandedEmail } from "@shared/workers/notify"
+import { recordLink } from "@shared/workers/record-link"
 import type { Invite, InviteAudit } from "@shared/types"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
@@ -235,6 +236,13 @@ export async function createInvite(
   // back to the request origin only when PUBLIC_APP_URL is unset (human path).
   const base = env.PUBLIC_APP_URL || new URL(request.url).origin
 
+  // THE LINK BACK, through the one helper every email uses (R29). It resolves to
+  // the agency app deliberately: an invite is how a person joins the team at all,
+  // including the person who will later be given a portal login, and the portal
+  // has no invitations screen to send them to. `base` rides in as the agency
+  // origin so the human path keeps its request-origin fallback.
+  const link = recordLink({ PUBLIC_APP_URL: base }, "agency", { kind: "invite" })
+
   // The branded invite email, through the same sender every other worker uses, and
   // CAPTURING whether it actually went out. Best-effort: a mail failure must NOT fail
   // the invite (the invite_index row already routes the acceptance, and the invitee can
@@ -247,10 +255,12 @@ export async function createInvite(
     {
       heading: `You're invited to ${teamName}`,
       intro: `${actor.name || "Someone"} invited you to join ${teamName} on ${brand.name} as ${roles[0].title}. Sign in with this email address to accept.`,
+      // "Join <team>" reads better on an invite than the helper's generic label,
+      // and it is the one place the label is about the TEAM rather than the
+      // screen. The URL is still the helper's — the destination is the part a
+      // call site must not be trusted with.
       ctaLabel: `Join ${teamName}`,
-      // Deep-link to the in-app Invitations inbox: an already-signed-in user lands
-      // right on Accept; a new user is sent to sign in, then onboarding auto-joins.
-      ctaUrl: `${base}/invitations`,
+      ctaUrl: link?.url,
       footnote: "This invite expires in 7 days. If you weren't expecting it, you can ignore this email.",
     },
     base

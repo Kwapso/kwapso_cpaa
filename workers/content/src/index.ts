@@ -224,6 +224,7 @@ import {
 } from "./routes/google"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
+import { clientUserIds } from "@shared/workers/record-link"
 import { dutyFor, loggedNothingLastWeek, needsTriage } from "./lib/triage"
 import { d1ConfigFrom } from "@shared/workers/gating"
 import { CRON_TEAM_CAP } from "@shared/workers/limits"
@@ -697,12 +698,22 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
         teamMemberNames(env, team.id),
       ])
       const missingTime = isMonday ? await loggedNothingLastWeek(cfg, guard, now, members) : []
+      // NOTHING CLIENT-FACING — and "every recipient comes off the team's own
+      // membership" was NOT the same sentence. A client login is an ordinary team
+      // member holding an ordinary role (R21 says so in as many words), so
+      // `teamMemberNames` returns them too: on any morning nobody was named for
+      // triage, this fanned the agency's own backlog — how many requests are
+      // sitting unread, and for how long — out to every client contact with a
+      // login. §6's promise is enforced here rather than assumed, one read, on
+      // the same fail-closed rule the rest of the file uses.
+      const clients = await clientUserIds(cfg, team.database_id, members.map((m) => m.userId))
+      const staff = members.filter((m) => !clients.has(m.userId))
       // The person on duty, or — when nobody has been named — everybody, because
       // a backlog with no owner is worse than a slightly noisy morning, and the
       // mail's own footnote asks them to fix exactly that.
       const to = onDuty
-        ? members.filter((m) => m.userId === onDuty.userId)
-        : members
+        ? staff.filter((m) => m.userId === onDuty.userId)
+        : staff
       await sendTriageDigest(env, team.id, to, {
         waiting: waiting.total,
         oldestDays: waiting.waiting[0]?.days ?? 0,

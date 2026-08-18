@@ -232,6 +232,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "one-page-width",
     status: "enforced",
   },
+  {
+    id: "R30",
+    dimension: "workflow",
+    law: "EVERY EMAIL IS CLASSIFIED, AND ONE THAT NAMES A RECORD CARRIES THE WAY BACK TO IT. Every function in workers/ that composes a branded message (the `brandedEmail` / `sendBrandedEmail` seams — derived from the source, never hand-listed) must appear in EMAIL_CENSUS as either `record` (it is about a specific record: it passes `ctaUrl`, built through the one helper, shared/workers/record-link.ts) or `none` with a real reason (and then it must NOT pass `ctaUrl` — an email that names no destination may not promise one). Both directions: an unclassified send fails the build, and a census entry matching no send is an orphan and fails too. No email may spell an origin: the two front doors arrive as configuration, because THE RECIPIENT DECIDES WHICH APP THE LINK OPENS — staff read the agency app, a client contact reads the portal, and the same ticket therefore has two addresses. Sending a client an agency URL hands them a link they cannot open and advertises a door they may not pass (R21).",
+    why: "The mention email said, in prose, 'Open the ticket to read the full conversation and reply' — and contained no link of any kind. The copy instructed an action the message made impossible, and it had been doing so since the notification path was written, because nothing in the build could see the difference between an email that links and one that only talks about linking. Buttons alone would have fixed twelve emails and nothing else: the thirteenth, written next year, would ship the same way. So the deliverable is the CENSUS — the same shape as R27's vocabulary and R13's exemptions — and the buttons are what it forced. The classification is also where the front-door decision is recorded, which is why it is a law and not a lint: 'which hostname does this go to' is a security question wearing a formatting question's clothes.",
+    checkId: "linked-emails",
+    status: "enforced",
+  },
 ]
 
 /** R29 — the ONE page container per front door, and the width it is allowed to set.
@@ -1030,3 +1038,80 @@ export const FORM_DIALOGS = [
   // again.
   "legal-details-dialog",
 ] as const
+
+/** R29 — THE EMAIL CENSUS. Every message this product sends a person, and the one
+ * question the owner asked about each of them: does it refer to a specific record?
+ *
+ * Keyed `<repo-relative file>::<function>`, and the KEYS ARE DERIVED, not typed:
+ * `web/test/linked-emails.test.ts` finds every function in `workers/` that composes
+ * a branded message and demands a line here for each. Add an email, the build goes
+ * red until it is classified; delete one, the orphan entry goes red too.
+ *
+ * `refersToRecord: true` means the email is ABOUT something with a screen, so it
+ * carries a button to it — built through shared/workers/record-link.ts, which
+ * decides WHICH FRONT DOOR from the recipient. `link` names the destination for a
+ * reader; the check reads the code, never this sentence.
+ *
+ * `false` is a real answer and it is written down, because "this one didn't need a
+ * button" is exactly the sentence that gets said about the one that did. Four of
+ * the five refusals here are refusals ON PURPOSE: a link a person cannot open, or
+ * must not be taught to click, is worse than no link at all. */
+export type EmailClassification =
+  | { refersToRecord: true; link: string }
+  | { refersToRecord: false; why: string }
+
+export const EMAIL_CENSUS: Record<string, EmailClassification> = {
+  /* ── auth: identity. Nothing here names a record, and nothing here gets a link ── */
+  "workers/auth/src/lib/email.ts::sendLoginCode": {
+    refersToRecord: false,
+    why: "a six-digit code refers to the sign-in attempt in front of the person reading it and to nothing else — there is no record to open. It is also the one email that must NEVER carry a button: a sign-in mail with a link in it is the exact shape of the phishing mail people are told to watch for, and teaching our own users to click one is a security cost with no product gain.",
+  },
+  "workers/auth/src/lib/email.ts::sendEmailChangeCode": {
+    refersToRecord: false,
+    why: "the same code, for a different proof, sent TO AN ADDRESS NOBODY HAS CONFIRMED YET. It names no record; and until the code comes back, the recipient is a stranger who typed an address into a form, which is not somebody to send a link into the app to.",
+  },
+  "workers/auth/src/lib/email.ts::sendEmailChangedNotice": {
+    refersToRecord: false,
+    why: "a security notice to the OLD address, sent precisely because the person reading it may be the one who did NOT make the change. Their account is not a record with a screen, and a link into an app that address can no longer sign in to is a dead end — the action it asks for is to contact us, which is the one thing a button here could not do.",
+  },
+
+  /* ── tenancy: membership, invites, and the estate's own plumbing ── */
+  "workers/tenancy/src/lib/invites.ts::createInvite": {
+    refersToRecord: true,
+    link: "invite → the in-app Invitations inbox (agency; the portal has none, and an invite is how a portal login comes into being in the first place)",
+  },
+  "workers/tenancy/src/lib/notify.ts::notifyRoleChanged": {
+    refersToRecord: true,
+    link: "member → their own membership in the team, for a STAFF recipient. A client login gets no button: the portal has no members screen, so the only link that could exist for them is an agency URL",
+  },
+  "workers/tenancy/src/lib/notify.ts::notifyRemoved": {
+    refersToRecord: false,
+    why: "it names a membership that has just been deactivated. Every link this base could build points at a screen the team they were removed from no longer lets them open, so a button would be a promise the app itself refuses one click later. The mail already names the only thing they can act on: ask an admin.",
+  },
+  "workers/tenancy/src/lib/notify.ts::notifyInviteRevoked": {
+    refersToRecord: false,
+    why: "the invite it names has been withdrawn, so the Invitations inbox the invite email points at would show them nothing. 'No action is needed' is the whole message, and a button under it would suggest otherwise.",
+  },
+  "workers/tenancy/src/lib/sharding.ts::alertNewAlarms": {
+    refersToRecord: false,
+    why: "a database crossing 80% is an operational record with no screen on EITHER front door — it lives in the core database's db_growth table, which no app screen reads. Its real destination is the runbook, which the footnote names (OPERATIONS.md, Growth watch), and inventing an admin screen to have somewhere to point at would be building a product out of an email.",
+  },
+
+  /* ── content: the work itself, and the two emails a client ever receives ── */
+  "workers/content/src/lib/notify.ts::notifyReplyAndMentions": {
+    refersToRecord: true,
+    link: "ticket → the ticket that was replied to, at the RECIPIENT's own front door (one send reaches staff and clients at once)",
+  },
+  "workers/content/src/lib/notify.ts::notifyTodoRaised": {
+    refersToRecord: true,
+    link: "todo → the portal home, where to-dos sit ('Waiting on you'). The portal has no to-do detail screen and one is not invented here",
+  },
+  "workers/content/src/lib/notify.ts::sendTriageDigest": {
+    refersToRecord: true,
+    link: "ticketList → the team's Tickets list (agency). It is about many records, so it points at the list they are all in — and it is staff-only, which is what makes an agency URL the right one",
+  },
+  "workers/content/src/lib/notify.ts::notifyTicketResolved": {
+    refersToRecord: true,
+    link: "ticket → the answered ticket, in the client's portal",
+  },
+}

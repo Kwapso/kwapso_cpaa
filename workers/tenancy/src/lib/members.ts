@@ -12,6 +12,7 @@ import type { Env } from "../env"
 import { listPortalUsers } from "./accounts"
 import { GuardError, type MemberGuard } from "./permissions"
 import { notifyRemoved, notifyRoleChanged } from "./notify"
+import { audienceOf, clientUserIds } from "@shared/workers/record-link"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 
 type RoleRow = {
@@ -257,8 +258,16 @@ export async function changeMemberRole(
     relatedRowId: targetUserId,
   })
 
-  // Tell the member — they didn't make this change but it affects them.
-  await notifyRoleChanged(env, guard.teamId, t.email, actor.name, roles[0].title)
+  // Tell the member — they didn't make this change but it affects them. WHICH
+  // FRONT DOOR they read us through decides whether the mail can carry a link
+  // back to their membership at all: a client login is an ordinary team member
+  // holding an ordinary role, so this path reaches both kinds of person, and the
+  // portal has no members screen to send one of them to.
+  const clients = await clientUserIds(cfg, guard.databaseId, [targetUserId])
+  await notifyRoleChanged(env, guard.teamId, t.email, actor.name, roles[0].title, {
+    userId: targetUserId,
+    audience: audienceOf(clients, targetUserId),
+  })
 }
 
 /** Remove a member = deactivate the membership (reversible; never hard-delete).
