@@ -1614,6 +1614,31 @@ export type GoogleSource = {
   editorName: string | null
 }
 
+/** ONE DRIVE FILE, AS A SCREEN SEES IT — the metadata that makes a list of
+ * documents look like documents rather than like a list of strings.
+ *
+ * `iconUrl` is Google's own small type icon (the Docs blue, the Sheets green): a
+ * static, unauthenticated, cacheable link, so it goes straight into a page.
+ * `hasThumbnail` is the opposite kind of fact and is deliberately a boolean —
+ * Google's preview link is authenticated and expires, so the ADDRESS never
+ * leaves the worker and a screen asks our own door for the bytes instead
+ * (`googleDriveThumbnailUrl`). */
+export type DriveFileRow = {
+  id: string
+  name: string
+  mimeType: string
+  modifiedTime: string | null
+  webViewLink: string | null
+  /** which named folder it came out of, or "" when the FILE itself was named. */
+  folderId: string
+  iconUrl: string | null
+  hasThumbnail: boolean
+  ownerName: string
+  /** bytes, when Google states one. A Google Doc has no size in the ordinary
+   * sense, so this is null more often than not. */
+  sizeBytes: number | null
+}
+
 /** One thing read out of Google, in the shape the retrieval lane wants it. See
  * workers/content/src/lib/google-read.ts for where that lane plugs in. */
 export type GoogleItem = {

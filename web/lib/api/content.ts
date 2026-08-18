@@ -13,10 +13,12 @@
 
 import type {
   BrandAsset,
+  DriveFileRow,
   GoogleConnection,
   GoogleService,
   GoogleShelf,
   GoogleSource,
+  GoogleSourceKind,
   HelpAttachment,
   HelpMessage,
   HelpStakeholder,
@@ -31,6 +33,7 @@ import type {
   Todo,
   WorkLog,
   Meeting,
+  MeetingPersonLink,
   MeetingPurpose,
   StaffCertificate,
   StaffProfile,
@@ -600,13 +603,39 @@ export const content = {
         accountId ? `&accountId=${enc(accountId)}` : ""
       }${appId ? `&appId=${enc(appId)}` : ""}${cursor ? `&cursor=${enc(cursor)}` : ""}`
     ),
-  /** BRING IN THE REPEATING CALENDAR ENTRIES (9.7). The next four weeks become
-   * real records; `ahead` is the instances beyond that, read-only. */
-  syncCalendarSeries: () =>
-    api<{ created: number; ahead: { eventId: string; title: string; startsAt: string; url: string | null }[] }>(
-      "/api/content/meetings/sync-calendar",
-      post({})
-    ),
+  /** BRING THE CALENDAR AND THE DIARY INTO STEP, BOTH WAYS (9.7, and the owner's
+   * "it should also update consistently if it's a past event").
+   *
+   * Three counts, because the sweep does three things over a window that reaches
+   * a fortnight back and four weeks on: repeating entries with no record become
+   * one (`created`), every meeting in the window has its Google facts refreshed
+   * (`updated`), and one called off in Google is cancelled here (`cancelled`).
+   * `ahead` is the instances beyond the horizon, read-only. */
+  syncCalendar: () =>
+    api<{
+      created: number
+      updated: number
+      cancelled: number
+      ahead: { eventId: string; title: string; startsAt: string; url: string | null }[]
+    }>("/api/content/meetings/sync-calendar", post({})),
+  /** WHAT WAS SAID, in full — read off the meeting row rather than from Google,
+   * so any colleague who may read meetings can read it. Its own call because of
+   * its size: a page of the diary is fifty meetings and a transcript is up to a
+   * megabyte. */
+  meetingTranscript: (id: string) =>
+    api<{
+      text: string
+      /** present only when the transcript was longer than one row may hold. */
+      note: string | null
+      url: string | null
+      foundBy: string | null
+      capturedAt: string | null
+    }>(`/api/content/meetings/transcript?id=${enc(id)}`),
+  /** WHICH OF THE PEOPLE ON THE INVITATION WE KNOW — a colleague, or a contact on
+   * one of our accounts. A read rather than a column, because a contact added
+   * next week should light up on a meeting held last week. */
+  meetingPeople: (id: string) =>
+    api<{ links: MeetingPersonLink[] }>(`/api/content/meetings/people?id=${enc(id)}`),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),
   createMeeting: (input: {
@@ -726,28 +755,57 @@ export const content = {
       sources: GoogleSource[]
     }>("/api/content/google/disconnect", post({ service })),
 
-  /** What could I name? Folders (Drive) or spaces (Chat) this person can see. */
-  googlePick: (service: "drive" | "chat", q?: string) =>
-    api<{ options: { externalId: string; name: string }[] }>(
-      `/api/content/google/pick?service=${enc(service)}${q ? `&q=${enc(q)}` : ""}`
+  /** What could I name? Folders or FILES (Drive), or spaces (Chat), this person
+   * can see. `named` false on a Chat option means the label is one WE wrote from
+   * the space's type — Google leaves the name of a direct message empty — so the
+   * picker can say so rather than presenting our sentence as Google's. */
+  googlePick: (service: "drive" | "chat", q?: string, kind?: "folder" | "file") =>
+    api<{
+      options: {
+        externalId: string
+        name: string
+        named: boolean
+        iconUrl: string | null
+        mimeType: string
+        /** whether Google can render a picture of it — the FACT, not the link
+         * (that one is authenticated and expires). Ask
+         * `googleDriveThumbnailUrl` for the picture itself. */
+        hasThumbnail: boolean
+      }[]
+    }>(
+      `/api/content/google/pick?service=${enc(service)}${kind ? `&kind=${enc(kind)}` : ""}${
+        q ? `&q=${enc(q)}` : ""
+      }`
     ),
-  /** Share one — and say, in the same call, who may read it AND whose material
-   * it is. Both questions are about where the contents end up, and neither can
-   * be read back off the contents afterwards. */
-  googleAddSource: (input: {
+  /** Share SEVERAL — and say, in the same call, who may read them AND whose
+   * material they are. Both questions are about where the contents end up,
+   * neither can be read back off the contents afterwards, and both are the same
+   * answer for every item in one act of sharing, which is why the list is in the
+   * call rather than the call being made once per item. */
+  googleAddSources: (input: {
     service: "drive" | "chat"
-    externalId: string
-    name: string
+    items: { externalId: string; name: string; kind: GoogleSourceKind }[]
     shelf: GoogleShelf
     accountId?: string | null
-  }) => api<{ sources: GoogleSource[] }>("/api/content/google/sources", post(input)),
+  }) => api<{ sources: GoogleSource[]; shared: number }>("/api/content/google/sources", post(input)),
   googleSetSourceActive: (id: string, active: boolean) =>
     api<{ sources: GoogleSource[] }>("/api/content/google/sources/active", post({ id, active })),
 
+  /** Files in the folders I named PLUS the files I named one by one. Each row
+   * carries Google's own icon for its type — an unauthenticated static link,
+   * which is why it can go straight into a page where `thumbnailUrl` cannot
+   * (that one needs `googleDriveThumbnailUrl` below). */
   googleDriveFiles: (q?: string) =>
-    api<{ files: { id: string; name: string; webViewLink: string | null; folderId: string }[] }>(
-      `/api/content/google/drive/files${q ? `?q=${enc(q)}` : ""}`
-    ),
+    api<{ files: DriveFileRow[] }>(`/api/content/google/drive/files${q ? `?q=${enc(q)}` : ""}`),
+  /** THE ADDRESS OF A PREVIEW, not the preview — a src for an `<img>`.
+   *
+   * Google's own `thumbnailLink` is authenticated and expires within hours, so
+   * it cannot be put in a page; this points at our own door, which fetches the
+   * picture with the caller's token and never stores it. A plain string rather
+   * than a fetch because that is what an `<img src>` wants, and because the
+   * browser's own cache is then the thing that stops a list asking twice. */
+  googleDriveThumbnailUrl: (fileId: string) =>
+    `/api/content/google/drive/thumbnail?fileId=${enc(fileId)}`,
   googleMail: (q?: string) =>
     api<{ messages: MailSummary[]; contactsUsed: number; note?: string }>(
       `/api/content/google/gmail/messages${q ? `?q=${enc(q)}` : ""}`

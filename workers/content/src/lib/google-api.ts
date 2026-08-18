@@ -113,15 +113,20 @@ export type DriveFile = {
    * straight into a page. (The thumbnail below is the opposite, and the note on
    * it says why.) */
   iconUrl: string | null
-  /** A PICTURE OF THE FIRST PAGE — and an AUTHENTICATED, EXPIRING url.
+  /** IS THERE A PICTURE OF THE FIRST PAGE — and deliberately not the link to it.
    *
-   * It is carried for completeness and MUST NOT be put in an `<img src>` on the
-   * client: it needs the caller's bearer token, which a browser will not send to
-   * `lh3.googleusercontent.com`, and the link Google mints rots within hours.
-   * A page that hotlinks it shows a broken image to everyone who is not the
-   * person who happened to fetch it. See `driveThumbnail` below for the door
-   * that actually serves one. */
-  thumbnailUrl: string | null
+   * Google's own `thumbnailLink` is an AUTHENTICATED url on
+   * `googleusercontent.com` that expires within hours. It cannot be put in an
+   * `<img src>`: a browser will not send our bearer token to Google's image
+   * host, so the page shows a broken image to everybody, and the link rots
+   * anyway. Carrying it to the client would be shipping a footgun with a
+   * plausible name on it — the first reader to try it would write the bug.
+   *
+   * So the fact travels and the address does not. A screen learns whether a
+   * preview EXISTS, and asks our own door for the bytes when it wants one
+   * (`driveThumbnail` below, and the note there says why it is a proxy rather
+   * than a copy in R2). */
+  hasThumbnail: boolean
   /** whose file it is, in Google's terms — the first owner's name, or "". */
   ownerName: string
   /** bytes, when Google states one. A Google Doc has no size (it is not a file
@@ -149,7 +154,7 @@ function toDriveFile(raw: unknown, folderId: string): DriveFile {
     webViewLink: str(f.webViewLink) || null,
     folderId,
     iconUrl: str(f.iconLink) || null,
-    thumbnailUrl: str(f.thumbnailLink) || null,
+    hasThumbnail: Boolean(str(f.thumbnailLink)),
     ownerName: str((owners[0] as Record<string, unknown> | undefined)?.displayName),
     sizeBytes: Number.isFinite(size) && size > 0 ? size : null,
   }
@@ -1288,7 +1293,11 @@ function toEvent(raw: unknown): CalendarEvent {
           name: str(a.displayName),
           response: str(a.responseStatus),
           organizer: a.organizer === true,
-          optional: a.optional === true,
+          // `optional` is the Events resource's own field name; `optionalAttendee`
+          // is what at least one Google client library projects it as. Reading
+          // both costs one `||` and removes a whole class of "the badge never
+          // shows" that nothing would report as an error.
+          optional: a.optional === true || a.optionalAttendee === true,
           resource: a.resource === true,
         }
       })
@@ -1300,7 +1309,15 @@ function toEvent(raw: unknown): CalendarEvent {
       .map((raw2) => {
         const a = raw2 as Record<string, unknown>
         return {
-          fileId: str(a.fileId),
+          // THE ID, OR THE ID OUT OF THE LINK — and the fallback is not defensive
+          // programming, it is the observed shape. Reading a real account's
+          // entries on 2026-08-18, every Meet artifact ("Notes by Gemini") came
+          // back with a `fileUrl` pointing at `docs.google.com/document/d/<id>`
+          // and NO `fileId` beside it. A transcript hunt that insisted on the
+          // field would have found nothing on the exact events it was written
+          // for, and would have failed silently — there is no error in "this
+          // event has no attachments we can use".
+          fileId: str(a.fileId) || documentIdInText(str(a.fileUrl)) || "",
           title: str(a.title),
           mimeType: str(a.mimeType),
           iconUrl: str(a.iconLink) || null,

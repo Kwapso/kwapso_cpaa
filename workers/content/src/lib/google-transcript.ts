@@ -26,10 +26,21 @@
 //      Good, and it is a MATCH rather than a fact — two calls called "Weekly"
 //      produce two documents called "Weekly - Transcript". The Meet code is the
 //      tiebreaker and is why it is tried second rather than not at all.
+//
+//      IT IS ALSO THE LEAST RELIABLE OF THE THREE, and that was learned by
+//      looking rather than guessed. Reading a real account on 2026-08-18, five
+//      "Notes by Gemini" documents sat under FIVE DIFFERENT parent folders —
+//      Meet does not file them all in one place, so "share the folder your
+//      transcripts land in" is advice with no single folder to follow. This
+//      route works when somebody has shared the right folder and is silent when
+//      they have not, which is precisely why it is not the only one.
 //   3. GOOGLE'S OWN NOTICE IN THE MAIL. Last, because it is the most indirect:
 //      a robot wrote to say a document exists, and we read the document id out of
 //      its body. Narrowly fenced (`googleNoticeQuery`) and narrowed again by the
-//      meeting's own words.
+//      meeting's own words. Confirmed against real mail on 2026-08-18: a share
+//      notice from `drive-shares-dm-noreply@google.com` carries the document as
+//      a plain `https://docs.google.com/document/d/<id>/edit?usp=sharing` line in
+//      its body, and its subject carries the meeting's own title.
 //
 // EVERY ROUTE STOPS AT THE FIRST HIT and says which route found it. A person
 // asking "how do you know that is the transcript of this call" gets a different

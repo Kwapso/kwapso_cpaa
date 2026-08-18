@@ -273,6 +273,7 @@ export async function getGooglePick(request: Request, env: Env): Promise<Respons
           named: s.named,
           iconUrl: null,
           mimeType: "",
+          hasThumbnail: false,
         }))
       : (kind === "file" ? await driveFilesPick(token, q) : await driveFolders(token, q)).map((f) => ({
           externalId: f.id,
@@ -280,6 +281,12 @@ export async function getGooglePick(request: Request, env: Env): Promise<Respons
           named: true,
           iconUrl: f.iconUrl,
           mimeType: f.mimeType,
+          // WHETHER THERE IS A PREVIEW — the fact, never Google's own link to
+          // one, which is authenticated and expires (see `DriveFile`). A picker
+          // that knows this can show a picture of the contract somebody is about
+          // to share, which is the difference between picking the right file and
+          // picking the one with the right name.
+          hasThumbnail: f.hasThumbnail,
         }))
   return json({ options })
 }

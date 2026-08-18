@@ -38,6 +38,7 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
+import { GoogleSyncButton } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
@@ -47,6 +48,8 @@ import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
 import { field, withDataDrivenCollection } from "@/lib/screens"
+import { usePermissions } from "@/lib/perms"
+import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
@@ -135,17 +138,37 @@ export function MeetingsScreen({
   // called off in Google before it happens.
   const [syncing, setSyncing] = React.useState(false)
   const [ahead, setAhead] = React.useState<{ eventId: string; title: string; startsAt: string }[]>([])
+  const { can } = usePermissions(teamId)
+
+  // FRESHNESS ON ARRIVAL (the owner's "a way to sync more often to make it feel
+  // instantaneous"). The shell already does this once when the app opens; a
+  // person who walks here two hours later was reading a two-hour-old answer on a
+  // screen that looks live. The hook's own header explains why calling it from a
+  // dozen screens is cheap: the five-minute floor is the DOOR's, so an extra
+  // mount is a round trip answered out of the last sweep, never an extra call to
+  // Google.
+  useGoogleCatchUp(teamId, can)
 
   async function bringInSeries() {
     setSyncing(true)
     try {
-      const r = await contentApi.syncCalendarSeries()
+      const r = await contentApi.syncCalendar()
       setAhead(r.ahead)
       invalidate(meetingsKey(teamId))
+      const moved = r.created + r.updated + r.cancelled
       toast.success(
-        r.created > 0
-          ? `${r.created} repeating ${r.created === 1 ? "meeting is" : "meetings are"} in the diary.`
-          : "Nothing new to bring in."
+        moved === 0
+          ? "Nothing new to bring in."
+          : // ALL THREE VERBS, because the sweep now does three things and a
+            // sentence naming only the new records would leave somebody
+            // wondering why a meeting they know changed said nothing happened.
+            [
+              r.created ? `${r.created} new` : "",
+              r.updated ? `${r.updated} brought up to date` : "",
+              r.cancelled ? `${r.cancelled} called off` : "",
+            ]
+              .filter(Boolean)
+              .join(", ") + " in the diary."
       )
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your calendar.")
@@ -290,22 +313,31 @@ export function MeetingsScreen({
         }}
       </PagedFind>
 
-      {/* THE REPEATING ENTRIES (9.7). A button rather than something that happens
-          on every page load: it reads a person's own Google calendar with their
-          own token, and a read that costs somebody else's quota should be one
-          they asked for. */}
+      {/* THE CALENDAR, BOTH WAYS (9.7 and the owner's "it should also update
+          consistently if it's a past event"). Still a button as well as an
+          automatic pass: it reads a person's own Google calendar with their own
+          token, and somebody who has just moved a meeting in Google wants to
+          press something and see it. `ahead` is why this one is here rather than
+          the shared control alone — the instances beyond the horizon come back
+          in its answer and are shown underneath. */}
       {canCreate && (
         <div className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={syncing}
-            onClick={() => void bringInSeries()}
-            className="w-fit gap-1.5"
-          >
-            {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
-            {t("Bring in repeating meetings")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={syncing}
+              onClick={() => void bringInSeries()}
+              className="w-fit gap-1.5"
+            >
+              {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
+                {t("Bring in the calendar")}
+            </Button>
+            {/* And the material half, so the assistant can answer from what is in
+                these meetings — the same control that is now on every screen
+                showing Google material. */}
+            <GoogleSyncButton teamId={teamId} scope="knowledge" />
+          </div>
           {ahead.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {/* READ-ONLY, AND SAID SO. These are not records: they become one
