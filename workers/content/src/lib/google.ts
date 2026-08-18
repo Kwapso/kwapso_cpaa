@@ -29,6 +29,7 @@ import {
   type GoogleNamedService,
   type GoogleService,
   type GoogleShelf,
+  type GoogleSourceKind,
   type GoogleSource,
 } from "@shared/types"
 import { openToken, sealToken, type TokenKeyEnv } from "./google-crypto"
@@ -156,6 +157,7 @@ type SourceRow = {
   external_id: string
   name: string
   shelf: string
+  kind: string
   account_id: string | null
   account_name: string | null
   deactivated_at: string | null
@@ -165,7 +167,7 @@ type SourceRow = {
   editor_name: string | null
 }
 
-const SOURCE_COLUMNS = `id, connection_id, user_id, service, external_id, name, shelf, account_id,
+const SOURCE_COLUMNS = `id, connection_id, user_id, service, external_id, name, shelf, kind, account_id,
                         (SELECT a.name FROM accounts a WHERE a.id = google_sources.account_id) AS account_name,
                         deactivated_at, created_at, creator_name, updated_at, editor_name`
 
@@ -178,6 +180,12 @@ function toSource(r: SourceRow): GoogleSource {
     externalId: r.external_id,
     name: r.name,
     shelf: r.shelf as GoogleShelf,
+    // WHAT WAS SHARED, not merely which service it came from. A Drive row is now
+    // a folder OR a single file, and the two behave differently everywhere they
+    // are read — one is a place to look inside, the other is the thing itself.
+    // Anything unrecognised reads as a folder, which is what every row was
+    // before 0035 and is the only value that cannot surprise an old reader.
+    kind: r.kind === "file" ? "file" : r.kind === "space" ? "space" : "folder",
     accountId: r.account_id,
     accountName: r.account_name,
     active: r.deactivated_at === null,
@@ -364,6 +372,8 @@ export async function addNamedSource(
     externalId: string
     name: string
     shelf: GoogleShelf
+    /** a Drive FOLDER or a single Drive FILE; a Chat share is always a space. */
+    kind: GoogleSourceKind
     /** which client this folder or space is about — null for the agency's own.
      * It is the COMPARTMENT everything inside it is filed under when the
      * knowledge base reads it, which is why the screen asks for it here rather
@@ -418,14 +428,14 @@ export async function addNamedSource(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id,
+    `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, kind, account_id,
         created_at, creator_id, creator_email, creator_name)
      VALUES (${sqlString(id)}, ${sqlString(connection.id)}, ${sqlString(guard.userId)}, ${sqlString(input.service)},
-        ${sqlString(input.externalId)}, ${sqlString(input.name)}, ${sqlString(input.shelf)}, ${sqlString(input.accountId ?? null)},
+        ${sqlString(input.externalId)}, ${sqlString(input.name)}, ${sqlString(input.shelf)}, ${sqlString(input.kind)}, ${sqlString(input.accountId ?? null)},
         ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
-    type: input.service === "drive" ? "Drive folder shared" : "Chat space shared",
+    type: input.kind === "file" ? "Drive file shared" : input.kind === "space" ? "Chat space shared" : "Drive folder shared",
     // The shelf is IN the history sentence, not just in the row. "Who could read
     // this?" is the question somebody asks six months later, and an activity feed
     // that only says "shared" cannot answer it.

@@ -111,6 +111,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "shares a Drive folder or a Chat space, and in the same call decides WHO MAY READ IT — just this person, or the whole team. That is the decision the module is built around, asked in words at the moment of sharing, and it is not one an assistant should be able to make on somebody's behalf: an assistant that can widen what it is allowed to see is not fenced by anything.",
   "POST /api/content/google/sources/active":
     "stops sharing a folder or space, or shares it again. The same decision as the door above, in reverse, and out of the assistant's hands for the same reason — re-sharing something a person deliberately withdrew is exactly the act nobody should be able to delegate by accident.",
+  "GET /api/content/google/drive/thumbnail":
+    "answers with an IMAGE, not with data. It exists so a page can put a picture of a Drive file on the screen — Google's own preview link is authenticated and expires within hours, so it cannot be handed to a browser directly — and the bytes it returns are the whole response. A tool on it would hand a model a JPEG it cannot read, about a file it can already list, name, open and read the text of through `list_drive_files` and `read_drive_file`. The capability a machine wants here is the file, and it already has it.",
 
 
   "POST /api/content/brand-assets/upload-stream":

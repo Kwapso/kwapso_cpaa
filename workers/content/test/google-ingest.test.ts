@@ -110,7 +110,14 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         start: "2026-08-05T09:00:00.000Z",
         end: "2026-08-05T10:00:00.000Z",
         url: "https://calendar.example/EVENT_1",
-        attendees: ["luis@bergman.example", "me@kwapso.app"],
+        // A guest is an OBJECT now, not an address: an invitation says who was
+        // asked AND what they answered, and the compartment still comes off the
+        // address exactly as it did (lib/google-api.ts EventGuest says why one
+        // field carrying both beats two fields that can disagree).
+        attendees: [
+          { email: "luis@bergman.example", name: "Luis", response: "accepted", organizer: false, optional: false, resource: false },
+          { email: "me@kwapso.app", name: "Me", response: "accepted", organizer: true, optional: false, resource: false },
+        ],
       },
     ],
     chatMessages: async () => [

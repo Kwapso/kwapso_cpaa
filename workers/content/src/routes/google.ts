@@ -70,8 +70,11 @@ import {
   chatSpaces,
   driveCreateFolder,
   driveFileText,
+  driveFilesById,
+  driveFilesPick,
   driveFolders,
   driveList,
+  driveThumbnail,
   driveTrash,
   driveUpdate,
   driveUpload,
@@ -88,6 +91,7 @@ import {
   knownContactQuery,
 } from "../lib/google-api"
 import { knownContactEmails } from "../lib/google-read"
+import { findTranscript, transcriptText } from "../lib/google-transcript"
 import { claimCalendarEvent, getMeeting } from "../lib/meetings"
 import { getSprint } from "../lib/stories"
 import type { Env } from "../env"
@@ -238,54 +242,133 @@ export async function postGoogleDisconnect(request: Request, env: Env): Promise<
 
 // ── what a connection shares ─────────────────────────────────────────────────
 
-/** GET /api/content/google/pick?service=drive&q= — the folders or spaces this
- * person could name. A read, and the only way to learn an id worth naming:
- * everything it returns is something the CALLER's own account can already see. */
+/** GET /api/content/google/pick?service=drive&kind=file&q= — the folders, files
+ * or spaces this person could name. A read, and the only way to learn an id
+ * worth naming: everything it returns is something the CALLER's own account can
+ * already see.
+ *
+ * `kind` is what the owner's question added — "In Drive, why is it that it's
+ * only folder-wise?" — so Drive now has two pickers behind one door, because
+ * they answer the same question about two shapes of the same thing. Absent, or
+ * anything but `file`, means folders: the old behaviour is what a caller who
+ * does not know about the new one gets.
+ *
+ * Every option carries its ICON and its type, because a list of Drive files
+ * whose names all end in the same three words is a list nobody can pick from. */
 export async function getGooglePick(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "create")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   const service = asNamedService(queryText(url.searchParams.get("service"), "Service"))
   const q = queryText(url.searchParams.get("q"), "Search", TEXT_LIMITS.short)
+  const kind = queryText(url.searchParams.get("kind"), "Kind", TEXT_LIMITS.short)
   const { token } = await accessTokenFor(env, cfg, guard, service)
   const options =
-    service === "drive"
-      ? (await driveFolders(token, q)).map((f) => ({ externalId: f.id, name: f.name }))
-      : (await chatSpaces(token)).map((s) => ({ externalId: s.name, name: s.displayName }))
+    service === "chat"
+      ? (await chatSpaces(token)).map((s) => ({
+          externalId: s.name,
+          name: s.displayName,
+          // WE MADE THIS LABEL UP, and the picker says so rather than presenting
+          // "A direct message" as a name Google gave us. See `toChatSpace`.
+          named: s.named,
+          iconUrl: null,
+          mimeType: "",
+        }))
+      : (kind === "file" ? await driveFilesPick(token, q) : await driveFolders(token, q)).map((f) => ({
+          externalId: f.id,
+          name: f.name,
+          named: true,
+          iconUrl: f.iconUrl,
+          mimeType: f.mimeType,
+        }))
   return json({ options })
 }
 
-/** POST /api/content/google/sources — name a Drive folder or a Chat space.
+/** POST /api/content/google/sources — name Drive folders, Drive FILES, or Chat
+ * spaces. SEVERAL AT ONCE.
+ *
+ * THE OWNER'S TWO ASKS, ANSWERED IN ONE DOOR. "Can you make it so that I can
+ * select multiple spaces, multiple folders, and multiple files at once?" and "In
+ * Drive, why is it that it's only folder-wise?"
+ *
+ * WHY A LIST RATHER THAN A DOOR CALLED N TIMES. The three decisions that come
+ * with a share — who may read it, whose material it is, and what kind of thing
+ * it is — are the same for every item in one act of sharing. A client asked to
+ * repeat them per item would either ask the person three questions per folder,
+ * or ask once and send them N times, which is a promise the client keeps rather
+ * than the door. One call, one set of answers, one history line per row.
  *
  * `shelf` is required in spirit and defaulted to `private` in code: the safe
  * answer is the one you get by not deciding. The screen asks the question in
  * words at the moment of sharing ("who will be able to read this?"), because a
  * person who thinks a folder is theirs alone and finds a colleague quoting it
- * back is the failure this whole column exists to prevent. */
+ * back is the failure this whole column exists to prevent.
+ *
+ * A REPEAT IS NOT AN ERROR. `addNamedSource` answers a folder already shared
+ * with the row it already has, so a list holding one new folder and four old
+ * ones shares the one and says nothing about the four. */
 export async function postGoogleSource(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{
     service?: unknown
-    externalId?: unknown
-    name?: unknown
+    items?: unknown
     shelf?: unknown
     accountId?: unknown
   }>(request, env, "google", "create")
   await refusePortalCaller(cfg, guard)
-  const id = await addNamedSource(cfg, guard, actor, {
-    // Through the text seam, then the module's own allow-list — see the note on
-    // the disconnect door for why the order is not optional (R20 is positional).
-    service: asNamedService(requireText(body.service, "Service", TEXT_LIMITS.short)),
-    externalId: requireText(body.externalId, "Folder or space", TEXT_LIMITS.short),
-    name: requireText(body.name, "Name", TEXT_LIMITS.short),
-    shelf: asShelf(optionalText(body.shelf, "Shelf", TEXT_LIMITS.short)),
-    // WHOSE MATERIAL IS IN IT — asked here, in the same breath as who may read
-    // it, because both are decisions about where the contents end up and neither
-    // can be read back off the contents. Left off = the agency's own.
-    accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short) ?? null,
-  })
-  await publishChange(env, guard.teamId, "google", id)
-  return json({ sources: await listNamedSources(cfg, guard) })
+  // Through the text seam, then the module's own allow-list — see the note on
+  // the disconnect door for why the order is not optional (R20 is positional).
+  const service = asNamedService(requireText(body.service, "Service", TEXT_LIMITS.short))
+  const shelf = asShelf(optionalText(body.shelf, "Shelf", TEXT_LIMITS.short))
+  // WHOSE MATERIAL IS IN IT — asked here, in the same breath as who may read
+  // it, because both are decisions about where the contents end up and neither
+  // can be read back off the contents. Left off = the agency's own.
+  const accountId = optionalText(body.accountId, "Client", TEXT_LIMITS.short) ?? null
+  // R20, the array shape, exactly as the calendar guest door does it:
+  // `Array.isArray` decides it is a list, then every field inside goes through
+  // the same text seam a single one would. A list is not a way in for values a
+  // scalar could not carry.
+  const items = shareList(Array.isArray(body.items) ? body.items : [])
+  if (items.length === 0) return fail(400, "invalid_input", "Say what to share.")
+
+  const ids: string[] = []
+  for (const item of items)
+    ids.push(
+      await addNamedSource(cfg, guard, actor, {
+        service,
+        externalId: item.externalId,
+        name: item.name,
+        // A Chat share is always a space; a Drive share is a folder unless the
+        // caller said file. Decided HERE from the service rather than trusted off
+        // the request, so there is no way to spell a Chat "folder".
+        kind: service === "chat" ? "space" : item.kind === "file" ? "file" : "folder",
+        shelf,
+        accountId,
+      })
+    )
+  // One ping per row, because each is a row a screen is looking at (R1/R15).
+  for (const id of ids) await publishChange(env, guard.teamId, "google", id)
+  return json({ sources: await listNamedSources(cfg, guard), shared: ids.length })
 }
+
+/** The things one share request may name: a bounded list, every field through
+ * the same text seam a single one would use. */
+function shareList(value: unknown[]): { externalId: string; name: string; kind: string }[] {
+  if (value.length > SHARE_CAP)
+    throw new GuardError(400, "invalid_input", `That's more than ${SHARE_CAP} things in one go.`)
+  return value.map((raw) => {
+    const item = (raw ?? {}) as { externalId?: unknown; name?: unknown; kind?: unknown }
+    return {
+      externalId: requireText(item.externalId, "Folder, file or space", TEXT_LIMITS.short),
+      name: requireText(item.name, "Name", TEXT_LIMITS.short),
+      kind: optionalText(item.kind, "Kind", TEXT_LIMITS.short) ?? "folder",
+    }
+  })
+}
+
+/** Things one call may share. Small on purpose, for the same reason the guest
+ * cap is: sharing is something a person does by picking, and a request naming
+ * five hundred folders is a script wearing a form's clothes. */
+const SHARE_CAP = 25
 
 /** POST /api/content/google/sources/active — stop sharing one, or share it
  * again. Gated on `delete`, because taking material away IS this module's
@@ -307,16 +390,73 @@ export async function postGoogleSourceActive(request: Request, env: Env): Promis
 
 // ── DRIVE ────────────────────────────────────────────────────────────────────
 
-/** GET /api/content/google/drive/files?q= — files in the folders I named, and
- * nowhere else. A person with no named folders gets an empty list, which is the
- * honest answer: they have shared nothing. */
+/** GET /api/content/google/drive/files?q= — files in the folders I named PLUS
+ * the files I named one by one, and nowhere else. A person who has shared
+ * nothing gets an empty list, which is the honest answer.
+ *
+ * The two halves are the same fence at two grains (see `driveFilesById`): a
+ * folder is a place to look inside, a file is the thing itself, and neither can
+ * reach anything the person did not choose. A named file ignores `q` — somebody
+ * who shared exactly one contract has already narrowed it as far as it goes, and
+ * hiding it behind a search term would make a deliberate share disappear from
+ * the list that exists to show what is shared. */
 export async function getGoogleDriveFiles(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "read")
   await refusePortalCaller(cfg, guard)
   const q = queryText(new URL(request.url).searchParams.get("q"), "Search", TEXT_LIMITS.short)
   const { token } = await accessTokenFor(env, cfg, guard, "drive")
-  const folders = (await listNamedSources(cfg, guard, "drive")).filter((s) => s.active)
-  return json({ files: await driveList(token, folders.map((f) => f.externalId), q) })
+  const shared = (await listNamedSources(cfg, guard, "drive")).filter((s) => s.active)
+  const [inFolders, named] = await Promise.all([
+    driveList(token, shared.filter((s) => s.kind === "folder").map((f) => f.externalId), q),
+    driveFilesById(token, shared.filter((s) => s.kind === "file").map((f) => f.externalId)),
+  ])
+  return json({ files: [...inFolders, ...named] })
+}
+
+/**
+ * GET /api/content/google/drive/thumbnail?fileId= — a PICTURE of a file, as
+ * bytes.
+ *
+ * THE OWNER: "if there is any way we can begin to pull in metadata like the
+ * logos or the preview URLs or anything like that… Previews are very helpful."
+ * They are, and Google's own preview link cannot simply be handed to a browser:
+ * it is authenticated with a bearer token and it expires within hours, so a page
+ * that puts it in an `<img src>` shows a broken image to everybody except the
+ * person whose request happened to mint it, and to them only until it rots.
+ *
+ * TWO WAYS TO SOLVE THAT, and the choice is written out in `driveThumbnail`:
+ * copy the picture into R2 and serve it from `/media/*` like a ticket
+ * attachment, or fetch it on read with the caller's own token. This is the
+ * second. Nothing is stored, so there is no stale copy of somebody's document in
+ * our storage to keep after they unshare it, and the preview is as current as
+ * the document.
+ *
+ * THE FENCE IS GOOGLE'S OWN, exactly as it is on the file-text door beside it:
+ * the call carries the CALLER's token, so a file id naming a document their
+ * Google account cannot read is refused at Google rather than by a clause here
+ * that could be forgotten.
+ *
+ * Cached at the edge for an hour, which is what makes a list of previews
+ * affordable — and a file with no preview is a 404 with no body rather than an
+ * error, because a spreadsheet having no picture is not a failure.
+ */
+export async function getGoogleDriveThumbnail(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "google", "read")
+  await refusePortalCaller(cfg, guard)
+  const fileId = queryText(new URL(request.url).searchParams.get("fileId"), "File", TEXT_LIMITS.short)
+  if (!fileId) return fail(400, "invalid_input", "Say which file.")
+  const { token } = await accessTokenFor(env, cfg, guard, "drive")
+  const picture = await driveThumbnail(token, fileId)
+  if (!picture) return fail(404, "google_no_preview", "There's no preview for that file.")
+  return new Response(picture.body, {
+    headers: {
+      "Content-Type": picture.contentType,
+      // PRIVATE, and that is not a detail. This is one person's document rendered
+      // as an image; a shared cache holding it would serve it to the next caller
+      // who asked for the same id, whoever they are.
+      "Cache-Control": "private, max-age=3600",
+    },
+  })
 }
 
 /** GET /api/content/google/drive/file?fileId= — one file's readable text. */
@@ -961,15 +1101,19 @@ const GUEST_CHANGE_CAP = 25
  * Nobody thinks that way. They think "what did we agree in Tuesday's call", and
  * Tuesday's call is a diary entry. This door starts where the person starts.
  *
- * IT SEARCHES ONLY THE FOLDERS THEY NAMED, which is the module's first promise
- * and is not bent for this. Meet's transcripts land in a "Meet Recordings"
- * folder; sharing that folder is what makes them reachable, and a person who
- * has not shared it gets an honest "nothing shared that holds it" rather than
- * kwapso quietly reading their whole Drive to find one file.
+ * THREE HUNTS, IN AN ORDER OF PROOF — the file Google itself attached to this
+ * entry, then a document in a folder this person NAMED, then Google's own notice
+ * in the mail naming the document it made. lib/google-transcript.ts holds them
+ * and says why the order is what it is; `foundBy` comes back so that a person
+ * asking "how do you know that is the transcript of THIS call" gets the honest
+ * answer for whichever route found it — the first is a fact Google recorded, the
+ * other two are matches.
  *
- * TWO SEARCHES AT MOST: the meeting's title, then — only if that found nothing —
- * its Meet code, which is what Google names a transcript after when the entry
- * had no title. Both are bounded reads inside the named folders.
+ * NONE OF THE THREE WIDENS A FENCE. The first reads an event this caller can
+ * already read; the second searches only folders they named; the third reads
+ * only mail from four Google robots about the caller's own files. A person who
+ * has shared nothing gets an honest empty answer rather than kwapso going
+ * looking through their whole Drive.
  */
 export async function getGoogleEventTranscript(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "read")
@@ -979,38 +1123,21 @@ export async function getGoogleEventTranscript(request: Request, env: Env): Prom
   const { token: calendarToken } = await accessTokenFor(env, cfg, guard, "calendar")
   const event = await calendarGet(calendarToken, eventId)
 
-  const { token: driveToken } = await accessTokenFor(env, cfg, guard, "drive")
-  const folders = (await listNamedSources(cfg, guard, "drive"))
-    .filter((s) => s.active)
-    .map((s) => s.externalId)
-  if (folders.length === 0)
-    return json({ event, transcript: null, note: "No Drive folder is shared, so there's nowhere to look." })
-
-  const terms = [event.summary, event.meetingCode].filter(Boolean)
-  let found: { id: string; name: string; webViewLink: string | null; modifiedTime: string | null } | null =
-    null
-  for (const term of terms) {
-    const hits = (await driveList(driveToken, folders, term))
-      .filter((f) => /transcript/i.test(f.name))
-      .sort((a, b) => (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? ""))
-    if (hits[0]) {
-      found = hits[0]
-      break
-    }
-  }
+  const found = await findTranscript(env, cfg, guard, event)
   if (!found)
     return json({
       event,
       transcript: null,
-      note: "No transcript for that meeting in the folders you've shared.",
+      note: "No transcript for that meeting yet, not on the calendar entry, not in the folders you have shared, and not in any notice from Google.",
     })
   return json({
     event,
     transcript: {
-      fileId: found.id,
+      fileId: found.fileId,
       name: found.name,
-      url: found.webViewLink,
-      text: await driveFileText(driveToken, found.id),
+      url: found.url,
+      foundBy: found.foundBy,
+      text: await transcriptText(env, cfg, guard, found.fileId),
     },
   })
 }

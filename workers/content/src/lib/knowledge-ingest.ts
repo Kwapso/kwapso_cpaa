@@ -486,6 +486,120 @@ export const INGEST_KINDS: IngestKind[] = [
       }))
     },
   },
+  {
+    // WHAT WAS SAID IN THE ROOM — the agenda, the notes somebody wrote up, and
+    // the transcript of the call itself.
+    //
+    // ── WHY THIS IS THE RIGHT PLACE FOR A TRANSCRIPT, AND A GOOGLE KIND IS NOT
+    // Every Google kind is swept PER PERSON, with that person's own token, only
+    // while they are here — lib/knowledge-google.ts's header explains why that
+    // separation is load-bearing security rather than a limitation. A transcript
+    // reached that way would be one person's SIGHT of a call, on their private
+    // shelf, invisible to the colleague who was in the same meeting.
+    //
+    // A transcript is not that. It is the record of a conversation the AGENCY
+    // had, filed against a client, and everybody whose role can read meetings
+    // should be answered from it. So the transcript's WORDS are copied onto the
+    // meeting row when it is captured, and from there it is an ordinary row of
+    // this database: swept by the cron as nobody in particular, owned by the
+    // team, compartmented by the meeting's own account. No second ingestion
+    // path, no token, no special case — which is exactly what R23's one-seam
+    // rule is for.
+    //
+    // ── AND IT CLOSES A GAP THAT PREDATES GOOGLE ENTIRELY
+    // `agenda` and `notes` are the two columns this module exists for, and until
+    // now nothing could answer a question from either. "What did we agree in
+    // March" was unanswerable by the assistant in an app built around a record
+    // that holds the answer.
+    //
+    // A CANCELLED MEETING IS RETIRED, not skipped: its source stops answering
+    // the moment somebody calls the meeting off, and comes back if they put it
+    // back — the same sentence every other kind here speaks.
+    kind: "meeting",
+    table: "meetings",
+    label: "meetings",
+    read: async (cfg, guard, cursor, limit) => {
+      const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
+      const rows = await d1Query<{
+        id: string
+        ref: string | null
+        title: string
+        agenda: string | null
+        notes: string | null
+        location: string | null
+        starts_at: string
+        status: string
+        transcript_text: string | null
+        transcript_note: string | null
+        transcript_url: string | null
+        google_event_url: string | null
+        google_organizer: string | null
+        account_id: string | null
+        app_id: string | null
+        account_name: string | null
+        purpose_name: string | null
+        deactivated_at: string | null
+        sort_at: string
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK. The transcript rides
+        // the read because it IS the material — a second call per meeting to
+        // fetch it would be a call per row for the one column that matters.
+        `SELECT m.id, m.ref, m.title, m.agenda, m.notes, m.location, m.starts_at, m.status,
+                m.transcript_text, m.transcript_note, m.transcript_url,
+                m.google_event_url, m.google_organizer, m.account_id, m.app_id, m.deactivated_at,
+                a.name AS account_name,
+                (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name,
+                COALESCE(m.updated_at, m.created_at) AS sort_at
+           FROM meetings m LEFT JOIN accounts a ON a.id = m.account_id
+          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
+          ORDER BY sort_at, m.id LIMIT ${limit}`,
+        keyset.params
+      )
+      return rows.map((r) => ({
+        originRowId: r.id,
+        sortAt: r.sort_at,
+        title: r.title,
+        summary: buildSummary({
+          noun: "meeting",
+          title: r.title,
+          ref: r.ref,
+          accountName: r.account_name,
+          status: r.status,
+          detail: plainText(r.notes || r.agenda || ""),
+        }),
+        body: [
+          `${r.title} is a meeting${r.account_name ? ` with ${r.account_name}` : " of ours"}${
+            r.purpose_name ? ` about ${r.purpose_name}` : ""
+          }, on ${r.starts_at.slice(0, 10)}${r.location ? ` at ${r.location}` : ""}.`,
+          r.ref ? `Reference ${r.ref}.` : "",
+          r.agenda ? `On the agenda: ${r.agenda}` : "",
+          r.notes ? `Notes: ${r.notes}` : "",
+          // Last and longest. The label is here so a quoted passage can say what
+          // it is — an answer built from a transcript reads very differently from
+          // one built from somebody's written-up notes, and the reader deserves
+          // to be able to tell.
+          r.transcript_text ? `What was said in the meeting:\n${r.transcript_text}` : "",
+          // The cut is never silent — the same rule a knowledge file follows.
+          r.transcript_note ?? "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        accountId: r.account_id,
+        appId: r.app_id,
+        // A meeting is FROM when it happened, not from when somebody typed the
+        // row up afterwards.
+        recordDate: r.starts_at,
+        // A row this app owns — it belongs to the team, not to one person.
+        ownerUserId: null,
+        // The transcript where it lives, or the diary entry. Either is somewhere
+        // a person can go and check what the assistant just quoted.
+        sourceUrl: r.transcript_url ?? r.google_event_url,
+        retired: r.deactivated_at !== null,
+      }))
+    },
+  },
 ]
 
 /** The first sentence of a ticket's description, for a ticket that has no title

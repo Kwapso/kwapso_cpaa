@@ -40,6 +40,7 @@ import type { GoogleItem, GoogleService } from "@shared/types"
 import {
   chatMessages,
   driveFileText,
+  driveFilesById,
   driveList,
   calendarList,
   gmailMessage,
@@ -165,10 +166,27 @@ export async function readGoogleMaterial(
   if (wanted.includes("drive")) {
     const token = await tokenOrNull(env, cfg, guard, "drive")
     if (token) {
-      const folders = (await listNamedSources(cfg, guard, "drive")).filter((s) => s.active)
+      const shared = (await listNamedSources(cfg, guard, "drive")).filter((s) => s.active)
+      // TWO GRAINS OF THE SAME FENCE. A folder is a place to look inside; a file
+      // named on its own IS the thing. Both are shares this person made, both
+      // carry their own shelf and their own client, and the knowledge base must
+      // see both or a deliberately shared contract would be the one document the
+      // assistant cannot answer from.
+      const folders = shared.filter((s) => s.kind === "folder")
+      const files = shared.filter((s) => s.kind === "file")
       const shelfOf = new Map(folders.map((f) => [f.externalId, f]))
-      for (const file of await driveList(token, [...shelfOf.keys()], request.search)) {
-        const source = shelfOf.get(file.folderId)
+      const namedFileSource = new Map(files.map((f) => [f.externalId, f]))
+      const found = [
+        ...(await driveList(token, [...shelfOf.keys()], request.search)),
+        // A named file ignores the search term for the same reason the door
+        // above it does: somebody who shared exactly one document has already
+        // narrowed it as far as narrowing goes.
+        ...(await driveFilesById(token, [...namedFileSource.keys()])),
+      ]
+      for (const file of found) {
+        // The folder it came out of, or — for a file named on its own — the row
+        // that names the file itself.
+        const source = shelfOf.get(file.folderId) ?? namedFileSource.get(file.id)
         items.push({
           service: "drive",
           sourceId: source?.id ?? null,
@@ -179,8 +197,8 @@ export async function readGoogleMaterial(
           updatedAt: file.modifiedTime,
           shelf: source?.shelf ?? "private",
           ownerUserId: guard.userId,
-          // The folder says whose it is — a decision somebody made when they
-          // named it, not a name matched out of the file's own text.
+          // The SHARE says whose it is — a decision somebody made when they named
+          // it, not a name matched out of the file's own text.
           accountId: source?.accountId ?? null,
         })
       }
@@ -233,7 +251,7 @@ export async function readGoogleMaterial(
           // A meeting with a client on the invitation is that client's; one with
           // nobody but us in the room is the agency's own. The guest list is the
           // only place on an event where that is written down.
-          accountId: accountForAddresses(contacts, event.attendees.join(" ")),
+          accountId: accountForAddresses(contacts, event.attendees.map((a) => a.email).join(" ")),
         })
   }
 

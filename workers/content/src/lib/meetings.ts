@@ -23,8 +23,10 @@ import { describeChanges, logActivity, type Actor } from "@shared/workers/activi
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
-import { accessTokenFor, listNamedSources } from "./google"
-import { calendarGet, calendarList, driveList } from "./google-api"
+import { accessTokenFor } from "./google"
+import { calendarGet, calendarList, type CalendarEvent } from "./google-api"
+import { capToRow } from "./knowledge-files"
+import { findTranscript, transcriptText, type TranscriptRoute } from "./google-transcript"
 import { MEETING_LOG_KIND } from "./work-logs"
 import type { Env } from "../env"
 
@@ -36,7 +38,7 @@ import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { optionalMoment, optionalText, requireMoment, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import type { Meeting } from "@shared/types"
+import type { Meeting, MeetingAttachment, MeetingGuest, MeetingPersonLink } from "@shared/types"
 
 import { nextRef, REF_KINDS } from "./refs"
 
@@ -61,7 +63,19 @@ type MeetingRow = {
   google_event_url: string | null
   transcript_file_id: string | null
   transcript_captured_at: string | null
+  transcript_url: string | null
+  transcript_found_by: string | null
   recurring_event_id: string | null
+  google_join_url: string | null
+  google_organizer: string | null
+  google_attendees_json: string | null
+  google_attachments_json: string | null
+  google_status: string | null
+  google_recurrence: string | null
+  google_time_zone: string | null
+  google_updated_at: string | null
+  google_synced_at: string | null
+  from_calendar: number | null
   created_at: string
   creator_name: string | null
   updated_at: string | null
@@ -74,7 +88,11 @@ type MeetingRow = {
  * would otherwise be a hundred round trips through the REST door. */
 const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id, m.agenda, m.notes, m.location,
   m.starts_at, m.ends_at, m.status, m.held_at, m.google_event_id, m.google_event_url,
-  m.transcript_file_id, m.transcript_captured_at, m.recurring_event_id,
+  m.transcript_file_id, m.transcript_captured_at, m.transcript_url, m.transcript_found_by,
+  m.recurring_event_id,
+  m.google_join_url, m.google_organizer, m.google_attendees_json, m.google_attachments_json,
+  m.google_status, m.google_recurrence, m.google_time_zone, m.google_updated_at, m.google_synced_at,
+  m.from_calendar,
   m.created_at, m.creator_name, m.updated_at, m.editor_name, m.deactivated_at,
   (SELECT a.name FROM accounts a WHERE a.id = m.account_id) AS account_name,
   (SELECT ap.name FROM apps ap WHERE ap.id = m.app_id) AS app_name,
@@ -84,6 +102,28 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
  * read backwards is what somebody wants — the thing that just happened is the
  * thing they are looking for — and the future sits at the top where it belongs. */
 const MEETING_ORDER = "m.starts_at"
+
+/** A JSON MIRROR COLUMN, READ DEFENSIVELY.
+ *
+ * These columns hold what Google said, written by a sweep, read by a screen —
+ * and a database is not a place where a shape is guaranteed. A half-written
+ * value, a column from before a migration, a hand-edited row: none of them is a
+ * reason to fail a whole meetings list. An unreadable mirror is EMPTY, which is
+ * the same thing the row says before it has ever been swept, and the screens
+ * already know how to say "we haven't read that from Google yet".
+ *
+ * The alternative — trusting the parse — turns one malformed row into a 500 on
+ * the diary, which is the collection somebody opens to find out what today
+ * holds. */
+function readJsonList<T>(raw: string | null): T[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? (parsed as T[]) : []
+  } catch {
+    return []
+  }
+}
 
 function toMeeting(r: MeetingRow): Meeting {
   return {
@@ -110,7 +150,18 @@ function toMeeting(r: MeetingRow): Meeting {
     googleEventUrl: r.google_event_url,
     transcriptFileId: r.transcript_file_id,
     transcriptCapturedAt: r.transcript_captured_at,
+    transcriptUrl: r.transcript_url,
+    transcriptFoundBy: r.transcript_found_by,
     recurringEventId: r.recurring_event_id,
+    googleJoinUrl: r.google_join_url,
+    googleOrganizer: r.google_organizer,
+    googleStatus: r.google_status,
+    googleTimeZone: r.google_time_zone,
+    googleRecurrence: r.google_recurrence,
+    googleGuests: readJsonList<MeetingGuest>(r.google_attendees_json),
+    googleAttachments: readJsonList<MeetingAttachment>(r.google_attachments_json),
+    googleSyncedAt: r.google_synced_at,
+    fromCalendar: r.from_calendar === 1,
     active: r.deactivated_at === null,
     createdAt: r.created_at,
     creatorName: r.creator_name,
@@ -572,6 +623,9 @@ export type TranscriptCapture = {
   captured: boolean
   fileId: string | null
   fileName: string | null
+  /** WHICH HUNT FOUND IT — the calendar entry's own attachment, a shared Drive
+   * folder, or a notice from Google in the mail. Null when nothing was found. */
+  foundBy: TranscriptRoute | null
   /** how many work logs were written — our staff who were in the room. */
   logsWritten: number
   /** why nothing happened, in a sentence a person can act on. */
@@ -606,11 +660,19 @@ async function ourStaffAmong(
 
 /** READ THE TRANSCRIPT FOR THIS MEETING, and do what its arrival means.
  *
- * The search is the one `GET …/calendar/event/transcript` already does and it is
- * not widened here: only the Drive folders this person has NAMED are looked in,
- * the meeting's title first and its Meet code second. A person who has not
- * shared the folder their transcripts land in gets an honest sentence rather
- * than kwapso reading their whole Drive. */
+ * THE HUNT ITSELF MOVED OUT (lib/google-transcript.ts) the day it stopped being
+ * one search. It is now three, in an order of proof — the file Google attached
+ * to this very entry, then a document in a folder this person named, then
+ * Google's own notice in the mail — and the route that found it is kept on the
+ * row, because "how do you know that is the transcript of THIS call" has a
+ * different and honest answer for each of the three.
+ *
+ * AND THE WORDS ARE KEPT, not merely the file id. That is the change the owner
+ * asked for in four words — "the call transcript should automatically be here" —
+ * and it is also what makes a transcript ANSWERABLE without a second ingestion
+ * path: text in a column is swept by the ordinary `meeting` kind, on the cron,
+ * in the client's own compartment, with no Google token in sight.
+ */
 export async function captureTranscript(
   env: Env,
   cfg: D1Rest,
@@ -623,6 +685,7 @@ export async function captureTranscript(
     captured: false,
     fileId: null,
     fileName: null,
+    foundBy: null,
     logsWritten: 0,
     note,
   })
@@ -633,22 +696,17 @@ export async function captureTranscript(
 
   const { token: calendarToken } = await accessTokenFor(env, cfg, guard, "calendar")
   const event = await calendarGet(calendarToken, meeting.googleEventId)
-  const folders = (await listNamedSources(cfg, guard, "drive")).filter((s) => s.active).map((s) => s.externalId)
-  if (folders.length === 0)
-    return nothing("No Drive folder is shared, so there's nowhere to look for the transcript.")
+  const found = await findTranscript(env, cfg, guard, event)
+  if (!found)
+    return nothing(
+      "No transcript for this meeting yet, not on the calendar entry, not in the folders you've shared, and not in any notice from Google."
+    )
 
-  const { token: driveToken } = await accessTokenFor(env, cfg, guard, "drive")
-  let found: { id: string; name: string } | null = null
-  for (const term of [event.summary, event.meetingCode].filter(Boolean)) {
-    const hits = (await driveList(driveToken, folders, term as string))
-      .filter((f) => /transcript/i.test(f.name))
-      .sort((a, b) => (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? ""))
-    if (hits[0]) {
-      found = { id: hits[0].id, name: hits[0].name }
-      break
-    }
-  }
-  if (!found) return nothing("No transcript for this meeting in the folders you've shared.")
+  // THE WORDS. Read before the claim on purpose: a transcript whose text we
+  // cannot get at is still worth naming on the row (the link opens it in Google),
+  // and reading it first means the claim below writes the whole fact at once
+  // rather than leaving a row that says "captured" with nothing in it.
+  const words = capToRow(await transcriptText(env, cfg, guard, found.fileId))
 
   // THE CLAIM. Everything below happens exactly once because this statement
   // moves exactly one row exactly once — and it ticks "held" in the same breath
@@ -657,10 +715,24 @@ export async function captureTranscript(
   const claimed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE meetings SET transcript_file_id = ?, transcript_captured_at = ?, status = 'held',
+    `UPDATE meetings SET transcript_file_id = ?, transcript_captured_at = ?, transcript_text = ?,
+        transcript_note = ?, transcript_url = ?, transcript_found_by = ?, status = 'held',
         held_at = COALESCE(held_at, ?), updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
       WHERE id = ? AND transcript_captured_at IS NULL RETURNING id`,
-    [found.id, now, now, now, actor.id, actor.email, actor.name, id]
+    [
+      found.fileId,
+      now,
+      words.text,
+      words.note,
+      found.url,
+      found.foundBy,
+      now,
+      now,
+      actor.id,
+      actor.email,
+      actor.name,
+      id,
+    ]
   )
   if (!claimed[0]) return nothing("The transcript for this meeting has already been read.")
 
@@ -669,7 +741,7 @@ export async function captureTranscript(
   // day, and inventing a finer figure out of a transcript's timestamps would be
   // inventing a fact. A meeting with no end runs the default hour, the same one
   // the calendar push assumes.
-  const staff = await ourStaffAmong(env, guard.teamId, event.attendees)
+  const staff = await ourStaffAmong(env, guard.teamId, event.attendees.map((a) => a.email))
   const endsAt = meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString()
   const seconds = Math.max(0, Math.round((Date.parse(endsAt) - Date.parse(meeting.startsAt)) / 1000))
   for (const person of staff)
@@ -689,30 +761,83 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
     relatedTable: "meetings",
     relatedRowId: id,
   })
-  return { captured: true, fileId: found.id, fileName: found.name, logsWritten: staff.length, note: null }
+  return {
+    captured: true,
+    fileId: found.fileId,
+    fileName: found.name,
+    foundBy: found.foundBy,
+    logsWritten: staff.length,
+    // The one note worth carrying up: a transcript longer than a row may hold
+    // was CUT, and the person is told so rather than left to discover that the
+    // assistant only knows the first half of the conversation.
+    note: words.note,
+  }
 }
 
-/* ------------------- the repeating entries in a calendar ------------------- */
+/* ------------------ the calendar, brought into step both ways -------------- */
 //
-// CHECKLIST 9.7, and it is Aurora's answer over the owner's "read-only always":
-// a repeating Google entry becomes a REAL RECORD four weeks ahead, and the
-// instances further out are shown read-only until their turn comes.
+// CHECKLIST 9.7 asked for one direction: a repeating Google entry becomes a REAL
+// RECORD four weeks ahead, and the instances further out are shown read-only
+// until their turn comes. That is still here and unchanged in spirit.
 //
-// WHY FOUR WEEKS. There has to be a month to prepare the notes — an agenda
-// written the morning of the call is an agenda nobody read. And there has to be
-// a horizon at all: a weekly stand-up with no end date is an infinite series,
-// and materialising it would be a table that grows for ever with rows nobody
-// will ever open.
+// WHAT THE OWNER ADDED, and it is not a bigger version of the same thing:
 //
-// WHY THE INSTANCES FURTHER OUT ARE NOT ROWS. A record you can edit is a promise
-// that the edit means something, and an instance six months out can be moved,
-// renamed or cancelled in Google before it ever happens. So it is SHOWN and not
-// STORED — the diary tells you it is coming, and the moment it enters the
-// window it becomes a record with somewhere to write.
+//   "Each and every record should sync with all of the calendar data and
+//    metadata, and it should also update consistently if it's a past event."
+//   "All transcripts will always come in a few minutes or an hour after the
+//    event is over, so that means all past events would need to be recent."
+//
+// A FORWARD-ONLY SWEEP CAN NEVER SATISFY THAT, and the reason is worth stating
+// because it is not obvious: everything interesting about a meeting arrives
+// AFTER it. The transcript, the recording, the notes doc somebody attached while
+// walking back to their desk — all of them land on an entry that has already
+// slipped out of a window looking at the future. A diary that only ever reads
+// forwards sees every meeting exactly once, at the moment when the least is
+// known about it, and never looks again.
+//
+// So the window now straddles today. Backward far enough that a call which ran
+// on Friday is re-read on Monday; forward far enough that there is a month to
+// prepare. And the sweep does three things rather than one:
+//
+//   • CREATES — a repeating instance with no record yet becomes one (9.7),
+//     including one in the PAST, which is how a freshly connected calendar gets
+//     last week's stand-up and therefore last week's transcript.
+//   • REFRESHES — every meeting whose entry is in the window has its `google_*`
+//     mirror rewritten: the guest list and what each person answered, the
+//     organiser, the join link, the attachments, the zone, the repeat rule.
+//   • RETIRES — an entry cancelled in Google cancels the meeting here, which is
+//     the fact a forward-only sweep could not even observe (a cancelled instance
+//     simply stops being returned, which is indistinguishable from the window
+//     having moved past it — hence `showDeleted`).
+//
+// WHOSE WORDS WIN. A meeting typed in kwapso and pushed out keeps kwapso's
+// title, times and place; a meeting read IN off a diary takes Google's. That is
+// `from_calendar`, decided once at insert, and the migration that added it says
+// why a single rule would have to be wrong for one of the two. `notes` is never
+// touched by any sync — it is the one column here that only a person writes.
+//
+// IDEMPOTENT, AND CHEAPLY (R17). Google stamps every entry with `updated`. An
+// entry whose stamp has not moved since we last mirrored it is skipped entirely
+// — no statement, no activity row, no ping — rather than being compared field by
+// field or rewritten identically. That is also exactly the signal this lane
+// needs: attaching a transcript to an event IS an edit of the event, so the one
+// stamp that says "look again" is the one that moves when a transcript lands.
 
 /** How far ahead a repeating entry becomes a real record. Four weeks, so there
  * is a month to prepare (Aurora's tk3). */
 const SERIES_HORIZON_DAYS = 28
+
+/** HOW FAR BACK THE SWEEP RE-READS.
+ *
+ * Two weeks. The owner's own reason sets the floor — "all transcripts will
+ * always come in a few minutes or an hour after the event is over" — so a day
+ * would technically do for the transcript itself. It is longer than that for the
+ * things that arrive on a human timescale rather than a machine one: the notes
+ * doc a colleague attaches on Monday about Friday's call, the guest who finally
+ * accepts, the room that changed. A fortnight covers a holiday weekend and a
+ * week off; a quarter would be re-reading meetings nobody will touch again, at a
+ * cost paid on every sweep for ever. */
+const CATCH_UP_DAYS = 14
 
 /** One instance of a repeating entry that is NOT yet a record — read-only, and
  * shown so nobody is surprised by it. */
@@ -723,82 +848,332 @@ export type AheadOfUs = {
   url: string | null
 }
 
-/** BRING THE REPEATING ENTRIES IN. Reads the caller's own calendar to the
- * horizon, makes a record of every repeating instance inside it that does not
- * have one yet, and hands back the ones beyond it so the diary can show them
- * without pretending they are rows.
+/** What one sweep did, in the three verbs above. */
+export type CalendarSync = {
+  created: number
+  updated: number
+  cancelled: number
+  ahead: AheadOfUs[]
+}
+
+/** THE MIRROR, AS COLUMNS. One place that turns a Google event into the
+ * `google_*` half of a meeting row, so the insert and the refresh below can
+ * never write two different versions of the same fact. */
+function mirrorOf(event: CalendarEvent, at: string): string {
+  return `google_event_id = ${sqlString(event.id)},
+    google_event_url = ${sqlString(event.url)},
+    google_join_url = ${sqlString(event.joinUrl)},
+    google_organizer = ${sqlString(event.organizer.email || null)},
+    google_attendees_json = ${sqlString(JSON.stringify(event.attendees))},
+    google_attachments_json = ${sqlString(JSON.stringify(event.attachments))},
+    google_status = ${sqlString(event.status || null)},
+    google_recurrence = ${sqlString(event.recurrence.join("\n") || null)},
+    google_time_zone = ${sqlString(event.timeZone || null)},
+    google_updated_at = ${sqlString(event.updatedAt)},
+    google_synced_at = ${sqlString(at)},
+    recurring_event_id = ${sqlString(event.recurringEventId || null)}`
+}
+
+/** What a row has to say for itself before the sweep decides whether to touch
+ * it. Deliberately six columns and not the whole meeting: the sweep asks two
+ * questions — has Google moved since we looked, and whose words are these — and
+ * reading a page of full meetings to answer them would be paying for the notes
+ * of every meeting in a fortnight. */
+type SyncedRow = {
+  id: string
+  google_event_id: string
+  google_updated_at: string | null
+  google_synced_at: string | null
+  from_calendar: number | null
+  deactivated_at: string | null
+}
+
+/**
+ * BRING THE CALENDAR INTO STEP — see the essay above for what that now means.
  *
- * IDEMPOTENT BY THE INDEX, not by a check: `idx_meetings_event` is unique on
- * `google_event_id`, so an instance that already has a record cannot get a
- * second one however many times this runs. The insert is skipped for ids we can
- * already see and the index is the backstop for the race between two people
- * pressing the button at once.
+ * IDEMPOTENT BY THE INDEX for the creates, not by a check: `idx_meetings_event`
+ * is unique on `google_event_id`, so an instance that already has a record
+ * cannot get a second one however many times this runs.
  *
- * ONLY REPEATING ENTRIES. A one-off in somebody's calendar is their own diary,
- * not the agency's record of a client conversation — importing those would turn
- * the meetings module into a copy of one person's Google account. */
-export async function syncCalendarSeries(
+ * ONLY REPEATING ENTRIES BECOME RECORDS. A one-off in somebody's calendar is
+ * their own diary, not the agency's record of a client conversation — importing
+ * those would turn the meetings module into a copy of one person's Google
+ * account. A one-off that is ALREADY a record here (somebody pushed it out from
+ * kwapso) is still refreshed, because that is a meeting we own and Google has
+ * facts about it.
+ */
+export async function syncCalendar(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor
-): Promise<{ created: number; ahead: AheadOfUs[] }> {
+): Promise<CalendarSync> {
   const { token } = await accessTokenFor(env, cfg, guard, "calendar")
   const now = new Date()
+  const since = new Date(now.getTime() - CATCH_UP_DAYS * 24 * 60 * 60 * 1000)
   const horizon = new Date(now.getTime() + SERIES_HORIZON_DAYS * 24 * 60 * 60 * 1000)
-  // Two reads, because they answer two questions: what to MAKE (inside the
-  // horizon) and what to SHOW (beyond it, to the end of the quarter). The second
-  // is deliberately short — "there is a stand-up every Monday for ever" is not
-  // information, and the calendar read is bounded either way.
+  // Two reads, because they answer two questions: what to MIRROR AND MAKE (the
+  // window that straddles today) and what to SHOW (beyond it, to the end of the
+  // quarter). The second is deliberately short — "there is a stand-up every
+  // Monday for ever" is not information — and the first asks for cancelled
+  // entries, because a cancellation is a fact that is only ever visible on
+  // request (see calendarList).
   const [inWindow, beyond] = await Promise.all([
-    calendarList(token, { from: now.toISOString(), to: horizon.toISOString() }),
+    calendarList(token, { from: since.toISOString(), to: horizon.toISOString(), showDeleted: true }),
     calendarList(token, {
       from: horizon.toISOString(),
       to: new Date(horizon.getTime() + SERIES_HORIZON_DAYS * 2 * 24 * 60 * 60 * 1000).toISOString(),
     }),
   ])
-  const repeating = inWindow.filter((e) => e.recurringEventId && e.status !== "cancelled")
-  const known = new Set<string>()
-  if (repeating.length) {
-    const rows = await d1Query<{ google_event_id: string }>(
+
+  // WHICH OF THESE WE ALREADY HAVE. One read for the whole window rather than a
+  // lookup per event: the window is bounded by the calendar read that produced
+  // it (GOOGLE_PAGE_SIZE), so the `IN` list is too.
+  const known = new Map<string, SyncedRow>()
+  if (inWindow.length) {
+    const rows = await d1Query<SyncedRow>(
       cfg,
       guard.databaseId,
       // R14: bounded by the calendar read that produced the ids (GOOGLE_PAGE_SIZE).
-      `SELECT google_event_id FROM meetings
-        WHERE google_event_id IN (${repeating.map((e) => sqlString(e.id)).join(", ")})
+      `SELECT id, google_event_id, google_updated_at, google_synced_at, from_calendar, deactivated_at
+         FROM meetings
+        WHERE google_event_id IN (${inWindow.map((e) => sqlString(e.id)).join(", ")})
         LIMIT ${LIST_HARD_CAP}`
     )
-    for (const r of rows) known.add(r.google_event_id)
+    for (const r of rows) known.set(r.google_event_id, r)
   }
+
   const at = new Date().toISOString()
   let created = 0
-  for (const event of repeating) {
-    if (known.has(event.id)) continue
-    const id = ulid()
+  let updated = 0
+  let cancelled = 0
+
+  for (const event of inWindow) {
+    const row = known.get(event.id)
+
+    if (!row) {
+      // A record is only MADE for a repeating instance, and never for one that
+      // was already called off — importing a cancelled entry would put a meeting
+      // in the diary purely in order to cancel it.
+      if (!event.recurringEventId || event.status === "cancelled") continue
+      const id = ulid()
+      await d1ExecScript(
+        cfg,
+        guard.databaseId,
+        `INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at, status,
+           recurring_event_id, from_calendar,
+           google_event_id, google_event_url, google_join_url, google_organizer,
+           google_attendees_json, google_attachments_json, google_status, google_recurrence,
+           google_time_zone, google_updated_at, google_synced_at,
+           created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, ${sqlString(heldAlready(event, now) ? "held" : "scheduled")}, ${sqlString(event.recurringEventId)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+      )
+      created++
+      continue
+    }
+
+    // CALLED OFF IN GOOGLE → called off here, once. The predicate rides the
+    // UPDATE (R17), so a sweep that runs every hour over a fortnight of
+    // cancelled entries writes nothing after the first one.
+    if (event.status === "cancelled") {
+      const moved = await d1Query<{ id: string }>(
+        cfg,
+        guard.databaseId,
+        `UPDATE meetings SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
+            deactivator_name = ?, google_status = 'cancelled', google_updated_at = ?, google_synced_at = ?,
+            updated_at = ?
+          WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+        [at, actor.id, actor.email, actor.name, event.updatedAt, at, at, row.id]
+      )
+      if (moved[0]) cancelled++
+      continue
+    }
+
+    // NOTHING MOVED AT GOOGLE'S END. The stamp is the whole comparison — see the
+    // essay above for why it is also the right one for a late-arriving
+    // transcript. A row that has never been mirrored is always due.
+    if (row.google_synced_at && row.google_updated_at && row.google_updated_at === event.updatedAt) continue
+
+    // Google's words for a row Google authored; only the mirror for one of ours.
+    const ownWords =
+      row.from_calendar === 1
+        ? `, title = ${sqlString(event.summary || "A repeating meeting")},
+             starts_at = ${sqlString(event.start)},
+             ends_at = ${sqlString(event.end || null)},
+             location = ${sqlString(event.location || null)},
+             agenda = ${sqlString(event.description || null)}`
+        : ""
     await d1ExecScript(
       cfg,
       guard.databaseId,
-      `INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at, status,
-         google_event_id, google_event_url, recurring_event_id,
-         created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, 'scheduled', ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.recurringEventId)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+      `UPDATE meetings SET ${mirrorOf(event, at)}${ownWords} WHERE id = ${sqlString(row.id)};`
     )
-    created++
+    updated++
   }
-  if (created > 0)
+
+  // ONE HISTORY LINE FOR THE WHOLE SWEEP, and only when it did something. A row
+  // per refreshed meeting would bury a person's own edits under a machine's
+  // bookkeeping — the activity feed is a record of what PEOPLE did, and "the
+  // guest list on Tuesday's stand-up now says Ana accepted" is not that.
+  if (created + updated + cancelled > 0)
     await logActivity(cfg, guard.databaseId, actor, {
-      type: "Repeating meetings brought in",
-      description: `${actor.name} brought in ${created} repeating ${
-        created === 1 ? "meeting" : "meetings"
-      } from their calendar`,
+      type: "Calendar brought into step",
+      description: `${actor.name} brought the calendar into step, ${[
+        created ? `${created} new ${created === 1 ? "meeting" : "meetings"}` : "",
+        updated ? `${updated} brought up to date` : "",
+        cancelled ? `${cancelled} called off` : "",
+      ]
+        .filter(Boolean)
+        .join(", ")}`,
       relatedTable: "meetings",
     })
+
   return {
     created,
+    updated,
+    cancelled,
     // Read-only, and shown as such: these are not records and nothing may be
     // written against them until they cross the horizon.
     ahead: beyond
       .filter((e) => e.recurringEventId && e.status !== "cancelled")
       .map((e) => ({ eventId: e.id, title: e.summary || "A repeating meeting", startsAt: e.start, url: e.url })),
   }
+}
+
+/** A MEETING THE BACKWARD WINDOW BROUGHT IN HAS ALREADY HAPPENED, and saying it
+ * is "scheduled" would put last Tuesday's stand-up in the diary as something
+ * still to come. It is `held` on arrival when its end is in the past — the same
+ * word the transcript capture ticks, reached by the same reasoning: the evidence
+ * that a conversation happened is that its hour went by. */
+function heldAlready(event: CalendarEvent, now: Date): boolean {
+  const ended = Date.parse(event.end || event.start)
+  return Number.isFinite(ended) && ended < now.getTime()
+}
+
+/* --------------- the two reads the meeting DETAIL screen makes ------------- */
+
+/** The transcript's own words, off the row. Null when there is no such meeting;
+ * a meeting with nothing captured yet answers with empty text and a null stamp,
+ * which is a different sentence from "that meeting doesn't exist" and the screen
+ * says a different thing for each. */
+export async function readTranscript(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  id: string
+): Promise<{
+  text: string
+  note: string | null
+  url: string | null
+  foundBy: string | null
+  capturedAt: string | null
+} | null> {
+  const rows = await d1Query<{
+    transcript_text: string | null
+    transcript_note: string | null
+    transcript_url: string | null
+    transcript_found_by: string | null
+    transcript_captured_at: string | null
+  }>(
+    cfg,
+    guard.databaseId,
+    // R14: one row by primary key.
+    `SELECT transcript_text, transcript_note, transcript_url, transcript_found_by, transcript_captured_at
+       FROM meetings WHERE id = ? LIMIT 1`,
+    [id]
+  )
+  const row = rows[0]
+  if (!row) return null
+  return {
+    text: row.transcript_text ?? "",
+    note: row.transcript_note,
+    url: row.transcript_url,
+    foundBy: row.transcript_found_by,
+    capturedAt: row.transcript_captured_at,
+  }
+}
+
+/**
+ * WHICH OF THESE ADDRESSES DO WE KNOW — one of our own people, or a contact on
+ * one of our accounts.
+ *
+ * TWO DATABASES, and that is why this is one function rather than a join. Our
+ * members live in the GLOBAL core database (a team's own database has no users
+ * table, which is the same reason `staff_profiles.user_id` carries no foreign
+ * key); the accounts live in the team's. So the addresses are asked of each in
+ * turn and the two answers are merged onto one line per person.
+ *
+ * A CONTACT RESOLVES TO ITS PARENT, exactly as the mail fence does: Marta — a
+ * person account sitting under Bergman — is BERGMAN's contact, and naming Marta
+ * would send a reader to a record that is not the client they meant. The rule
+ * lives in two places because the two reads are for two different purposes, and
+ * lib/google-read.ts's `knownContacts` says the whole of it.
+ *
+ * BOTH HALVES CAN BE NULL and usually one of them is. Most addresses on most
+ * invitations are neither a colleague nor a client, and a screen that implies
+ * otherwise is a screen inventing relationships.
+ */
+export async function linkGuests(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  emails: string[]
+): Promise<MeetingPersonLink[]> {
+  const list = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]
+  if (!list.length) return []
+  // Bounded by the guest list that produced it (EVENT_ATTENDEE_CAP is 50), which
+  // keeps both statements under D1's bound-parameter ceiling with room to spare.
+  const placeholders = list.map(() => "?").join(", ")
+  const [members, contacts] = await Promise.all([
+    env.DB.prepare(
+      `SELECT LOWER(u.email) AS email, u.id, u.first_name, u.last_name FROM users u
+         JOIN team_members tm ON tm.user_id = u.id
+        WHERE tm.team_id = ? AND tm.deactivated_at IS NULL AND LOWER(u.email) IN (${placeholders})`
+    )
+      .bind(guard.teamId, ...list)
+      .all<{ email: string; id: string; first_name: string | null; last_name: string | null }>(),
+    d1Query<{ email: string; account_id: string; account_name: string | null }>(
+      cfg,
+      guard.databaseId,
+      // R14: bounded by the named address list above. GROUPED for the same
+      // reason `knownContacts` is — two contact rows can share one address, and
+      // a row per duplicate would put the same person on the screen twice.
+      //
+      // THE PARENT IS RESOLVED BY A SELF-JOIN, in this one statement, rather
+      // than by a second read of the ids this one produced. That was the first
+      // shape and the parameter-cap suite refused it, correctly: a second `IN`
+      // list built from the answer to the first is a placeholder count nothing
+      // in the source bounds, however small it happens to be in practice.
+      //
+      // `min(...)` is what makes the two bare columns deterministic: SQLite
+      // takes them from the row that produced the minimum, so the name and the
+      // id are always the same account rather than two arbitrary rows of a
+      // group.
+      `SELECT LOWER(c.email) AS email,
+              min(COALESCE(p.id, c.id)) AS account_id,
+              COALESCE(p.name, c.name) AS account_name
+         FROM accounts c LEFT JOIN accounts p ON p.id = c.parent_account_id
+        WHERE c.email IS NOT NULL AND LOWER(c.email) IN (${placeholders})
+        GROUP BY LOWER(c.email) LIMIT ${LIST_HARD_CAP}`,
+      list
+    ),
+  ])
+  const memberBy = new Map(
+    (members.results ?? []).map((r) => [
+      r.email,
+      { id: r.id, name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email },
+    ])
+  )
+  const contactBy = new Map(contacts.map((c) => [c.email, c]))
+
+  return list.map((email) => {
+    const member = memberBy.get(email) ?? null
+    const contact = contactBy.get(email) ?? null
+    return {
+      email,
+      memberUserId: member?.id ?? null,
+      memberName: member?.name ?? null,
+      accountId: contact?.account_id ?? null,
+      accountName: contact?.account_name ?? null,
+    }
+  })
 }
