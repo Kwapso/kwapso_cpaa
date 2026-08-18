@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { NAV, TEAM_SECTIONS, bottomNavItems } from "@/lib/pages"
+import { BOTTOM_NAV_SLOTS, NAV, TEAM_SECTIONS, bottomNavItems, overflowNavItems } from "@/lib/pages"
 import { MODULE_PERMISSION } from "@/lib/screens"
 import { TEAM_MODULES } from "@shared/team-modules"
 
@@ -29,9 +29,64 @@ describe("bottomNavItems — Home, Knowledge base, Tickets, Settings", () => {
     ])
   })
 
-  it("caps the bar at 5 destinations", () => {
-    const many = [...composed, { slug: "a" }, { slug: "b" }]
-    expect(bottomNavItems(many)).toHaveLength(5)
+  it("shows all of them when they fit", () => {
+    expect(bottomNavItems(composed)).toHaveLength(4)
+    expect(overflowNavItems(composed)).toEqual([])
+  })
+
+  it("gives the last slot to More once there are more sections than slots", () => {
+    // Five sections still fit — the fifth is a section, not a More.
+    const five = [...composed, { slug: "a" }]
+    expect(bottomNavItems(five)).toHaveLength(5)
+    expect(overflowNavItems(five)).toEqual([])
+
+    // Six do not. The bar shows four and hands the fifth slot to More.
+    const six = [...five, { slug: "b" }]
+    expect(bottomNavItems(six)).toHaveLength(BOTTOM_NAV_SLOTS - 1)
+    expect(overflowNavItems(six).map((i) => i.slug)).toEqual(["a", "b"])
+  })
+
+  it("NOTHING FALLS BETWEEN THEM, at any length", () => {
+    // THE INVARIANT THIS FILE EXISTS FOR. `bottomNavItems` used to be
+    // `items.slice(0, 5)` and there was no second function at all: every
+    // section past the fifth was dropped on the floor, and since the desktop
+    // rail is `hidden md:flex` those sections could not be reached on a phone
+    // or a tablet by any route. Five of the ten real ones were unreachable.
+    //
+    // So the property is not "the bar is capped" — a cap was never the
+    // problem. It is that the two halves PARTITION the list, whatever its
+    // length, so a section added in ten years' time lands in one of them.
+    for (let n = 0; n <= 12; n++) {
+      const items = Array.from({ length: n }, (_, i) => ({ slug: `s${i}` }))
+      expect(
+        [...bottomNavItems(items), ...overflowNavItems(items)],
+        `${n} sections`
+      ).toEqual(items)
+    }
+  })
+})
+
+describe("the phone can actually reach the overflow", () => {
+  // The partition being right is not the same as the shell USING it — that gap
+  // is exactly how this shipped: pages.ts even carried a comment promising
+  // extras "would fold into a More entry", and nothing folded them anywhere. A
+  // comment describing the catch is not the catch, so this reads the shell.
+  const shell = readFileSync(join(ROOT, "web", "components", "app-shell.tsx"), "utf8")
+
+  it("the shell computes the overflow", () => {
+    expect(shell).toContain("overflowNavItems(navLinks)")
+  })
+
+  it("the shell renders a control for it, and it opens something", () => {
+    expect(shell, "no More control in the bottom bar").toMatch(/overflowNav\.length > 0/)
+    expect(shell, "the More control opens nothing").toMatch(/setMoreOpen\(true\)/)
+  })
+
+  it("what it opens lists EVERY section, not only the leftovers", () => {
+    // navGroups is the whole rail. Listing only `overflowNav` here would mean
+    // "where is Tickets?" has a different answer on a phone than on a laptop.
+    const sheet = shell.slice(shell.indexOf("<Sheet open={moreOpen}"))
+    expect(sheet).toContain("navGroups.map(")
   })
 })
 

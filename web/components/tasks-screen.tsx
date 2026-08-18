@@ -30,10 +30,6 @@ import {
   type ScreenActionContext,
   type ScreenIntent,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import {
-  CalendarView,
-  defaultCalendarViewConfig,
-} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
 import type { RecipeField, ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Inbox } from "lucide-react"
@@ -42,6 +38,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
+import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
@@ -54,9 +51,10 @@ import { withDataDrivenCollection } from "@/lib/screens"
 import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
 import type { AppRow, Account, SelectableValue, Task, TeamMember } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
-import { formatDate } from "@shared/web/format"
+import { formatDate, formatDateSortable } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { assignableMembers } from "@/lib/people"
 
 /** One task, as a row. Every column the six views need is on it, so the two
  * column sets below are a CHOICE of what to show rather than two shapings that
@@ -89,8 +87,11 @@ function shapeTasks(tasks: Task[]) {
         client: t.accountName ?? "—",
         important: t.important ? "Yes" : "No",
         urgent: t.urgent ? "Yes" : "No",
-        deadline: t.dueOn ? formatDate(t.dueOn) : "—",
-        closed: t.completedAt ? formatDate(t.completedAt) : "—",
+        // THE TWO TABLE COLUMNS PEOPLE SORT, so they are the sortable spelling
+        // of a date rather than the warm one (shared/web/format.ts says why).
+        // The summary line above keeps `formatDate`: it is read, not compared.
+        deadline: t.dueOn ? formatDateSortable(t.dueOn) : "—",
+        closed: t.completedAt ? formatDateSortable(t.completedAt) : "—",
         // Facet columns (read by the filter engine, not the renderer).
         status: t.status === "done" ? "Done" : "Open",
         assignee: t.assigneeName ?? "Nobody yet",
@@ -154,10 +155,9 @@ function useTaskFormOptions(teamId: string) {
   const accountsQ = useCached<Account[]>(`accounts:${teamId}`, () => listFetch.accounts(teamId))
   const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () => listFetch.selectable(teamId))
   return {
-    members: (membersQ.data ?? []).map((m) => ({
-      id: m.userId,
-      name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
-    })),
+    // Who's doing it: OUR people. A client login is an ordinary member and
+    // was in this dropdown until the one seam started deciding (lib/people).
+    members: assignableMembers(membersQ.data),
     apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
     accounts: (accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
     // A retired department never appears as a pickable option, exactly as a
@@ -273,7 +273,7 @@ export function TasksScreen({
   const dueToday = counts.dueToday ?? 0
   const doneToday = counts.dueTodayDone ?? 0
   const progressBar = (
-    <section className="flex flex-col gap-1.5" aria-label={t("Today's tasks")}>
+    <section className="flex flex-col gap-2" aria-label={t("Today's tasks")}>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-medium">{t("Today's tasks")}</h2>
         <p className="text-muted-foreground text-xs tabular-nums">
@@ -299,28 +299,37 @@ export function TasksScreen({
   // A TABLE, not a two-line list, and that is what makes the four priority levels
   // distinct: each is its own sortable, filterable column rather than the fourth
   // clause of a summary sentence nobody reads to the end of.
-  const listRecipe = {
-    ...withDataDrivenCollection(recipe, data.rows),
-    display: "table" as const,
-    fields: columns,
-  }
+  // THE DISPLAY IS DECIDED FIRST, then the collection is tuned to the rows — not
+  // the other way round. A table's column headers ARE its sort control, and the
+  // tuner stands its own picker down when it can see it is drawing one
+  // (`frameSortOptions`); spreading the display on afterwards would hide that
+  // fact from it and put two sort controls on one screen.
+  const listRecipe = withDataDrivenCollection(
+    { ...recipe, display: "table" as const, fields: columns },
+    data.rows
+  )
 
-  // THE MONTH GRID — the library's own calendar-view, given the same rows. It
-  // wants a bare date, so the deadline's day is what it is keyed on; the
-  // department colour-codes the entry, which is the one thing you can read from
-  // across a room.
-  const calendarRows = tasksQ.data
+  // THE CALENDAR — the host's own (components/record-calendar.tsx), given the
+  // same rows. It wants a bare day, so the deadline's day is what it is keyed on;
+  // the department colour-codes the entry, which is the one thing you can read
+  // from across a room. The second line is what the AGENDA has room for and a
+  // square has not: how urgent it is, and whose it is.
+  //
+  // AND EVERY ONE OF THEM OPENS. `onOpen` is the engine's own `open` intent, so
+  // a task reached from a square lands on exactly the screen the list reaches.
+  const calendarEntries: CalendarEntry[] = tasksQ.data
     .filter((r) => r.dueOn)
     .map((r) => ({
       id: r.id,
-      date: (r.dueOn as string).slice(0, 10),
-      title: r.title,
+      day: (r.dueOn as string).slice(0, 10),
+      title: r.ref ? `${r.ref} · ${r.title}` : r.title,
       accent: r.department ?? "",
+      detail: [PRIORITY_LABEL[r.priority], r.assigneeName].filter(Boolean).join(" · "),
     }))
 
   return (
     <CountedAbove active={openBadge !== ""}>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the count lives in ONE place. The strip below badges all six views,
           so the heading stands down through the arbitration context rather than
           saying the same number twice. */}
@@ -356,15 +365,10 @@ export function TasksScreen({
         }
       >
         {view === "calendar" ? (
-          <CalendarView
-            data={calendarRows}
-            config={{
-              ...defaultCalendarViewConfig,
-              dateField: "date",
-              titleField: "title",
-              accentField: "accent",
-              weekStartsOn: "monday",
-            }}
+          <RecordCalendar
+            entries={calendarEntries}
+            onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
+            emptyText={t("Nothing due this month.")}
           />
         ) : (
           <ScreenRenderer
@@ -380,7 +384,7 @@ export function TasksScreen({
       {/* R14: BOUNDED, not paged — admin is ticked off as fast as it arrives. */}
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
+        <h2 className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
           <Inbox className="size-3.5" />
           {t("Waiting on clients")}
         </h2>
@@ -395,6 +399,7 @@ export function TasksScreen({
         open={taskOpen}
         onOpenChange={setTaskOpen}
         draftKey={`task:add:${teamId}`}
+        teamId={teamId}
         members={options.members}
         apps={options.apps}
         accounts={options.accounts}

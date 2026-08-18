@@ -140,6 +140,19 @@ const brandAssetBody = (i: Record<string, unknown>): Record<string, unknown> => 
   fileUrl: opt(i, "fileUrl"),
 })
 
+/** WHAT WE HANDED OVER, as a body. The APP rides on both writes — the create
+ * door needs it to resolve the account, and the edit door needs it to answer
+ * with the right shelf — so it is in the shared builder rather than spelled
+ * twice. R22 proves the forwarding half by RUNNING this. */
+const deliverableBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  appId: str(i, "appId"),
+  title: str(i, "title"),
+  kind: opt(i, "kind"),
+  datedOn: opt(i, "datedOn"),
+  url: opt(i, "url"),
+  imageUrl: opt(i, "imageUrl"),
+})
+
 const meetingPurposeBody = (i: Record<string, unknown>): Record<string, unknown> => ({
   name: str(i, "name"),
   department: opt(i, "department"),
@@ -259,9 +272,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle, 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle, 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'created', 'updated', 'status', 'kind' or 'title'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, view: S, q: S, accountId: S, appId: S, helpType: S, status: S, id: S, cursor: S }),
+    schema: obj({
+      scope: S, view: S, q: S, accountId: S, appId: S, helpType: S, status: S, id: S,
+      sort: S, dir: S, cursor: S,
+    }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
       if (str(i, "q")) q.push(`q=${encodeURIComponent(str(i, "q"))}`)
@@ -274,6 +290,10 @@ export const SHARED_TOOLS: SharedTool[] = [
       // the model has to keep re-reading.
       if (str(i, "view") === "archived") q.push("view=archived")
       if (str(i, "id")) q.push(`id=${encodeURIComponent(str(i, "id"))}`)
+      // THE ORDER is a question for the door, exactly as the filters are: the
+      // list pages, so ordering the rows a caller already has orders one page.
+      if (str(i, "sort")) q.push(`sort=${encodeURIComponent(str(i, "sort"))}`)
+      if (str(i, "dir")) q.push(`dir=${encodeURIComponent(str(i, "dir"))}`)
       if (str(i, "cursor")) q.push(`cursor=${encodeURIComponent(str(i, "cursor"))}`)
       return `?${q.join("&")}`
     },
@@ -327,12 +347,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client', as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question, how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client', as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code', 'status' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question, how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
-    schema: obj({ q: S, type: S, status: S, archived: S, parentId: S, cursor: S }),
+    schema: obj({ q: S, type: S, status: S, archived: S, parentId: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "status", "archived", "parentId", "cursor"])
+      for (const key of ["q", "type", "status", "archived", "parentId", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -350,7 +370,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_account",
     summary:
-      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
+      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. Both are still live here, but the agency's own screens now only ever create companies: a person is made on a company's Contacts tab, which creates the account and then links it the way `link_contact` does. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts",
     schema: obj(
       { accountType: S, name: S, parentAccountId: S, ...ACCOUNT_FIELD_SCHEMA },
@@ -841,12 +861,17 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_stories",
     summary:
-      "List the team's STORIES, the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system, a story always has an app and only sometimes a sprint), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work. Pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's STORIES, the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system, a story always has an app and only sometimes a sprint), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work. Pass 'all' to include it). Pass `id` to fetch one story. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'deadline', 'created', 'status', 'assignee' or 'title'. The order is the DOOR's, so 'the three latest deadlines' is the whole backlog's three and not the loaded page's. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/stories",
-    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, q: S, view: S, cursor: S }),
+    schema: obj({
+      id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, q: S, view: S,
+      sort: S, dir: S, cursor: S,
+    }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["id", "status", "ticketId", "sprintId", "appId", "assigneeId", "q", "view", "cursor"])
+      for (const k of [
+        "id", "status", "ticketId", "sprintId", "appId", "assigneeId", "q", "view", "sort", "dir", "cursor",
+      ])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -1046,12 +1071,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_meetings",
     summary:
-      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client', 'status' or 'added'. The order is the DOOR's, so it spans the whole diary rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
-    schema: obj({ id: S, accountId: S, appId: S, purposeId: S, status: S, view: S, q: S, cursor: S }),
+    schema: obj({ id: S, accountId: S, appId: S, purposeId: S, status: S, view: S, q: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["id", "accountId", "appId", "purposeId", "status", "view", "q", "cursor"])
+      for (const k of ["id", "accountId", "appId", "purposeId", "status", "view", "q", "sort", "dir", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -1138,9 +1163,27 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
+    name: "get_meeting_transcript",
+    summary:
+      "What was SAID in a meeting, by `id` — the transcript's own words, kept on the record rather than fetched from Google, so any colleague who may read meetings can read it. `text` is empty when none has been captured yet and `capturedAt` is then null; `foundBy` says which of the three hunts found it, `url` opens the document where it lives, and `note` is present only when the transcript was longer than one record may hold and says so in words. Use `read_meeting_transcript` first to go and find one.",
+    binding: "CONTENT", method: "GET", path: "/api/content/meetings/transcript",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: () => "Read what was said in a meeting" },
+  },
+  {
+    name: "get_meeting_people",
+    summary:
+      "Which of the people on a meeting's invitation we already know, by `id`. Every address on the entry comes back once in `links`, with `memberUserId` and `memberName` set when it is one of our own team members, and `accountId` and `accountName` set when it is a contact on one of our accounts, resolved to the client the contact sits under rather than the contact's own row. Both halves are null for an address that is neither, which is most of them. Nothing is looked up anywhere outside this team. Who was INVITED, and what each of them answered, is on the meeting record itself.",
+    binding: "CONTENT", method: "GET", path: "/api/content/meetings/people",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: () => "Look up who was at a meeting" },
+  },
+  {
     name: "sync_calendar_series",
     summary:
-      "Bring the caller's REPEATING calendar entries into the diary. Every repeating instance in the next four weeks that has no record yet becomes one, so there is a month to prepare its notes; the instances further out come back in `ahead` as read-only, because an entry six months away can still be moved or called off in Google. `created` counts the records it made. One-off entries are never imported, somebody's own diary is not the agency's record of a client conversation. Safe to call twice: an instance that already has a record cannot get a second one.",
+      "Bring the caller's calendar and the diary into step, over a window that reaches back a fortnight and forward four weeks. Three things happen. Every REPEATING instance in that window with no record yet becomes one, so there is a month to prepare its notes and last week's calls are records too; `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the guest list and what each person answered, the organiser, the join link, the attachments, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. The instances beyond the horizon come back in `ahead` as read-only, because an entry six months away can still be moved or called off in Google. One-off entries are never imported, somebody's own diary is not the agency's record of a client conversation, though a one-off already in the diary is kept up to date like any other. Safe to call twice: an instance that already has a record cannot get a second one, and an entry Google has not touched since the last call is skipped without a write.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
     schema: obj({}),
     buildBody: () => ({}),
@@ -1153,7 +1196,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "read_meeting_transcript",
     summary:
-      "Read the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It looks only in the Drive folders the caller has shared, first by the meeting's title and then by its Meet code. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time.",
+      "Find and keep the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It hunts three ways in order of proof, the file Google attached to the calendar entry itself, then a document in a Drive folder the caller has shared, then a notice from Google in the caller's mail naming the document it made, and `foundBy` says which of the three found it. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time. The words themselves are read back with `get_meeting_transcript`.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/transcript",
     schema: obj({ id: S }, ["id"]),
     buildBody: (i) => ({ id: str(i, "id") }),
@@ -1322,6 +1365,22 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
     agent: { write: false, summarize: (i) => (str(i, "scope") === "mine" ? "List my time" : "List logged time") },
   },
+  /* --------------------------------- the pulse ------------------------------ */
+  {
+    name: "get_team_pulse",
+    // NO BACKTICKED IDENTIFIER IN THIS SUMMARY, and it is not shyness (R27). The
+    // handler answers with shorthand properties, which the response-key
+    // derivation reads as variables rather than field names — so naming them here
+    // would need a DESCRIPTION_VOCABULARY line to explain a shape the caller can
+    // simply read off one answer. The sentences below say what the tool is FOR,
+    // which is the part a model cannot derive.
+    summary:
+      "The team's week in numbers, in one call: how many tickets are open and how they are spread across the stages of the lifecycle, how much work is in hand, how much of our own admin is due today or earlier, how many meetings are in this week, and — the part no other tool can give you — how many seconds were logged in each of the last eight weeks, oldest first, each labelled with the Monday that opens it. Ask it for a picture of how a week or a month went; ask list_help_tickets, list_stories or list_work_logs when you need the rows themselves. A section comes back empty when the caller's role cannot read that module, which is not the same as there being none.",
+    binding: "CONTENT", method: "GET", path: "/api/content/insights",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Check how the team's week is going" },
+  },
   {
     name: "list_running_timers",
     summary:
@@ -1423,13 +1482,16 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "ask_knowledge",
     summary:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. It NEVER writes an answer for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one unit of the team's AI allowance and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
-    schema: obj({ q: S, accountId: S, limit: N }, ["q"]),
+    schema: obj({ q: S, accountId: S, limit: N, compose: B }, ["q"]),
     buildQuery: (i) => {
       const q = [`q=${encodeURIComponent(str(i, "q"))}`]
       if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
       if (typeof i.limit === "number") q.push(`limit=${i.limit}`)
+      // The door reads the flag as the literal "1" (R20: a query value is checked
+      // where it sits), so the only truthy spelling this surface sends is that one.
+      if (i.compose === true) q.push("compose=1")
       return `?${q.join("&")}`
     },
     agent: { write: false, summarize: (i) => `Ask the knowledge base: "${str(i, "q").slice(0, 60)}"` },
@@ -1437,12 +1499,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_knowledge_sources",
     summary:
-      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'account' / 'app' / 'story' / 'sprint' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). Pass `id` for one source, a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, 'file' for one somebody uploaded, or 'ticket' / 'account' / 'contact' / 'app' / 'process' / 'sprint' / 'story' / 'meeting' / 'todo' / 'task' for material mirrored from the app's own rows, and 'document' / 'email' / 'event' / 'message' for material out of your own Google connection), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'touched' (the default, most recently changed), 'added', 'title', 'kind' or 'dated' (the date the MATERIAL is from, which is not the date it was filed). Pass `id` for one source, a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
-    schema: obj({ id: S, kind: S, compartment: S, q: S, cursor: S }),
+    schema: obj({ id: S, kind: S, compartment: S, q: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["id", "kind", "compartment", "q", "cursor"])
+      for (const key of ["id", "kind", "compartment", "q", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -1454,7 +1516,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_knowledge_status",
     summary:
-      "Is the knowledge base in step? One row per kind of material the app keeps in step for you (tickets, accounts, apps, stories, sprints): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday'. Read this before trusting an answer that seems to be missing something recent.",
+      "Is the knowledge base in step? One row per kind of material the app keeps in step for you — the customer spine (accounts, contacts), the built systems and their process maps, and the work (tickets, sprints, stories, meetings, to-dos, tasks): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday'. Read this before trusting an answer that seems to be missing something recent.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/sync",
     schema: obj({}),
     agent: { write: false, summarize: () => "Check whether the knowledge base is up to date" },
@@ -1616,15 +1678,67 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i) => `${i.active === true ? "Restore" : "Archive"} app ${str(i, "id")}`,
     },
   },
+  // WHAT WE HANDED OVER ON AN APP — its own module, so a token whose role opens
+  // apps does not automatically reach the handover shelf, and one that reaches
+  // the shelf does not automatically edit the app. Internal: like the brand
+  // library, every one of these doors refuses a client login outright.
+  {
+    name: "list_deliverables",
+    summary:
+      "What we handed over on one system: handover docs, API references, recorded walkthroughs, SOPs. `appId` names the app whose shelf you want; `id` narrows to one row. Each carries a `kind` (the team's own word for what sort of thing it is), a `title`, a `datedOn` day, a `url` pointing at the material itself, and an `imageUrl` when there is a picture worth showing. Bounded: a shelf is curated rather than accumulated, so there is no cursor here. Internal: a client login cannot reach this door.",
+    binding: "CONTENT", method: "GET", path: "/api/content/deliverables",
+    schema: obj({ appId: S, id: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["appId", "id"]) if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "Read what we handed over" },
+  },
+  {
+    name: "create_deliverable",
+    summary:
+      "File something we handed over on an app. `appId` and `title` are required, and the app is what it belongs to for good, the account it was built for is copied off the app rather than sent. `kind` is picked-or-created as a dropdown value, so a word nobody has used yet becomes one. `datedOn` is a calendar day written YYYY-MM-DD. `url` is the material: a link anywhere (a recording, a document, an API reference) — uploading the bytes themselves is a screen action, not a tool. `imageUrl` is the picture on its card.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables",
+    schema: obj({ appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["appId", "title"]),
+    buildBody: (i) => deliverableBody(i),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `File "${str(i, "title")}" as a deliverable`,
+    },
+  },
+  {
+    name: "update_deliverable",
+    summary:
+      "Correct a deliverable (by `id`). `appId` is which app's shelf it sits on and cannot be changed by sending a different one — file it again on the right app and archive this one. Same fields as filing one.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables/update",
+    schema: obj({ id: S, appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["id", "appId", "title"]),
+    buildBody: (i) => ({ id: str(i, "id"), ...deliverableBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit deliverable ${str(i, "id")}` },
+  },
+  {
+    name: "set_deliverable_active",
+    summary:
+      "Archive a deliverable (`active: false`) or put it back (`active: true`). Never deleted, and the file behind it is never thrown away either way, restoring one whose bytes had gone would hand back a broken link.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables/active",
+    schema: obj({ id: S, appId: S, active: B }, ["id", "appId", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), appId: str(i, "appId"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} deliverable ${str(i, "id")}`,
+    },
+  },
   {
     name: "list_processes",
     summary:
-      "List process maps, a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps). Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List process maps, a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'app' or 'steps' (the longest map first). The order is the DOOR's, so it spans every map rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes",
-    schema: obj({ q: S, appId: S, cursor: S }),
+    schema: obj({ q: S, appId: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "appId", "cursor"])
+      for (const key of ["q", "appId", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -1647,14 +1761,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_process",
     summary:
-      "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way.",
+      "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way. `roleName` is WHOSE hours this takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_value) — a map created without one counts its hours and reports no money at all, so name it here rather than leaving it for update_process.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes",
-    schema: obj({ appId: S, name: S, description: S, baselineLabel: S }, ["appId", "name"]),
+    schema: obj({ appId: S, name: S, description: S, baselineLabel: S, roleName: S }, ["appId", "name"]),
     buildBody: (i) => ({
       appId: str(i, "appId"),
       name: str(i, "name"),
       description: opt(i, "description"),
       baselineLabel: opt(i, "baselineLabel"),
+      roleName: opt(i, "roleName"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Map the process "${str(i, "name")}"` },
   },

@@ -32,9 +32,9 @@ const optionField = { ...defaultFieldConfig, label: "Option", required: true }
  * missing glyph costs nothing because the word is always beside it. */
 const markField = {
   ...defaultFieldConfig,
-  label: "Mark",
+  label: "Emoji",
   required: false,
-  hint: "One small picture shown beside this word, wherever the type appears. Leave it empty for a plain label.",
+  hint: "One emoji shown beside this word, wherever the type appears. Leave it empty for a plain label.",
 }
 
 export function SelectableFormDialog({

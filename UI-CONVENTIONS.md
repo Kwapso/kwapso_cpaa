@@ -160,12 +160,19 @@ permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
 // host composes it from the library PermissionMatrix (see role-detail.tsx).
 ```
 
-The current bespoke details are the names in `RECORD_DETAIL_COMPONENTS`
-(`shared/rules/registry.ts`), **`role-detail`**, **`help-detail`**,
+The bespoke details are **not a list anybody keeps**. They are DERIVED off disk
+by `recordDetailComponents()` in `web/test/rules.test.ts`, from two independent
+signals: a component under `web/components/` named `*-detail.tsx`, or one that
+renders an `<ActivityPanel>` (a record's own history feed, which nothing but a
+record detail has any business drawing). `RECORD_DETAIL_NOT` in the registry is
+the reasoned residue, rot-checked so it can only shrink. **Do not add a screen to
+a list to make it obeyed — name the file `*-detail.tsx` and it is.**
+
+Today that census catches **`role-detail`**, **`help-detail`**,
 **`account-detail`**, **`contact-detail`**, **`knowledge-detail`**,
-**`meeting-detail`** and **`process-detail`**, each a full record screen (its own
-header, tabs, actions) wired by hand because it carries a control the engine doesn't
-render: a permission matrix / a ticket thread + status stepper / the account's
+**`meeting-detail`**, **`process-detail`**, **`app-detail`**, **`sprint-detail`**
+and **`story-detail`**, each a full record screen (its own header, tabs, actions)
+wired by hand because it carries a control the engine doesn't render: a permission matrix / a ticket thread + status stepper / the account's
 contacts, the accounts nested under it and its portal logins / a source's own words
 and the switches that take it away from the assistant / prose somebody wrote before
 and after a meeting / a numbered sequence of steps and the subtraction between two
@@ -270,13 +277,17 @@ these as recipe data (see §2a). The **bespoke** details must render them themse
 and the check verifies exactly that, reading the source for the two library names:
 
 ```ts
-// web/test/rules.test.ts
-for (const c of RECORD_DETAIL_COMPONENTS) {          // ["help-detail", "role-detail", …]
-  const src = read(join(WEB, "components", `${c}.tsx`))
-  expect(src, `${c} must use library TabsView`).toContain("TabsView")
-  expect(src, `${c} must render an ActivityFeed (the Activity tab)`).toContain("ActivityFeed")
+// web/test/rules.test.ts — the SUBJECT is read off disk, never hand-listed
+for (const c of recordDetailComponents()) {          // *-detail.tsx, or renders <ActivityPanel>
+  expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
+  expect(c.source, `${c.name} must render an ActivityPanel (the Activity tab)`).toContain("ActivityPanel")
 }
 ```
+
+The two signals are deliberately **not** the two obligations, so nothing here is
+circular: a file caught by NAME is held to both with neither assumed, which is
+the case that actually bites — a new `foo-detail.tsx` shipped without tabs turns
+this red.
 
 `knowledge-detail.tsx` is the shortest model to copy: a `TabsView` whose panels are
 `Source` (the words themselves) / `Overview` (a description list built from
@@ -285,11 +296,20 @@ for (const c of RECORD_DETAIL_COMPONENTS) {          // ["help-detail", "role-de
 badge; Activity carries `formatCount(activity.total)`.
 
 **No exceptions today.** `role-detail`, the last one, grew its tabs on 2026-07-06
-(Permissions is its main tab, then Overview + Activity) and joined
-`RECORD_DETAIL_COMPONENTS`, so `RECORD_DETAIL_EXCEPTIONS` is empty: **every record
-detail in the app now carries the tabs, machine-checked.** Exceptions remain **data**
-in the registry, a new bespoke record detail must either join
-`RECORD_DETAIL_COMPONENTS` (and get the tabs) or earn a reasoned, visible exception.
+(Permissions is its main tab, then Overview + Activity): **every record detail in
+the app carries the tabs, machine-checked.**
+
+And the *census* is the part that had to change, not the screens. It used to be
+an inclusion list, `RECORD_DETAIL_COMPONENTS`, so R2 and R8 walked exactly the
+screens somebody had remembered to type into it — and it opened twice.
+`app-detail` and `process-detail` were added on 17 Aug 2026 after a tester found
+faults on screens no law had ever read; `sprint-detail` and `story-detail` were
+found missing on 18 Aug, having shipped tabs and an Activity panel that neither
+law had ever looked at. Nothing was red either time, **because a screen no law
+walks looks exactly like a screen that passes.** A law that enumerates its
+subject from a hand-kept list has a hole by construction. So the list is gone;
+what remains is `RECORD_DETAIL_NOT`, the reasoned residue of files the census
+catches and should not, each with its reason and rot-checked in both directions.
 
 ### R3, no hand-rolled toggles
 
@@ -413,9 +433,8 @@ detail render (`module-content.tsx`), keyed by what `tabCountKey` names, so a ho
 supplies numbers without knowing tab keys, and the check asserts one `withTabCounts`
 per rendered detail recipe (a seam nothing calls is dead code wearing a law's clothes).
 
-**Bespoke details** (`role-detail`, `help-detail`, `knowledge-detail`, and the rest of
-`RECORD_DETAIL_COMPONENTS`) build their own
-tabs config, so the check reads the tabs **out of the source** and requires each one to
+**Bespoke details** (`role-detail`, `help-detail`, `knowledge-detail` and every
+other file the derived census catches) build their own tabs config, so the check reads the tabs **out of the source** and requires each one to
 carry a badge or be a reviewed exception. Their counts come from the one generic record
 read, **`useRecordActivity(table, id)`** (`web/lib/use-record-activity.ts`), which
 returns page one's rows *and* the door's exact `total`, the feed is paged, so the
@@ -552,6 +571,17 @@ plain, sentence case, no jargon, no emoji**, and it uses the **glossary terms**.
   never announces it, it is always accompanied by the type WORD nearby, and it is set on
   the Dropdown values screen rather than written into a component.
 
+  **WHERE the mark belongs, extended 18 Aug 2026 (UI-RULEBOOK N11).** Not only on a
+  record detail. The owner asked for glyphs on the main screens too, so the mark also sits
+  on the nav rail (already, from `CONCEPT_ICON`), on a tab strip (`TabsView` takes an
+  `icon` per tab), beside a `CollectionHeading` title, on a group heading inside a
+  collection, and in the leading slot of any **host-composed** row (the library `List` has
+  `item.leading`; Home and Settings use it today). It CANNOT go on a **recipe-driven** row:
+  `ScreenRenderer.renderList` builds `{ id, title, subtitle }` and passes no `leading`
+  (UI-GAPS #16). Do not work around that by putting the glyph inside the title string,
+  which is the one shape this rule refuses. There, the word carries the meaning on its own
+  until the library ships the slot.
+
   **Why the rule moved, on 17 Aug 2026.** The owner asked for these twice, in writing,
   and Aurora asked for the same thing independently after counting how long it took her
   to tell a question from an issue in a list of forty. The agency's own legacy data has
@@ -685,8 +715,84 @@ alive underneath, that's the "immovable, contentless page" feel.
 - [ ] Copy is warm, plain, sentence case, no jargon, no emoji.
 - [ ] Search/filters are wired through `listCollection` + `withDataDrivenCollection` so
       they **hide when empty**.
+- [ ] **The screen is inside the glance budget** (§9): no band over 4 units (6 in a
+      table), no more than 3 blocks before the primary content, and no width of its own.
+- [ ] **Every gap is one of the five** (`gap-1` / `gap-2` / `gap-4` / `gap-6` /
+      `gap-10`), every radius is `rounded-xl` or `rounded-full`, every colour is a token.
 - [ ] `npm run check` is green (TypeScript + the full test suite, including
       `web/test/rules.test.ts`).
+
+---
+
+## 9. Density: the glance budget
+
+**The canon is [UI-RULEBOOK.md §12](UI-RULEBOOK.md#12-density-the-glance-budget-n1-to-n12)
+(rules N1 to N12).** This section is the short version, so nobody has to open two books to
+add a button.
+
+The complaint this answers, in the owner's words: *"in one given glance, the amount of
+cognitive load applied on the user should be low"*, and *"it is feeling a bit twisted,
+like there is too much to do"*. Those are two faults. **Too much** is a count. **Twisted**
+is a grouping failure, where things sitting next to each other are not about each other,
+so the eye keeps regrouping and never settles.
+
+**The metric.** Five measures, twenty points each, one hundred total. Higher is calmer.
+Every input is a count you take off the JSX, so two people measuring the same screen get
+the same number.
+
+| | Measure | Budget |
+|---|---|---|
+| **H** | units on the busiest horizontal band | **≤ 4** (a table row: ≤ 6, because its column header does the labelling) |
+| **V** | blocks before the primary content | **≤ 3** |
+| **G** | units above the fold, `3 + 2(V−1) + T + min(5, rows) × H` | **≤ 25** |
+| **F** | bands and boundaries that group correctly, over all of them | **1.0** |
+| **S** | content width ÷ the width content may fill, at 1440 | **≥ 0.90** |
+
+85 and up is *calm*, 70 to 84 *fine*, 55 to 69 *busy*, under 55 *overwhelming*. **An
+overwhelming screen is a defect in the same way too much code is a defect.** The app
+measured 75.9 across 53 screens on 18 Aug 2026; the table and the ordered work list are in
+`.session-notes/ui-rearrangement-plan.md`.
+
+**An information unit** is one thing the eye decodes on its own: a heading, a
+label-and-value pair (one unit, not two), a badge, a button, an avatar or type mark, a
+standalone number, an input, a date, a meaningful icon. A glyph beside its own word rides
+with the word and is not a unit.
+
+**The seven rules you will actually reach for.**
+
+1. **One width.** `max-w-[1600px]` lives in `web/components/deep-link-screen.tsx` and
+   nowhere else. A screen never sets its own width. Gutters are `px-4 sm:px-6 lg:px-10`,
+   once, in `app-shell.tsx`. Card padding `p-4`, panel padding `p-6`. (N8)
+2. **Five gaps, each with a meaning.** `gap-1` parts of one thing · `gap-2` siblings in a
+   group · `gap-4` rows in a block · **`gap-6` between blocks, the gap that says "these
+   are separate"** · `gap-10` between titled page sections. Nothing between them, nothing
+   outside them. (N7)
+3. **One cue per boundary, and a container is earned.** A block gets a container only when
+   it holds a collection of two or more rows or a form of two or more fields. Everything
+   else is bare on the page with `gap-6` around it. Never two cues on one boundary. (N6)
+4. **The surface step is measured.** Two surfaces read as separate at **ΔL\* ≥ 8**; a
+   hairline reads as a line at **ΔL\* ≥ 4** from both surfaces. Light mode's page-to-card
+   step is 3.22 and dark mode's is 10.32, which is exactly why the owner finds dark mode
+   clearer, so **a card keeps its hairline** and never gets a shadow. Never hard-code a
+   colour: it resolves through a token. (N5)
+5. **Two radii.** `rounded-xl` for a surface, `rounded-full` for a pill. Every other step
+   already computes to the same 24px, so writing one of them is a source-only mistake and
+   a free fix. (N9)
+6. **The control follows the option count.** 2 to 6 mutually exclusive options that change
+   the VIEW are tabs; that set a VALUE are chips (or radio when each needs a sentence).
+   **7 or more is a dropdown.** Not mutually exclusive is a filter facet or checkboxes.
+   And the override that beats both: **a chip row that wraps at 1440 is a dropdown.** (N10)
+7. **A glyph on every destination and every collection heading**, not only on detail
+   screens. The nav rail, the tab strips, `CollectionHeading`, group headings and any
+   host-composed row can all carry one today. A **recipe-driven** row cannot, because
+   `ScreenRenderer.renderList` has no `leading` slot (UI-GAPS #16), and the workaround, a
+   pictograph inside the title string, is the one shape §5 refuses. There, the word carries
+   the meaning alone. (N11)
+
+**When a screen is over budget, do these in order and stop when it passes** (N12): widen
+it → split the busiest band → move actions into the three-dot menu → push non-primary
+blocks below the primary content → take away containers → fix the gaps → collapse the
+control. Deleting a feature is not on the list.
 
 ## Collection counts, one number, one place, one seam (LAW R16)
 Every screen that shows a collection shows its count **exactly once**:

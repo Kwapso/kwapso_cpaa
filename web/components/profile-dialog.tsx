@@ -101,7 +101,7 @@ export function ProfileDialog({
           <DialogDescription>{t("Your name and photo across the app.")}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={submit}>
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-4">
             <Avatar className="size-20">
               {(photo || user?.imageUrl) && (
                 <AvatarImage src={photo || (user?.imageUrl as string)} alt={t("Your photo")} />

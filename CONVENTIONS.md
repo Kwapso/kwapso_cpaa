@@ -765,6 +765,41 @@ A law without a passing check is not a law, you cannot add one to `RULES.md` and
 registry without also adding its test (`registry-integrity` enforces the doc/registry/
 check triangle stays in sync). See [RULES.md](RULES.md).
 
+### `npm run check:built`, the second gate, for what only a BUILD can be wrong about
+
+`check` deliberately does not build: it has to be cheap enough to run before every
+commit. But a few assertions can only be true of a **built** app — they read
+`web/out/` and `web-portal/out/` and compare the shipped bytes against the source
+strings — and those were written as `it.skipIf(!html)`, so on a fresh clone, and on
+any machine that had not happened to build, **they skipped**. A skipped test and a
+passing test print the same colour. The one guard covering a fault no other test in
+this repo can see (the minifier fold above) was therefore also the one most likely to
+be silently absent at the moment somebody asked whether it was green.
+
+```jsonc
+"check:built": "npm run build
+             && REQUIRE_EXPORT=1 npm run test --workspace=kwapso-web
+             && REQUIRE_EXPORT=1 npm run test --workspace=kwapso-portal-web"
+```
+
+Three things make it a gate rather than a wish:
+
+1. **It builds first**, so the export exists by the time anything reads it.
+2. **`REQUIRE_EXPORT=1` turns "no export" from a silence into a failure**, and the
+   suite carries a tripwire asserting the file is there — a green run on a build that
+   produced nothing would otherwise look identical to a green run on the right bytes.
+3. **`deploy:staging` and `deploy:production` call it in place of `npm run build`**,
+   so the export these bytes are read out of is the very one about to be uploaded, and
+   it is listed under *Verify before shipping* in [OPERATIONS.md](OPERATIONS.md), which
+   is the list `/ship-staging` reads and runs. A gate nobody runs is not a gate.
+
+It re-runs both front-door suites WHOLE rather than naming the test files that read
+the export. That costs about ten seconds and buys the property that matters: a check
+written next year against the built output is in this gate the day it is written,
+because nothing has to remember to add it. A gate that enumerates from a hand-kept
+list has a hole by construction — the same reasoning R2's record-detail census now
+follows.
+
 Beyond the automated gate, the **ship gate** (before `/ship-staging`) runs the quality
 skills, `lean_mean` (≥ 92), `story_checks_out`, `security_sentry` (no critical/high).
 This is where "too much code is a defect" is actually scored: a lean, well-reused diff
@@ -785,8 +820,39 @@ the *why*. Add the least code that does the job, and keep `npm run check` green.
 
 ## Reading config, and writing a check that can fail
 
-Two conventions that look like trivia and are not, each one shipped as a real
+Three conventions that look like trivia and are not, each one shipped as a real
 defect first.
+
+- **A SHIPPED STRING MUST NOT INTERPOLATE A COMPILE-TIME CONSTANT.** If a string
+  reaches the browser as text the app writes itself, its literal is typed out, and
+  any number a constant derives is asserted against the constant in a test —
+  never spliced in with `${}`.
+
+  ```ts
+  const R = 435
+  // NEVER, in a string that ships:
+  const mark = `<circle r="${R}" fill="url(#ks-glow)" opacity="0"/>`
+  // The literal, plus a test that the constants still derive it:
+  const mark = `<circle r="435" fill="url(#ks-glow)" opacity="0"/>`
+  ```
+
+  Why: the production minifier (SWC, via `next build`) **constant-folds** a template
+  literal whose substitutions are all compile-time constants, and folding the boot
+  loader's mark once **dropped text** — `r="435" fill="url(#ks-glow)" opacity="0"/>`
+  reached the browser as `r="435`, leaving three malformed tags in the middle of the
+  opening frame of both front doors. The value was correct; the characters after it
+  were gone.
+
+  It is worth a convention rather than a bug report because **nothing in this repo's
+  ordinary toolchain can see it**. Vitest compiles with oxc and folds nothing, so the
+  source-level assertions all passed; TypeScript sees a well-typed string; the lint
+  sees a string. Thirty-four green tests and a clean `npm run check` said the boot
+  screen was fine. The only thing that catches it is reading the built export, which
+  is what `npm run check:built` exists for — and the class is wider than the splash:
+  any inlined SVG, `<style>` or `<script>` text assembled in TypeScript is exposed to
+  it. `web/test/splash.test.ts` shows the pattern for the assertion that replaces the
+  interpolation: the geometry is typed into the markup and DERIVED in the test, so the
+  two cannot drift apart silently.
 
 - **Numeric env vars go through `numberVar(env.X, DEFAULT)`** (`shared/workers/limits.ts`),
   never `Number(env.X) || DEFAULT` and never bare `Number(env.X)`. The two obvious

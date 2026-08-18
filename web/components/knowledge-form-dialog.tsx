@@ -27,9 +27,12 @@ import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import {
   Select,
   SelectContent,
@@ -68,6 +71,7 @@ export function KnowledgeFormDialog({
   open,
   onOpenChange,
   onSubmit,
+  teamId,
   accountOptions,
   appOptions,
   initial,
@@ -80,6 +84,8 @@ export function KnowledgeFormDialog({
   onOpenChange: (open: boolean) => void
   onSubmit: (values: KnowledgeFormValues) => Promise<void>
   /** the accounts this caller may file under — already fenced by their own read */
+  /** the team whose clients the compartment picker searches (accounts PAGE, R14) */
+  teamId: string | null
   accountOptions: { id: string; name: string }[]
   /** the apps this caller may limit a source to. The host hands in the ones it
    * already loaded; the DOOR is what decides, and it refuses any app the caller
@@ -127,7 +133,7 @@ export function KnowledgeFormDialog({
     try {
       await onSubmit({
         title: values.title.trim(),
-        body: values.body.trim(),
+        body: richTextValue(values.body),
         sourceUrl: values.sourceUrl.trim(),
         accountId: values.accountId === AGENCY ? "" : values.accountId,
         visibility: values.visibility,
@@ -183,13 +189,12 @@ export function KnowledgeFormDialog({
         />
       </Field>
       <Field config={bodyField} htmlFor="knowledge-body" className={fieldSpacing}>
-        <Textarea
-          id="knowledge-body"
-          value={values.body}
-          onChange={(e) => setValues((v) => ({ ...v, body: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.body}
+          onChange={(html) => setValues((v) => ({ ...v, body: html }))}
           placeholder={t("Write it the way you would explain it to a new colleague.")}
-          disabled={busy || textOwnedElsewhere}
-          rows={8}
+          className="min-h-32"
         />
       </Field>
       <Field config={linkField} htmlFor="knowledge-link" className={fieldSpacing}>
@@ -202,23 +207,19 @@ export function KnowledgeFormDialog({
         />
       </Field>
       <Field config={filedField} htmlFor="knowledge-filed" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="knowledge-filed"
           value={values.accountId}
-          onValueChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+          onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: AGENCY, label: t("The agency's own") }}
+          placeholder={t("The agency's own")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="knowledge-filed">
-            <SelectValue placeholder={t("The agency's own")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={AGENCY}>{t("The agency's own")}</SelectItem>
-            {accountOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <p className="text-muted-foreground mt-1 text-xs">
           {t("Filing it under a client is how a question about them finds it first.")}
         </p>
@@ -252,22 +253,16 @@ export function KnowledgeFormDialog({
       </Field>
       {values.visibility === "app" && (
         <Field config={appField} htmlFor="knowledge-app" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="knowledge-app"
             value={values.visibleToAppId}
-            onValueChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
+            onChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
+            options={appOptions.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder={t("Pick the app")}
+            searchPlaceholder={t("Search apps…")}
+            emptyText={t("No app matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="knowledge-app">
-              <SelectValue placeholder={t("Pick the app")} />
-            </SelectTrigger>
-            <SelectContent>
-              {appOptions.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
           <p className="text-muted-foreground mt-1 text-xs">
             {t("The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.")}
           </p>

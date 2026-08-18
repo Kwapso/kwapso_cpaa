@@ -177,7 +177,13 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
   return (
     <RecordScreen
-      eyebrow={[t("Role"), role.isDefault ? t("Locked") : null, role.active ? null : t("Inactive")]
+      // D4 + N4: the eyebrow says WHAT THIS IS, and one thing about its state.
+      // It used to read `Role · Locked · Inactive` — a type plus two states on
+      // one band, which is three units before the title has been read. The two
+      // states are mutually exclusive in practice (a locked role is a seeded
+      // one and a seeded one is never switched off), so the eyebrow carries
+      // whichever applies and never both.
+      eyebrow={[t("Role"), role.active ? (role.isDefault ? t("Locked") : null) : t("Inactive")]
         .filter(Boolean)
         .join(" · ")}
       title={role.title}
@@ -186,7 +192,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       }
       actions={
         canSave ? (
-          <Button variant="outline" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1.5">
+          <Button variant="outline" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1">
             <Pencil className="size-3.5" />
             {t("Edit details")}
           </Button>
@@ -206,7 +212,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           // Permissions — the main tab.
           return !role.active ? (
             // Deactivated: permissions frozen (holders keep access); offer reactivate.
-            <div className="border-border/60 flex flex-col gap-3 rounded-xl border p-6">
+            <div className="border-border/60 flex flex-col gap-4 rounded-xl border p-6">
               <p className="text-muted-foreground text-sm">
                 This role is deactivated. Members who have it keep their access, but you can&apos;t
                 give it to anyone new until you activate it again.
@@ -215,7 +221,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                 <Button
                   onClick={() => void setActive(true)}
                   disabled={busyActive}
-                  className="w-full gap-1.5 sm:w-auto sm:self-start"
+                  className="w-full gap-1 sm:w-auto sm:self-start"
                 >
                   {busyActive ? <Spinner /> : <Power className="size-3.5" />}
                   {busyActive ? "Activating…" : "Activate"}
@@ -225,8 +231,8 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           ) : permsQ.loading || !matrixConfig || !draft ? (
             <Skeleton className="h-64 w-full rounded-xl" />
           ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-muted-foreground text-sm">
                   {perms?.isDefault
                     ? "The Admin role has full access and can't be changed."
@@ -241,7 +247,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                       size="sm"
                       onClick={() => setConfirmDeactivate(true)}
                       disabled={busyActive}
-                      className="text-destructive hover:text-destructive gap-1.5"
+                      className="text-destructive hover:text-destructive gap-1"
                     >
                       <Power className="size-3.5" />
                       Deactivate

@@ -27,11 +27,17 @@ import { knowledgeAnswer } from "../src/lib/knowledge"
 const ROUTES = join(__dirname, "..", "src", "routes", "knowledge.ts")
 const LIB = join(__dirname, "..", "src", "lib", "knowledge.ts")
 
-const passage = (sourceId: string, title: string, seq = 0): KnowledgePassage => ({
+const passage = (
+  sourceId: string,
+  title: string,
+  seq = 0,
+  recordPath: string | null = null
+): KnowledgePassage => ({
   sourceId,
   title,
   kind: "note",
   url: null,
+  recordPath,
   compartment: "agency",
   seq,
   text: "The dispatch rollout is paused until the invoice run is fixed.",
@@ -78,6 +84,29 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
     expect(answer.reason).toContain("Bergman")
   })
 
+  it("a citation points at the same record its passage does", () => {
+    // The owner's ask: "the ability to go and check out the links to the sources
+    // or to those particular records as well." The path is DERIVED once, on the
+    // passage, and copied — so the link under a passage and the link under its
+    // citation can never point at different rows, which is the whole reason the
+    // citation does not work it out again.
+    const answer = knowledgeAnswer({
+      question: "what did we agree?",
+      compartments: [],
+      reason: "…",
+      records: [],
+      passages: [
+        passage("S1", "Dispatch keeps logging drivers out", 0, "tickets/H1"),
+        passage("S2", "A note somebody typed", 0, null),
+      ],
+      candidates: 4,
+    })
+    expect(answer.citations.map((c) => c.recordPath)).toEqual(["tickets/H1", null])
+    // A source with no record screen renders no link rather than a broken one —
+    // a note somebody typed IS the record.
+    expect(answer.citations[1].recordPath).toBeNull()
+  })
+
   it("cannot be talked into passages without citations", () => {
     // The shape the law exists to forbid: evidence with nothing behind it. The
     // seam drops the passages rather than trusting the caller, so there is no
@@ -102,7 +131,13 @@ describe("R23 — no door assembles that answer by hand", () => {
     expect(routes).toContain("await retrieve(")
     // …and nothing in the routes file mentions passages or citations at all: a
     // door that shaped its own response would have to name one of them.
-    for (const forbidden of ["passages", "citations", "found:"])
+    //
+    // `answer:` joined that list the day the base started WRITING the answer. The
+    // door now supplies the model call that composes it, which is exactly the
+    // position from which a door would be tempted to staple the prose onto the
+    // response itself — and prose stapled on beside the seam is prose that can
+    // outlive the citations it was written from.
+    for (const forbidden of ["passages", "citations", "found:", "answer:"])
       expect(
         routes.includes(forbidden),
         `the knowledge routes must not build an answer by hand — "${forbidden}" appears in routes/knowledge.ts`
@@ -117,5 +152,30 @@ describe("R23 — no door assembles that answer by hand", () => {
     expect([...lib.matchAll(/citations:\s*KnowledgeCitation\[\]/g)].length).toBeGreaterThan(0)
     // The tripwire: this scan must be reading a file that really builds answers.
     expect([...lib.matchAll(/knowledgeAnswer\(\{/g)].length).toBeGreaterThanOrEqual(2)
+  })
+
+  // THE WRITTEN ANSWER IS AN INPUT TO THE SEAM, NOT A SECOND PRODUCT OF IT. The
+  // composer hands back a string and knows nothing about `found`; the seam decides
+  // whether that string may exist, in the same expression as the citations. Read
+  // off the source because it is a structural claim: a composer that could reach
+  // into the answer would be a second place an answer gets built, which is the
+  // whole of what R23 forbids.
+  it("the writer composes prose and decides nothing", () => {
+    const composer = stripComments(
+      readFileSync(join(__dirname, "..", "src", "lib", "knowledge-compose.ts"), "utf8")
+    )
+    // Structural tokens, not English: the writer's own prompt may perfectly well
+    // say the word "found" to a model. What it may not do is read or set the
+    // decision — `.found`, a `found:` key, a citation list, or the seam itself.
+    for (const forbidden of [".found", "found:", "citations:", "knowledgeAnswer"])
+      expect(
+        composer.includes(forbidden),
+        `the answer writer must not decide anything about the answer — "${forbidden}" appears in lib/knowledge-compose.ts`
+      ).toBe(false)
+    // And the seam ties the prose to the same `found` the passages ride.
+    const lib = stripComments(readFileSync(LIB, "utf8"))
+    expect(lib, "the written answer must be gated on `found`, in the seam").toMatch(
+      /answer:\s*found\s*\?/
+    )
   })
 })

@@ -1,7 +1,7 @@
 "use client"
 
-// ONE form for the two agency-internal RECORD kinds — a brand asset and a
-// meeting purpose.
+// ONE form for the three small RECORD kinds that share a shape — a brand asset,
+// a meeting purpose, and a deliverable.
 //
 // They are the same form: a name, an optional vocabulary field, some prose, and
 // one or two extras. Two dialogs would be two copies of one draft rule, one
@@ -37,14 +37,21 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 export type InternalField = {
   key: string
   label: string
-  kind: "text" | "prose" | "date" | "number" | "file"
+  /** `link` is `file`'s twin for a field that may hold EITHER — an address
+   * somebody types, or a file we store and address ourselves. It renders the
+   * text input AND the picker, both writing the one field, because "here is the
+   * thing I mean" is one answer with two ways of giving it (a Loom recording
+   * has no bytes to upload; a handover PDF has no address until we make one).
+   * Two fields would be two columns, two lists and two ways to be wrong about
+   * which one is set. */
+  kind: "text" | "prose" | "date" | "number" | "file" | "link"
   placeholder?: string
   options?: string[]
   required?: boolean
-  /** `kind: "file"` only — post the bytes and answer with the URL to store. It
-   * lives on the FIELD rather than on the dialog because each upload door is
-   * gated on the module that owns the thing being uploaded, and this one form
-   * serves four modules. */
+  /** `kind: "file"` and `kind: "link"` only — post the bytes and answer with the
+   * URL to store. It lives on the FIELD rather than on the dialog because each
+   * upload door is gated on the module that owns the thing being uploaded, and
+   * this one form serves several modules. */
   upload?: (dataUrl: string, fileName: string) => Promise<string>
 }
 
@@ -130,6 +137,30 @@ export function InternalRecordDialog({
                 upload={f.upload}
                 disabled={busy}
               />
+            ) : f.kind === "link" && f.upload ? (
+              /* THE ADDRESS AND THE PICKER, both writing the ONE field. The
+                 picker is handed an empty value on purpose, so it stays the
+                 "choose a file" button rather than collapsing into its chosen-
+                 file chip — what was chosen is already visible in the input
+                 above it, as the address the record will actually store, and a
+                 person clears it the way they clear any other field. */
+              <div className="flex flex-col gap-2">
+                <Input
+                  id={id}
+                  type="text"
+                  value={values[f.key] ?? ""}
+                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  disabled={busy}
+                />
+                <FilePicker
+                  id={`${id}-file`}
+                  value=""
+                  onChange={(url) => setValues((v) => ({ ...v, [f.key]: url }))}
+                  upload={f.upload}
+                  disabled={busy}
+                />
+              </div>
             ) : f.kind === "prose" ? (
               <Textarea
                 id={id}
@@ -188,6 +219,32 @@ export const brandAssetFields = (categories: string[]): InternalField[] => [
     upload: (dataUrl) => content.uploadBrandAssetFile(dataUrl).then((r) => r.url),
   },
   { key: "description", label: "Description", kind: "prose", placeholder: "When to use it, and when not to." },
+]
+
+/** WHAT WE HANDED OVER, as a form. Five fields, and they are the four the legacy
+ * app carried (name, type, a content URL and a thumbnail) plus the date its card
+ * has always shown.
+ *
+ * The APP is not among them: you are standing on it, so it is a fact rather than
+ * a question — the same rule the ticket and meeting forms follow when they are
+ * opened from a record. */
+export const deliverableFields = (kinds: string[]): InternalField[] => [
+  { key: "title", label: "Title", kind: "text", required: true, placeholder: "Demo walkthrough" },
+  { key: "kind", label: "Kind", kind: "text", options: kinds, placeholder: "Video, handover doc, SOP…" },
+  { key: "datedOn", label: "Date", kind: "date" },
+  {
+    key: "url",
+    label: "Link or file",
+    kind: "link",
+    placeholder: "https://…",
+    upload: (dataUrl) => content.uploadDeliverableFile(dataUrl).then((r) => r.url),
+  },
+  {
+    key: "imageUrl",
+    label: "Picture",
+    kind: "file",
+    upload: (dataUrl) => content.uploadDeliverableFile(dataUrl).then((r) => r.url),
+  },
 ]
 
 export const purposeFields = (departments: string[]): InternalField[] => [

@@ -32,8 +32,8 @@ import { ProcessDetailScreen } from "@/components/process-detail"
 import { AppDetailScreen } from "@/components/app-detail"
 import { SprintDetailScreen } from "@/components/sprint-detail"
 import { StoryDetailScreen } from "@/components/story-detail"
+import { TaskDetailScreen } from "@/components/task-detail"
 import { MeetingDetailScreen } from "@/components/meeting-detail"
-import { RecordTimerButton } from "@/components/timer-bar"
 import { ImportScreen } from "@/components/import-screen"
 import { InternalRateCardScreen } from "@/components/internal-rate-card"
 import { StaffPanel } from "@/components/staff-panel"
@@ -47,7 +47,6 @@ import {
   shapeInviteDetail,
   shapeMemberDetail,
   shapePurposeDetail,
-  shapeTaskDetail,
   shapeTeamDetail,
 } from "@/components/deep-link/shape"
 import type { ActivityItem } from "@shared/types"
@@ -57,7 +56,6 @@ import type { useActiveTeam } from "@/lib/use-active-team"
 import {
   MODULE_PERMISSION,
   resolveRecipe,
-  withActionLabel,
   withoutActions,
   withTabCounts,
 } from "@/lib/screens"
@@ -72,7 +70,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
@@ -137,11 +135,6 @@ function internalDetail(
      * label deciding from a different spelling of the same field is how a button
      * ends up disagreeing with the write behind it. */
     adapt?: (recipe: ScreenRecipe, record: Record<string, unknown>) => ScreenRecipe
-    /** One control above the engine's blocks, for the thing a recipe cannot draw
-     * at all. Today that is exactly one thing — the timer on a task — and it is
-     * a slot rather than a fifth branch because the alternative was to stop
-     * using the engine for a record the engine draws perfectly well. */
-    above?: React.ReactNode
   }
 ): React.ReactNode {
   if (spec.query.error) return <LoadError what={spec.what} />
@@ -150,8 +143,7 @@ function internalDetail(
   if (!row) return <p className="text-muted-foreground text-sm">That record no longer exists.</p>
   const data = spec.shape(row, ctx.internalActivity.rows)
   return (
-    <div className="flex flex-col gap-4">
-      {spec.above && <div className="flex flex-wrap justify-end gap-2">{spec.above}</div>}
+    <div className="flex flex-col gap-6">
       <ScreenRenderer
         recipe={spec.adapt ? spec.adapt(recipe, data.record ?? {}) : recipe}
         data={data}
@@ -382,40 +374,27 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     if (module === "meetings") {
       return <MeetingDetailScreen teamId={teamId as string} meetingId={recordId} />
     }
+    // ONE TASK. A component since 18 Aug 2026, when it grew a Work logs tab —
+    // see task-detail.tsx for why the engine handed it over. The tick still runs
+    // through the SAME `onAction` seam the recipe used, and the host still reads
+    // the CURRENT status off the record to decide which way it goes, so there is
+    // one place that owns the direction and it did not move.
     if (module === "tasks") {
-      const base = resolveRecipe("tasks.detail", overridesQ.data, t)
-      if (!base) return <NotFound />
-      // R8/R16: the Activity tab badges this record's exact history total.
-      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
-        what: "the tasks",
-        // The ALL list, not the open one: ticking a task off removes it from the
-        // open collection, so a detail read out of that would answer "that record
-        // no longer exists" the instant you used the button on it.
-        query: ctx.tasksAllQ,
-        shape: shapeTaskDetail as InternalShaper,
-        // THE CLOCK ON OUR OWN ADMIN. Forty minutes on the quarterly VAT return
-        // costs the agency what forty minutes of delivery costs, which is why
-        // `tasks` has been a work-log target since work logs shipped — and why
-        // the absence of any control to start one was a capability the code had
-        // and no screen offered. A task that is already ticked off has nothing
-        // left to time.
-        above: (
-          <RecordTimerButton
-            teamId={teamId as string}
-            targetTable="tasks"
-            targetId={recordId}
-            canLog={can("work", "create")}
-            disabled={ctx.tasksAllQ.data?.find((r) => r.id === recordId)?.status === "done"}
-          />
-        ),
-        // THE TICK SAYS WHAT IT WILL DO NEXT. Same door, two directions — the
-        // host already toggles on the record's status, and the label has to
-        // agree with it or a finished task offers to be finished again.
-        adapt: (recipe, record) =>
-          record.status === "Done"
-            ? withActionLabel(recipe, "tasks.done", "Put it back", "ghost")
-            : recipe,
-      })
+      const task = ctx.tasksAllQ.data?.find((r) => r.id === recordId) ?? null
+      return (
+        <TaskDetailScreen
+          teamId={teamId as string}
+          taskId={recordId}
+          task={task}
+          loading={ctx.tasksAllQ.data === undefined}
+          onToggleDone={() =>
+            ctx.onAction("tasks.done", {
+              id: recordId,
+              record: { id: recordId, status: task?.status === "done" ? "Done" : "Open" },
+            })
+          }
+        />
+      )
     }
 
     // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────

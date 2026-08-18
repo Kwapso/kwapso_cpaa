@@ -63,13 +63,6 @@ import {
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
 import { GitBranch, ListOrdered, Pencil, Power } from "lucide-react"
 
@@ -83,6 +76,7 @@ import { StepFormDialog, type StepFormValues } from "@/components/step-form-dial
 import { SavingStepLine } from "@/components/value-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -106,6 +100,7 @@ import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** How a version is named out loud, everywhere on this screen: its number, then
  * what somebody called it. Written once so the picker, the banner and the
@@ -235,7 +230,7 @@ export function ProcessDetailScreen({
         runsPerMonth: values.runsPerMonth,
       })
     refresh()
-    toast.success(editingStep ? "Step updated." : "Step added.")
+    toast.success(editingStep ? t("Step updated.") : t("Step added."))
   }
 
   if (detailQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the process.")}</p>
@@ -383,7 +378,7 @@ export function ProcessDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -398,8 +393,8 @@ export function ProcessDetailScreen({
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "overview")
+        renderPanel={(panel) => {
+          if (panel.value === "overview")
             return (
               <div className="flex flex-col gap-4">
                 {/* WHAT THIS MAP SAYS ABOUT ITSELF, in full and at the top. The
@@ -412,19 +407,17 @@ export function ProcessDetailScreen({
                     it qualifies. `whitespace-pre-line` keeps the blank line the
                     caveat is written after. */}
                 {process.description && (
-                  <div className="bg-muted/40 rounded-lg border p-4">
-                    <p className="text-sm leading-relaxed whitespace-pre-line">
-                      {process.description}
-                    </p>
+                  <div className="bg-muted/40 rounded-xl border p-4">
+                    <RichText html={process.description} />
                   </div>
                 )}
                 <OverviewList items={overviewItems} />
               </div>
             )
 
-          if (t.value === "steps")
+          if (panel.value === "steps")
             return (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {/* WHICH VERSION AM I READING. A picker rather than a strip of
                     buttons: R3 forbids a hand-rolled toggle, and a map cut once
                     per completed sprint grows more versions than a strip can
@@ -433,26 +426,24 @@ export function ProcessDetailScreen({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground shrink-0 text-sm">Showing</span>
-                    <Select
+                    <RecordPicker
                       value={shownVersion?.id ?? ""}
-                      onValueChange={(v) => setVersionId(v === current?.id ? null : v)}
-                    >
-                      <SelectTrigger className="w-[19rem] max-w-full">
-                        <SelectValue placeholder="Pick a version" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {versions.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {versionLabel(v)}
-                            {v.id === current?.id ? " · current" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => setVersionId(v === current?.id ? null : v)}
+                      options={versions.map((v) => ({
+                        value: v.id,
+                        label: versionLabel(v),
+                        hint: v.id === current?.id ? t("current") : undefined,
+                      }))}
+                      placeholder={t("Pick a version")}
+                      searchPlaceholder={t("Search versions…")}
+                      emptyText={t("Nothing matched.")}
+                      clearable={false}
+                      className="w-[19rem] max-w-full"
+                    />
                   </div>
                   {canCreate && isCurrent && (
                     <AddButton
-                      label="Add step"
+                      label={t("Add step")}
                       onClick={() => {
                         setEditingStep(null)
                         setStepOpen(true)
@@ -466,12 +457,12 @@ export function ProcessDetailScreen({
                     server refuses the write regardless — this is the sentence,
                     not the lock. */}
                 {!isCurrent && (
-                  <p className="text-muted-foreground bg-muted/40 rounded-lg border p-3 text-xs">
-                    This is how the work was described when{" "}
-                    {shownVersion ? versionLabel(shownVersion).toLowerCase() : "this version"} was
-                    cut{shownVersion ? ` on ${new Date(shownVersion.createdAt).toLocaleDateString()}` : ""}.
-                    Older versions can be read but never edited, every saving is a subtraction from
-                    them, so they stay exactly as they were agreed.
+                  <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-xs">
+                    {t("This is how the work was described when")}{" "}
+                    {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
+                    {t("was cut")}
+                    {shownVersion ? ` on ${new Date(shownVersion.createdAt).toLocaleDateString()}` : ""}.{" "}
+                    {t("Older versions can be read but never edited, every saving is a subtraction from them, so they stay exactly as they were agreed.")}
                   </p>
                 )}
 
@@ -479,9 +470,9 @@ export function ProcessDetailScreen({
                   // A version that can't be read says so and offers the way back
                   // — a skeleton that never resolves is the same screen as a hang.
                   <div className="flex flex-col items-start gap-2">
-                    <p className="text-destructive text-sm">Couldn&apos;t load that version.</p>
+                    <p className="text-destructive text-sm">{t("Couldn't load that version.")}</p>
                     <Button variant="outline" size="sm" onClick={() => setVersionId(null)}>
-                      Show the current version
+                      {t("Show the current version")}
                     </Button>
                   </div>
                 ) : shownSteps === undefined ? (
@@ -489,82 +480,96 @@ export function ProcessDetailScreen({
                 ) : shownSteps.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {isCurrent
-                      ? "No steps yet. Add the first one and say how long it takes and how often it happens, that is what a saving is measured from."
-                      : "This version has no steps recorded."}
+                      ? t("No steps yet. Add the first one and say how long it takes and how often it happens, that is what a saving is measured from.")
+                      : t("This version has no steps recorded.")}
                   </p>
                 ) : (
-                  <div className="rounded-lg border">
+                  <div className="rounded-xl border">
+                    {/* ONE STEP, AS A TITLE AND A META LINE (K1), and it used to
+                        be eight things on one sweep: number, name, "no longer
+                        done", minutes each time, runs a month, hours a month,
+                        Edit and Stopped. N1 caps a band at four, and this was the
+                        joint-worst row in the app.
+
+                        The NUMBER now rides with the NAME, because a step's place
+                        in the sequence and its name are one thing the eye reads
+                        together, not two. The three TIMES stay together on the
+                        meta line — they are the point of this screen and the
+                        third is the product of the first two, so splitting them
+                        would break the arithmetic a reader checks. "No longer
+                        done" is a STATE and sits at the end of the line as a
+                        badge. And the two ACTIONS leave the band entirely for the
+                        row's three-dot menu (B2), keeping their confirms: facts
+                        and actions never interleave (N4). H 8 → 4. */}
                     {shownSteps.map((step, i) => (
                       <div
                         key={step.id}
-                        className="flex flex-col gap-2 border-b p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex items-start justify-between gap-2 border-b p-3 last:border-b-0"
                       >
-                        {/* THE NUMBER IS THE POINT. A step's place in the
-                            sequence is what a reader could not tell before, and
-                            it is what makes the times underneath checkable. */}
-                        <div className="flex min-w-0 gap-3">
-                          <span className="text-muted-foreground w-6 shrink-0 text-sm tabular-nums">
-                            {i + 1}.
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {step.name}
-                              {step.removed && (
-                                <Badge variant="secondary" className="ml-2 text-[10px]">
-                                  no longer done
-                                </Badge>
-                              )}
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                              {minutesText(step.secondsPerRun)} each time ·{" "}
-                              {step.runsPerMonth.toLocaleString()}× a month ·{" "}
-                              {hoursText(stepSecondsPerMonth(step))} a month
-                            </p>
-                            {step.description && (
-                              <p className="text-muted-foreground mt-1 text-xs">{step.description}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {i + 1}. {step.name}
+                            {step.removed && (
+                              <Badge variant="secondary" className="ml-2 text-[10px]">
+                                {t("no longer done")}
+                              </Badge>
                             )}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          {canEdit && isCurrent && !step.removed && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1.5"
-                              onClick={() => {
-                                setEditingStep(step)
-                                setStepOpen(true)
-                              }}
-                            >
-                              <Pencil className="size-3.5" />
-                              Edit
-                            </Button>
-                          )}
-                          {canArchive && isCurrent && !step.removed && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busy}
-                              className="text-destructive hover:text-destructive gap-1.5"
-                              onClick={() =>
-                                setConfirm({
-                                  title: `Does "${step.name}" still happen?`,
-                                  body: "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted.",
-                                  action: "It no longer happens",
-                                  run: () =>
-                                    run(
-                                      () => tenancy.removeStep(step.id),
-                                      "Step recorded as no longer done.",
-                                      "Couldn't record that."
-                                    ),
-                                })
-                              }
-                            >
-                              <Power className="size-3.5" />
-                              Stopped
-                            </Button>
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {minutesText(step.secondsPerRun)} {t("each time")} ·{" "}
+                            {step.runsPerMonth.toLocaleString()}× {t("a month")} ·{" "}
+                            {hoursText(stepSecondsPerMonth(step))} {t("a month")}
+                          </p>
+                          {step.description && (
+                            <RichText
+                              html={step.description}
+                              className="text-muted-foreground mt-1 text-xs"
+                            />
                           )}
                         </div>
+                        <RecordActionsMenu
+                          tone="row"
+                          actions={[
+                            ...(canEdit && isCurrent && !step.removed
+                              ? [
+                                  {
+                                    key: "edit",
+                                    label: t("Edit"),
+                                    icon: <Pencil className="size-3.5" />,
+                                    onSelect: () => {
+                                      setEditingStep(step)
+                                      setStepOpen(true)
+                                    },
+                                  },
+                                ]
+                              : []),
+                            ...(canArchive && isCurrent && !step.removed
+                              ? [
+                                  {
+                                    key: "stopped",
+                                    label: t("Stopped"),
+                                    icon: <Power className="size-3.5" />,
+                                    disabled: busy,
+                                    destructive: true,
+                                    onSelect: () =>
+                                      setConfirm({
+                                        title: `${t("Does")} "${step.name}" ${t("still happen?")}`,
+                                        body: t(
+                                          "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted."
+                                        ),
+                                        action: t("It no longer happens"),
+                                        run: () =>
+                                          run(
+                                            () => tenancy.removeStep(step.id),
+                                            t("Step recorded as no longer done."),
+                                            t("Couldn't record that.")
+                                          ),
+                                      }),
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
                       </div>
                     ))}
                     {/* THE TOTAL AT THE END — the plain sum of the column above
@@ -573,13 +578,14 @@ export function ProcessDetailScreen({
                         month this way of working costs. The subtraction between
                         two of these is the saving, and it is shown below with
                         the sentence it has to be quoted with. */}
-                    <div className="bg-muted/40 flex items-baseline justify-between gap-3 border-t p-3">
+                    <div className="bg-muted/40 flex items-baseline justify-between gap-2 border-t p-3">
                       <span className="text-sm font-medium">
-                        Total, as {shownVersion ? versionLabel(shownVersion).toLowerCase() : "this version"}{" "}
-                        describes it
+                        {t("Total, as")}{" "}
+                        {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
+                        {t("describes it")}
                       </span>
                       <span className="text-sm font-semibold tabular-nums">
-                        {hoursText(shownTotalSeconds)} a month
+                        {hoursText(shownTotalSeconds)} {t("a month")}
                       </span>
                     </div>
                   </div>
@@ -595,10 +601,11 @@ export function ProcessDetailScreen({
                     there is, and a comparison that showed only surviving steps
                     would leave it out. */}
                 {saving && saving.steps.length > 0 && (
-                  <div className="rounded-lg border p-4">
+                  <div className="rounded-xl border p-4">
                     <p className="text-muted-foreground text-sm">
-                      Time given back, every month, {baseline ? versionLabel(baseline) : "the baseline"}{" "}
-                      minus {current ? versionLabel(current) : "today"}
+                      {t("Time given back, every month,")}{" "}
+                      {baseline ? versionLabel(baseline) : t("the baseline")} {t("minus")}{" "}
+                      {current ? versionLabel(current) : t("today")}
                     </p>
                     <p className="text-2xl font-semibold tracking-tight">
                       {hoursText(saving.savedSecondsPerMonth)}
@@ -618,65 +625,63 @@ export function ProcessDetailScreen({
               </div>
             )
 
-          if (t.value === "versions")
+          if (panel.value === "versions")
             return (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <p className="text-muted-foreground text-sm">
-                  Every version this way of working has been through. Open one to read its steps and
-                  the times they were agreed at, version 1 is how the work was done before us, and
-                  every saving is measured from it.
+                  {t("Every version this way of working has been through. Open one to read its steps and the times they were agreed at, version 1 is how the work was done before us, and every saving is measured from it.")}
                 </p>
-                <div className="rounded-lg border">
+                {/* THE ROW IS THE DOOR (tester L4). The list said a version
+                    existed and nothing opened it; then it grew an Open button,
+                    which made the band seven units — label, baseline, date, cut
+                    from, who cut it, current, Open. A row whose ONLY action is
+                    "open this" does not need a button saying so: the whole row
+                    is the button, which is what every other collection in this
+                    app does and what removes the last unit from the band. It is
+                    a real <button>, so it is reachable by keyboard and announced
+                    as a control, and the two states stay badges. H 7 → 4. */}
+                <div className="rounded-xl border">
                   {versions.map((v) => (
-                    <div
+                    <button
                       key={v.id}
-                      className="flex flex-col gap-2 border-b p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+                      type="button"
+                      onClick={() => {
+                        setVersionId(v.id === current?.id ? null : v.id)
+                        setTab("steps")
+                      }}
+                      className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center justify-between gap-2 border-b p-3 text-left transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:outline-none"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          Version {v.versionNo}
-                          {v.label ? `, ${v.label}` : ""}
+                      <span className="min-w-0">
+                        <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                          <span className="truncate">
+                            {t("Version")} {v.versionNo}
+                            {v.label ? `, ${v.label}` : ""}
+                          </span>
                           {v.isBaseline && (
-                            <Badge variant="secondary" className="ml-2 text-[10px]">
-                              baseline
+                            <Badge variant="secondary" className="shrink-0 text-[10px]">
+                              {t("baseline")}
                             </Badge>
                           )}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
+                          {v.id === current?.id && (
+                            <Badge variant="outline" className="shrink-0 text-[10px]">
+                              {t("current")}
+                            </Badge>
+                          )}
+                        </span>
+                        <span className="text-muted-foreground block text-xs">
                           {new Date(v.createdAt).toLocaleDateString()}
-                          {v.cutFromSprintId ? " · cut when a sprint completed" : ""}
+                          {v.cutFromSprintId ? ` · ${t("cut when a sprint completed")}` : ""}
                           {v.createdByName ? ` · ${v.createdByName}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {v.id === current?.id && (
-                          <Badge variant="outline" className="text-[10px]">
-                            current
-                          </Badge>
-                        )}
-                        {/* THE MISSING DOOR (tester L4). The list said a version
-                            existed; nothing opened it. This selects it and moves
-                            to the steps, which is where a version's detail is. */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={() => {
-                            setVersionId(v.id === current?.id ? null : v.id)
-                            setTab("steps")
-                          }}
-                        >
-                          <ListOrdered className="size-3.5" />
-                          Open
-                        </Button>
-                      </div>
-                    </div>
+                        </span>
+                      </span>
+                      <ListOrdered className="text-muted-foreground size-4 shrink-0" />
+                    </button>
                   ))}
                 </div>
               </div>
             )
 
-          if (t.value === "conversation")
+          if (panel.value === "conversation")
             return (
               <Comments
                 items={(commentsQ.data?.comments ?? []).map((c) => ({
@@ -751,7 +756,7 @@ export function ProcessDetailScreen({
               }}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Working…" : confirm?.action}
+              {busy ? t("Working…") : confirm?.action}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

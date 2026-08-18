@@ -78,7 +78,7 @@ export function AgentPanel({
           <div className="flex items-center justify-between gap-2">
             <SheetTitle>{t("Assistant")}</SheetTitle>
             {canUse && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 {chat.quotaLabel && (
                   <button
                     type="button"
@@ -175,7 +175,7 @@ export function AgentPanel({
 
             {/* A paused turn: the proposed actions + approve / decline. */}
             {chat.pending && (
-              <div className="flex flex-col gap-3 border-t p-4">
+              <div className="flex flex-col gap-4 border-t p-4">
                 <p className="text-sm font-medium">{t("I'd like to make these changes:")}</p>
                 {/* Each step now carries the PAYLOAD under its label (a role's
                  * whole access sheet is a dozen lines), so the list scrolls on

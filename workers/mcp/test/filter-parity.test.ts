@@ -77,6 +77,15 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the forensic trail behind ONE invite (who sent it, when it was opened, when it was revoked). The invite's own state — email, role, status, id — is already machine-readable through list_invites; this is the strip a person reads on the invite's detail when something looks wrong.",
   "GET /api/tenancy/activity":
     "the cross-module history feed, and the one door whose answer is assembled by SUBTRACTING the caller's denied modules (R18). Everything it reports is readable through the module's own tools, with that module's own gate; putting the merged stream on the machine surface is a separate decision for the owner, not a parity default.",
+  // THE TWO BADGE DOORS — one per worker, because the counting functions live
+  // with the modules that own them. They exist to save a SCREEN round trips: a
+  // record's tabs are badged when the record opens instead of when a tab is
+  // clicked, so what they return is a bundle of numbers the machine surface can
+  // already get, each with more control than this door offers.
+  "GET /api/tenancy/record-counts":
+    "how many apps, process maps and rate lines hang off one record — a bundle assembled so a SCREEN can badge its tabs in one round trip instead of five. Every figure in it is already machine-readable, exactly and with filters this door does not take: `list_apps` and `list_processes` each answer with the same exact `total` over the same narrowing, from the same count. A tool here would be a slower way to ask questions the surface can already ask, and its `null` (meaning 'your role may not read that module') is a distinction a tool caller learns better from being refused by the door itself.",
+  "GET /api/content/record-counts":
+    "the same bundle, content's half — sprints, stories, to-dos, tickets, meetings and a ticket's files. Same reason, and the same list of tools that already answer it one at a time with the narrowing of the caller's choosing: `list_sprints`, `list_stories`, `list_todos`, `list_help_tickets`, `list_meetings`.",
   "GET /api/tenancy/config/screens":
     "the screen-engine recipe store — which blocks the AGENCY APP renders on a module's screen. It describes an interface, not the team's data, and an MCP client has no screen to render it on.",
   "POST /api/tenancy/config/screens":
@@ -111,6 +120,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "shares a Drive folder or a Chat space, and in the same call decides WHO MAY READ IT — just this person, or the whole team. That is the decision the module is built around, asked in words at the moment of sharing, and it is not one an assistant should be able to make on somebody's behalf: an assistant that can widen what it is allowed to see is not fenced by anything.",
   "POST /api/content/google/sources/active":
     "stops sharing a folder or space, or shares it again. The same decision as the door above, in reverse, and out of the assistant's hands for the same reason — re-sharing something a person deliberately withdrew is exactly the act nobody should be able to delegate by accident.",
+  "GET /api/content/google/drive/thumbnail":
+    "answers with an IMAGE, not with data. It exists so a page can put a picture of a Drive file on the screen — Google's own preview link is authenticated and expires within hours, so it cannot be handed to a browser directly — and the bytes it returns are the whole response. A tool on it would hand a model a JPEG it cannot read, about a file it can already list, name, open and read the text of through `list_drive_files` and `read_drive_file`. The capability a machine wants here is the file, and it already has it.",
 
 
   "POST /api/content/brand-assets/upload-stream":
@@ -118,6 +129,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
 
   "POST /api/content/staff/upload-stream":
     "the streamed twin of the staff-file upload — a photo or a certificate PDF as the request body, which a tool call cannot express. Same reasoning as its buffered pair.",
+
+  "POST /api/content/deliverables/upload-stream":
+    "the fourth byte-shovel, and the only one with no buffered twin — a module written after that pair stopped being worth shipping. The transport is the whole answer: this surface is JSON-RPC, a tool call IS a JSON object, so there is no request body for a tool to stream into and no way to express 'the bytes are the body' as an argument. Nothing is lost. `create_deliverable` and `update_deliverable` both carry `url`, so a machine that already has an address for the material — a recording, a document, an API reference, which is what most deliverables are — files the record in full. What it cannot do is hold a PDF, and it never could.",
 
 
   "POST /api/content/knowledge/upload":
@@ -129,11 +143,16 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "GET /api/content/portal/delivery":
     "the CLIENT's own picture of the work they bought — the same sprints list_sprints already answers with, minus the price, minus the story titles and minus the goal text. It exists because a shape that cannot carry a price cannot leak one, which is a fence for a browser on the other hostname, not a capability. A machine caller holds a STAFF token (this surface refuses client logins outright, MCP.md §5) and list_sprints gives it strictly more: the same blocks, with what they were sold for. A tool here would be a narrower duplicate of one already on the surface, which is how two answers to one question start disagreeing.",
 
+  "GET /api/content/work-logs/summary":
+    "THE SAME ROWS, ADDED UP FOR A PICTURE. It answers hours by person, by kind of work and by week over one record — every one of which is a SUM over the very rows `list_work_logs` already hands back against the same `targetTable` and `targetId`, under the same gate. So a machine caller is not missing an answer; it is missing an arithmetic it can do better than we can describe, on data it already has. The door exists because a BROWSER cannot do that arithmetic honestly: the list is paged, so summing what is loaded would answer about the newest fifty rows while looking exactly like an answer about the record.",
+
   "POST /api/content/work-logs/update":
     "CORRECTING somebody's hours, which is a different act from logging your own and is gated a step higher (work:edit rather than work:create). The machine surface can start a timer, stop one, write time down and answer for a runaway — everything a person does about their OWN time — but a timesheet correction is the one write in this module that changes a number after the fact, and time is the record here that turns into money. It leaves a trail either way (lib/work-logs editWorkLog writes one); the reason it has no tool is that nobody should be able to say 'make last Tuesday four hours' to an assistant and have it happen. A person opens the row.",
 
   "POST /api/data-ops/agent/translate-ticket":
     "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`, which is one of the fields R22 makes it expose.",
+  "POST /api/data-ops/agent/translate":
+    "the SECOND button in the app that spends the team's AI allowance without going through a chat turn, and it is off this surface for the same reason as the ticket translation above it: MCP.md §6 promises a machine token that only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance, and a fourth silent spender from a headless client that cannot see the balance is a change to the cost model rather than a parity default. It is also a door about READING — it writes nothing, it stores nothing, and what it hands back is one person's own view of one screen for as long as they are looking at it. A machine has no screen and no reader: it already receives every one of these fields, verbatim, in the language they were typed in, from the tools that answer with the record itself — which is the form a machine can actually work with, since a translated value matches no record.",
   "POST /api/content/brand-assets/upload":
     "a byte-shovel, and the arithmetic is the whole answer: up to 25 MB of base64 argument on a surface whose whole ANSWER is capped at 400,000 characters. A machine writes the brand-asset ROW — create_brand_asset carries `fileUrl` — and references a file it already has a URL for. Uploading the bytes is a screen action.",
   "POST /api/content/staff/upload":

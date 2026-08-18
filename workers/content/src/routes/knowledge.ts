@@ -13,7 +13,12 @@
 // the portal's list is still served to them at the other hostname. That mistake
 // has been made twice in this codebase and caught twice.
 
+import type { Actor, MemberGuard } from "@shared/workers/gating"
+import type { D1Rest } from "@shared/workers/d1-rest"
+import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
+import { consumeAiUnit, logUsage, refundAiUnits, type UsageSource } from "@shared/workers/credits"
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { resolveOrdering } from "@shared/workers/sorting"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
@@ -33,11 +38,13 @@ import {
   getSource,
   KNOWLEDGE_KINDS,
   listSources,
+  KNOWLEDGE_SORTS,
   retrieve,
   setSourceActive,
   updateSource,
   type SourceInput,
 } from "../lib/knowledge"
+import { writeAnswer } from "../lib/knowledge-compose"
 import { extractFile, unreadableNote } from "../lib/knowledge-files"
 import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
@@ -69,7 +76,21 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     q: queryText(url.searchParams.get("q"), "Search"),
   }
   const [page, total] = await Promise.all([
-    listSources(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null),
+    listSources(
+      cfg,
+      guard,
+      filter,
+      queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+      // WHAT ORDER — asked of the door, because the base PAGES (R14). Sorting
+      // the loaded page orders the newest fifty sources and says nothing about
+      // the thousands behind them.
+      resolveOrdering(
+        KNOWLEDGE_SORTS,
+        "touched",
+        queryText(url.searchParams.get("sort"), "Sort"),
+        queryText(url.searchParams.get("dir"), "Direction")
+      )
+    ),
     // …over the SAME question the rows answered. Counting the whole base beside a
     // searched page badges a number the list cannot reach.
     countSources(cfg, guard, filter),
@@ -79,19 +100,74 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
   return pagedJson("sources", { ...page, total })
 }
 
-/** GET /api/content/knowledge/ask — answer a question from the team's own
- * material, with citations.
+/** SPEND ONE AI UNIT AND WRITE THE ANSWER OUT — the only act on this module that
+ * costs the team anything, kept in one function so the whole transaction reads at
+ * once: claim the unit, write, give it back if nothing was written.
  *
- * A READ, deliberately: it changes nothing, and the cost model (MCP.md) puts it
- * with the other reads — it spends ONE embedding of the question, which is a
- * rounding error beside a chat turn, and no model writes a word here. The
- * assistant composes the answer with these passages in front of it, which is
- * what makes "every answer cites its sources" a property of the data.
+ * NOTHING WRITTEN IS NOT AN ERROR, twice over. Out of allowance, and a model that
+ * could not be reached, both end the same way: null, no charge, and the question
+ * still answered with the material it found. The alternative — a 429 — would take
+ * a free search away from somebody the moment the team's assistant budget ran out,
+ * which is the opposite of what the budget is for.
+ *
+ * AND THE UNIT IS RECORDED. `logUsage` puts the question in the team's AI usage
+ * log as the caller's OWN row ("prompt", so a teammate sees who spent what and
+ * never what they typed). A spend nobody can find afterwards is exactly the
+ * surprise this product is built not to have.
+ *
+ * THE GATE OPENS THIS FUNCTION, one line above the spend, because a door that
+ * spends the team's money is an assistant door (workers/data-ops/test/
+ * ai-cost-gate.test.ts reads both workers' routes for exactly this). It refuses
+ * rather than quietly answering less than was asked for: a machine caller that
+ * sets `compose` without the assistant right gets the 403 the tool description
+ * promises it, not a response with a silently missing field. The SCREEN never
+ * meets that refusal — it only asks when the person holds the right. */
+// Exported for one reason: ai-cost-gate.test.ts indexes `export async function`
+// declarations, and a spender the census cannot SEE is a spender nobody grades.
+export async function payToWrite(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  question: string,
+  material: KnowledgePassage[],
+  sources: KnowledgeCitation[]
+): Promise<string | null> {
+  await requireRight(cfg, guard, "agent", "create")
+  const spend = await consumeAiUnit(env, guard.teamId)
+  if (!spend.ok) return null
+  const source: UsageSource = spend.source === "credit" ? "credit" : "free"
+  const written = await writeAnswer(env, question, material, sources)
+  if (!written) {
+    await refundAiUnits(env, guard.teamId, source === "free" ? 1 : 0, source === "credit" ? 1 : 0)
+    return null
+  }
+  await logUsage(env, guard.teamId, actor, 1, source, `Knowledge base: ${question}`.slice(0, 140), "prompt")
+  return written
+}
+
+/** GET /api/content/knowledge/ask — answer a question from the team's own
+ * material, with citations, and WRITE THAT ANSWER OUT when asked to.
+ *
+ * THE FINDING IS FREE; THE WRITING IS THE COST, and that split is the whole cost
+ * model of this door. Finding the material spends ONE embedding of the question —
+ * a rounding error, which is why it sits with the reads in MCP.md. `compose=1`
+ * additionally asks a cheap model to write the answer out of what was found, which
+ * is one unit of the team's AI allowance, so it gates on the `agent` module exactly
+ * as every other door that spends the allowance does. A role without the assistant
+ * still gets the material, still spends nothing, and loses nothing it had
+ * yesterday.
+ *
+ * WHY A PARAMETER RATHER THAN ALWAYS. An assistant calling this composes its own
+ * reply — that IS R23's design — so writing the answer for it would spend the
+ * team's allowance twice for one answer. The Knowledge tab has no assistant of its
+ * own, so it asks, every time. There is no switch on the screen: the screen always
+ * asks, and the MODEL decides whether a picture belongs in what it writes.
  *
  * `accountId` is how a screen says WHOSE record the question was asked from; the
  * compartment is derived from it (or from the question), never picked by hand. */
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "knowledge", "read")
+  const { cfg, guard, actor } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   // A question is prose, so it carries the message cap rather than the query
@@ -105,11 +181,20 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // run, just as current as the last sweep.
   await catchUp(env, cfg, guard)
   const limit = Number(queryText(url.searchParams.get("limit"), "Limit"))
+  // Checked where it sits (R20): the door reads exactly one spelling of yes, so
+  // there is no truthiness anywhere on this path.
+  const write = queryText(url.searchParams.get("compose"), "Compose") === "1"
   return json(
     await retrieve(env, cfg, guard, {
       question,
       accountId: queryText(url.searchParams.get("accountId"), "Account") ?? null,
       limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
+      // The writer is only ever REACHED once there is something to write about —
+      // `retrieve` calls it after `found` is settled — and it gates and meters
+      // itself. So a question the base cannot answer costs nothing at all.
+      compose: write
+        ? (material, sources) => payToWrite(env, cfg, guard, actor, question, material, sources)
+        : undefined,
     })
   )
 }

@@ -12,6 +12,7 @@ import { MENTIONS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
+import { resolveOrdering } from "@shared/workers/sorting"
 import { requireIdList } from "../lib/bulk"
 import {
   addReply,
@@ -36,6 +37,7 @@ import {
   countTicketFacets,
   countReplies,
   bulkSetStatusByFilter,
+  TICKET_SORTS,
 } from "../lib/help"
 import {
   addAttachment,
@@ -88,10 +90,11 @@ async function ticketPage(
   guard: Parameters<typeof listTickets>[1],
   scope: AccountScope,
   filter: TicketFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering?: Parameters<typeof listTickets>[5]
 ): Promise<Response> {
   const [page, counts, facets] = await Promise.all([
-    listTickets(cfg, guard, scope, filter, cursor),
+    listTickets(cfg, guard, scope, filter, cursor, ordering),
     // R16: the total is counted over the SAME view the page came from, or the
     // badge is a number the list cannot reach — and over the same SEARCH, the
     // same ACCOUNT, the same KIND and the same STAGE, for the same reason. One
@@ -188,7 +191,23 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // `q` is the screen's search box, answered HERE rather than in the browser: a
   // list that pages cannot be searched by filtering the page it loaded, or a
   // ticket raised last spring is unfindable while the badge above still counts it.
-  return ticketPage(cfg, guard, scope, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+  // WHAT ORDER — asked of the door, for the reason `q` is: the list PAGES, so
+  // ordering the loaded page orders the newest fifty tickets and says nothing
+  // about the rest, under a badge counting all of them. The default is the
+  // drag-rank, so a screen that asks for no ordering gets what it always got.
+  return ticketPage(
+    cfg,
+    guard,
+    scope,
+    filter,
+    queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+    resolveOrdering(
+      TICKET_SORTS,
+      "rank",
+      queryText(url.searchParams.get("sort"), "Sort"),
+      queryText(url.searchParams.get("dir"), "Direction")
+    )
+  )
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first).

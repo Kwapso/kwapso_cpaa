@@ -181,7 +181,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R23",
     dimension: "ai",
-    law: "An answer from the knowledge base carries its sources, or it is not an answer. Retrieval never writes prose — it hands back the passages it found and the sources they came from, and the assistant composes the reply with those in front of it. So `found`, `passages` and `citations` are ONE decision made in ONE place (knowledgeAnswer): no citation means no passage, and a sentence the assistant must say instead of inventing one. No door may assemble that response by hand — the same shape as R14's pagedJson seam, and for the same reason: a door that builds half a contract ships half a contract, and here the missing half is the difference between \"we have nothing on that\" and a confident answer with nothing behind it. The compartment a question was answered from, and the REASONING that chose it, ride the same object, because a wrong compartment is invisible otherwise. Earned by: the owner's own sentence in the brief — \"an answer with no source is a bug, not a style choice\" — and by what a sourceless answer costs where this one is aimed: an agency repeating it to a client.",
+    law: "An answer from the knowledge base carries its sources, or it is not an answer. Retrieval never writes prose — it hands back the passages it found and the sources they came from, and the assistant composes the reply with those in front of it. So `found`, `passages` and `citations` are ONE decision made in ONE place (knowledgeAnswer): no citation means no passage, and a sentence the assistant must say instead of inventing one. No door may assemble that response by hand — the same shape as R14's pagedJson seam, and for the same reason: a door that builds half a contract ships half a contract, and here the missing half is the difference between \"we have nothing on that\" and a confident answer with nothing behind it. The compartment a question was answered from, and the REASONING that chose it, ride the same object, because a wrong compartment is invisible otherwise. And now the assistant writing it is sometimes US (2026-08-18): the Knowledge tab asks the door to compose the reply, one cheap model call, so the law's own sentence became a code path rather than a hope about a chat panel. It did not bend to make room. The prose is an INPUT to knowledgeAnswer, decided in the same expression as the citations (answer: found ? …), so a written answer cannot outlive its sources; the writer (lib/knowledge-compose.ts) is handed the settled passages and citations, reads nothing about found, and hands back a string; the door may not name answer: any more than it may name passages; and the passages reach the model FENCED, because half of them are words a client wrote. Earned by: the owner's own sentence in the brief — \"an answer with no source is a bug, not a style choice\" — and by what a sourceless answer costs where this one is aimed: an agency repeating it to a client.",
     checkId: "cited-answers",
     status: "enforced",
   },
@@ -224,7 +224,86 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "catalogued-strings",
     status: "enforced",
   },
+  {
+    id: "R29",
+    dimension: "ui",
+    law: "THE PAGE HAS ONE WIDTH, AND A SCREEN DOES NOT GET ITS OWN. Each front door owns exactly one page container — `web/components/deep-link-screen.tsx` at `max-w-[1600px]`, `web-portal/components/portal-shell.tsx` at `max-w-3xl` — and no other component may set a page-level width. A page container is identified positionally, the way R20 identifies a checked field: one line carrying `mx-auto`, `w-full` and a `max-w-*` together, which is the exact signature of a centred content column and of nothing else. Anything else that needs a cap (a dialog, a sheet, a door card, a chat bubble, a line of prose) is not centred-and-full-width and is not caught. Exceptions are DATA in `SCREEN_WIDTH_EXEMPT`, each with its reason, and every one is rot-checked: an entry whose file no longer sets a width turns the build red, so the list can only shrink.",
+    why: "The owner named this one himself, and named it as an inconsistency rather than a bug: work logs, tasks and meetings use the full width, and he could not see why other pages did not. The answer was that those three render through the one shell and six screens cap themselves narrower. One of the six is the shell's OWN loading skeleton (`app-shell.tsx:489`, `max-w-2xl`), so every cold load of the agency app visibly snapped sideways as 672px of skeleton became 1120px of content. That is the shape of failure this law exists for: not a rule anybody disagreed with — UI-RULEBOOK L1 already said 'one container, one cap', and round one of the feedback implemented it in `deep-link-screen.tsx` — but a rule that was implemented in the one place somebody happened to be looking and stayed unimplemented in six others, silently, under a green build. A width is invisible to every other check in this repo: TypeScript sees a string, the lint sees a string, and no test reads layout. It ships a screen that works, on which two thirds of a wide display is empty.",
+    checkId: "one-page-width",
+    status: "enforced",
+  },
+  {
+    id: "R30",
+    dimension: "workflow",
+    law: "EVERY EMAIL IS CLASSIFIED, AND ONE THAT NAMES A RECORD CARRIES THE WAY BACK TO IT. Every function in workers/ that composes a branded message (the `brandedEmail` / `sendBrandedEmail` seams — derived from the source, never hand-listed) must appear in EMAIL_CENSUS as either `record` (it is about a specific record: it passes `ctaUrl`, built through the one helper, shared/workers/record-link.ts) or `none` with a real reason (and then it must NOT pass `ctaUrl` — an email that names no destination may not promise one). Both directions: an unclassified send fails the build, and a census entry matching no send is an orphan and fails too. No email may spell an origin: the two front doors arrive as configuration, because THE RECIPIENT DECIDES WHICH APP THE LINK OPENS — staff read the agency app, a client contact reads the portal, and the same ticket therefore has two addresses. Sending a client an agency URL hands them a link they cannot open and advertises a door they may not pass (R21).",
+    why: "The mention email said, in prose, 'Open the ticket to read the full conversation and reply' — and contained no link of any kind. The copy instructed an action the message made impossible, and it had been doing so since the notification path was written, because nothing in the build could see the difference between an email that links and one that only talks about linking. Buttons alone would have fixed twelve emails and nothing else: the thirteenth, written next year, would ship the same way. So the deliverable is the CENSUS — the same shape as R27's vocabulary and R13's exemptions — and the buttons are what it forced. The classification is also where the front-door decision is recorded, which is why it is a law and not a lint: 'which hostname does this go to' is a security question wearing a formatting question's clothes.",
+    checkId: "linked-emails",
+    status: "enforced",
+  },
+  {
+    id: "R31",
+    dimension: "ui",
+    law: "TWO RADII AND NO THIRD. A rectangular surface is `rounded-xl` and a pill is `rounded-full`; a directional variant of the first (`rounded-t-xl`, for a sheet that meets the bottom of the screen) is the same word applied to one edge. No other step of the scale may be written in `web/`, `web-portal/` or `shared/`, and `shadow-*` stays at exactly one use. Enforced by one grep, because every step from `sm` to `3xl` already resolves to the same 24px in this theme.",
+    why: "It is the cheapest rule in the book to obey and it was the most broken: 63 of 125 radius classes were off-vocabulary — `rounded-lg` 52 times, `rounded-md` 7, `rounded-2xl` 2 — and changing every one of them moved NOTHING on screen, because `--radius-sm` through `--radius-3xl` are all `var(--radius)`. So five words were in use for one value, which means five decisions a developer can make where there is only one, and the day the theme gives those steps different values the app acquires five radii it never chose. The law could not be written before the fix, because a law that ships with a 57-line exemption list is a list and not a law. It ships the moment the grep is clean. THE ONE THING IT DOES NOT REACH is the bare `rounded` class: that is 4px here, not 24px, so it is a genuinely different value on an inline highlight and a 32px thumbnail, and folding it in would be a redesign wearing a sweep's clothes.",
+    checkId: "two-radii",
+    status: "enforced",
+  },
+  {
+    id: "R32",
+    dimension: "ui",
+    law: "EVERY COLOUR RESOLVES THROUGH A TOKEN. No screen in `web/`, `web-portal/` or `shared/` may name a Tailwind colour ramp (`amber-*`, `emerald-*`, `red-*`, `green-*`, `blue-*`, `slate-*`, `gray-*`, `zinc-*` …) or write a hex literal. What a colour MEANS has a token — `warning`, `success`, `destructive`, `muted`, `primary`, `chart-1` to `chart-5` — and a mark comes from the chart series (UI-RULEBOOK C6). The five files that legitimately hold hexes are DATA in `PALETTE_LITERAL_OK`, each with its reason, and rot-checked so the list can only shrink.",
+    why: "A hard-coded colour is invisible to a theme. `import-screen.tsx` said `amber-600` and `emerald-500` where it meant warning and success, so the one screen in the app that reports a result was the one screen a rebrand could not reach; `shared/departments.ts` held five hexes the LEGACY app had chosen, none of them one of kwapso's own seven, so a department dot was the single mark on screen that did not belong to this product's palette. Neither was a bug anybody would file — both look fine, in one theme, on one day. That is the whole argument for making it a law rather than a review note: colour drift is only ever visible in aggregate, and nobody sees the aggregate.",
+    checkId: "closed-palette",
+    status: "enforced",
+  },
 ]
+
+/** R32 — the files that may hold a colour LITERAL, and why. Everything else in
+ * the two front doors and `shared/` resolves through a token. Rot-checked: an
+ * entry whose file no longer holds one turns the build red. */
+export const PALETTE_LITERAL_OK: Record<string, string> = {
+  "shared/brand.ts":
+    "the branding seam itself. It is where a fork of this base changes the palette, so it is the one file whose job is to hold the values the rest of the app resolves.",
+  "shared/workers/email-template.ts":
+    "an email. No CSS variable survives a mail client, so every colour in a message has to travel as a literal — and it is not a screen, so no theme reaches it anyway.",
+  "shared/web/pwa.ts":
+    "the OS-level theme colour, read by the browser chrome and the app switcher before any stylesheet exists.",
+  "shared/web/splash.ts":
+    "the launch screen, painted by the OS from a manifest before the app has loaded.",
+  "shared/web/google-sign-in.tsx":
+    "Google's own mark, whose colours are theirs and are specified by their brand terms.",
+  "web/lib/image.ts":
+    "a canvas fill. It is drawn into a bitmap, and a canvas has no cascade to read a variable out of.",
+}
+
+/** R29 — the ONE page container per front door, and the width it is allowed to set.
+ * Everything else that matches the page-container signature is either in
+ * SCREEN_WIDTH_EXEMPT below or is a breach. */
+export const PAGE_WIDTH_OWNER: Record<string, string> = {
+  "web/components/deep-link-screen.tsx": "max-w-[1600px]",
+  // The portal's cap is NARROWER on purpose and it is a locked decision
+  // (UI-RULEBOOK L5, "Do not do" #15): a client reads a handful of screens on a
+  // phone, and 768px with larger type is the right measure for that. Three lines
+  // in the one file (the header, the main region and the bottom nav) so all three
+  // align to the same edge.
+  "web-portal/components/portal-shell.tsx": "max-w-3xl",
+}
+
+/** R29 — reviewed exceptions. A file listed here matches the page-container
+ * signature and is allowed to, WITH ITS REASON. Rot-checked in both directions:
+ * an entry whose file no longer sets a width fails the build, so a screen that
+ * gets fixed cannot leave its pin behind.
+ *
+ * The ratchet CLOSED on 18 Aug 2026. Six screens were pinned here as a work list
+ * rather than as an approval (plan W1); the boot loader deleted `app-shell.tsx`'s
+ * pin when it rewrote the skeleton, and the rearrangement lane deleted the other
+ * five by widening Home, Settings, Profile, Invitations and Kwapso to the shell's
+ * own container. What survives is one entry that is not a page at all, which is
+ * what this list was always meant to hold. */
+export const SCREEN_WIDTH_EXEMPT: Record<string, string> = {
+  "web/components/install-prompt.tsx":
+    "not a page. It is the install nudge's Sheet content, which is centred and full-width INSIDE the sheet, and a sheet is an overlay with its own measure.",
+}
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
  * each with its reason. Every other module must have a TargetDef in the catalog. */
@@ -254,6 +333,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "not a table at all — the module exists to carry ONE switch on the permission sheet (may kwapso send mail as you). There is nothing to import into a right; it is granted on the Roles screen, one role at a time, by somebody who understands what they are granting.",
   google_events:
     "the same as google_mail, and for the same reason: a module that exists to hold one switch (may kwapso put an event in your calendar) has no rows for a file to bring.",
+  deliverables:
+    "a deliverable is MATERIAL — a file we hold or a link we do not — and a CSV can carry the link but never the file, so a file of them would import half the shelf as titles pointing at nothing. And the row that matters cannot be resolved from a spreadsheet at all: a deliverable hangs off exactly one APP, which is an id here and a name in a file, and `apps` is not an import target (it belongs to `processes`, exempt above for its own reason), so there is nothing for a reference to resolve against and every row would have to be re-filed by hand — which is the entire write. The legacy set is EIGHT rows across twenty-eight apps (glide/RECONCILIATION.md), typed in the afternoon somebody decides to. The write an import would replace is: you finish a handover, and you attach it, once, standing on the app it belongs to.",
   commercials:
     "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
@@ -520,6 +601,19 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
+  // WHAT WE HANDED OVER. `null`, and it is the same sentence the module's own
+  // doors already speak: every deliverables handler opens with
+  // refusePortalCaller, so a client login reaches no row here to have a history
+  // of. It is worth writing down WHY it is `null` rather than "account", because
+  // this is the one table in the block above where the rows genuinely are the
+  // client's — the material IS what we hand them — and the answer is still the
+  // one SCOPE ch.06 gives every other feed on that side: a history line reads
+  // "Ana handed over the dispatch walkthrough" and then "Ana archived it", which
+  // names the staff member doing the work and, worse, shows the client us
+  // changing our minds about what we gave them. If the shelf is ever opened to
+  // the portal, the ROWS are the decision; this line is a separate one and stays
+  // `null` unless somebody argues it down.
+  deliverables: { fence: null, why: "a deliverable's history names the staff who filed, corrected and archived it — the client is shown the material itself, which is the part that is theirs, and never our record of changing it (SCOPE ch.06). Every door on the module refuses a client login today, so this is the door's own sentence repeated where the feed can hear it" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R24)" },
   internal_role_rates: { fence: null, why: "what an hour of a ROLE is worth — the second internal rate card, and the number an app's money figure is computed from. The same ruling as the line above it, for the same reason: a client may not see what we think an hour of anybody's time costs, and a history line saying we re-priced it is the same disclosure spread over time (R24)" },
@@ -623,6 +717,11 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_versions: "processes",
   process_steps: "processes",
   process_comments: "processes",
+  // WHAT WE HANDED OVER on an app. Its OWN module and not `processes`, which is
+  // the whole point of it being a module: "Ana handed over the Payroll API
+  // reference" names a deliverable, and a role that may read the app but not its
+  // handover shelf must not read that sentence out of the feed either.
+  deliverables: "deliverables",
   account_rates: "commercials",
   internal_rates: "commercials",
   // Time gates on the same module as the work it is against — a row of hours is
@@ -674,7 +773,35 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
  * DATA, not a hand-list in a test: adding a growing module means adding a line here. */
 export const GROWING_COLLECTIONS: Record<
   string,
-  { lib: string; fn: string; routes: string; rowsKey: string; webKey: string; listRecipe?: string; why: string }
+  {
+    lib: string
+    fn: string
+    routes: string
+    rowsKey: string
+    webKey: string
+    listRecipe?: string
+    /** WHERE PAGE TWO IS REACHED — the component holding THIS collection's own
+     * `<LoadMore>`, relative to `web/`, and the string that must appear inside
+     * that control's own props.
+     *
+     * Per-ENTRY because the check over it used to be per-BRANCH, and one branch
+     * stood for three collections. It keyed on `!c.listRecipe`, which is true of
+     * `recordActivity`, `activity` AND `workLogs`, and then asserted a
+     * `<LoadMore listKey={activity.listKey}>` inside `activity-panel.tsx` — the
+     * record feed's control, and nothing whatever to do with the team feed or the
+     * work-log list. For those two the conjunct was a CONSTANT: deleting their
+     * pagers outright left the build green, where the older, weaker-looking
+     * sentence it replaced had gone red.
+     *
+     * `pagerKey` is usually the same string as `webKey`. On the record feed it is
+     * not — that control reads `listKey={activity.listKey}`, a value the hook
+     * hands it — and that difference is the reason this is named here rather than
+     * inferred: the two halves of that pairing live in two files by construction,
+     * so each has to be pointed at. */
+    pagerFile: string
+    pagerKey: string
+    why: string
+  }
 > = {
   help: {
     lib: "workers/content/src/lib/help.ts",
@@ -683,6 +810,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "tickets",
     listRecipe: "tickets.list",
     webKey: "helpKey(",
+    pagerFile: "components/tickets-collection.tsx",
+    pagerKey: "helpKey(",
     why: "tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },
   knowledge: {
@@ -692,6 +821,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "sources",
     listRecipe: "knowledge.list",
     webKey: "knowledgeKey(",
+    pagerFile: "components/deep-link/collection-content.tsx",
+    pagerKey: "knowledgeKey(",
     why: "one source per ticket, per article, per account, plus every note anybody writes — the agency's own history is thousands of rows on day one and the sweep only ever adds",
   },
   accounts: {
@@ -701,6 +832,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "accounts",
     listRecipe: "accounts.list",
     webKey: "accountsKey(",
+    pagerFile: "components/deep-link/collection-content.tsx",
+    pagerKey: "accountsKey(",
     why: "every company AND every person an agency works with is a row here — a contact list that only grows, so a ceiling would eventually become a refusal to answer",
   },
   activity: {
@@ -709,6 +842,8 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/tenancy/src/routes/team.ts",
     rowsKey: "activity",
     webKey: "activity:team:",
+    pagerFile: "components/deep-link/module-content.tsx",
+    pagerKey: "activity:team:",
     why: "the fastest-growing table in the base — EVERY mutation writes a row",
   },
   // The SAME door and the SAME rows, read through the generic (table, id) scope —
@@ -721,6 +856,8 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/tenancy/src/routes/team.ts",
     rowsKey: "activity",
     webKey: "useRecordActivity(",
+    pagerFile: "components/activity-panel.tsx",
+    pagerKey: "activity.listKey",
     why: "one record's slice of the same ever-growing feed — a long-running ticket outgrows a page on its own",
   },
   processes: {
@@ -730,6 +867,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "processes",
     listRecipe: "processes.list",
     webKey: "processesKey(",
+    pagerFile: "components/processes-screen.tsx",
+    pagerKey: "processesKey(",
     why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
   },
   workLogs: {
@@ -738,6 +877,8 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/content/src/routes/work-logs.ts",
     rowsKey: "logs",
     webKey: "workLogsKey(",
+    pagerFile: "components/time-panel.tsx",
+    pagerKey: "workLogsKey(",
     why: "the fastest-growing row in the work engine — 2,940 arrived from two years of the previous system and the rate only goes up, because every piece of work produces several. A ceiling here would eventually be a refusal to show somebody their own week",
   },
   meetings: {
@@ -747,6 +888,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "meetings",
     listRecipe: "meetings.list",
     webKey: "meetingsKey(",
+    pagerFile: "components/meetings-screen.tsx",
+    pagerKey: "meetingsKey(",
     why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
   },
   stories: {
@@ -756,6 +899,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "stories",
     listRecipe: "stories.list",
     webKey: "storiesKey(",
+    pagerFile: "components/stories-screen.tsx",
+    pagerKey: "storiesKey(",
     why: "one piece of work per thing we do, kept forever — the two years arriving from Glide are 3,677 rows on day one, and a done story is never deleted because the savings and the margin computed from it have to stay checkable. SPRINTS are deliberately NOT here beside it: a sprint is a block of SOLD work, so that collection grows at the speed of contracts rather than of clicks and a hard ceiling is an honest answer",
   },
 }
@@ -799,43 +944,33 @@ export const ACTIVITY_TABLE_EXEMPT: Record<string, string> = {
  * publish-seam test is a gap — track it here. */
 export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
 
-/** R2 — the bespoke (host-composed) record-detail components that MUST render the
- * Overview + Activity tabs themselves (the engine-recipe details get them for free). */
-export const RECORD_DETAIL_COMPONENTS = [
-  "help-detail",
-  "role-detail",
-  "account-detail",
-  // A CONTACT'S OWN SCREEN. One table underneath (a company and a person are one
-  // row shape), two screens on top: a person has no sprints, no rate card and no
-  // contacts of their own, and drawing them with a company's tabs is what the
-  // split was asked for.
-  "contact-detail",
-  "knowledge-detail",
-  // A meeting's detail is a component rather than a recipe because two of its
-  // three tabs are PROSE somebody wrote (the agenda, and the notes afterwards)
-  // and its header carries the one button that reaches outside this app — "put
-  // it in my calendar". No engine block draws either.
-  "meeting-detail",
-  // A process map's detail is a component because its Steps tab draws an
-  // ARITHMETIC — a numbered sequence, each step's time, the version's total, and
-  // the subtraction between the baseline and today — over a collection the
-  // reader chooses the VERSION of. No engine block expresses either half.
-  //
-  // Listed here on 17 Aug 2026, after a tester could not tell what order the
-  // steps ran in and could not open an older version: the screen already had the
-  // tabs, but no law was walking it, so nothing would have caught the Steps badge
-  // counting today's steps over an older version's list.
-  "process-detail",
-  // An APP's detail is a component because five of its seven tabs are the work
-  // hanging off the system — sprints, stories, maps, meetings, tickets — each a
-  // collection with its own actions that no engine block draws, and because the
-  // record is the first in this codebase with RECORD-LEVEL visibility: only the
-  // staff on it and an admin open it at all (CHECKLIST 8.11).
-  //
-  // Listed here on 17 Aug 2026, when it grew the people, the tickets tab and the
-  // knowledge tab. It had a detail screen for a day without a law walking it.
-  "app-detail",
-] as const
+/** R2 / R8 — the components under `web/components` that are NOT record details,
+ * though the census in `web/test/rules.test.ts` would otherwise read them as one.
+ * Key = the file's basename, value = the reason, mandatory.
+ *
+ * THIS USED TO BE THE OTHER LIST. Until 18 Aug 2026 the registry held
+ * `RECORD_DETAIL_COMPONENTS`, an INCLUSION list of the bespoke record details,
+ * and R2 and R8 walked exactly the screens somebody had remembered to type into
+ * it. That is a hole by construction, and it opened twice: `app-detail` and
+ * `process-detail` were added on 17 Aug after a tester found faults on screens no
+ * law had ever walked, and on 18 Aug `sprint-detail` and `story-detail` turned
+ * out to have been missing the whole time — two record details with tabs and an
+ * Activity panel that R2 and R8 had never once read, under a green build. Both
+ * times the screen was correct-looking and the LAW was absent, which is the
+ * failure that leaves no trace.
+ *
+ * So the census is DERIVED from the code now, exactly as R8 already derives which
+ * collection a badge describes, and this list is the small reasoned residue that a
+ * derivation always needs. It is a RATCHET like `RAW_BODY_EXEMPT`: an entry naming
+ * a file the census would not have caught anyway turns the build red, so it can
+ * only ever shrink.
+ *
+ * Empty today. Nothing under `web/components` is named `*-detail.tsx` or renders an
+ * `<ActivityPanel>` without being a record detail — and the per-screen reasoning
+ * that used to live in the old list has not been lost with it: every one of those
+ * components opens with its own comment saying why it is host-composed rather than
+ * a recipe, which is where a reader looks for it. */
+export const RECORD_DETAIL_NOT: Record<string, string> = {}
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
  * (Empty today: role-detail — the last exception — grew its Permissions/Overview/
@@ -886,16 +1021,21 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // server total like every other record in the app.
   "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
   "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
-  // The work engine's one recipe detail. Its three siblings (an app, a sprint, a
-  // story) are components because each carries a collection tab or a status
-  // track no engine block draws; a task carries neither, so its Overview is a
-  // description block like the housekeeping four above it.
-  "tasks.detail.overview":
-    "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
+  "task-detail.overview":
+    "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its two sibling tabs, work logs and activity, each carry the exact server total like every other record in the app.",
   "meeting-detail.overview":
     "one meeting's client, purpose, when and where, and its audit block — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
   "meeting-detail.notes":
     "the agenda we set and the notes we took — the two pieces of prose this module exists to keep. One record's body, not a collection.",
+  // PINNED 18 Aug 2026, and the way it surfaced is the point. The tab's own
+  // comment in meeting-detail.tsx says "the rule caught this rather than a
+  // reviewer" — and the rule had never read the tab at all. R8's bespoke scan
+  // allows 300 characters between a tab's `value:` and its `badge:`, and those six
+  // lines of comment are longer than that, so the match simply did not happen. The
+  // reasoning was written down in the one place no law reads. It is here now, and
+  // the census strips comments before it matches so the window measures code.
+  "meeting-detail.calendar":
+    "the guest list mirrored from the calendar entry, which the calendar read CAPS — so its length is a ceiling, not a count (R16), and an invitation with sixty people on it would badge fifty. The tab lists them, and a list you can see the end of does not need a number on it. Shown only when the meeting is in a calendar at all.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
   "app-detail.overview":
@@ -906,6 +1046,16 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",
   "process-detail.overview":
     "the map's own description — including the caveat saying whether its times have been agreed yet — plus its app, its current version, its baseline and its audit block. One record, not a collection. Its four siblings each carry a server count, and the Steps badge counts the VERSION being shown rather than always the current one.",
+  // THE WORK ENGINE'S TWO RECORDS, pinned on 18 Aug 2026 — the day the census
+  // stopped being a hand-kept list and read the code instead. Both screens had
+  // carried tabs and an Activity panel since they were written, and neither R2 nor
+  // R8 had ever walked either of them: they were simply not in the old
+  // RECORD_DETAIL_COMPONENTS array. Nothing was wrong on the screens; the law was
+  // absent, which is the failure that shows no colour at all.
+  "sprint-detail.overview":
+    "one block of sold work — what kind it is, when it runs, what it was sold for, and how much of the work inside it is done. One record, not a collection. Its two sibling tabs, stories and activity, each carry the exact server total.",
+  "story-detail.overview":
+    "one piece of work's own fields — its status, its kind, its reference, who has it, when the sprint it was sold inside is due, and the three pieces of prose somebody typed (the detail, what was done, what the client will be told). One record, not a collection. Its two sibling tabs, work logs and activity, each carry the exact server total.",
 }
 
 /** R4 — the form dialogs that MUST use FormShell. */
@@ -990,3 +1140,80 @@ export const FORM_DIALOGS = [
   // again.
   "legal-details-dialog",
 ] as const
+
+/** R29 — THE EMAIL CENSUS. Every message this product sends a person, and the one
+ * question the owner asked about each of them: does it refer to a specific record?
+ *
+ * Keyed `<repo-relative file>::<function>`, and the KEYS ARE DERIVED, not typed:
+ * `web/test/linked-emails.test.ts` finds every function in `workers/` that composes
+ * a branded message and demands a line here for each. Add an email, the build goes
+ * red until it is classified; delete one, the orphan entry goes red too.
+ *
+ * `refersToRecord: true` means the email is ABOUT something with a screen, so it
+ * carries a button to it — built through shared/workers/record-link.ts, which
+ * decides WHICH FRONT DOOR from the recipient. `link` names the destination for a
+ * reader; the check reads the code, never this sentence.
+ *
+ * `false` is a real answer and it is written down, because "this one didn't need a
+ * button" is exactly the sentence that gets said about the one that did. Four of
+ * the five refusals here are refusals ON PURPOSE: a link a person cannot open, or
+ * must not be taught to click, is worse than no link at all. */
+export type EmailClassification =
+  | { refersToRecord: true; link: string }
+  | { refersToRecord: false; why: string }
+
+export const EMAIL_CENSUS: Record<string, EmailClassification> = {
+  /* ── auth: identity. Nothing here names a record, and nothing here gets a link ── */
+  "workers/auth/src/lib/email.ts::sendLoginCode": {
+    refersToRecord: false,
+    why: "a six-digit code refers to the sign-in attempt in front of the person reading it and to nothing else — there is no record to open. It is also the one email that must NEVER carry a button: a sign-in mail with a link in it is the exact shape of the phishing mail people are told to watch for, and teaching our own users to click one is a security cost with no product gain.",
+  },
+  "workers/auth/src/lib/email.ts::sendEmailChangeCode": {
+    refersToRecord: false,
+    why: "the same code, for a different proof, sent TO AN ADDRESS NOBODY HAS CONFIRMED YET. It names no record; and until the code comes back, the recipient is a stranger who typed an address into a form, which is not somebody to send a link into the app to.",
+  },
+  "workers/auth/src/lib/email.ts::sendEmailChangedNotice": {
+    refersToRecord: false,
+    why: "a security notice to the OLD address, sent precisely because the person reading it may be the one who did NOT make the change. Their account is not a record with a screen, and a link into an app that address can no longer sign in to is a dead end — the action it asks for is to contact us, which is the one thing a button here could not do.",
+  },
+
+  /* ── tenancy: membership, invites, and the estate's own plumbing ── */
+  "workers/tenancy/src/lib/invites.ts::createInvite": {
+    refersToRecord: true,
+    link: "invite → the in-app Invitations inbox (agency; the portal has none, and an invite is how a portal login comes into being in the first place)",
+  },
+  "workers/tenancy/src/lib/notify.ts::notifyRoleChanged": {
+    refersToRecord: true,
+    link: "member → their own membership in the team, for a STAFF recipient. A client login gets no button: the portal has no members screen, so the only link that could exist for them is an agency URL",
+  },
+  "workers/tenancy/src/lib/notify.ts::notifyRemoved": {
+    refersToRecord: false,
+    why: "it names a membership that has just been deactivated. Every link this base could build points at a screen the team they were removed from no longer lets them open, so a button would be a promise the app itself refuses one click later. The mail already names the only thing they can act on: ask an admin.",
+  },
+  "workers/tenancy/src/lib/notify.ts::notifyInviteRevoked": {
+    refersToRecord: false,
+    why: "the invite it names has been withdrawn, so the Invitations inbox the invite email points at would show them nothing. 'No action is needed' is the whole message, and a button under it would suggest otherwise.",
+  },
+  "workers/tenancy/src/lib/sharding.ts::alertNewAlarms": {
+    refersToRecord: false,
+    why: "a database crossing 80% is an operational record with no screen on EITHER front door — it lives in the core database's db_growth table, which no app screen reads. Its real destination is the runbook, which the footnote names (OPERATIONS.md, Growth watch), and inventing an admin screen to have somewhere to point at would be building a product out of an email.",
+  },
+
+  /* ── content: the work itself, and the two emails a client ever receives ── */
+  "workers/content/src/lib/notify.ts::notifyReplyAndMentions": {
+    refersToRecord: true,
+    link: "ticket → the ticket that was replied to, at the RECIPIENT's own front door (one send reaches staff and clients at once)",
+  },
+  "workers/content/src/lib/notify.ts::notifyTodoRaised": {
+    refersToRecord: true,
+    link: "todo → the portal home, where to-dos sit ('Waiting on you'). The portal has no to-do detail screen and one is not invented here",
+  },
+  "workers/content/src/lib/notify.ts::sendTriageDigest": {
+    refersToRecord: true,
+    link: "ticketList → the team's Tickets list (agency). It is about many records, so it points at the list they are all in — and it is staff-only, which is what makes an agency URL the right one",
+  },
+  "workers/content/src/lib/notify.ts::notifyTicketResolved": {
+    refersToRecord: true,
+    link: "ticket → the answered ticket, in the client's portal",
+  },
+}

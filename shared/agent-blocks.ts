@@ -47,6 +47,11 @@ export const BLOCK_LIMITS = {
   text: 120,
   /** a block's own title. */
   title: 80,
+  /** ARROWS in a flow. Higher than `rows` on purpose: a diagram of a dozen
+   * boxes is ordinary and every box can point at more than one other, so a cap
+   * of twelve would refuse honest process maps. It is still a hard ceiling on
+   * what one untrusted reply can make the browser lay out. */
+  edges: 24,
 } as const
 
 /* ------------------------------ the blocks ------------------------------ */
@@ -74,11 +79,30 @@ export type StepItem = {
   note?: string
 }
 
+/** ONE BOX IN A FLOW. `id` is a wire handle the edges point at — never shown to
+ * anybody, so it is held to the same text rules as a label and nothing more. */
+export type FlowNode = {
+  id: string
+  label: string
+  note?: string
+}
+
+/** ONE ARROW. `from` and `to` must both name a node DECLARED IN THE SAME BLOCK —
+ * an arrow into nothing is a broken diagram, and the parser refuses the whole
+ * block rather than drawing three quarters of a process. */
+export type FlowEdge = {
+  from: string
+  to: string
+  /** what makes the arrow true — "if approved", "when the client replies". */
+  label?: string
+}
+
 export type AgentBlock =
   | { kind: "metric"; title?: string; items: MetricItem[] }
   | { kind: "bars"; title?: string; unit?: string; rows: BarRow[] }
   | { kind: "table"; title?: string; columns: string[]; rows: string[][] }
   | { kind: "steps"; title?: string; steps: StepItem[] }
+  | { kind: "flow"; title?: string; nodes: FlowNode[]; edges: FlowEdge[] }
 
 export type AgentBlockKind = AgentBlock["kind"]
 
@@ -120,6 +144,12 @@ export const AGENT_BLOCKS: Record<AgentBlockKind, AgentBlockSpec> = {
     when: "an ordered sequence — the steps of a process, or what happens next and in what order. Use it when the ORDER is the point",
     shape: `{"title":"optional heading","steps":[{"label":"what happens","note":"optional one line under it"}]}`,
     example: `{"title":"How a new ticket is handled","steps":[{"label":"The ticket arrives","note":"Raised in the portal or by email"},{"label":"Triage","note":"Answer it, or split it into stories"},{"label":"Into a sprint"},{"label":"Resolved, and the client is told"}]}`,
+  },
+  flow: {
+    kind: "flow",
+    when: "a process that BRANCHES, loops back, or has more than one way through — a lifecycle, a decision, how one kind of record becomes another. Use it only when the ARROWS carry meaning that a numbered list cannot: if every box simply follows the one before it, that is `steps`, not this",
+    shape: `{"title":"optional heading","nodes":[{"id":"short-handle","label":"what the box says","note":"optional one line under it"}],"edges":[{"from":"short-handle","to":"another-handle","label":"optional, what makes this arrow true"}]} — an id is a handle for the arrows and is never shown; every edge must point at ids declared in the SAME block, at least two nodes and at least one edge`,
+    example: `{"title":"How a ticket becomes delivered work","nodes":[{"id":"raised","label":"Ticket raised","note":"By the client, in the portal or by email"},{"id":"triage","label":"Triage"},{"id":"answer","label":"Answered and resolved","note":"Nothing to build"},{"id":"story","label":"Split into stories"},{"id":"sprint","label":"Into a sprint"},{"id":"done","label":"Delivered, and the client is told"}],"edges":[{"from":"raised","to":"triage"},{"from":"triage","to":"answer","label":"a question"},{"from":"triage","to":"story","label":"work to do"},{"from":"story","to":"sprint"},{"from":"sprint","to":"done"},{"from":"sprint","to":"story","label":"sent back"}]}`,
   },
 }
 
@@ -255,6 +285,43 @@ export function parseAgentBlock(kind: string, body: string): AgentBlock | null {
     return { kind, title, columns, rows }
   }
 
+  if (kind === "flow") {
+    // NODES FIRST, because the edges are checked AGAINST them. A flow of one box
+    // is a sentence, so two is the floor; ids must be unique, because a repeated
+    // id makes every arrow touching it ambiguous, and an ambiguous arrow is a
+    // diagram that states something nobody said.
+    const declared = sizedArray(o.nodes, BLOCK_LIMITS.rows)
+    if (!declared || declared.length < 2) return null
+    const nodes: FlowNode[] = []
+    const ids = new Set<string>()
+    for (const entry of declared) {
+      const r = record(entry)
+      if (!r) return null
+      const id = text(r.id, BLOCK_LIMITS.text)
+      const label = text(r.label, BLOCK_LIMITS.text)
+      if (id === null || label === null || ids.has(id)) return null
+      ids.add(id)
+      nodes.push({ id, label, note: maybeText(r.note, BLOCK_LIMITS.text) })
+    }
+    const drawn = sizedArray(o.edges, BLOCK_LIMITS.edges)
+    if (!drawn) return null
+    const edges: FlowEdge[] = []
+    for (const entry of drawn) {
+      const r = record(entry)
+      if (!r) return null
+      const from = text(r.from, BLOCK_LIMITS.text)
+      const to = text(r.to, BLOCK_LIMITS.text)
+      // AN ARROW INTO NOTHING REFUSES THE WHOLE BLOCK, where a ragged table row
+      // is merely padded. The difference is what the two shapes claim: a blank
+      // cell says nothing, while a diagram missing an arrow says the process
+      // goes somewhere it doesn't. A self-loop is refused for the same reason —
+      // it draws nothing and would read as a step that repeats forever.
+      if (from === null || to === null || !ids.has(from) || !ids.has(to) || from === to) return null
+      edges.push({ from, to, label: maybeText(r.label, BLOCK_LIMITS.text) })
+    }
+    return { kind, title, nodes, edges }
+  }
+
   const list = sizedArray(o.steps, BLOCK_LIMITS.rows)
   if (!list) return null
   const steps: StepItem[] = []
@@ -295,5 +362,9 @@ export function blockBrief(): string {
     lines.push(b.example)
     lines.push("```")
   }
+  lines.push("")
+  lines.push(
+    "WHEN NOT TO DRAW — read this half twice, it is the half that gets ignored. Nobody chose to see a picture: there is no switch for this, so the decision is entirely yours and a picture nobody needed is a cost you imposed on the reader. Say it in a sentence, with no block at all, when: the answer is ONE number, one date, one name, or a yes or a no; there are only two or three things and they fit in the sentence you were going to write anyway; the answer is an explanation, a judgement or a piece of advice, where there is nothing to lay out; or the question was conversational. ONE block in a reply is normal and two is the most you should ever need — the same facts drawn twice in two shapes has said one thing twice and buried it. Never draw to look thorough or to fill a short answer: a wall of charts over a one-line answer is a worse answer than the line on its own. And never put a number in a block that was not in the material you were given — a block is as much a claim as a sentence is, and an invented bar is an invented fact that happens to look measured."
+  )
   return lines.join("\n")
 }

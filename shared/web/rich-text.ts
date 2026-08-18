@@ -1,10 +1,16 @@
+// THE RENDER SECURITY BOUNDARY, and it lives in shared/web/ because BOTH front
+// doors author and display the same bodies: a client types a ticket description
+// in the portal and staff read it in the agency app, and the other way round.
+// One sanitizer, or two that drift apart.
+//
 // Sanitize user-authored rich text (the library Notes editor emits HTML) to a SAFE
 // HTML string. We parse with DOMParser — a DETACHED document where <script> never
 // executes and inline handlers never fire — keep only an ALLOWLIST of formatting tags
 // with their text HTML-escaped, drop scripts/handlers entirely, and allow only
 // http/https/mailto links. The result is safe to inject (same model as DOMPurify);
-// the <RichText> component does exactly that. richTextPlain strips everything to
-// plain text (list/card previews, and the copy the assistant reads).
+// the <RichText> component (rich-text-view.tsx) does exactly that. richTextPlain
+// strips everything to plain text (list/card previews, a record's own title line,
+// the words that go out in an email, and the copy the assistant reads).
 
 // DOM tag (uppercase, as the parser reports) → the element we emit.
 const TAG_MAP: Record<string, string> = {
@@ -117,8 +123,8 @@ function serializeNode(node: ChildNode): string {
  * else — markdown and plain text alike — goes the other way, where a plain
  * paragraph is still just a paragraph.
  *
- * The RENDERING half is in components/rich-text.tsx: it picks the pipeline, and
- * there is exactly one of each. */
+ * The RENDERING half is in rich-text-view.tsx: it picks the pipeline, and there
+ * is exactly one of each. */
 export function looksLikeHtml(s: string | null | undefined): boolean {
   return !!s && /<\/?[a-z][a-z0-9]*(\s[^<>]*)?>/i.test(s)
 }
@@ -130,6 +136,19 @@ export function sanitizeRichHtml(html: string | null | undefined): string {
   if (typeof DOMParser === "undefined") return escapeText(richTextPlain(html))
   const doc = new DOMParser().parseFromString(html, "text/html")
   return Array.from(doc.body.childNodes).map(serializeNode).join("")
+}
+
+/** WHAT A RICH-TEXT FIELD SUBMITS.
+ *
+ * A form used to ask `values.detail.trim()` and get a truthful answer, because the
+ * field held the characters a person typed. A contentEditable does not: delete the
+ * last letter of a paragraph and the browser leaves `<p><br></p>` behind, which is
+ * not empty to `trim()` and is empty to a reader. So every form asks THIS instead —
+ * the HTML as typed when there are words in it, and "" when there are none, so an
+ * emptied field stores nothing rather than an invisible paragraph, and a required
+ * field's submit button greys out exactly when the box looks empty. */
+export function richTextValue(html: string | null | undefined): string {
+  return richTextPlain(html) ? (html ?? "") : ""
 }
 
 /** Strip all tags → plain text (list/card previews, the assistant's reading copy). */

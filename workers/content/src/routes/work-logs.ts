@@ -31,6 +31,7 @@ import {
   setAutoStop,
   startTimer,
   stopTimer,
+  summariseWorkLogs,
   type LogFilter,
 } from "../lib/work-logs"
 import { progressFlip, ticketBehind } from "../lib/ready-flip"
@@ -79,6 +80,27 @@ export async function getWorkLogs(request: Request, env: Env): Promise<Response>
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   return logPage(cfg, guard, logFilterFrom(url), queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+}
+
+/** GET /api/content/work-logs/summary — THE NUMBERS ON TOP OF A LIST OF TIME.
+ *
+ * Same gate and same refusal as the list beside it (`work:read`, and never a
+ * client login — a work log names the staff member who did the work and how long
+ * they took, which is both halves of what SCOPE ch.06 keeps off the portal), and
+ * the SAME filter, read through the same `logFilterFrom`. That is the point of it
+ * being here rather than a second parser: the hours above a list are the hours OF
+ * that list (R16), and the only way to guarantee that is for both to be the same
+ * sentence.
+ *
+ * It answers one object and no rows, so it is `json` rather than `pagedJson` —
+ * there is no collection to page. The bounded reads behind it are in
+ * `summariseWorkLogs`, which says its ceilings at the query (R14).
+ */
+export async function getWorkLogSummary(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  return json(await summariseWorkLogs(cfg, guard, logFilterFrom(url), new Date()))
 }
 
 /** GET /api/content/work-logs/running — what the caller has running RIGHT NOW.

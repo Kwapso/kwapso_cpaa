@@ -34,7 +34,8 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
-import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { AppTiles } from "@/components/app-tiles"
 import { tenancy } from "@/lib/api"
 import { accountsKey, appsKey, listFetch, valueKey } from "@/lib/live-resources"
@@ -124,7 +125,7 @@ export function AppsScreen({
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
   // Who can be put on an app (8.10) — the team, from the cache four other
   // screens already fill.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   const [addOpen, setAddOpen] = React.useState(false)
   const [tab, setTab] = React.useState("active")
   // The engine recipe and its rights are still the contract this screen is
@@ -159,7 +160,7 @@ export function AppsScreen({
     // rather than saying a third number two lines above them. Same shape as the
     // tasks screen's six views, and for the same reason.
     <CountedAbove active={activeBadge !== "" || inactiveBadge !== ""}>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <CollectionHeading sectionKey="apps" total={total} />
 
       <SectionWithCreate

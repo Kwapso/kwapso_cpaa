@@ -18,24 +18,20 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
-/** Radix Select can't hold an empty value, so "nobody in particular" needs a
+/** A picker can't hold an empty value, so "nobody in particular" needs a
  * sentinel — the same one the knowledge form uses for the agency's own material. */
 const NONE = "__none__"
 
@@ -68,23 +64,33 @@ export function MeetingFormDialog({
   open,
   onOpenChange,
   onSubmit,
+  teamId,
   accountOptions,
   appOptions,
   purposeOptions,
+  fixedApp,
   initial,
   draftKey,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (values: MeetingFormValues) => Promise<void>
-  /** the clients this caller may file a meeting under — already fenced by their
-   * own read of the accounts door. */
+  /** the team whose clients the picker searches. Accounts PAGE (R14), so the
+   * question goes to the door rather than to the loaded page. */
+  teamId: string | null
+  /** the clients the screen already holds — painted while the door's first
+   * answer arrives, and where an edited meeting's client gets its NAME. */
   accountOptions: { id: string; name: string }[]
   /** the systems a meeting can be filed against — the same bounded apps list
    * every other form in the work engine picks from. */
   appOptions: { id: string; name: string }[]
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeOptions: { id: string; name: string }[]
+  /** Set when the form is opened FROM an app's own screen — the system the
+   * meeting is about is then a fact about where you are standing, so the picker
+   * is replaced by its name. Separate from `initial`, which means EDIT: a create
+   * with one field already answered must not claim to be an edit. */
+  fixedApp?: { id: string; name: string }
   /** Present = EDIT mode (prefilled). */
   initial?: Partial<MeetingFormValues>
   draftKey?: string
@@ -98,7 +104,7 @@ export function MeetingFormDialog({
       startsAt: initial?.startsAt ?? "",
       endsAt: initial?.endsAt ?? "",
       accountId: initial?.accountId || NONE,
-      appId: initial?.appId || NONE,
+      appId: initial?.appId || fixedApp?.id || NONE,
       purposeId: initial?.purposeId || NONE,
       location: initial?.location ?? "",
       agenda: initial?.agenda ?? "",
@@ -119,11 +125,11 @@ export function MeetingFormDialog({
         startsAt: toMoment(values.startsAt),
         endsAt: toMoment(values.endsAt),
         accountId: values.accountId === NONE ? "" : values.accountId,
-        appId: values.appId === NONE ? "" : values.appId,
+        appId: fixedApp ? fixedApp.id : values.appId === NONE ? "" : values.appId,
         purposeId: values.purposeId === NONE ? "" : values.purposeId,
         location: values.location.trim(),
-        agenda: values.agenda.trim(),
-        notes: values.notes.trim(),
+        agenda: richTextValue(values.agenda),
+        notes: richTextValue(values.notes),
       })
       clearDraft()
       onOpenChange(false)
@@ -185,61 +191,45 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={clientField} htmlFor="meeting-client" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="meeting-client"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: NONE, label: t("Nobody, it is ours") }}
+          placeholder={t("Nobody, it is ours")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="meeting-client">
-            <SelectValue placeholder={t("Nobody, it is ours")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Nobody, it is ours")}</SelectItem>
-            {accountOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="meeting-app"
           value={values.appId}
-          onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          options={appOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: NONE, label: t("Not about one app") }}
+          placeholder={t("Not about one app")}
+          searchPlaceholder={t("Search apps…")}
+          emptyText={t("No app matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="meeting-app">
-            <SelectValue placeholder={t("Not about one app")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Not about one app")}</SelectItem>
-            {appOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={purposeField} htmlFor="meeting-purpose" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="meeting-purpose"
           value={values.purposeId}
-          onValueChange={(v) => setValues((s) => ({ ...s, purposeId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, purposeId: v }))}
+          options={purposeOptions.map((p) => ({ value: p.id, label: p.name }))}
+          emptyOption={{ value: NONE, label: t("Not said") }}
+          placeholder={t("Not said")}
+          searchPlaceholder={t("Search reasons…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="meeting-purpose">
-            <SelectValue placeholder={t("Not said")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
-            {purposeOptions.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={whereField} htmlFor="meeting-where" className={fieldSpacing}>
         <Input
@@ -251,23 +241,21 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={agendaField} htmlFor="meeting-agenda" className={fieldSpacing}>
-        <Textarea
-          id="meeting-agenda"
-          value={values.agenda}
-          onChange={(e) => setValues((s) => ({ ...s, agenda: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.agenda}
+          onChange={(html) => setValues((s) => ({ ...s, agenda: html }))}
           placeholder={t("What we mean to cover.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       <Field config={notesField} htmlFor="meeting-notes" className={fieldSpacing}>
-        <Textarea
-          id="meeting-notes"
-          value={values.notes}
-          onChange={(e) => setValues((s) => ({ ...s, notes: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.notes}
+          onChange={(html) => setValues((s) => ({ ...s, notes: html }))}
           placeholder={t("What was said and decided.")}
-          disabled={busy}
-          rows={4}
+          className="min-h-32"
         />
       </Field>
     </FormShellDialog>

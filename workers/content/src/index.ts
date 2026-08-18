@@ -51,6 +51,8 @@
 //   POST /api/content/tasks/done          -> tick it / put it back
 //   GET  /api/content/triage              -> whose week it is + the tickets nobody has read
 //   POST /api/content/triage              -> put somebody on triage duty for a week
+//   GET  /api/content/insights            -> the team's week in numbers (per-module gated)
+//   GET  /api/content/record-counts       -> one record's child totals, before a tab is clicked
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -66,6 +68,9 @@
 //   POST /api/content/meetings/update     -> correct it / write the notes up
 //   POST /api/content/meetings/held       -> it happened / it hasn't yet
 //   POST /api/content/meetings/active     -> cancel it / put it back
+//   GET  /api/content/deliverables        -> what we handed over on an app (?appId=, ?id → one)
+//   POST /api/content/deliverables[/update|/active] -> file / correct / archive one
+//   POST /api/content/deliverables/upload-stream -> store the bytes behind one
 //   GET  /api/content/brand-assets        -> the brand library (?id → one)
 //   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
 //   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
@@ -112,6 +117,7 @@ import {
 import {
   getRunningTimers,
   getWorkLogs,
+  getWorkLogSummary,
   postAutoStop,
   postLogTime,
   postResolveRunaway,
@@ -130,6 +136,8 @@ import {
   getPortalDelivery,
 } from "./routes/todos"
 import { getTriage, postSetTriageDuty } from "./routes/triage"
+import { getInsights } from "./routes/insights"
+import { getRecordCounts } from "./routes/record-counts"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -143,14 +151,23 @@ import {
   postUploadKnowledgeFile,
 } from "./routes/knowledge"
 import {
+  getMeetingPeople,
   getMeetings,
+  getMeetingTranscript,
   postCreateMeeting,
   postMeetingHeld,
   postMeetingTranscript,
-  postSyncCalendarSeries,
+  postSyncCalendar,
   postSetMeetingActive,
   postUpdateMeeting,
 } from "./routes/meetings"
+import {
+  getDeliverables,
+  postCreateDeliverable,
+  postSetDeliverableActive,
+  postStreamDeliverableFile,
+  postUpdateDeliverable,
+} from "./routes/deliverables"
 import {
   getBrandAssets,
   getBrandAssetsExport,
@@ -186,6 +203,7 @@ import {
   getGoogleConnections,
   getGoogleDriveFile,
   getGoogleDriveFiles,
+  getGoogleDriveThumbnail,
   getGoogleEvents,
   getGoogleEventTranscript,
   getGoogleMail,
@@ -217,6 +235,7 @@ import {
 } from "./routes/google"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
+import { clientUserIds } from "@shared/workers/record-link"
 import { dutyFor, loggedNothingLastWeek, needsTriage } from "./lib/triage"
 import { d1ConfigFrom } from "@shared/workers/gating"
 import { CRON_TEAM_CAP } from "@shared/workers/limits"
@@ -348,6 +367,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // TIME. A timer is a work log with no end yet, so there is one table and one
   // pair of doors rather than a timer service beside a timesheet.
   "GET /api/content/work-logs": { handler: getWorkLogs, kind: "read" },
+  // THE NUMBERS ON TOP OF A RECORD'S LIST OF TIME — the same filter the list
+  // above parses, answered in aggregate. Its own door rather than more fields on
+  // the page, because a screen showing the header without the rows (or the rows
+  // without the header) should pay for exactly what it draws.
+  "GET /api/content/work-logs/summary": { handler: getWorkLogSummary, kind: "read" },
   "GET /api/content/work-logs/running": { handler: getRunningTimers, kind: "read" },
   "POST /api/content/work-logs": { handler: postLogTime, kind: "mutation" },
   "POST /api/content/work-logs/start": { handler: postStartTimer, kind: "mutation" },
@@ -375,6 +399,17 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // a client login: an unread request is our failure, not an SLA we promised.
   "GET /api/content/triage": { handler: getTriage, kind: "read" },
   "POST /api/content/triage": { handler: postSetTriageDuty, kind: "mutation" },
+  // THE PULSE — the four numbers and the one series Home draws a picture out of.
+  // Refused to a client login like everything above it, and gated SECTION by
+  // section rather than at the door: it crosses three modules, so one right
+  // standing in for three would give somebody a chart they may not read or take
+  // away one they may (R18). See routes/insights.ts.
+  "GET /api/content/insights": { handler: getInsights, kind: "read" },
+  // THE BADGES ON A RECORD'S TABS, answered when the record OPENS rather than
+  // when the tab is clicked — the counts are eager, the rows stay lazy. Gated
+  // per COLLECTION for the same R18 reason as the pulse above it, and refused to
+  // a client login. See routes/record-counts.ts.
+  "GET /api/content/record-counts": { handler: getRecordCounts, kind: "read" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
@@ -406,10 +441,33 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // ticks "held" and writes a work log for every one of OUR people who was in
   // the room (9.4 + 9.2). One door, because it is one moment.
   "POST /api/content/meetings/transcript": { handler: postMeetingTranscript, kind: "mutation" },
-  // A repeating calendar entry becomes a real record four weeks ahead, and the
-  // instances beyond that come back read-only (9.7).
-  "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendarSeries, kind: "mutation" },
+  // The WORDS, and WHO WAS THERE — two reads the detail screen makes and no list
+  // ever does. Their own doors because of what each costs: a transcript is up to
+  // a megabyte, and resolving an invitation against the address book is two
+  // databases. See routes/meetings.ts for why neither belongs on the row.
+  "GET /api/content/meetings/transcript": { handler: getMeetingTranscript, kind: "read" },
+  "GET /api/content/meetings/people": { handler: getMeetingPeople, kind: "read" },
+  // The diary, brought into step BOTH WAYS: a repeating entry becomes a real
+  // record four weeks ahead (9.7), every entry in the window has its Google
+  // facts refreshed, and one cancelled in Google is called off here. The
+  // backward half is why a transcript that lands an hour after the call is found
+  // at all.
+  "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendar, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
+
+  // ── WHAT WE HAND OVER ──────────────────────────────────────────────────────
+  // A deliverable belongs to ONE app and every row carries that app's account,
+  // so the fence is built — but no portal door names this module and every door
+  // here refuses a client login (R21), the way the knowledge base's do. Whether
+  // a client may one day see their own handover shelf is a product decision, and
+  // an unmade decision is a closed door.
+  "GET /api/content/deliverables": { handler: getDeliverables, kind: "read" },
+  "POST /api/content/deliverables": { handler: postCreateDeliverable, kind: "mutation" },
+  "POST /api/content/deliverables/update": { handler: postUpdateDeliverable, kind: "mutation" },
+  "POST /api/content/deliverables/active": { handler: postSetDeliverableActive, kind: "mutation" },
+  // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
+  // the same classification the three upload doors below it carry.
+  "POST /api/content/deliverables/upload-stream": { handler: postStreamDeliverableFile, kind: "housekeeping" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
   // Three modules, four tables, and one thing every door below has in common: it
@@ -469,6 +527,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // in ours would be the one write in the base with no audit block.
   "GET /api/content/google/drive/files": { handler: getGoogleDriveFiles, kind: "read" },
   "GET /api/content/google/drive/file": { handler: getGoogleDriveFile, kind: "read" },
+  // A PICTURE of a file, fetched with the caller's own token and never stored —
+  // Google's own preview link is authenticated and expires, so it cannot be put
+  // in a page. routes/google.ts says why this is a proxy rather than a copy.
+  "GET /api/content/google/drive/thumbnail": { handler: getGoogleDriveThumbnail, kind: "read" },
   "POST /api/content/google/drive/upload": { handler: postGoogleDriveUpload, kind: "mutation" },
   // WRITING is not just putting a file in. Rewriting one, making a folder to put
   // it in, filing a conversation as a document — and the bin, without which the
@@ -666,12 +728,22 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
         teamMemberNames(env, team.id),
       ])
       const missingTime = isMonday ? await loggedNothingLastWeek(cfg, guard, now, members) : []
+      // NOTHING CLIENT-FACING — and "every recipient comes off the team's own
+      // membership" was NOT the same sentence. A client login is an ordinary team
+      // member holding an ordinary role (R21 says so in as many words), so
+      // `teamMemberNames` returns them too: on any morning nobody was named for
+      // triage, this fanned the agency's own backlog — how many requests are
+      // sitting unread, and for how long — out to every client contact with a
+      // login. §6's promise is enforced here rather than assumed, one read, on
+      // the same fail-closed rule the rest of the file uses.
+      const clients = await clientUserIds(cfg, team.database_id, members.map((m) => m.userId))
+      const staff = members.filter((m) => !clients.has(m.userId))
       // The person on duty, or — when nobody has been named — everybody, because
       // a backlog with no owner is worse than a slightly noisy morning, and the
       // mail's own footnote asks them to fix exactly that.
       const to = onDuty
-        ? members.filter((m) => m.userId === onDuty.userId)
-        : members
+        ? staff.filter((m) => m.userId === onDuty.userId)
+        : staff
       await sendTriageDigest(env, team.id, to, {
         waiting: waiting.total,
         oldestDays: waiting.waiting[0]?.days ?? 0,

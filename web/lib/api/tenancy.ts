@@ -36,6 +36,7 @@ import type {
   TeamRole,
   TeamSummary,
 } from "@shared/types"
+import type { RecordCounts } from "@shared/record-counts"
 import type { SavingsView } from "@shared/workers/savings"
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
@@ -173,11 +174,18 @@ export const tenancy = {
       body: JSON.stringify({ type, value, mark }),
     }),
 
-  /** Rename a dropdown value (its type stays). Needs selectable_data:edit. */
-  updateSelectable: (id: string, value: string) =>
+  /** Edit a dropdown value — its word and its emoji; its type stays. Needs
+   * selectable_data:edit.
+   *
+   * `mark` UNDEFINED leaves the emoji alone, an empty string clears it — the
+   * lib's own contract. The screen sends it either way, because it now has a
+   * field for it: the door has parsed and written `mark` since the day it
+   * shipped, and this client sent only the word, so a value's emoji could be
+   * set when it was created and never changed afterwards. */
+  updateSelectable: (id: string, value: string, mark?: string) =>
     api<{ values: SelectableValue[] }>("/api/tenancy/selectable/update", {
       method: "POST",
-      body: JSON.stringify({ id, value }),
+      body: JSON.stringify({ id, value, mark }),
     }),
 
   /** Deactivate / reactivate a dropdown value (deactivate-only). Needs
@@ -292,6 +300,11 @@ export const tenancy = {
       /** "yes" = only the put-away ones, "no" = only the live ones */
       archived?: string
       parentId?: string
+      /** WHAT ORDER, one of the door's own sort names (ACCOUNT_SORTS), with
+       * `dir` flipping it. Omit both for the door's default (newest first) —
+       * the list pages, so this is the only honest place to ask. */
+      sort?: string
+      dir?: string
       cursor?: string | null
     } = {}
   ) => {
@@ -301,6 +314,8 @@ export const tenancy = {
     if (opts.status) p.set("status", opts.status)
     if (opts.archived) p.set("archived", opts.archived)
     if (opts.parentId) p.set("parentId", opts.parentId)
+    if (opts.sort) p.set("sort", opts.sort)
+    if (opts.dir) p.set("dir", opts.dir)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()
     return api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
@@ -379,10 +394,14 @@ export const tenancy = {
   /** R14: a PAGE of process maps (a GROWING collection) — hand `cursor` back from
    * the previous response for the next one; `total` is the exact server count of
    * what this caller may see. */
-  processes: (opts: { q?: string; appId?: string; cursor?: string | null } = {}) => {
+  processes: (opts: { q?: string; appId?: string; sort?: string; dir?: string; cursor?: string | null } = {}) => {
     const p = new URLSearchParams()
     if (opts.q) p.set("q", opts.q)
     if (opts.appId) p.set("appId", opts.appId)
+    // The order, one of PROCESS_SORTS' own names — the maps page, so it is asked
+    // of the door rather than applied to the fifty rows in the browser.
+    if (opts.sort) p.set("sort", opts.sort)
+    if (opts.dir) p.set("dir", opts.dir)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()
     return api<PagedResponse<{ processes: ProcessSummary[] }>>(
@@ -450,6 +469,12 @@ export const tenancy = {
     const qs = p.toString()
     return api<SavingsView>(`/api/tenancy/value${qs ? `?${qs}` : ""}`)
   },
+
+  /** HOW MANY OF EACH THING HANG OFF ONE RECORD — this worker's half (apps,
+   * process maps, the rate card). Asked when the record opens so its tabs are
+   * badged before anybody clicks one; the rows behind each tab stay lazy. */
+  recordCounts: (table: string, id: string) =>
+    api<RecordCounts>(`/api/tenancy/record-counts?table=${enc(table)}&id=${enc(id)}`),
 
   /* ---- the money (agency only — every door below refuses a client login) ---- */
 

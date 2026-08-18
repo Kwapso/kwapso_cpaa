@@ -47,6 +47,11 @@ export const TOOL_GATES: Record<string, string> = {
   create_dropdown_value: "selectable_data:create",
   update_dropdown_value: "selectable_data:edit",
   set_dropdown_active: "selectable_data:delete",
+  // WHAT WE HANDED OVER. Its own module, never `processes` — filing a handover
+  // doc against a system is a different grant from editing the system itself.
+  create_deliverable: "deliverables:create",
+  update_deliverable: "deliverables:edit",
+  set_deliverable_active: "deliverables:delete",
   create_brand_asset: "brand_assets:create",
   update_brand_asset: "brand_assets:edit",
   set_brand_asset_active: "brand_assets:delete",

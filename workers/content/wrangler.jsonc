@@ -2,9 +2,11 @@
 // Secrets (wrangler secret put): CF_D1_TOKEN (Account→D1→Edit API token) so it
 // can reach per-team databases over the one REST door.
 //
-// The AI binding is the knowledge base's EMBEDDING model and nothing else — no
-// prose is generated on this worker. The Vectorize binding is where those
-// embeddings are searched. The cron is the module's BACKSTOP sweep — a write
+// The AI binding does TWO jobs here: the knowledge base's EMBEDDING model, and the
+// cheap model that WRITES an answer out of the passages a question found (R23,
+// lib/knowledge-compose.ts). Only the second one costs the team anything, so only
+// the second one is gated on the `agent` module and metered — see AGENT_FREE_DAILY
+// in the vars below. The Vectorize binding is where those embeddings are searched. The cron is the module's BACKSTOP sweep — a write
 // re-indexes what it touched immediately, so the cron's job is only to notice
 // what nobody was there to tell us about. Bounded per tick, resumable from a
 // cursor, and it records its failures (R12).
@@ -56,7 +58,24 @@
   "ratelimits": [
     { "name": "CALLER_LIMIT", "namespace_id": "1102", "simple": { "limit": 600, "period": 60 } }
   ],
-  "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7", "PUBLIC_APP_URL": "https://agency.kwapso.app" },
+  // AGENT_FREE_DAILY / AGENT_NO_DAILY_CAP are the TEAM'S ONE AI allowance, and they
+  // are here because this worker spends it too — writing out the answer a question
+  // found (R23). They must match data-ops' values exactly; credits-invariant.test.ts
+  // compares the two files, because one allowance enforced at two different heights
+  // is a bug nobody sees until somebody runs out twice.
+  //
+  // THE TWO FRONT DOORS, AS CONFIGURATION. This worker's emails link a staff
+  // member into the agency app and a CLIENT into the portal, and neither hostname
+  // may be spelled at a call site (shared/workers/record-link.ts).
+  // client.kwapso.app is the portal; portal.kwapso.app is the owner's live
+  // third-party product and must never appear here.
+  "vars": {
+    "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
+    "PUBLIC_APP_URL": "https://agency.kwapso.app",
+    "PUBLIC_PORTAL_URL": "https://client.kwapso.app",
+    "AGENT_FREE_DAILY": "50",
+    "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
+  },
   // The knowledge sweep. Fifteen minutes is the backstop §3 names ("push where
   // the source supports it, with a 15-minute sweep as the backstop"); a tick
   // whose sources have not changed costs three reads per team and no model call.
@@ -91,7 +110,14 @@
       "ratelimits": [
         { "name": "CALLER_LIMIT", "namespace_id": "1102", "simple": { "limit": 600, "period": 60 } }
       ],
-      "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7", "PUBLIC_APP_URL": "https://agency-staging.kwapso.app" }
+      "vars": {
+        "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
+        "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
+        "PUBLIC_PORTAL_URL": "https://staging-client.kwapso.app",
+        "AGENT_FREE_DAILY": "50",
+        "AGENT_NO_DAILY_CAP": "true",
+        "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
+      }
     }
   }
 }

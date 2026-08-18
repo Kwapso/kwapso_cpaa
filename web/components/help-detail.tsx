@@ -38,24 +38,31 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
-import { personName } from "@/lib/identity"
+import { assignableMembers } from "@/lib/people"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpAttachmentsPanel, helpAttachmentsKey } from "@/components/help-attachments"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper } from "@/components/help-status-stepper"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
-import { StoriesPanel } from "@/components/work-panels"
+import { StoryFormDialog } from "@/components/story-form-dialog"
+import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
+import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
+import { richTextPlain } from "@shared/web/rich-text"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -116,6 +123,10 @@ export function HelpDetailScreen({
   // The generic record feed (Law R5) + the exact server total its tab badges
   // (R8 for the place, R16 for the number — never the loaded page's length).
   const activity = useRecordActivity("help", helpId)
+  // THE BADGES, BEFORE THE CLICK — the work written down against this request,
+  // and what is attached to it. One bounded read of both totals when the ticket
+  // opens; the rows behind each tab stay lazy (lib/use-record-counts).
+  useRecordCounts("help", helpId)
   const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
     tenancy.selectable().then((r) => r.values)
   )
@@ -131,19 +142,59 @@ export function HelpDetailScreen({
   // right and not the ticket's: answering a request and putting hours on the
   // team's timesheet are two different things a role may grant separately.
   const canLogTime = can("work", "create")
+  // WRITING WORK DOWN IS THE WORK MODULE'S RIGHT, NOT THE TICKET'S. A person who
+  // may read and answer requests is not necessarily a person who may put things
+  // on the team's backlog, so the button on the Related stories tab asks the
+  // right the STORY door itself gates on (`work:create`) rather than any `help:*`
+  // right — the child's right, never the parent's. The door decides either way
+  // (R10); this only decides whether we draw a button that would come back 403.
+  const canWriteWork = can("work", "create")
+  // THE TIME AGAINST THIS REQUEST. Reading it is `work:read` and correcting a row
+  // is `work:edit` — the two rights those doors gate on, and neither of them is a
+  // ticket right: answering a request and reading the team's timesheet are
+  // different things a role may grant separately. A role without `work:read` sees
+  // no tab at all rather than a tab that refuses.
+  const canSeeTime = can("work", "read")
+  const canEditTime = can("work", "edit")
+  // R16: the door's exact COUNT(*) over this record's time, fetched by the panel
+  // and read back here for the badge.
+  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("help", helpId))
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
+  // NEW WORK AGAINST THIS REQUEST — and this is NOT "make it a story".
+  //
+  // CHECKLIST 3.10 took away three controls that CONVERTED a request into a
+  // piece of work (the button on the title, the prompt after triage, and this
+  // tab's create action), and the first two were right to go: a ticket never
+  // becomes a story, it is answered by however many stories the work turns out
+  // to need. The third was collateral damage. Writing a NEW story that ANSWERS
+  // this request is a different act from turning the request into one, and it is
+  // the act that gets a ticket to triaged: the stepper cannot move until there
+  // is work booked against it, and until 18 Aug 2026 there was no way to book
+  // any from the record you were standing on.
+  //
+  // So the distinction is this, and it is the reason the two must not be
+  // re-merged: the ticket is UNCHANGED by this. Nothing about it is consumed,
+  // renamed or replaced — a second story on the same request is as ordinary as
+  // the first, which is precisely what a conversion could never express.
+  const [storyOpen, setStoryOpen] = React.useState(false)
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
-  // R16: the Files and links tab badges the door's exact COUNT(*).
-  const attachmentsTotal = useCachedValue<number>(`total:${helpAttachmentsKey(helpId)}`)
+  // R16: the Files and links tab badges the door's exact COUNT(*). `null` there
+  // is the third answer beside a number and an absence — the role may not read
+  // the module (R18) — and it renders as nothing, exactly as a zero does.
+  const attachmentsTotal = useCachedValue<number | null>(`total:${helpAttachmentsKey(helpId)}`)
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total badges the tab.
-  const storiesTotal = useCachedValue<number>(totalKey("stories-ticket", helpId))
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-ticket", helpId))
   const host = { base: basePath.replace(/\/tickets$/, "") }
+  // WHAT A STORY NEEDS TO BE WRITTEN AT ALL — the same four lists the backlog,
+  // the sprint and the app hand this form. A hook, so it sits above the early
+  // returns below; every list it reads is a cache another screen already holds.
+  const options = useStoryFormOptions(teamId)
 
   // Land on the newest reply, and follow the one you just sent — the same
   // behaviour the client gets on their side of this same conversation, from the
@@ -160,6 +211,16 @@ export function HelpDetailScreen({
   const helpTypeOptions = (selectableQ.data ?? [])
     .filter((v) => v.type === "Ticket type")
     .map((v) => v.value)
+
+  // READ THIS CONVERSATION IN YOUR OWN LANGUAGE, if you ask. The whole screen's
+  // human-typed words go in one array — the request AND every reply on it — so
+  // one press is one call rather than one per paragraph. Nothing is written: the
+  // ticket still says exactly what the client typed, and "Show original" puts it
+  // straight back. A hook, so it sits above the three early returns below.
+  const translation = useHumanTranslation(teamId, [
+    ticket?.description,
+    ...replyRows.map((r) => r.body),
+  ])
 
   /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
    * happens by itself — a sprint is picked, a timer starts, the last story
@@ -294,16 +355,23 @@ export function HelpDetailScreen({
   if (ticketsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!ticket) return <p className="text-muted-foreground text-sm">{t("That ticket no longer exists.")}</p>
 
-  // self-tag fix: you can't @mention yourself
-  const mentionableMembers: TicketMember[] = (membersQ.data ?? [])
-    .filter((m) => m.userId !== myUserId)
-    .map((m) => ({ id: m.userId, name: personName(m) }))
+  // WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
+  // ordinary team member and used to be offered here, which would have put a
+  // "you were mentioned" email in a client's inbox about our internal note —
+  // and the portal has never offered mentions in the other direction, on
+  // purpose. The one seam decides (lib/people).
+  const mentionableMembers: TicketMember[] = assignableMembers(membersQ.data).filter(
+    (m) => m.id !== myUserId
+  )
 
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
     author: r.authorName || "Member",
     time: formatRelative(r.createdAt),
-    body: r.body,
+    // The reply as the reader asked for it: what was typed, or the translation
+    // they pressed for. Never both, and never a stored rewrite of somebody's
+    // words — `of` is a lookup, not a save.
+    body: translation.of(r.body),
     aiDrafted: r.isAgent,
   }))
 
@@ -356,6 +424,22 @@ export function HelpDetailScreen({
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
+      // WORK LOGS, wherever time can be tracked (CHECKLIST 6.8). A ticket has
+      // carried a start/stop timer in its own header since the work engine
+      // shipped, and no screen showed what that timer had produced — so the hours
+      // on a request could be logged and never read back on the record they were
+      // logged against.
+      ...(canSeeTime
+        ? [
+            {
+              value: "time",
+              label: t("Work logs"),
+              icon: CONCEPT_ICON.time,
+              badge: formatCount(timeTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       {
         value: "files",
         label: t("Files and links"),
@@ -387,16 +471,23 @@ export function HelpDetailScreen({
    * Translate, Edit and Archive go into the three-dot menu. None of them loses
    * its confirm or its colour by moving. */
   const overflow: RecordAction[] = [
-    // TRANSLATE, on a ticket that has a German title and no English one yet. It
-    // SETS the field rather than showing a preview (BUILD-1 §8): a preview is a
-    // thing one person reads once, and a set field is a thing the whole team,
-    // the search and the assistant read afterwards. It disappears the moment
-    // there is an English title, because there is then nothing to ask for.
+    // GIVE THE TICKET AN ENGLISH TITLE, on one that has a German title and no
+    // English one yet. It SETS the field rather than showing a preview (BUILD-1
+    // §8): a preview is a thing one person reads once, and a set field is a
+    // thing the whole team, the search and the assistant read afterwards. It
+    // disappears the moment there is an English title, because there is then
+    // nothing to ask for.
+    //
+    // IT IS NAMED FOR WHAT IT WRITES, not for what it does on the way, because
+    // the conversation below now carries a Translate of its own that changes
+    // nothing and belongs to one reader. Two buttons called "Translate", one
+    // permanent and team-wide and one personal and temporary, is the kind of
+    // thing somebody presses once and never trusts again.
     ...(canEdit && ticket.titleDe && !ticket.titleEn
       ? [
           {
             key: "translate",
-            label: translating ? t("Translating…") : t("Translate"),
+            label: translating ? t("Translating…") : t("Set an English title"),
             icon: <Languages className="size-3.5" />,
             disabled: translating,
             onSelect: () => void translate(),
@@ -455,7 +546,7 @@ export function HelpDetailScreen({
               "Couldn't confirm that."
             )
           }
-          className="shrink-0 gap-1.5"
+          className="shrink-0 gap-1"
         >
           <CheckCheck className="size-3.5" />
           {t("They've confirmed it")}
@@ -466,7 +557,7 @@ export function HelpDetailScreen({
           ticket already answered. The panel is where the words are written,
           because the door refuses without them (5.6). */}
       {canEdit && ticket.status === "ready" && (
-        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
+        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
           <Send className="size-3.5" />
           {t("Answer and close")}
         </Button>
@@ -496,7 +587,11 @@ export function HelpDetailScreen({
       eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
         .filter(Boolean)
         .join(" · ")}
-      title={ticket.description}
+      // The description is rich text now, and a TITLE is one line: the words,
+      // without the markup they were typed with. The body renders formatted in
+      // the conversation below, which is where a person reads it. Translated
+      // FIRST, then flattened — a title has to say what the reader just chose.
+      title={richTextPlain(translation.of(ticket.description))}
       // D5: one line, three facts at most.
       status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
         .filter(Boolean)
@@ -517,9 +612,12 @@ export function HelpDetailScreen({
             return <OverviewList items={overviewItems} />
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
-          // THE SECOND WAY IN — a tab on the ticket where MORE work can be
-          // added. One story may answer many tickets and one ticket may need
-          // many stories, so this is a collection with its own create action.
+          // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
+          // answer many tickets and one ticket may need many stories, so this is
+          // a collection with its own create action — and the button is the
+          // create action the comment above it had been promising while handing
+          // the panel no `onNew` at all. See the note on `storyOpen` for why
+          // adding work here is not the "make it a story" that was removed.
           if (t.value === "stories")
             return (
               <StoriesPanel
@@ -527,7 +625,19 @@ export function HelpDetailScreen({
                 ownerId={helpId}
                 filter={{ ticketId: helpId }}
                 host={host}
+                onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
                 emptyText="No work written down against this request yet."
+              />
+            )
+          if (t.value === "time")
+            return (
+              <WorkLogsPanel
+                targetTable="help"
+                targetId={helpId}
+                recordLabel={[ticket.ref, richTextPlain(ticket.description)].filter(Boolean).join(" · ")}
+                canEdit={canEditTime}
+                canLog={canLogTime}
+                onActivityChanged={() => invalidate(recordActivityKey("help", helpId))}
               />
             )
           if (t.value === "files")
@@ -536,30 +646,40 @@ export function HelpDetailScreen({
             return (
               <HelpStakeholders
                 stakeholders={stakeholdersQ.data ?? []}
-                members={membersQ.data ?? []}
+                members={assignableMembers(membersQ.data)}
                 canAdd={can("help", "read")}
                 onAdd={addStakeholder}
               />
             )
           return (
-            <TicketThread
-              ticket={{
-                description: ticket.description,
-                type: ticket.helpType || "General",
-                status: TO_LIBRARY[ticket.status],
-                fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,
-              }}
-              replies={replies}
-              members={mentionableMembers}
-              // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
-              // is off now too, because the library's resolve button moves a
-              // status with no words attached and CHECKLIST 5.6 says resolving is
-              // refused until a resolution is written. The one way to answer this
-              // ticket is the panel on the title, which sends what a person typed.
-              canResolve={false}
-              showStatusControl={false}
-              onReply={onReply}
-            />
+            <>
+              {/* READ IT IN YOUR OWN LANGUAGE — above the conversation, because
+                  the conversation is what it acts on. Inline rather than in the
+                  three-dot menu: this is a thing somebody presses while reading
+                  and presses back a moment later, and it must not be hidden
+                  behind a click for a person who cannot read the screen. */}
+              <div className="flex justify-end">
+                <TranslateAction translation={translation} />
+              </div>
+              <TicketThread
+                ticket={{
+                  description: <RichText html={translation.of(ticket.description)} />,
+                  type: ticket.helpType || "General",
+                  status: TO_LIBRARY[ticket.status],
+                  fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,
+                }}
+                replies={replies}
+                members={mentionableMembers}
+                // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
+                // is off now too, because the library's resolve button moves a
+                // status with no words attached and CHECKLIST 5.6 says resolving is
+                // refused until a resolution is written. The one way to answer this
+                // ticket is the panel on the title, which sends what a person typed.
+                canResolve={false}
+                showStatusControl={false}
+                onReply={onReply}
+              />
+            </>
           )
         }}
       />
@@ -572,6 +692,43 @@ export function HelpDetailScreen({
           createdAt: ticket.createdAt,
           editedByName: ticket.editorName,
           updatedAt: ticket.updatedAt,
+        }}
+      />
+
+      {/* NEW WORK ON THIS REQUEST. The ticket rides in as `fixedTicket`: the
+          request behind the work is a fact about where you are standing, not a
+          question, so it is shown rather than offered and cannot be mistyped.
+          The app is left as a question, because a request about one system is
+          often answered by work on another.
+
+          The story arrives ALREADY RELATED — that relation is the entire point,
+          and it is what makes the list behind this dialog move. `createStoryFrom`
+          drops the backlog and the sprints; the slice this record reads is
+          dropped here, because it is the one cache that knows about this ticket.
+          Everyone else's screen is patched by the publish the door already
+          sends (R1/R15). */}
+      <StoryFormDialog
+          teamId={teamId}
+        open={storyOpen}
+        onOpenChange={setStoryOpen}
+        sprints={options.sprints}
+        apps={options.apps}
+        fixedTicket={{
+          // The same words the picker on this form would have shown, through the
+          // same plain-text seam the header uses — a request written in rich text
+          // must not arrive in the dialog wearing its markup.
+          id: helpId,
+          label: [ticket.ref, richTextPlain(ticket.description)].filter(Boolean).join(" · "),
+        }}
+        tickets={options.tickets}
+        members={options.members}
+        appStaff={options.appStaff}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
+        draftKey={`story:add:ticket:${helpId}`}
+        onSubmit={async (v) => {
+          await createStoryFrom(teamId, { ...v, ticketId: helpId })
+          invalidate(sliceKey("stories-ticket", helpId))
         }}
       />
 

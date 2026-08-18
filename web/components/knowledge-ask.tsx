@@ -1,44 +1,50 @@
 "use client"
 
-// ASK THE KNOWLEDGE BASE, ON THE KNOWLEDGE PAGE — a question box, the passages
-// that answer it, and the sources they came from as links you can open.
+// ASK THE KNOWLEDGE BASE, ON THE KNOWLEDGE PAGE — a question box, the answer
+// written out, the passages it was written from, and the sources they came from
+// as links you can open.
 //
 // ════════════════════════════════════════════════════════════════════════════
-// IT SPENDS NO ASSISTANT ALLOWANCE, AND IT SAYS SO ON THE SCREEN.
+// IT NOW WRITES THE ANSWER, AND IT SAYS WHAT THAT COSTS.
 //
-// This was the design decision, and it went the way it did because the door was
-// already built and already free. `GET /api/content/knowledge/ask` is a READ:
-// it spends ONE embedding of the question and no model writes a word (MCP.md's
-// cost table puts it with the reads, beside the exports; `agent_chat` and
-// `agent_confirm` are the only tools there that draw a whole turn). So the panel
-// shows the RETRIEVED passages and their citations rather than composing prose,
-// and it costs the team nothing.
+// The first version of this panel did not, and the reasoning was sound at the
+// time: `GET /api/content/knowledge/ask` was a free READ, so the panel showed the
+// retrieved passages, said so on screen, and pointed at the assistant for anyone
+// who wanted it in words. What that missed is what the owner actually saw — he
+// asked a question, got a list of extracts, and read it as the app declining to
+// answer him. "I should have gotten a clear answer."
 //
-// The alternative — pipe the answer through the assistant so it reads as a
-// paragraph — is perfectly defensible and was rejected for two reasons. It would
-// build a SECOND answering path, which R23 exists to prevent (`knowledgeAnswer`
-// is the one seam, and a door that assembles half a contract ships half a
-// contract). And it would put a spending screen where a searching screen
-// belongs: a person types six questions in a row here, and a quota that drains
-// from something that looks free is the exact surprise this product is built not
-// to have. So the panel says which it is, in a line under the box, and points at
-// the assistant for the other thing.
+// So the door now writes it, one cheap model call, and the panel asks for that
+// every time. The two objections the old design raised were both real and both
+// answered rather than ignored:
+//
+//   • A SECOND ANSWERING PATH (R23). There isn't one. `knowledgeAnswer` is still
+//     the one seam, the prose is an INPUT to it, and it rides the same `found`
+//     the citations do — so a written answer cannot exist without the sources it
+//     was written from. Nothing is assembled beside the seam.
+//   • A SPENDING SCREEN WHERE A SEARCHING SCREEN BELONGS. Still true, which is
+//     why the cost is a line under the box rather than a tooltip, why it is
+//     stated BEFORE the first question rather than after the bill, and why the
+//     sentence changes for somebody whose role has no assistant — they spend
+//     nothing, so they are not told they do. A sentence about cost that is wrong
+//     is the same class of fault as a privacy line that is wrong.
 //
 // WHY IT IS NOT `use-agent-chat`. That is the streaming co-pilot's whole state
 // machine — a transcript, per-device thread resume, a broken-stream re-sync, a
 // confirm pause, staged file attachments, quota accounting. Every one of those
-// exists because a turn is expensive, stateful and can act. This is a question
-// and its evidence: one request, one answer, nothing changed, no thread. There
-// is no transcript here to write a second one of. What IS reused is the piece
-// that actually applies — `AgentMarkdown`, so a passage reads the same way a
-// reply does, which matters more now that half the passages in the base were
-// converted FROM documents and arrive as markdown.
+// exists because a turn is expensive, stateful and can ACT. This is a question
+// and its answer: one request, one reply, nothing changed, no thread. What IS
+// reused is the piece that applies — `AgentMarkdown`, which is the ONE renderer
+// for both surfaces, so the visual blocks the assistant can draw in chat are the
+// same blocks that appear here, from the same catalogue, with no second renderer
+// to keep in step.
 //
-// R23 IS THE CONTRACT, ON THE SCREEN. `found` false renders the seam's own
-// `message` word for word and nothing else — no invented sentence, no "try
-// rephrasing", no list of near-misses. And `reason` is always shown, because a
-// question answered out of the wrong client's compartment is invisible
-// otherwise.
+// R23 IS THE CONTRACT, ON THE SCREEN. `found` false renders a plain sentence and
+// nothing else — no invented answer, no "try rephrasing", no list of near-misses.
+// `reason` is always shown, because a question answered out of the wrong client's
+// compartment is invisible otherwise. And the passages stay UNDER the answer,
+// with their links, because the owner's other sentence was that he wants to go
+// and check the sources: an answer you cannot audit is a worse answer.
 
 import * as React from "react"
 
@@ -46,19 +52,29 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { FileText, Search } from "lucide-react"
+import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "lucide-react"
 
-import type { KnowledgeAnswer } from "@shared/types"
+import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { useT } from "@shared/web/language"
+import { safeHref } from "@shared/web/rich-text"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { ApiFailure, content } from "@/lib/api"
+import { usePermissions } from "@/lib/perms"
+import { useActiveTeam } from "@/lib/use-active-team"
 
 export function KnowledgeAsk({
   onOpenSource,
+  onOpenRecord,
   accountId,
   context,
 }: {
   onOpenSource: (sourceId: string) => void
+  /** OPEN THE RECORD ITSELF, one hop past the source. The owner's own sentence:
+   * "the ability to go and check out the links to the sources or to those
+   * particular records as well." The seam hands back a path relative to the team
+   * (`tickets/<id>`) and the caller prefixes it, because only the caller knows
+   * which team's screens it is standing in. */
+  onOpenRecord: (path: string) => void
   /** WHICH CLIENT'S COMPARTMENT to search, when the screen already knows (R23:
    * `reason` says which one it chose, and naming it here is what stops a
    * question about one client being answered out of another's material). Null on
@@ -78,6 +94,13 @@ export function KnowledgeAsk({
   // old question.
   const [answer, setAnswer] = React.useState<KnowledgeAnswer | null>(null)
   const t = useT()
+  // MAY THIS PERSON SPEND THE TEAM'S ASSISTANT ALLOWANCE? The same right the
+  // co-pilot's launcher is gated on, read from the same cached permissions, so
+  // there is no extra fetch. The server decides again at the door; this decides
+  // which SENTENCE about cost is true for the person reading it.
+  const teamId = useActiveTeam().ctx?.team?.id ?? null
+  const { can } = usePermissions(teamId)
+  const mayWrite = can("agent", "create")
 
   async function ask(e: React.FormEvent) {
     e.preventDefault()
@@ -88,7 +111,7 @@ export function KnowledgeAsk({
       // In context, the record's own details lead the question — so "when is it
       // due?" asked on an app's page is "About the app Dispatch, built for
       // Bergman GmbH: when is it due?" by the time it reaches retrieval.
-      setAnswer(await content.askKnowledge(context ? `About ${context}: ${q}` : q, accountId))
+      setAnswer(await content.askKnowledge(context ? `About ${context}: ${q}` : q, accountId, mayWrite))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't ask the knowledge base.")
     } finally {
@@ -97,7 +120,7 @@ export function KnowledgeAsk({
   }
 
   return (
-    <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+    <div className="bg-card flex flex-col gap-4 rounded-xl border p-4">
       <form onSubmit={(e) => void ask(e)} className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={question}
@@ -110,16 +133,19 @@ export function KnowledgeAsk({
           disabled={busy}
           aria-label={t("Ask the knowledge base")}
         />
-        <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1.5">
+        <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1">
           {busy ? <Spinner /> : <Search className="size-4" />}
           {busy ? "Looking…" : "Ask"}
         </Button>
       </form>
-      {/* THE COST, SAID BEFORE IT IS SPENT — see the header. It is a line under
-          the box rather than a tooltip because the whole point is that nobody
-          should have to go looking for it. */}
+      {/* THE COST, SAID BEFORE IT IS SPENT. A line under the box rather than a
+          tooltip because the whole point is that nobody should have to go looking
+          for it — and two sentences rather than one, because the cost is only
+          true for somebody whose role can use the assistant at all. */}
       <p className="text-muted-foreground text-xs">
-        {t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance. Open the assistant if you want the answer written out.")}
+        {mayWrite
+          ? t("This reads what the assistant can read and writes you the answer, with the passages and their sources underneath. Looking is free; writing the answer uses one of the team's assistant requests.")
+          : t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance.")}
       </p>
       {/* SAID OUT LOUD, because the question that gets asked is not the question
           that was typed. A person has to be able to see what was added. */}
@@ -152,7 +178,32 @@ export function KnowledgeAsk({
             <p className="text-sm">{t("The knowledge base has nothing on this.")}</p>
           ) : (
             <>
-              <div className="flex flex-col gap-4">
+              {/* THE ANSWER, written out of the passages below and nothing else.
+                  Through the same markdown seam a reply uses, which is what makes
+                  the visual blocks work here: one catalogue, one renderer, both
+                  surfaces. */}
+              {answer.answer ? (
+                <div className="text-sm">
+                  <AgentMarkdown text={answer.answer} />
+                </div>
+              ) : (
+                mayWrite && (
+                  // NOT SILENCE. Nothing was written — the model was unreachable,
+                  // or the team's assistant requests are spent for today — and
+                  // nothing was charged either. The material is still the answer,
+                  // which is exactly what this panel used to be, so it says so
+                  // rather than looking like it forgot.
+                  <p className="text-muted-foreground text-sm">
+                    {t("I couldn't write this one out just now, so here's what I found.")}
+                  </p>
+                )
+              )}
+
+              <div className="flex flex-col gap-4 border-t pt-3">
+                {/* The evidence, kept UNDER the answer rather than replaced by it:
+                    the answer is only trustworthy because you can read what it was
+                    written from. */}
+                <p className="text-xs font-medium">{t("What I read")}</p>
                 {answer.passages.map((p) => (
                   <div key={`${p.sourceId}:${p.seq}`} className="flex flex-col gap-1">
                     <button
@@ -167,7 +218,7 @@ export function KnowledgeAsk({
                       // legible enough for one small link at the end of a
                       // screen, not for the heading of every passage in an
                       // answer. Seen on the screen rather than reasoned about.
-                      className="hover:text-primary flex w-fit items-center gap-1.5 text-left text-sm font-medium underline-offset-2 hover:underline"
+                      className="hover:text-primary flex w-fit items-center gap-1 text-left text-sm font-medium underline-offset-2 hover:underline"
                     >
                       <FileText className="size-3.5 shrink-0" aria-hidden />
                       <span className="min-w-0">{p.title}</span>
@@ -178,6 +229,11 @@ export function KnowledgeAsk({
                     <div className="text-muted-foreground text-sm">
                       <AgentMarkdown text={p.text} />
                     </div>
+                    {/* AND THE RECORD IT CAME OUT OF. The title above opens the
+                        SOURCE — what was indexed, and why. This opens the ticket,
+                        the map or the meeting itself, which is what somebody
+                        checking an answer actually wants to read. */}
+                    <OpenTheRecord from={p} onOpenRecord={onOpenRecord} />
                   </div>
                 ))}
               </div>
@@ -210,6 +266,7 @@ export function KnowledgeAsk({
                          , that record says &ldquo;{c.liveStatus}{t("” right now")}
                         </span>
                       )}
+                      <OpenTheRecord from={c} onOpenRecord={onOpenRecord} />
                     </li>
                   ))}
                 </ul>
@@ -219,5 +276,53 @@ export function KnowledgeAsk({
         </div>
       )}
     </div>
+  )
+}
+
+/** THE LINK TO THE RECORD BEHIND A PASSAGE — a ticket, a map, a meeting, or the
+ * document in somebody's Drive.
+ *
+ * TWO KINDS OF DESTINATION AND EXACTLY ONE IS OFFERED. `recordPath` is a row this
+ * app owns, opened in place; `url` is somewhere else entirely, opened in a new
+ * tab and only after `safeHref` has agreed it is a web address (the same
+ * boundary the knowledge screen's own "open where this came from" link goes
+ * through — a source URL arrives from Google, or from a person typing, and a
+ * `javascript:` in an href is a rendered link nobody inspected).
+ *
+ * Nothing at all when a source has neither, which is the honest state of a note
+ * somebody typed: it IS the record, and the title above already opens it. */
+function OpenTheRecord({
+  from,
+  onOpenRecord,
+}: {
+  from: Pick<KnowledgePassage | KnowledgeCitation, "recordPath" | "url">
+  onOpenRecord: (path: string) => void
+}) {
+  const t = useT()
+  // Through the seam FIRST, and unconditionally: a URL is checked because of
+  // where it came from, never because of which branch happens to render it.
+  const external = safeHref(from.url)
+  if (from.recordPath)
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenRecord(from.recordPath as string)}
+        className="text-primary flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
+      >
+        <SquareArrowOutUpRight className="size-3 shrink-0" aria-hidden />
+        {t("Open the record")}
+      </button>
+    )
+  if (!external) return null
+  return (
+    <a
+      href={external}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="text-primary flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
+    >
+      <ExternalLink className="size-3 shrink-0" aria-hidden />
+      {t("Open the original")}
+    </a>
   )
 }

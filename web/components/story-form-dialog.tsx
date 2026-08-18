@@ -35,19 +35,15 @@ import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/d
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Label } from "@kwapso/ui/registry/primitives/label/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
+import { pickerKey, searchTickets } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -117,6 +113,7 @@ const assigneeField = { ...defaultFieldConfig, label: "Who's doing it", required
 export function StoryFormDialog({
   open,
   onOpenChange,
+  teamId,
   sprints,
   apps,
   fixedApp,
@@ -132,6 +129,9 @@ export function StoryFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** The team whose tickets the request picker searches — tickets PAGE (R14), so
+   * that one question goes to the door rather than to the loaded page. */
+  teamId: string | null
   /** Every sprint the caller could pick, each tagged with which app it is on and
    * its mark. Narrowed to the CHOSEN app here rather than by the caller, so the
    * list updates as the person changes their mind about the app. */
@@ -141,9 +141,21 @@ export function StoryFormDialog({
    * fact about where you are standing rather than a question, so the picker is
    * replaced by its name and cannot be changed by accident. */
   fixedApp?: { id: string; name: string }
-  /** The same, from a TICKET: "turn this request into a piece of work". It is
-   * the first of the three ways a ticket becomes a story, and the request behind
-   * the work is the one thing about it nobody should be able to mistype. */
+  /** The same, from a TICKET's own Related stories tab: NEW work that answers
+   * this request.
+   *
+   * READ THE VERB. This is not "turn this request into a piece of work" — that
+   * control (and the prompt after triage) went on 17 Aug 2026 and is not coming
+   * back, because a ticket never BECOMES a story. This is the other sentence,
+   * which survives: a request may need several stories and a story may answer
+   * several requests, so writing another one changes nothing about the ticket at
+   * all. Removing the conversion took this create action with it by accident,
+   * and it is the only way to get a request to triaged from its own record — so
+   * if the two ever look like the same button again, they are not.
+   *
+   * Fixed rather than picked for the ordinary reason: the request behind the
+   * work is a fact about where you are standing, and the one thing about a new
+   * story nobody should be able to mistype. */
   fixedTicket?: { id: string; label: string }
   /** OPEN tickets only (6.4), each tagged with the app it is about. */
   tickets: { id: string; label: string; appId: string | null }[]
@@ -212,7 +224,7 @@ export function StoryFormDialog({
     try {
       await onSubmit({
         title: values.title.trim(),
-        detail: values.detail.trim(),
+        detail: richTextValue(values.detail),
         sprintId: values.sprintId,
         appId,
         ticketId: fixedTicket ? fixedTicket.id : values.ticketId,
@@ -230,28 +242,32 @@ export function StoryFormDialog({
     }
   }
 
-  /** One picker, four times over — app, sprint, request, person. Each may be left
-   * empty, which the door reads as "not set" rather than "cleared to nothing". */
+  /** One picker, three times over — app, sprint, person. Each may be left empty,
+   * which the door reads as "not set" rather than "cleared to nothing".
+   *
+   * All three are BOUNDED lists the screen already holds (a team's systems, the
+   * sprints that are open, the staff on this app), so their search runs in the
+   * browser and costs nothing. The REQUEST picker below is the odd one out: it
+   * reads tickets, which page, so it asks the door instead. */
   const picker = (
     id: string,
     value: string,
     placeholder: string,
+    searchPlaceholder: string,
     options: { id: string; label: string }[],
     set: (v: string) => void
   ) => (
-    <Select value={value || NONE} onValueChange={(v) => set(v === NONE ? "" : v)} disabled={busy}>
-      <SelectTrigger id={id}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>{placeholder}</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o.id} value={o.id}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <RecordPicker
+      id={id}
+      value={value || NONE}
+      onChange={(v) => set(v === NONE ? "" : v)}
+      options={options.map((o) => ({ value: o.id, label: o.label }))}
+      emptyOption={{ value: NONE, label: placeholder }}
+      placeholder={placeholder}
+      searchPlaceholder={searchPlaceholder}
+      emptyText={t("Nothing matched.")}
+      disabled={busy}
+    />
   )
 
   return (
@@ -285,6 +301,7 @@ export function StoryFormDialog({
             "story-app",
             values.appId,
             "No app yet",
+            t("Search apps…"),
             apps.map((a) => ({ id: a.id, label: a.name })),
             (v) => setValues((s) => ({ ...s, appId: v }))
           )
@@ -301,31 +318,24 @@ export function StoryFormDialog({
         />
       </Field>
       <Field config={typeField} htmlFor="story-type" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="story-type"
           value={values.storyType || NONE}
-          onValueChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
+          onChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
+          options={storyTypes.map((v) => ({ value: v, label: v }))}
+          placeholder={t("Pick one")}
+          searchPlaceholder={t("Search kinds…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="story-type">
-            <SelectValue placeholder={t("Pick one")} />
-          </SelectTrigger>
-          <SelectContent>
-            {storyTypes.map((v) => (
-              <SelectItem key={v} value={v}>
-                {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={detailField} htmlFor="story-detail" className={fieldSpacing}>
-        <Textarea
-          id="story-detail"
-          value={values.detail}
-          onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.detail}
+          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
           placeholder={t("What good looks like when it's finished.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       <Field config={sprintField} htmlFor="story-sprint" className={fieldSpacing}>
@@ -333,6 +343,7 @@ export function StoryFormDialog({
           "story-sprint",
           values.sprintId,
           "No sprint yet",
+          t("Search sprints…"),
           // THE MARK RIDES THE LABEL (CHECKLIST 6.3). A person picking a sprint is
           // choosing between "the one running now" and "the one starting in
           // October", and the two are otherwise two names.
@@ -346,16 +357,30 @@ export function StoryFormDialog({
             {fixedTicket.label}
           </p>
         ) : (
-          picker("story-ticket", values.ticketId, "No ticket", ticketOptions, (v) =>
-            setValues((s) => ({ ...s, ticketId: v }))
-          )
+          /* TICKETS PAGE (R14), so this one asks the DOOR — narrowed to the
+             same app the rest of the form is narrowed to, which is what the
+             in-memory `onThisApp` was doing over a loaded page. `ticketOptions`
+             stays as the list painted before anything is typed. */
+          <RecordPicker
+            id="story-ticket"
+            value={values.ticketId || NONE}
+            onChange={(v) => setValues((s) => ({ ...s, ticketId: v === NONE ? "" : v }))}
+            search={(term) => searchTickets(term, { appId: appId || undefined })}
+            searchKey={pickerKey(`tickets:${appId || "any"}`, teamId)}
+            options={ticketOptions.map((o) => ({ value: o.id, label: o.label }))}
+            emptyOption={{ value: NONE, label: t("No ticket") }}
+            placeholder={t("No ticket")}
+            searchPlaceholder={t("Search tickets…")}
+            emptyText={t("No ticket matched.")}
+            disabled={busy}
+          />
         )}
       </Field>
       {/* CHECKLIST 6.5. The tick is the explicit "no process" Aurora asked for:
           an empty list on its own is refused by the door, so a person cannot skip
           the question by not answering it. Ticking it hides the list, because a
           list you have just said you are not using is noise. */}
-      <Field config={processField} htmlFor="story-processes" className={fieldSpacing}>
+      <Field config={processField} shape="group" htmlFor="story-processes" className={fieldSpacing}>
         <div className="flex flex-col gap-2" id="story-processes">
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
@@ -397,6 +422,7 @@ export function StoryFormDialog({
           "story-assignee",
           values.assigneeId,
           "Nobody yet",
+          t("Search people…"),
           assignable.map((m) => ({ id: m.id, label: m.name })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}

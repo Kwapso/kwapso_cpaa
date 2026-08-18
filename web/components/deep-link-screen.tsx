@@ -104,7 +104,6 @@ export function DeepLinkScreen() {
     invitesQ,
     metaQ,
     helpQ,
-    helpMineQ,
     helpArchivedQ,
     brandQ,
     purposesQ,
@@ -358,7 +357,7 @@ export function DeepLinkScreen() {
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
-            sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ, helpArchivedQ,
+            sectionPath, helpScope, setHelpScope, myUserId, query, helpArchivedQ,
             // The tickets screen's sub-tab strip is built from the team's own
             // ticket types (CHECKLIST 5.1) — the same list the ticket form's
             // picker reads, so the words agree wherever they appear.

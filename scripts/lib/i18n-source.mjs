@@ -34,6 +34,15 @@ export const VISIBLE_PROPS = new Set([
   "description",
   "alt",
   "emptyText",
+  // WHAT CONNECTING A SERVICE LETS US SEE (google-connections.tsx). Four
+  // sentences, and they were user-visible prose sitting outside the catalogue —
+  // so somebody reading the app in German was told in English what kwapso may
+  // read from their mailbox. The sentence a person needs MOST in their own
+  // language is the one about their own privacy. Narrow by construction: the
+  // only string-literal `scope` props in either front door are those four, and
+  // the prose guard already refuses an OAuth scope like `gmail.modify` (dotted
+  // id, no spaces).
+  "scope",
   "cta",
   "submitLabel",
   "confirmLabel",
@@ -98,15 +107,54 @@ export function isUserVisible(text) {
   return true
 }
 
-/** The string behind a node, when it IS a plain string — a literal, or a
- * template with no `${}` in it. Anything computed is deliberately skipped: a
- * concatenation has no single English key, so it has to be split at the call
- * site before it can be translated. */
-export function literalText(node) {
-  if (!node) return null
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
-  if (ts.isJsxExpression(node)) return literalText(node.expression)
-  return null
+/** Every plain string a node can RENDER AS — a literal, or a template with no
+ * `${}` in it, or one of the branches of a choice between them.
+ *
+ * A CHOICE IS DESCENDED; A COMPOSITION IS NOT. That is the whole rule, and the
+ * line falls where translatability falls:
+ *
+ *   `editing ? "Edit app" : "Record an app"`  two sentences, one shown → BOTH
+ *   `name ?? "Nobody yet"`                    a fallback a reader sees   → BOTH
+ *   `"Saved " + count + " rows"`              no single English key      → NEITHER
+ *   `` `Filed under ${name}` ``               same                       → NEITHER
+ *
+ * Returning an ARRAY rather than one string is what closes R28's oldest hole.
+ * A sentence inside a ternary is a JSX EXPRESSION, not a literal and not JSX
+ * text, so the old single-valued version walked straight past it — and the
+ * dialog titles and subtitles of most of the form dialogs in this app are
+ * exactly that shape. They were in no catalogue, so they were translated
+ * nowhere, so they reached a German reader in English on a screen that looked
+ * finished. The only fix available at the call site was to wrap each branch in
+ * `t(...)` by hand (web/components/account-form-dialog.tsx says so in a comment),
+ * which works for the four somebody remembered and for none written afterwards.
+ *
+ * The two operands of `&&` are NOT treated alike: `cond && "Saved"` renders its
+ * RIGHT side and tests its left, so descending into the left would harvest the
+ * string out of a comparison (`kind === "asc" && …`) and put a sort direction in
+ * the catalogue. `||` and `??` can render either side, so both are taken. No
+ * other operator is descended, which is why `===` inside a condition is never
+ * reached at all. */
+export function literalTexts(node, out = []) {
+  if (!node) return out
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    out.push(node.text)
+    return out
+  }
+  if (ts.isJsxExpression(node) || ts.isParenthesizedExpression(node))
+    return literalTexts(node.expression, out)
+  if (ts.isConditionalExpression(node)) {
+    literalTexts(node.whenTrue, out)
+    return literalTexts(node.whenFalse, out)
+  }
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind
+    if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken) {
+      literalTexts(node.left, out)
+      return literalTexts(node.right, out)
+    }
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken) return literalTexts(node.right, out)
+  }
+  return out
 }
 
 /** Every .ts/.tsx under `dir`, recursively, in a stable order. */
@@ -138,9 +186,12 @@ export function parseFile(path) {
 }
 
 /** Walk a parsed file and call `hit({ text, node, kind })` for every position a
- * person reads. The FIVE positions, and why each one:
+ * person reads. The SIX positions, and why each one:
  *
  *   jsx-text    <p>No tickets yet</p>          the words themselves
+ *   jsx-child   <p>{busy ? "Saving…" : "Save"}</p>
+ *                                              the words themselves again, when
+ *                                              they arrive through an expression
  *   attribute   placeholder="Search accounts"  a prop the reader sees
  *   property    { title: "Home" }              the nav registry and the screen
  *                                              recipes are DATA the engine
@@ -151,19 +202,35 @@ export function parseFile(path) {
  * The last one is what keeps the pair honest. Without it, wrapping a string in
  * `t(...)` would delete it from the extraction — the catalogue would lose its
  * key the moment the call site started using it, and the app would go back to
- * English with a green build. */
+ * English with a green build.
+ *
+ * JSX-CHILD IS THE SIXTH, AND IT IS THE SAME WORDS AS THE FIRST. `<p>Save</p>`
+ * and `<p>{busy ? "Saving…" : "Save"}</p>` are one sentence on screen and two
+ * different syntax nodes underneath — a JsxText and a JsxExpression — and only
+ * the first was ever looked at. A person cannot see which one a developer typed;
+ * the reader who chose German only saw that one of the two was still in English.
+ * Every OTHER kind of child expression (`{count}`, `{items.map(…)}`, `{cond &&
+ * <Row/>}`) yields no plain string and is skipped by `literalTexts` without a
+ * special case, which is why this position costs one branch rather than a
+ * heuristic. */
 export function visitStrings(tree, hit) {
   const visit = (node) => {
     if (ts.isJsxText(node)) {
-      report(node.text, node, "jsx-text")
+      report([node.text], node, "jsx-text")
+    } else if (
+      ts.isJsxExpression(node) &&
+      node.parent &&
+      (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))
+    ) {
+      report(literalTexts(node), node, "jsx-child")
     } else if (ts.isJsxAttribute(node) && VISIBLE_PROPS.has(node.name.getText(tree))) {
-      report(literalText(node.initializer), node, "attribute")
+      report(literalTexts(node.initializer), node, "attribute")
     } else if (
       ts.isPropertyAssignment(node) &&
       (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
       VISIBLE_PROPS.has(node.name.text)
     ) {
-      report(literalText(node.initializer), node, "property")
+      report(literalTexts(node.initializer), node, "property")
     } else if (ts.isCallExpression(node)) {
       if (
         ts.isPropertyAccessExpression(node.expression) &&
@@ -171,22 +238,23 @@ export function visitStrings(tree, hit) {
         /(^|\.)toast$/.test(node.expression.expression.getText(tree)) &&
         node.arguments.length > 0
       ) {
-        report(literalText(node.arguments[0]), node, "toast")
+        report(literalTexts(node.arguments[0]), node, "toast")
       } else if (
         ts.isIdentifier(node.expression) &&
         node.expression.text === "t" &&
         node.arguments.length > 0
       ) {
-        report(literalText(node.arguments[0]), node, "t-call")
+        report(literalTexts(node.arguments[0]), node, "t-call")
       }
     }
     ts.forEachChild(node, visit)
   }
 
-  function report(raw, node, kind) {
-    if (raw === null || raw === undefined) return
-    const text = collapse(raw)
-    if (isUserVisible(text)) hit({ text, node, kind })
+  function report(raws, node, kind) {
+    for (const raw of raws) {
+      const text = collapse(raw)
+      if (isUserVisible(text)) hit({ text, node, kind })
+    }
   }
 
   visit(tree)

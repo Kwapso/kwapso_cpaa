@@ -22,13 +22,14 @@
 //     answers on Monday morning instead (see resolveRunaway).
 
 import { logActivity, type Actor } from "@shared/workers/activity"
-import { boundedInner, reportedTotal } from "@shared/workers/count"
+import { boundedInner, countCollection, isCapped, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
-import { LIST_HARD_CAP } from "@shared/workers/limits"
-import type { RunningTimer, WorkLog } from "@shared/types"
+import { LIST_HARD_CAP, WORK_LOG_GROUP_CAP } from "@shared/workers/limits"
+import { pulseWeekStarts } from "./insights"
+import type { RunningTimer, WorkLog, WorkLogSummary } from "@shared/types"
 
 /** WHAT TIME MAY BE LOGGED AGAINST — the whole allow-list, in one place, and the
  * only place. Each entry names the table, the column its human label lives in,
@@ -278,6 +279,126 @@ export async function countWorkLogs(
   return {
     total: reportedTotal(rows[0]?.n ?? 0),
     totalSeconds: Math.max(0, Math.round(rows[0]?.s ?? 0)),
+  }
+}
+
+/** THE NUMBERS ON TOP OF A LIST OF TIME — the same question the list asks, asked
+ * in aggregate instead of row by row.
+ *
+ * WHY A DOOR AND NOT ARITHMETIC IN THE BROWSER. The list under it is a PAGE
+ * (R14): a story worked on for a year has more rows of time than any page holds,
+ * so summing the loaded fifty would produce "23 hours" on a record with 140 —
+ * a number that looks exactly like an answer and is not one. Every figure below
+ * is computed in SQL over the WHOLE filter, which is the same filter the page
+ * came from, so the total above the list and the rows inside it are one question
+ * (R16).
+ *
+ * FIVE READS, and each is bounded at both ends:
+ *   • the count and the exact seconds, through `countWorkLogs` — no second way
+ *     to count anything, so the badge and this header can never disagree;
+ *   • HOW MANY PEOPLE, through the same bounded seam every other collection count
+ *     goes through. Its own read rather than `people.length`, because that array
+ *     is the top `WORK_LOG_GROUP_CAP` and its length is a CEILING: a record
+ *     worked on by eighty people answered "50" for ever, with nothing saying it
+ *     had stopped, which is exactly the failure R16 names first;
+ *   • BY PERSON and BY KIND OF WORK: grouped, ordered by size, `WORK_LOG_GROUP_CAP`
+ *     rows each (R14). A team has tens of people and a dropdown has tens of
+ *     words, so the cap is a ceiling on a pathological row rather than a real
+ *     limit — and a cap is what makes that a fact rather than a hope;
+ *   • WEEK BY WEEK, over the SAME eight windows Home draws, through the same
+ *     `pulseWeekStarts`. Reused rather than restated because "which Monday opens
+ *     this week" written twice is two definitions that drift at a year boundary
+ *     — the exact trap `weeklySeconds` was written to avoid. One row by
+ *     construction: conditional sums with no GROUP BY.
+ *
+ * NOTHING HERE IS MONEY. A work log's cost is derived, and it is derived in the
+ * one file R24 fences (`internal-money.ts`) — this summary counts hours and never
+ * reaches into it, so no screen built on it can put an internal rate in front of
+ * anybody.
+ */
+export async function summariseWorkLogs(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  filter: LogFilter,
+  now: Date
+): Promise<WorkLogSummary> {
+  const where = logWhere(guard, filter)
+  const starts = pulseWeekStarts(now)
+  const weekSums: string[] = []
+  const weekParams: string[] = []
+  starts.forEach((start, i) => {
+    const end = new Date(start)
+    end.setUTCDate(end.getUTCDate() + 7)
+    weekSums.push(
+      `SUM(CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.seconds ELSE 0 END) AS w${i}`
+    )
+    weekParams.push(start.toISOString(), end.toISOString())
+  })
+
+  const [counts, peopleTotal, people, kinds, weekRows] = await Promise.all([
+    countWorkLogs(cfg, guard, filter),
+    // HOW MANY PEOPLE, exactly — one row per distinct person, counted through the
+    // one bounded seam (R16). The same WHERE as everything else here, so the
+    // figure and the bars under it are one question.
+    countCollection(
+      cfg,
+      guard.databaseId,
+      `SELECT w.user_id FROM work_logs w WHERE ${where.sql} GROUP BY w.user_id`,
+      where.params
+    ),
+    d1Query<{ user_id: string; user_name: string | null; s: number | null }>(
+      cfg,
+      guard.databaseId,
+      `SELECT w.user_id, MAX(w.user_name) AS user_name, SUM(w.seconds) AS s
+         FROM work_logs w WHERE ${where.sql}
+        GROUP BY w.user_id ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
+      where.params
+    ),
+    d1Query<{ kind: string | null; s: number | null }>(
+      cfg,
+      guard.databaseId,
+      // A log with no kind is its own bucket rather than a dropped row: most time
+      // is logged without one, and a chart that quietly omitted it would be a
+      // picture of the minority.
+      `SELECT w.kind, SUM(w.seconds) AS s
+         FROM work_logs w WHERE ${where.sql}
+        GROUP BY w.kind ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
+      where.params
+    ),
+    d1Query<Record<string, number | null>>(
+      cfg,
+      guard.databaseId,
+      // R14: one aggregate row — no GROUP BY, so there is nothing else it could be.
+      `SELECT ${weekSums.join(", ")} FROM work_logs w WHERE ${where.sql} LIMIT 1`,
+      [...weekParams, ...where.params]
+    ),
+  ])
+
+  const row = weekRows[0] ?? {}
+  return {
+    total: counts.total,
+    // …and it says whether it stopped early, in the same object. This door
+    // answers with `json` rather than `pagedJson`, which is the seam that DERIVES
+    // this flag for every paged door — so without the line it would be the one
+    // total in the app that hedges nowhere but in the browser's rendering.
+    totalCapped: isCapped(counts.total),
+    totalSeconds: counts.totalSeconds,
+    peopleTotal,
+    people: people.map((r) => ({
+      userId: r.user_id,
+      userName: r.user_name ?? null,
+      seconds: Math.max(0, Math.round(r.s ?? 0)),
+    })),
+    kinds: kinds.map((r) => ({
+      kind: r.kind ?? null,
+      seconds: Math.max(0, Math.round(r.s ?? 0)),
+    })),
+    weeks: starts.map((start, i) => ({
+      weekStart: start.toISOString().slice(0, 10),
+      // SUM over no rows is NULL, not 0 — a record nobody has logged time against
+      // gets a flat, honest zero line rather than a series of nulls.
+      seconds: Math.max(0, Math.round(Number(row[`w${i}`] ?? 0))),
+    })),
   }
 }
 

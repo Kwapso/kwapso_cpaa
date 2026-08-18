@@ -123,7 +123,11 @@ on top follows [CACHING.md](CACHING.md).
 > are worth knowing without opening the code: the client portal's own standing doors
 > (`GET /api/tenancy/portal/context`, `POST /api/tenancy/portal/switch-account`) and
 > the knowledge base's three (`GET /api/content/knowledge`, `GET
-> /api/content/knowledge/ask`, `POST /api/content/knowledge/sync`).
+> /api/content/knowledge/ask`, `POST /api/content/knowledge/sync`). The middle one
+> is the only READ in the fleet that can spend the team's AI allowance: `?compose=1`
+> asks it to WRITE the answer out of the passages it found (R23), which gates on the
+> `agent` module and meters like any other assistant turn. Finding the material
+> stays free.
 
 | Action | Worker | What it does |
 |---|---|---|

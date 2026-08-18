@@ -176,7 +176,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
               .filter(Boolean)
               .join(" · ")
             return (
-              <li key={a.id} className="flex items-center gap-3 p-4">
+              <li key={a.id} className="flex items-center gap-2 p-4">
                 <Glyph className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   {isFollowable(a.url) ? (
@@ -233,7 +233,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
       <div className="mt-4 flex gap-2">
         <Button
           variant="outline"
-          className="flex-1 gap-1.5"
+          className="flex-1 gap-1"
           disabled={!!busy}
           onClick={() => picker.current?.click()}
         >
@@ -242,7 +242,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
         </Button>
         <Button
           variant="outline"
-          className="flex-1 gap-1.5"
+          className="flex-1 gap-1"
           disabled={!!busy}
           onClick={() => setAdding(true)}
         >

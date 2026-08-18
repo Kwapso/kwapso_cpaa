@@ -14,25 +14,18 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { accountsKey, listFetch } from "@/lib/live-resources"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useActiveTeam } from "@/lib/use-active-team"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useCached } from "@shared/web/store"
-import type { Account } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 export type TodoFormValues = { accountId: string; title: string; detail: string; dueOn: string }
@@ -45,26 +38,31 @@ const dueField = { ...defaultFieldConfig, label: "By when", required: false }
 export function TodoFormDialog({
   open,
   onOpenChange,
+  fixedAccount,
   draftKey,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Set when the form is opened FROM a client's own record — the client is then
+   * a fact about where you are standing rather than a question, so the picker is
+   * replaced by their name and cannot be changed by accident. The same shape
+   * SprintFormDialog and StoryFormDialog use for a fixed app, and for the same
+   * reason: the relation is the whole point of creating it from here. */
+  fixedAccount?: { id: string; name: string }
   draftKey?: string
   onSubmit: (values: TodoFormValues) => Promise<void>
 }) {
   const t = useT()
   const teamId = useActiveTeam().ctx?.team?.id ?? null
-  const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
-    listFetch.accounts(teamId as string)
-  )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     { accountId: "", title: "", detail: "", dueOn: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
-  const ready = values.accountId !== "" && values.title.trim() !== ""
+  const accountId = fixedAccount ? fixedAccount.id : values.accountId
+  const ready = accountId !== "" && values.title.trim() !== ""
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -72,9 +70,9 @@ export function TodoFormDialog({
     setBusy(true)
     try {
       await onSubmit({
-        accountId: values.accountId,
+        accountId,
         title: values.title.trim(),
-        detail: values.detail.trim(),
+        detail: richTextValue(values.detail),
         dueOn: values.dueOn,
       })
       clearDraft()
@@ -85,8 +83,6 @@ export function TodoFormDialog({
       setBusy(false)
     }
   }
-
-  const companies = (accountsQ.data ?? []).filter((a) => a.active)
 
   return (
     <FormShellDialog
@@ -108,22 +104,20 @@ export function TodoFormDialog({
       }}
     >
       <Field config={accountField} htmlFor="todo-account" className={fieldSpacing}>
-        <Select
+        {/* THE DOOR ANSWERS THIS, because accounts PAGE (R14): the list cache
+            this used to read holds page one, so an agency past fifty companies
+            could not ask the fifty-first for anything. */}
+        <RecordPicker
+          id="todo-account"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          placeholder={t("Pick the client")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="todo-account">
-            <SelectValue placeholder={t("Pick the client")} />
-          </SelectTrigger>
-          <SelectContent>
-            {companies.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={titleField} htmlFor="todo-title" className={fieldSpacing}>
         <Input
@@ -136,13 +130,12 @@ export function TodoFormDialog({
         />
       </Field>
       <Field config={detailField} htmlFor="todo-detail" className={fieldSpacing}>
-        <Textarea
-          id="todo-detail"
-          value={values.detail}
-          onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.detail}
+          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
           placeholder={t("Where to find it, what format, who to ask.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       <Field config={dueField} htmlFor="todo-due" className={fieldSpacing}>

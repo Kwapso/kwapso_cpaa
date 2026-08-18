@@ -20,14 +20,18 @@ import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
+import { resolveOrdering } from "@shared/workers/sorting"
 import {
   countMeetings,
   createMeeting,
   getMeeting,
   listMeetings,
+  MEETING_SORTS,
   captureTranscript,
+  linkGuests,
+  readTranscript,
   setMeetingActive,
-  syncCalendarSeries,
+  syncCalendar,
   setMeetingHeld,
   updateMeeting,
   type MeetingFilter,
@@ -69,7 +73,22 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
   }
   const filter = filterFrom(url)
   const [page, total, weekTotal] = await Promise.all([
-    listMeetings(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null),
+    listMeetings(
+      cfg,
+      guard,
+      filter,
+      queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+      // WHAT ORDER — asked of the door, because the diary PAGES (R14). The "All"
+      // view draws a TABLE with nine columns, and a column header that sorted
+      // the loaded page would order the newest fifty meetings under a badge
+      // counting every one the agency has ever held.
+      resolveOrdering(
+        MEETING_SORTS,
+        "when",
+        queryText(url.searchParams.get("sort"), "Sort"),
+        queryText(url.searchParams.get("dir"), "Direction")
+      )
+    ),
     // R16: the exact server total rides every list response, over the SAME
     // question the rows answered.
     countMeetings(cfg, guard, filter),
@@ -180,27 +199,108 @@ export async function postMeetingTranscript(request: Request, env: Env): Promise
   })
 }
 
-/** POST /api/content/meetings/sync-calendar — bring the repeating entries in
- * (CHECKLIST 9.7).
+/** POST /api/content/meetings/sync-calendar — bring the diary into step, both
+ * ways (CHECKLIST 9.7, and the owner's "it should also update consistently if
+ * it's a past event").
  *
- * A repeating entry becomes a REAL RECORD four weeks ahead, so there is a month
- * to prepare its notes, and the instances further out come back read-only in
- * `ahead` — shown so nobody is surprised by them, not stored, because an
- * instance six months out can still be moved or called off in Google.
+ * THREE THINGS, over a window that straddles today. A repeating entry becomes a
+ * REAL RECORD four weeks ahead, so there is a month to prepare its notes;
+ * every meeting whose entry is in the window has its Google facts brought up to
+ * date — the guest list and what each person answered, the organiser, the join
+ * link, the attachments; and an entry cancelled in Google is called off here.
+ * The instances beyond the horizon come back read-only in `ahead` — shown so
+ * nobody is surprised by them, not stored, because an instance six months out
+ * can still be moved or called off in Google.
+ *
+ * THE BACKWARD HALF IS WHY THE TRANSCRIPTS LAND. Everything interesting about a
+ * meeting arrives after it, and a sweep that only ever looked forward saw each
+ * one exactly once, at the moment when the least was known about it. See
+ * lib/meetings.ts for the whole argument.
  *
  * It creates meetings, so it opens on this module's `create` right; it reads the
  * caller's own calendar with the caller's own token, so it demands `google:read`
- * besides. Idempotent by the unique index on the event id rather than by a
- * check: two people pressing it at once cannot make two records of one call. */
-export async function postSyncCalendarSeries(request: Request, env: Env): Promise<Response> {
+ * besides. Idempotent by the unique index on the event id for the creates, and
+ * by Google's own `updated` stamp for the refreshes: an entry that has not moved
+ * since we last mirrored it is skipped entirely. */
+export async function postSyncCalendar(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await gatedBody<Record<string, unknown>>(request, env, "meetings", "create")
   await refusePortalCaller(cfg, guard)
   await requireRight(cfg, guard, "google", "read")
-  const result = await syncCalendarSeries(env, cfg, guard, actor)
-  // R1 — only when something actually landed in the diary.
-  if (result.created > 0) await publishChange(env, guard.teamId, "meetings", "series", "add")
+  const result = await syncCalendar(env, cfg, guard, actor)
+  // R1 — only when something actually moved in the diary. All three verbs count:
+  // a refreshed guest list and a cancelled entry are changes a screen is looking
+  // at exactly as a new record is.
+  if (result.created + result.updated + result.cancelled > 0)
+    await publishChange(env, guard.teamId, "meetings", "series", "add")
   // Spelled out rather than spread: R27 derives what a tool may PROMISE from the
   // literal a door returns, so a shorthand response is a door whose contract
   // nothing can read.
-  return json({ created: result.created, ahead: result.ahead })
+  return json({
+    created: result.created,
+    updated: result.updated,
+    cancelled: result.cancelled,
+    ahead: result.ahead,
+  })
+}
+
+/**
+ * GET /api/content/meetings/transcript?id= — what was SAID, in full.
+ *
+ * ITS OWN DOOR because of its size. A page of the diary is fifty meetings and a
+ * transcript is up to a megabyte; carrying one on the other would make the list
+ * read the heaviest response in the app in order to show a column nobody
+ * scrolls. So the meeting row says a transcript EXISTS, where it came from and
+ * where it lives, and this reads the words — once, for the one screen that
+ * shows them.
+ *
+ * IT READS THE COLUMN, NOT GOOGLE. The words were copied onto the row when the
+ * transcript was captured, which is what makes them readable by every colleague
+ * whose role can read meetings rather than only by whoever holds the connection.
+ * `note` is present when the transcript was longer than one row may hold and
+ * says so in words — the same rule a knowledge file follows.
+ */
+export async function getMeetingTranscript(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "meetings", "read")
+  await refusePortalCaller(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Meeting", TEXT_LIMITS.short)
+  if (!id) return fail(400, "invalid_input", "Say which meeting.")
+  const found = await readTranscript(cfg, guard, id)
+  if (!found) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
+  return json({
+    text: found.text,
+    note: found.note,
+    url: found.url,
+    foundBy: found.foundBy,
+    capturedAt: found.capturedAt,
+  })
+}
+
+/**
+ * GET /api/content/meetings/people?id= — which of the people on the invitation
+ * we already know.
+ *
+ * THE SECOND HALF OF THE OWNER'S "STAKEHOLDERS". The first half is the guest
+ * list itself, mirrored onto the meeting row: who was asked, and what they
+ * answered. This is the half that turns an address into a RECORD — one of our
+ * own team members, or a contact on one of our accounts.
+ *
+ * A READ RATHER THAN A COLUMN, and that is the whole reason it is a door. Who a
+ * given address belongs to is a fact with a different lifetime from the
+ * invitation: a contact added to an account next week should light up on a
+ * meeting held last week, and a link frozen into the row at sync time never
+ * would. The invitation is history; the address book is not.
+ *
+ * IT NAMES ONLY WHAT THIS TEAM ALREADY HOLDS. Nothing is looked up anywhere, no
+ * directory is consulted, and an address matching neither a member nor a contact
+ * comes back with both halves null — which is the honest answer for most people
+ * on most invitations.
+ */
+export async function getMeetingPeople(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "meetings", "read")
+  await refusePortalCaller(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Meeting", TEXT_LIMITS.short)
+  if (!id) return fail(400, "invalid_input", "Say which meeting.")
+  const meeting = await getMeeting(cfg, guard, id)
+  if (!meeting) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
+  return json({ links: await linkGuests(env, cfg, guard, meeting.googleGuests.map((g) => g.email)) })
 }

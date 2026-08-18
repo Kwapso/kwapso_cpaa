@@ -54,7 +54,7 @@ function call(userId: string, route: string, query = "") {
 }
 
 /** Every agent door, read off the worker's OWN route table rather than retyped —
- * a seventh one added tomorrow is covered the day it lands. */
+ * a ninth one added tomorrow is covered the day it lands. */
 const AGENT_DOORS = Object.keys(ROUTES).filter((r) => r.includes("/agent/"))
 
 beforeEach(() => {
@@ -73,7 +73,7 @@ beforeEach(() => {
 
 describe("a client login never reaches the agency's assistant", () => {
   it("finds the agent doors (the scan must not go blind)", () => {
-    expect(AGENT_DOORS.length, "data-ops serves seven agent doors").toBe(7)
+    expect(AGENT_DOORS.length, "data-ops serves eight agent doors").toBe(8)
   })
 
   // THE CONTROL, FIRST. Every refusal below is a status code, and a door that is

@@ -9,21 +9,16 @@ import * as React from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@kwapso/ui/registry/primitives/avatar/avatar"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { UserPlus } from "lucide-react"
 
-import type { HelpStakeholder, TeamMember } from "@shared/types"
+import type { HelpStakeholder } from "@shared/types"
+import type { PickablePerson } from "@/lib/people"
 import { ApiFailure } from "@/lib/api"
-import { letterMark, personName } from "@/lib/identity"
+import { letterMark } from "@/lib/identity"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { RecordPicker } from "@/components/record-picker"
 
 const ORIGIN_LABEL: Record<HelpStakeholder["origin"], string> = {
   raiser: "Raiser",
@@ -39,7 +34,9 @@ export function HelpStakeholders({
   onAdd,
 }: {
   stakeholders: HelpStakeholder[]
-  members: TeamMember[]
+  /** Our own staff only — the caller narrows through the one people seam, so a
+   * client contact can never be offered here (web/lib/people.ts). */
+  members: PickablePerson[]
   canAdd: boolean
   onAdd: (userId: string) => Promise<void>
 }) {
@@ -48,7 +45,7 @@ export function HelpStakeholders({
   const [busy, setBusy] = React.useState(false)
 
   const existing = new Set(stakeholders.map((s) => s.userId))
-  const addable = members.filter((m) => !existing.has(m.userId))
+  const addable = members.filter((m) => !existing.has(m.id))
 
   async function add() {
     if (!picked) return
@@ -70,11 +67,11 @@ export function HelpStakeholders({
       {stakeholders.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="divide-border divide-y rounded-xl border">
           {stakeholders.map((s) => (
             <li
               key={s.userId}
-              className="border-border/60 flex items-center gap-3 rounded-lg border px-3 py-2"
+              className="flex items-center gap-2 px-3 py-2"
             >
               <Avatar className="size-8">
                 {s.imageUrl && <AvatarImage src={s.imageUrl} alt="" />}
@@ -94,18 +91,16 @@ export function HelpStakeholders({
 
       {canAdd && addable.length > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Select value={picked} onValueChange={setPicked} disabled={busy}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder={t("Pick someone to keep in the loop")} />
-            </SelectTrigger>
-            <SelectContent>
-              {addable.map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {personName(m)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <RecordPicker
+            value={picked}
+            onChange={setPicked}
+            options={addable.map((m) => ({ value: m.id, label: m.name }))}
+            placeholder={t("Pick someone to keep in the loop")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
+            disabled={busy}
+            className="w-full sm:w-64"
+          />
           <AddButton label={t("Add stakeholder")} onClick={() => void add()} icon={<UserPlus className="size-4" />} />
         </div>
       )}

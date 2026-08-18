@@ -10,6 +10,64 @@ export function formatDate(iso?: string | null): string {
     : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 }
 
+/** "13 Jun" — a date with the year left off, for an AXIS.
+ *
+ * Its own formatter rather than a slice of `formatDate`, for the reason this
+ * file exists: eight of these sit side by side under a chart, and "13 Jun 2026"
+ * eight times over is four repetitions of a fact nobody is reading and a row of
+ * labels that overlap on a phone. The year is dropped and nothing else is —
+ * still the reader's own locale, still one place. Use it ONLY where the
+ * surrounding copy already says which period is on screen ("the last eight
+ * weeks"); anywhere a date stands alone, `formatDate` is the one. */
+export function formatDayMonth(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+}
+
+/** "14:05" — the clock time alone, for a row whose DAY is already said.
+ *
+ * Its own formatter for the same reason `formatDayMonth` is: an agenda groups
+ * its rows under the day, so every row repeating "13 Jun 2026" is a fact nobody
+ * is reading four times down one screen — but the TIME is the whole reason a
+ * person opens the day at all. Still the reader's own locale, still one place. */
+export function formatTime(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { timeStyle: "short" })
+}
+
+/** "2026-06-13" — a date for a COLUMN SOMEBODY SORTS.
+ *
+ * IT IS THE SAME DECISION `formatActivityWhen` MAKES ONE FUNCTION DOWN, and for
+ * the same reason: the library's collection engine compares a column with
+ * `String(a).localeCompare(String(b))` unless BOTH values are already numbers,
+ * and the library is lego this repo does not edit (UI-GAPS #22 asks for a typed
+ * comparison). So a column showing "14 Apr 2025" sorts alphabetically — April
+ * before January, 2019 between 2018 and 2020 only by luck — and it does it
+ * silently: the rows move, so the control looks like it worked. The owner's
+ * report was "the sort actually doesn't work… I don't see the order changing,
+ * even though I can see that there are different values", which is what a wrong
+ * comparison looks like from the outside.
+ *
+ * A value cannot be both `formatDate`'s and sortable, because the thing being
+ * compared IS the thing being shown. So the value that has to give is the one
+ * whose job is to be compared. Year-month-day, zero-padded, so lexical order is
+ * chronological order — unambiguous in every locale this app is translated into,
+ * which a locale-formatted date in a sortable column is not.
+ *
+ * USE IT ONLY IN A TABLE COLUMN. A date standing alone in a sentence, a subtitle
+ * or a detail is `formatDate`'s, and stays warm. */
+export function formatDateSortable(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 /** "13 Jun 2026, 14:05" — for activity rows where the moment matters. */
 export function formatDateTime(iso?: string | null): string {
   if (!iso) return ""

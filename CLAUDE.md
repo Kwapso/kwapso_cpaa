@@ -78,6 +78,34 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   build-time, so "is the catalogue current?" was the assumption it all rested on
   and the only thing enforcing it was somebody remembering to run a script. Run
   `node scripts/i18n-extract.mjs` before you commit. (`catalogued-strings`)
+- **The page has one width, and a screen does not get its own (R29).** Each front
+  door owns exactly ONE page container, `web/components/deep-link-screen.tsx` at
+  `max-w-[1600px]` and `web-portal/components/portal-shell.tsx` at `max-w-3xl`
+  (narrower on purpose), and no other component sets a page-level width. A page
+  container is identified POSITIONALLY, as R20 identifies a checked field: one line
+  carrying `mx-auto`, `w-full` and a `max-w-*` together, which is the signature of a
+  centred content column and of nothing else, so a dialog, a sheet, a door card or a
+  capped line of prose keeps its own measure and is never caught. Exceptions are data
+  in `SCREEN_WIDTH_EXEMPT` with a reason each, rot-checked, so a pin whose file no
+  longer sets a width turns the build red and the list can only shrink. Earned by six
+  screens capping themselves at 60% of the room they had, one of them the shell's own
+  loading skeleton, under a green build, because a width is invisible to every other
+  check here. (`one-page-width`. UI-RULEBOOK N8)
+- **Two radii and no third (R31).** A rectangular surface is `rounded-xl`, a pill
+  is `rounded-full`, and a sheet that meets the bottom of the screen is
+  `rounded-t-xl`. Nothing else, because every step from `sm` to `3xl` already
+  resolves to the same 24px here — so five spellings of one value were five
+  decisions where there is one. Bare `rounded` is 4px and is deliberately outside
+  the rule. (`two-radii`. UI-RULEBOOK N9)
+- **Every colour resolves through a token (R32).** No Tailwind colour ramp and no
+  hex literal in `web/`, `web-portal/` or `shared/`: what a colour MEANS has a
+  token (`warning`, `success`, `destructive`, `chart-1`…`chart-5`), and a mark
+  comes from the chart series. The six files that legitimately hold a literal —
+  the branding seam, the email template, the two OS-level theme files, Google's
+  own mark and a canvas fill — are data in `PALETTE_LITERAL_OK`, rot-checked.
+  Earned by three breaches nobody would have filed as bugs: colour drift is only
+  visible in aggregate, and nobody sees the aggregate. (`closed-palette`.
+  UI-RULEBOOK N5)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 
@@ -86,7 +114,7 @@ A law cannot be added without its check (`registry-integrity`). When you add a r
 Answer these seven, in order, *before* you write code. It's the thinking that keeps a change in-rule and lean, the antidote to the failure mode that bit us (a change that looked fine but broke an unstated invariant, or rebuilt a seam that already existed).
 
 1. **Say it in one glossary sentence.** What changes, in [the glossary's](shared/glossary.ts) words. Never a synonym. No word for it yet? That's a glossary decision first (Law R6).
-2. **Which Laws bite?** Walk R1–R28: it reads a request body → every field through the validation seam, positionally (R20); a client login could reach it at the agency origin → it decides about portal callers at the door (R21); it mutates → gate (R10) + publish (R1) + a reachable listener (R15); renders a form → FormShell (R4) + draft (R7); a collection → tabs (R2/R3/R8), a bounded read, or real keyset paging if it GROWS (R14), and an exact, once-only count through the one seam (R16); a deactivate/reactivate or status move → the idempotent predicate + zero-row silence (R17); writes activity → its relatedTable resolves through the gate map (R18); a new module → an import TargetDef or a reasoned exemption (R13); touches the agent/MCP → capability parity (R9), every door filter exposed + forwarded (R19), every BODY field too (R22), a description whose every backticked identifier names something real (R27), and the confirm rule; calls an external service → a fetch timeout (R11); runs on a cron → record failures (R12); answers from the knowledge base → the one answer seam, citations and all (R23), and its search is namespaced and its words come from D1 (R26); **says a single word to a person → that sentence is in the catalogue (R28), which means running `node scripts/i18n-extract.mjs` before you commit**. Name them now, not in review.
+2. **Which Laws bite?** Walk R1–R32: it reads a request body → every field through the validation seam, positionally (R20); a client login could reach it at the agency origin → it decides about portal callers at the door (R21); it mutates → gate (R10) + publish (R1) + a reachable listener (R15); renders a form → FormShell (R4) + draft (R7); a collection → tabs (R2/R3/R8), a bounded read, or real keyset paging if it GROWS (R14), and an exact, once-only count through the one seam (R16); a screen → ONE page width, and the pin deleted by the commit that fixes it (R29), `rounded-xl` or `rounded-full` and no third radius (R31), and every colour through a token and never a Tailwind ramp or a hex (R32); a deactivate/reactivate or status move → the idempotent predicate + zero-row silence (R17); writes activity → its relatedTable resolves through the gate map (R18); a new module → an import TargetDef or a reasoned exemption (R13); touches the agent/MCP → capability parity (R9), every door filter exposed + forwarded (R19), every BODY field too (R22), a description whose every backticked identifier names something real (R27), and the confirm rule; calls an external service → a fetch timeout (R11); runs on a cron → record failures (R12); answers from the knowledge base → the one answer seam, citations and all (R23), and its search is namespaced and its words come from D1 (R26); **it sends a person an email → that send is classified in the census, and if it names a record it carries a button to it, at the recipient's OWN front door (R30)**; **says a single word to a person → that sentence is in the catalogue (R28), which means running `node scripts/i18n-extract.mjs` before you commit**. Name them now, not in review.
 3. **Which seams do I reuse, not rebuild?** The data door (`shared/workers/d1-rest`), gating (`requireRight`), validation (`shared/workers/validate`), `publishChange`, `FormShell`, the recipe engine, the tool catalog. If you're writing what a seam already does, stop.
 4. **What's the smallest shape?** A route on an existing worker (not a new worker); a column (not a table); a recipe (not a bespoke screen); a flag (not a code path). "Too much code is a defect."
 5. **What could break?** Name the failure path *before* the happy path: tenant isolation, ≥1 admin, a unique pending invite, a never-negative balance, a concurrent write, a partial failure, a hung fetch. Validate at the boundary; make retryable writes idempotent.

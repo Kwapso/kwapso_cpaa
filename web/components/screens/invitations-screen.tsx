@@ -10,7 +10,7 @@ import { useT } from "@shared/web/language"
 export function InvitationsScreen({ active }: { active: ActiveTeam }) {
   const t = useT()
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
+    <div className="flex w-full flex-col gap-6">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
         {t("Invitations")}
       </h2>

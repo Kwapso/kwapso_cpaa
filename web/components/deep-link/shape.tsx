@@ -5,8 +5,9 @@
 
 import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 
-import { formatActivityWhen, formatDate, formatDateTime } from "@shared/web/format"
+import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"
+import { richTextPlain } from "@shared/web/rich-text"
 import type {
   Account,
   ActivityItem,
@@ -17,7 +18,6 @@ import type {
   KnowledgeSource,
   Meeting,
   MeetingPurpose,
-  Task,
   TeamMeta,
   TeamMember,
   TeamRole,
@@ -130,7 +130,7 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
       // which is why a page of tickets read as a wall of text with no shape. It
       // has not been lost: it leads the eyebrow on the record's own screen (D4),
       // where a person looks when a client rings up saying it out loud.
-      name: truncate(t.description),
+      name: truncate(richTextPlain(t.description)),
       // ONE LINE, TWO FACTS. How far along, and what kind. The story counts and
       // the archived flag went with the same edit: a subtitle carrying four
       // facts is table content smuggled into a list (K2).
@@ -155,6 +155,26 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   // source IS even though nothing writes a new one.
   article: "From an article",
   account: "From an account",
+  // EVERY KIND THE SWEEP WRITES NEEDS A WORD HERE. A kind missing from this map
+  // falls through to its own bare name, so the Kind filter offered "sprint" and
+  // "account_links" beside "From a ticket" — and the six kinds added on 18 Aug
+  // would have made most of the filter read that way. Held to the kind list by
+  // workers/content/test/knowledge-coverage.test.ts, which reads this map off
+  // disk — so a new kind cannot ship without a word for it here.
+  contact: "From a contact",
+  app: "From an app",
+  process: "From a process map",
+  sprint: "From a sprint",
+  story: "From a story",
+  meeting: "From a meeting",
+  todo: "From a to-do",
+  task: "From a task",
+  // The four that arrive through somebody's own Google connection — named for
+  // the thing rather than the service, the same way the kinds themselves are.
+  document: "From a document",
+  email: "From an email",
+  event: "From a calendar entry",
+  message: "From a chat message",
 }
 
 /** Where a source is filed, as a person reads it: an account compartment shows
@@ -212,7 +232,10 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // columns"). They ride every row rather than a second shaper, because the
       // three views are three renderings of ONE list — a second shaper is a
       // second idea of what a meeting row is, and the two drift.
-      when: formatDate(m.startsAt),
+      // A TABLE COLUMN, and the one the "All" view is most often ordered by — so
+      // it is the sortable spelling of a date. The subtitle above it keeps
+      // `formatDate`, because that one is read rather than compared.
+      when: formatDateSortable(m.startsAt),
       // The bare day the calendar view keys entries on — it wants a date, not a
       // moment, and formatting it for the grid is the grid's job.
       startsOn: m.startsAt.slice(0, 10),
@@ -357,27 +380,6 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
       department: p.department || "—",
       state: p.active ? "Live" : "Archived",
     })),
-  }
-}
-
-/** ONE TASK, as a record. The only work-engine detail that is a recipe rather
- * than a component: an app, a sprint and a story each carry a collection tab or
- * a status track that no engine block draws, and a task carries neither — it is
- * a title, a date and a tick. */
-export function shapeTaskDetail(task: Task, activity: ActivityItem[]): ScreenData {
-  return {
-    record: {
-      id: task.id,
-      name: task.ref ? `${task.ref} · ${task.title}` : task.title,
-      detail: task.status === "done" ? "Done" : "Open",
-      status: task.status === "done" ? "Done" : "Open",
-      assignee: task.assigneeName || "Nobody yet",
-      due: task.dueOn ? formatDate(task.dueOn) : "—",
-      detailText: task.detail || "—",
-      created: formatDateTime(task.createdAt),
-      createdBy: task.createdByName || "—",
-    },
-    sets: { activity: shapeActivity(activity) },
   }
 }
 

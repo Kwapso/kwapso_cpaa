@@ -142,6 +142,16 @@ export const TICKET_FACET_CAP = 500
  * read to the end of and a count can be trusted. */
 export const TICKET_ATTACHMENT_CAP = 50
 
+/** Rows the work-log summary's two grouped reads may return (R14) — time BY
+ * PERSON and time BY KIND OF WORK, on one record. Both group over sets that
+ * cannot run away: the people are the team's members and the kinds are the
+ * team's own dropdown vocabulary. So the ceiling is generous and exists to make
+ * the bound VISIBLE at the query rather than implied by the shape of the data —
+ * the same argument TICKET_FACET_CAP makes, at the size those two sets actually
+ * are. A chart with fifty bars on it is already unreadable; this is the point
+ * past which it also stops being bounded. */
+export const WORK_LOG_GROUP_CAP = 50
+
 /** Processes one story may link to (CHECKLIST 6.5). "One or more" is the ask; a
  * ceiling is what makes the `IN (...)` proof a bounded statement rather than one
  * with as many placeholders as somebody types. */
@@ -168,6 +178,23 @@ export const AGENT_FILE_MAX_BYTES = 5_000_000
 
 /** Files one agent chat message may attach. */
 export const AGENT_MAX_FILES = 8
+
+// ── translating what a PERSON typed, on demand ───────────────────────────────
+// Two numbers, and they are a pair with a purpose: one press of "Translate" is
+// ONE call and ONE unit of the team's AI allowance, so the pair is what stops a
+// screen with a long thread on it turning that promise into a request no model
+// can answer. A screen with more text than this translates the first
+// TRANSLATE_MAX_TEXTS pieces and leaves the rest in the language they were
+// written in, which is the same degradation the whole language engine is built
+// on: untranslated is a sentence, a failed request is not.
+
+/** Pieces of human-typed text one press of "Translate" may carry. */
+export const TRANSLATE_MAX_TEXTS = 40
+
+/** Characters of ONE of those pieces. Longer is truncated rather than refused —
+ * a paragraph and a half of somebody's ticket in their own language is more use
+ * than a refusal, and the original is always one press away. */
+export const TRANSLATE_MAX_CHARS = 4_000
 
 // ── a file dropped into the knowledge base ───────────────────────────────────
 // TWO NUMBERS, AND THEY ARE A PAIR — the same shape as the agent-chat ceiling

@@ -29,6 +29,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { StartTimerStrip } from "@/components/time-panel"
@@ -40,6 +41,8 @@ import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { assignableMembers } from "@/lib/people"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
  * who has it, when it is due, and which request it answers. */
@@ -114,7 +117,7 @@ export function useStoryFormOptions(teamId: string) {
       .filter((t) => t.status !== "resolved" && !t.archivedAt)
       .map((t) => ({
         id: t.id,
-        label: t.ref ? `${t.ref} · ${t.description}` : t.description,
+        label: t.ref ? `${t.ref} · ${richTextPlain(t.description)}` : richTextPlain(t.description),
         appId: t.appId,
       })),
     processes: (processesQ.data ?? [])
@@ -128,10 +131,8 @@ export function useStoryFormOptions(teamId: string) {
     // as its word (UI-RULEBOOK G2). The words above stay because a picker wants
     // words; a header band wants the glyph beside them.
     selectableValues: selectableQ.data,
-    members: (membersQ.data ?? []).map((m) => ({
-      id: m.userId,
-      name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
-    })),
+    // Our people only — a story is internal work (lib/people).
+    members: assignableMembers(membersQ.data),
     // WHO IS ON EACH APP (CHECKLIST 6.6). The staff set rides the app row, so
     // the picker narrows without a second read — and the DOOR enforces the same
     // rule, so a narrowed list is a courtesy rather than the control.
@@ -208,7 +209,7 @@ export function StoriesScreen({
   const loaded = storiesQ.data
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the count lives in the heading (a sidebar page has no tab strip to
           badge), and it is the door's exact COUNT(*) — never the loaded page's
           length, which on a paged list is just "50" for ever. */}
@@ -222,12 +223,18 @@ export function StoriesScreen({
         listKey={storiesKey(teamId)}
         placeholder={t("Search work…")}
         noun="stories"
+        sorts={translatedSorts("stories", t)}
+        defaultSort={COLLECTION_SORTS.stories.defaultSort}
         fetchPage={(query, cursor) =>
           contentApi
             // `view: "all"` while searching: somebody looking for a story by name
             // is as likely to want the finished one, and the everyday backlog
             // hides those.
-            .stories({ filter: { q: query.q, view: "all" }, cursor })
+            .stories({
+              filter: { q: query.q, view: "all" },
+              order: { sort: query.sort, dir: query.dir },
+              cursor,
+            })
             .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor, total: r.total }))
         }
       >
@@ -272,6 +279,7 @@ export function StoriesScreen({
       <StartTimerStrip teamId={teamId} canCreate={canCreate} />
 
       <StoryFormDialog
+        teamId={teamId}
         open={storyOpen}
         onOpenChange={setStoryOpen}
         sprints={options.sprints}

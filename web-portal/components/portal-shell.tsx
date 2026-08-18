@@ -23,7 +23,6 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Building2, House, LifeBuoy, LogOut, PiggyBank } from "lucide-react"
 
 import { brand } from "@shared/brand"
@@ -33,6 +32,7 @@ import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 import { useT, LanguageProvider } from "@shared/web/language"
 import { LanguageMenu } from "@shared/web/language-menu"
+import { MarkLoader } from "@shared/web/mark-loader"
 import { auth } from "@/lib/api"
 import { applyLivePing, PORTAL_SUBSCRIPTIONS, replayAfterReconnect } from "@/lib/live-resources"
 import { usePortalSession, type PortalSession } from "@/lib/session"
@@ -88,18 +88,19 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     PORTAL_SUBSCRIPTIONS
   )
 
+  // THE APP IS STARTING. Not one screen's own wait — nothing is drawn yet and
+  // nothing is known yet, including whether there is anything here for this
+  // person — so it wears the mark the front door opened on rather than a spinner
+  // in an empty page. The mid-switch wait further down is the opposite case and
+  // stays a skeleton: the page IS drawn, and what is coming has a shape.
   if (session.state === "loading" || session.state === "signed-out")
-    return (
-      <main className="flex min-h-[100svh] items-center justify-center">
-        <Spinner />
-      </main>
-    )
+    return <MarkLoader label={t("Loading…")} />
 
   // Ours, not theirs. Say so, and offer the only useful thing — try again —
   // rather than the sign-in screen, which would read as "you were logged out".
   if (session.state === "unavailable")
     return (
-      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
+      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{t("We can't reach your account")}</h1>
         <p className="text-muted-foreground">
           {t("Something on our side isn't responding. Nothing is lost. Try again in a moment.")}
@@ -169,7 +170,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         {switching ? (
           <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
             <span className="sr-only">{t("Switching company…")}</span>
-            <Skeleton className="h-8 w-56 rounded-lg" />
+            <Skeleton className="h-8 w-56 rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
           </div>
@@ -210,7 +211,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
  * and the shell agree on what "not yet" looks like. */
 export function PortalDoor({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-[100svh] flex-col items-center justify-center gap-8 p-6">
+    <main className="flex min-h-[100svh] flex-col items-center justify-center gap-6 p-6">
       <div className="fixed right-4 top-4 z-30">
         <ModeToggle />
       </div>

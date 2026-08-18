@@ -39,8 +39,19 @@ const DATE_FIELDS = [
   "resolvedAt",
 ]
 
-/** The formatters that make a date readable — all from the one file. */
-const FORMATTED = /format(Date|DateTime|Relative|ActivityWhen)\s*\(/
+/** The formatters that make a date readable — all from the one file.
+ *
+ * `formatTime` is here because an AGENDA row says the clock time alone under a
+ * heading that already said the day.
+ *
+ * `DateSortable` is here for a reason worth reading: it produces "2026-06-13",
+ * which is exactly the shape this check exists to catch. The difference is that
+ * it is a decision rather than a leak — a table column somebody clicks to sort
+ * has to compare correctly, and the library compares the rendered text
+ * (shared/web/format.ts says the rest). Its output being a date and not a
+ * timestamp is the visible half of that: no clock, no `T`, no `Z`, nothing that
+ * looks like a database row. */
+const FORMATTED = /format(DateSortable|DateTime|Date|Time|Relative|ActivityWhen)\s*\(/
 
 const ROOTS = [
   join(__dirname, "..", "components"),
@@ -82,7 +93,7 @@ describe("no screen shows a raw timestamp", () => {
     const shared = sourceFiles(join(__dirname, "..", "..", "shared", "web"), { extensions: [".ts"] })
     const format = shared.find((f) => f.rel.endsWith("format.ts"))
     expect(format, "shared/web/format.ts has moved — this suite is scanning for the wrong name").toBeTruthy()
-    for (const fn of ["formatDate", "formatDateTime"])
+    for (const fn of ["formatDate", "formatDateTime", "formatTime"])
       expect(format!.source, `${fn} is gone from the shared formatter`).toContain(`export function ${fn}`)
   })
 })

@@ -28,13 +28,7 @@ import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -43,8 +37,11 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
-import type { SelectableValue, TeamMember } from "@shared/types"
+import type { SelectableValue } from "@shared/types"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
@@ -141,19 +138,6 @@ export function useAppStages(teamId: string): { value: string; mark: string }[] 
   return rows.length > 0 ? rows : APP_STAGES.map((s) => ({ value: s.name, mark: s.mark }))
 }
 
-/** THE TEAM, for the "who is on it" list (8.10). Its own hook beside the stage
- * one so every screen that can record an app asks the same question of the same
- * cache — the members list four other screens already hold, so opening the
- * dialog costs a round trip only on a page that has never needed it. */
-export function useTeamMembers(teamId: string): { id: string; name: string }[] {
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
-    tenancy.members().then((r) => r.members)
-  )
-  return (membersQ.data ?? []).map((m) => ({
-    id: m.userId,
-    name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
-  }))
-}
 
 export function AppFormDialog({
   open,
@@ -256,9 +240,9 @@ export function AppFormDialog({
         stage: values.stage.trim(),
         toolCostCentsPerMonth:
           values.cost.trim() !== "" && Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : 0,
-        about: values.about.trim(),
-        clientContext: values.clientContext.trim(),
-        solution: values.solution.trim(),
+        about: richTextValue(values.about),
+        clientContext: richTextValue(values.clientContext),
+        solution: richTextValue(values.solution),
         keyActors: values.keyActors.trim(),
         staffUserIds: values.staffUserIds,
         leadUserId: lead,
@@ -306,73 +290,66 @@ export function AppFormDialog({
       </Field>
       {!editing && (
       <Field config={accountField} htmlFor="app-account" className={fieldSpacing}>
-        <Select
+        {/* The COMPANIES, asked of the door (accounts PAGE, R14). `accounts` is
+            still passed in: the screen's own page one, painted while the first
+            answer arrives, and where an app already on a client gets its name. */}
+        <RecordPicker
+          id="app-account"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term, { type: "entity" })}
+          searchKey={pickerKey("companies", teamId)}
+          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          placeholder={t("One of ours")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="app-account">
-            <SelectValue placeholder={t("One of ours")} />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       )}
       {/* STAGE IS A CHOICE, not a typed word. It was free text until 17 Aug 2026,
           which is how one inventory came to carry "live", "Live" and "in dev" for
           the same three systems. The mark rides the LABEL only. */}
       <Field config={stageField} htmlFor="app-stage" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="app-stage"
           value={values.stage}
-          onValueChange={(v) => setValues((s) => ({ ...s, stage: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, stage: v }))}
+          options={stages.map((s) => ({
+            value: s.value,
+            label: s.mark ? `${s.mark} ${t(s.value)}` : t(s.value),
+          }))}
+          placeholder={t("Not said")}
+          searchPlaceholder={t("Search stages…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="app-stage">
-            <SelectValue placeholder={t("Not said")} />
-          </SelectTrigger>
-          <SelectContent>
-            {stages.map((s) => (
-              <SelectItem key={s.value} value={s.value}>
-                {s.mark ? `${s.mark} ${t(s.value)}` : t(s.value)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
-        <Textarea
-          id="app-about"
-          rows={3}
-          value={values.about}
-          onChange={(e) => setValues((s) => ({ ...s, about: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.about}
+          onChange={(html) => setValues((s) => ({ ...s, about: html }))}
           placeholder={t("What this system does, and for whom.")}
-          disabled={busy}
+          className="min-h-32"
         />
       </Field>
       <Field config={contextField} htmlFor="app-client-context" className={fieldSpacing}>
-        <Textarea
-          id="app-client-context"
-          rows={3}
-          value={values.clientContext}
-          onChange={(e) => setValues((s) => ({ ...s, clientContext: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.clientContext}
+          onChange={(html) => setValues((s) => ({ ...s, clientContext: html }))}
           placeholder={t("How they were working before, and what it was costing them.")}
-          disabled={busy}
+          className="min-h-32"
         />
       </Field>
       <Field config={solutionField} htmlFor="app-solution" className={fieldSpacing}>
-        <Textarea
-          id="app-solution"
-          rows={3}
-          value={values.solution}
-          onChange={(e) => setValues((s) => ({ ...s, solution: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.solution}
+          onChange={(html) => setValues((s) => ({ ...s, solution: html }))}
           placeholder={t("What we built, and the decisions behind it.")}
-          disabled={busy}
+          className="min-h-32"
         />
       </Field>
       <Field config={actorsField} htmlFor="app-key-actors" className={fieldSpacing}>
@@ -389,7 +366,7 @@ export function AppFormDialog({
           because the library ships no multi-select and the rulebook is explicit
           that nothing here edits the library — the same shape the story form
           already uses for the processes it touches. */}
-      <Field config={staffField} htmlFor="app-staff" className={fieldSpacing}>
+      <Field config={staffField} shape="group" htmlFor="app-staff" className={fieldSpacing}>
         <div className="flex flex-col gap-2" id="app-staff">
           {members.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nobody on the team yet.")}</p>
@@ -420,31 +397,25 @@ export function AppFormDialog({
           a picker with nothing in it is a question with no possible answer. */}
       {values.staffUserIds.length > 0 && (
         <Field config={leadField} htmlFor="app-lead" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="app-lead"
             value={lead || NOBODY}
-            onValueChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
+            onChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
+            options={members
+              .filter((m) => values.staffUserIds.includes(m.id))
+              .map((m) => ({ value: m.id, label: m.name }))}
+            emptyOption={{ value: NOBODY, label: t("Nobody yet") }}
+            placeholder={t("Nobody yet")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="app-lead">
-              <SelectValue placeholder={t("Nobody yet")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NOBODY}>{t("Nobody yet")}</SelectItem>
-              {members
-                .filter((m) => values.staffUserIds.includes(m.id))
-                .map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
       )}
       {/* THEIR PEOPLE (8.5), from the client's own contacts. Absent entirely on
           one of our own systems, which has no client to have contacts at. */}
       {clientId && (
-        <Field config={stakeholderField} htmlFor="app-stakeholders" className={fieldSpacing}>
+        <Field config={stakeholderField} shape="group" htmlFor="app-stakeholders" className={fieldSpacing}>
           <div className="flex flex-col gap-2" id="app-stakeholders">
             {contacts.length === 0 ? (
               <p className="text-muted-foreground text-sm">
@@ -475,27 +446,21 @@ export function AppFormDialog({
       )}
       {values.stakeholderContactIds.length > 0 && (
         <Field config={mainStakeholderField} htmlFor="app-main-stakeholder" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="app-main-stakeholder"
             value={mainHolder || NOBODY}
-            onValueChange={(v) =>
+            onChange={(v) =>
               setValues((s) => ({ ...s, mainStakeholderContactId: v === NOBODY ? "" : v }))
             }
+            options={contacts
+              .filter((c) => values.stakeholderContactIds.includes(c.id))
+              .map((c) => ({ value: c.id, label: c.name }))}
+            emptyOption={{ value: NOBODY, label: t("Not said") }}
+            placeholder={t("Not said")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="app-main-stakeholder">
-              <SelectValue placeholder={t("Not said")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NOBODY}>{t("Not said")}</SelectItem>
-              {contacts
-                .filter((c) => values.stakeholderContactIds.includes(c.id))
-                .map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
       )}
     </FormShellDialog>

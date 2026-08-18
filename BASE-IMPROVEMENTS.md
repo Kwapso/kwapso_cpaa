@@ -154,7 +154,7 @@ any writes, so all N proceed. The free allowance overruns by the burst width and
 paid credits are never reached.
 
 ```bash
-grep -c "agent_usage.used <" workers/data-ops/src/lib/credits.ts
+grep -c "agent_usage.used <" shared/workers/credits.ts
 ```
 **Patch:** a count of `0` is vulnerable, the cap isn't in the write.
 (Don't grep for `SELECT used FROM agent_usage`: a legitimate read of the same
@@ -343,7 +343,7 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 |---|---|---|
 | HIGH | Agent could make privilege/identity writes (rename team, change roles, set permissions, invite) with **no confirmation**, reproduced live (a read-only question silently renamed a team) | `confirm: true` on the 7 privilege/identity tools; `agent.test.ts` flipped to the safe contract (`workers/data-ops/src/lib/tools.ts`). **Superseded 2026-07-10:** by owner decision the confirm rule was relaxed to **destructive-only** (removals + deactivations + bulk); the privilege-confirm defense-in-depth was traded for a smoother agent, the fence (untrusted content as DATA) + act-as-user gating + audit remain the primary defenses. See EDGE-CASES §5. |
 | HIGH | **Stored XSS**: `parseUploadDataUrl` accepted any MIME (`text/html`, `svg`); gateway served `/media/learning/*` back with it on the app origin (worker-built response, so `_headers` didn't apply) → attacker JS rides a viewer's session, cross-team | Allow-listed inline-safe MIME at the boundary + `mediaHeaders()` adds `CSP: default-src 'none'; sandbox` + `nosniff` on both gateway media branches (`shared/workers/image.ts`, `workers/gateway/src/index.ts`) |
-| MEDIUM | AI usage-log returned **every member's raw prompt** to any teammate who opened it | `readUsageLog` redacts the summary to the viewer's own rows (`workers/data-ops/src/lib/credits.ts`) |
+| MEDIUM | AI usage-log returned **every member's raw prompt** to any teammate who opened it | `readUsageLog` redacts the summary to the viewer's own rows (`shared/workers/credits.ts`, moved there 2026-08-18 when a second worker started spending the allowance) |
 | MEDIUM | No anti-clickjacking / MIME / referrer headers served | `X-Frame-Options: DENY` + `nosniff` + `Referrer-Policy` in `web/public/_headers` |
 | LOW | Boundary validation gaps: role `description`, team `name`, member/invite ids not type-checked → a non-string body was a **500, not a 400** | `optionalText` / `requireText` / `typeof` guards (tenancy routes) |
 | CRIT (forks) | `mcp` binds the core DB but docs said "**five** core-bound workers" → a fork on a shared account silently binds mcp to the ORIGINAL core DB (cross-tenant) | "SIX core-bound workers" everywhere (BOOTSTRAP, OPERATIONS, new-app); OPERATIONS now lists migration 0013 + mcp in the `INTERNAL_KEY` set |

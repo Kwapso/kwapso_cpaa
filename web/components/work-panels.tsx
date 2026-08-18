@@ -34,6 +34,7 @@ import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -44,19 +45,29 @@ export const STORY_STATUS_LABEL: Record<Story["status"], string> = {
   done: "Done",
 }
 
-/** A row in one of these lists — bordered, faded when the record is switched off
- * or finished. Nothing here is ever hidden for being done: "finished" is a state,
- * not an absence, and a sprint's whole point is that you can look back at it. */
+/** A row in one of these lists, faded when the record is switched off or
+ * finished. Nothing here is ever hidden for being done: "finished" is a state,
+ * not an absence, and a sprint's whole point is that you can look back at it.
+ *
+ * IT HAS NO BORDER OF ITS OWN ANY MORE, and its list carries one instead
+ * (`RowList` below). A bordered box per row inside a gapped column draws TWO
+ * cues at every boundary — a drawn line AND a space — where N6 allows exactly
+ * one, and it did it seven times in this file alone. The COLLECTION is the block
+ * that earns a container; a row inside one is a row. */
 function Row({ live, children }: { live: boolean; children: React.ReactNode }) {
   return (
-    <li
-      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
-        live ? "" : "opacity-60"
-      }`}
-    >
+    <li className={`flex flex-wrap items-center gap-2 px-3 py-2 ${live ? "" : "opacity-60"}`}>
       {children}
     </li>
   )
+}
+
+/** The container those rows sit in: one hairline round the collection and one
+ * between each pair, which is N6's "a block earns a container when it holds a
+ * collection of two or more rows". Written once so seven panels cannot drift
+ * into seven spellings of one list. */
+function RowList({ children }: { children: React.ReactNode }) {
+  return <ul className="divide-border divide-y rounded-xl border">{children}</ul>
 }
 
 /** The clickable name of a record, in the URL form the caller arrived through. */
@@ -91,14 +102,22 @@ export function sliceKey(kind: string, ownerId: string): string {
 /** One story, in one line: where it is, who has it, when it is due, and which
  * request it answers. The same sentence the backlog row says, because it is the
  * same record — a person reading it on a sprint should not have to re-learn it. */
-function storyLine(s: Story): string {
+function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket"): string {
   return (
     [
       STORY_STATUS_LABEL[s.status],
       s.assigneeName ?? "unassigned",
       s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
-      s.sprintName,
-      s.ticketRef,
+      // THE OWNER IS NOT A FACT ABOUT THE ROW. This list hangs off a sprint, an
+      // app or a ticket, and it used to name the sprint and the ticket on every
+      // row of all three — so the sprint's own Stories tab said "Sprint 14" forty
+      // times under a heading that said Sprint 14, and the ticket's said its own
+      // reference. Five facts against D5's three, and the fifth was the record
+      // the reader was already looking at. The one that is NOT the owner still
+      // earns its place: on an app's stories, which sprint a story sits in is
+      // real information.
+      ownerKind === "sprint" ? null : s.sprintName,
+      ownerKind === "ticket" ? null : s.ticketRef,
     ]
       .filter(Boolean)
       .join(" · ") || "—"
@@ -144,7 +163,7 @@ export function StoriesPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("New story")} onClick={onNew} />
@@ -153,7 +172,7 @@ export function StoriesPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{emptyText}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((s) => (
             <Row key={s.id} live={s.status !== "done"}>
               <div className="min-w-0 flex-1">
@@ -161,7 +180,7 @@ export function StoriesPanel({
                   label={s.ref ? `${s.ref} · ${s.title}` : s.title}
                   onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)}
                 />
-                <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s)}</p>
+                <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind)}</p>
               </div>
               {s.status === "done" && (
                 <Badge variant="secondary" className="text-[10px]">
@@ -170,7 +189,7 @@ export function StoriesPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       {/* R14: the badge above counts ALL of this slice, so the list under it has
           to be able to reach the rest of it. */}
@@ -212,6 +231,38 @@ export function sprintLine(s: Sprint): string {
   )
 }
 
+/** THE SAME SPRINT, ON A LIST THAT HAS ALREADY SAID ITS KIND — three facts, not
+ * five.
+ *
+ * The Sprints overview groups by kind and puts the kind's own word above each
+ * group, and then every row underneath repeated it: "Retainer · Northwind ·
+ * Portal · 3 Feb → 20 Mar · 3 of 11 done", under a heading that said Retainer.
+ * A fact restated once per row is not information, it is noise with a job title,
+ * and it took that band to seven units against N1's four.
+ *
+ * So the KIND comes off (the heading says it) and HOW MUCH IS DONE comes off
+ * (it becomes the row's trailing number, where a number belongs — T4), leaving
+ * the three facts D5 allows a status line: whose, which app, and when.
+ *
+ * `sprintLine` above is unchanged and still carries all five, because the flat
+ * "All sprints" list and the panels on an account and an app are NOT grouped by
+ * kind, and there the kind is the one word telling you what sort of block of
+ * work you are looking at. Two lines, because there are two situations, not
+ * because there are two opinions. */
+export function sprintLineInKindGroup(s: Sprint): string {
+  return (
+    [
+      s.accountName,
+      s.appName,
+      s.startsOn && s.endsOn
+        ? `${formatDate(s.startsOn)} → ${formatDate(s.endsOn)}`
+        : (formatDate(s.startsOn) || formatDate(s.endsOn) || null),
+    ]
+      .filter(Boolean)
+      .join(" · ") || "—"
+  )
+}
+
 /** THE BLOCKS OF WORK SOLD on one app, or to one account. Bounded, not paged —
  * a sprint is a contract, so the whole set is the answer and its exact total
  * comes back beside it. */
@@ -244,7 +295,7 @@ export function SprintsPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Start a sprint")} onClick={onNew} />
@@ -253,7 +304,7 @@ export function SprintsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{emptyText}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((s) => (
             <Row key={s.id} live={!s.completedAt}>
               <div className="min-w-0 flex-1">
@@ -270,7 +321,7 @@ export function SprintsPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
     </div>
   )
@@ -311,7 +362,7 @@ export function AppsPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Record an app")} onClick={onNew} />
@@ -320,7 +371,7 @@ export function AppsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing built for")} {accountName} {t("yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((a) => (
             <Row key={a.id} live={a.active}>
               <div className="min-w-0 flex-1">
@@ -334,7 +385,7 @@ export function AppsPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
     </div>
   )
@@ -372,7 +423,7 @@ export function ProcessesPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Map a process")} onClick={onNew} />
@@ -383,7 +434,7 @@ export function ProcessesPanel({
           {t("No processes drawn inside this app yet.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((p) => (
             <Row key={p.id} live={p.active}>
               <div className="min-w-0 flex-1">
@@ -401,7 +452,7 @@ export function ProcessesPanel({
               <ChevronRight className="text-muted-foreground size-4" />
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       <LoadMore
         listKey={key}
@@ -424,7 +475,16 @@ export function ProcessesPanel({
  * reason — a two-year system accumulates meetings and the oldest is the one
  * somebody is digging for. `total` is the door's exact COUNT(*) over this same
  * filter, parked in the sidecar the tab badge reads (R16). */
-export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHost }) {
+export function AppMeetingsPanel({
+  appId,
+  host,
+  onNew,
+}: {
+  appId: string
+  host: PanelHost
+  /** present = the caller may arrange one from here, and this opens the form */
+  onNew?: () => void
+}) {
   const t = useT()
   const key = sliceKey("meetings-app", appId)
   const q = useCached<Meeting[]>(key, () =>
@@ -440,11 +500,16 @@ export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHo
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      {onNew && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <AddButton label={t("Arrange a meeting")} onClick={onNew} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No meetings about this app yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((m) => (
             <Row key={m.id} live={m.active}>
               <div className="min-w-0 flex-1">
@@ -460,7 +525,7 @@ export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHo
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       <LoadMore
         listKey={key}
@@ -480,7 +545,16 @@ export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHo
  * GROWING collection that pages, so "this app's tickets among the newest fifty"
  * would be an answer that looks like an answer. `total` is the door's exact
  * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
-export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHost }) {
+export function AppTicketsPanel({
+  appId,
+  host,
+  onNew,
+}: {
+  appId: string
+  host: PanelHost
+  /** present = the caller may raise one from here, and this opens the form */
+  onNew?: () => void
+}) {
   const t = useT()
   const key = sliceKey("tickets-app", appId)
   const q = useCached<HelpTicket[]>(key, () =>
@@ -497,16 +571,21 @@ export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHos
   // Tickets live at their own top-level URL, so the link is built off the host
   // prefix rather than the section we are standing in.
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      {onNew && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <AddButton label={t("Raise a ticket")} onClick={onNew} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing has been raised about this app yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((ticket) => (
             <Row key={ticket.id} live={!ticket.archivedAt}>
               <div className="min-w-0 flex-1">
                 <OpenLink
-                  label={ticket.description}
+                  label={richTextPlain(ticket.description)}
                   onOpen={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
                 />
                 <p className="text-muted-foreground truncate text-xs">
@@ -515,7 +594,7 @@ export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHos
               </div>
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       <LoadMore
         listKey={key}
@@ -574,7 +653,7 @@ export function TodosPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Ask for something")} onClick={onNew} />
@@ -583,7 +662,7 @@ export function TodosPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing outstanding with a client.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <RowList>
           {rows.map((t) => (
             <Row key={t.id} live={!t.completedAt && !t.cancelled}>
               <div className="min-w-0 flex-1">
@@ -616,7 +695,7 @@ export function TodosPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
     </div>
   )

@@ -72,6 +72,11 @@ export const GLOSSARY = {
   margin: { term: "Margin", def: "What is left of revenue after our own time and tool costs. Ours alone, never shown to a client." },
   toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month, hosting and the services behind it." },
   priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Value is shown either way." },
+  // WHAT WE HAND OVER on an app. Two words, because the KIND is a field a person
+  // fills in and a word the card shows in small caps, so it needs a definition of
+  // its own or somebody writes "category" on one screen and "type" on the next.
+  deliverable: { term: "Deliverable", def: "Something we handed over on an app: a handover doc, an API reference, a recorded walkthrough, an SOP." },
+  deliverableKind: { term: "Kind", def: "What sort of thing a deliverable is. Your own list, so you can add one we haven't thought of." },
 
   // THE AGENCY'S OWN HOUSEKEEPING — the words for the three modules that describe
   // how we run ourselves. Every definition here says, or implies, the same thing

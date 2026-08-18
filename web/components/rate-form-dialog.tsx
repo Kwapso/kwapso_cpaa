@@ -152,7 +152,7 @@ export function RateFormDialog({
       {/* Stacked on a phone, side by side from sm: — a rate and its currency are
           two narrow controls, and three characters of currency in a box shared
           with a price is a box showing neither (UI-CONVENTIONS §4). */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:gap-2">
         <Field config={amountField} htmlFor="rate-amount" className={`${fieldSpacing} w-full`}>
           <Input
             id="rate-amount"

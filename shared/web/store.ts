@@ -134,6 +134,23 @@ export function invalidatePrefix(prefix: string): void {
   for (const key of keys) if (key.startsWith(prefix)) invalidate(key)
 }
 
+/** WHICH KEYS UNDER A PREFIX ARE ACTUALLY LOADED — for a listener that has to
+ * NAME the caches a ping moves and cannot derive their ids from the ping.
+ *
+ * `invalidatePrefix` above drops a family blindly; this one hands the family
+ * back so the caller can decide, which is the difference between "a story
+ * changed, drop every record's counts" and "a story changed, drop the counts of
+ * the records whose badges count stories" (R15, web/lib/live-resources.ts). The
+ * ping carries the CHILD's id — the record it hangs off is on the row, which the
+ * listener has not read and may never read — so the parent can only be found by
+ * looking at what is on screen.
+ *
+ * Cache-first, so this is normally one or two keys: a record nobody has open has
+ * no entry to return. */
+export function cachedKeys(prefix: string): string[] {
+  return [...cache.keys()].filter((key) => key.startsWith(prefix))
+}
+
 /** FORGET EVERYTHING — sign-out, and switching to another team.
  *
  * Both change WHO IS ASKING, and a cache keyed by resource + team id still holds

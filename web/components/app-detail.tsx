@@ -22,8 +22,11 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { ProcessFormDialog } from "@/components/process-form-dialog"
+import { HelpFormDialog } from "@/components/help-form-dialog"
+import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createSprintFrom } from "@/components/sprints-screen"
@@ -36,11 +39,12 @@ import {
   StoriesPanel,
   sliceKey,
 } from "@/components/work-panels"
+import { DeliverablesPanel } from "@/components/deliverables-panel"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
   RecordFooter,
@@ -49,15 +53,26 @@ import {
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
-import { accountsKey, appsKey, listFetch, totalKey, valueKey } from "@/lib/live-resources"
+import {
+  accountsKey,
+  appMoneyKey,
+  appsKey,
+  helpKey,
+  listFetch,
+  meetingsKey,
+  totalKey,
+  valueKey,
+} from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { appStageMark } from "@shared/app-stages"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import type { Account, AppRow } from "@shared/types"
+import { useRecordCounts } from "@/lib/use-record-counts"
+import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 export function AppDetailScreen({
   teamId,
@@ -77,13 +92,21 @@ export function AppDetailScreen({
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends.
   const activity = useRecordActivity("apps", appId)
-  // The exact totals the three collection tabs badge (R16). Each is primed by
-  // the panel's own fetch, over the same filter the panel's rows came from.
-  const sprintsTotal = useCachedValue<number>(totalKey("sprints-app", appId))
-  const storiesTotal = useCachedValue<number>(totalKey("stories-app", appId))
-  const mapsTotal = useCachedValue<number>(totalKey("processes-app", appId))
-  const meetingsTotal = useCachedValue<number>(totalKey("meetings-app", appId))
-  const ticketsTotal = useCachedValue<number>(totalKey("tickets-app", appId))
+  // THE BADGES, BEFORE THE CLICK. Five collections hang off a system and all
+  // five used to be blank until you opened the tab — this record is the one the
+  // owner named first. One bounded read of every total, primed into the same
+  // sidecars below; the ROWS behind each tab stay lazy.
+  useRecordCounts("apps", appId)
+  // The exact totals the five collection tabs badge (R16) — from the counts read
+  // above, and re-primed by each panel's own fetch over the same filter its rows
+  // came from. `null` is the third answer: the role may not read that module
+  // (R18), which renders as nothing exactly as a zero does.
+  const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-app", appId))
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-app", appId))
+  const mapsTotal = useCachedValue<number | null>(totalKey("processes-app", appId))
+  const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-app", appId))
+  const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-app", appId))
+  const deliverablesTotal = useCachedValue<number | null>(totalKey("deliverables-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "edit")
@@ -95,9 +118,21 @@ export function AppDetailScreen({
   // all. The door refuses a client login besides (R24).
   const canSeeMoney = can("commercials", "read")
   const canReadTickets = can("help", "read")
+  // 8.7 — WHAT WE HANDED OVER on this system. Its own module, so a role that may
+  // open an app does not automatically see its handover shelf: without the right
+  // there is no tab at all, rather than a tab that refuses.
+  const canReadDeliverables = can("deliverables", "read")
+  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Raising a request about this
+  // system is `help:create` and putting a meeting in the diary is
+  // `meetings:create` — the rights those two doors gate on. `processes:edit`,
+  // which is what lets somebody edit the app record itself, says nothing about
+  // either. The door decides (R10); these only decide whether we draw a button
+  // that would come back a 403.
+  const canRaiseTicket = can("help", "create")
+  const canArrangeMeeting = can("meetings", "create")
   // Who can be put on this app (8.10) — the team, from the cache the members
   // screen already fills.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   // The client's own people, by name — see the note beside `contactNames` below
   // for why this is a second read rather than the accounts cache.
   const clientId = appsQ.data?.find((a) => a.id === appId)?.accountId ?? null
@@ -105,11 +140,25 @@ export function AppDetailScreen({
     tenancy.accountDetail(clientId as string)
   )
 
+  // WHAT THE TWO NEW FORMS NEED, and nothing more. Both read the SAME cache keys
+  // their own sections read, and both are conditional on the right that draws
+  // the button: a role that cannot arrange a meeting never fetches the purposes.
+  const purposesQ = useCached<MeetingPurpose[]>(
+    canArrangeMeeting ? `purposes:${teamId}` : null,
+    () => listFetch.purposes(teamId)
+  )
+  const selectableQ = useCached<SelectableValue[]>(
+    canRaiseTicket ? `selectable:${teamId}` : null,
+    () => tenancy.selectable().then((r) => r.values)
+  )
+
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
   const [mapOpen, setMapOpen] = React.useState(false)
   const [storyOpen, setStoryOpen] = React.useState(false)
+  const [ticketOpen, setTicketOpen] = React.useState(false)
+  const [meetingOpen, setMeetingOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
 
@@ -175,7 +224,7 @@ export function AppDetailScreen({
   // enforces it. An overview tile is still theirs to see; the record is not.
   if (!app.canOpen)
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">{app.name}</h1>
         <p className="text-muted-foreground text-sm">
           {t(
@@ -218,9 +267,12 @@ export function AppDetailScreen({
   const overviewItems = [
     { label: t("Client"), value: accountName ?? "Ours, no client" },
     { label: t("Stage"), value: app.stage ? `${appStageMark(app.stage)} ${app.stage}`.trim() : "—" },
-    { label: t("About"), value: app.about || "—" },
-    { label: t("Client context"), value: app.clientContext || "—" },
-    { label: t("Solution"), value: app.solution || "—" },
+    { label: t("About"), value: app.about ? <RichText html={app.about} /> : "—" },
+    {
+      label: t("Client context"),
+      value: app.clientContext ? <RichText html={app.clientContext} /> : "—",
+    },
+    { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : "—" },
     { label: t("Key actors"), value: app.keyActors || "—" },
     // WHO IS ON IT, both sides (8.10 + 8.5). High on the Overview rather than
     // under the audit block: "who do I ask about this?" is the question a person
@@ -273,6 +325,20 @@ export function AppDetailScreen({
               label: t("Tickets"),
               icon: CONCEPT_ICON.tickets,
               badge: formatCount(ticketsTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      // WHAT WE HANDED OVER (8.7) — the handover docs, API references, recorded
+      // walkthroughs and SOPs filed against this system. Behind the caller's own
+      // deliverables right, exactly like the ticket tab above it.
+      ...(canReadDeliverables
+        ? [
+            {
+              value: "deliverables",
+              label: t("Deliverables"),
+              icon: CONCEPT_ICON.deliverables,
+              badge: formatCount(deliverablesTotal),
               badgeVariant: "" as const,
             },
           ]
@@ -354,7 +420,7 @@ export function AppDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -414,9 +480,24 @@ export function AppDetailScreen({
                 onNew={canEdit ? () => setMapOpen(true) : undefined}
               />
             )
-          if (t.value === "meetings") return <AppMeetingsPanel appId={appId} host={host} />
-          if (t.value === "tickets") return <AppTicketsPanel appId={appId} host={host} />
-          if (t.value === "value") return <AppMoneyPanel appId={appId} />
+          if (t.value === "meetings")
+            return (
+              <AppMeetingsPanel
+                appId={appId}
+                host={host}
+                onNew={canArrangeMeeting ? () => setMeetingOpen(true) : undefined}
+              />
+            )
+          if (t.value === "tickets")
+            return (
+              <AppTicketsPanel
+                appId={appId}
+                host={host}
+                onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
+              />
+            )
+          if (t.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
+          if (t.value === "value") return <AppMoneyPanel appId={appId} host={host} />
           if (t.value === "knowledge")
             return (
               <KnowledgeAsk
@@ -429,6 +510,7 @@ export function AppDetailScreen({
                   .filter(Boolean)
                   .join(", ")}
                 onOpenSource={(sourceId) => softNavigate(`${host.base}/knowledge/${sourceId}`)}
+                onOpenRecord={(path) => softNavigate(`${host.base}/${path}`)}
               />
             )
           if (t.value === "activity")
@@ -467,6 +549,67 @@ export function AppDetailScreen({
         onSubmit={save}
       />
 
+      {/* A REQUEST ABOUT THIS SYSTEM, RAISED FROM ITS OWN RECORD. The app rides in
+          as `fixedApp` — which system it is about is a fact about where you are
+          standing, and it is the field that routes the request and decides who
+          gets told when it is answered (5.8). The CLIENT is left as a question:
+          a ticket about one of our systems may be raised on behalf of a client
+          or be our own housekeeping, and the app cannot answer that.
+
+          It arrives already related, which is the entire point: the tab behind
+          this dialog asks the server for `?appId=`, so the new row and the exact
+          count above it move together on the next read. */}
+      <HelpFormDialog
+        open={ticketOpen}
+        onOpenChange={setTicketOpen}
+        teamId={teamId}
+        helpTypeOptions={(selectableQ.data ?? [])
+          .filter((v) => v.type === "Ticket type" && v.active)
+          .map((v) => v.value)}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`help:add:app:${appId}`}
+        onSubmit={async (v) => {
+          await contentApi.createHelp(v)
+          invalidate(sliceKey("tickets-app", appId))
+          invalidate(helpKey(teamId, "all"))
+          toast.success(t("Ticket raised."))
+        }}
+      />
+
+      {/* A MEETING ABOUT THIS SYSTEM, arranged from its own record. Same shape,
+          same reason — and the CLIENT is again left as a question, because a
+          meeting about an app is not always with the client who owns it. */}
+      <MeetingFormDialog
+          teamId={teamId}
+        open={meetingOpen}
+        onOpenChange={setMeetingOpen}
+        accountOptions={(accountsQ.data ?? [])
+          .filter((a) => a.active && a.accountType === "entity")
+          .map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={[{ id: appId, name: app.name }]}
+        purposeOptions={(purposesQ.data ?? [])
+          .filter((x) => x.active)
+          .map((x) => ({ id: x.id, name: x.name }))}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`meeting:add:app:${appId}`}
+        onSubmit={async (v: MeetingFormValues) => {
+          await contentApi.createMeeting({
+            title: v.title,
+            startsAt: v.startsAt,
+            endsAt: v.endsAt || undefined,
+            accountId: v.accountId || undefined,
+            appId,
+            purposeId: v.purposeId || undefined,
+            location: v.location || undefined,
+            agenda: v.agenda || undefined,
+            notes: v.notes || undefined,
+          })
+          invalidate(sliceKey("meetings-app", appId))
+          invalidate(meetingsKey(teamId))
+          toast.success(t("It's in the diary."))
+        }}
+      />
+
       {/* A MAP IS DRAWN FROM THE APP IT BELONGS TO (8.12). Process maps stopped
           being a nav destination on 17 Aug 2026, so this button is the way in —
           without it the tab could only ever show maps somebody made elsewhere. */}
@@ -482,9 +625,15 @@ export function AppDetailScreen({
             name: v.name,
             description: v.description || undefined,
             baselineLabel: v.baselineLabel || undefined,
+            // Who does it — the answer the form collects and this call used to
+            // drop, which is why the money half of the Value tab was 0.00.
+            roleName: v.roleName || undefined,
           })
           invalidate(sliceKey("processes-app", appId))
           invalidate(valueKey(teamId))
+          // The money is computed from this map's role, so the panel that shows
+          // it has to be told a priced map just appeared.
+          invalidate(appMoneyKey(appId))
           toast.success(t("Process mapped."))
         }}
       />
@@ -503,6 +652,7 @@ export function AppDetailScreen({
         }}
       />
       <StoryFormDialog
+        teamId={teamId}
         open={storyOpen}
         onOpenChange={setStoryOpen}
         sprints={options.sprints}

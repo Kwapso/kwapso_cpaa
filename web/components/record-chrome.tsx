@@ -56,8 +56,29 @@ export type RecordAction = {
  * and one secondary button lives here, in sentence case (W5), destructive last.
  *
  * It renders nothing when there is nothing to put in it, so a viewer with no
- * rights sees no empty affordance. */
-export function RecordActionsMenu({ actions }: { actions: RecordAction[] }) {
+ * rights sees no empty affordance.
+ *
+ * ON A HEADER IT IS OUTLINED; IN A ROW IT IS GHOST, and that is the whole of the
+ * `tone` prop. A record header has one menu on it and the outline says where to
+ * press. A LIST has one per row, and forty outlined squares down the right-hand
+ * edge is forty drawn cues on a surface that already has a divider doing the
+ * grouping — which is the two-cues-on-one-boundary that N6 refuses. Same menu,
+ * same items, same confirms; only the resting weight of the trigger moves.
+ *
+ * It is a LOOKUP and not `tone === "row" ? … : …`, which is deliberate: R3
+ * catches a hand-rolled tab strip by exactly that shape (a Button variant
+ * computed from a comparison), and a rule that reads source has no way to tell a
+ * fake toggle from an honest one. Writing the table is cheaper than arguing with
+ * the check, and the check stays as sharp as it was. */
+const TRIGGER_TONE = { header: "outline", row: "ghost" } as const
+
+export function RecordActionsMenu({
+  actions,
+  tone = "header",
+}: {
+  actions: RecordAction[]
+  tone?: keyof typeof TRIGGER_TONE
+}) {
   const t = useT()
   const items = actions.filter(Boolean)
   if (items.length === 0) return null
@@ -66,7 +87,12 @@ export function RecordActionsMenu({ actions }: { actions: RecordAction[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" aria-label={t("More actions")}>
+        <Button
+          variant={TRIGGER_TONE[tone]}
+          size="icon"
+          className="shrink-0"
+          aria-label={t("More actions")}
+        >
           <MoreHorizontal className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -241,7 +267,7 @@ export function RecordHeader({
   }, [onCollapsedChange])
 
   return (
-    <header className="flex flex-col gap-3 pb-6">
+    <header className="flex flex-col gap-4 pb-6">
       <div className="flex flex-wrap items-start gap-4">
         {leading ?? (mark ? <TypeMark mark={mark} size="band" /> : null)}
         <div className="min-w-0 flex-1">

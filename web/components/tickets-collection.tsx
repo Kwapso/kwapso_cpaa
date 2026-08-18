@@ -44,8 +44,11 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
+import { TicketStagesCard } from "@/components/pulse"
+import { CONCEPT_ICON } from "@/lib/pages"
 import { shapeHelpList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
@@ -64,6 +67,7 @@ import { formatRelative } from "@shared/web/format"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { HelpTicket } from "@shared/types"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** The two facets that are STAGES rather than kinds, and the tab each one is.
  * Named here so the strip's shape is readable in one place: Ready first because
@@ -94,7 +98,7 @@ export function TicketsCollection({
   setHelpScope: (v: HelpScope) => void
   /** the team's live `Ticket type` values — the inner strip is built from these */
   helpTypeOptions: string[]
-  totals: { help?: number; helpMine?: number; helpArchived?: number }
+  totals: { help?: number; helpArchived?: number }
   can: (module: string, right: "read" | "create" | "edit" | "delete") => boolean
   onCreate: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
@@ -103,12 +107,9 @@ export function TicketsCollection({
   const t = useT()
   const [facet, setFacet] = React.useState<HelpFacet>(ALL)
 
-  // THE THREE SCOPE CACHES, unchanged: each is a server scope with its own page.
+  // THE TWO SCOPE CACHES: each is a server scope with its own page. There were
+  // three until "My tickets" went (live-resources.ts says why).
   const allQ = useCached<HelpTicket[]>(helpKey(teamId, "all"), () => listFetch.help(teamId))
-  const mineQ = useCached<HelpTicket[]>(
-    helpScope === "mine" ? helpKey(teamId, "mine") : null,
-    () => listFetch.helpMine(teamId)
-  )
   const archivedQ = useCached<HelpTicket[]>(
     helpScope === "archived" ? helpKey(teamId, "archived") : null,
     () => listFetch.helpArchived(teamId)
@@ -127,13 +128,7 @@ export function TicketsCollection({
   const byType = useCachedValue<Record<string, number>>(`help-by-type:${teamId}`)
   const byStatus = useCachedValue<Record<string, number>>(`help-by-status:${teamId}`)
 
-  const scopedQ = narrowed
-    ? facetQ
-    : helpScope === "mine"
-      ? mineQ
-      : helpScope === "archived"
-        ? archivedQ
-        : allQ
+  const scopedQ = narrowed ? facetQ : helpScope === "archived" ? archivedQ : allQ
   // The list key is written out at BOTH call sites below rather than held in a
   // variable: the paging and search checks read the JSX and look for the key the
   // door's own page lands in (`helpKey(`), which is the honest thing to look for
@@ -142,7 +137,7 @@ export function TicketsCollection({
     totalKey(`help-facet:${helpScope}:${facet}`, teamId)
   )
   const scopeTotal =
-    helpScope === "archived" ? totals.helpArchived : helpScope === "mine" ? totals.helpMine : totals.help
+    helpScope === "archived" ? totals.helpArchived : totals.help
   const shownTotal = narrowed ? facetTotal : scopeTotal
 
   const outerTabs = {
@@ -150,7 +145,6 @@ export function TicketsCollection({
     variant: "line" as const,
     tabs: [
       { value: "all", label: t("All tickets"), icon: "inbox", badge: formatCount(totals.help), badgeVariant: "" as const },
-      { value: "mine", label: t("My tickets"), icon: "user", badge: formatCount(totals.helpMine), badgeVariant: "" as const },
       // THE PUT-AWAY PILE. Archive shipped as a door with no button; giving it a
       // button without giving the pile a screen would have moved the dead end one
       // step along instead of ending it.
@@ -175,22 +169,25 @@ export function TicketsCollection({
       })),
       { value: CLOSED, label: t("Closed"), icon: "", badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
-      { value: TRIAGE, label: t("Triage"), icon: "", badge: "", badgeVariant: "" as const },
+      // The one tab on this strip whose idea has a concept icon of its own. The
+      // four KIND tabs beside it carry the team's own type MARKS on every other
+      // surface (a ticket's header band, its detail) and cannot carry one here:
+      // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
+      // renders nothing at all. Logged as UI-GAPS #17 rather than worked around
+      // by writing a glyph into the LABEL, which is the one shape
+      // UI-CONVENTIONS §5 refuses (a pictograph inside a sentence).
+      { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
     ],
   }
 
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <CollectionHeading sectionKey="tickets" total={shownTotal} />
-        {/* WHOSE WEEK IT IS, above the list rather than in a screen of its own: it
-            is the sentence a person needs before they look, and a page they have
-            to go and open is a page nobody opens (BUILD-1 §6). The QUEUE beneath
-            it is the Triage tab, because that is a screen's worth. */}
-        <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
-
-        <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
-        <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
+        <div className="flex flex-col gap-2">
+          <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
+          <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
+        </div>
 
         {facet === TRIAGE ? (
           <TriageQueue teamId={teamId} canTriage={can("help", "edit")} />
@@ -203,6 +200,8 @@ export function TicketsCollection({
             listKey={narrowed ? helpFacetKey(teamId, helpScope, facet) : helpKey(teamId, helpScope)}
             placeholder={t("Search tickets…")}
             noun="tickets"
+            sorts={translatedSorts("help", t)}
+            defaultSort={COLLECTION_SORTS.help.defaultSort}
             fetchPage={(query, cursor) => {
               // The search rides the SAME two narrowings the tab strip chose, so
               // "search my questions" means exactly that.
@@ -215,7 +214,9 @@ export function TicketsCollection({
                   query.q,
                   undefined,
                   f.helpType,
-                  f.status as HelpTicket["status"] | undefined
+                  f.status as HelpTicket["status"] | undefined,
+                  undefined,
+                  { sort: query.sort, dir: query.dir }
                 )
                 .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
             }}
@@ -253,6 +254,32 @@ export function TicketsCollection({
               )
             }}
           </PagedFind>
+        )}
+
+        {/* THE TWO PANELS THAT ARE NOT THE LIST, and they are UNDER it now.
+            WHOSE WEEK IT IS was written above the list because "it is the
+            sentence a person needs before they look, and a page they have to go
+            and open is a page nobody opens" (BUILD-1 §6) — the first half of
+            which is still true and the second half is what put it here rather
+            than on a screen of its own. WHERE THE WORK IS SITTING went above for
+            the same reason: the strip badges Ready, each kind and Closed and
+            says nothing about the four stages in between.
+
+            What neither argument answered is N2. Between the heading and the
+            first ticket a reader was crossing SIX blocks — a duty band about ONE
+            person, a stage chart about the whole pipeline, two tab strips, a
+            search bar and an action row — before reaching the thing the page is
+            named after. That is the "too much in one glance" complaint arriving
+            as a stack. The person came for the list, so the list comes first and
+            these two are a scroll away, which the owner explicitly asked people
+            to be happy to do. Nothing is hidden, nothing is conditional on who is
+            reading, and the Triage QUEUE is still its own tab because that is a
+            screen's worth. */}
+        {facet !== TRIAGE && (
+          <>
+            <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
+            <TicketStagesCard teamId={teamId} />
+          </>
         )}
       </div>
     </CountedAbove>
@@ -304,10 +331,10 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
   return (
     <ul className="divide-border divide-y">
       {view.waiting.map((w) => (
-        <li key={w.id} className="flex flex-wrap items-center gap-3 py-3">
+        <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
           <AlarmClock className="text-destructive size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-sm">
-            {[w.ref, w.description].filter(Boolean).join(" · ")}
+            {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
           </span>
           <span className="text-muted-foreground text-xs tabular-nums">
             {`${w.days} days · ${formatRelative(w.createdAt)}`}
@@ -318,7 +345,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
               size="sm"
               disabled={busy === w.id}
               onClick={() => void markRead(w.id)}
-              className="shrink-0 gap-1.5"
+              className="shrink-0 gap-1"
             >
               <MailOpen className="size-3.5" />
               {t("Mark it read")}

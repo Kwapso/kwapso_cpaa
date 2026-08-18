@@ -16,23 +16,22 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Check, ClipboardCheck, Pencil } from "lucide-react"
 
-import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
 import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
-import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
+import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -44,20 +43,16 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { cursorKey, recordTimeKey, storiesKey, totalKey } from "@/lib/live-resources"
+import { storiesKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import type { Story, WorkLog } from "@shared/types"
-import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useRecordCounts } from "@/lib/use-record-counts"
+import type { Story } from "@shared/types"
+import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-
-/** Whole seconds → the hours and minutes a person would say. */
-function spell(seconds: number): string {
-  const m = Math.round(seconds / 60)
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`
-}
+import { RichText } from "@shared/web/rich-text-view"
 
 export function StoryDetailScreen({
   teamId,
@@ -75,18 +70,15 @@ export function StoryDetailScreen({
   // knowledge base does for a source past its first page.
   const storyQ = useCached<Story | null>(`story:one:${storyId}`, () => contentApi.storyOne(storyId))
   const activity = useRecordActivity("stories", storyId)
-  // The time on THIS story. Keyed through recordTimeKey rather than the generic
-  // slice key, because that family is the one the live registry drops when any
-  // row of time moves (R15) — a stop pressed on the header bar has to land here.
-  const timeKey = recordTimeKey("stories", storyId)
-  const logsQ = useCached<WorkLog[]>(timeKey, () =>
-    contentApi.workLogs({ filter: { targetTable: "stories", targetId: storyId } }).then((r) => {
-      primeCache(totalKey("time-story", storyId), r.total)
-      primeCache(cursorKey(timeKey), r.nextCursor)
-      return r.logs
-    })
-  )
-  const timeTotal = useCachedValue<number>(totalKey("time-story", storyId))
+  // The exact number of entries on THIS story, for the tab badge (R16), fetched
+  // when the STORY opens rather than when the tab is clicked. It used to wait for
+  // the WorkLogsPanel below to mount, and a panel does not mount until its tab is
+  // active — so the badge was missing exactly when a reader needed it to decide
+  // whether the tab was worth opening (shared/record-counts.ts). One exported key
+  // function is still what keeps the panel's own refresh and this badge on the
+  // same string.
+  useRecordCounts("stories", storyId)
+  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("stories", storyId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
@@ -98,11 +90,6 @@ export function StoryDetailScreen({
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [reviewOpen, setReviewOpen] = React.useState(false)
-  // THE ROW OF TIME BEING CORRECTED. Held rather than routed through the URL,
-  // for the reason the Stories page's panel holds its own: a correction is a
-  // thing you do to a line you are looking at, and Back should close the form
-  // rather than walk you back through every line you opened.
-  const [editingLog, setEditingLog] = React.useState<WorkLog | null>(null)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/stories$/, "") }
@@ -112,6 +99,16 @@ export function StoryDetailScreen({
     invalidate(storiesKey(teamId))
     invalidate(`activity:record:stories:${storyId}`)
   }, [storyId, teamId])
+
+  // READ THIS STORY IN YOUR OWN LANGUAGE, if you ask. Everything on it somebody
+  // typed goes in one array, so one press is one call. A hook, so it sits above
+  // the three early returns below.
+  const translation = useHumanTranslation(teamId, [
+    storyQ.data?.title,
+    storyQ.data?.detail,
+    storyQ.data?.reviewNote,
+    storyQ.data?.closingNote,
+  ])
 
   /** Run a write, say plainly if it was refused, and re-read. */
   async function run(what: () => Promise<unknown>, done: string, fallback: string) {
@@ -125,25 +122,6 @@ export function StoryDetailScreen({
     } finally {
       setBusy(false)
     }
-  }
-
-  /** CORRECT A ROW OF TIME, on the record it was logged against. The Time tab
-   * listed the hours and offered nothing to do about a wrong one — so a mistyped
-   * figure could only be fixed from the Stories page, if you knew it was there.
-   * The door keeps the trail (who corrected what, and when). */
-  async function correctTime(values: TimeFormValues) {
-    if (!editingLog) return
-    await contentApi.updateWorkLog({
-      id: editingLog.id,
-      startedAt: values.startedAt,
-      endedAt: values.endedAt,
-      note: values.note,
-      kind: values.kind,
-      billable: values.billable,
-    })
-    invalidate(timeKey)
-    invalidate(`activity:record:stories:${storyId}`)
-    toast.success(t("Time corrected."))
   }
 
   async function save(values: StoryFormValues) {
@@ -193,15 +171,23 @@ export function StoryDetailScreen({
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story
     // with no sprint has no deadline to show, which is the honest answer.
     { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
-    { label: t("Detail"), value: story.detail || "—" },
+    // The three fields somebody TYPED — the detail, what was done, and what the
+    // client will be told — read through `of`, so the reader who pressed
+    // Translate sees them in their own language and nobody else's row changed.
+    // Then through RichText, because they are typed in an editor now: translate
+    // first, render second, and the sanitizer runs on what comes back.
+    {
+      label: t("Detail"),
+      value: story.detail ? <RichText html={translation.of(story.detail)} /> : "—",
+    },
     {
       label: t("Processes it changes"),
       value: story.changesNoStep
         ? "None"
         : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "—",
     },
-    { label: t("What was done"), value: story.reviewNote || "—" },
-    { label: t("What we'll tell them"), value: story.closingNote || "—" },
+    { label: t("What was done"), value: translation.of(story.reviewNote) || "—" },
+    { label: t("What we'll tell them"), value: translation.of(story.closingNote) || "—" },
     // The audit rows moved to the footer at the foot of the record (D7 /
     // CHECKLIST 11.3); the status is on the header band's own line.
   ]
@@ -251,7 +237,7 @@ export function StoryDetailScreen({
       mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
       // D4: the type word and the reference, above the title.
       eyebrow={[story.storyType || t("Story"), story.ref].filter(Boolean).join(" · ")}
-      title={story.title}
+      title={translation.of(story.title)}
       // D5: where it is, who has it, when it is due. Three facts, no more.
       status={[
         STORY_STATUS_LABEL[story.status],
@@ -278,7 +264,7 @@ export function StoryDetailScreen({
               and one already in review or done has been explained. The panel
               collects the words; the door refuses if a timer is still running. */}
           {canEdit && (story.status === "open" || story.status === "in_progress") && (
-            <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1.5">
+            <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1">
               <ClipboardCheck className="size-3.5" />
               {t("Ready for review")}
             </Button>
@@ -296,7 +282,7 @@ export function StoryDetailScreen({
                   "Couldn't close that story."
                 )
               }
-              className="gap-1.5"
+              className="gap-1"
             >
               <Check className="size-3.5" />
               {t("Done")}
@@ -358,70 +344,28 @@ export function StoryDetailScreen({
         renderPanel={(t) => {
           if (t.value === "time")
             return (
-              <div className="flex flex-col gap-3">
-                {logsQ.data === undefined ? (
-                  <Skeleton variant="list" lines={3} />
-                ) : logsQ.data.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No time logged against this yet.</p>
-                ) : (
-                  <ul className="flex flex-col gap-1.5">
-                    {logsQ.data.map((l) => (
-                      <li
-                        key={l.id}
-                        className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
-                          l.discarded ? "opacity-60" : ""
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {[l.userName, l.startedAt.slice(0, 10), l.kind, l.note]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                        <span className="text-muted-foreground text-xs">
-                          {l.endedAt ? spell(l.seconds) : "running"}
-                        </span>
-                        {l.discarded && (
-                          <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                            Discarded
-                          </Badge>
-                        )}
-                        {/* FIX A LINE. Only on time that has FINISHED and has
-                            not been binned: a running timer is corrected by
-                            stopping it (the control for that is on the header
-                            bar, on every screen), and a start time you can edit
-                            while the clock is still counting is two people
-                            writing the same number. */}
-                        {canEdit && l.endedAt && !l.discarded && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingLog(l)}
-                            className="shrink-0 gap-1.5"
-                          >
-                            <Pencil className="size-3.5" />
-                            Edit
-                          </Button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {/* R14: time is the fastest-growing row in the work engine, so the
-                    badge above counts rows this list has to be able to reach. */}
-                <LoadMore
-                  listKey={timeKey}
-                  label="Load more time"
-                  fetchPage={(c: string) =>
-                    contentApi
-                      .workLogs({ filter: { targetTable: "stories", targetId: storyId }, cursor: c })
-                      .then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
-                  }
-                />
-              </div>
+              <WorkLogsPanel
+                targetTable="stories"
+                targetId={storyId}
+                recordLabel={story.ref ? `${story.ref} · ${story.title}` : story.title}
+                canEdit={canEdit}
+                canLog={canLogTime}
+                onActivityChanged={() => invalidate(`activity:record:stories:${storyId}`)}
+              />
             )
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
-          return <OverviewList items={overviewItems} />
+          return (
+            <>
+              {/* Above the fields it acts on, and out of the header's one-primary
+                  -one-secondary-and-a-menu discipline — this is a thing somebody
+                  presses while reading and presses back a moment later. */}
+              <div className="flex justify-end">
+                <TranslateAction translation={translation} />
+              </div>
+              <OverviewList items={overviewItems} />
+            </>
+          )
         }}
       />
 
@@ -436,6 +380,7 @@ export function StoryDetailScreen({
       />
 
       <StoryFormDialog
+        teamId={teamId}
         open={editOpen}
         onOpenChange={setEditOpen}
         sprints={options.sprints}
@@ -469,13 +414,6 @@ export function StoryDetailScreen({
           reviewFileName: story.reviewFileName ?? "",
         }}
         onSubmit={sendToReview}
-      />
-      <TimeFormDialog
-        open={!!editingLog}
-        onOpenChange={(o) => !o && setEditingLog(null)}
-        draftKey={editingLog ? `work-log:edit:${editingLog.id}` : undefined}
-        initial={editingLog}
-        onSubmit={correctTime}
       />
     </RecordScreen>
   )

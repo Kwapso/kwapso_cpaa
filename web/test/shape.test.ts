@@ -38,6 +38,7 @@ const member: TeamMember = {
   roleTitle: "Admin",
   isYou: true,
   isAdmin: true,
+  isClient: false,
   joinedAt: "2026-06-13T10:00:00.000Z",
 }
 

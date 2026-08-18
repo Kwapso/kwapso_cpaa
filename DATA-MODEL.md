@@ -29,6 +29,7 @@ Nine and a half thousand words is too many to scroll, so: the two tiers, in orde
 | The customer spine | `accounts` + `account_links` + `portal_users` (+ `current_account_id`) |
 | The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
 | Process maps + the money | `apps` + `processes` + `process_versions` + `process_steps` + `process_comments` · `account_rates` + `internal_rates` |
+| What we hand over | `deliverables` |
 | The work engine | `stories` + `sprints` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
 | The agency's own housekeeping | `brand_assets` · `meeting_purposes` · `staff_profiles` · `staff_certificates` |
 | One person's own Google | `google_connections` + `google_sources` |
@@ -654,8 +655,16 @@ them. Four tables, one per job:
   Three families in one table, because a person edits them in one list: a `note`
   somebody typed here (the body IS the truth), a `file` somebody uploaded (THE
   FILE is the truth and the body is a READING of it), and a MIRROR of a row we
-  already own, `ticket` / `account` / `app` / `story` / `sprint`, where the row
-  is the truth and the sweep keeps the body in step. **`article` is a kind with no
+  already own — `ticket` / `account` / `contact` / `app` / `process` / `sprint` /
+  `story` / `meeting` / `todo` / `task`, where the row is the truth and the sweep
+  keeps the body in step. **Every table that can carry an account id is on that
+  list**, which is the point of it: a question about a client lands on whatever
+  the client's world is made of, and until 18 Aug 2026 six of those ten were
+  missing — most glaringly the process map, the record that says what we actually
+  DO for a client. A kind must also be named in `KNOWLEDGE_KINDS`
+  (`workers/content/src/lib/knowledge.ts`), or `toSource` coerces it to `note`
+  and every source of it lists and filters as one; `meeting` shipped a reader
+  before it was named there, and nothing about that was visible. **`article` is a kind with no
   mirror behind it any more, and deliberately kept:** the Learning module was
   purged on 17 Aug 2026 and its table went with it, but its 41 articles had
   already been indexed here, so the material outlived the module. Dropping the
@@ -702,6 +711,26 @@ them. Four tables, one per job:
   last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12). The
   cursor is what makes ingestion resumable, a tick that dies halfway costs the
   next one nothing but the rows it has not reached.
+
+  **The cursor carries the TEXT BUILDER that wrote it** (`v<n>|<sort>|<id>`).
+  The content hash answers "has this row changed?", which is a different question
+  from "has the way we WRITE this row changed?" — and the cursor makes the second
+  one fatal, because every row already behind it is invisible forever unless
+  somebody touches it. So improving what a kind SAYS reaches every future ticket
+  and not one existing one. A stored cursor whose version is not the kind's
+  current `textVersion` reads as null, the kind walks its table again, and the
+  hash then does its ordinary job. Bump the version when a reader's text changes;
+  `workers/content/test/knowledge-coverage.test.ts` pins a digest of every reader
+  (and of the helpers they share) to the number declared, so a change without a
+  bump turns the build red.
+
+  **A ROLLUP kind starts again when it catches up.** An account's source is built
+  from rows its own cursor cannot see — its apps, sprints, tickets, maps, people
+  — none of which moves `accounts.updated_at`. So `rollup: true` drops the
+  position at the end of the table and the next tick starts over, refreshing every
+  account's text on a rolling cycle. It is not `windowed`: a windowed kind
+  re-walks in the same tick and therefore never reports `caughtUp`, which is the
+  signal `scripts/knowledge-backfill.mjs` loops on.
 
 **Where the search lives, and why the tenancy argument survived the move.** The
 SEARCH is Cloudflare Vectorize, one account-wide index, with every team in its
@@ -916,6 +945,32 @@ can answer *"what did we agree in March"*.
   it in my calendar" twice must not make two entries, and the row is the only place
   that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing;
   Google holding two copies of one meeting is not the same kind of harmless).
+- **The `google_*` columns are a MIRROR of the diary entry** (team migration
+  `0035_calendar_depth_and_file_shares`): the join link, the organiser, the guest
+  list and what each person answered (`google_attendees_json`), whatever is
+  attached (`google_attachments_json`), the status, the zone, the repeat rule, and
+  `google_synced_at` saying when all of that was last true. They exist because the
+  alternative is that a meeting can only say who was in the room to the one person
+  whose connection pushed it, live, one call per meeting — a record of a
+  conversation with the conversation left out. **Nothing writes to Google through
+  them**; the four calendar doors do that against the live entry, so there is no
+  direction in which the mirror can disagree with Google and win.
+- **`from_calendar` decides what a re-sync may overwrite.** Two kinds of meeting
+  carry an event id and they are not the same record: one was typed here and
+  pushed out, the other was read IN off somebody's diary. Google owns the words of
+  a row it authored, kwapso owns the words of a row it authored, and `notes` is
+  never touched by any sync — it is the one column in this module that only a
+  person writes.
+- **`transcript_text` is what was SAID, kept here rather than fetched.** That is
+  what makes it readable by every colleague whose role can read meetings instead
+  of only by whoever holds the Drive connection — and it is what makes it
+  answerable **without a second ingestion path**: text in a column is swept by the
+  ordinary `meeting` ingest kind, on the cron, in the client's own compartment,
+  with no Google token in sight. It is cut to what one row may hold and
+  `transcript_note` says so when it was, the same rule (and the same words) a
+  knowledge file uses. `transcript_found_by` records which of the three hunts
+  found it — the calendar entry's own attachment, a shared Drive folder, or a
+  notice from Google in the mail — because the three do not prove the same thing.
 
 **Why it is its own permission module and not four more rights on `delivery`.**
 `meeting_purposes` is a TAXONOMY of why we meet, a settled list somebody curates
@@ -984,6 +1039,42 @@ account, because a country typed free into an address is a country spelled five
 ways by five people. Both are seeded in `DEFAULT_SELECTABLE` and backfilled for
 existing teams by the same migration; the hyphen is not carried across.
 
+### deliverables. KEEP (BUILT 2026-08-18, team migration `0036_deliverables`). WHAT WE HAND OVER
+
+One table, hanging off an **app**, and the whole of it is the owner's own
+sentence about what the word means: *"handover materials / handover docs / API
+documentation / loom or teller reviews / SOPs of how to use the app, etc."* So a
+deliverable is a piece of MATERIAL with a **kind**, a **title**, a **date** and
+something it points at. CHECKLIST 8.7 sat parked for weeks because nobody had
+said that; it is a module rather than a tab because a table, a permission row and
+a machine surface are what a shelf needs to exist at all.
+
+| Column | What it is |
+|---|---|
+| `app_id` | NOT NULL. The legacy app hung these off apps too (`glide/RECONCILIATION.md`: 8 rows, *Name, type, a content URL and a thumbnail*), and the reason is that file's own headline, the customer is the owner but the **app is the unit of work**. A handover doc with no system to hand over is not a record anybody could file. |
+| `account_id` | Denormalised from the app at creation and never edited, exactly as `processes` and its three children carry it, so the account fence rides ONE clause with no join. |
+| `title` · `kind` · `dated_on` | What the card shows: a name, the word in small caps, and the day. `kind` pick-or-creates into the **Deliverable kind** dropdown group (`shared/selectable-groups.ts`) — a vocabulary and not an enum, because the owner's list ends in "etc." `dated_on` is a calendar DAY through `optionalDate`. |
+| `url` | ONE column for TWO shapes: an object we host (a `/media/internal/…` URL the upload door minted) or a link we do not (a Loom recording, a Google Doc, an API reference). The same sentence `brand_assets.file_url` makes, for the reason `help_attachments` gives at length — "here is the thing I mean" is one act, and two columns would be two ways to be wrong about which is set. Everything stored goes through `safeExternalLink`. |
+| `image_url` | The picture on the card, when there is one. Separate from `url` because a Loom link carries no thumbnail of its own and a PDF is not its own preview. |
+
+**THE FENCE IS BUILT, AND SWITCHED OFF.** This is the one table in the app whose
+rows genuinely are the client's — the material is what we hand them — and it is
+still agency-only today: no door is on the portal gateway's surface, every one of
+the five opens with `refusePortalCaller` (R21), and nothing in `web-portal/`
+names the table or the paths, proved off disk by
+`workers/content/test/deliverables.test.ts`. Whether a client may see their own
+handover shelf is a product decision the owner has not made, and the base's rule
+is that an unmade decision is a closed door. `account_id` is what makes opening
+it later a door change rather than a data migration.
+
+**Its history gates on its own module** (`ACTIVITY_GATE_MAP.deliverables`), not on
+`processes`: "Ana handed over the Payroll API reference" names a deliverable, and
+a role that may open the app but not its shelf must not read that sentence out of
+the feed either (R18). The live ping carries the **app's** id rather than the
+deliverable's, the shape `account_rates` and `account_links` already have — a
+deliverable has no list and no screen of its own, so the app is the one row a
+listener can act on.
+
 ### google_connections + google_sources. KEEP (BUILT 2026-08-12, team migration `0019_google_connections`). ONE PERSON'S OWN GOOGLE
 
 Two tables, and the shape of the first one is the whole product decision: a
@@ -1022,13 +1113,21 @@ folder" about a folder full of things), the two token columns, `last_used_at`,
   (CONCURRENCY rule 2). Partial, so disconnecting and connecting again, the
   ordinary way somebody fixes a broken grant, is still allowed.
 
-**`google_sources`**, the Drive FOLDERS and Chat SPACES one person named. Drive
-is not "your Drive" and Chat is not "your Chat": both are reached only through
-rows here, so the unnamed rest is out of reach by construction rather than by a
-filter somebody has to remember to write. Gmail and Calendar have no rows here
-because there is nothing to name, mail is narrowed to a **known contact** (an
-address on one of the team's `accounts`) and the calendar is the person's own
-diary.
+**`google_sources`**, the Drive FOLDERS, the individual Drive FILES, and the Chat
+SPACES one person named. Drive is not "your Drive" and Chat is not "your Chat":
+both are reached only through rows here, so the unnamed rest is out of reach by
+construction rather than by a filter somebody has to remember to write. Gmail and
+Calendar have no rows here because there is nothing to name, mail is narrowed to
+a **known contact** (an address on one of the team's `accounts`) and the calendar
+is the person's own diary.
+
+- **`kind`** (`folder` / `file` / `space`, migration
+  `0035_calendar_depth_and_file_shares`) splits what used to be one word. Sharing
+  was folder-wise only, which meant sharing one contract meant sharing everything
+  filed beside it. The fence does not change shape — what is named is the only
+  thing readable — and a named file is exactly one file, ignored by the search
+  term because somebody who shared one document has already narrowed it as far as
+  narrowing goes.
 
 - **`shelf`** (`private` / `team`) is the answer to the question the design round
   said we must answer at the moment of sharing: who will be able to read this?

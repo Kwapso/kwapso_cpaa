@@ -30,10 +30,6 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
-  CalendarView,
-  defaultCalendarViewConfig,
-} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
-import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
@@ -41,7 +37,14 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
+// The picture comes from pulse.tsx, which holds the agency shell's ONE lazy
+// boundary onto the chart module — a second dynamic() here would be a second
+// loader for one library, and the shell is the chunk every page in the app pays
+// for. Nothing in this file may import the library's chart module directly; see
+// the header of pulse-charts.tsx for the 114 kB that costs.
+import { BandCard, SprintBurndownChart } from "@/components/pulse"
 import { CountedAbove } from "@/components/counted-tabs"
+import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import {
   SprintFormDialog,
@@ -50,7 +53,7 @@ import {
   type SprintFormValues,
   type SprintTypeOption,
 } from "@/components/sprint-form-dialog"
-import { sprintLine } from "@/components/work-panels"
+import { sprintLine, sprintLineInKindGroup } from "@/components/work-panels"
 import { content as contentApi } from "@/lib/api"
 import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -171,6 +174,29 @@ function endingBadge(s: Sprint, t: (english: string) => string): React.ReactNode
   return undefined
 }
 
+/** WHAT SITS AT THE END OF AN OVERVIEW ROW: how much of the sprint is done, and
+ * the badge if it has stopped.
+ *
+ * "3 of 11 done" used to be the fifth fact on the row's summary sentence, where
+ * it read as prose and had to be decoded a row at a time. It is a NUMBER, and T4
+ * says a number goes in the trailing slot in `tabular-nums` so a column of them
+ * lines up and can be compared without reading any of them. The two states are
+ * mutually exclusive with each other and nearly always absent, so on a running
+ * sprint this slot holds exactly one thing. */
+function progressTrailing(s: Sprint, t: (english: string) => string): React.ReactNode {
+  const badge = endingBadge(s, t)
+  const done = s.storyCount - s.openStoryCount
+  if (s.storyCount === 0) return badge
+  return (
+    <span className="flex items-center gap-2">
+      <span className="text-muted-foreground text-xs tabular-nums">
+        {done} {t("of")} {s.storyCount} {t("done")}
+      </span>
+      {badge}
+    </span>
+  )
+}
+
 /* --------------------------------- the rows -------------------------------- */
 
 /** One sprint, as a row. Everything a person would say about one out loud. */
@@ -268,28 +294,52 @@ export function SprintsScreen({
     ],
   }
 
-  // THE MONTH GRID — the library's own calendar-view, given the same rows. It is
-  // SINGLE-DATE: one `dateField`, one square, so it cannot draw the span between
-  // a sprint's start and its end. A sprint therefore sits on the day it STARTS,
-  // which is the date a team actually plans around; both dates are still on the
-  // row's own line everywhere else. A sprint nobody has given a start date is
-  // left off rather than parked on a day it has no claim to, and the kind
-  // colour-codes the entry — the one thing you can read from across a room.
-  const calendarRows = sprints
+  // THE CALENDAR — the host's own (components/record-calendar.tsx), given the
+  // same rows. It is SINGLE-DATE: one day, one square, so it cannot draw the span
+  // between a sprint's start and its end. A sprint therefore sits on the day it
+  // STARTS, which is the date a team actually plans around; both dates are still
+  // on the row's own line everywhere else, and on the agenda's second line here.
+  // A sprint nobody has given a start date is left off rather than parked on a
+  // day it has no claim to, and the kind colour-codes the entry — the one thing
+  // you can read from across a room.
+  //
+  // AND EVERY ONE OF THEM OPENS, by the same `open` intent the overview list
+  // below already fires: a calendar is a way IN to sprints, not a picture of them.
+  const calendarEntries: CalendarEntry[] = sprints
     .filter((s) => s.startsOn)
     .map((s) => ({
       id: s.id,
-      date: (s.startsOn as string).slice(0, 10),
+      day: (s.startsOn as string).slice(0, 10),
       title: s.ref ? `${s.ref} · ${s.name}` : s.name,
       accent: s.sprintType ?? "",
+      detail: sprintLine(s),
     }))
 
   // THE OVERVIEW — state first, kind second. Two levels because the two
   // questions a person opens this page with are "what is live?" and "what kind
   // of work are we selling?", and answering them in that order puts the running
   // blocks at the top of the screen every time.
+  // HOW FULL THE RUNNING BLOCKS ARE — a stacked bar per live sprint, done under
+  // open. Free: `storyCount` and `openStoryCount` are exact server counts already
+  // on every row (the collection is bounded and read whole), so this costs no
+  // request and no new door. It is the one thing the list underneath cannot show
+  // at a glance — "3 of 11 done" reads the same on a sprint that is nearly
+  // finished and one that has barely started, until you do the arithmetic on
+  // every line.
+  //
+  // ONLY THE RUNNING ONES, and only where there is work to show. A chart of
+  // wrapped sprints is history nobody is deciding anything from, and a row of
+  // empty columns is a picture of nothing.
+  const burndown = sprints
+    .filter((s) => sprintState(s, today) === "running" && s.storyCount > 0)
+    .map((s) => ({
+      label: s.ref ?? s.name,
+      done: s.storyCount - s.openStoryCount,
+      open: s.openStoryCount,
+    }))
+
   const overview = (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       {sprints.length === 0 && <p className="text-muted-foreground text-sm">{t("No sprints yet.")}</p>}
       {SPRINT_STATES.map((state) => {
         const inState = sprints.filter((s) => sprintState(s, today) === state)
@@ -300,7 +350,7 @@ export function SprintsScreen({
                 own. The collection's one number is on the strip above (R16). */}
             <h2 className="text-lg font-medium">{t(STATE_HEADING[state])}</h2>
             {groupByKind(inState, byKind, lang, t("No kind said")).map((group) => (
-              <div key={group.key} className="flex flex-col gap-1.5">
+              <div key={group.key} className="flex flex-col gap-2">
                 <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
                   {group.word}
                 </p>
@@ -310,8 +360,11 @@ export function SprintsScreen({
                     id: s.id,
                     leading: group.mark ? <KindMark mark={group.mark} /> : undefined,
                     title: s.ref ? `${s.ref} · ${s.name}` : s.name,
-                    subtitle: sprintLine(s),
-                    trailing: endingBadge(s, t),
+                    // The kind is the heading above; how much is done is the
+                    // number on the right. What is left is the three facts a
+                    // status line may carry (D5): whose, which app, and when.
+                    subtitle: sprintLineInKindGroup(s),
+                    trailing: progressTrailing(s, t),
                   }))}
                   onItemClick={(item) => onIntent({ kind: "open", module: "sprints", id: item.id })}
                 />
@@ -320,12 +373,24 @@ export function SprintsScreen({
           </section>
         )
       })}
+
+      {/* HOW FULL THE RUNNING BLOCKS ARE — UNDER the groups, not above them.
+          It was the first thing on the screen, which put a chart between the
+          heading and the first sprint and made this the fifth block a reader
+          crossed before reaching the list they came for (N2). It is a picture
+          OF the rows below it, so it reads perfectly well after them, and the
+          person who came to find a sprint finds one first. */}
+      {burndown.length > 0 && (
+        <BandCard title={t("Work inside the running sprints")}>
+          <SprintBurndownChart rows={burndown} doneLabel={t("Done")} openLabel={t("Still open")} />
+        </BandCard>
+      )}
     </div>
   )
 
   return (
     <CountedAbove active={badge !== ""}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         {/* R16: the strip below badges all three views, so the heading stands
             down through the arbitration context rather than saying the same
             number twice. */}
@@ -343,15 +408,10 @@ export function SprintsScreen({
           {view === "overview" ? (
             overview
           ) : view === "calendar" ? (
-            <CalendarView
-              data={calendarRows}
-              config={{
-                ...defaultCalendarViewConfig,
-                dateField: "date",
-                titleField: "title",
-                accentField: "accent",
-                weekStartsOn: "monday",
-              }}
+            <RecordCalendar
+              entries={calendarEntries}
+              onOpen={(id) => onIntent({ kind: "open", module: "sprints", id })}
+              emptyText={t("No sprints start this month.")}
             />
           ) : (
             // ALL SPRINTS — the engine's own flat list, with the search and the

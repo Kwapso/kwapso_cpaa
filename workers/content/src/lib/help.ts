@@ -32,6 +32,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_FACET_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
 // The reference number moved out to its own file the moment a second noun needed
 // one (a story, a task, a to-do, a sprint). One counter, one race guard, one
@@ -247,6 +248,25 @@ async function ticketOrThrow(
  * TOTAL, which is what the keyset cursor needs to page without repeating a row. */
 const TICKET_ORDER = "COALESCE(rank, id)"
 
+/** WHAT THE TICKET LIST MAY BE ORDERED BY (shared/workers/sorting.ts), with the
+ * drag-rank as the fallback so a screen that asks for nothing gets the order
+ * somebody arranged by hand — which is what the paragraph above is about.
+ *
+ * THIS DOOR IS ON THE PORTAL'S SURFACE, so the menu was read as an R21 question
+ * as well as a usability one: an ordering cannot show a client a row the fence
+ * excluded (the WHERE is untouched), but a position can make a hidden VALUE
+ * inferable, so every name here is a column that already rides a client's own
+ * ticket row. Their question, when they asked it, what kind it is, where it has
+ * got to. Nothing about who else asked and nothing about what it cost. */
+export const TICKET_SORTS: SortMenu<TicketRow> = {
+  rank: { expr: TICKET_ORDER, dir: "desc", key: (r) => r.rank ?? r.id },
+  created: { expr: "created_at", dir: "desc", key: (r) => r.created_at },
+  updated: { expr: "COALESCE(updated_at, created_at)", dir: "desc", key: (r) => r.updated_at ?? r.created_at },
+  status: { expr: "status", dir: "asc", key: (r) => r.status },
+  kind: { expr: "help_type", dir: "asc", key: (r) => r.help_type },
+  title: { expr: "description", dir: "asc", key: (r) => r.description },
+}
+
 /** Tickets for the team, newest-activity first. `scope: "mine"` returns only the
  * caller's own raised tickets (the My tab); "all" returns everyone's (All tab).
  * R14 GROWING collection: keyset-PAGED, not capped — tickets accumulate forever,
@@ -449,10 +469,13 @@ export async function listTickets(
   guard: MemberGuard,
   scope: AccountScope,
   filter: TicketFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<TicketRow> = resolveOrdering(TICKET_SORTS, "rank", undefined, undefined)
 ): Promise<Page<HelpTicket>> {
-  const pos = decodeCursor(cursor)
-  const after = keysetAfter(pos, TICKET_ORDER)
+  // The ORDER BY, the keyset predicate and the cursor's key come off ONE
+  // ordering, so the sort can never reach the rows and miss the cursor.
+  const pos = decodeCursor(cursor, ordering.sig)
+  const after = keysetAfter(pos, ordering.expr, ordering.dir)
   const where = ticketWhere(guard, scope, filter)
   const clauses = [...where.sql, ...(after.sql ? [after.sql] : [])]
   const params = [...where.params, ...after.params]
@@ -461,12 +484,12 @@ export async function listTickets(
     guard.databaseId,
     // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
     `SELECT ${TICKET_COLS} FROM help WHERE ${clauses.join(" AND ")}
-     ORDER BY ${TICKET_ORDER} DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
+     ${orderBy(ordering)} LIMIT ${PAGE_SIZE + 1}`,
     params
   )
   // The page's key is the SORT, and the sort is the rank — keyed off anything
   // else and page two starts in a different place from where page one stopped.
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.rank ?? r.id, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return { ...page, rows: page.rows.map((r) => toTicket(r, scope)) }
 }
 

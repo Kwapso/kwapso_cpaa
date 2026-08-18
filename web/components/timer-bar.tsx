@@ -103,7 +103,7 @@ export function TimerBar({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {running.map((t) => {
         // Elapsed at the moment the SERVER answered, plus the wall time since —
         // so a tab left open overnight is right, not an hour of re-renders out.
@@ -220,7 +220,7 @@ export function RecordTimerButton({
     <Button
       variant="outline"
       size="sm"
-      className="gap-1.5"
+      className="gap-1"
       disabled={busy || disabled}
       onClick={() => void toggle()}
     >

@@ -7,7 +7,7 @@ import { sqlString } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
-import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 
 // The module list itself lives in shared/team-modules.ts — data-ops builds the
 // import/export permission-matrix columns from the SAME list, so the matrix a
@@ -2362,6 +2362,189 @@ UPDATE selectable_data SET mark = '✨' WHERE type = 'Story type' AND value = 'F
 UPDATE selectable_data SET mark = '🔀' WHERE type = 'Story type' AND value = 'Change' AND mark IS NULL;
 `,
   },
+  {
+    // THE WHOLE CALENDAR ENTRY, NOT A LINK TO IT — and a Drive share that can be
+    // one FILE.
+    //
+    // ── WHY THE MIRROR COLUMNS ────────────────────────────────────────────────
+    // The owner: "All the other information, like location, stakeholders, or any
+    // other calendar data or metadata, should be pulled in and organised
+    // correctly." Until now a meeting kept two facts about its diary entry — the
+    // id and the link — and every other fact (who was invited, who accepted, who
+    // called it, where to join, what was attached) was reachable only by asking
+    // Google again, live, with the reader's own token.
+    //
+    // That is not a small inconvenience. It means the facts are unavailable to
+    // ANYBODY BUT THE PERSON WHOSE CONNECTION PUSHED THE MEETING, unreadable when
+    // Google is slow, and impossible to put in a list — fifty rows would be fifty
+    // calls. A meeting record that cannot say who was in the room is a record of
+    // a conversation with the conversation left out.
+    //
+    // THEY ARE A MIRROR AND THEY SAY SO. Every one is prefixed \`google_\`, and
+    // \`google_synced_at\` says when it was last true. Nothing in the app WRITES
+    // to Google through these columns — the four calendar doors do that, against
+    // the live entry — so there is no direction in which they can disagree with
+    // Google and win. If they are stale, the sweep is behind; the entry is right.
+    //
+    // TWO OF THEM ARE JSON, which this database already does in a dozen places
+    // (\`files_json\`, \`plan_json\`, \`tool_calls_json\`, \`preview_json\`) and for the
+    // same reason: a guest list is a LIST OF THE EVENT, not a table of its own.
+    // Nothing joins to it, nothing sorts by it, and nothing outside the meeting
+    // ever asks a question of it — an \`event_attendees\` table would be five
+    // hundred rows a week whose only reader is the row above them.
+    //
+    // ── \`from_calendar\`, AND WHY IT DECIDES WHAT A RE-SYNC MAY OVERWRITE ──────
+    // Two kinds of meeting carry a \`google_event_id\` and they are NOT the same
+    // record. One was typed in kwapso and pushed out; the other was read IN off
+    // somebody's diary. A re-sync that rewrote the title of both would quietly
+    // undo a person's own words the moment Google's copy differed — which it
+    // will, because the push writes "BERG-M0007 · Kickoff" and the diary says
+    // "Kickoff".
+    //
+    // So the flag records WHERE THE ROW CAME FROM, once, at insert. Google owns
+    // the words of a row it authored; kwapso owns the words of a row it authored;
+    // and the \`google_*\` mirror is refreshed on both, because those are Google's
+    // facts either way. \`notes\` is never touched by a sync at all — it is the one
+    // column in this module that only a person writes.
+    //
+    // ── AND A SHARE THAT IS ONE FILE ─────────────────────────────────────────
+    // \`google_sources.kind\` splits what was one word. The owner: "In Drive, why
+    // is it that it's only folder-wise? What if it had to be file-wise?" It did
+    // not have to — a folder was only ever the thing the form could spell, which
+    // made sharing one contract mean sharing everything filed beside it. The
+    // fence does not change shape: what is named is the only thing readable, and
+    // a named file is exactly one file.
+    version: "0035_calendar_depth_and_file_shares",
+    sql: `
+ALTER TABLE meetings ADD COLUMN google_join_url TEXT;
+ALTER TABLE meetings ADD COLUMN google_organizer TEXT;
+ALTER TABLE meetings ADD COLUMN google_attendees_json TEXT;
+ALTER TABLE meetings ADD COLUMN google_attachments_json TEXT;
+ALTER TABLE meetings ADD COLUMN google_status TEXT;
+ALTER TABLE meetings ADD COLUMN google_recurrence TEXT;
+ALTER TABLE meetings ADD COLUMN google_time_zone TEXT;
+ALTER TABLE meetings ADD COLUMN google_updated_at TEXT;
+ALTER TABLE meetings ADD COLUMN google_synced_at TEXT;
+ALTER TABLE meetings ADD COLUMN from_calendar INTEGER NOT NULL DEFAULT 0;
+
+-- WHAT WAS SAID, ON THE MEETING ITSELF.
+--
+-- The owner: "For older meetings, the call transcript should automatically be
+-- here." HERE is the word that decides these four columns. A transcript reachable
+-- only by whoever holds the Drive connection, only while Google answers, is not
+-- on the meeting — it is a link to somewhere else, and the reason this module
+-- exists at all is that \`agenda\` and \`notes\` had nowhere else to live either.
+--
+-- AND IT IS WHAT MAKES THE TRANSCRIPT ANSWERABLE WITHOUT A SECOND INGESTION
+-- PATH. The knowledge base sweeps rows of THIS database on a cron, as nobody in
+-- particular; everything Google is swept per person, with that person's token,
+-- only when they are here (lib/knowledge-google.ts's header says why that
+-- separation is load-bearing). Text sitting in a column is on the near side of
+-- that line: the ordinary \`meeting\` ingest kind reads it like any other row, in
+-- the client's own compartment, with no token and no special case.
+--
+-- \`transcript_text\` is CUT to what one row may hold and \`transcript_note\` says
+-- so when it was — the same rule and the same words a knowledge file uses
+-- (\`capToRow\`), because "never silently trimmed" is the promise, not "never
+-- trimmed".
+--
+-- \`transcript_found_by\` records WHICH of the three hunts found it — the event's
+-- own attachments, a shared Drive folder, or a Google notice in the mail. It is
+-- kept because the three are not equally trustworthy and a person asking "how do
+-- you know that is the transcript of THIS call" deserves an answer.
+ALTER TABLE meetings ADD COLUMN transcript_text TEXT;
+ALTER TABLE meetings ADD COLUMN transcript_note TEXT;
+ALTER TABLE meetings ADD COLUMN transcript_url TEXT;
+ALTER TABLE meetings ADD COLUMN transcript_found_by TEXT;
+
+-- EXISTING ROWS THAT CAME OUT OF A CALENDAR. Before this migration the only
+-- writer of \`recurring_event_id\` was the series sweep, so a row carrying one is
+-- a row Google authored — which makes this back-fill a reading of history rather
+-- than a guess about it. A meeting pushed OUT of kwapso never had one.
+UPDATE meetings SET from_calendar = 1 WHERE recurring_event_id IS NOT NULL;
+
+-- The backward sweep asks "which of these event ids do I already have?" over a
+-- window of a few dozen. The unique index on \`google_event_id\` already serves
+-- that lookup; this one is for the OTHER question the sweep asks — which rows
+-- Google owns the words of — on a table where nearly every row answers no.
+CREATE INDEX idx_meetings_from_calendar ON meetings (from_calendar) WHERE from_calendar = 1;
+
+-- A FOLDER, A FILE, OR A SPACE. Defaulting to 'folder' keeps every Drive row
+-- exactly what it already was; the one UPDATE names the Chat rows for what they
+-- have always been, so no row is left describing itself wrongly.
+ALTER TABLE google_sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'folder';
+UPDATE google_sources SET kind = 'space' WHERE service = 'chat';
+`,
+  },
+  {
+    // WHAT WE HAND OVER (CHECKLIST 8.7). A DELIVERABLE is a piece of material we
+    // hand over on an app: a handover doc, an API reference, a recorded
+    // walkthrough, an SOP. The owner's own list, and the reason the item sat
+    // parked for weeks is that nobody had said what the word meant.
+    //
+    // IT BELONGS TO AN APP, NOT TO AN ACCOUNT, and \`app_id\` is NOT NULL because
+    // of it. The legacy app hung these off the app too (glide/RECONCILIATION.md:
+    // 8 rows, "Name, type, a content URL and a thumbnail"), and the reason is the
+    // one that whole file opens with: the customer is the owner, the APP is the
+    // unit of work. A handover doc with no system to hand over is not a record
+    // anybody could file.
+    //
+    // \`account_id\` IS DENORMALISED FROM THE APP, exactly as \`processes\`,
+    // \`process_versions\` and \`process_steps\` carry it: written once from the
+    // app at creation, never edited, so the account fence rides ONE clause with
+    // no join the day a client is ever shown these. It is the fence built now,
+    // switched off now (R21: every door on this module refuses a portal caller);
+    // what it is NOT is a column somebody has to back-fill later under pressure.
+    //
+    // \`url\` IS ONE COLUMN FOR TWO SHAPES — an object we host (a
+    // /media/internal/… URL the upload door mints) or a link we do not (a Loom
+    // recording, a Google Doc, an API reference). The same sentence
+    // \`brand_assets.file_url\` makes, and for the same reason help_attachments
+    // gives at length: "here is the thing I mean" is ONE act, and two columns
+    // would be two lists, two counts and two ways to be wrong about which is set.
+    //
+    // \`image_url\` is the picture on the card. Separate from \`url\` because a
+    // Loom link has no thumbnail of its own and a PDF is not its own preview —
+    // "some have a picture worth showing" is a fact about the deliverable, not
+    // about its material.
+    //
+    // \`kind\` is the word in small caps on the card (VIDEO, SOP). A dropdown
+    // vocabulary rather than an enum, like every other word this app lets a team
+    // choose: the five below are the starting set, and a team that hands over
+    // something we have not thought of adds it on its own Dropdown values screen.
+    //
+    // \`dated_on\` is a calendar DAY, written YYYY-MM-DD through \`optionalDate\` —
+    // nobody hands a deck over at 14:32:07.
+    version: "0036_deliverables",
+    sql: `
+CREATE TABLE deliverables (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  account_id TEXT REFERENCES accounts (id),
+  title TEXT NOT NULL,
+  kind TEXT,
+  dated_on TEXT,
+  url TEXT,
+  image_url TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- The one question this table is ever asked: what has been handed over on this
+-- app, newest first. The date leads the index because it leads the order.
+CREATE INDEX idx_deliverables_app ON deliverables (app_id, dated_on);
+CREATE INDEX idx_deliverables_account ON deliverables (account_id);
+
+-- ONE STATEMENT PER VALUE, generated from the shared list — D1's compound-SELECT
+-- ceiling is FIVE terms, which 0018 learned the hard way. Guarded by WHERE NOT
+-- EXISTS so a team that already types one of these words keeps its own row.
+${DELIVERABLE_KINDS.map(
+  (v) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.deliverableKind)}, ${sqlString(v)}, 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = ${sqlString(SELECTABLE_GROUPS.deliverableKind)} AND s.value = ${sqlString(v)});`
+).join("\n")}
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -2477,6 +2660,11 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // implies is not here, because a dropdown row has nowhere to put it — it
   // lives beside the vocabulary in shared/app-stages.ts.
   ...APP_STAGES.map((s) => ({ type: SELECTABLE_GROUPS.appStage, value: s.name, mark: s.mark })),
+  // WHAT KIND OF THING WE HANDED OVER — the five words a deliverable's card
+  // shows in small caps. Same shape and same reason as the stages above: a
+  // newborn team and a team upgraded by migration 0036 offer the same starting
+  // set, and either can add a sixth on its own Dropdown values screen.
+  ...DELIVERABLE_KINDS.map((v) => ({ type: SELECTABLE_GROUPS.deliverableKind, value: v })),
 ]
 
 /**

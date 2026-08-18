@@ -47,10 +47,12 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** Whole cents → what a person would say. The FORMATTING is the shared seam
  * (shared/web/money.ts) now that the two rate cards render prices of their own;
@@ -77,7 +79,12 @@ export function SprintDetailScreen({
   // the list holds — opening one costs no round-trip.
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
   const activity = useRecordActivity("sprints", sprintId)
-  const storiesTotal = useCachedValue<number>(totalKey("stories-sprint", sprintId))
+  // THE BADGE, BEFORE THE CLICK — the work inside this block, counted when the
+  // sprint opens rather than when the tab is opened; the rows stay lazy.
+  useRecordCounts("sprints", sprintId)
+  // `null` is the third answer beside a number and an absence: the role holds no
+  // `work:read` (R18), and it renders as nothing exactly as a zero does.
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-sprint", sprintId))
   // The team's own sprint-type vocabulary, for the mark and the standard length
   // the Kind row shows. Cache-first: the form beside it reads the same key.
   const sprintTypes = useSprintTypes(teamId)
@@ -139,7 +146,7 @@ export function SprintDetailScreen({
     { label: t("Kind"), value: kindLine },
     { label: t("Client"), value: sprint.accountName || "Ours, no client" },
     { label: t("App"), value: sprint.appName || "—" },
-    { label: t("What it's for"), value: sprint.goal || "—" },
+    { label: t("What it's for"), value: sprint.goal ? <RichText html={sprint.goal} /> : "—" },
     {
       label: t("Runs"),
       value:
@@ -207,7 +214,7 @@ export function SprintDetailScreen({
       actions={
         canEdit ? (
           <>
-            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1.5">
+            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1">
               {busy ? (
                 <Spinner />
               ) : sprint.completedAt ? (
@@ -245,14 +252,21 @@ export function SprintDetailScreen({
               </button>
             )}
           </p>
-          {canEdit && !sprint.completedAt && (
-            <p className="text-muted-foreground text-sm">
-              {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
-            </p>
-          )}
         </>
       }
     >
+      {/* WHAT COMPLETING IT WILL DO — a C8 warning band UNDER the header, which
+          is where this book already says a warning band goes, rather than a
+          third paragraph inside the header itself. The header's job is who and
+          what; a consequence of pressing a button is a different question, and
+          two questions on one band is N4's fault. The cross-links stay in the
+          header, because they ARE who and what. */}
+      {canEdit && !sprint.completedAt && (
+        <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-sm">
+          {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
+        </p>
+      )}
+
       <TabsView
         className={STICKY_TABS}
         config={tabsConfig}
@@ -286,6 +300,7 @@ export function SprintDetailScreen({
       />
 
       <StoryFormDialog
+        teamId={teamId}
         open={storyOpen}
         onOpenChange={setStoryOpen}
         sprints={options.sprints}

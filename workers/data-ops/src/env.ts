@@ -35,6 +35,13 @@ export type Env = {
   /** Reasoning effort for the Claude path: low | medium | high | xhigh | max.
    *  Defaults to "low" (cheap). Raise it when more capability is worth the cost. */
   AGENT_EFFORT?: string
+  /** The prompt cache on the Claude path: "off" | "5m" | "1h". Unset (or anything
+   *  unrecognised) means "5m" — the provider's own default TTL, caching ON. It
+   *  marks the stable prefix (tool definitions + system prompt) as cacheable; it
+   *  changes no bytes the model reads, so it is a price knob, never a behaviour
+   *  one. "1h" writes at a higher premium and is the better setting when turns
+   *  arrive more than five minutes apart. */
+  AGENT_PROMPT_CACHE?: string
   /** Daily free agent turns per team; defaults to FREE_DAILY. Set very high to
    *  effectively remove the cap. */
   AGENT_FREE_DAILY?: string

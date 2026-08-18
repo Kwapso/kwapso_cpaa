@@ -33,6 +33,7 @@ import { getAccountRow, pricesVisibleFor } from "../lib/accounts"
 import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
+import { resolveOrdering } from "@shared/workers/sorting"
 import {
   addProcessComment,
   addStep,
@@ -45,6 +46,7 @@ import {
   listProcessComments,
   listProcesses,
   listSavings,
+  PROCESS_SORTS,
   removeStep,
   setAppActive,
   setAppStaff,
@@ -263,6 +265,15 @@ export async function getProcesses(request: Request, env: Env): Promise<Response
   const url = new URL(request.url)
   const page = await listProcesses(cfg, guard, scope, {
     ...processQuery(url),
+    // WHAT ORDER — asked of the door, because the list PAGES (R14). Sorting the
+    // loaded page would order the newest fifty maps and say nothing about the
+    // rest, under a badge counting all of them.
+    ordering: resolveOrdering(
+      PROCESS_SORTS,
+      "created",
+      queryText(url.searchParams.get("sort"), "Sort"),
+      queryText(url.searchParams.get("dir"), "Direction")
+    ),
     // Capped like every other query parameter — an opaque cursor is ~70 chars, so
     // a megabyte of it is a bad request, not an atob + JSON.parse of a megabyte.
     cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
@@ -301,6 +312,11 @@ export async function postCreateProcess(request: Request, env: Env): Promise<Res
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     baselineLabel: optionalText(body.baselineLabel, "Baseline name", TEXT_LIMITS.short),
+    // WHO DOES THIS WORK (8.13), on the way IN. The edit door has taken it
+    // since the role rate card shipped and this one did not, so the answer a
+    // person typed into "Who does it" on the New process form was thrown away
+    // and every map started unpriced.
+    roleName: optionalText(body.roleName, "Who does it", TEXT_LIMITS.short),
   })
   await publishChange(env, guard.teamId, "processes", id, "add")
   return json({ id })

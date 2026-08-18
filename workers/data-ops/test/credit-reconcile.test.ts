@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 
-const credits = readFileSync(join(__dirname, "..", "src", "lib", "credits.ts"), "utf8")
+const credits = readFileSync(join(__dirname, "..", "..", "..", "shared", "workers", "credits.ts"), "utf8")
 const agent = readFileSync(join(__dirname, "..", "src", "lib", "agent.ts"), "utf8")
 
 const confirmBody = (() => {

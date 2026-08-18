@@ -30,16 +30,18 @@ import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/know
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
-import { safeHref } from "@/lib/rich-text"
+import { safeHref } from "@shared/web/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 export function KnowledgeDetailScreen({
   teamId,
@@ -90,6 +92,13 @@ export function KnowledgeDetailScreen({
   const [editingOpen, setEditingOpen] = React.useState(false)
   const [busyActive, setBusyActive] = React.useState(false)
 
+  // READ THE MATERIAL IN YOUR OWN LANGUAGE, if you ask. A source is a document
+  // somebody wrote — a contract, a transcript, a page of house rules — so it is
+  // the same line every other record is on: never translated on a read, once on
+  // a press, and never written back. The words the assistant searches stay the
+  // words that were filed.
+  const translation = useHumanTranslation(teamId, [item?.body])
+
   function patchLists(next: KnowledgeSource | null) {
     if (!next) return
     primeCache(`knowledge:one:${sourceId}`, next)
@@ -121,10 +130,10 @@ export function KnowledgeDetailScreen({
       const { source } = await content.setKnowledgeActive(sourceId, activeNext)
       patchLists(source)
       toast.success(
-        activeNext ? "The assistant can use this again." : "The assistant will no longer use this."
+        activeNext ? t("The assistant can use this again.") : t("The assistant will no longer use this.")
       )
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the source.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the source."))
     } finally {
       setBusyActive(false)
     }
@@ -209,8 +218,8 @@ export function KnowledgeDetailScreen({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <span className="truncate">{item.title}</span>
@@ -239,7 +248,7 @@ export function KnowledgeDetailScreen({
             variant="outline"
             size="sm"
             onClick={() => setEditingOpen(true)}
-            className="shrink-0 gap-1.5"
+            className="shrink-0 gap-1"
           >
             <Pencil className="size-3.5" />
             {t("Edit")}
@@ -251,59 +260,84 @@ export function KnowledgeDetailScreen({
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "overview")
+        renderPanel={(panel) => {
+          if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (t.value === "activity")
+          if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
           return (
             <div className="flex flex-col gap-6">
-              {mirrored && (
-                <p className="text-muted-foreground text-sm">
-                  Kept in step with the record it came from, its words change when that record does.
-                </p>
-              )}
-              {/* THE FILE THIS WAS READ FROM, and — when there was nothing to
-                  read — the sentence saying so. It goes ABOVE the words rather
-                  than below them, because it is the thing that tells a reader
-                  what they are looking at: words a colleague typed, or words a
-                  converter produced from a document they can open and check. */}
-              {item.fileUrl && (
-                <div className="flex flex-col gap-2">
-                  <a
-                    // Through the seam like every other URL on a screen, even
-                    // though this one is a path THIS app minted (/media/internal/…)
-                    // rather than anything a person typed. A URL nobody validated
-                    // because "it can't be dangerous" is how the next one gets in.
-                    href={safeHref(item.fileUrl)}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="bg-card flex w-fit max-w-full items-center gap-2 rounded-lg border p-2 text-sm"
-                  >
-                    <Paperclip className="text-muted-foreground size-4 shrink-0" />
-                    <span className="min-w-0 truncate">{item.fileName ?? "Open the file"}</span>
-                  </a>
+              {/* WHERE THESE WORDS CAME FROM — ONE BLOCK, not three.
+                  A mirrored note, a file link, a note about a file we could not
+                  read and a note about material too long to draw were four
+                  separate blocks stacked between the tab strip and the words,
+                  each with `gap-6` around it. That is four things to cross
+                  before reaching the thing the screen exists to show, on a
+                  screen whose whole job is "what does it actually know?" (N2
+                  allows three blocks; this was five).
+
+                  Nothing is hidden and no sentence is softened — least of all
+                  the one about a file we could not read, which is the one that
+                  must never be missed. They are simply all the same KIND of
+                  statement (this is where the material comes from and how
+                  complete it is), so they sit together at `gap-1`, which is what
+                  N7 says the gap between parts of one thing means. The eye reads
+                  one provenance note and then the material. */}
+              {(mirrored || item.fileUrl || item.bodyTruncated) && (
+                <div className="text-muted-foreground flex flex-col gap-1 text-sm">
+                  {item.fileUrl && (
+                    <a
+                      // Through the seam like every other URL on a screen, even
+                      // though this one is a path THIS app minted (/media/internal/…)
+                      // rather than anything a person typed. A URL nobody validated
+                      // because "it can't be dangerous" is how the next one gets in.
+                      href={safeHref(item.fileUrl)}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-primary flex w-fit max-w-full items-center gap-2 underline-offset-2 hover:underline"
+                    >
+                      <Paperclip className="size-4 shrink-0" />
+                      <span className="min-w-0 truncate">{item.fileName ?? t("Open the file")}</span>
+                    </a>
+                  )}
                   {item.fileNote && (
                     // Never hidden, never softened. A file we could not read is
                     // kept on purpose, and the one thing that must not happen is
                     // a reader assuming the assistant can answer from it.
-                    <p className="text-muted-foreground text-sm">{item.fileNote}</p>
+                    <p>{item.fileNote}</p>
+                  )}
+                  {mirrored && (
+                    <p>
+                      {t("Kept in step with the record it came from, its words change when that record does.")}
+                    </p>
+                  )}
+                  {item.bodyTruncated && (
+                    <p>
+                      {t("Showing the first part of")}{" "}
+                      {Math.round(item.bodyBytes / 1000).toLocaleString()}{" "}
+                      {t("KB of material. Every word of it is searchable, this is the screen being kind to itself.")}
+                    </p>
                   )}
                 </div>
               )}
-              {item.bodyTruncated ? (
-                <p className="text-muted-foreground text-sm">
-                  Showing the first part of {Math.round(item.bodyBytes / 1000).toLocaleString()} KB of
-                  material. Every word of it is searchable, this is the screen being kind to itself.
-                </p>
-              ) : null}
               {item.body ? (
-                // The material itself, as text. Deliberately NOT rendered as
-                // rich text: what is shown here has to be what the assistant
-                // reads, and the assistant reads the plain words.
-                <p className="text-sm whitespace-pre-wrap">{item.body}</p>
+                <>
+                  {/* Above the material, because the material is what it acts
+                      on — and it changes nothing that is filed: the assistant
+                      still searches the words that were written. */}
+                  <div className="flex justify-end">
+                    <TranslateAction translation={translation} />
+                  </div>
+                  {/* The material itself. An article somebody wrote here is
+                      HTML, a mirrored document is plain words or markdown, and
+                      RichText picks the pipeline. Rendering it FORMATTED does
+                      not desync it from the assistant: the assistant is handed
+                      plainText of this same body, so both read the same words
+                      and only the layout differs. */}
+                  <RichText html={translation.of(item.body)} />
+                </>
               ) : (
-                <p className="text-muted-foreground text-sm">No text yet.</p>
+                <p className="text-muted-foreground text-sm">{t("No text yet.")}</p>
               )}
               {item.sourceUrl &&
                 (link ? (
@@ -313,11 +347,11 @@ export function KnowledgeDetailScreen({
                     rel="noreferrer noopener"
                     className="text-primary inline-flex w-fit items-center gap-1 text-sm underline-offset-2 hover:underline"
                   >
-                    Open where this came from
+                    {t("Open where this came from")}
                   </a>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    The link on this source isn&apos;t a web address we can open safely.
+                    {t("The link on this source isn't a web address we can open safely.")}
                   </p>
                 ))}
               {canRemove && (
@@ -328,21 +362,21 @@ export function KnowledgeDetailScreen({
                       size="sm"
                       onClick={() => void setActive(false)}
                       disabled={busyActive}
-                      className="text-destructive hover:text-destructive gap-1.5"
+                      className="text-destructive hover:text-destructive gap-1"
                     >
                       {busyActive ? <Spinner /> : <Power className="size-3.5" />}
-                      Stop using this
+                      {t("Stop using this")}
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => void setActive(true)} disabled={busyActive} className="gap-1.5">
+                    <Button size="sm" onClick={() => void setActive(true)} disabled={busyActive} className="gap-1">
                       {busyActive ? <Spinner /> : <Power className="size-3.5" />}
-                      Use this again
+                      {t("Use this again")}
                     </Button>
                   )}
                   <span className="text-muted-foreground text-xs">
                     {item.active
-                      ? "The assistant stops reading it. Nothing is deleted, and the sweep won't put it back."
-                      : "Nothing was deleted, this puts it back in front of the assistant."}
+                      ? t("The assistant stops reading it. Nothing is deleted, and the sweep won't put it back.")
+                      : t("Nothing was deleted, this puts it back in front of the assistant.")}
                   </span>
                 </div>
               )}
@@ -355,6 +389,7 @@ export function KnowledgeDetailScreen({
         open={editingOpen}
         onOpenChange={setEditingOpen}
         draftKey={`knowledge:edit:${sourceId}`}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
         // Only the apps this caller may OPEN (8.11) — the door refuses any other,
         // so offering one would be offering a refusal.

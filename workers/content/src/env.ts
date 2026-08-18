@@ -35,8 +35,14 @@ export type Env = {
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */
   CF_ACCOUNT_ID: string
-  /** The app's public origin — the only way an email's logo can be absolute. */
+  /** The AGENCY app's public origin — an email's logo, and the link back to a
+   * record for a STAFF recipient. */
   PUBLIC_APP_URL?: string
+  /** The CLIENT PORTAL's public origin. The other half of the same job: this
+   * worker's emails reach clients as well as staff, and the same ticket has a
+   * different address on each front door (R21 · R29). Unset means no button,
+   * never an agency link in a client's inbox. */
+  PUBLIC_PORTAL_URL?: string
 
   // Secrets (wrangler secret put):
   /** API token scoped to Account → D1 → Edit. Without it, team databases
@@ -46,10 +52,22 @@ export type Env = {
    * alongside workers_dev:false). */
   INTERNAL_KEY?: string
 
-  /** Cloudflare Workers AI — the knowledge base's embedding model, and nothing
-   * else on this worker. No external key, no external socket: it is a binding,
-   * so R11's timeout law is satisfied the way a service binding satisfies it. */
+  /** Cloudflare Workers AI — the knowledge base's embedding model, AND the cheap
+   * model that WRITES the answer a question found (R23). No external key, no
+   * external socket: it is a binding, so R11's timeout law is satisfied the way a
+   * service binding satisfies it. */
   AI: Ai
+  /** Which cheap model writes that answer (shared/workers/model-text.ts). Same var
+   * name as data-ops carries, so one setting moves the whole cheap path. */
+  WORKERS_AI_MODEL?: string
+  /** THE TEAM'S DAILY AI ALLOWANCE — the SAME two knobs data-ops carries, with the
+   * same values, because there is one allowance and two workers that spend it now.
+   * A cap set on one and not the other is one allowance enforced at two different
+   * heights, so credits-invariant.test.ts compares the two wrangler configs. */
+  AGENT_FREE_DAILY?: string
+  /** Testing environments only: stop ENFORCING the allowance, keep measuring it.
+   * Never set on production — the same invariant test fails the build if it is. */
+  AGENT_NO_DAILY_CAP?: string
   /** THE KNOWLEDGE BASE'S VECTOR INDEX — one index for the whole account, with
    * every team in its own NAMESPACE (a hard partition applied before the search)
    * and every chunk carrying the labels the router narrows by. The whole

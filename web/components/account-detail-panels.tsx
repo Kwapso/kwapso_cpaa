@@ -19,7 +19,7 @@
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Ban, KeyRound, Power, UserMinus } from "lucide-react"
+import { Ban, KeyRound, Link2, Power, UserMinus } from "lucide-react"
 
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
@@ -47,7 +47,7 @@ export type PanelActions = {
 function Row({ active, children }: { active: boolean; children: React.ReactNode }) {
   return (
     <li
-      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+      className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
         active ? "" : "opacity-60"
       }`}
     >
@@ -56,38 +56,67 @@ function Row({ active, children }: { active: boolean; children: React.ReactNode 
   )
 }
 
-/** The people attached to this account. Adding one is a link, never a new
- * person; removing one says they are no longer a contact HERE — they keep
+/** The people attached to this account.
+ *
+ * TWO WAYS IN, AND BOTH EARN THEIR PLACE. New contact makes a person who did not
+ * exist a minute ago; Add contact says someone we already hold is a contact here
+ * too — which is the case a parent pointer cannot express, and the reason we do
+ * not make somebody type a second Marta because the search missed the first.
+ *
+ * Until 18 Aug 2026 only the second existed, and the only way to make a person
+ * at all was the Type selector on the account form. Taking that selector away
+ * without this button would have left the search here pointed at a set nobody
+ * could ever add to.
+ *
+ * Removing a contact says they are no longer a contact HERE — they keep
  * everything else they are attached to. */
 export function ContactsPanel({
   accountName,
   links,
   canCreate,
+  canCreatePerson,
   canArchive,
   actions: { busy, ask, act },
   onAdd,
+  onNew,
   onOpen,
 }: {
   accountName: string
   links: AccountDetail["links"]
+  /** may LINK a person already on the books — `contacts:create` on its own. */
   canCreate: boolean
+  /** may make a NEW one, which writes an accounts row as well as a link, so it
+   * needs `accounts:create` too. The door decides either way (R10); this only
+   * decides whether we offer a button that would come back a 403. */
+  canCreatePerson: boolean
   canArchive: boolean
   actions: PanelActions
   onAdd: () => void
+  onNew: () => void
   onOpen: (accountId: string) => void
 }) {
   const t = useT()
   return (
-    <div className="flex flex-col gap-3">
-      {canCreate && (
+    <div className="flex flex-col gap-4">
+      {(canCreate || canCreatePerson) && (
         <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Add contact")} onClick={onAdd} />
+          {/* Distinct glyphs on purpose: two icon-only buttons that both showed a
+              plus would be one button drawn twice. Create keeps the Plus
+              (UI-CONVENTIONS §4); linking gets the link. */}
+          {canCreate && (
+            <AddButton
+              label={t("Add contact")}
+              onClick={onAdd}
+              icon={<Link2 className="size-4" />}
+            />
+          )}
+          {canCreatePerson && <AddButton label={t("New contact")} onClick={onNew} />}
         </div>
       )}
       {links.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No contacts yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="divide-border divide-y rounded-xl border">
           {links.map((l) => (
             <Row key={l.id} active={l.active}>
               <button
@@ -125,7 +154,7 @@ export function ContactsPanel({
                           ),
                       })
                     }
-                    className="text-destructive hover:text-destructive gap-1.5"
+                    className="text-destructive hover:text-destructive gap-1"
                     aria-label={`Remove ${l.personName}`}
                   >
                     <UserMinus className="size-3.5" />
@@ -142,7 +171,7 @@ export function ContactsPanel({
                         "Couldn't add that contact back."
                       )
                     }
-                    className="gap-1.5"
+                    className="gap-1"
                     aria-label={`Add ${l.personName} back`}
                   >
                     <Power className="size-3.5" /> {t("Add back")}
@@ -174,10 +203,10 @@ export function PortalAccessPanel({
 }) {
   const t = useT()
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {canGrant && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onGrant} className="gap-1.5">
+          <Button size="sm" onClick={onGrant} className="gap-1">
             <KeyRound className="size-4" />
             {t("Give access")}
           </Button>
@@ -188,7 +217,7 @@ export function PortalAccessPanel({
           {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="divide-border divide-y rounded-xl border">
           {portalUsers.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">
@@ -218,7 +247,7 @@ export function PortalAccessPanel({
                           ),
                       })
                     }
-                    className="text-destructive hover:text-destructive gap-1.5"
+                    className="text-destructive hover:text-destructive gap-1"
                     aria-label={t("Take access away")}
                   >
                     <Ban className="size-3.5" />
@@ -235,7 +264,7 @@ export function PortalAccessPanel({
                         "Couldn't change that login."
                       )
                     }
-                    className="gap-1.5"
+                    className="gap-1"
                     aria-label={t("Switch access back on")}
                   >
                     <Power className="size-3.5" /> {t("Switch back on")}

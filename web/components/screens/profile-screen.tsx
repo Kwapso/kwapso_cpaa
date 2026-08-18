@@ -55,8 +55,8 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
-        <section className="animate-rise flex flex-col gap-3">
+      <div className="flex w-full flex-col gap-10">
+        <section className="animate-rise flex flex-col gap-4">
           <List
             surface="none"
             className="rounded-xl border"
@@ -100,7 +100,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
          * its own control shows the flags rather than hiding them. */}
         <LanguageSection save={(lang) => auth.setLanguage(lang)} />
 
-        <section className="animate-rise flex flex-col gap-3">
+        <section className="animate-rise flex flex-col gap-4">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             {t("Account activity")}
           </h2>

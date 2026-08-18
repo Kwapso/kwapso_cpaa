@@ -253,22 +253,77 @@ function readAnswer(text, batch, language) {
   const end = raw.lastIndexOf("}")
   if (start === -1 || end <= start) return {}
 
+  const body = raw.slice(start, end + 1)
   let parsed
   try {
-    parsed = JSON.parse(raw.slice(start, end + 1))
+    parsed = JSON.parse(body)
   } catch {
-    console.warn(`  ${language.code}: unparseable answer for a batch of ${batch.length}`)
-    return {}
+    // ONE BAD VALUE MUST NOT COST THE SEVEN BESIDE IT. Asking for German back,
+    // the model translated `Choose “Add to Home Screen”` as `Wählen Sie „Zum
+    // Startbildschirm hinzufügen"` — it opened with the German low quote and
+    // closed with an ordinary one it forgot to escape, which is not JSON. The
+    // whole object then failed to parse and SEVEN correct translations beside it
+    // were thrown away with it, on every run, for ever, because the next run
+    // asks the same question and gets the same answer.
+    //
+    // So a failed parse falls back to reading the object PAIR BY PAIR. It is the
+    // same posture, applied at a finer grain: a pair that cannot be read is
+    // still dropped, and it is now the only thing dropped.
+    parsed = salvagePairs(body)
+    if (Object.keys(parsed).length === 0) {
+      console.warn(`  ${language.code}: unparseable answer for a batch of ${batch.length}`)
+      return {}
+    }
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
 
-  const asked = new Set(batch)
+  // THE KEY, MATCHED THROUGH THE ONE THING A MODEL CHANGES WITHOUT BEING ASKED.
+  // A string carrying typographic quotes — `Choose “Add to Home Screen”` — comes
+  // back with ORDINARY ones, every time, in every language. That is the model
+  // tidying the typography, which is a different act from inventing a key, and
+  // treating it as one cost four strings × twenty-eight languages: they were
+  // dropped silently as "not asked about", reported as missing, and re-sent on
+  // every subsequent run to be dropped again.
+  //
+  // So the lookup folds the quote FAMILIES and nothing else. The value is still
+  // held to every rule in `acceptable`, and a key that is genuinely not one of
+  // ours still matches nothing.
+  const asked = new Map(batch.map((s) => [fold(s), s]))
   const out = {}
   for (const [english, translated] of Object.entries(parsed)) {
-    if (!asked.has(english)) continue // invented a key — drop it
-    if (acceptable(english, translated)) out[english] = translated.trim()
+    const key = asked.get(fold(english)) // not one of ours → undefined → dropped
+    if (key === undefined) continue
+    if (acceptable(key, translated)) out[key] = translated.trim()
   }
   return out
+}
+
+/** Every `"key": "value"` a broken object still holds, read one pair at a time.
+ *
+ * Deliberately NOT a JSON repairer: it does not balance braces, close strings or
+ * guess at what was meant. It walks the text for pairs whose two halves are each
+ * a complete, correctly escaped JSON string, and hands back only those. A pair
+ * whose value ran off the end of its quotes matches nothing and is simply not
+ * there — which is what "still missing" has always meant here. */
+function salvagePairs(body) {
+  const out = {}
+  const PAIR = /"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"/g
+  for (const m of body.matchAll(PAIR)) {
+    try {
+      out[JSON.parse(`"${m[1]}"`)] = JSON.parse(`"${m[2]}"`)
+    } catch {
+      // A half we cannot read is a half we do not use.
+    }
+  }
+  return out
+}
+
+/** Curly quotes → straight ones, for COMPARING two spellings of one string. Never
+ * for storing: the catalogue's key stays exactly the sentence the app says. */
+function fold(text) {
+  return text
+    .replace(/[“”„‟″]/g, '"')
+    .replace(/[‘’‚‛′]/g, "'")
 }
 
 /** Run `jobs` with a fixed number in flight. Fixed rather than unbounded so a
@@ -387,6 +442,28 @@ if (!apiKey) {
 
 const written = Object.fromEntries(targets.map((l) => [l.code, 0]))
 
+/** SAVE WHAT HAS BEEN BOUGHT, WHILE IT IS BEING BOUGHT.
+ *
+ * A full run is twenty-six thousand strings and the better part of an hour, and
+ * the file is the only record of it — everything held in `catalogue` is gone the
+ * instant the process is. Writing only between languages meant a laptop that
+ * slept, a network that dropped or a Ctrl-C lost up to a language's worth of
+ * work that had already been PAID for, and the re-run pays for it a second time.
+ *
+ * So the checkpoint rides every BATCH, throttled to at most one write every ten
+ * seconds: the file is a megabyte and six hundred batches of un-throttled
+ * rewriting is half a gigabyte of pointless IO, while ten seconds is at most one
+ * batch of loss. Time-based rather than count-based because the batches finish
+ * in a pool, not in order. */
+const CHECKPOINT_MS = 10_000
+let lastWrite = 0
+function checkpoint(force = false) {
+  const now = Date.now()
+  if (!force && now - lastWrite < CHECKPOINT_MS) return
+  lastWrite = now
+  writeFileSync(OUT, render(catalogue, languages, Object.keys(seed).length))
+}
+
 for (const { language, missing } of gaps) {
   if (missing.length === 0) continue
   const batches = []
@@ -401,15 +478,16 @@ for (const { language, missing } of gaps) {
         written[language.code]++
       }
       process.stdout.write(".")
+      checkpoint()
     }),
     CONCURRENCY
   )
 
   console.log(` ${written[language.code]}/${missing.length}`)
-  // Written after EVERY language, not once at the end: a run that dies on
-  // language nineteen keeps eighteen languages' work, and a re-run picks up
-  // exactly where it stopped.
-  writeFileSync(OUT, render(catalogue, languages, Object.keys(seed).length))
+  // And unconditionally after EVERY language, not once at the end: a run that
+  // dies on language nineteen keeps eighteen languages' work, and a re-run picks
+  // up exactly where it stopped.
+  checkpoint(true)
 }
 
 const done = Object.values(written).reduce((a, b) => a + b, 0)

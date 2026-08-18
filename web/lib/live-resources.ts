@@ -14,7 +14,8 @@
 
 import { content as contentApi, tenancy } from "@/lib/api"
 import { TASK_VIEWS, type HelpTicket, type TaskViewName } from "@shared/types"
-import { primeCache, readCache } from "@shared/web/store"
+import { RECORD_CHILDREN } from "@shared/record-counts"
+import { cachedKeys, primeCache, readCache } from "@shared/web/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
 export function totalKey(prefix: string, teamId: string): string {
@@ -122,13 +123,6 @@ export const listFetch = {
       primeCache(`help-by-status:${teamId}`, r.byStatus)
       return r.tickets
     }),
-  helpMine: (teamId: string) =>
-    contentApi.help("mine").then((r) => {
-      primeCache(totalKey("help", teamId), r.total)
-      primeCache(totalKey("help-mine", teamId), r.mineTotal)
-      primeCache(cursorKey(helpKey(teamId, "mine")), r.nextCursor)
-      return r.tickets
-    }),
   // PUT AWAY, AND FINDABLE. The archived view is its own paged read, and it has
   // to exist: archive shipped as a door with no button, and giving it a button
   // without giving the put-away pile a screen would only move the dead end one
@@ -152,7 +146,7 @@ export const listFetch = {
     const f = helpFacetFilter(facet)
     return contentApi
       .help(
-        scope === "mine" ? "mine" : "all",
+        "all",
         null,
         scope === "archived" ? "archived" : "live",
         undefined,
@@ -325,10 +319,83 @@ export function meetingsKey(teamId: string): string {
   return `meetings:${teamId}`
 }
 
+/** WHICH OF ONE MEETING'S GUESTS WE KNOW — its own key because it is its own
+ * read: who was invited is on the row, and who they are TO US is a question with
+ * a different lifetime (a contact added next week should light up on a meeting
+ * held last week). */
+export function meetingPeopleKey(id: string): string {
+  return `meeting:people:${id}`
+}
+
+/** ONE MEETING'S TRANSCRIPT — its own key because it is its own read, and that
+ * is a size decision: a page of the diary is fifty meetings and a transcript is
+ * up to a megabyte. */
+export function meetingTranscriptKey(id: string): string {
+  return `meeting:transcript:${id}`
+}
+
 /** The triage strip: whose week it is, and the requests nobody has read. One
  * key, because the screen asks them as one question. */
 export function triageKey(teamId: string): string {
   return `triage:${teamId}`
+}
+
+/** THE PULSE — Home's big numbers and its two charts, in one cache entry.
+ *
+ * ONE KEY FOR ALL THREE SECTIONS, because it is one round trip and one answer:
+ * the door hands back tickets, work and meetings together, and splitting them
+ * into three keys would be three cache entries able to hold three different
+ * moments of the same week.
+ *
+ * It is a DERIVED cache, so it is dropped and re-read rather than patched —
+ * there is no row in it to patch. Every collection it counts names this key in
+ * its `deps` below, which is the seam the savings drill-down already uses to
+ * stay live (see `apps`): the row-level patch keeps the LIST honest, and the
+ * coarse drop keeps the NUMBER computed off it honest. It costs one small read
+ * when a ticket moves, and only when a screen is actually showing it — an
+ * invalidated key nobody is subscribed to fetches nothing at all. */
+export function insightsKey(teamId: string): string {
+  return `insights:${teamId}`
+}
+
+/** THE BADGES ON ONE RECORD'S TABS — how many apps, sprints, to-dos, tickets,
+ * meetings or files hang off it, fetched when the record OPENS rather than when
+ * a tab is clicked (shared/record-counts.ts says why, and which).
+ *
+ * Its own cache key, and not merely the sidecars it primes, because the LIVE
+ * layer has to be able to NAME something: a count fetched once and never re-read
+ * would replace "blank until you click" with "stale for ever", which is worse
+ * because it looks right. Dropping this key re-reads every one of that record's
+ * badges in one round trip — the same shape the pulse above already has. */
+export function recordCountsKey(table: string, id: string): string {
+  return `counts:record:${table}:${id}`
+}
+
+/** THE PREFIX over that family, so the listener below and the key above cannot
+ * drift apart. */
+const RECORD_COUNTS_PREFIX = "counts:record:"
+
+/** WHICH LOADED RECORDS' BADGES THIS RESOURCE MOVES (R15).
+ *
+ * A ping carries the CHILD row's id — a new sprint, a withdrawn to-do — and the
+ * record it hangs off is on the row, which the listener has not read and may
+ * never read. So the parent cannot be derived from the ping; it can only be
+ * found by looking at which record screens are open. `cachedKeys` answers that,
+ * and the registry answers "does this record's badge count that resource?", so
+ * a story landing drops the counts of the app, sprint and ticket screens on
+ * display and leaves a client's record — which badges no stories — alone.
+ *
+ * DERIVED, never hand-listed: a new child collection in RECORD_CHILDREN is live
+ * the day it is added, which is R8's sentence about badges applied to the layer
+ * that keeps them true. Cache-first, so this is normally nothing at all — a
+ * record nobody has open has no entry to drop. */
+function recordCountDeps(resource: string): string[] {
+  return cachedKeys(RECORD_COUNTS_PREFIX).filter((key) => {
+    // `counts:record:<table>:<id>` — the table is the one segment we need, and
+    // an id may itself contain nothing that breaks this, since it is a ULID.
+    const table = key.slice(RECORD_COUNTS_PREFIX.length).split(":")[0]
+    return (RECORD_CHILDREN[table] ?? []).some((child) => child.resource === resource)
+  })
 }
 
 export function runningTimersKey(teamId: string): string {
@@ -352,12 +419,33 @@ export const TIME_SLICE_PREFIX = "time-of:"
 export function recordTimeKey(targetTable: string, targetId: string): string {
   return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}`
 }
+/** THE NUMBERS ABOVE THAT SAME LIST — the aggregate the Work logs tab draws.
+ *
+ * Deliberately INSIDE the same prefix. It is a second read of the same question,
+ * so it goes stale on exactly the same events, and putting it in the family means
+ * the family drop above already covers it — no second listener, no second thing
+ * to remember. A key outside the prefix would be the original bug wearing a new
+ * hat: a stopped timer would update the rows and leave the total above them
+ * reading the number from before. */
+export function recordTimeSummaryKey(targetTable: string, targetId: string): string {
+  return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}:summary`
+}
 /** The agency-internal collections' cache keys. Named functions rather than
  * inline templates for the same reason the accounts and ticket keys are: the
  * live registry, the screen read and the count sidecar all have to say the same
  * string, and three places typing it is three places to mistype it. */
 export function brandAssetsKey(teamId: string): string {
   return `brand_assets:${teamId}`
+}
+/** WHAT WE HANDED OVER, ON ONE APP. Its rows live ONLY in a per-app slice,
+ * because a deliverable is never read anywhere but the app it belongs to —
+ * spelled the way `sliceKey` spells every nested collection (`<kind>-of:<id>`),
+ * but written HERE rather than at the call site for the reason the accounts and
+ * ticket keys are: the live registry, the screen read and the count sidecar all
+ * have to say the same string, and three places typing it is three places to
+ * mistype it. */
+export function deliverablesKey(appId: string): string {
+  return `deliverables-app-of:${appId}`
 }
 export function purposesKey(teamId: string): string {
   return `purposes:${teamId}`
@@ -466,7 +554,6 @@ export function knowledgeKey(teamId: string): string {
  * once a list is paged, filtering the loaded page by raiser would show "my
  * tickets in the newest 50" under a badge counting all of them (R16). */
 export function helpKey(teamId: string, scope: HelpScope): string {
-  if (scope === "mine") return `help-mine:${teamId}`
   if (scope === "archived") return `help-archived:${teamId}`
   return `help:${teamId}`
 }
@@ -474,7 +561,20 @@ export function helpKey(teamId: string, scope: HelpScope): string {
 /** Which pile of tickets a screen is showing. Two of these are a raiser filter
  * (`mine` / `all`) and one is a VIEW (`archived`), and they are one type because
  * a screen shows exactly one of the three at a time — the strip is one strip. */
-export type HelpScope = "mine" | "all" | "archived"
+/** Which pile of tickets the agency's Tickets screen shows.
+ *
+ * "MINE" WENT ON 18 AUG 2026, at the owner's word: "there's no such thing as my
+ * tickets.. that tab does not make sense". In an agency nobody on staff HAS a
+ * ticket — a client raises it and staff answer it through a story. The tab had
+ * already been redefined once (CHECKLIST 2.3, from "tickets I typed" to "tickets
+ * on the apps I am staffed to") because the first meaning was wrong; the owner's
+ * ruling is that the question itself is the wrong one.
+ *
+ * THE DOOR KEEPS `scope=mine`, and deliberately: the CLIENT PORTAL asks it for
+ * "what I raised", which is the one place the question does mean something — a
+ * contact really did raise those, and without it their list would be every
+ * ticket their company ever sent. So `mineClause` in workers/content stays. */
+export type HelpScope = "all" | "archived"
 
 /** THE SECOND STRIP (CHECKLIST 5.1): sub-tabs by TYPE beneath All / My /
  * Archived, plus the two stage tabs and the triage queue.
@@ -614,7 +714,19 @@ export const TEAM_RESOURCES: Record<
     // A status change / edit / reply / stakeholder-add on a ticket also refreshes
     // its Activity tab + Stakeholders tab. The My list is a SERVER-scoped page, so
     // it can't be row-patched from here — drop it and it reloads page one.
-    deps: (t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`, `help-mine:${t}`],
+    // …and the PULSE, whose open-ticket number and stage chart are counted off
+    // this collection. A derived cache has no row to patch, so it is dropped and
+    // re-read — and only actually re-read when a screen is showing it.
+    // …and the TAB BADGES of any record counting tickets — an app's Tickets tab,
+    // a contact's — which are now answered when the record opens rather than
+    // when the tab is clicked, so nothing else would ever re-read them (R15).
+    deps: (t, id) => [
+      `activity:record:help:${id}`,
+      `help-stakeholders:${id}`,
+      `help-mine:${t}`,
+      insightsKey(t),
+      ...recordCountDeps("help"),
+    ],
     // …and every per-account slice of the ticket list — a contact's Tickets tab
     // is one of those, and a slice nobody drops is a tab that goes stale the
     // moment somebody else raises a ticket.
@@ -630,7 +742,14 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.processRow(id),
     fetchList: (t) => listFetch.processes(t),
-    deps: (t, id) => [processKey(id), processCommentsKey(id), `activity:record:processes:${id}`, valueKey(t)],
+    deps: (t, id) => [
+      processKey(id),
+      processCommentsKey(id),
+      `activity:record:processes:${id}`,
+      valueKey(t),
+      // …and the Process maps badge on whichever app screen is open (R15).
+      ...recordCountDeps("processes"),
+    ],
     // …and any OLDER version somebody has open. A cut is a `processes` ping, and
     // it is the one event that changes what an old version IS — the version that
     // was current a moment ago is now one of these. The ping names the map, not
@@ -658,7 +777,13 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.storyOne(id),
     fetchList: (t) => listFetch.stories(t),
-    deps: (t, id) => [`activity:record:stories:${id}`, sprintsKey(t)],
+    // …and the Stories badge on whichever app, sprint or ticket is open (R15).
+    deps: (t, id) => [
+      `activity:record:stories:${id}`,
+      sprintsKey(t),
+      insightsKey(t),
+      ...recordCountDeps("stories"),
+    ],
   },
   // A sprint has a list of its own, and its rows carry counts of the stories
   // inside it — so a sprint ping patches the sprint row and leaves the backlog
@@ -668,7 +793,8 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.sprintOne(id),
     fetchList: (t) => listFetch.sprints(t),
-    deps: (_t, id) => [`activity:record:sprints:${id}`],
+    // …and the Sprints badge on whichever client or app record is open (R15).
+    deps: (_t, id) => [`activity:record:sprints:${id}`, ...recordCountDeps("sprints")],
   },
   // TIME — row-level live, and the one resource whose ping most often lands on
   // the person who caused it: the header timer is on every screen, so starting
@@ -680,7 +806,18 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.workLogOne(id),
     fetchList: (t) => listFetch.workLogs(t),
-    deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
+    deps: (t, id) => [
+      runningTimersKey(t),
+      storiesKey(t),
+      `activity:record:work_logs:${id}`,
+      // …and the hours-per-week chart, which is a SUM over exactly these rows.
+      insightsKey(t),
+      // …and the Time BADGE on whichever story, ticket, task or meeting is open
+      // (R15). The rows below it are dropped by the slice prefix; the number
+      // above it is a different cache key, and a count fetched once and never
+      // re-read is worse than a blank one because it looks right.
+      ...recordCountDeps("work_logs"),
+    ],
     // …and the Time tab on whichever record this row was logged against, which
     // the ping cannot name (recordTimeKey above says why it is a family drop).
     slicePrefix: TIME_SLICE_PREFIX,
@@ -694,7 +831,9 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.todoOne(id),
     fetchList: (t) => listFetch.todos(t),
-    deps: (_t, id) => [`activity:record:todos:${id}`],
+    // …and the To-dos badge on whichever client's record is open (R15) — the one
+    // of these a CLIENT can move, from their own portal, while we are looking.
+    deps: (_t, id) => [`activity:record:todos:${id}`, ...recordCountDeps("todos")],
   },
   // TASKS — our own admin, agency-side only. The row-level patch lands on the
   // OPEN list; the OTHER FIVE views are dropped instead, because a task that has
@@ -710,6 +849,7 @@ export const TEAM_RESOURCES: Record<
     deps: (t, id) => [
       ...TASK_VIEWS.filter((v) => v !== "open").map((v) => tasksKey(t, v)),
       `activity:record:tasks:${id}`,
+      insightsKey(t),
     ],
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
@@ -721,7 +861,27 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.meetingOne(id),
     fetchList: (t) => listFetch.meetings(t),
-    deps: (_t, id) => [`activity:record:meetings:${id}`],
+    // THE THREE READS A MEETING'S DETAIL SCREEN MAKES BESIDE THE ROW. Its
+    // activity feed, who on the invitation we know, and what was said. All three
+    // hang off the meeting rather than being fetched with it — a page of the
+    // diary is fifty meetings and a transcript is up to a megabyte — so a ping
+    // about this row has to drop them too, or a re-synced guest list would sit
+    // stale behind a record that had visibly just changed (R15).
+    //
+    // …and the team's own pulse, which counts THIS WEEK'S meetings: a diary
+    // entry that appears or is cancelled moves a number on Home, and a stale
+    // headline beside a list that just changed is the same fault one line up.
+    //
+    // …and the Meetings badge on whichever app or contact record is open, for
+    // the same reason one line up: the badge is answered when the record opens,
+    // so nothing else would ever re-read it (R15).
+    deps: (t, id) => [
+      ...recordCountDeps("meetings"),
+      `activity:record:meetings:${id}`,
+      meetingPeopleKey(id),
+      meetingTranscriptKey(id),
+      insightsKey(t),
+    ],
     // THE PER-OWNER SLICES OF THE DIARY — a contact's Meetings tab
     // (`meetings-account-of:`) and an app's (`meetings-app-of:`). One prefix
     // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and
@@ -770,12 +930,32 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.staffCertificates(t),
     deps: (_t, id) => [`activity:record:staff_certificates:${id}`],
   },
+  // WHAT WE HANDED OVER — and the ping carries the APP it sits on, not the
+  // deliverable's own id. The same shape `account_rates`, `account_links` and
+  // `portal_users` already have, for the same reason: a deliverable has no list
+  // and no screen of its own, it is only ever read on the app it belongs to, so
+  // the APP is the one row a listener can act on. A ping naming the deliverable
+  // would name a row nothing holds, and the app it hangs off is on that row —
+  // which the listener has not read and never will.
+  deliverables: {
+    key: (t) => appsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.apps().then((r) => r.apps.find((a) => a.id === id) ?? null),
+    fetchList: (t) => listFetch.apps(t),
+    // The shelf itself, and the badge above it. Both are named exactly, because
+    // the ping said which app.
+    deps: (_t, appId) => [deliverablesKey(appId), ...recordCountDeps("deliverables")],
+  },
   account_rates: {
     key: (t) => accountsKey(t),
     idField: "id",
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
-    deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id)],
+    // The ping carries the ACCOUNT, so the record's own counts key is nameable
+    // directly — but it goes through the same derivation as everything else, so
+    // there is one answer to "which badges does this resource move" rather than
+    // one general one and one special case (R15).
+    deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id), ...recordCountDeps("account_rates")],
   },
   // APPS — row-level live now that they have a list and a record screen of their
   // own. Like the staff profiles above, an app has no by-id read door (it is
@@ -789,7 +969,14 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.apps().then((r) => r.apps.find((a) => a.id === id) ?? null),
     fetchList: (t) => listFetch.apps(t),
-    deps: (t, id) => [valueKey(t), sprintsKey(t), storiesKey(t), `activity:record:apps:${id}`],
+    // …and the Apps badge on whichever client's record is open (R15).
+    deps: (t, id) => [
+      valueKey(t),
+      sprintsKey(t),
+      storiesKey(t),
+      `activity:record:apps:${id}`,
+      ...recordCountDeps("apps"),
+    ],
   },
 }
 
@@ -821,7 +1008,13 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // writes a file of stories, and a file writes many rows with no one row to
   // patch. So the backlog is dropped and re-read, and the sprint list with it,
   // because a sprint row carries the counts of the stories inside it.
-  work: (t) => [storiesKey(t), sprintsKey(t)],
+  // …and the pulse with them: a file of stories moves the backlog number Home
+  // shows, and an import is the one write that moves it by hundreds at once.
+  // …and the tab badges of any record open at the time. An import is the one
+  // write that moves those by hundreds at once, and it is also the one that
+  // carries no row id — so the per-row `deps` path below never runs for it, and
+  // this is the only place the badges hear about it (R15).
+  work: (t) => [storiesKey(t), sprintsKey(t), insightsKey(t), ...recordCountDeps("stories")],
   // THE IMPORT'S OWN PINGS. The import engine publishes each TargetDef's MODULE
   // key (never a row id — a batch touches many rows and no one row is the
   // change), so one module name reaches the live layer that no single table

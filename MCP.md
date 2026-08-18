@@ -129,7 +129,7 @@ agent_confirm, plan_import) use the team's AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read**, 57 tools, grouped the way the app groups them:
+- **Read**, 58 tools, grouped the way the app groups them:
   - identity and rights, `whoami`, `my_permissions`, `get_team`
   - people and access, `list_members`, `list_roles`, `list_invites`,
     `list_portal_access`
@@ -138,11 +138,13 @@ Today it covers:
   - learning, `list_learning`, `list_learning_progress`
   - tickets, `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`
   - the work engine, `list_stories`, `list_sprints`, `list_todos`, `list_tasks`,
-    `get_triage`, `list_work_logs`, `list_running_timers`
+    `get_triage`, `list_work_logs`, `list_running_timers`, `get_team_pulse`
   - meetings, `list_meetings`
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_value`, `list_account_rates`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_value`
+  - what we hand over on a system, `list_deliverables` (`appId` names the app
+    whose handover shelf you want; internal, a client login reaches no door on it)
   - the knowledge base, `ask_knowledge`, `list_knowledge_sources`,
     `get_knowledge_status`
   - the agency's own housekeeping, `list_marketing_posts`, `list_brand_assets`,
@@ -178,16 +180,26 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **218 doors, 178 with a tool, 40 with a written reason**, the
+  red build. Today: **231 doors, 185 with a tool, 46 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
   buffered door plus a streamed twin: the buffered half cannot be called because a
   base64 document will not fit in a tool argument, and the streamed half cannot be
   called because a JSON-RPC request has no body to stream into. Same conclusion,
-  two different reasons, both written down, the seven
-  Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 178, **149 are on THIS surface** and 29 are the in-app assistant's
+  two different reasons, both written down, plus the ONE streamed door with no
+  buffered twin (the bytes behind a deliverable, written after that pair stopped
+  being worth shipping) which is the second of those two reasons on its own, the seven
+  Google doors that are a person's own decision, the timesheet correction, the two doors
+  that spend the team's AI allowance outside a chat turn (translating a ticket's
+  title, and translating a screen's human-typed text for the reader looking at
+  it), one
+  invite's audit trail, the cross-module activity feed, and the two
+  record-counts doors, one per worker, which bundle a record's child totals so a
+  SCREEN can badge its tabs in one round trip: every number in that bundle is
+  already machine-readable, exactly and with narrowing those doors do not take,
+  through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 185, **156 are on THIS surface** and 29 are the in-app assistant's
   alone, the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -351,9 +363,29 @@ Today it covers:
     the door, and one call ticks the meeting held AND writes a row of time for each
     of OUR OWN people who was in the room — never the client's, because a client's
     hour is not our cost. It is idempotent, so a second read does nothing.
-    `sync_calendar_series` brings the caller's REPEATING calendar entries in: the
-    next four weeks become real records, and the instances beyond that come back
-    read-only. One-off entries are never imported.
+    The hunt itself is three, in an order of proof, the file Google attached to the
+    calendar entry, then a document in a shared Drive folder, then a notice from
+    Google in the caller's own mail, and `foundBy` says which one found it.
+    `get_meeting_transcript` and `get_meeting_people` are the two reads beside it,
+    both on `meetings:read`: the WORDS of a call, kept on the record so any
+    colleague who may read meetings can read them, and which of the addresses on
+    the invitation are our own members or contacts on our accounts.
+    `sync_calendar_series` brings the caller's calendar and the diary into step
+    over a window reaching a fortnight back and four weeks forward: repeating
+    entries become real records, every meeting in the window has its Google facts
+    refreshed, an entry called off in Google is cancelled here, and the instances
+    beyond the horizon come back read-only. One-off entries are never imported,
+    though a one-off already in the diary is kept up to date like any other. The
+    backward half is why a transcript that lands an hour after a call is ever
+    found.
+  - what we hand over, `create_deliverable`, `update_deliverable`,
+    `set_deliverable_active` (`deliverables:*`). A deliverable is one piece of
+    material on an app — a handover doc, an API reference, a recorded
+    walkthrough, an SOP — so `appId` rides on all three, and the ACCOUNT it was
+    built for is copied off that app rather than sent. Its own module and not
+    `processes`: opening an app and publishing against it are two grants. The
+    BYTES are a screen action, as with every other upload here; `url` carries a
+    link a machine already has, which is what most deliverables are.
   - the agency's own housekeeping, `create_marketing_post`, `update_marketing_post`,
     `set_marketing_post_active` (`marketing:*`); `create_brand_asset`,
     `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);
@@ -573,15 +605,27 @@ pay Anthropic, they're hitting our endpoints.
 |---|---|---|
 | `agent_chat`, `agent_confirm` | Yes, one assistant turn each | The **team's AI quota** (free per day + purchased credits) AND needs the **AI-agent right** |
 | `plan_import` | Yes, one assistant unit per plan | The team's AI quota |
+| `ask_knowledge` **with `compose`** | Yes, one unit per question | The team's AI quota AND needs the **AI-agent create right** |
 | everything else | No |, |
 
-**Where the knowledge tools fall.** `ask_knowledge` is a READ and sits on the free
-side of that table: it spends ONE embedding of the question, a rounding error beside
-an assistant turn, and no model writes a word. `sync_knowledge` spends one embedding
-per CHANGED chunk and nothing at all for a row whose text has not moved, so filling the
-base for the first time over an agency's entire history measured at roughly a cent, and
-the steady state at about nothing. `agent_chat` and `agent_confirm` remain the only
-tools here that draw a whole assistant turn.
+**Where the knowledge tools fall, and the one line in the table that has two sides.**
+`ask_knowledge` is a READ and it is free *as you will normally call it*: finding the
+material spends ONE embedding of the question, a rounding error beside an assistant
+turn, and nothing writes a word. Set `compose` and the app additionally writes the
+answer out of those passages on a cheap model and returns it as `answer` — one unit
+of the team's quota, one model call, gated on the same **AI-agent create right** as
+`agent_chat`, so a token without the assistant gets the passages and spends nothing,
+exactly as it did before the flag existed.
+
+**Leave `compose` off unless you have nothing that can write.** An assistant calling
+this composes its own reply from the passages — that is what Law R23 is for — so
+asking the app to write one as well pays for the same answer twice. The flag exists
+for a caller that has no model of its own; kwapso's own Knowledge tab is one, which
+is why the flag is there at all.
+
+`sync_knowledge` spends one embedding per CHANGED chunk and nothing at all for a row
+whose text has not moved, so filling the base for the first time over an agency's
+entire history measured at roughly a cent, and the steady state at about nothing.
 
 That AI cost lands on **the team's quota** (our Anthropic key), **not** on the
 developer. So two levers keep it under control:
@@ -591,10 +635,11 @@ developer. So two levers keep it under control:
    top-up). When it's spent, `agent_chat` / `plan_import` return a clean "out of AI
    requests" (HTTP 429) until it resets or an admin adds credits. A runaway script
    can't run up an unbounded bill, it hits the quota wall.
-2. **Scope the role.** A token can only call `agent_chat` / `agent_confirm` if its
-   role holds the **AI-agent create right**. Give a developer a role **without** it and
-   those tools return 403, their token literally cannot spend agent AI budget. Reads,
-   exports, and running a *pre-planned* import stay available. (`plan_import` is the one
+2. **Scope the role.** A token can only call `agent_chat` / `agent_confirm` — or pass
+   `compose` to `ask_knowledge` — if its role holds the **AI-agent create right**. Give
+   a developer a role **without** it and those return 403, their token literally cannot
+   spend agent AI budget. Reads, exports, asking the knowledge base without `compose`,
+   and running a *pre-planned* import all stay available. (`plan_import` is the one
    import step that uses AI, bounded by the quota like everything else.)
 
 So your instinct is right for the cheap tools ("they're just hitting our endpoints"),

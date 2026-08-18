@@ -104,8 +104,60 @@ export type DriveFile = {
   modifiedTime: string | null
   webViewLink: string | null
   /** which named folder it came out of — carried so the caller never has to
-   * guess which shelf a file sits on. */
+   * guess which shelf a file sits on. Empty when the file was named DIRECTLY
+   * rather than reached through a folder. */
   folderId: string
+  /** GOOGLE'S OWN SMALL ICON for the type — the Docs blue, the Sheets green, the
+   * PDF red. A link to Google's static icon host, tiny, cacheable and NOT
+   * authenticated, so it is the one piece of Drive chrome that can be rendered
+   * straight into a page. (The thumbnail below is the opposite, and the note on
+   * it says why.) */
+  iconUrl: string | null
+  /** IS THERE A PICTURE OF THE FIRST PAGE — and deliberately not the link to it.
+   *
+   * Google's own `thumbnailLink` is an AUTHENTICATED url on
+   * `googleusercontent.com` that expires within hours. It cannot be put in an
+   * `<img src>`: a browser will not send our bearer token to Google's image
+   * host, so the page shows a broken image to everybody, and the link rots
+   * anyway. Carrying it to the client would be shipping a footgun with a
+   * plausible name on it — the first reader to try it would write the bug.
+   *
+   * So the fact travels and the address does not. A screen learns whether a
+   * preview EXISTS, and asks our own door for the bytes when it wants one
+   * (`driveThumbnail` below, and the note there says why it is a proxy rather
+   * than a copy in R2). */
+  hasThumbnail: boolean
+  /** whose file it is, in Google's terms — the first owner's name, or "". */
+  ownerName: string
+  /** bytes, when Google states one. A Google Doc has no size (it is not a file
+   * in the ordinary sense), so this is null far more often than it is not. */
+  sizeBytes: number | null
+}
+
+/** What we ask Google for about a file, in ONE place. Spelled once because it is
+ * used by four reads and a mask that drifts between them is a field that is
+ * present on one screen and mysteriously absent on the next. */
+const DRIVE_FILE_FIELDS =
+  "id,name,mimeType,modifiedTime,webViewLink,iconLink,thumbnailLink,size,owners(displayName)"
+
+/** One Google file row → our shape. The single mapper, for the same reason the
+ * field mask above is a single string. */
+function toDriveFile(raw: unknown, folderId: string): DriveFile {
+  const f = raw as Record<string, unknown>
+  const owners = Array.isArray(f.owners) ? f.owners : []
+  const size = Number(f.size)
+  return {
+    id: str(f.id),
+    name: str(f.name),
+    mimeType: str(f.mimeType),
+    modifiedTime: str(f.modifiedTime) || null,
+    webViewLink: str(f.webViewLink) || null,
+    folderId,
+    iconUrl: str(f.iconLink) || null,
+    hasThumbnail: Boolean(str(f.thumbnailLink)),
+    ownerName: str((owners[0] as Record<string, unknown> | undefined)?.displayName),
+    sizeBytes: Number.isFinite(size) && size > 0 ? size : null,
+  }
 }
 
 /** Google's own mime type for a folder. Named once because it is spelled in two
@@ -137,7 +189,7 @@ export async function driveList(
     const url = new URL("https://www.googleapis.com/drive/v3/files")
     url.searchParams.set("q", clauses.join(" and "))
     url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
-    url.searchParams.set("fields", "files(id,name,mimeType,modifiedTime,webViewLink)")
+    url.searchParams.set("fields", `files(${DRIVE_FILE_FIELDS})`)
     // ONE PAGE, so WHICH page matters. Newest-changed first is what a person
     // scanning a folder wants, and it is what makes the knowledge sweep's window
     // the RIGHT fifty files rather than an arbitrary fifty: a document edited
@@ -149,20 +201,117 @@ export async function driveList(
     url.searchParams.set("supportsAllDrives", "true")
     url.searchParams.set("includeItemsFromAllDrives", "true")
     const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
-    for (const raw of Array.isArray(data.files) ? data.files : []) {
-      const f = raw as Record<string, unknown>
-      out.push({
-        id: str(f.id),
-        name: str(f.name),
-        mimeType: str(f.mimeType),
-        modifiedTime: str(f.modifiedTime) || null,
-        webViewLink: str(f.webViewLink) || null,
-        folderId,
-      })
+    for (const raw of Array.isArray(data.files) ? data.files : [])
+      out.push(toDriveFile(raw, folderId))
+  }
+  return out
+}
+
+/**
+ * THE FILES SOMEBODY NAMED ONE BY ONE — the other half of "what is shared".
+ *
+ * The owner's question was exactly right: "In Drive, why is it that it's only
+ * folder-wise? What if it had to be file-wise, or does that file have to be in a
+ * folder?" It did not have to. A folder was simply the only thing the sharing
+ * form could spell, which meant sharing one contract with kwapso meant sharing
+ * the folder it happens to sit in — and everything else in there.
+ *
+ * SAME FENCE, ONE STEP TIGHTER. `driveList` answers "what is inside the folders
+ * you named"; this answers "the files you named", and neither can reach anything
+ * else. The empty case is the same early return, for the same reason: a request
+ * with no ids gets nothing, never everything.
+ *
+ * A file that has been deleted, or whose sharing was taken away at Google's end,
+ * is simply ABSENT from the answer rather than an error. One id going stale must
+ * not cost a person the other nine.
+ */
+export async function driveFilesById(token: string, fileIds: string[]): Promise<DriveFile[]> {
+  if (fileIds.length === 0) return []
+  const out: DriveFile[] = []
+  // Bounded by the caller: these ids come from rows this person created, and
+  // `listNamedSources` is itself capped. One call per file is Drive's own shape —
+  // there is no batch get — so the cap is what keeps the cost knowable.
+  for (const fileId of fileIds.slice(0, GOOGLE_PAGE_SIZE)) {
+    const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`)
+    url.searchParams.set("fields", DRIVE_FILE_FIELDS)
+    url.searchParams.set("supportsAllDrives", "true")
+    try {
+      out.push(toDriveFile(await googleFetch(url.toString(), token), ""))
+    } catch {
+      // Gone, or no longer shared with this person. The other named files are
+      // still the honest answer.
     }
   }
   return out
 }
+
+/** The FILES a person could name — the picker behind "share a file", exactly as
+ * `driveFolders` is the one behind "share a folder". Folders are excluded
+ * because they have their own picker and their own meaning; a list mixing the
+ * two would make "what did I just share?" a question about an icon. */
+export async function driveFilesPick(token: string, search?: string): Promise<DriveFile[]> {
+  const clauses = [`mimeType != '${DRIVE_FOLDER_MIME}'`, "trashed = false"]
+  if (search) clauses.push(`name contains '${escapeDriveLiteral(search)}'`)
+  const url = new URL("https://www.googleapis.com/drive/v3/files")
+  url.searchParams.set("q", clauses.join(" and "))
+  url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
+  url.searchParams.set("fields", `files(${DRIVE_FILE_FIELDS})`)
+  url.searchParams.set("orderBy", "modifiedTime desc")
+  url.searchParams.set("supportsAllDrives", "true")
+  url.searchParams.set("includeItemsFromAllDrives", "true")
+  const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
+  return (Array.isArray(data.files) ? data.files : []).map((raw) => toDriveFile(raw, ""))
+}
+
+/**
+ * THE PICTURE ITSELF, as bytes — not a link to one.
+ *
+ * Google's `thumbnailLink` is an authenticated url on `googleusercontent.com`
+ * that expires within hours. Two ways to put one on a screen were considered:
+ *
+ *   • COPY IT INTO R2 and serve it from `/media/*`, like a ticket attachment.
+ *     Rejected — it makes a second, stale copy of somebody's document in our
+ *     storage, keeps it after they unshare the file, and has to be invalidated
+ *     when they edit page one. A preview is worth having; it is not worth owning.
+ *   • FETCH IT ON READ, through this door, with the caller's own token. Chosen.
+ *     Nothing is stored, the fence is the ordinary one (a file this person named,
+ *     resolved before we ever get here), and the picture is as current as the
+ *     document. The cost is one Google call per preview, which is why the door
+ *     above it caches at the edge for an hour and why a list renders ICONS —
+ *     unauthenticated, tiny, free — and only a detail view asks for a thumbnail.
+ *
+ * Returns null rather than throwing when Google has no preview: a spreadsheet,
+ * a file still being processed and a format Google cannot render all land here,
+ * and none of them is a failure worth a red box.
+ */
+export async function driveThumbnail(
+  token: string,
+  fileId: string
+): Promise<{ body: ArrayBuffer; contentType: string } | null> {
+  const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`)
+  url.searchParams.set("fields", "thumbnailLink")
+  url.searchParams.set("supportsAllDrives", "true")
+  const meta = (await googleFetch(url.toString(), token)) as Record<string, unknown>
+  const link = str(meta.thumbnailLink)
+  if (!link) return null
+  // R11 — the picture comes from a different host to every other call in this
+  // file, so it carries its own timeout rather than inheriting one.
+  const res = await fetch(link, {
+    signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return null
+  const body = await res.arrayBuffer()
+  // A preview is a small image. Anything larger is not a thumbnail and is not
+  // worth putting through a worker's memory.
+  if (body.byteLength > DRIVE_THUMBNAIL_CAP) return null
+  return { body, contentType: res.headers.get("content-type") ?? "image/jpeg" }
+}
+
+/** The most a preview may weigh. Google's own thumbnails are tens of kilobytes;
+ * this is the ceiling that keeps a surprise from becoming a worker's whole
+ * memory budget. */
+const DRIVE_THUMBNAIL_CAP = 2 * 1024 * 1024
 
 /** The folders a person could name — the picker behind "share a folder". Read
  * only: it lists folder NAMES and ids so somebody can choose one, and choosing
@@ -173,21 +322,11 @@ export async function driveFolders(token: string, search?: string): Promise<Driv
   const url = new URL("https://www.googleapis.com/drive/v3/files")
   url.searchParams.set("q", clauses.join(" and "))
   url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
-  url.searchParams.set("fields", "files(id,name,mimeType,modifiedTime,webViewLink)")
+  url.searchParams.set("fields", `files(${DRIVE_FILE_FIELDS})`)
   url.searchParams.set("supportsAllDrives", "true")
   url.searchParams.set("includeItemsFromAllDrives", "true")
   const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
-  return (Array.isArray(data.files) ? data.files : []).map((raw) => {
-    const f = raw as Record<string, unknown>
-    return {
-      id: str(f.id),
-      name: str(f.name),
-      mimeType: str(f.mimeType),
-      modifiedTime: str(f.modifiedTime) || null,
-      webViewLink: str(f.webViewLink) || null,
-      folderId: "",
-    }
-  })
+  return (Array.isArray(data.files) ? data.files : []).map((raw) => toDriveFile(raw, ""))
 }
 
 /** Google's own escape for a query literal: a backslash before `'` and `\`.
@@ -257,18 +396,11 @@ export async function driveUpload(
     `--${boundary}\r\nContent-Type: ${input.mimeType}\r\n\r\n${input.text}\r\n` +
     `--${boundary}--`
   const data = (await googleFetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,webViewLink",
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=${DRIVE_FILE_FIELDS}`,
     token,
     { method: "POST", body, contentType: `multipart/related; boundary=${boundary}` }
   )) as Record<string, unknown>
-  return {
-    id: str(data.id),
-    name: str(data.name),
-    mimeType: str(data.mimeType),
-    modifiedTime: str(data.modifiedTime) || null,
-    webViewLink: str(data.webViewLink) || null,
-    folderId: input.folderId,
-  }
+  return toDriveFile(data, input.folderId)
 }
 
 /**
@@ -298,20 +430,13 @@ export async function driveUpdate(
     `--${boundary}\r\nContent-Type: ${input.mimeType}\r\n\r\n${input.text}\r\n` +
     `--${boundary}--`
   const data = (await googleFetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(input.fileId)}?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,webViewLink,parents`,
+    `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(input.fileId)}?uploadType=multipart&supportsAllDrives=true&fields=${DRIVE_FILE_FIELDS},parents`,
     token,
     { method: "PATCH", body, contentType: `multipart/related; boundary=${boundary}` }
   )) as Record<string, unknown>
-  return {
-    id: str(data.id),
-    name: str(data.name),
-    mimeType: str(data.mimeType),
-    modifiedTime: str(data.modifiedTime) || null,
-    webViewLink: str(data.webViewLink) || null,
-    // Whichever folder it was already in — a rewrite never moves a file, and
-    // saying which shelf it sits on is the one thing the caller cannot see.
-    folderId: str((Array.isArray(data.parents) ? data.parents[0] : "") as string),
-  }
+  // Whichever folder it was already in — a rewrite never moves a file, and
+  // saying which shelf it sits on is the one thing the caller cannot see.
+  return toDriveFile(data, str((Array.isArray(data.parents) ? data.parents[0] : "") as string))
 }
 
 /** A NEW FOLDER inside one the caller named. A folder is an ordinary Drive file
@@ -322,7 +447,7 @@ export async function driveCreateFolder(
   input: { parentId: string; name: string }
 ): Promise<DriveFile> {
   const data = (await googleFetch(
-    "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,webViewLink",
+    `https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=${DRIVE_FILE_FIELDS}`,
     token,
     {
       method: "POST",
@@ -333,14 +458,7 @@ export async function driveCreateFolder(
       }),
     }
   )) as Record<string, unknown>
-  return {
-    id: str(data.id),
-    name: str(data.name),
-    mimeType: str(data.mimeType),
-    modifiedTime: str(data.modifiedTime) || null,
-    webViewLink: str(data.webViewLink) || null,
-    folderId: input.parentId,
-  }
+  return toDriveFile(data, input.parentId)
 }
 
 /**
@@ -405,6 +523,60 @@ export function knownContactQuery(contacts: string[]): string | null {
   if (usable.length === 0) return null
   const terms = usable.flatMap((c) => [`from:${c}`, `to:${c}`])
   return `{${terms.join(" ")}}`
+}
+
+/**
+ * GOOGLE'S OWN NOTICES ABOUT YOUR OWN MATERIAL — a second, narrower fence, and
+ * the ONLY other one this product will build.
+ *
+ * The owner asked for it in as many words: kwapso should find "any emails that
+ * come describing that a Google Doc has been created for a particular calendar
+ * or particular meeting". Those mails exist and they are useful — a Meet
+ * transcript announces itself by email minutes after the call — and every one of
+ * them is from a Google no-reply address, which is by definition not a contact
+ * on anybody's account. The known-contact fence therefore excludes them
+ * perfectly, which is why this was invisible.
+ *
+ * WHY THIS IS NOT A WIDENING OF THE MAIL PROMISE. The promise is "only mail to or
+ * from someone on one of your accounts", and it is about mail with PEOPLE — the
+ * thing a person would mind kwapso reading. This names four robots, spelled out
+ * here in the server's own source, that write to you about files you already own.
+ * It cannot be steered: the addresses are a constant, the caller contributes only
+ * the narrowing terms, and there is no request parameter anywhere that reaches
+ * this list. A mail from a colleague can never match it.
+ *
+ * IT IS STILL A SECOND DOOR ON SOMEBODY'S MAILBOX, and it is used by exactly one
+ * caller (the transcript hunt), never by the assistant's own mail tools and never
+ * by the knowledge sweep — which read through `knownContactQuery` and are
+ * unchanged.
+ */
+export function googleNoticeQuery(): string {
+  return `{${GOOGLE_NOTICE_SENDERS.map((s) => `from:${s}`).join(" ")}}`
+}
+
+/** The robots. Meet announces a recording and a transcript from the first;
+ * Drive's share notices come from the next two depending on whether the file was
+ * shared to a person or a group; comments-noreply carries "so-and-so mentioned
+ * you in <document>", which is the other way a meeting's notes doc arrives. */
+const GOOGLE_NOTICE_SENDERS = [
+  "meet-recordings-noreply@google.com",
+  "drive-shares-noreply@google.com",
+  "drive-shares-dm-noreply@google.com",
+  "comments-noreply@docs.google.com",
+]
+
+/** THE DOCUMENT A NOTICE IS ABOUT. Google writes the link into the body in one
+ * shape — `docs.google.com/document/d/<id>` — and the id is what makes the mail
+ * worth reading: it turns "somebody made a doc" into a file we can open, read and
+ * file against the meeting.
+ *
+ * Returns null rather than guessing when the body carries no document link. A
+ * notice about a spreadsheet, a folder or a comment on something else is not a
+ * transcript, and half-matching one would attach the wrong file to a meeting —
+ * which is worse than attaching none. */
+export function documentIdInText(text: string): string | null {
+  const hit = /docs\.google\.com\/document\/d\/([A-Za-z0-9_-]{16,})/.exec(text)
+  return hit?.[1] ?? null
 }
 
 export async function gmailSearch(
@@ -766,6 +938,54 @@ export async function gmailLabelMessage(
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
 
+/**
+ * ONE PERSON ON AN INVITATION — the "stakeholders" the owner asked for, and the
+ * reason this is an object rather than the bare address it used to be.
+ *
+ * An address alone answers "whose material is this" and nothing else. It cannot
+ * say who called the meeting, who accepted, who never replied, or which of the
+ * five lines is a meeting room rather than a person — and those are the facts
+ * somebody actually reads off an invitation. One field carrying all of it beats
+ * an address list plus a second list of statuses, which is two spellings of one
+ * fact and a guarantee they will disagree.
+ */
+export type EventGuest = {
+  /** lower-cased, so a match against a member or a contact is a comparison
+   * rather than a guess. */
+  email: string
+  /** what Google shows for them, or "" — an invitation to somebody outside the
+   * organisation often carries no name at all. */
+  name: string
+  /** Google's own word: `needsAction`, `declined`, `tentative` or `accepted`. */
+  response: string
+  /** whoever called the meeting. */
+  organizer: boolean
+  /** invited, but the meeting happens without them. */
+  optional: boolean
+  /** a ROOM, not a person. Google puts meeting rooms on the same list, and a
+   * room shown as a stakeholder is a stakeholder nobody can ring. */
+  resource: boolean
+}
+
+/**
+ * A FILE HANGING OFF A DIARY ENTRY — an agenda doc, a deck, and the one this
+ * whole lane turns on: the transcript Google Meet files against the event once
+ * the call is over.
+ *
+ * `fileId` is a Drive id, so the transcript hunt can go straight to the document
+ * rather than searching a folder for something whose name looks right. That is
+ * the difference between finding a transcript and finding a file called
+ * "Transcript" that belongs to a different call.
+ */
+export type EventAttachment = {
+  fileId: string
+  title: string
+  mimeType: string
+  /** Google's own small icon for the file type — a Docs blue, a Sheets green. */
+  iconUrl: string | null
+  url: string | null
+}
+
 export type CalendarEvent = {
   id: string
   summary: string
@@ -773,13 +993,33 @@ export type CalendarEvent = {
   /** RFC-3339, or a plain date for an all-day entry — carried as Google gives it. */
   start: string
   end: string
+  /** THE IANA ZONE the entry is written in (`Europe/Berlin`), or "". An hour is
+   * not a fact without one: the same RFC-3339 stamp read in two places is two
+   * different meetings to the people reading it. */
+  timeZone: string
+  /** true when Google gave a plain `date` rather than a `dateTime` — the entry
+   * is a day, not an hour, and rendering 00:00 for it would invent a time. */
+  allDay: boolean
+  /** htmlLink — the entry in Google Calendar's own web app. The owner's first
+   * ask: "a link that I can open the meeting within my calendar". */
   url: string | null
-  /** Everybody invited, lower-cased. Carried because it is the ONE thing on an
-   * event that says whose material it is: an entry with a known contact on it is
-   * that client's, and an entry with nobody but us on it is ours. Without it the
+  /** WHERE THE CALL IS. `hangoutLink` when Google gives one, otherwise the video
+   * entry point off `conferenceData` — Meet is not the only conferencing system
+   * an entry can carry, and a Zoom link parked in `conferenceData` is the join
+   * link for that meeting exactly as a Meet link is. */
+  joinUrl: string | null
+  /** Everybody invited. Carried because it is the ONE thing on an event that
+   * says whose material it is: an entry with a known contact on it is that
+   * client's, and an entry with nobody but us on it is ours. Without it the
    * knowledge base would have to guess a client out of a meeting's title, which
    * is the guess the compartment idea exists to avoid. */
-  attendees: string[]
+  attendees: EventGuest[]
+  /** WHO CALLED IT. Not the same question as who is on the list — an entry
+   * organised by a client and one we called are different conversations, and the
+   * organiser is often not on the attendee list at all. */
+  organizer: { email: string; name: string }
+  /** Files hanging off the entry — where a Meet transcript lands. */
+  attachments: EventAttachment[]
   /** WHERE — a room, an address, or nothing. Free text at Google, because that
    * is what a person types. */
   location: string
@@ -799,6 +1039,15 @@ export type CalendarEvent = {
    * the eleventh Monday stand-up from a one-off — and why "recurring meetings
    * appear" had no fact to stand on. */
   recurringEventId: string
+  /** THE REPEAT RULE ITSELF, as Google states it (`RRULE:FREQ=WEEKLY;BYDAY=MO`).
+   * Only ever present on a series MASTER — an expanded instance carries the
+   * parent's id above and no rule of its own — so it is "" on nearly every event
+   * this app reads, and that absence is the honest answer rather than a gap. */
+  recurrence: string[]
+  /** WHEN GOOGLE LAST TOUCHED IT. The one field that makes a re-sync cheap to
+   * reason about: an entry whose `updated` has not moved since we last read it
+   * says nothing changed, without us comparing a dozen fields to find out. */
+  updatedAt: string | null
 }
 
 /** Guests read off one event — and the most this app will REWRITE in one go.
@@ -807,9 +1056,26 @@ export type CalendarEvent = {
  * is a refusal rather than a silent uninvitation (see calendarGuests). */
 const EVENT_ATTENDEE_CAP = 50
 
+/**
+ * A WINDOW OF THE DIARY.
+ *
+ * NO `fields` MASK, deliberately. Google's default is the whole event resource,
+ * which is exactly what this app now wants — the guest list, the organiser, the
+ * conference link, the attachments and the repeat rule are all on it. A mask
+ * would make the response smaller and would make every future field somebody
+ * needs a silent absence rather than a value: the failure mode of a typo'd mask
+ * is not an error, it is a field that is quietly always empty. The read is
+ * bounded by `maxResults` either way, which is the cost that actually matters.
+ *
+ * `showDeleted` is off by default and ON for the re-sync (see syncCalendar in
+ * lib/meetings.ts). With `singleEvents=true` a cancelled instance simply is not
+ * in the window unless it is asked for, so a diary that never asks can never
+ * learn that Tuesday's call was called off — it only ever sees the entry stop
+ * being returned, which is indistinguishable from the window having moved.
+ */
 export async function calendarList(
   token: string,
-  range: { from?: string; to?: string }
+  range: { from?: string; to?: string; showDeleted?: boolean }
 ): Promise<CalendarEvent[]> {
   const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events")
   if (range.from) url.searchParams.set("timeMin", range.from)
@@ -817,6 +1083,7 @@ export async function calendarList(
   url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
   url.searchParams.set("singleEvents", "true")
   url.searchParams.set("orderBy", "startTime")
+  if (range.showDeleted) url.searchParams.set("showDeleted", "true")
   const data = (await googleFetch(url.toString(), token)) as { items?: unknown }
   return (Array.isArray(data.items) ? data.items : []).map(toEvent)
 }
@@ -974,35 +1241,110 @@ export async function calendarCancel(
   return { event: await calendarPatch(token, eventId, { status: "cancelled" }), changed: true }
 }
 
+/** THE VIDEO LINK OFF `conferenceData`, when there is no plain `hangoutLink`.
+ * Google puts every way into the call on `entryPoints` — a dial-in number, a PIN,
+ * an SIP address — and the one a person means by "the link" is the video one.
+ * Falling back to the first entry point would hand somebody a phone number when
+ * they asked for a meeting room. */
+function conferenceVideoUri(conference: Record<string, unknown>): string {
+  const points = Array.isArray(conference.entryPoints) ? conference.entryPoints : []
+  for (const raw of points) {
+    const p = raw as Record<string, unknown>
+    if (str(p.entryPointType) === "video" && str(p.uri)) return str(p.uri)
+  }
+  return ""
+}
+
 function toEvent(raw: unknown): CalendarEvent {
   const e = raw as Record<string, unknown>
   const start = (e.start ?? {}) as Record<string, unknown>
   const end = (e.end ?? {}) as Record<string, unknown>
   const conference = (e.conferenceData ?? {}) as Record<string, unknown>
+  const organizer = (e.organizer ?? {}) as Record<string, unknown>
   return {
     id: str(e.id),
     summary: str(e.summary),
     description: str(e.description),
     start: str(start.dateTime) || str(start.date),
     end: str(end.dateTime) || str(end.date),
+    // The zone rides whichever half of the entry states one; Google writes it on
+    // both and they agree.
+    timeZone: str(start.timeZone) || str(end.timeZone),
+    // `date` and no `dateTime` is Google's own way of saying "a day, not an hour".
+    allDay: !str(start.dateTime) && Boolean(str(start.date)),
     url: str(e.htmlLink) || null,
+    joinUrl: str(e.hangoutLink) || conferenceVideoUri(conference) || null,
+    organizer: { email: str(organizer.email).toLowerCase(), name: str(organizer.displayName) },
     location: str(e.location),
     status: str(e.status),
     meetingCode: str(conference.conferenceId),
     recurringEventId: str(e.recurringEventId),
+    recurrence: (Array.isArray(e.recurrence) ? e.recurrence : []).map(str).filter(Boolean),
+    updatedAt: str(e.updated) || null,
     // Bounded like every other list here: an event with two hundred guests is
     // one somebody was BCC'd on, and reading all of them would make the cost of
     // one calendar read a number a stranger sets.
     attendees: (Array.isArray(e.attendees) ? e.attendees : [])
       .slice(0, EVENT_ATTENDEE_CAP)
-      .map((a) => str((a as Record<string, unknown>).email).toLowerCase())
-      .filter(Boolean),
+      .map((raw2) => {
+        const a = raw2 as Record<string, unknown>
+        return {
+          email: str(a.email).toLowerCase(),
+          name: str(a.displayName),
+          response: str(a.responseStatus),
+          organizer: a.organizer === true,
+          // `optional` is the Events resource's own field name; `optionalAttendee`
+          // is what at least one Google client library projects it as. Reading
+          // both costs one `||` and removes a whole class of "the badge never
+          // shows" that nothing would report as an error.
+          optional: a.optional === true || a.optionalAttendee === true,
+          resource: a.resource === true,
+        }
+      })
+      .filter((a) => a.email !== ""),
+    // Same cap, same reason: an entry somebody attached a folder's worth of
+    // material to must not decide what one read costs.
+    attachments: (Array.isArray(e.attachments) ? e.attachments : [])
+      .slice(0, EVENT_ATTENDEE_CAP)
+      .map((raw2) => {
+        const a = raw2 as Record<string, unknown>
+        return {
+          // THE ID, OR THE ID OUT OF THE LINK — and the fallback is not defensive
+          // programming, it is the observed shape. Reading a real account's
+          // entries on 2026-08-18, every Meet artifact ("Notes by Gemini") came
+          // back with a `fileUrl` pointing at `docs.google.com/document/d/<id>`
+          // and NO `fileId` beside it. A transcript hunt that insisted on the
+          // field would have found nothing on the exact events it was written
+          // for, and would have failed silently — there is no error in "this
+          // event has no attachments we can use".
+          fileId: str(a.fileId) || documentIdInText(str(a.fileUrl)) || "",
+          title: str(a.title),
+          mimeType: str(a.mimeType),
+          iconUrl: str(a.iconLink) || null,
+          url: str(a.fileUrl) || null,
+        }
+      })
+      .filter((a) => a.fileId !== "" || a.url !== null),
   }
 }
 
 // ── GOOGLE CHAT ──────────────────────────────────────────────────────────────
 
-export type ChatSpace = { name: string; displayName: string }
+export type ChatSpace = {
+  /** Google's own resource name, `spaces/AAAA…`. The id, not a label. */
+  name: string
+  /** WHAT TO SHOW A PERSON. Google's own `displayName` where there is one, and a
+   * made-up description of the space where there is not — see `toChatSpace`. */
+  displayName: string
+  /** Google's word: `SPACE`, `DIRECT_MESSAGE` or `GROUP_CHAT`, or "". */
+  spaceType: string
+  /** FALSE WHEN WE MADE THE LABEL UP. The owner screenshotted a list of raw ids
+   * where names belonged, and the fix is not to invent a name and say nothing —
+   * it is to say which of these two things the reader is looking at. A screen
+   * that cannot tell them apart is a screen that will one day present a guess as
+   * a fact. */
+  named: boolean
+}
 export type ChatMessage = {
   id: string
   space: string
@@ -1011,15 +1353,50 @@ export type ChatMessage = {
   createdAt: string | null
 }
 
+/**
+ * A SPACE, WITH SOMETHING A PERSON CAN READ ON IT.
+ *
+ * THE BUG THIS FIXES, in the owner's own screenshot: a list of `spaces/lJXiZKAAAAE`
+ * where names belonged. The old mapping was `displayName || name`, which reads as
+ * a sensible fallback and is not one — Google leaves `displayName` EMPTY for
+ * every direct message and every ad-hoc group chat, because those spaces have no
+ * name. They are "me and Ana". So the fallback fired for the majority of a
+ * person's spaces and put a resource id in a list of names.
+ *
+ * WHAT WE CAN AND CANNOT KNOW HERE, said plainly. `chat.spaces.readonly` — the
+ * scope this connection holds — returns a space's TYPE but not its members, so
+ * "Ana Ruiz" is not available to us at any price short of asking every connected
+ * person to grant `chat.memberships.readonly` and reconnect. Given that, the
+ * choice is between an id, an invented name, and an honest description. This
+ * takes the third: the type, in words, with `named: false` on it so nothing
+ * downstream can mistake our sentence for Google's.
+ *
+ * The id is still the answer of last resort, for a space whose type Google did
+ * not state — but it now arrives labelled as one rather than dressed as a name.
+ */
+function toChatSpace(raw: unknown): ChatSpace {
+  const s = raw as Record<string, unknown>
+  const id = str(s.name)
+  const given = str(s.displayName)
+  if (given) return { name: id, displayName: given, spaceType: str(s.spaceType), named: true }
+  const type = str(s.spaceType) || str(s.type)
+  const described =
+    type === "DIRECT_MESSAGE"
+      ? "A direct message"
+      : type === "GROUP_CHAT"
+        ? "A group chat"
+        : type === "SPACE"
+          ? "An unnamed space"
+          : ""
+  return { name: id, displayName: described || id, spaceType: type, named: false }
+}
+
 /** The spaces a person could name — the picker, exactly as Drive has one. */
 export async function chatSpaces(token: string): Promise<ChatSpace[]> {
   const url = new URL("https://chat.googleapis.com/v1/spaces")
   url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
   const data = (await googleFetch(url.toString(), token)) as { spaces?: unknown }
-  return (Array.isArray(data.spaces) ? data.spaces : []).map((raw) => {
-    const s = raw as Record<string, unknown>
-    return { name: str(s.name), displayName: str(s.displayName) || str(s.name) }
-  })
+  return (Array.isArray(data.spaces) ? data.spaces : []).map(toChatSpace)
 }
 
 /** Messages in ONE named space. `spaceName` is Google's `spaces/AAAA…`, and it

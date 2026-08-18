@@ -7,9 +7,12 @@
 import type { TeamMember, TeamRole } from "@shared/types"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import type { AccountScope } from "@shared/workers/account-scope"
 import type { Env } from "../env"
+import { listPortalUsers } from "./accounts"
 import { GuardError, type MemberGuard } from "./permissions"
 import { notifyRemoved, notifyRoleChanged } from "./notify"
+import { audienceOf, clientUserIds } from "@shared/workers/record-link"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 
 type RoleRow = {
@@ -39,11 +42,14 @@ async function countRole(env: Env, teamId: string, roleId: string): Promise<numb
   return row?.n ?? 0
 }
 
-/** Everyone on the team: membership + fresh identity + role title. */
+/** Everyone on the team: membership + fresh identity + role title + whether this
+ * login belongs to a client. The scope is the caller's, and it is here because
+ * the last of those four is a read of the customer spine. */
 export async function listMembers(
   env: Env,
   cfg: D1Rest,
-  guard: MemberGuard
+  guard: MemberGuard,
+  scope: AccountScope
 ): Promise<TeamMember[]> {
   const members = await env.DB.prepare(
     `SELECT tm.user_id, tm.role_id, tm.created_at,
@@ -76,6 +82,24 @@ export async function listMembers(
   )
   const roleById = new Map(roles.map((r) => [r.id, r]))
 
+  // WHICH OF THESE MEMBERS IS A CLIENT. A portal login is an ordinary team
+  // member (grant → invite → accept is the only way to make one that works), so
+  // there is no flag on the membership row to read — the fact is a `portal_users`
+  // row in the team's own database.
+  //
+  // THROUGH THE FENCED READER, not a query of our own. lib/accounts.ts owns every
+  // statement against the spine's three tables and each of its doors takes the
+  // caller's scope, so "was this query fenced?" has one place to look. A select
+  // written here would have been correct today and outside that boundary forever,
+  // which is the shape the law exists to refuse — and the check reads raw text, so
+  // it refuses the SQL even in a comment. Rightly: an example is how a copy starts.
+  //
+  // PRESENCE, not liveness, exactly as the fence decides the caller's own kind
+  // (account-scope.ts): a revoked grant still means "this login belongs to a
+  // client", and reviving it is one click. Reading only the live ones would put a
+  // client whose access was paused back into the agency's assignee lists.
+  const clientIds = new Set((await listPortalUsers(cfg, guard, scope)).map((p) => p.userId))
+
   return (members.results ?? []).map((m) => {
     const role = roleById.get(m.role_id)
     return {
@@ -88,6 +112,7 @@ export async function listMembers(
       roleTitle: role?.title ?? "Unknown role",
       isYou: m.user_id === guard.userId,
       isAdmin: role?.is_default === 1,
+      isClient: clientIds.has(m.user_id),
       joinedAt: m.created_at,
     }
   })
@@ -233,8 +258,16 @@ export async function changeMemberRole(
     relatedRowId: targetUserId,
   })
 
-  // Tell the member — they didn't make this change but it affects them.
-  await notifyRoleChanged(env, guard.teamId, t.email, actor.name, roles[0].title)
+  // Tell the member — they didn't make this change but it affects them. WHICH
+  // FRONT DOOR they read us through decides whether the mail can carry a link
+  // back to their membership at all: a client login is an ordinary team member
+  // holding an ordinary role, so this path reaches both kinds of person, and the
+  // portal has no members screen to send one of them to.
+  const clients = await clientUserIds(cfg, guard.databaseId, [targetUserId])
+  await notifyRoleChanged(env, guard.teamId, t.email, actor.name, roles[0].title, {
+    userId: targetUserId,
+    audience: audienceOf(clients, targetUserId),
+  })
 }
 
 /** Remove a member = deactivate the membership (reversible; never hard-delete).

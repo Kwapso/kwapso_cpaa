@@ -13,10 +13,13 @@
 
 import type {
   BrandAsset,
+  Deliverable,
+  DriveFileRow,
   GoogleConnection,
   GoogleService,
   GoogleShelf,
   GoogleSource,
+  GoogleSourceKind,
   HelpAttachment,
   HelpMessage,
   HelpStakeholder,
@@ -28,13 +31,17 @@ import type {
   Story,
   Task,
   TaskViewName,
+  TeamPulse,
   Todo,
   WorkLog,
+  WorkLogSummary,
   Meeting,
+  MeetingPersonLink,
   MeetingPurpose,
   StaffCertificate,
   StaffProfile,
 } from "@shared/types"
+import type { RecordCounts } from "@shared/record-counts"
 import { api, enc, post } from "@shared/web/api"
 
 /** SEND A FILE AS THE BODY — the client half of the four streaming upload doors.
@@ -140,7 +147,14 @@ function logQuery(filter: LogQuery | undefined, cursor: string | null | undefine
   return s ? `?${s}` : ""
 }
 
-function storyQuery(filter: StoryQuery | undefined, cursor: string | null | undefined): string {
+function storyQuery(
+  filter: StoryQuery | undefined,
+  cursor: string | null | undefined,
+  // The ORDER is not a filter and does not travel in one: a filter says which
+  // rows, this says in what sequence. Kept apart so a caller cannot narrow by
+  // accident while meaning to sort.
+  order?: { sort?: string; dir?: string }
+): string {
   const q = new URLSearchParams()
   if (filter?.status) q.set("status", filter.status)
   if (filter?.ticketId) q.set("ticketId", filter.ticketId)
@@ -149,6 +163,8 @@ function storyQuery(filter: StoryQuery | undefined, cursor: string | null | unde
   if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
   if (filter?.view) q.set("view", filter.view)
   if (filter?.q) q.set("q", filter.q)
+  if (order?.sort) q.set("sort", order.sort)
+  if (order?.dir) q.set("dir", order.dir)
   if (cursor) q.set("cursor", cursor)
   const s = q.toString()
   return s ? `?${s}` : ""
@@ -178,7 +194,12 @@ export const content = {
     /** ONE SYSTEM'S tickets — the app record's Tickets tab (CHECKLIST 8.6). The
      * door narrows and counts the same narrowed question, so the tab badge and
      * the rows under it are one answer (R16). */
-    appId?: string
+    appId?: string,
+    /** WHAT ORDER — a name out of the door's own TICKET_SORTS, with `dir`
+     * flipping it. ONE trailing object rather than two more positional
+     * parameters on a function that already takes eight: the door's default is
+     * the drag-rank, so omitting this is the order the list has always had. */
+    order?: { sort?: string; dir?: string }
   ) =>
     api<
       PagedResponse<{
@@ -192,7 +213,9 @@ export const content = {
         accountId ? `&accountId=${enc(accountId)}` : ""
       }${appId ? `&appId=${enc(appId)}` : ""}${helpType ? `&helpType=${enc(helpType)}` : ""}${
         status ? `&status=${enc(status)}` : ""
-      }${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+      }${order?.sort ? `&sort=${enc(order.sort)}` : ""}${order?.dir ? `&dir=${enc(order.dir)}` : ""}${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+      }`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
@@ -270,9 +293,9 @@ export const content = {
   /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to
    * get the next one. `total`/`mineTotal` are the exact server counts, taken
    * over the SAME filter the page came from. */
-  stories: (opts: { filter?: StoryQuery; cursor?: string | null } = {}) =>
+  stories: (opts: { filter?: StoryQuery; order?: { sort?: string; dir?: string }; cursor?: string | null } = {}) =>
     api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(
-      `/api/content/stories${storyQuery(opts.filter, opts.cursor)}`
+      `/api/content/stories${storyQuery(opts.filter, opts.cursor, opts.order)}`
     ),
   storyOne: (id: string) =>
     api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
@@ -353,6 +376,21 @@ export const content = {
       post({ userId, week })
     ),
 
+  /* --------------------------------- the pulse ------------------------------ */
+  /** THE TEAM'S WEEK IN NUMBERS — the one read behind Home's big numbers and its
+   * two charts. Internal only (the door refuses a client login), and gated
+   * SECTION by section: a section comes back `null` when the caller's role
+   * cannot read that module, which is why every screen reading this must render
+   * nothing for a null rather than an empty state (R18). */
+  insights: () => api<TeamPulse>("/api/content/insights"),
+
+  /** HOW MANY OF EACH THING HANG OFF ONE RECORD — this worker's half (sprints,
+   * stories, to-dos, tickets, meetings, a ticket's files). Asked when the record
+   * opens so its tabs are badged before anybody clicks one; the rows behind each
+   * tab stay lazy. */
+  recordCounts: (table: string, id: string) =>
+    api<RecordCounts>(`/api/content/record-counts?table=${enc(table)}&id=${enc(id)}`),
+
   /* ---------------------------- to-dos and tasks ---------------------------- */
   /** What we are waiting on a client for. Fenced: a client login sees their own
    * company's. Bounded rather than paged — a to-do is a thing we are WAITING on. */
@@ -405,6 +443,12 @@ export const content = {
     api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
       `/api/content/work-logs${logQuery(opts.filter, opts.cursor)}`
     ),
+  /** THE NUMBERS ON TOP OF A RECORD'S TIME — the same filter as the page above,
+   * answered in aggregate by the same door's own parser, so the header and the
+   * rows are one question (R16). Never summed in the browser: the list is a
+   * PAGE, so adding up what is loaded would answer about the newest fifty. */
+  workLogSummary: (filter?: LogQuery) =>
+    api<WorkLogSummary>(`/api/content/work-logs/summary${logQuery(filter, null)}`),
   /** One row of time, read back off its own page — there is no by-id door,
    * because a work log is only ever read in a list of its neighbours. */
   workLogOne: (id: string) =>
@@ -465,11 +509,15 @@ export const content = {
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null
     ),
-  /** Ask the knowledge base a question. A READ — it writes nothing and answers
-   * with passages plus the sources they came from (Law R23). */
-  askKnowledge: (question: string, accountId?: string | null) =>
+  /** Ask the knowledge base a question. Answers with the passages plus the sources
+   * they came from (Law R23) and, when `compose` is set, the answer written out of
+   * exactly those passages — which costs one unit of the team's AI allowance and
+   * needs the assistant right, so the screen only asks when the person has it. */
+  askKnowledge: (question: string, accountId?: string | null, compose?: boolean) =>
     api<KnowledgeAnswer>(
-      `/api/content/knowledge/ask?q=${enc(question)}${accountId ? `&accountId=${enc(accountId)}` : ""}`
+      `/api/content/knowledge/ask?q=${enc(question)}${accountId ? `&accountId=${enc(accountId)}` : ""}${
+        compose ? "&compose=1" : ""
+      }`
     ),
   knowledgeStatus: () =>
     api<{
@@ -593,20 +641,52 @@ export const content = {
     /** ONE SYSTEM'S diary, for the app record's own Meetings tab. Asked of the
      * SERVER rather than filtered in the browser: the diary pages, so "this
      * app's meetings among the newest fifty" is an answer that looks like one. */
-    appId?: string
+    appId?: string,
+    /** WHAT ORDER — a name out of the door's own MEETING_SORTS, with `dir`
+     * flipping it. One trailing object, as on `help` above and for the same
+     * reason. Omit it for the diary's own order, most recent first. */
+    order?: { sort?: string; dir?: string }
   ) =>
     api<PagedResponse<{ meetings: Meeting[]; weekTotal: number }>>(
       `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
         accountId ? `&accountId=${enc(accountId)}` : ""
-      }${appId ? `&appId=${enc(appId)}` : ""}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      }${appId ? `&appId=${enc(appId)}` : ""}${order?.sort ? `&sort=${enc(order.sort)}` : ""}${
+        order?.dir ? `&dir=${enc(order.dir)}` : ""
+      }${cursor ? `&cursor=${enc(cursor)}` : ""}`
     ),
-  /** BRING IN THE REPEATING CALENDAR ENTRIES (9.7). The next four weeks become
-   * real records; `ahead` is the instances beyond that, read-only. */
-  syncCalendarSeries: () =>
-    api<{ created: number; ahead: { eventId: string; title: string; startsAt: string; url: string | null }[] }>(
-      "/api/content/meetings/sync-calendar",
-      post({})
-    ),
+  /** BRING THE CALENDAR AND THE DIARY INTO STEP, BOTH WAYS (9.7, and the owner's
+   * "it should also update consistently if it's a past event").
+   *
+   * Three counts, because the sweep does three things over a window that reaches
+   * a fortnight back and four weeks on: repeating entries with no record become
+   * one (`created`), every meeting in the window has its Google facts refreshed
+   * (`updated`), and one called off in Google is cancelled here (`cancelled`).
+   * `ahead` is the instances beyond the horizon, read-only. */
+  syncCalendar: () =>
+    api<{
+      created: number
+      updated: number
+      cancelled: number
+      ahead: { eventId: string; title: string; startsAt: string; url: string | null }[]
+    }>("/api/content/meetings/sync-calendar", post({})),
+  /** WHAT WAS SAID, in full — read off the meeting row rather than from Google,
+   * so any colleague who may read meetings can read it. Its own call because of
+   * its size: a page of the diary is fifty meetings and a transcript is up to a
+   * megabyte. */
+  meetingTranscript: (id: string) =>
+    api<{
+      text: string
+      /** present only when the transcript was longer than one row may hold. */
+      note: string | null
+      url: string | null
+      foundBy: string | null
+      capturedAt: string | null
+    }>(`/api/content/meetings/transcript?id=${enc(id)}`),
+  /** WHICH OF THE PEOPLE ON THE INVITATION WE KNOW — a colleague, or a contact on
+   * one of our accounts. A read rather than a column, because a contact added
+   * next week should light up on a meeting held last week. */
+  meetingPeople: (id: string) =>
+    api<{ links: MeetingPersonLink[] }>(`/api/content/meetings/people?id=${enc(id)}`),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),
   createMeeting: (input: {
@@ -638,6 +718,30 @@ export const content = {
       note: string | null
       meeting: Meeting | null
     }>("/api/content/meetings/transcript", post({ id })),
+
+  /* ------------------------- what we hand over ------------------------------
+   * One app's handover shelf. CAPPED rather than paged (R14): a shelf is
+   * curated, not accumulated. `appId` narrows at the DOOR, so the rows and the
+   * `total` beside them answer the same question (R16). */
+  deliverables: (appId: string) =>
+    api<{ deliverables: Deliverable[]; total: number }>(`/api/content/deliverables?appId=${enc(appId)}`),
+  deliverableOne: (id: string) =>
+    api<{ deliverables: Deliverable[] }>(`/api/content/deliverables?id=${enc(id)}`).then(
+      (r) => r.deliverables[0] ?? null
+    ),
+  createDeliverable: (input: Partial<Deliverable> & { appId: string }) =>
+    api<{ deliverables: Deliverable[]; total: number }>("/api/content/deliverables", post(input)),
+  updateDeliverable: (input: Partial<Deliverable> & { id: string; appId: string }) =>
+    api<{ deliverables: Deliverable[]; total: number }>("/api/content/deliverables/update", post(input)),
+  setDeliverableActive: (id: string, appId: string, active: boolean) =>
+    api<{ deliverables: Deliverable[]; total: number }>(
+      "/api/content/deliverables/active",
+      post({ id, appId, active })
+    ),
+  /** The bytes behind a deliverable (gated deliverables:create), streamed as the
+   * request body. Answers with the /media/internal URL the record then stores. */
+  uploadDeliverableFile: (dataUrl: string) =>
+    sendFile<{ url: string; contentType: string }>("/api/content/deliverables/upload-stream", dataUrl),
 
   /* ------------------- the agency's own housekeeping ------------------------
    * Two modules, both CAPPED rather than paged (R14) — an authored library and a
@@ -726,28 +830,57 @@ export const content = {
       sources: GoogleSource[]
     }>("/api/content/google/disconnect", post({ service })),
 
-  /** What could I name? Folders (Drive) or spaces (Chat) this person can see. */
-  googlePick: (service: "drive" | "chat", q?: string) =>
-    api<{ options: { externalId: string; name: string }[] }>(
-      `/api/content/google/pick?service=${enc(service)}${q ? `&q=${enc(q)}` : ""}`
+  /** What could I name? Folders or FILES (Drive), or spaces (Chat), this person
+   * can see. `named` false on a Chat option means the label is one WE wrote from
+   * the space's type — Google leaves the name of a direct message empty — so the
+   * picker can say so rather than presenting our sentence as Google's. */
+  googlePick: (service: "drive" | "chat", q?: string, kind?: "folder" | "file") =>
+    api<{
+      options: {
+        externalId: string
+        name: string
+        named: boolean
+        iconUrl: string | null
+        mimeType: string
+        /** whether Google can render a picture of it — the FACT, not the link
+         * (that one is authenticated and expires). Ask
+         * `googleDriveThumbnailUrl` for the picture itself. */
+        hasThumbnail: boolean
+      }[]
+    }>(
+      `/api/content/google/pick?service=${enc(service)}${kind ? `&kind=${enc(kind)}` : ""}${
+        q ? `&q=${enc(q)}` : ""
+      }`
     ),
-  /** Share one — and say, in the same call, who may read it AND whose material
-   * it is. Both questions are about where the contents end up, and neither can
-   * be read back off the contents afterwards. */
-  googleAddSource: (input: {
+  /** Share SEVERAL — and say, in the same call, who may read them AND whose
+   * material they are. Both questions are about where the contents end up,
+   * neither can be read back off the contents afterwards, and both are the same
+   * answer for every item in one act of sharing, which is why the list is in the
+   * call rather than the call being made once per item. */
+  googleAddSources: (input: {
     service: "drive" | "chat"
-    externalId: string
-    name: string
+    items: { externalId: string; name: string; kind: GoogleSourceKind }[]
     shelf: GoogleShelf
     accountId?: string | null
-  }) => api<{ sources: GoogleSource[] }>("/api/content/google/sources", post(input)),
+  }) => api<{ sources: GoogleSource[]; shared: number }>("/api/content/google/sources", post(input)),
   googleSetSourceActive: (id: string, active: boolean) =>
     api<{ sources: GoogleSource[] }>("/api/content/google/sources/active", post({ id, active })),
 
+  /** Files in the folders I named PLUS the files I named one by one. Each row
+   * carries Google's own icon for its type — an unauthenticated static link,
+   * which is why it can go straight into a page where `thumbnailUrl` cannot
+   * (that one needs `googleDriveThumbnailUrl` below). */
   googleDriveFiles: (q?: string) =>
-    api<{ files: { id: string; name: string; webViewLink: string | null; folderId: string }[] }>(
-      `/api/content/google/drive/files${q ? `?q=${enc(q)}` : ""}`
-    ),
+    api<{ files: DriveFileRow[] }>(`/api/content/google/drive/files${q ? `?q=${enc(q)}` : ""}`),
+  /** THE ADDRESS OF A PREVIEW, not the preview — a src for an `<img>`.
+   *
+   * Google's own `thumbnailLink` is authenticated and expires within hours, so
+   * it cannot be put in a page; this points at our own door, which fetches the
+   * picture with the caller's token and never stores it. A plain string rather
+   * than a fetch because that is what an `<img src>` wants, and because the
+   * browser's own cache is then the thing that stops a list asking twice. */
+  googleDriveThumbnailUrl: (fileId: string) =>
+    `/api/content/google/drive/thumbnail?fileId=${enc(fileId)}`,
   googleMail: (q?: string) =>
     api<{ messages: MailSummary[]; contactsUsed: number; note?: string }>(
       `/api/content/google/gmail/messages${q ? `?q=${enc(q)}` : ""}`

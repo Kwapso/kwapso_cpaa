@@ -27,8 +27,10 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
-import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { ValuePanel } from "@/components/value-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -84,7 +86,7 @@ export function ProcessesScreen({
 }) {
   const t = useT()
   // Who can be put on an app (8.10), for the record-an-app dialog below.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   // Page one, and its next cursor parked in the sidecar <LoadMore> reads (R14).
   // The same fetcher primes the exact `total:` sidecar the heading badges (R16).
   const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
@@ -108,6 +110,9 @@ export function ProcessesScreen({
         name: values.name,
         description: values.description || undefined,
         baselineLabel: values.baselineLabel || undefined,
+        // The form has always asked; now it is also sent. Without it the map
+        // is born with no role, and no role means no rate means no money.
+        roleName: values.roleName || undefined,
       })
       invalidate(processesKey(teamId))
       invalidate(valueKey(teamId))
@@ -138,13 +143,11 @@ export function ProcessesScreen({
   const apps = (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the count lives in the heading (a sidebar page has no tab strip to
           badge), and it is the door's exact COUNT(*) — never the loaded page's
           length, which on a paged list is just "50" forever. */}
       <CollectionHeading sectionKey="processes" total={total} />
-
-      <ValuePanel view={valueQ.data} />
 
       {/* R14's other half: maps are kept rather than replaced, and the oldest is
           the one a client asks about — so the search box is answered by the door
@@ -153,6 +156,8 @@ export function ProcessesScreen({
         listKey={processesKey(teamId)}
         placeholder={t("Search processes…")}
         noun="maps"
+        sorts={translatedSorts("processes", t)}
+        defaultSort={COLLECTION_SORTS.processes.defaultSort}
         fetchPage={(query, cursor) =>
           tenancy
             .processes({ ...query, cursor })
@@ -196,6 +201,15 @@ export function ProcessesScreen({
           )
         }}
       </PagedFind>
+
+      {/* WHAT THE MAPS ADD UP TO — under them, not over them. `ValuePanel` is a
+          headline, R25's caption and a three-level accordion, and it sat between
+          the heading and the search box: four blocks before the first process on
+          a screen called Processes (N2). The person came for the list. It is the
+          SUM of the rows above it, so it reads better after them anyway, and it
+          is one scroll away rather than a click — which is the trade the owner
+          asked for when he said people should be happy to scroll. */}
+      <ValuePanel view={valueQ.data} />
 
       <AppFormDialog
         members={members}

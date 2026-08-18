@@ -56,7 +56,7 @@ import {
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import type { Account, AccountDetail, AccountRate } from "@shared/types"
+import type { Account, AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
 import { moneyText } from "@shared/web/money"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
@@ -67,19 +67,27 @@ import {
   type Confirm,
   type PanelActions,
 } from "@/components/account-detail-panels"
-import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
+import {
+  ContactCreateDialog,
+  ContactLinkDialog,
+  type ContactCreateValues,
+  type ContactLinkValues,
+} from "@/components/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/contact-detail"
-import { AppFormDialog, useTeamMembers } from "@/components/app-form-dialog"
+import { AppFormDialog } from "@/components/app-form-dialog"
+import { SprintFormDialog } from "@/components/sprint-form-dialog"
+import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
-import { RichText } from "@/components/rich-text"
-import { safeSrc } from "@/lib/rich-text"
+import { RichText } from "@shared/web/rich-text-view"
+import { safeSrc } from "@shared/web/rich-text"
 import { ValuePanel } from "@/components/value-panel"
 import { createAppFrom } from "@/components/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
 import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
   RecordFooter,
@@ -92,8 +100,11 @@ import {
   accountKey,
   accountValueKey,
   accountsKey,
+  appsKey,
   listFetch,
   ratesKey,
+  sprintsKey,
+  todosKey,
   totalKey,
 } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -101,6 +112,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
 
 export function AccountDetailScreen({
@@ -135,7 +147,13 @@ export function AccountDetailScreen({
 
   const { can } = usePermissions(teamId)
   // Who can be put on an app (8.10), for the record-an-app dialog below.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
+  // THE SYSTEMS A SPRINT ON THIS CLIENT COULD COVER. The SAME cache key the
+  // Apps screen (and every other form in the work engine) reads, narrowed here
+  // rather than asked for again: a sprint covers one app and an app belongs to
+  // one account, so offering another client's systems would be offering a row
+  // the door would refuse.
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
   const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")
@@ -146,6 +164,11 @@ export function AccountDetailScreen({
   const canSeeContacts = can("contacts", "read")
   const canLinkContacts = can("contacts", "create")
   const canUnlinkContacts = can("contacts", "delete")
+  // MAKING a contact is two writes and therefore two rights: the person is an
+  // `accounts` row and being a contact here is a `contacts` row. Both doors gate
+  // on their own (R10) — this only decides whether to offer a button that would
+  // come straight back a 403. Linking somebody we already hold stays one right.
+  const canCreateContacts = canLinkContacts && can("accounts", "create")
   // THE WORK HANGING OFF THIS CLIENT. Apps are the record directly below an
   // account (an app belongs to ONE account, always — the owner's ruling), and
   // the sprints and to-dos beside them are the two other collections a door
@@ -154,7 +177,15 @@ export function AccountDetailScreen({
   const canSeeApps = can("processes", "read")
   const canWriteApps = can("processes", "create")
   const canSeeWork = can("work", "read")
+  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Selling a block of work is
+  // `work:create` and asking a client for something is `todos:create` — the
+  // rights the SPRINT door and the TO-DO door gate on. Standing on an account
+  // record is not a right; `accounts:*` says nothing about whether a person may
+  // put work on the backlog. The door decides either way (R10); these only
+  // decide whether we draw a button that would come back a 403.
+  const canWriteWork = can("work", "create")
   const canSeeTodos = can("todos", "read")
+  const canAskTodo = can("todos", "create")
   const canCancelTodo = can("todos", "delete")
   // WHAT THIS CLIENT IS CHARGED. A second module on the same record, like the
   // logins above: reading a phone number and seeing a price are different sized
@@ -174,18 +205,30 @@ export function AccountDetailScreen({
       })
   )
 
-  // R16: the exact totals those tabs badge, each primed by the panel's own fetch
-  // over the same filter its rows came from.
-  const appsTotal = useCachedValue<number>(totalKey("apps-account", accountId))
-  const sprintsTotal = useCachedValue<number>(totalKey("sprints-account", accountId))
-  const todosTotal = useCachedValue<number>(totalKey("todos-account", accountId))
-  const ratesTotal = useCachedValue<number>(totalKey("account-rates", accountId))
+  // THE BADGES, BEFORE THE CLICK. One bounded read of every child total on this
+  // record, primed into the same sidecars below — so a tab with work behind it
+  // says so on arrival instead of only once you open it. The ROWS stay lazy:
+  // each panel still fetches its own when its tab is shown.
+  useRecordCounts("accounts", accountId)
+  // R16: the exact totals those tabs badge — from the counts read above, and
+  // re-primed by each panel's own fetch over the same filter its rows came from.
+  // `null` is a THIRD answer beside a number and an absence: the role holds no
+  // read right on that module, so nobody counted (R18). It renders as nothing,
+  // like a zero and like a still-loading total, and stays distinguishable from
+  // both in the cache.
+  const appsTotal = useCachedValue<number | null>(totalKey("apps-account", accountId))
+  const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-account", accountId))
+  const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
+  const ratesTotal = useCachedValue<number | null>(totalKey("account-rates", accountId))
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
+  const [newContactOpen, setNewContactOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [appOpen, setAppOpen] = React.useState(false)
+  const [sprintOpen, setSprintOpen] = React.useState(false)
+  const [todoOpen, setTodoOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
 
   /** Re-read what this screen shows after our own write. (Everyone else's screen
@@ -267,6 +310,69 @@ export function AccountDetailScreen({
     toast.success(t("Contact added."))
   }
 
+  /** MAKE a person and put them on this company. Two writes, on purpose.
+   *
+   * THE LINK AND THE PARENT POINTER ARE DIFFERENT FACTS, and this does both.
+   * The parent says "Marta sits under Bergman" — one company, the tree the
+   * header draws. The LINK says "Marta is a contact of Bergman" — and the same
+   * person can hold several of those, at companies she does not sit under,
+   * which is precisely what a single pointer cannot express (see
+   * contact-link-dialog's header). Creating with a parent does NOT create a
+   * link, so the tab she was created on would not list her. Hence both.
+   *
+   * THE TYPE IS WRITTEN HERE, BY THE CODE. A contact is a person, always — it
+   * is not a question this form asks, the way it is no longer a question the
+   * account form asks (18 Aug 2026).
+   *
+   * WHEN THE SECOND WRITE FAILS. The person now exists and is not a contact.
+   * We do NOT roll her back: undoing it means archiving an account, which needs
+   * a right this caller may well not hold and is itself a write that can fail —
+   * a rollback that fails silently is worse than the state it was fixing. So we
+   * say exactly what happened and where she is. She is a live account, in the
+   * accounts list and findable by the Add contact search on this very tab, so
+   * the recovery is one button away and nothing is stranded in silence. The
+   * dialog closes rather than staying open, because a second submit would make
+   * a second Marta.
+   */
+  async function createContact(values: ContactCreateValues) {
+    const name = values.name.trim()
+    const { id } = await tenancy.createAccount({
+      accountType: "individual",
+      name,
+      parentAccountId: accountId,
+      email: values.email.trim() || undefined,
+      phone: values.phone.trim() || undefined,
+    })
+    try {
+      await tenancy.linkPerson({
+        accountId,
+        personAccountId: id,
+        relationship: values.relationship.trim() || undefined,
+        isMainStakeholder: values.isMainStakeholder,
+      })
+    } catch (err) {
+      refresh()
+      // Through `t` with a placeholder rather than a template literal: a
+      // computed string has no English key, so the catalogue cannot hold it and
+      // it would ship in English to somebody who chose German (R28 ·
+      // shared/i18n.ts `fill`). The server's own sentence rides in the same way
+      // when it has one — it is the half that knows WHY.
+      toast.error(
+        err instanceof ApiFailure
+          ? t("{name} is now in your accounts, but not a contact here: {reason} Use Add contact to finish.", {
+              name,
+              reason: err.message,
+            })
+          : t("{name} is now in your accounts, but we couldn't make them a contact here. Use Add contact to finish.", {
+              name,
+            })
+      )
+      return
+    }
+    refresh()
+    toast.success(t("Contact added."))
+  }
+
   if (detailQ.error)
     return <p className="text-destructive text-sm">{t("Couldn't load the account.")}</p>
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
@@ -287,7 +393,7 @@ export function AccountDetailScreen({
       />
     )
 
-  // THE STORED PATH, through the one URL boundary (lib/rich-text safeSrc): the
+  // THE STORED PATH, through the one URL boundary (shared/web/rich-text safeSrc): the
   // column is ordinary text a machine caller can write, so what reaches a `src`
   // is checked here rather than trusted because we happen to have written it.
   const cover = safeSrc(account.coverUrl)
@@ -489,7 +595,7 @@ export function AccountDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -556,7 +662,7 @@ export function AccountDetailScreen({
                         comes with the hours: a figure a client cannot account
                         for is worse than no figure at all. */}
                     {moneyBack && (
-                      <div className="rounded-lg border p-4">
+                      <div className="rounded-xl border p-4">
                         <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
                         <p className="text-2xl font-semibold tracking-tight tabular-nums">{moneyBack}</p>
                         <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
@@ -576,9 +682,11 @@ export function AccountDetailScreen({
                 accountName={account.name}
                 links={links}
                 canCreate={canLinkContacts}
+                canCreatePerson={canCreateContacts}
                 canArchive={canUnlinkContacts}
                 actions={actions}
                 onAdd={() => setLinkOpen(true)}
+                onNew={() => setNewContactOpen(true)}
                 onOpen={openAccount}
               />
             )
@@ -602,11 +710,19 @@ export function AccountDetailScreen({
                 ownerId={accountId}
                 filter={{ accountId }}
                 host={{ base: basePath.replace(/\/accounts$/, "") }}
+                onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
                 emptyText={`Nothing has been sold to ${account.name} yet.`}
               />
             )
           if (tabItem.value === "todos")
-            return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
+            return (
+              <TodosPanel
+                teamId={teamId}
+                accountId={accountId}
+                canCancel={canCancelTodo}
+                onNew={canAskTodo ? () => setTodoOpen(true) : undefined}
+              />
+            )
           // THE KNOWLEDGE BASE, IN CONTEXT (7.15), THE SAME WAY AN APP DOES IT
           // (8.9). Two things travel and they do different jobs. `accountId`
           // names the COMPARTMENT, so a question typed here cannot be answered
@@ -630,6 +746,7 @@ export function AccountDetailScreen({
                 onOpenSource={(sourceId) =>
                   softNavigate(`${basePath.replace(/\/accounts$/, "")}/knowledge/${sourceId}`)
                 }
+                onOpenRecord={(path) => softNavigate(`${basePath.replace(/\/accounts$/, "")}/${path}`)}
               />
             )
 
@@ -711,6 +828,71 @@ export function AccountDetailScreen({
         }}
       />
 
+      {/* MOUNTED ONLY WHEN OPEN, unlike the app and contact dialogs above. These
+          two resolve the team THEMSELVES (`useActiveTeam`) and fetch their own
+          pickers, so keeping them mounted behind a closed dialog would cost every
+          reader of an account record a router subscription and two list reads for
+          a form nobody has asked for. The draft survives either way — it lives in
+          session storage, which is the whole point of Law R7.
+
+          A BLOCK OF WORK SOLD TO THIS CLIENT, written from their own record with
+          the client already chosen. A sprint cannot be moved to another client
+          afterwards (the update door refuses it), so being on the right record
+          when you write it down is the whole safeguard — the same argument the
+          app form above makes. The APP is left as a question: a client has more
+          than one system and the sprint has to say which. */}
+      {sprintOpen && (
+      <SprintFormDialog
+        open={sprintOpen}
+        onOpenChange={setSprintOpen}
+        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === accountId).map((a) => ({ id: a.id, name: a.name }))}
+        fixedAccount={{ id: accountId, name: account.name }}
+        draftKey={`sprint:add:account:${accountId}`}
+        onSubmit={async (v) => {
+          await contentApi.createSprint({
+            name: v.name,
+            goal: v.goal || undefined,
+            sprintType: v.sprintType || undefined,
+            accountId,
+            appId: v.appId || undefined,
+            startsOn: v.startsOn || undefined,
+            endsOn: v.endsOn || undefined,
+            soldPriceCents: v.soldPriceCents,
+            currency: v.currency || undefined,
+          })
+          // The new sprint arrives ALREADY on this client, so the slice this tab
+          // reads is the one cache that has to be told. Everyone else's screen is
+          // patched by the publish the door already sends (R1/R15).
+          invalidate(sliceKey("sprints-account", accountId))
+          invalidate(sprintsKey(teamId))
+          toast.success(t("Sprint started."))
+        }}
+      />
+      )}
+
+      {/* SOMETHING WE NEED FROM THIS CLIENT. Same shape again: the client is a
+          fact about where you are standing, and it is the field that decides
+          whose portal this lands in. */}
+      {todoOpen && (
+      <TodoFormDialog
+        open={todoOpen}
+        onOpenChange={setTodoOpen}
+        fixedAccount={{ id: accountId, name: account.name }}
+        draftKey={`todo:add:account:${accountId}`}
+        onSubmit={async (v: TodoFormValues) => {
+          await contentApi.raiseTodo({
+            accountId,
+            title: v.title,
+            detail: v.detail || undefined,
+            dueOn: v.dueOn ? new Date(v.dueOn).toISOString() : undefined,
+          })
+          invalidate(sliceKey("todos-account", accountId))
+          invalidate(todosKey(teamId))
+          toast.success(t("Asked, and emailed to them."))
+        }}
+      />
+      )}
+
       <ContactLinkDialog
         open={linkOpen}
         onOpenChange={setLinkOpen}
@@ -719,6 +901,17 @@ export function AccountDetailScreen({
         draftKey={`account:contact:${accountId}`}
         excludeIds={[accountId, ...links.filter((l) => l.active).map((l) => l.personAccountId)]}
         onSubmit={addContact}
+      />
+
+      {/* The other way onto the same tab — a person who did not exist yet. Its own
+       * draft key, because a half-typed new person and a half-picked existing one
+       * are two different half-finished errands. */}
+      <ContactCreateDialog
+        open={newContactOpen}
+        onOpenChange={setNewContactOpen}
+        accountName={account.name}
+        draftKey={`account:new-contact:${accountId}`}
+        onSubmit={createContact}
       />
 
       {/* One confirm for every red action — nothing here deletes, so each one says

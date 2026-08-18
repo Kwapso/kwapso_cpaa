@@ -6,22 +6,48 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
-import { Plus, Mail, Upload, Download } from "lucide-react"
+import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "lucide-react"
 
-export function NoAccess() {
+/** A state with nothing in it still gets a face. One glyph in the leading slot,
+ * `aria-hidden` beside the sentence that carries the meaning (UI-CONVENTIONS §5)
+ * — a bare line of grey text in the middle of a page reads as a screen that
+ * failed rather than a screen with nothing on it. */
+function StateLine({
+  icon: Icon,
+  tone,
+  children,
+}: {
+  icon: typeof Lock
+  tone?: "muted" | "destructive"
+  children: React.ReactNode
+}) {
+  const colour = tone === "destructive" ? "text-destructive" : "text-muted-foreground"
   return (
-    <p className="text-muted-foreground text-sm">
-      You don&apos;t have access to this, or it doesn&apos;t exist.
+    <p className={`flex items-center gap-2 text-sm ${colour}`}>
+      <Icon aria-hidden className="size-4 shrink-0" />
+      {children}
     </p>
   )
 }
 
+export function NoAccess() {
+  return (
+    <StateLine icon={Lock}>
+      You don&apos;t have access to this, or it doesn&apos;t exist.
+    </StateLine>
+  )
+}
+
 export function NotFound() {
-  return <p className="text-muted-foreground text-sm">That screen doesn&apos;t exist.</p>
+  return <StateLine icon={SearchX}>That screen doesn&apos;t exist.</StateLine>
 }
 
 export function LoadError({ what }: { what: string }) {
-  return <p className="text-destructive text-sm">Couldn&apos;t load {what}.</p>
+  return (
+    <StateLine icon={TriangleAlert} tone="destructive">
+      Couldn&apos;t load {what}.
+    </StateLine>
+  )
 }
 
 /** Box a collection (its title/search/filter/rows) into ONE card surface so it
@@ -105,7 +131,7 @@ export function SectionWithCreate({
         // Global UI rule — see UI-CONVENTIONS "Action-button rows never clip".
         <div className="flex flex-wrap justify-end gap-2">
           {showDownload && download && (
-            <Button asChild variant="outline" className="gap-1.5">
+            <Button asChild variant="outline" className="gap-1">
               <a href={download.href}>
                 <Download className="size-4" />
                 {download.label}
@@ -113,7 +139,7 @@ export function SectionWithCreate({
             </Button>
           )}
           {showSecondary && secondary && (
-            <Button variant="outline" onClick={secondary.onClick} className="gap-1.5">
+            <Button variant="outline" onClick={secondary.onClick} className="gap-1">
               <Upload className="size-4" />
               {secondary.label}
             </Button>

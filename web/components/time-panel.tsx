@@ -22,6 +22,7 @@
 
 import * as React from "react"
 
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -45,18 +46,20 @@ import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
 
-/** One row of time, in a sentence: what it was on, who, how long, and whether we
- * are charging for it. */
+/** THE META LINE OF A ROW OF TIME: who, and when. Two facts, and it used to be
+ * five.
+ *
+ * The row was `targetLabel · userName · date · "not billable" · kind · note ·
+ * duration · Edit` — eight things on one line, the worst row in the agency app
+ * by the glance budget's own count (UI-RULEBOOK N1 caps a band at four). K1 is
+ * the shape it takes instead: a title, ONE meta line, and the number the row is
+ * for. So the two STATES (not billable, the kind of work) leave the sentence and
+ * become a badge, which is what a state is; and the NOTE leaves the row
+ * altogether, because a note is a paragraph somebody wrote and a list is not
+ * where you read one — it is on the record, one click away, and the click is
+ * cheaper than the crowd. */
 function line(l: WorkLog): string {
-  return [
-    l.userName,
-    l.startedAt.slice(0, 10),
-    l.billable ? null : "not billable",
-    l.kind,
-    l.note,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  return [l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")
 }
 
 /** Everything a row of time touches: the team's list and its totals, the header
@@ -95,7 +98,7 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
       refreshTime(teamId)
       toast.success(t("Timer started."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't start that timer.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't start that timer."))
     }
   }
 
@@ -103,9 +106,9 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
     try {
       await contentApi.resolveRunaway(id, answer)
       refreshTime(teamId)
-      toast.success(answer === "discard" ? "Binned, nothing was counted." : "Stopped, kept in full.")
+      toast.success(answer === "discard" ? t("Binned, nothing was counted.") : t("Stopped, kept in full."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
     }
   }
 
@@ -114,10 +117,10 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
   return (
     <section className="flex flex-col gap-2">
       {canCreate && mine.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul className="flex flex-wrap gap-2">
           {mine.map((s) => (
             <li key={s.id}>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => start(s.id)}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => start(s.id)}>
                 <Play className="size-3.5" />
                 {s.title.length > 34 ? `${s.title.slice(0, 34)}…` : s.title}
               </Button>
@@ -141,31 +144,35 @@ function RunawayPrompts({
   runaways: RunningTimer[]
   onAnswer: (id: string, answer: "keep" | "discard") => void
 }) {
+  // The timer used to be bound as `t` here, which shadowed the translate
+  // function and is why every sentence in this block was still in English on a
+  // German screen (R28). Renamed, not worked around.
+  const t = useT()
   return (
     <>
-      {runaways.map((t) => (
+      {runaways.map((timer) => (
         <div
-          key={t.id}
-          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+          key={timer.id}
+          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm"
         >
           <span>
-            <AlarmClockOff className="mr-1.5 inline size-3.5" />A timer on{" "}
-            <strong>{t.targetLabel ?? "something"}</strong> has been running for{" "}
-            {clockFrom(t.elapsedSeconds)}.
+            <AlarmClockOff className="mr-1.5 inline size-3.5" />
+            {t("A timer on")} <strong>{timer.targetLabel ?? t("something")}</strong>{" "}
+            {t("has been running for")} {clockFrom(timer.elapsedSeconds)}.
           </span>
-          <span className="flex gap-1.5">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onAnswer(t.id, "keep")}>
+          <span className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => onAnswer(timer.id, "keep")}>
               <CircleStop className="size-3.5" />
-              Keep it all
+              {t("Keep it all")}
             </Button>
             <Button
               variant="destructive"
               size="sm"
-              className="gap-1.5"
-              onClick={() => onAnswer(t.id, "discard")}
+              className="gap-1"
+              onClick={() => onAnswer(timer.id, "discard")}
             >
               <Trash2 className="size-3.5" />
-              Bin it
+              {t("Bin it")}
             </Button>
           </span>
         </div>
@@ -240,9 +247,9 @@ export function TimePanel({
     try {
       await contentApi.resolveRunaway(id, answer)
       refreshTime(teamId)
-      toast.success(answer === "discard" ? "Binned, nothing was counted." : "Stopped, kept in full.")
+      toast.success(answer === "discard" ? t("Binned, nothing was counted.") : t("Stopped, kept in full."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
     }
   }
 
@@ -251,13 +258,13 @@ export function TimePanel({
   const runaways = (timersQ.data ?? []).filter((t) => t.runaway)
 
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-2">
         {/* THE HOURS. Not the collection's count (the heading above says that) —
             the number anybody reading a timesheet actually came for. */}
-        <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <p className="text-muted-foreground flex items-center gap-1 text-sm">
           <Clock className="size-3.5" />
-          {totalSeconds ? `${clockFrom(totalSeconds)} logged` : "Nothing logged yet"}
+          {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
         </p>
         {canCreate && (
           <AddButton label={t("Log time")} onClick={() => setAddOpen(true)} />
@@ -269,29 +276,52 @@ export function TimePanel({
       {logs.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No time logged yet.")}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-md border">
+        <ul className="divide-border divide-y rounded-xl border">
           {logs.map((l) => (
-            <li key={l.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+            <li key={l.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{l.targetLabel ?? "—"}</p>
-                <p className="text-muted-foreground truncate text-xs">{line(l)}</p>
+                <p className="text-muted-foreground flex items-center gap-2 truncate text-xs">
+                  {line(l)}
+                  {/* THE STATES, at the END of the meta line, never inside it —
+                      a badge is how the eye reads "this row is unusual" without
+                      reading the row (N4). Only the exceptions are drawn: nearly
+                      all time is billable and most of it has no kind said, and a
+                      badge on every row is a badge that says nothing. */}
+                  {!l.billable && (
+                    <Badge variant="outline" className="shrink-0">
+                      {t("not billable")}
+                    </Badge>
+                  )}
+                  {l.kind && (
+                    <Badge variant="secondary" className="shrink-0">
+                      {l.kind}
+                    </Badge>
+                  )}
+                </p>
               </div>
               <span className="shrink-0 text-sm tabular-nums">
-                {l.endedAt ? clockFrom(l.seconds) : "running"}
+                {l.endedAt ? clockFrom(l.seconds) : t("running")}
               </span>
               {/* FIX A LINE. Only on time that has FINISHED: a running timer is
                   corrected by stopping it, and a start time you can edit while
                   the clock is still counting is two people writing the same
-                  number. */}
+                  number.
+
+                  ICON ONLY, in the trailing slot. The word "Edit" beside a
+                  pencil on every row of a 2,940-row timesheet is the same word
+                  2,940 times; the pencil is the mapping this app uses everywhere
+                  (UI-CONVENTIONS §4) and the label rides on `aria-label` for
+                  anybody who needs it read out. */}
               {canEdit && l.endedAt && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => setEditing(l)}
-                  className="shrink-0 gap-1.5"
+                  className="shrink-0"
+                  aria-label={t("Edit")}
                 >
                   <Pencil className="size-3.5" />
-                  {t("Edit")}
                 </Button>
               )}
             </li>

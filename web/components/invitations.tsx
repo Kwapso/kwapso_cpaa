@@ -89,7 +89,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
             size="sm"
             onClick={() => void accept(inv)}
             disabled={accepting !== null}
-            className="gap-1.5"
+            className="gap-1"
           >
             {accepting === inv.id ? <Spinner /> : null}
             {accepting === inv.id ? "Joining…" : "Accept"}

@@ -12,15 +12,9 @@ import {
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Mail } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -111,22 +105,16 @@ export function InviteDialog({
         />
       </Field>
       <Field config={roleField} htmlFor="invite-role" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="invite-role"
           value={values.roleId}
-          onValueChange={(roleId) => setValues((v) => ({ ...v, roleId }))}
+          onChange={(roleId) => setValues((v) => ({ ...v, roleId }))}
+          options={roles.map((r) => ({ value: r.id, label: r.title }))}
+          placeholder={t("Role")}
+          searchPlaceholder={t("Search roles…")}
+          emptyText={t("No role matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="invite-role" className="w-full">
-            <SelectValue placeholder={t("Role")} />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                {r.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
     </FormShellDialog>
   )

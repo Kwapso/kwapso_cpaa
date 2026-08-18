@@ -258,3 +258,138 @@ longer builds the purged ones.
 | 15.6 | A settings page in the client portal | You confirmed none is needed. The picker sits in the header |
 | 15.7 | A new staging backdoor | One already exists, refuses production in code, and carries its own dedicated secret. Building a second would add attack surface for nothing |
 | 15.8 | "What it costs us a month" on an app | Aurora deferred it to version two herself: "it's a much more complex topic, not a single number" |
+
+---
+
+# Round two: 18 August 2026
+
+Everything from your testing pass on staging, in your own words. Round one is above and
+stays there as the record. **BUILDING** means a lane is on it in this session right now.
+
+## 16 · What you tested and passed
+
+| # | The thing | Status |
+|---|---|---|
+| 16.1 | Paste a ticket link into a new tab, it opens the ticket | **DONE**, confirmed by you |
+| 16.2 | Click a status chip, nothing happens, it is a label | **DONE**, confirmed by you |
+| 16.3 | Tasks, six tabs, progress bar on every one | **DONE**, confirmed by you |
+| 16.4 | Any record on a phone, buttons below the title, tabs stay put | **DONE**, confirmed by you |
+| 16.5 | The sidebar: Marketing, Learning, Delivery method and Process maps gone, Time is Work logs, Kwapso is new | **DONE**, confirmed by you |
+| 16.6 | Seventeen of your own repeating meetings, pulled from your real calendar | **DONE**, confirmed by you |
+| 16.7 | Anthropic credit added | **DONE**, by you |
+| 16.8 | Gmail reconnected with the labelling permission | **DONE**, by you, screenshot confirms all four services connected as alaap@kwapso.com |
+
+## 17 · Inputs and the people in them
+
+| # | The thing | Status |
+|---|---|---|
+| 17.1 | Every long-text input on a primary screen becomes a rich text notes component, and renders as rich text too | **DONE**, 15 more fields across both doors. The sanitizer moved to shared code, because a client types a ticket in the portal and staff read it in the agency app — one body, two doors, and the portal may not import from the agency app |
+| 17.2 | Clients stop appearing in internal people pickers on stories, tickets and tasks | **DONE**, and the cause was structural: a portal login IS an ordinary team member, so client contacts sat in the member list with nothing on the row to tell them apart. One seam now decides for all nine pickers |
+| 17.3 | Clients appear in exactly two places: marking to-dos, and raising a ticket on their behalf | **DONE**, and neither of the two is a person picker — a to-do names an account, a client-behalf ticket names an account and a contact |
+| 17.4 | The same name appears twice in "Who's doing it" | **DONE**, and it was not a repeated row. It was two different people with one display name, an agency login and a client login for the same human. Clients dropping out removes that pair; any name that is not unique now carries its email |
+
+## 18 · Meetings and the calendar
+
+| # | The thing | Status |
+|---|---|---|
+| 18.1 | A link that opens the meeting inside my calendar | **DONE** |
+| 18.2 | Location, stakeholders and every other piece of calendar data and metadata, organised | **DONE**, eighteen calendar fields where there were eleven, including the video link specifically rather than whatever the conference block lists first — a dial-in number must never be handed over as "the link" |
+| 18.3 | The call transcript is already there on older meetings | **PART DONE**, all three routes built. Nothing was ingested end to end: the lane could not reach the app's own Google connection |
+| 18.4 | The knowledge base ingests transcripts from calendar meetings, from Google Docs, and from emails announcing a Doc was made for a meeting | **PART DONE**, same reason. It rides the existing knowledge seam, which also closed a gap nobody had noticed — agendas and notes were never answerable at all |
+| 18.5 | Past events re-sync, because a transcript lands minutes to an hour after the room empties | **DONE**, fourteen days back as well as four weeks forward, and it asks for deleted instances, because a cancelled meeting is not absent, it is invisible |
+| 18.6 | Every record stays in step with its calendar entry, past events included | **DONE**, and stakeholders resolve as a READ rather than a stored column, so a contact added next week lights up on a meeting held last week |
+
+## 19 · Google, deeper
+
+| # | The thing | Status |
+|---|---|---|
+| 19.1 | Select several folders, several spaces and several files in one go | **DONE**, up to 25 at a time |
+| 19.2 | Share a Drive FILE, not only a folder | **DONE**, and your instinct was right: a Drive file does not have to sit in a folder at all, so folder-only genuinely shut some out |
+| 19.3 | Chat spaces show their names, not `spaces/lJXiZKAAAAE` | **DONE**, and the old fallback was not one — Google leaves the display name empty for every direct message, so it printed the id every time. It now says plainly when Google has no name |
+| 19.4 | Logos, icons, thumbnails and previews pulled in wherever Google data appears: search, knowledge base, meetings | **DONE**, thumbnails proxied with your own token rather than copied — a copy outlives the moment somebody unshares the document |
+| 19.5 | The sync button on every screen showing Google data, not only Settings and Meetings | **DONE**, one shared button on Settings, Meetings and the knowledge base |
+| 19.6 | Sync often enough to feel instant | **DONE**, per-screen freshness on top of the app-open catch-up that already existed, with no second sweep path and no interval |
+| 19.7 | The Chat app's Configuration tab in Google Cloud | **BLOCKED ON YOU**, Google refuses every post until name, avatar and description are filled in |
+
+## 20 · Language
+
+| # | The thing | Status |
+|---|---|---|
+| 20.1 | Every system string translated by us, at build time, in all 29 languages | **DONE**, 26,588 of 26,600. Sixteen languages complete, twelve at 99.9%. No placeholder lost, no product name lost |
+| 20.2 | What a person types is translated only when somebody asks for it, on the cheapest Haiku | **DONE**, one press, one unit, refunded on failure, and it writes nothing — your row does not change for anybody else |
+| 20.3 | One translation call routed everywhere it is needed, rather than one per field | **DONE**, a whole screen's text in one call, cached so a toggle back and a return visit are free |
+| 20.4 | The switcher becomes a dropdown, not 25 stretched pills | **DONE** |
+
+## 21 · How it looks, round two
+
+| # | The thing | Status |
+|---|---|---|
+| 21.1 | A cognitive-load metric of my own, measured on every page, screen, tab and detail screen | **DONE**, a glance score out of 100 from five counts taken off the code. 53 screens and 96 tabs measured, mean 75.9, seven screens under 55 |
+| 21.2 | One central rule set: colours, spacing, padding, separators, when a dropdown, when a shape | **DONE**, into the existing rule book as twelve new rules, not a third document |
+| 21.3 | The full horizontal span applied everywhere on desktop, the way work logs, tasks and meetings already do it | **PART DONE**, the ruling is written and R29 enforces it as a ratchet — the six screens that break it are pinned and a seventh cannot be added. Applying it is 21.4 |
+| 21.4 | The global rearrangement, executed against that rule set | **TO DO**, deliberately after the rules exist. Rearranging first is how you get 40 screens that each look reasonable and none of which match |
+| 21.5 | Charts and big numbers on the home page, main pages and detail screens, on real data, never taking the whole screen | **DONE**, on Home, tickets, work logs, sprints and both client screens. Deliberately NOT on tasks, where six badges and a progress bar already say every number a chart would draw |
+| 21.6 | Glyphs and icons on main screens, page icons and collections, not only detail screens | **PART DONE**, section icons on every collection heading, derived from the same key the title comes from. Four library gaps still block glyphs in rows, tabs, empty states and stat cards |
+| 21.7 | Dark mode reads better than light because the contrast between elements is clearer | **DONE**, and it turned out to be arithmetic: light separates page from card by 3.22, dark by 10.32. It is now the contrast rule rather than a preference |
+
+## 22 · Answered rather than built
+
+| # | The question | The answer |
+|---|---|---|
+| 22.1 | What actually was the deep link issue, and is it the mechanism Glide used? | Answered in full. It was the gateway's own list of which addresses it handles, not permissions and not the row id. Yes, the shape is the same as Glide's: the URL names the record, the page resolves it in the browser, and the server decides whether you may see it |
+| 22.2 | Is sync-on-open in place? | Yes, and proved live. Per-screen freshness is not, and is being built |
+| 22.3 | Why is Drive folder-wise only? | It was a scoping decision, not a limitation. File-level sharing is being added |
+| 22.4 | Why did the Value tab show hours but no money? | The money half needs a role on the process and a rate on that role. The hours half needs neither. Being diagnosed and made speakable |
+
+## 23 · Still blocked on you
+
+| # | The thing | What is needed |
+|---|---|---|
+| 23.1 | The Chat app's Configuration tab | Name, avatar, description in Google Cloud. Google 404s every post until then, and did before today |
+| 23.2 | The stray "co-op: check the account" text | The screenshot. The string is in no source file anywhere |
+| 23.3 | Production | Go or wait. Staging carries everything; production has deliberately not been touched |
+| 23.4 | The deliverables module (8.7) | It is a module, not a tab. Say whether to scope it now or park it |
+
+## 24 · Found while building round two
+
+Nobody asked for these. They are the faults the work walked into.
+
+| # | The thing | Status |
+|---|---|---|
+| 24.1 | Half the app could not be reached on a phone or a tablet | **DONE**, you reported it. Ten sections, five slots on the bottom bar, and nothing catching the other five — the rail beside it is desktop-only, so Tasks, Work logs, Meetings, Apps and Sprints had no way in at all. The comment above that line promised a "More" entry that was never built |
+| 24.2 | The Gmail promise on the Settings screen had stopped being true | **DONE**, finding the transcripts needed a second, narrow fence over four Google robot senders, and the screen still said "only mail to or from someone on one of your accounts". It was invisible precisely because the first fence works: Google's own no-reply addresses are nobody's contact |
+| 24.3 | None of the four privacy sentences was translated | **DONE**, they sat in a data table as bare properties, so somebody reading in German was told in English what kwapso may read from their mailbox |
+| 24.4 | Every process map in the app was born with no role | **DONE**, the form has asked "who does it" since the rate card shipped and nothing behind it read the answer. No role, no rate, no price — which is why you saw hours and no money |
+| 24.5 | A story could store the literal word "Assignee" as the person doing it | **DONE**, it resolved the name from the activity feed and fell back to the label |
+| 24.6 | The calendar sweep would have reported success while never reaching tomorrow | **DONE**, caught in the lane's own review: one straddling window spent its whole page on the past |
+| 24.7 | The charting library put 114 KB on every route | **DONE**, the whole app is one shell, and lazy-loading the component alone does nothing because its config lives in the same module. Isolated behind one dynamic import per app: the agency shell is 4 KB over baseline and the client's value screen is 100 KB lighter than before |
+| 24.8 | Three real defects in the translation generator | **DONE**, no checkpoint inside a language, curly quotes read as invented keys, and one bad value binning its whole batch of seven good ones |
+
+## 25 · Asked for after the first round-two build
+
+| # | The thing | Status |
+|---|---|---|
+| 25.1 | The Kwapso logo loop becomes the loader when the app boots | **BUILDING**, ported out of the 1 MB export into dependency-free SVG that paints before the app loads. The file you sent is not being shipped |
+| 25.2 | A new account is always a company, with no type dropdown on create or edit | **BUILDING**. Edit already had none |
+| 25.3 | A contact created under an account is always a person | **BUILDING**, and it needs a new capability: today "Add contact" only links somebody who already exists |
+
+## 26 · The knowledge base, after you tested it on two real accounts
+
+| # | The thing | Status |
+|---|---|---|
+| 26.1 | Anything with a client's id on it is searchable from that client's record | **BUILDING**, and it was not. Six kinds were indexed. Processes and their steps — which IS the scope — were never in there at all, nor tasks, work logs, to-dos, contacts or the rate card |
+| 26.2 | The material is rich enough to answer with | **BUILDING**, and this is the real fault behind both your screenshots. The whole indexed text of an account was its name, "is a company we work with", its reference and its status. The search worked perfectly and returned the only thing it had |
+| 26.3 | Every passage links to the record it came from | **BUILDING** |
+| 26.4 | Drive, Gmail, Chat, Calendar and transcripts are searched too | **DONE** for the four Google kinds; transcripts ride the meeting record |
+| 26.5 | A written answer, not a list of sources | **BUILDING**, on the cheapest model, one call per ask. It spends the allowance, which the screen used to say it did not |
+| 26.6 | Charts, flows and diagrams appear when they help, with no toggle | **BUILDING**, extending the four block kinds the assistant already draws rather than a second vocabulary |
+| 26.7 | The client portal gets none of this yet | **CHANGED**, your decision. It has no knowledge surface at all today, and none is being added — the fence is being built as if a client could reach it tomorrow, so switching it on later is a decision rather than a rebuild |
+| 26.8 | A re-index after the text changes | **TO DO**, existing rows carry a content hash and would be skipped as unchanged. One command after deploy |
+
+## 27 · Tabs
+
+| # | The thing | Status |
+|---|---|---|
+| 27.1 | A record's tab badges appear on arrival, not after you click the tab | **BUILDING**, you reported it. The badge reads a number out of the cache and never fetches it, so only the tab you clicked could have one. Contacts was the exception because its total rides the record's own read |
+| 27.2 | An empty tab and an uncounted tab stop looking the same | **BUILDING**, they render identically today, which is why a blank badge read as "nothing in there" |
+| 27.3 | The rows still load only when you open the tab | **BUILDING**, unchanged. Counts eagerly, rows lazily, exactly as you put it |

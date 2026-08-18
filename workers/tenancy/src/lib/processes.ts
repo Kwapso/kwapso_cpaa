@@ -27,6 +27,7 @@ import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { savingsView, type SavingsView, type StepFigures } from "@shared/workers/savings"
 import type { AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
@@ -75,6 +76,47 @@ async function insertRow(
 
 // ── apps ─────────────────────────────────────────────────────────────────────
 
+/** THE APPS THIS CALLER MAY SEE, AS A QUESTION — the account fence plus the
+ * optional narrowing to one client, written once so the rows and the count over
+ * them cannot be asked differently (R16). */
+function appsWhere(scope: AccountScope, opts: { accountId?: string }): { sql: string; params: string[] } {
+  const fence = accountScopeClause(scope, "account_id")
+  return {
+    sql: where([fence.sql, opts.accountId ? "account_id = ?" : undefined]),
+    params: opts.accountId ? [...fence.params, opts.accountId] : [...fence.params],
+  }
+}
+
+/** R16: the exact server COUNT(*) an Apps badge shows, over the SAME fence and
+ * the same narrowing the list applies. Not bounded through the count seam
+ * because `apps` is not a GROWING_COLLECTIONS row — an agency has tens of built
+ * systems, not thousands, which is the same reason the list is capped and not
+ * paged.
+ *
+ * Apart from the list because a client's record now badges its Apps tab BEFORE
+ * the tab is opened (shared/record-counts.ts) — the whole point being not to
+ * pull the rows to learn how many there are.
+ *
+ * IT DOES NOT SUBTRACT RECORD-LEVEL VISIBILITY, and that is deliberate rather
+ * than an oversight: `listApps` withholds four context FIELDS from a reader who
+ * is not staffed on an app (8.11), and everyone still SEES the app. The row is
+ * in the list either way, so the count over the list is the count. */
+export async function countApps(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: { accountId?: string } = {}
+): Promise<number> {
+  const q = appsWhere(scope, opts)
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM apps${q.sql}`,
+    q.params
+  )
+  return rows[0]?.n ?? 0
+}
+
 /** The team's apps. BOUNDED, not paged: an app is a whole built system, and an
  * agency has tens of them, not thousands — the collection that grows underneath
  * is `processes`, which pages. */
@@ -84,9 +126,7 @@ export async function listApps(
   scope: AccountScope,
   opts: { accountId?: string } = {}
 ): Promise<{ rows: AppRow[]; total: number }> {
-  const fence = accountScopeClause(scope, "account_id")
-  const sql = where([fence.sql, opts.accountId ? "account_id = ?" : undefined])
-  const params = opts.accountId ? [...fence.params, opts.accountId] : [...fence.params]
+  const { sql, params } = appsWhere(scope, opts)
   const [rows, counted] = await Promise.all([
     d1Query<{
       id: string
@@ -120,8 +160,9 @@ export async function listApps(
       params
     ),
     // R16: the exact total of what THIS caller may see — the same WHERE, so a
-    // badge can never count rows the list withholds.
-    d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM apps${sql}`, params),
+    // badge can never count rows the list withholds. ONE expression, shared with
+    // the eager badge above.
+    countApps(cfg, guard, scope, opts),
   ])
   // WHO MAY OPEN WHAT (8.11). Aurora's ruling: everyone still SEES an app in the
   // overview, and only the staff on it (plus an admin) open its detail. That is
@@ -175,7 +216,7 @@ export async function listApps(
         editedByName: scope.kind === "portal" ? null : r.editor_name,
       }
     }),
-    total: counted[0]?.n ?? 0,
+    total: counted,
   }
 }
 
@@ -606,6 +647,70 @@ function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: strin
   return { sql: where([fence.sql, ...filters]), params }
 }
 
+/** R16 (amended): the exact server total behind a process-map badge — the SAME
+ * WHERE and the SAME join the page uses, counted exactly to TOTAL_COUNT_CAP
+ * through the one bounded seam and reported as "at least" beyond it, because
+ * `processes` GROWS with ordinary use.
+ *
+ * Apart from the list for the reason the whole of shared/record-counts.ts
+ * exists: an app's Process maps tab is badged when the record opens, and pulling
+ * a page of maps to learn how many there are is what the eager count replaces. */
+export async function countProcesses(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: ProcessFilters = {}
+): Promise<number> {
+  const { sql, params } = processesWhere(scope, opts)
+  return countCollection(
+    cfg,
+    guard.databaseId,
+    `SELECT 1 FROM processes p JOIN apps a ON a.id = p.app_id${sql}`,
+    params
+  )
+}
+
+/** One process, as the list reads it off the join. Named rather than inline
+ * because PROCESS_SORTS reads the same row: a menu entry pairs its SQL with the
+ * field that mirrors it, and it can only do that if the field has a type. */
+type ProcessListRow = {
+  id: string
+  app_id: string
+  app_name: string
+  account_id: string | null
+  name: string
+  description: string | null
+  role_name: string | null
+  deactivated_at: string | null
+  created_at: string
+  version_count: number
+  step_count: number
+}
+
+/** WHAT THE PROCESS LIST MAY BE ORDERED BY (shared/workers/sorting.ts). Four
+ * names, each a column already on the row in front of whoever asked: the map's
+ * own name, the app it hangs off, when it was written down, and how many steps
+ * it has — which is the one an agency actually asks for ("which of these is the
+ * monster?"). `created` is the fallback, because newest-first is the order this
+ * list has always been in. */
+export const PROCESS_SORTS: SortMenu<ProcessListRow> = {
+  created: { expr: "p.created_at", dir: "desc", key: (r) => r.created_at },
+  name: { expr: "p.name", dir: "asc", key: (r) => r.name },
+  app: { expr: "a.name", dir: "asc", key: (r) => r.app_name },
+  // A COUNT is a number, and the cursor's key is text — so the position is
+  // zero-padded on both sides (`printf` in SQL, `padStart` off the row) and the
+  // comparison stays the one the ORDER BY made. Sorting "10" before "9" is the
+  // classic version of the bug this whole lane is about; doing it in the KEYSET
+  // is the version that silently drops rows instead of misplacing them.
+  steps: {
+    expr: `printf('%08d', (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
+             AND s.version_id = (SELECT id FROM process_versions v2 WHERE v2.process_id = p.id
+                                  ORDER BY v2.version_no DESC LIMIT 1)))`,
+    dir: "desc",
+    key: (r) => String(r.step_count ?? 0).padStart(8, "0"),
+  },
+}
+
 /** The team's processes, newest first, PAGED by key.
  *
  * R14: processes GROW with ordinary use — every app of every client grows a map,
@@ -617,27 +722,18 @@ export async function listProcesses(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: ProcessFilters & { cursor?: string | null } = {}
+  opts: ProcessFilters & { cursor?: string | null; ordering?: Ordering<ProcessListRow> } = {}
 ): Promise<Page<ProcessSummary> & { total: number }> {
   const { sql: base, params } = processesWhere(scope, opts)
-  const after = keysetAfter(decodeCursor(opts.cursor), "p.created_at")
+  // The ORDER BY, the keyset predicate and the next cursor's key all come off
+  // ONE ordering, so a sort cannot reach the rows and miss the cursor.
+  const ordering = opts.ordering ?? resolveOrdering(PROCESS_SORTS, "created", undefined, undefined)
+  const after = keysetAfter(decodeCursor(opts.cursor, ordering.sig), ordering.expr, ordering.dir, "p.id")
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
 
   const [rows, counted] = await Promise.all([
     // PAGE_SIZE + 1 is how hasMore is known without a second query.
-    d1Query<{
-      id: string
-      app_id: string
-      app_name: string
-      account_id: string | null
-      name: string
-      description: string | null
-      role_name: string | null
-      deactivated_at: string | null
-      created_at: string
-      version_count: number
-      step_count: number
-    }>(
+    d1Query<ProcessListRow>(
       cfg,
       guard.databaseId,
       `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
@@ -647,21 +743,17 @@ export async function listProcesses(
                  AND s.version_id = (SELECT id FROM process_versions v2 WHERE v2.process_id = p.id
                                       ORDER BY v2.version_no DESC LIMIT 1)) AS step_count
          FROM processes p JOIN apps a ON a.id = p.app_id${pageWhere}
-        ORDER BY p.created_at DESC, p.id DESC LIMIT ${PAGE_SIZE + 1}`,
+        ${orderBy(ordering, "p.id")} LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
     // R16 (amended): the total behind the page — the SAME WHERE and the SAME
     // join, so a badge can never count rows the list withholds — counted exactly
-    // to TOTAL_COUNT_CAP and "at least" beyond it.
-    countCollection(
-      cfg,
-      guard.databaseId,
-      `SELECT 1 FROM processes p JOIN apps a ON a.id = p.app_id${base}`,
-      params
-    ),
+    // to TOTAL_COUNT_CAP and "at least" beyond it. ONE expression, shared with
+    // the eager badge above.
+    countProcesses(cfg, guard, scope, opts),
   ])
 
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return {
     ...page,
     rows: page.rows.map((r) => ({
@@ -872,7 +964,20 @@ export async function createProcess(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { appId: string; name: string; description?: string; baselineLabel?: string }
+  input: {
+    appId: string
+    name: string
+    description?: string
+    baselineLabel?: string
+    /** WHOSE HOURS THIS TAKES (8.13) — the role the saving is priced in.
+     * It is on the CREATE now, not only the edit: the form has asked "who
+     * does it" since the role rate card shipped, and this door dropped the
+     * answer on the floor. So every process ever mapped was born with no
+     * role, and a process with no role has no rate, and an app whose
+     * processes have no rate reports its hours and 0.00 for the money —
+     * which is exactly what the owner opened the Value tab and saw. */
+    roleName?: string
+  }
 ): Promise<string> {
   const app = await appOrThrow(cfg, guard, scope, input.appId)
   const id = ulid()
@@ -883,6 +988,7 @@ export async function createProcess(
     account_id: app.accountId,
     name: input.name,
     description: input.description ?? null,
+    role_name: input.roleName ?? null,
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,

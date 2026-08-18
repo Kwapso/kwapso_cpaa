@@ -87,10 +87,10 @@ beforeEach(() => {
   sent = []
   holder.db = buildSpineDb()
   // The stakeholder reader resolves each person's PHOTO as well as their name and
-  // email — that is the disclosure, so the column has to exist here for the
-  // assertion to be about the right thing. Added locally rather than widening a
-  // fixture every other suite depends on.
-  db().exec("ALTER TABLE users ADD COLUMN image_url TEXT;")
+  // email — that is the disclosure, so the column has to exist for the assertion
+  // to be about the right thing. It used to be added here, locally, rather than
+  // widening a fixture every other suite depends on; the members door selects it
+  // too, so `image_url` is on the shared fixture now, where the real table has it.
   // THERE MUST BE A ROSTER TO LEAK. The stakeholder reader derives admins as
   // "holders of the role with is_default = 1", and the shared fixture's staff
   // role is not that role — so without this, the "no admin roster" case below

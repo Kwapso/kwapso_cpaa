@@ -176,6 +176,13 @@ describe("team schema", () => {
       // fenced rather than refused. `commercials` is the agency's own books, and
       // no client login passes one of its doors at all.
       "processes",
+      // WHAT WE HAND OVER on an app (8.7). Its own switch rather than four more
+      // rights on `processes`, because "may open the app" and "may publish the
+      // handover material against it" are two questions an agency answers
+      // differently for the same person. The rows carry the client's account id
+      // — the fence is built — but no portal door names the module, and every
+      // door on it refuses a client login the way the knowledge base's do.
+      "deliverables",
       "commercials",
       // THE WORK ENGINE — stories, the sprints they sit in, and the time logged
       // against them. Agency material: a client login never holds it, and every

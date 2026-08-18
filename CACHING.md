@@ -295,6 +295,47 @@ last page, `undefined` = nothing loaded yet).
   `web-portal/lib/tickets.ts`, the two share no lib). It sits inside
   `MAX_CACHED_ROWS` on purpose, so one list can never spend the whole tab's budget.
 
+### 13 · A record's tab badges are EAGER, its tab rows are LAZY
+
+A record detail's collection tabs badge a `total:<prefix>:<recordId>` sidecar
+through `useCachedValue`, which is a pure cache **read** and never fetches. For a
+long time the only thing that ever wrote those sidecars was the tab PANEL's own
+list fetch, so the number arrived when you opened the tab and not one moment
+sooner. And `formatCount` renders nothing for a zero **and** nothing for a
+missing number, so "nobody has looked yet" and "there are none of these" were the
+same pixels: every unopened tab read as an empty one. The owner reported it as
+"until I don't click on the tab, I am always assuming that there is no
+information in that tab".
+
+So the counts are fetched when the RECORD opens and the rows are still fetched
+when the TAB opens.
+
+- **One registry, three surfaces.** `shared/record-counts.ts` says which
+  collections hang off which record, which module's read right each one costs
+  (R18) and which live resource moves it (R15). The doors, the screen and the
+  listener all derive from it, because three hand-written copies of one list is
+  how two of them come to disagree (R8: a badge's collection is derived).
+- **`useRecordCounts(table, id)`** at the top of a record detail asks whichever
+  doors that record needs (`GET /api/{tenancy,content}/record-counts`), in
+  parallel, and primes **the same sidecars the badges already read**. Nothing on
+  the screen awaits it: the record is what a person came for, so the badges
+  arrive beside the content rather than in front of it.
+- **Three states, kept apart in the data even though two of them render the
+  same.** A NUMBER is counted (`0` means there are none, and we know). `null`
+  means the caller's role holds no read right on that module, so nobody counted.
+  ABSENT from the cache means not counted yet, which is the only one that ever
+  resolves into something else.
+- **It is two doors, not one**, because the counting functions live in the worker
+  that owns each module and a domain worker binds only AUTH and REALTIME. The
+  browser asks both at once; neither writes a second expression for a number the
+  other already owns (R16).
+- **A count that never refreshes is worse than a blank one**, because a blank
+  badge looks unloaded and a stale one looks right. The counts live under
+  `counts:record:<table>:<id>`, and every resource a record badges names those
+  keys in its `deps` (`recordCountDeps` in `web/lib/live-resources.ts`). A ping
+  carries the CHILD's id, never the parent's, so the open records are found by
+  looking at the cache.
+
 ## Checklist for a new screen / module
 1. Read with `useCached("<resource>:<scopeId>", fetcher)`.
 2. On every server write, `publishChange(env, teamId, "<resource>", id, op)`
@@ -306,6 +347,9 @@ last page, `undefined` = nothing loaded yet).
 6. If the collection GROWS with ordinary use, page it (rule 12): register it in
    `GROWING_COLLECTIONS`, prime the `cursor:` sidecar in its fetcher, and render
    `<LoadMore>`.
+7. If it hangs off a RECORD and badges a tab there, add it to `RECORD_CHILDREN`
+   (rule 13) and give its worker's door a counter, so the badge is there before
+   anybody clicks the tab.
 
 ## Loading & feedback (the rule for "something's happening")
 

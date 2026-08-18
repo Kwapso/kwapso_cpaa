@@ -4,7 +4,7 @@
 // can't be fooled by anything but the real code.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
@@ -19,8 +19,11 @@ import {
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
   MUTATING_WORKERS,
+  PAGE_WIDTH_OWNER,
   RAW_BODY_EXEMPT,
-  RECORD_DETAIL_COMPONENTS,
+  RECORD_DETAIL_NOT,
+  PALETTE_LITERAL_OK,
+  SCREEN_WIDTH_EXEMPT,
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
@@ -65,6 +68,51 @@ function componentFiles(): string[] {
   return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
+/** R2 / R8 — THE BESPOKE RECORD DETAILS, READ OFF THE CODE.
+ *
+ * A law that enumerates its subject from a hand-kept list has a hole by
+ * construction, and this one's opened twice. `RECORD_DETAIL_COMPONENTS` in the
+ * registry was that list: R2 and R8 walked exactly the screens somebody had
+ * remembered to type into it. `app-detail` and `process-detail` were added on 17
+ * Aug 2026 after a tester found faults on screens no law had ever read; `sprint-
+ * detail` and `story-detail` were found missing on 18 Aug, having shipped tabs
+ * and an Activity panel that neither law had ever looked at. Nothing was red
+ * either time. A screen that no law walks looks precisely like a screen that
+ * passes.
+ *
+ * So the subject is derived, the way R8 already derives which collection a badge
+ * describes. TWO INDEPENDENT SIGNALS, because either alone has a gap:
+ *
+ *   BY NAME       `web/components/**\/*-detail.tsx` — the convention every one of
+ *                 them already follows, and the one the hand-rolled-feed check
+ *                 below has always used.
+ *   BY BEHAVIOUR  it renders an `<ActivityPanel>` — a record's own history feed,
+ *                 which nothing but a record detail has any business drawing. This
+ *                 catches the detail screen that arrives under some other name.
+ *
+ * AND THE SIGNALS ARE DELIBERATELY NOT THE OBLIGATIONS, so nothing here is
+ * circular. R2 demands TabsView *and* ActivityPanel; a file caught by NAME is held
+ * to both with neither assumed, which is the case that actually bites — a new
+ * `foo-detail.tsx` shipped without tabs turns this red. A file caught only by
+ * BEHAVIOUR has satisfied one of the two by definition, and is still held to the
+ * other, and to every per-tab count R8 asks for.
+ *
+ * `RECORD_DETAIL_NOT` (registry) is the reasoned residue, rot-checked below.
+ *
+ * COMMENTS ARE STRIPPED FIRST, as every source scan here does (CONVENTIONS.md).
+ * Not housekeeping: R8's tab scan matches `{ value: "…" … badge: … }`, and
+ * `story-detail` writes three lines of comment between the brace and the value,
+ * so on the raw text its Work logs tab simply was not there. A tab a law cannot
+ * see is a tab with no count and nothing red — the same shape as the screens this
+ * census was written to stop losing, one level down. The blindness tripwire below
+ * is what surfaced it. */
+function recordDetailComponents(): { name: string; source: string }[] {
+  return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+    .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
+    .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+    .filter((c) => !RECORD_DETAIL_NOT[c.name])
+}
+
 describe("RULES — the laws of the base", () => {
   // L0 — the keystone: the doc, the data, and the table can't drift.
   it("registry-integrity: RULES.md lists exactly the law ids in RULES_REGISTRY", () => {
@@ -97,20 +145,49 @@ describe("RULES — the laws of the base", () => {
       "<LoadMore"
     )
 
-    for (const c of RECORD_DETAIL_COMPONENTS) {
-      const src = read(join(WEB, "components", `${c}.tsx`))
-      expect(src, `${c} must use library TabsView`).toContain("TabsView")
-      expect(src, `${c} must render the Activity tab through <ActivityPanel>`).toContain("<ActivityPanel")
+    const details = recordDetailComponents()
+    // The census must not go blind. A derivation that matches nothing reports the
+    // same all-clear as one that matched everything and found no fault, which is
+    // the exact failure the hand-kept list used to produce one screen at a time.
+    expect(
+      details.length,
+      "the record-detail census found almost nothing — the derivation has gone blind"
+    ).toBeGreaterThanOrEqual(9)
+
+    for (const c of details) {
+      expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
+      expect(c.source, `${c.name} must render the Activity tab through <ActivityPanel>`).toContain(
+        "<ActivityPanel"
+      )
+    }
+  })
+
+  // …and the exemptions can't rot. An entry naming a file the census would not
+  // have caught anyway is a line nobody can delete safely and nobody can justify —
+  // the ratchet RAW_BODY_EXEMPT already runs, so the list can only shrink.
+  it("record-detail-tabs: every RECORD_DETAIL_NOT entry is a real exemption", () => {
+    const caught = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+      .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
+      .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+      .map((c) => c.name)
+    for (const [name, why] of Object.entries(RECORD_DETAIL_NOT)) {
+      expect(why.trim(), `RECORD_DETAIL_NOT["${name}"] must say WHY it is not a record detail`).not.toBe("")
+      expect(
+        caught,
+        `RECORD_DETAIL_NOT lists ${name}, which the census would not have caught — delete the line`
+      ).toContain(name)
     }
   })
 
   // …and nothing goes back to hand-rolling one. A detail that renders its own
   // ActivityFeed is a second copy of the pairing above, and the copy is exactly
-  // what shipped a feed under an unreachable badge the first time.
+  // what shipped a feed under an unreachable badge the first time. Same census as
+  // above, so a screen cannot be a record detail for one half of R2 and not the
+  // other.
   it("record-detail-tabs: no record detail hand-rolls its own Activity feed", () => {
-    const offenders = componentFiles()
-      .filter((f) => /-detail\.tsx$/.test(f))
-      .filter((f) => read(f).includes("<ActivityFeed"))
+    const offenders = recordDetailComponents()
+      .filter((c) => c.source.includes("<ActivityFeed"))
+      .map((c) => c.name)
     expect(
       offenders,
       `render the Activity tab through <ActivityPanel> instead of a local ActivityFeed: ${offenders.join(", ")}`
@@ -139,6 +216,102 @@ describe("RULES — the laws of the base", () => {
       const src = read(join(WEB, "components", `${d}.tsx`))
       expect(src, `${d} must persist its draft (useFormDraft — CACHING.md §11)`).toContain("useFormDraft")
     }
+  })
+
+  // ONE SEARCHABLE PICKER, NOT NINE. Not a law of its own — a regression lock on
+  // the shape R4 already asks for. Every "which record do you mean?" control goes
+  // through components/record-picker.tsx, which is the only file that composes the
+  // library's Command palette. Nine screens each building their own is how they
+  // came to behave nine different ways, reported from a phone as "any drop-downs
+  // are becoming impossible to search through".
+  it("one-record-picker: only record-picker.tsx composes the library Command", () => {
+    const picker = read(join(WEB, "components", "record-picker.tsx"))
+    // A blind check reports "all clear" exactly like a passing one.
+    expect(picker, "the record picker must be the library Command + Popover").toContain(
+      "primitives/command/command"
+    )
+    const offenders = componentFiles()
+      .filter((f) => !f.endsWith("record-picker.tsx"))
+      .filter((f) => stripComments(read(f)).includes("primitives/command/command"))
+    expect(
+      offenders,
+      `use <RecordPicker> instead of composing a second searchable picker: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  // ONE CALENDAR, AND EVERYTHING ON IT OPENS. Not a law of its own — a
+  // regression lock on the shape R2/R8 already assume, in the same spirit as the
+  // record-picker check above.
+  //
+  // Reported by the owner on 18 Aug 2026: "all detail screens should be clickable
+  // and accessible if there are records displaying on the calendar". They were
+  // not, on any of the three screens that have one, and the reason was
+  // structural rather than an oversight — the library's `CalendarView` draws an
+  // event as a plain `<div>` and takes no click prop of any kind, so a screen
+  // could not have wired one if it wanted to. "+6 more" was a second `<div>`,
+  // naming six records with no way to reach one.
+  //
+  // The check therefore holds TWO things, because either alone can go quietly
+  // wrong: no screen may render the library's calendar directly (it is a picture,
+  // not a way in), and the host's own must keep the two controls that make it a
+  // way in — an entry that is a BUTTON, and an overflow that OPENS THE DAY.
+  it("one-calendar: every calendar is the host's, and every record on it opens", () => {
+    const host = join(WEB, "components", "record-calendar.tsx")
+    const src = stripComments(read(host))
+    // i · the entry is a control, and it opens the record it names.
+    expect(src, "an entry must be a <button> — a div cannot be reached by keyboard or click").toMatch(
+      /<button[\s\S]*onClick=\{\(\) => onOpen\(entry\.id\)\}/
+    )
+    // ii · the overflow opens the day rather than naming records nobody can reach.
+    expect(src, '"+N more" must be a control that opens the day').toMatch(
+      /<button[\s\S]*onClick=\{\(\) => setOpenDay\(key\)\}/
+    )
+    expect(src, "…and the day it opens lists rows that open too").toContain("<DayRows")
+    // iii · nothing else draws a calendar. Derived from the imports themselves,
+    // so a fourth screen that grows one is caught the day it is written.
+    const offenders = componentFiles()
+      .filter((f) => f !== host)
+      .filter((f) => stripComments(read(f)).includes("collections/calendar-view/calendar-view"))
+    expect(
+      offenders,
+      `use <RecordCalendar> — the library calendar cannot open a record (UI-GAPS #22): ${offenders.join(", ")}`
+    ).toEqual([])
+    // iv · and every screen that shows one wires it to the engine's open intent.
+    const wired = componentFiles().filter((f) => read(f).includes("<RecordCalendar"))
+    expect(wired.length, "no screen renders the calendar — this check has gone blind").toBeGreaterThan(2)
+    for (const f of wired)
+      expect(
+        /onOpen=\{\(id\) => onIntent\(\{ kind: "open"/.test(read(f)),
+        `${f} shows a calendar whose records go nowhere — pass onOpen through onIntent`
+      ).toBe(true)
+  })
+
+  // …AND A PICKER OVER A PAGED COLLECTION ASKS THE DOOR, never the list cache.
+  // Derived from two pieces of registry data that were never read together: the
+  // GROWING collections' own web cache keys (R14) and the form dialogs (R4/R7).
+  // A form that filled a picker from one of those keys was offering PAGE ONE as
+  // if it were the collection — every company past the cursor silently
+  // un-nameable, under a control that gave no sign of it. Reported from staging
+  // as "not all clients or contacts are showing per account".
+  it("pickers-ask-the-door: no form dialog fills a picker from a PAGED list cache", () => {
+    // The LIST cache keys only (`…Key(`) — the activity feed's entries in the
+    // same table are a record's history, not a picker's options.
+    const pagedKeys = Object.values(GROWING_COLLECTIONS)
+      .map((c) => c.webKey)
+      .filter((k) => k.endsWith("Key("))
+    expect(pagedKeys.length, "no paged list keys to check — the derivation has gone blind").toBeGreaterThan(3)
+
+    const offenders: string[] = []
+    for (const d of FORM_DIALOGS) {
+      const file = join(WEB, "components", `${d}.tsx`)
+      if (!existsSync(file)) continue
+      const src = stripComments(read(file))
+      for (const key of pagedKeys) if (src.includes(key)) offenders.push(`${d} reads ${key}`)
+    }
+    expect(
+      offenders,
+      `a paged collection's list cache holds page one — search it at the door instead (lib/picker-sources.ts): ${offenders.join(", ")}`
+    ).toEqual([])
   })
 
   // R8, surface ONE — the TEAM section strip. A placement:"tab" section that
@@ -219,10 +392,9 @@ describe("RULES — the laws of the base", () => {
     // must therefore carry a badge OR be a reviewed exception. Reading the tabs
     // out of the source (not a hand-list) is what makes a NEW tab arrive already
     // held to the law.
-    for (const c of RECORD_DETAIL_COMPONENTS) {
-      const src = read(join(WEB, "components", `${c}.tsx`))
-      const tabs = [...src.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
-      expect(tabs.length, `${c}: the tab scan found no tabs — it has gone blind`).toBeGreaterThan(2)
+    for (const c of recordDetailComponents()) {
+      const tabs = [...c.source.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
+      expect(tabs.length, `${c.name}: the tab scan found no tabs — it has gone blind`).toBeGreaterThan(2)
       let counted = 0
       for (const [, value, badge] of tabs) {
         if (badge.trim() !== '""') {
@@ -230,15 +402,16 @@ describe("RULES — the laws of the base", () => {
           continue
         }
         expect(
-          RECORD_TAB_COUNT_EXCEPTIONS[`${c}.${value}`],
-          `${c} tab "${value}" carries no count → badge it from the door's exact total, or pin it (with a reason) in RECORD_TAB_COUNT_EXCEPTIONS`
+          RECORD_TAB_COUNT_EXCEPTIONS[`${c.name}.${value}`],
+          `${c.name} tab "${value}" carries no count → badge it from the door's exact total, or pin it (with a reason) in RECORD_TAB_COUNT_EXCEPTIONS`
         ).toBeTruthy()
       }
       // R16 owns the NUMBER here too — a counted bespoke tab goes through the seam.
       if (counted > 0)
-        expect(src, `${c} badges a tab → the number must come through the formatCount seam (R16)`).toContain(
-          "format-count"
-        )
+        expect(
+          c.source,
+          `${c.name} badges a tab → the number must come through the formatCount seam (R16)`
+        ).toContain("format-count")
     }
   })
 
@@ -425,24 +598,37 @@ describe("RULES — the laws of the base", () => {
       // its LIST had no paging control at all while its record DETAIL had one (for
       // the activity feed) and mentioned the list's cache key elsewhere, so a
       // component with both substrings existed and the law reported "all clear".
-      // Deleting the whole control left the build green. So for a paged LIST
-      // SCREEN (one with a `listRecipe`) the key must appear INSIDE the LoadMore's
-      // own props — that is what makes it that collection's paging control.
+      // Deleting the whole control left the build green. So the key must appear
+      // INSIDE the LoadMore's own props — that is what makes it that collection's
+      // paging control rather than a coincidence of substrings.
       //
-      // The two record feeds are excepted on purpose and it is not a loophole:
-      // their control reads `listKey={activity.listKey}`, a value the hook named
-      // `useRecordActivity(` hands them, so the key genuinely is not written at
-      // the call site. For those the file-level check is the strongest honest one
-      // — and R2's own check (record-detail-tabs) already demands a `<LoadMore>`
-      // in every one of those components by name.
-      const wired = componentFiles().some((f) => {
-        const src = read(f)
-        if (!c.listRecipe) return src.includes("<LoadMore") && src.includes(c.webKey)
-        return [...src.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.webKey))
-      })
+      // AND EVERY COLLECTION IS PROVED AGAINST ITS OWN CONTROL, IN ITS OWN FILE.
+      // The fix above was written as a BRANCH on `!c.listRecipe`, which reads like
+      // "the record feed" and is in fact true of THREE entries — `recordActivity`,
+      // `activity` and `workLogs`. That branch asserted a `<LoadMore
+      // listKey={activity.listKey}>` inside `activity-panel.tsx`, which is the
+      // record feed's control and has nothing to do with the team feed or the list
+      // of time. So for two of the three collections it was a CONSTANT: deleting
+      // `<LoadMore listKey={workLogsKey(teamId)}>` from `time-panel.tsx`, or the
+      // team-feed pager from `module-content.tsx`, left the build green — where the
+      // weaker-looking sentence it replaced had gone red. One branch cannot stand
+      // for three collections; `pagerFile`/`pagerKey` name each one's own.
+      const pager = read(join(WEB, c.pagerFile))
+      const wired = [...pager.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) =>
+        m[0].includes(c.pagerKey)
+      )
       expect(
         wired,
-        `${name} pages on the server but nothing in web can reach page two — a <LoadMore> whose listKey is built from ${c.webKey}`
+        `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> whose listKey is built from ${c.pagerKey}`
+      ).toBe(true)
+      // …and the collection's cache key is NAMED by a component, which on the
+      // record feed is the second half of the pairing rather than a restatement of
+      // the first: its control reads `listKey={activity.listKey}`, a value the
+      // `useRecordActivity(` hook hands it, so the hook has to be called somewhere
+      // for that control to be about anything at all.
+      expect(
+        componentFiles().some((f) => read(f).includes(c.webKey)),
+        `${name}: no component names ${c.webKey}, so ${c.pagerFile}'s pager pages nothing`
       ).toBe(true)
 
       // R14 meets R16: the collection frame's own "Showing X of Y" counts the
@@ -773,6 +959,50 @@ describe("RULES — the laws of the base", () => {
     expect(
       lengthBadges,
       `a capped list's length is a ceiling, not a total (R16) — badge from the server total via formatCount: ${lengthBadges.join(", ")}`
+    ).toEqual([])
+
+    // (i, widened) A STAT TILE IS A BADGE WITH A LABEL, and this clause is the
+    // half that was missing. The scan above reads `badge:` props only, so
+    // `work-logs-panel.tsx` shipped both of R16's failure modes side by side,
+    // inside a `<StatGrid>`, under a green build:
+    //
+    //   • `value: String(summary.total)` — the SAME collection the tab strip
+    //     directly above it badged through `formatCount`. At 1,200 entries the
+    //     tab read "1.2k" and the tile read "1200": one collection, two numbers,
+    //     which is the sentence R16 opens with.
+    //   • `value: String(summary.people.length)` — and `people` is `LIMIT
+    //     WORK_LOG_GROUP_CAP`, so a record worked on by more than fifty people
+    //     read "People on it: 50" for ever with nothing saying it had stopped.
+    //     A capped list's length wearing a total's clothes: R16's origin story.
+    //
+    // SCOPED TO THE FILES THAT RENDER A `<StatGrid`, deliberately. A `value:`
+    // prop anywhere else is an overview FIELD — a phone number, a language, a
+    // status word — and holding those to a count seam would be noise that
+    // teaches people to widen the exemption list instead of fixing the number.
+    // Inside a stat grid every `value:` IS a figure, by construction.
+    const tileOffenders: string[] = []
+    let tiles = 0
+    for (const f of componentFiles()) {
+      const src = stripComments(read(f))
+      if (!src.includes("<StatGrid")) continue
+      for (const m of src.matchAll(/value:\s*([^,\n]+)/g)) {
+        const v = m[1].trim()
+        tiles++
+        // `.length` as the FIGURE. `xs.length - 1` is an index and `xs.length ?`
+        // is a "is there anything" test — neither is a count being rendered, and
+        // banning them would ban the pulse band's own last-week lookup.
+        if (/\.length/.test(v) && !/\.length\s*[-+]/.test(v) && !/\.length\s*\?/.test(v))
+          tileOffenders.push(`${f} → ${v}`)
+        // …and a figure stringified straight past the seam. `formatCount` is
+        // where the abbreviation ladder and the "+" at the counting ceiling live,
+        // so `String(n)` beside a badge is two renderings of one number.
+        if (/^String\(/.test(v)) tileOffenders.push(`${f} → ${v}`)
+      }
+    }
+    expect(tiles, "the stat-tile scan found no tiles — it has gone blind").toBeGreaterThan(5)
+    expect(
+      tileOffenders,
+      `a stat tile shows a figure exactly as a badge does (R16) — through formatCount (or hoursSpoken for hours), never String(n) and never a capped list's length: ${tileOffenders.join(", ")}`
     ).toEqual([])
     // …and the badge builders route through the seam. The deep-link switch's
     // badges are all on the COLLECTION half (a record detail badges its tabs
@@ -1333,6 +1563,149 @@ describe("RULES — the laws of the base", () => {
   })
 
   // per-worker seam test) — a law can't exist without a check.
+  // R29 — the page has ONE width per front door, and no screen sets its own.
+  //
+  // A page container is identified POSITIONALLY, the same way R20 identifies a
+  // checked field: one LINE carrying `mx-auto`, `w-full` and a `max-w-*`
+  // together. That triple is the signature of a centred content column and of
+  // nothing else — a dialog, a sheet, a door card, a chat bubble and a capped
+  // line of prose are none of them centred-and-full-width, so none is caught and
+  // none has to be excused. It is read per line rather than per className because
+  // `deep-link-screen.tsx`'s own container is a template literal that runs past
+  // the end of the line, and a scan that needed the closing quote would have
+  // missed the one file the law is built around.
+  //
+  // Both directions are checked, so the exemption list is a RATCHET: a file that
+  // sets a width and is not the owner must be pinned, and a pin whose file no
+  // longer sets a width must be deleted.
+  it("one-page-width: exactly one page container per front door, and every pin is live", () => {
+    const roots = [
+      join(WEB, "components"),
+      join(WEB, "app"),
+      join(ROOT, "web-portal", "components"),
+      join(ROOT, "web-portal", "app"),
+      join(ROOT, "shared", "web"),
+    ].filter((d) => existsSync(d))
+
+    /** Every page-container line in the app, as `file → the widths it sets`. */
+    const found = new Map<string, string[]>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      for (const line of stripComments(f.source).split("\n")) {
+        if (!/\bmx-auto\b/.test(line) || !/\bw-full\b/.test(line)) continue
+        const cap = /\bmax-w-(?:\[[^\]]*\]|[\w.]+)/.exec(line)
+        if (!cap) continue
+        const list = found.get(f.rel) ?? []
+        list.push(cap[0])
+        found.set(f.rel, list)
+      }
+    }
+
+    // i · every owner is present and sets ONLY the width it declares.
+    for (const [file, width] of Object.entries(PAGE_WIDTH_OWNER)) {
+      const widths = found.get(file)
+      expect(widths, `${file} owns its front door's page width and must set one`).toBeDefined()
+      expect([...new Set(widths)], `${file} may set only ${width}`).toEqual([width])
+    }
+
+    // ii · nothing else sets a page width unless it is pinned, with its reason.
+    const offenders = [...found.keys()].filter(
+      (f) => !(f in PAGE_WIDTH_OWNER) && !(f in SCREEN_WIDTH_EXEMPT)
+    )
+    expect(
+      offenders,
+      `these set their own page width (R29). Delete the cap, or pin it in SCREEN_WIDTH_EXEMPT with a reason:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    // iii · the ratchet. A pin that no longer describes anything is a record of
+    // what the app used to do, and it goes red so the fix takes its pin with it.
+    const stale = Object.keys(SCREEN_WIDTH_EXEMPT).filter((f) => !found.has(f))
+    expect(
+      stale,
+      `these SCREEN_WIDTH_EXEMPT entries match nothing — the file no longer sets a page width, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  // R31 — TWO RADII AND NO THIRD.
+  //
+  // The cheapest rule in the book to check and the one that was most broken:
+  // every Tailwind radius step from `sm` to `3xl` resolves to the same
+  // `var(--radius)` (24px) in this theme, so `rounded-lg` and `rounded-xl` were
+  // two spellings of one pixel value and the app used five of them. That is five
+  // decisions where there is one, and the day the theme gives those steps
+  // different numbers the app acquires radii nobody chose.
+  //
+  // BARE `rounded` IS NOT CAUGHT, deliberately, and it is the interesting case.
+  // It resolves to 4px here, NOT 24 — measured in a browser against the running
+  // theme rather than read off a file — so on an inline `<mark>` and on a 32px
+  // thumbnail it is a genuinely different value doing a genuinely different job.
+  // Folding it into the vocabulary would put a lozenge round every highlighted
+  // word, which is a redesign wearing a sweep's clothes.
+  it("two-radii: only rounded-xl, rounded-t-xl and rounded-full ship (R31)", () => {
+    // `shared/rules/` is the LAW BOOK — prose ABOUT the code, not code that
+    // renders. R31's own sentence names the steps it forbids, so a scan that
+    // read it would go red on the rule's own text.
+    const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
+    const lawBook = join(ROOT, "shared", "rules")
+    const offenders: string[] = []
+    for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
+      if (f.path.startsWith(lawBook)) continue
+      for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)?[a-z0-9]+/g) ?? []) {
+        if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
+        offenders.push(`${f.rel}: ${hit}`)
+      }
+    }
+    expect(
+      offenders,
+      `R31 — a surface is rounded-xl and a pill is rounded-full, nothing else:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  // R32 — EVERY COLOUR RESOLVES THROUGH A TOKEN.
+  //
+  // A hard-coded colour is invisible to a theme, and colour drift is only ever
+  // visible in aggregate — which is exactly why it needs a check rather than a
+  // reviewer. Two live breaches earned this: `import-screen.tsx` said `amber-600`
+  // and `emerald-500` where it meant warning and success, so the one screen that
+  // reports a RESULT was the one screen a rebrand could not reach; and
+  // `shared/departments.ts` held five hexes the legacy app chose, none of them
+  // one of kwapso's own seven, so a department dot was the single mark on screen
+  // that did not belong to this product's palette.
+  //
+  // The exemptions are DATA, with reasons, rot-checked in both directions — the
+  // same shape as R29's width pins, so a file that stops holding a literal must
+  // lose its entry and the list can only shrink.
+  it("closed-palette: no Tailwind ramp and no hex outside PALETTE_LITERAL_OK (R32)", () => {
+    const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
+    const RAMP =
+      /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g
+    const HEX = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g
+    const lawBook = join(ROOT, "shared", "rules") // it quotes what it forbids
+    const ramps: string[] = []
+    const hexed = new Set<string>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
+      if (f.path.startsWith(lawBook)) continue
+      const src = stripComments(f.source)
+      for (const hit of src.match(RAMP) ?? []) ramps.push(`${f.rel}: ${hit}`)
+      if ((src.match(HEX) ?? []).length > 0) hexed.add(f.rel)
+    }
+    expect(
+      ramps,
+      `R32 — a Tailwind ramp names a colour, not a meaning. Use the token (warning / success / destructive / chart-N):\n  ${ramps.join("\n  ")}`
+    ).toEqual([])
+
+    const unexcused = [...hexed].filter((f) => !(f in PALETTE_LITERAL_OK))
+    expect(
+      unexcused,
+      `R32 — these hold a colour literal. Resolve it through a token, or pin the file in PALETTE_LITERAL_OK with a reason:\n  ${unexcused.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(PALETTE_LITERAL_OK).filter((f) => !hexed.has(f))
+    expect(
+      stale,
+      `these PALETTE_LITERAL_OK entries match nothing — the file no longer holds a colour literal, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "publish-seam", // the 3 per-worker publish-seam.test.ts suites
@@ -1356,6 +1729,8 @@ describe("RULES — the laws of the base", () => {
       "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
       "client-reachable-doors", // R21: the client-reach scan above
+      "two-radii", // R31: the radius-vocabulary grep above
+      "closed-palette", // R32: the ramp + hex-literal grep above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
       "cited-answers", // R23: workers/content/test/cited-answers.test.ts
       "internal-money-never-in-portal", // R24: the import-graph scan above
@@ -1363,10 +1738,57 @@ describe("RULES — the laws of the base", () => {
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
       "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
       "catalogued-strings", // R28: web/test/catalogued-strings.test.ts — re-runs the real extractor over both front doors
+      "one-page-width", // R29: the page-container scan above, over both front doors
+      "linked-emails", // R30: web/test/linked-emails.test.ts — the email census, derived from the send sites themselves
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
         expect(known.has(r.checkId), `law ${r.id} (${r.checkId}) needs a real check`).toBe(true)
     }
+  })
+})
+
+/** A GROUP OF CONTROLS IS NOT ONE CONTROL, and the required ring says so.
+ *
+ * `Field` draws `required-ring` — a hairline box at the input's corner radius —
+ * around whatever it wraps, whenever the field is required. That is right for a
+ * single input and wrong for a stack of checkboxes: the ring boxes the WHOLE
+ * group including the gaps, and because the stack carries no padding of its own
+ * the boxes sit flush against the hairline and read as breaking out of it. The
+ * owner reported exactly that on the New story form.
+ *
+ * The library already anticipated it — `FieldShape` has a `group` value whose
+ * own comment says "a ring would box the WHOLE group in gold… so there is no
+ * ring — the label's asterisk carries required instead". Nothing declared it:
+ * 138 Field call sites and not one passed a shape. So this is not a library
+ * gap, it is a call site that never answered a question it was asked.
+ *
+ * Derived, so a fifth cannot be added: any Field wrapping more than one
+ * Checkbox / RadioGroup / ToggleGroup must say `shape="group"` (or turn the
+ * ring off itself). */
+describe("required-ring: a group says it is a group", () => {
+  it("no Field boxes a group of controls in the single-control ring", () => {
+    const offenders: string[] = []
+    const files = [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+    ]
+    for (const f of files) {
+      const src = readFileSync(f.path, "utf8")
+      for (const m of src.matchAll(/<Field\b[^>]*>/g)) {
+        const tag = m[0]
+        const end = src.indexOf("</Field>", m.index! + tag.length)
+        const body = src.slice(m.index! + tag.length, end < 0 ? undefined : end)
+        const composite =
+          /<Checkbox\b/.test(body) || /<RadioGroup\b/.test(body) || /<ToggleGroup\b/.test(body)
+        if (!composite) continue
+        if (tag.includes('shape="group"') || tag.includes("ringed={false}")) continue
+        offenders.push(`${f.path.slice(ROOT.length + 1)}:${src.slice(0, m.index!).split("\n").length}`)
+      }
+    }
+    expect(
+      offenders,
+      `these Fields wrap a group of controls and let the required ring box the whole stack — pass shape="group": ${offenders.join(", ")}`
+    ).toEqual([])
   })
 })

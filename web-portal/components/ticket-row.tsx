@@ -16,6 +16,7 @@ import { ChevronRight } from "lucide-react"
 import type { HelpTicket } from "@shared/types"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** Plain words for each state, and a colour that means the same thing every time.
  *
@@ -62,22 +63,28 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="hover:bg-accent/50 flex items-center gap-3 rounded-xl border p-4 transition-colors"
+      className="hover:bg-accent/50 flex items-center gap-2 rounded-xl border p-4 transition-colors"
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <p className="line-clamp-2">{ticket.description}</p>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="line-clamp-2">{richTextPlain(ticket.description)}</p>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
           <Badge variant={status.variant}>{t(status.label)}</Badge>
           {/* HOW MUCH WORK IS ON IT, and nothing else about that work
               (.plans/BUILD-1 §7: "stories as a COUNT only — never the titles").
-              Two numbers, because "3 pieces of work, 1 done" is a picture and "3
-              pieces of work" is a shrug. Absent when there is none, rather than
-              a "0 of 0" that reads as neglect on a request somebody answered
-              without needing to build anything. */}
+              Both numbers, because "3 pieces of work, 1 done" is a picture and
+              "3 pieces of work" is a shrug. Absent when there is none, rather
+              than a "0 of 0" that reads as neglect on a request somebody
+              answered without needing to build anything.
+
+              ONE PHRASE, NOT TWO. It used to read "3 pieces of work, 1 done" —
+              two numbers a sentence apart, which is two things on a band that
+              already carries a state and a date (N1). "1 of 3 done" is the same
+              picture in one unit, and it is the phrasing the sprint rows on the
+              other front door already use, so a count reads the same way
+              wherever somebody meets it. */}
           {ticket.storyCount > 0 && (
             <span>
-              {ticket.storyCount} {ticket.storyCount === 1 ? "piece" : "pieces"} {t("of work,")}{" "}
-              {ticket.doneStoryCount} {t("done")}
+              {ticket.doneStoryCount} {t("of")} {ticket.storyCount} {t("done")}
             </span>
           )}
           <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt)}</span>

@@ -19,7 +19,6 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AlertDialog,
@@ -31,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Ban, Plus, Power, RefreshCw } from "lucide-react"
+import { Ban, Plus, Power } from "lucide-react"
 
 import {
   GOOGLE_SERVICES,
@@ -46,27 +45,39 @@ import { googleKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { GoogleSourceDialog } from "@/components/google-source-dialog"
+import { GoogleSyncButton } from "@/components/google-sync"
 import { useT } from "@shared/web/language"
 
 /** The word a person reads for each service, and the sentence saying what
  * connecting it actually lets kwapso see. The second half matters more than the
- * first: "Gmail" tells somebody nothing about what they are agreeing to. */
+ * first: "Gmail" tells somebody nothing about what they are agreeing to.
+ *
+ * THIS SENTENCE IS A PROMISE AND IT HAS TO STAY TRUE. Gmail's read "Only mail to
+ * or from someone on one of your accounts" for as long as the known-contact
+ * fence was the only one. It stopped being true the day the transcript hunt
+ * added a SECOND fence (`googleNoticeQuery`, workers/content/src/lib/google-api.ts)
+ * over four Google robot senders — narrow, hard-coded in the server, unreachable
+ * from any request, and used by exactly one caller, but outside the sentence all
+ * the same. The widening was invisible precisely BECAUSE the first fence works:
+ * Google's own no-reply addresses are nobody's contact, so nothing about the old
+ * rule hinted that a notice could ever be read.
+ *
+ * A privacy sentence that is 99% true is worse than a longer one that is true,
+ * because the person reading it has no way to find the 1%. If a third fence is
+ * ever added, this sentence changes in the same commit. */
 const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
   drive: { label: "Drive", scope: "Only the folders you share below, nothing else in your Drive." },
-  gmail: { label: "Gmail", scope: "Only mail to or from someone on one of your accounts." },
+  gmail: {
+    label: "Gmail",
+    scope:
+      "Mail to or from someone on one of your accounts, plus Google's own notices about shared documents and recordings.",
+  },
   calendar: { label: "Calendar", scope: "Your own calendar, so meetings and sprints can be read and added." },
   chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
 
 /** Which services are shared through NAMED folders or spaces. */
 const NAMED: GoogleService[] = ["drive", "chat"]
-
-/** How many bounded ticks one press of "bring it in" will run. Each one files up
- * to INGEST_SOURCES_PER_TICK sources, so this is a first pass over a few hundred
- * items — and a ceiling, because a loop that keeps going until an external system
- * says stop is a loop whose length somebody else decides. What is left is picked
- * up by the next press, from the cursor. */
-const MAX_SYNC_PASSES = 12
 
 export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) {
   const t = useT()
@@ -82,7 +93,6 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     tenancy.accounts().then((r) => r.accounts)
   )
   const [busy, setBusy] = React.useState(false)
-  const [syncing, setSyncing] = React.useState(false)
   const [disconnecting, setDisconnecting] = React.useState<GoogleService | null>(null)
   const [sharing, setSharing] = React.useState<"drive" | "chat" | null>(null)
   const { can } = usePermissions(teamId)
@@ -120,52 +130,6 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     primeCache(key, await content.googleConnections())
   }
 
-  /** BRING MY GOOGLE MATERIAL INTO THE KNOWLEDGE BASE.
-   *
-   * The one sweep in the product that CANNOT run itself, and therefore the one
-   * that has to have a button. Everything it reads comes through this person's
-   * own token, so it has to run as them — and a cron has no caller to be. So the
-   * control lives here, on the card that owns the connection, rather than on the
-   * knowledge base's own screen where it would look like the fifteen-minute
-   * sweep and quietly be a different thing.
-   *
-   * It loops until the sweep says it has caught up, because a tick is bounded
-   * (25 sources) and a first run over a full folder is more than one tick.
-   * Bounded here too: a runaway loop against somebody's Drive is a worse failure
-   * than an incomplete first pass, and the next press carries on from the cursor.
-   */
-  async function syncGoogle() {
-    if (syncing) return
-    setSyncing(true)
-    let indexed = 0
-    try {
-      for (let pass = 0; pass < MAX_SYNC_PASSES; pass++) {
-        const r = await content.syncGoogleKnowledge()
-        indexed += r.results.reduce((n, k) => n + k.indexed, 0)
-        // A KIND THAT FAILED CARRIES ITS OWN SENTENCE (R12 records it on the
-        // row; the door hands it back per kind), and that sentence is the one
-        // worth showing — "connect it again in Settings" is actionable where a
-        // generic "couldn't read your Google material" is not. Found by pressing
-        // the button against a dead token and reading what came back.
-        const failed = r.results.find((k) => k.error)
-        if (failed?.error) {
-          toast.error(failed.error)
-          return
-        }
-        if (r.caughtUp) break
-      }
-      toast.success(
-        indexed > 0
-          ? `Brought in ${indexed} ${indexed === 1 ? "thing" : "things"} the assistant can now answer from.`
-          : "Everything of yours is already up to date."
-      )
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your Google material just now.")
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   async function disconnect() {
     if (!disconnecting || busy) return
     setBusy(true)
@@ -186,7 +150,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
   }
 
   return (
-    <section className="animate-rise flex flex-col gap-3">
+    <section className="animate-rise flex flex-col gap-4">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
         {t("Connect your own Google account, one service at a time. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
@@ -207,7 +171,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             const named = sources.filter((s) => s.service === service)
             return (
               <div key={service} className="flex flex-col gap-2 border-b p-3 last:border-0">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                   <span className="font-medium">{SERVICE_COPY[service].label}</span>
                   {live ? (
                     <Badge variant="secondary" className="text-[10px]">
@@ -223,7 +187,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                       ? live.lastUsedAt
                         ? `Last used ${formatActivityWhen(live.lastUsedAt)}`
                         : "Never used yet"
-                      : SERVICE_COPY[service].scope}
+                      : t(SERVICE_COPY[service].scope)}
                   </span>
                   <div className="flex items-center gap-2">
                     {live && NAMED.includes(service) && (
@@ -231,7 +195,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         variant="outline"
                         size="sm"
                         onClick={() => setSharing(service as "drive" | "chat")}
-                        className="gap-1.5"
+                        className="gap-1"
                         title={service === "drive" ? "Share a folder" : "Share a space"}
                       >
                         <Plus className="size-3.5" aria-hidden />
@@ -243,7 +207,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         variant="outline"
                         size="sm"
                         onClick={() => setDisconnecting(service)}
-                        className="text-destructive gap-1.5"
+                        className="text-destructive gap-1"
                         title={t("Disconnect")}
                       >
                         <Power className="size-3.5" aria-hidden />
@@ -259,7 +223,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         onClick={() => {
                           window.location.href = `/api/content/google/start?service=${encodeURIComponent(service)}`
                         }}
-                        className="gap-1.5"
+                        className="gap-1"
                       >
                         <Plus className="size-3.5" aria-hidden /> {t("Connect")}
                       </Button>
@@ -280,7 +244,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   <div className="flex flex-col gap-1 pl-1">
                     {named.length === 0 ? (
                       <p className="text-muted-foreground text-xs">
-                        {t("Nothing shared yet —")} {SERVICE_COPY[service].scope}
+                        {t("Nothing shared yet —")} {t(SERVICE_COPY[service].scope)}
                       </p>
                     ) : (
                       named.map((s) => (
@@ -297,6 +261,17 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                            * learnt, and this card is written for a reader who
                            * should never have to decode it (UI-CONVENTIONS: the
                            * voice). */}
+                          {/* A FOLDER OR ONE FILE. Shown because the two are
+                           * different promises: a folder keeps taking in
+                           * whatever somebody puts there afterwards, and a file
+                           * is only ever itself. Six months later that is the
+                           * difference between "why can it see this?" and "of
+                           * course it can". */}
+                          {s.kind === "file" && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {t("One file")}
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="text-[10px]">
                             {s.shelf === "team" ? "The team can read it" : "Just you"}
                           </Badge>
@@ -355,19 +330,14 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
        * on a not-ready environment the button works until the first token expires
        * and then fails with a message about something the person cannot fix. */}
       {q.data?.ready && connections.length > 0 && can("knowledge", "create") && can("google", "read") && (
-        <div className="flex flex-col gap-1.5 rounded-xl border p-3">
+        <div className="flex flex-col gap-2 rounded-xl border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">{t("Let the assistant read what you have shared")}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={syncing || busy}
-              onClick={syncGoogle}
-              className="gap-1.5"
-            >
-              {syncing ? <Spinner /> : <RefreshCw className="size-3.5" aria-hidden />}
-              {syncing ? "Reading…" : "Bring it in"}
-            </Button>
+            {/* THE SAME CONTROL THAT IS NOW ON EVERY GOOGLE SCREEN. It used to be
+             * written out here and only here, which is exactly why nowhere else
+             * had one — see components/google-sync.tsx. Both halves, because
+             * this is the card where a person comes to sort Google out. */}
+            <GoogleSyncButton teamId={teamId} scope="both" />
           </div>
           <p className="text-muted-foreground text-xs">
             {t("Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just yourself stays answerable to you alone.")}
@@ -381,12 +351,25 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           onOpenChange={(o) => !o && setSharing(null)}
           service={sharing}
           draftKey={`google-source:${sharing}`}
+          teamId={teamId}
           accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
           onSubmit={async (values) => {
-            await content.googleAddSource({ service: sharing, ...values })
+            const r = await content.googleAddSources({
+              service: sharing,
+              items: values.items,
+              shelf: values.shelf,
+              accountId: values.accountId,
+            })
             await refresh()
+            // The COUNT is in the sentence because a multi-select can quietly do
+            // less than a person meant: something already shared is answered
+            // with the row it already has rather than a second one, so "four
+            // picked, two shared" is a real and unalarming outcome that they
+            // should be able to see.
             toast.success(
-              values.shelf === "team" ? "Shared, the team can read it." : "Shared, only you can read it."
+              `${r.shared === 1 ? "Shared" : `${r.shared} shared`}, ${
+                values.shelf === "team" ? "the team can read " : "only you can read "
+              }${r.shared === 1 ? "it" : "them"}.`
             )
           }}
         />
@@ -410,7 +393,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                 void disconnect()
               }}
               disabled={busy}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1"
             >
               <Power className="size-3.5" aria-hidden /> {t("Disconnect")}
             </AlertDialogAction>

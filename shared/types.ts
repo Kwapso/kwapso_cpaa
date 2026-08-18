@@ -80,6 +80,16 @@ export type TeamMember = {
   isYou: boolean
   /** true if they hold the team's locked Admin role */
   isAdmin: boolean
+  /** TRUE IF THIS IS A CLIENT LOGIN, NOT ONE OF OURS.
+   *
+   * A portal login is an ordinary team member — grant → invite → accept is the
+   * only way to make a working one — so a client contact has always been in this
+   * list, and therefore in every dropdown built from it. That is right for the
+   * admin screens (they are a member; somebody has to be able to see and remove
+   * them) and wrong everywhere work is handed out, which is what the front door
+   * uses this to decide (web/lib/people.ts). The fact is a `portal_users` row in
+   * the team's own database, the same table the account fence reads. */
+  isClient: boolean
   joinedAt: string
 }
 
@@ -821,6 +831,12 @@ export type KnowledgePassage = {
   title: string
   kind: string
   url: string | null
+  /** THE RECORD THIS CAME OUT OF, as a path under the team (`tickets/<id>`).
+   * A reader who disagrees with an answer has to be able to go and look at the
+   * ticket, the map or the meeting itself — not only at the source row that
+   * mirrors it. Null where there is no record screen to open: a note somebody
+   * typed IS the record, and a document out of Drive is reached through `url`. */
+  recordPath: string | null
   compartment: string
   seq: number
   text: string
@@ -834,6 +850,8 @@ export type KnowledgeCitation = {
   title: string
   kind: string
   url: string | null
+  /** the record itself, one hop past the source — see `KnowledgePassage`. */
+  recordPath: string | null
   /** WHAT THE LIVE ROW SAYS RIGHT NOW, read at the moment of answering rather
    * than taken from the index — so a ticket that was "in progress" when it was
    * indexed and is "done" now cannot be quoted as in progress. Null for a source
@@ -842,15 +860,25 @@ export type KnowledgeCitation = {
   checkedAt: string | null
 }
 
-/** What the knowledge base answers with. It never writes prose — the assistant
- * does that, with these passages in front of it — so what a caller receives is
- * the evidence plus the reasoning about WHERE it looked (`reason`), which is the
- * part a person needs to see when the answer is wrong. */
+/** What the knowledge base answers with: the evidence, the reasoning about WHERE
+ * it looked (`reason`), and — when it was asked to write one — the answer itself.
+ *
+ * RETRIEVAL STILL WRITES NOTHING. `answer` is composed by a model that was handed
+ * exactly the `passages` and `citations` below and nothing else, and it is decided
+ * in the SAME seam they are (Law R23), so it cannot exist without them. A caller
+ * that did not ask for it, or a question nothing answers, gets null and the
+ * evidence — which is what this type has always been. */
 export type KnowledgeAnswer = {
   question: string
   found: boolean
   /** the sentence to say when there is nothing — never an invented answer */
   message: string
+  /** THE WRITTEN ANSWER, or null when nobody asked for one, nothing was found, or
+   * the model could not be reached. Markdown, and it may carry the app's visual
+   * blocks (shared/agent-blocks.ts) — the same string shape an assistant reply is,
+   * rendered by the same one renderer. Null is never an error: it means the
+   * passages below are the whole answer, exactly as they were before. */
+  answer: string | null
   /** the compartments searched; empty means the whole knowledge base */
   compartments: string[]
   /** WHY those compartments, in a sentence a person can disagree with */
@@ -954,6 +982,38 @@ export type AppRow = {
   createdByName?: string | null
   updatedAt?: string | null
   editedByName?: string | null
+}
+
+/** A DELIVERABLE: one piece of material we handed over on an app — a handover
+ * doc, an API reference, a recorded walkthrough, an SOP (CHECKLIST 8.7).
+ *
+ * It hangs off exactly one app, always, which is why `appId` is not optional:
+ * the legacy app hung them off apps too, and a handover doc with no system to
+ * hand over is not a record anybody could file. */
+export type Deliverable = {
+  id: string
+  appId: string
+  /** whose system it was built for, copied off the app at creation and never
+   * edited — the account fence, ready, on a module no client door names yet. */
+  accountId: string | null
+  title: string
+  /** the word the card shows in small caps (VIDEO, SOP). A dropdown value from
+   * the team's own "Deliverable kind" vocabulary, so it grows. */
+  kind: string | null
+  /** the day it was handed over, written YYYY-MM-DD. */
+  datedOn: string | null
+  /** THE MATERIAL: an object we host (a /media/internal/… URL the upload door
+   * minted) or a link we do not (a Loom recording, a Google Doc, an API
+   * reference). One field for both shapes — "here is the thing I mean" is one
+   * act, and two fields would be two ways to be wrong about which is set. */
+  url: string | null
+  /** the picture worth showing on the card, when there is one. */
+  imageUrl: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
 }
 
 /** One process in a list: what it is, and how much of it there is. */
@@ -1309,10 +1369,145 @@ export type Task = {
 export const TASK_VIEWS = ["open", "overdue", "upcoming", "completed", "calendar", "all"] as const
 export type TaskViewName = (typeof TASK_VIEWS)[number]
 
+/* ── THE PULSE — the team's week as numbers a screen can draw ──────────────── */
+
+/** One week of logged time. The worker knows no locale, so it hands back the
+ * Monday that opens the week and the screen spells it in the reader's language. */
+export type PulseWeek = {
+  /** the Monday, `YYYY-MM-DD`, in UTC (the server owns the boundary so the chart
+   * and every badge beside it mean the same week). */
+  weekStart: string
+  /** whole seconds logged inside it. EXACT — hours are the number an invoice is
+   * argued about, so this is never a bounded display tally. */
+  seconds: number
+}
+
+/** What `GET /api/content/insights` answers with.
+ *
+ * A `null` SECTION IS A RIGHT THE CALLER'S ROLE DOES NOT HOLD, and it is
+ * deliberately not a zero: "you may not look at this" and "there are none of
+ * these" are different sentences, and a chart drawn on the second one would be a
+ * confident lie about the first (R18 — a cross-module read carries the caller's
+ * rights). Every screen reading this must render nothing for a null section
+ * rather than an empty state. */
+export type TeamPulse = {
+  tickets: {
+    /** everything not yet resolved. */
+    open: number
+    /** the live stages in the lifecycle's own order — a chart of them reads left
+     * to right as the work moves, and a stage nobody is in stays at zero rather
+     * than vanishing, because an empty column is information too. */
+    byStage: { stage: HelpStatus; count: number }[]
+  } | null
+  work: {
+    /** the backlog: stories that are not done. */
+    storiesOpen: number
+    /** admin due today or earlier, and how much of it is ticked off. */
+    tasksDue: number
+    tasksDueDone: number
+    /** the last eight weeks of logged time, oldest first. */
+    weeks: PulseWeek[]
+  } | null
+  meetings: {
+    /** this week's diary, Monday to Sunday, decided by the server. */
+    thisWeek: number
+  } | null
+}
+
+/** What `GET /api/content/work-logs/summary` answers with — the numbers on top
+ * of one record's list of time.
+ *
+ * EVERY FIGURE IS OVER THE WHOLE FILTER, never the page under it. The list is
+ * keyset-paged (R14), so a browser adding up the rows it happens to hold would
+ * answer "the newest fifty entries" while looking exactly like an answer about
+ * the record. `total` and `totalSeconds` are the SAME two numbers the list door
+ * returns, from the same function, so the badge and the header cannot disagree
+ * (R16).
+ *
+ * NOTHING HERE IS MONEY. What an hour costs us is derived in the one file R24
+ * fences and never travels on this object. */
+export type WorkLogSummary = {
+  /** how many entries — a badge number, bounded like every other count. */
+  total: number
+  /** did that count stop early? R16 says a total that hit the ceiling SAYS SO in
+   * the same object, and this door answers with `json` rather than `pagedJson`,
+   * which is where every paged door gets the flag for free. Without it the only
+   * thing hedging was `formatCount`'s "+", which is a rendering decision — a
+   * caller reading the number itself (an export, the agent) had nothing to read. */
+  totalCapped: boolean
+  /** whole seconds across all of them. EXACT, for the reason PulseWeek says. */
+  totalSeconds: number
+  /** HOW MANY PEOPLE HAVE WORKED ON IT — the door's own bounded count over the
+   * whole filter, and NOT `people.length`, which is the top `WORK_LOG_GROUP_CAP`
+   * by hours. A record worked on by more than fifty people read "People on it:
+   * 50" for ever (R16: a capped list's length is a ceiling, not a total).
+   *
+   * No `peopleCapped` beside it: the ceiling is `TOTAL_COUNT_CAP`, so reaching it
+   * means a million distinct people logged time against one story, and
+   * `formatCount` renders the "+" if that day ever comes. */
+  peopleTotal: number
+  /** who spent it, biggest first — the top `WORK_LOG_GROUP_CAP` of them, which is
+   * what a bar chart can show. `userName` is the snapshot on the row, so time
+   * logged by somebody since removed from the team still has a name on it. */
+  people: { userId: string; userName: string | null; seconds: number }[]
+  /** what kind of work it was, biggest first. `null` is the real bucket for time
+   * logged without a kind, which is most of it — not a dropped row. */
+  kinds: { kind: string | null; seconds: number }[]
+  /** the last eight weeks, oldest first — the SAME eight windows Home draws, so
+   * two screens can never be looking at two different Mondays. */
+  weeks: PulseWeek[]
+}
+
 /** The two states a meeting has. Cancelling is not a third one — it is the
  * module's `delete`, and the row survives it. */
 export const MEETING_STATUSES = ["scheduled", "held"] as const
 export type MeetingStatus = (typeof MEETING_STATUSES)[number]
+
+/** ONE PERSON ON A DIARY ENTRY — the "stakeholders" a meeting record carries.
+ *
+ * As Google states them and nothing more: this is the MIRROR of the invitation,
+ * so it says who was asked and what they answered, and it deliberately does not
+ * say who they are to us. That second question is a different fact with a
+ * different lifetime — a contact added to an account next week should light up
+ * on a meeting held last week — so it is answered by a read (`meetingPeople`)
+ * rather than frozen into the row at sync time. */
+export type MeetingGuest = {
+  email: string
+  name: string
+  /** Google's own word: `needsAction`, `declined`, `tentative` or `accepted`. */
+  response: string
+  organizer: boolean
+  optional: boolean
+  /** a meeting ROOM rather than a person — Google puts both on one list. */
+  resource: boolean
+}
+
+/** A file hanging off a diary entry: an agenda, a deck, or the transcript Google
+ * Meet files against the event once the call is over. */
+export type MeetingAttachment = {
+  fileId: string
+  title: string
+  mimeType: string
+  iconUrl: string | null
+  url: string | null
+}
+
+/** WHO ON AN INVITATION WE ALREADY KNOW. The answer to the second half of the
+ * owner's "stakeholders" ask: an address that matches one of our own people, or
+ * a contact on one of our accounts, is a RECORD rather than a string.
+ *
+ * Both halves can be null — most addresses on most invitations are neither, and
+ * saying so plainly is better than a screen that implies every guest is filed
+ * somewhere. */
+export type MeetingPersonLink = {
+  email: string
+  /** one of our own team members. */
+  memberUserId: string | null
+  memberName: string | null
+  /** a contact on one of our accounts, and the client it sits under. */
+  accountId: string | null
+  accountName: string | null
+}
 
 /** A CONVERSATION WE HAD, or are about to have — the record Glide never kept.
  * Its 350 meetings were folded into work logs, which kept the hours and lost the
@@ -1346,12 +1541,55 @@ export type Meeting = {
    * pressing the button twice cannot make a second entry. */
   googleEventId: string | null
   googleEventUrl: string | null
+  /* ── THE REST OF THE DIARY ENTRY, MIRRORED ────────────────────────────────
+   * Everything below is Google's fact about the same entry, copied onto the row
+   * by the calendar sweep so that a meeting can SAY who was in the room, where
+   * to join and what was attached — without every reader holding a connection
+   * and every list costing fifty calls to Google.
+   *
+   * The direction is one-way and the mirror never wins: the four calendar doors
+   * write to Google, this is only ever read back. `googleSyncedAt` says when it
+   * was last true, which is the honest thing a mirror can offer. */
+  /** the join link — Meet, or whatever conferencing system is on the entry. */
+  googleJoinUrl: string | null
+  /** who called the meeting. Often not on the guest list at all. */
+  googleOrganizer: string | null
+  /** Google's own word: `confirmed`, `tentative` or `cancelled`. */
+  googleStatus: string | null
+  /** the IANA zone the entry is written in — an hour is not a fact without it. */
+  googleTimeZone: string | null
+  /** the repeat rule as Google states it (`RRULE:FREQ=WEEKLY;BYDAY=MO`). */
+  googleRecurrence: string | null
+  googleGuests: MeetingGuest[]
+  googleAttachments: MeetingAttachment[]
+  /** when the mirror above was last brought into step with Google. */
+  googleSyncedAt: string | null
+  /** TRUE when this row was read IN off somebody's diary rather than typed here
+   * and pushed out. It decides what a re-sync may overwrite: Google owns the
+   * words of a row it authored, kwapso owns the words of a row it authored, and
+   * the notes belong to a person either way. */
+  fromCalendar: boolean
   /** WHICH TRANSCRIPT WAS READ, and WHEN (CHECKLIST 9.2 + 9.4). The timestamp is
    * the idempotence predicate as much as it is a fact: reading a transcript
    * ticks the meeting held and writes a work log for every one of OUR people who
    * was in the room, and both of those must happen exactly once. */
   transcriptFileId: string | null
   transcriptCapturedAt: string | null
+  /** the document itself, in Google — so "read the transcript" has somewhere to
+   * go on any screen, whoever is looking. */
+  transcriptUrl: string | null
+  /** WHICH OF THE THREE HUNTS FOUND IT: `attachment` (Google put it on the
+   * calendar entry itself), `drive` (a document in a folder somebody shared) or
+   * `mail` (a notice from Google naming the document). They do not prove the
+   * same thing — the first is a fact and the other two are matches — so the
+   * screen says which. Null until one is captured. */
+  transcriptFoundBy: string | null
+  /* THE WORDS THEMSELVES ARE NOT HERE, and that is deliberate. A page of the
+   * diary is fifty meetings; a transcript is up to a megabyte. Putting one on
+   * the other would make the list read the heaviest response in the app to show
+   * a column nobody scrolls. The text has its own door
+   * (`GET /api/content/meetings/transcript`), read once, by the one screen that
+   * displays it. */
   /** THE GOOGLE SERIES this entry belongs to, when it is one of a repeating set
    * (9.7). Null on a one-off. */
   recurringEventId: string | null
@@ -1487,7 +1725,20 @@ export type GoogleConnection = {
   editorName: string | null
 }
 
-/** A Drive folder or a Chat space one person named for kwapso. */
+/** WHAT WAS SHARED. Two of these are Drive, and the difference between them is
+ * the owner's own question — "In Drive, why is it that it's only folder-wise?
+ * What if it had to be file-wise, or does that file have to be in a folder?" It
+ * did not have to. A folder is a place to look inside; a file is the thing
+ * itself, and sharing one no longer means sharing everything filed beside it.
+ *
+ * A Chat share is always a space, which is why this is one word rather than a
+ * boolean on the Drive rows: three shapes, three names, and no row that has to
+ * be read together with its service to know what it is. */
+export const GOOGLE_SHARE_KINDS = ["folder", "file", "space"] as const
+export type GoogleSourceKind = (typeof GOOGLE_SHARE_KINDS)[number]
+
+/** A Drive folder, a single Drive file, or a Chat space one person named for
+ * kwapso. */
 export type GoogleSource = {
   id: string
   connectionId: string
@@ -1497,6 +1748,7 @@ export type GoogleSource = {
   externalId: string
   name: string
   shelf: GoogleShelf
+  kind: GoogleSourceKind
   /** WHICH CLIENT this folder or space is about — the compartment everything
    * inside it is filed under when the knowledge base reads it. Null means the
    * agency's own, exactly as it does on a knowledge source. Asked at the moment
@@ -1509,6 +1761,31 @@ export type GoogleSource = {
   creatorName: string | null
   updatedAt: string | null
   editorName: string | null
+}
+
+/** ONE DRIVE FILE, AS A SCREEN SEES IT — the metadata that makes a list of
+ * documents look like documents rather than like a list of strings.
+ *
+ * `iconUrl` is Google's own small type icon (the Docs blue, the Sheets green): a
+ * static, unauthenticated, cacheable link, so it goes straight into a page.
+ * `hasThumbnail` is the opposite kind of fact and is deliberately a boolean —
+ * Google's preview link is authenticated and expires, so the ADDRESS never
+ * leaves the worker and a screen asks our own door for the bytes instead
+ * (`googleDriveThumbnailUrl`). */
+export type DriveFileRow = {
+  id: string
+  name: string
+  mimeType: string
+  modifiedTime: string | null
+  webViewLink: string | null
+  /** which named folder it came out of, or "" when the FILE itself was named. */
+  folderId: string
+  iconUrl: string | null
+  hasThumbnail: boolean
+  ownerName: string
+  /** bytes, when Google states one. A Google Doc has no size in the ordinary
+   * sense, so this is null more often than not. */
+  sizeBytes: number | null
 }
 
 /** One thing read out of Google, in the shape the retrieval lane wants it. See

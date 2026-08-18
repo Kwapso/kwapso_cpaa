@@ -75,10 +75,30 @@ export function brandedEmail(o: BrandedEmail): { html: string; text: string } {
        </td></tr>`
     : ""
 
+  // THE BUTTON, AS A TABLE CELL — not a padded anchor, which is what this was.
+  //
+  // AND ITS LABEL IS `ink`, NOT WHITE. The accent is a light yellow (#FED069):
+  // white on it is about 1.4:1, which is a button whose words you cannot read.
+  // It went unnoticed for as long as it did because only ONE email in the fleet
+  // had a call to action; now that every email about a record carries one, the
+  // colour is load-bearing. `ink` is the brand's own answer to "text on the
+  // accent" — the same pairing the code block below already uses.
+  //
+  // Outlook on Windows renders mail with Word's engine, and Word ignores padding
+  // on an inline-block anchor: the button arrived as bare underlined text in the
+  // one client a 45-55-year-old manager is most likely to be reading it in. So
+  // the colour and the shape live on a `<td>` (which Word does paint), the anchor
+  // keeps its own padding for every other client, and `mso-padding-alt` gives
+  // Word the padding through the cell. No VML — that buys a rounded corner in
+  // Outlook and costs a block of conditional markup nobody here can test.
   const ctaBlock =
     o.ctaLabel && o.ctaUrl
-      ? `<tr><td style="padding:12px 0 4px">
-           <a href="${safeUrl(o.ctaUrl, o.origin)}" style="display:inline-block;background:${primary};color:#ffffff;font:600 15px ${font};text-decoration:none;padding:12px 22px;border-radius:10px">${esc(o.ctaLabel)}</a>
+      ? `<tr><td style="padding:14px 0 4px">
+           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+             <td align="center" bgcolor="${primary}" style="background:${primary};border-radius:10px;mso-padding-alt:12px 22px">
+               <a href="${safeUrl(o.ctaUrl, o.origin)}" style="display:inline-block;color:${ink};font:600 15px ${font};text-decoration:none;padding:12px 22px;border-radius:10px;mso-padding-alt:0">${esc(o.ctaLabel)}</a>
+             </td>
+           </tr></table>
          </td></tr>`
       : ""
 
@@ -106,7 +126,12 @@ export function brandedEmail(o: BrandedEmail): { html: string; text: string } {
     "",
     o.intro,
     o.code ? `\nCode: ${o.code}` : "",
-    o.ctaLabel && o.ctaUrl ? `\n${o.ctaLabel}: ${o.ctaUrl}` : "",
+    // THE RAW URL, ON A LINE OF ITS OWN. The plain-text alternative is what a
+    // text-only reader, a screen reader in plain mode and half the corporate mail
+    // filters actually show, and a URL with anything after it on the line is a URL
+    // that gets linkified with the trailing character stuck to it. The button is
+    // useless there; this line is the whole way back to the record.
+    o.ctaLabel && o.ctaUrl ? `\n${o.ctaLabel}:\n${o.ctaUrl}` : "",
     o.footnote ? `\n${o.footnote}` : "",
     `\n— ${brand.name} · ${brand.motto}`,
   ]

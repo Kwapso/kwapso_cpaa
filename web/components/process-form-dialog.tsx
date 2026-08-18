@@ -15,19 +15,14 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -105,7 +100,7 @@ export function ProcessFormDialog({
       await onSubmit({
         appId: values.appId,
         name: values.name.trim(),
-        description: values.description.trim(),
+        description: richTextValue(values.description),
         roleName: values.roleName.trim(),
         baselineLabel: values.baselineLabel.trim(),
       })
@@ -145,22 +140,16 @@ export function ProcessFormDialog({
       )}
       {!editing && !fixedApp && (
         <Field config={appField} htmlFor="process-app" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="process-app"
             value={values.appId}
-            onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+            onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+            options={apps.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder={t("Pick the app")}
+            searchPlaceholder={t("Search apps…")}
+            emptyText={t("No app matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="process-app">
-              <SelectValue placeholder={t("Pick the app")} />
-            </SelectTrigger>
-            <SelectContent>
-              {apps.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
       )}
       <Field config={nameField} htmlFor="process-name" className={fieldSpacing}>
@@ -188,13 +177,12 @@ export function ProcessFormDialog({
         />
       </Field>
       <Field config={descField} htmlFor="process-description" className={fieldSpacing}>
-        <Textarea
-          id="process-description"
-          value={values.description}
-          onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.description}
+          onChange={(html) => setValues((s) => ({ ...s, description: html }))}
           placeholder={t("Who does it, when, and what it's for.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       {!editing && (

@@ -25,10 +25,6 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { CalendarSync } from "lucide-react"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  CalendarView,
-  defaultCalendarViewConfig,
-} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   ScreenRenderer,
@@ -38,19 +34,24 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
+import { GoogleSyncButton } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
+import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
-import { appsKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
+import { appsKey, cursorKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
 import { field, withDataDrivenCollection } from "@/lib/screens"
+import { usePermissions } from "@/lib/perms"
+import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
-import { formatDate } from "@shared/web/format"
+import { formatDate, formatTime } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
 /** THE WEEK WE ARE IN, Monday to Sunday, in UTC — the same boundary
@@ -66,19 +67,60 @@ function inThisWeek(startsAt: string): boolean {
   return at >= start.getTime() && at < end.getTime()
 }
 
+/** WHAT THE MONTH IN FRONT OF YOU DOES NOT SAY (R14).
+ *
+ * The diary PAGES, newest first, so the rows in hand run from the furthest-out
+ * meeting back to wherever the cursor stopped. A month grid drawn over that is
+ * honest about the months it has read and silently wrong about every month
+ * before them: an empty square in March reads as "we did not meet", when what it
+ * means is "nobody has read March yet". A calendar that quietly answers a
+ * question it has not asked is worse than one that refuses.
+ *
+ * So the calendar renders this under the grid exactly on the months that start
+ * before the oldest row loaded — and this renders NOTHING when the cursor says
+ * the whole diary is already in hand, because then an empty March really is an
+ * empty March. Its own component so the cursor can be read with a hook: the
+ * calendar sits inside PagedFind's render prop, where a hook cannot go. */
+function EarlierNotLoaded({
+  listKey,
+  fetchPage,
+}: {
+  listKey: string
+  fetchPage: (cursor: string) => Promise<{ rows: Meeting[]; nextCursor: string | null }>
+}) {
+  const t = useT()
+  const cursor = useCachedValue<string | null>(cursorKey(listKey))
+  if (!cursor) return null
+  return (
+    <>
+      <p className="text-muted-foreground text-sm">
+        {t("Earlier meetings haven't been loaded yet, so this month may not be the whole of it.")}
+      </p>
+      <LoadMore listKey={listKey} fetchPage={fetchPage} label={t("Load more meetings")} />
+    </>
+  )
+}
+
 /** WHAT "ALL" SHOWS (CHECKLIST 9.1: "all, with far more columns"). The two-field
- * list is for scanning; this is the one somebody reads across, so it carries
- * every fact a meeting row can state without opening it. */
+ * list is for scanning; this is the one somebody reads across.
+ *
+ * SIX COLUMNS, NOT NINE. "Every fact a meeting row can state" was the brief and
+ * nine columns was the result — the widest table in either front door, against
+ * N1's table budget of six. A table's column header does the labelling, which is
+ * why it gets six where a list row gets four; past that the row stops being
+ * scannable and becomes something you read, which is what the record is for.
+ *
+ * The three that went: `Why we met` and `Notes` are prose, and prose in a table
+ * cell is a truncated sentence nobody can read either way; `Reference` already
+ * rides the record's own eyebrow (D4), so it was the same string in two places.
+ * All three are on the meeting, one click from the row they were crowding. */
 const ALL_COLUMNS = [
   field("name", "Meeting"),
   field("when", "When"),
   field("client", "Client"),
   field("app", "App"),
-  field("purpose", "Why we met"),
   field("where", "Where"),
   field("state", "Status"),
-  field("written", "Notes"),
-  field("reference", "Reference"),
 ]
 
 export function MeetingsScreen({
@@ -135,17 +177,37 @@ export function MeetingsScreen({
   // called off in Google before it happens.
   const [syncing, setSyncing] = React.useState(false)
   const [ahead, setAhead] = React.useState<{ eventId: string; title: string; startsAt: string }[]>([])
+  const { can } = usePermissions(teamId)
+
+  // FRESHNESS ON ARRIVAL (the owner's "a way to sync more often to make it feel
+  // instantaneous"). The shell already does this once when the app opens; a
+  // person who walks here two hours later was reading a two-hour-old answer on a
+  // screen that looks live. The hook's own header explains why calling it from a
+  // dozen screens is cheap: the five-minute floor is the DOOR's, so an extra
+  // mount is a round trip answered out of the last sweep, never an extra call to
+  // Google.
+  useGoogleCatchUp(teamId, can)
 
   async function bringInSeries() {
     setSyncing(true)
     try {
-      const r = await contentApi.syncCalendarSeries()
+      const r = await contentApi.syncCalendar()
       setAhead(r.ahead)
       invalidate(meetingsKey(teamId))
+      const moved = r.created + r.updated + r.cancelled
       toast.success(
-        r.created > 0
-          ? `${r.created} repeating ${r.created === 1 ? "meeting is" : "meetings are"} in the diary.`
-          : "Nothing new to bring in."
+        moved === 0
+          ? "Nothing new to bring in."
+          : // ALL THREE VERBS, because the sweep now does three things and a
+            // sentence naming only the new records would leave somebody
+            // wondering why a meeting they know changed said nothing happened.
+            [
+              r.created ? `${r.created} new` : "",
+              r.updated ? `${r.updated} brought up to date` : "",
+              r.cancelled ? `${r.cancelled} called off` : "",
+            ]
+              .filter(Boolean)
+              .join(", ") + " in the diary."
       )
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your calendar.")
@@ -176,7 +238,7 @@ export function MeetingsScreen({
 
   return (
     <CountedAbove active>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the strip below badges two exact server counts, so the heading
           stands down through the arbitration context rather than saying a
           number twice. */}
@@ -221,9 +283,11 @@ export function MeetingsScreen({
         listKey={meetingsKey(teamId)}
         placeholder={t("Search meetings…")}
         noun="meetings"
+        sorts={translatedSorts("meetings", t)}
+        defaultSort={COLLECTION_SORTS.meetings.defaultSort}
         fetchPage={(query, cursor) =>
           contentApi
-            .meetings(cursor, "all", query.q)
+            .meetings(cursor, "all", query.q, undefined, undefined, { sort: query.sort, dir: query.dir })
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
         }
       >
@@ -237,35 +301,50 @@ export function MeetingsScreen({
           // boundary is the same one the door computes — Monday, in UTC.
           const shown = view === "week" ? rows.filter((m) => inThisWeek(m.startsAt)) : rows
           const data = shapeMeetingsList(shown)
+          // THE CALENDAR'S ROWS — the shaper's, so a meeting reads the same in
+          // the grid as it does in the list underneath (a cancelled one still
+          // says so). The one thing the shaper has no column for is the CLOCK
+          // TIME, which is the whole point of an agenda row, so it is looked up
+          // beside it rather than shaped a second way.
+          const startsAtById = new Map(shown.map((m) => [m.id, m.startsAt]))
+          const calendarEntries: CalendarEntry[] = (data.rows ?? []).map((r) => ({
+            id: String(r.id),
+            day: String(r.startsOn ?? ""),
+            title: String(r.name ?? ""),
+            accent: String(r.state ?? ""),
+            detail: [formatTime(startsAtById.get(String(r.id))), String(r.client ?? "")]
+              .filter(Boolean)
+              .join(" · "),
+          }))
           // ALL shows far more columns (9.1). The other two views stay the
           // two-line list a person scans, which is the rulebook's own rule about
           // a table being for scanning and a list for reading.
+          // The display is decided BEFORE the collection is tuned, so the tuner
+          // can see it is drawing a table (whose column headers are its own sort
+          // control) and stand its picker down — see tasks-screen for the whole
+          // sentence.
           const listRecipe =
             view === "all"
-              ? {
-                  ...withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText),
-                  display: "table" as const,
-                  fields: ALL_COLUMNS,
-                }
+              ? withDataDrivenCollection(
+                  { ...recipe, display: "table" as const, fields: ALL_COLUMNS },
+                  data.rows ?? [],
+                  found.emptyText
+                )
               : withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
           return (
             <>
               <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
                 {view === "calendar" ? (
-                  <CalendarView
-                    data={(data.rows ?? []).map((r) => ({
-                      id: String(r.id),
-                      date: String(r.startsOn ?? ""),
-                      title: String(r.name ?? ""),
-                      accent: String(r.state ?? ""),
-                    }))}
-                    config={{
-                      ...defaultCalendarViewConfig,
-                      dateField: "date",
-                      titleField: "title",
-                      accentField: "accent",
-                      weekStartsOn: "monday",
-                    }}
+                  <RecordCalendar
+                    entries={calendarEntries}
+                    onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
+                    emptyText={t("Nothing in the diary this month.")}
+                    unloaded={
+                      <EarlierNotLoaded
+                        listKey={found.listKey ?? meetingsKey(teamId)}
+                        fetchPage={found.fetchPage}
+                      />
+                    }
                   />
                 ) : (
                   <ScreenRenderer
@@ -279,35 +358,50 @@ export function MeetingsScreen({
               </SectionWithCreate>
 
               {/* R14: the heading counts the WHOLE diary, so the list under it has to be
-                  able to reach all of it — page one, then Load more. */}
-              <LoadMore
-                listKey={found.listKey ?? meetingsKey(teamId)}
-                fetchPage={found.fetchPage}
-                label={t("Load more meetings")}
-              />
+                  able to reach all of it — page one, then Load more.
+                  NOT ON THE CALENDAR, because the calendar carries its own: the
+                  grid knows which month you are reading and can offer the button
+                  on exactly the months that need it, beside the sentence saying
+                  why. Two of the same button on one screen is one too many. */}
+              {view !== "calendar" && (
+                <LoadMore
+                  listKey={found.listKey ?? meetingsKey(teamId)}
+                  fetchPage={found.fetchPage}
+                  label={t("Load more meetings")}
+                />
+              )}
             </>
           )
         }}
       </PagedFind>
 
-      {/* THE REPEATING ENTRIES (9.7). A button rather than something that happens
-          on every page load: it reads a person's own Google calendar with their
-          own token, and a read that costs somebody else's quota should be one
-          they asked for. */}
+      {/* THE CALENDAR, BOTH WAYS (9.7 and the owner's "it should also update
+          consistently if it's a past event"). Still a button as well as an
+          automatic pass: it reads a person's own Google calendar with their own
+          token, and somebody who has just moved a meeting in Google wants to
+          press something and see it. `ahead` is why this one is here rather than
+          the shared control alone — the instances beyond the horizon come back
+          in its answer and are shown underneath. */}
       {canCreate && (
         <div className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={syncing}
-            onClick={() => void bringInSeries()}
-            className="w-fit gap-1.5"
-          >
-            {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
-            {t("Bring in repeating meetings")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={syncing}
+              onClick={() => void bringInSeries()}
+              className="w-fit gap-1"
+            >
+              {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
+                {t("Bring in the calendar")}
+            </Button>
+            {/* And the material half, so the assistant can answer from what is in
+                these meetings — the same control that is now on every screen
+                showing Google material. */}
+            <GoogleSyncButton teamId={teamId} scope="knowledge" />
+          </div>
           {ahead.length > 0 && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               {/* READ-ONLY, AND SAID SO. These are not records: they become one
                   four weeks before they happen, which is when there is somewhere
                   to write the notes. */}
@@ -347,6 +441,7 @@ export function MeetingsScreen({
         open={open}
         onOpenChange={setOpen}
         draftKey={`meeting:add:${teamId}`}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}

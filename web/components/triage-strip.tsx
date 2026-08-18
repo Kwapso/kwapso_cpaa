@@ -15,20 +15,15 @@
 import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { AlarmClock, UserCheck } from "lucide-react"
 
+import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { triageKey } from "@/lib/live-resources"
 import type { TeamMember } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
+import { assignableMembers } from "@/lib/people"
 
 type Triage = Awaited<ReturnType<typeof contentApi.triage>>
 
@@ -37,6 +32,9 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
     tenancy.members().then((r) => r.members)
   )
+  // Triage duty is OURS to be on — the one seam decides who can hold it
+  // (lib/people), so a client login never appears in this list.
+  const onDutyCandidates = assignableMembers(membersQ.data)
   const [picking, setPicking] = React.useState(false)
 
   const t = triageQ.data
@@ -56,8 +54,8 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
   // Nothing waiting AND somebody named is the quiet, ordinary state — one short
   // line, no colour, no call to action.
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-      <span className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm">
+      <span className="flex items-center gap-1">
         <UserCheck className="size-3.5 shrink-0" />
         {t.onDuty?.userName ? (
           <>
@@ -76,18 +74,16 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
       </span>
       {canSetDuty &&
         (picking ? (
-          <Select onValueChange={assign}>
-            <SelectTrigger className="w-56" aria-label="Who is on triage duty">
-              <SelectValue placeholder="Pick who's on duty" />
-            </SelectTrigger>
-            <SelectContent>
-              {(membersQ.data ?? []).map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <RecordPicker
+            ariaLabel="Who is on triage duty"
+            value=""
+            onChange={assign}
+            options={onDutyCandidates.map((m) => ({ value: m.id, label: m.name }))}
+            placeholder="Pick who's on duty"
+            searchPlaceholder="Search people…"
+            emptyText="Nobody here matched."
+            className="w-56"
+          />
         ) : (
           <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
             {t.onDuty ? "Change" : "Put somebody on duty"}

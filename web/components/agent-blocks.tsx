@@ -32,6 +32,8 @@ import {
   TableRow,
 } from "@kwapso/ui/registry/primitives/table/table"
 
+import { ArrowDown, CornerDownRight } from "lucide-react"
+
 import type { AgentBlock } from "@shared/agent-blocks"
 
 /** A block's own heading, when the model gave it one. Sentence case is the model's
@@ -105,10 +107,10 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
   }
   return (
     <BlockFrame title={block.title}>
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-4">
         {block.rows.map((r, i) => (
           <div key={i} className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 items-baseline justify-between gap-3">
+            <div className="flex min-w-0 items-baseline justify-between gap-2">
               <span className="truncate text-sm text-foreground" title={r.label}>
                 {r.label}
               </span>
@@ -140,7 +142,7 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
 function TableBlock({ block }: { block: Extract<AgentBlock, { kind: "table" }> }) {
   return (
     <BlockFrame title={block.title}>
-      <div className="rounded-lg border">
+      <div className="rounded-xl border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -189,7 +191,7 @@ function StepsBlock({ block }: { block: Extract<AgentBlock, { kind: "steps" }> }
     <BlockFrame title={block.title}>
       <ol className="flex flex-col">
         {block.steps.map((s, i) => (
-          <li key={i} className="flex gap-3">
+          <li key={i} className="flex gap-2">
             {/* The number and the rule under it are one column, so the line joins
                 consecutive steps and stops at the last one. */}
             <div className="flex flex-col items-center">
@@ -209,6 +211,80 @@ function StepsBlock({ block }: { block: Extract<AgentBlock, { kind: "steps" }> }
   )
 }
 
+/* --------------------------------- flow --------------------------------- */
+
+/** A PROCESS THAT BRANCHES — nodes and labelled arrows, which `steps` cannot say.
+ * A numbered list can only mean "and then"; a triage that goes one of two ways, a
+ * sprint that sends work back, an app that has to be approved before it ships are
+ * all shapes where the ARROW carries the meaning. The product's own process maps
+ * (app → process → step) are exactly this, so the shape is earned by the data
+ * rather than borrowed from a chart library.
+ *
+ * LAID OUT DOWN THE PAGE, NEVER AS A CANVAS, and that is the whole design. A real
+ * graph layout needs width to be legible, and the narrow host here is ~400px — a
+ * box-and-line canvas at that width is either a pile of overlapping labels or a
+ * thing you drag sideways. So the nodes are drawn in the order the model listed
+ * them (its own reading order), the arrow BETWEEN two consecutive nodes becomes
+ * the connector that joins them, and every other arrow — a branch, a loop back, a
+ * skip — is drawn under its source as a labelled jump naming the box it goes to.
+ * Nothing is hidden and nothing is invented: every edge appears exactly once.
+ *
+ * Composed in the host, not taken from the library: there is no graph primitive in
+ * @kwapso/ui, and this file does not fork it (see UI-GAPS.md). */
+function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) {
+  const labelOf = new Map(block.nodes.map((n) => [n.id, n.label]))
+  return (
+    <BlockFrame title={block.title}>
+      <div className="flex flex-col">
+        {block.nodes.map((node, i) => {
+          const next = block.nodes[i + 1]
+          // The arrow that happens to join these two in the reading order — it
+          // becomes the connector rather than a chip, so an ordinary straight-
+          // through process draws as one column with no repetition in it.
+          const onward = next ? block.edges.find((e) => e.from === node.id && e.to === next.id) : undefined
+          const jumps = block.edges.filter((e) => e.from === node.id && e !== onward)
+          return (
+            <div key={node.id} className="flex min-w-0 flex-col">
+              <div className="rounded-xl border px-3 py-2">
+                <div className="text-sm text-foreground">{node.label}</div>
+                {node.note && <div className="text-xs text-muted-foreground">{node.note}</div>}
+              </div>
+              {jumps.map((e, j) => (
+                // The corner says "this is a branch off the line"; the arrow says
+                // which way it goes. Both, because "work to do  Split into stories"
+                // on one line reads as two labels rather than a condition and a
+                // destination — and a diagram that has to be guessed at is not one.
+                <div key={j} className="flex min-w-0 flex-wrap items-baseline gap-1 py-1 pl-3 text-xs">
+                  <CornerDownRight className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden />
+                  {e.label && (
+                    <>
+                      <span className="text-muted-foreground">{e.label}</span>
+                      <span className="text-muted-foreground" aria-hidden>
+                        →
+                      </span>
+                    </>
+                  )}
+                  <span className="min-w-0 text-foreground">{labelOf.get(e.to)}</span>
+                </div>
+              ))}
+              {/* Only drawn when an arrow really joins these two. Two boxes with
+                  nothing between them are two boxes with nothing between them —
+                  a connector there would state a step nobody said existed. */}
+              {onward && (
+                <div className="flex min-w-0 items-center gap-1 py-1 pl-3">
+                  <ArrowDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  {onward.label && <span className="min-w-0 text-xs text-muted-foreground">{onward.label}</span>}
+                </div>
+              )}
+              {!onward && next && <div className="h-2" />}
+            </div>
+          )
+        })}
+      </div>
+    </BlockFrame>
+  )
+}
+
 /* ------------------------------- the switch ------------------------------ */
 
 /** ONE RENDERER PER KIND. The mapped type over the catalogue's own union is the
@@ -223,6 +299,7 @@ const BLOCK_RENDERERS: {
   bars: BarsBlock,
   table: TableBlock,
   steps: StepsBlock,
+  flow: FlowBlock,
 }
 
 export function AgentBlockView({ block }: { block: AgentBlock }) {

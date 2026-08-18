@@ -42,9 +42,12 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { LIST_HARD_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
 import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shared/types"
 
+import type { Env } from "../env"
+import { teamMemberNames } from "./notify"
 import { nextRef, REF_KINDS } from "./refs"
 
 export { STORY_STATUSES, type StoryStatus }
@@ -164,6 +167,24 @@ function toStory(r: StoryRow): Story {
  * keyset cursor needs to page without repeating a row. */
 const STORY_ORDER = "COALESCE(s.rank, s.id)"
 
+/** WHAT THE BACKLOG MAY BE ORDERED BY (shared/workers/sorting.ts), with the
+ * drag-rank as the fallback for the reason above: a screen that asks for no
+ * ordering gets the order somebody arranged by hand.
+ *
+ * `deadline` is the one worth naming. A due date is the question a backlog is
+ * most often asked ("what is late?"), and it is exactly the column the browser
+ * could never sort correctly — the row prints "14 Apr 2025" and the library
+ * compares that as text. Here it is the stored date, compared as a date, over
+ * the whole backlog rather than the loaded page. */
+export const STORY_SORTS: SortMenu<StoryRow> = {
+  rank: { expr: STORY_ORDER, dir: "desc", key: (r) => r.rank ?? r.id },
+  created: { expr: "s.created_at", dir: "desc", key: (r) => r.created_at },
+  deadline: { expr: "s.due_on", dir: "asc", key: (r) => r.due_on },
+  title: { expr: "s.title", dir: "asc", key: (r) => r.title },
+  status: { expr: "s.status", dir: "asc", key: (r) => r.status },
+  assignee: { expr: "s.assignee_name", dir: "asc", key: (r) => r.assignee_name },
+}
+
 /** The facets the list door parses. Declared as a type so the route, the tool
  * and this file cannot drift about what a filter IS (R19). */
 export type StoryFilter = {
@@ -232,10 +253,12 @@ export async function listStories(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: StoryFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<StoryRow> = resolveOrdering(STORY_SORTS, "rank", undefined, undefined)
 ): Promise<Page<Story>> {
-  const pos = decodeCursor(cursor)
-  const after = keysetAfter(pos, STORY_ORDER)
+  // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
+  const pos = decodeCursor(cursor, ordering.sig)
+  const after = keysetAfter(pos, ordering.expr, ordering.dir, "s.id")
   const where = storyWhere(filter)
   const clauses = [where.sql, ...(after.sql ? [after.sql] : [])]
   const rows = await d1Query<StoryRow>(
@@ -243,10 +266,10 @@ export async function listStories(
     guard.databaseId,
     // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
     `SELECT ${STORY_COLS} FROM stories s WHERE ${clauses.join(" AND ")}
-      ORDER BY ${STORY_ORDER} DESC, s.id DESC LIMIT ${PAGE_SIZE + 1}`,
+      ${orderBy(ordering, "s.id")} LIMIT ${PAGE_SIZE + 1}`,
     [...where.params, ...after.params]
   )
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.rank ?? r.id, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return { ...page, rows: page.rows.map(toStory) }
 }
 
@@ -449,24 +472,28 @@ async function resolveAccount(
  * so a list of fifty stories draws fifty names without fifty lookups; the id is
  * what anything is ever decided from. */
 async function memberOrThrow(
-  cfg: D1Rest,
+  env: Env,
   guard: MemberGuard,
   userId: string,
   what: string
 ): Promise<{ id: string; name: string }> {
-  // The team's own membership lives in the CORE database, but every team database
-  // already carries the name on the audit blocks of rows that person has written.
-  // Rather than reach across, the door hands us the name it resolved from the
-  // team's member list; this proves the id at least belongs to somebody who has
-  // touched this team's data. A wrong id is a 400, never a silent null assignee.
-  const rows = await d1Query<{ name: string }>(
-    cfg,
-    guard.databaseId,
-    `SELECT creator_name AS name FROM activity WHERE creator_id = ? AND creator_name IS NOT NULL
-      ORDER BY id DESC LIMIT 1`,
-    [userId]
-  )
-  return { id: userId, name: rows[0]?.name ?? what }
+  // THE MEMBER LIST, NOT THE ACTIVITY FEED. It used to read the newest
+  // `creator_name` this person had written into the team database — which is a
+  // name they once typed under, not the name they are called — and fell back to
+  // the literal label when there was none. So a story handed to somebody in
+  // their first week, before they had touched a single row, stored
+  // `assignee_name = "Assignee"`, and that is what every list drew.
+  //
+  // Membership and identity both live in the CORE database, so ask it: the same
+  // read the to-do door already uses, and the same one `listMembers` answers the
+  // picker from. A name is still STORED beside the id (the audit habit of this
+  // codebase) so fifty stories draw fifty names without fifty lookups; the id is
+  // what anything is ever decided from. And an id belonging to nobody on the
+  // team is now the 400 the old comment already claimed it was.
+  const member = (await teamMemberNames(env, guard.teamId)).find((m) => m.userId === userId)
+  if (!member)
+    throw new GuardError(400, "invalid_input", `That ${what.toLowerCase()} isn't on the team.`)
+  return { id: userId, name: member.name }
 }
 
 /* ------------------- the app's own people decide two things ---------------- */
@@ -559,6 +586,7 @@ async function topRank(cfg: D1Rest, guard: MemberGuard): Promise<string> {
 
 /** Raise a story. Title is required; everything else optional. Opens in `open`. */
 export async function createStory(
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
@@ -586,8 +614,8 @@ export async function createStory(
   const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
   // 6.6 — the work goes to somebody who is on this app, or nowhere.
   await refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person")
-  const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
-  const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
+  const assignee = assigneeId ? await memberOrThrow(env, guard, assigneeId, "Assignee") : null
+  const reviewer = reviewerId ? await memberOrThrow(env, guard, reviewerId, "Reviewer") : null
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -619,6 +647,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
 /** Edit a story's content. Everything except the status and the rank, which have
  * their own doors — a status is a transition, not a field. */
 export async function updateStory(
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
@@ -651,8 +680,8 @@ export async function updateStory(
   // another system and handing it to somebody who is not on that system is one
   // refusal rather than two edits that each looked fine.
   await refuseOffAppAssignee(cfg, guard, appId ?? before.app_id, assigneeId ?? null, "That person")
-  const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
-  const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
+  const assignee = assigneeId ? await memberOrThrow(env, guard, assigneeId, "Assignee") : null
+  const reviewer = reviewerId ? await memberOrThrow(env, guard, reviewerId, "Reviewer") : null
 
   const now = new Date().toISOString()
   await d1Query(

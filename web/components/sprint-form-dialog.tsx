@@ -26,24 +26,19 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
-import { accountsKey, listFetch } from "@/lib/live-resources"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
-import type { Account, SelectableValue } from "@shared/types"
+import type { SelectableValue } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
 
 export type SprintFormValues = {
@@ -168,6 +163,7 @@ export function SprintFormDialog({
   onOpenChange,
   apps,
   fixedApp,
+  fixedAccount,
   initial,
   draftKey,
   onSubmit,
@@ -179,6 +175,11 @@ export function SprintFormDialog({
    * fact about where you are standing rather than a question, so the picker is
    * replaced by the app's name and the value cannot be changed by accident. */
   fixedApp?: { id: string; name: string }
+  /** Set when the form is opened FROM a client's own record — the same shape and
+   * the same reason as `fixedApp` above. A sprint is sold TO somebody and cannot
+   * be moved to another client afterwards (the update door refuses it), so being
+   * on the right record when you write it down is the whole safeguard. */
+  fixedAccount?: { id: string; name: string }
   /** Present = EDIT mode (prefilled; client and app shown, not offered). */
   initial?: SprintFormInitial
   draftKey?: string
@@ -188,11 +189,6 @@ export function SprintFormDialog({
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   const sprintTypes = useSprintTypes(teamId)
-  // Page one of the accounts list is plenty for a picker, and it is the SAME
-  // cache the accounts screen holds.
-  const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
-    listFetch.accounts(teamId as string)
-  )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
@@ -225,9 +221,9 @@ export function SprintFormDialog({
     try {
       await onSubmit({
         name: values.name.trim(),
-        goal: values.goal.trim(),
+        goal: richTextValue(values.goal),
         sprintType: values.sprintType,
-        accountId: values.accountId,
+        accountId: fixedAccount ? fixedAccount.id : values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId,
         startsOn: values.startsOn,
         endsOn: values.endsOn,
@@ -249,7 +245,6 @@ export function SprintFormDialog({
     }
   }
 
-  const companies = (accountsQ.data ?? []).filter((a) => a.active && a.accountType === "entity")
 
   return (
     <FormShellDialog
@@ -282,48 +277,40 @@ export function SprintFormDialog({
         />
       </Field>
       <Field config={typeField} htmlFor="sprint-type" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="sprint-type"
           value={values.sprintType || NONE}
-          onValueChange={(v) => setValues((s) => ({ ...s, sprintType: v === NONE ? "" : v }))}
+          onChange={(v) => setValues((s) => ({ ...s, sprintType: v === NONE ? "" : v }))}
+          options={sprintTypes.map((option) => ({
+            value: option.value,
+            label: sprintTypeLabel(option, lang),
+            hint: option.standardDays === null ? undefined : `${option.standardDays} days`,
+          }))}
+          emptyOption={{ value: NONE, label: t("Not said") }}
+          placeholder={t("Not said")}
+          searchPlaceholder={t("Search kinds…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="sprint-type">
-            <SelectValue placeholder={t("Not said")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
-            {sprintTypes.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {sprintTypeLabel(option, lang)}
-                {option.standardDays === null ? "" : ` · ${option.standardDays} days`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
-        {initial ? (
+        {initial || fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="sprint-account">
-            {initial.accountName || "Ours, no client"}
+            {fixedAccount ? fixedAccount.name : initial?.accountName || "Ours, no client"}
           </p>
         ) : (
-        <Select
+        <RecordPicker
+          id="sprint-account"
           value={values.accountId || NONE}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
+          search={(term) => searchAccounts(term, { type: "entity" })}
+          searchKey={pickerKey("companies", teamId)}
+          emptyOption={{ value: NONE, label: t("Ours, no client") }}
+          placeholder={t("Ours, no client")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="sprint-account">
-            <SelectValue placeholder={t("Ours, no client")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Ours, no client")}</SelectItem>
-            {companies.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         )}
       </Field>
       <Field config={appField} htmlFor="sprint-app" className={fieldSpacing}>
@@ -336,33 +323,26 @@ export function SprintFormDialog({
             {fixedApp.name}
           </p>
         ) : (
-          <Select
+          <RecordPicker
+            id="sprint-app"
             value={values.appId || NONE}
-            onValueChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
+            onChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
+            options={apps.map((a) => ({ value: a.id, label: a.name }))}
+            emptyOption={{ value: NONE, label: t("No app yet") }}
+            placeholder={t("No app yet")}
+            searchPlaceholder={t("Search apps…")}
+            emptyText={t("No app matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="sprint-app">
-              <SelectValue placeholder={t("No app yet")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>{t("No app yet")}</SelectItem>
-              {apps.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         )}
       </Field>
       <Field config={goalField} htmlFor="sprint-goal" className={fieldSpacing}>
-        <Textarea
-          id="sprint-goal"
-          value={values.goal}
-          onChange={(e) => setValues((s) => ({ ...s, goal: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.goal}
+          onChange={(html) => setValues((s) => ({ ...s, goal: html }))}
           placeholder={t("What this block of work is meant to achieve.")}
-          disabled={busy}
-          rows={2}
+          className="min-h-32"
         />
       </Field>
       <Field config={startField} htmlFor="sprint-start" className={fieldSpacing}>

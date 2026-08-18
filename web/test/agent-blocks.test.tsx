@@ -79,6 +79,34 @@ describe("the block catalogue refuses what it cannot vouch for", () => {
     expect(b).toMatchObject({ rows: [["1", "2", ""], ["1", "2", "3"]] })
   })
 
+  // A FLOW IS A GRAPH, so it refuses things the other kinds forgive. A table pads
+  // a short row because a blank cell says nothing; a diagram with an arrow into
+  // nothing says the process goes somewhere it doesn't, which is a claim.
+  it("refuses a flow whose arrow points at a node that isn't there", () => {
+    const nodes = '"nodes":[{"id":"a","label":"A"},{"id":"b","label":"B"}]'
+    expect(parseAgentBlock("flow", `{${nodes},"edges":[{"from":"a","to":"ghost"}]}`)).toBeNull()
+    expect(parseAgentBlock("flow", `{${nodes},"edges":[{"from":"ghost","to":"b"}]}`)).toBeNull()
+    // …and a self-loop, which would draw nothing and read as a step that repeats
+    // for ever.
+    expect(parseAgentBlock("flow", `{${nodes},"edges":[{"from":"a","to":"a"}]}`)).toBeNull()
+    expect(parseAgentBlock("flow", `{${nodes},"edges":[{"from":"a","to":"b"}]}`)).not.toBeNull()
+  })
+
+  it("refuses a flow with duplicate ids, one node, or no arrows at all", () => {
+    const two = '{"id":"a","label":"A"},{"id":"b","label":"B"}'
+    // A repeated id makes every arrow touching it ambiguous.
+    expect(
+      parseAgentBlock("flow", `{"nodes":[{"id":"a","label":"A"},{"id":"a","label":"Again"}],"edges":[{"from":"a","to":"a"}]}`)
+    ).toBeNull()
+    // One box is a sentence, not a diagram.
+    expect(parseAgentBlock("flow", `{"nodes":[{"id":"a","label":"A"}],"edges":[{"from":"a","to":"a"}]}`)).toBeNull()
+    // No arrows is a list — `steps` exists for that.
+    expect(parseAgentBlock("flow", `{"nodes":[${two}],"edges":[]}`)).toBeNull()
+    // And past the edge cap it is a report, not a glance.
+    const many = Array.from({ length: BLOCK_LIMITS.edges + 1 }, () => '{"from":"a","to":"b"}')
+    expect(parseAgentBlock("flow", `{"nodes":[${two}],"edges":[${many.join(",")}]}`)).toBeNull()
+  })
+
   it("caps a very long label instead of letting one row own the panel", () => {
     const long = "x".repeat(BLOCK_LIMITS.text + 500)
     const b = parseAgentBlock("bars", `{"rows":[{"label":"${long}","value":1}]}`)
@@ -134,12 +162,26 @@ describe("what the browser actually paints", () => {
       bars: "Acme Manufacturing",
       table: "BERG-T0412",
       steps: "Triage",
+      flow: "Split into stories",
     }
     for (const b of Object.values(AGENT_BLOCKS)) {
       const { container } = render(<AgentMarkdown text={fenced(b.kind, b.example)} />)
       expect(container.textContent, `${b.kind} must paint its data`).toContain(expected[b.kind])
       expect(container.textContent, `${b.kind} must keep the prose around it`).toContain("That's the lot.")
     }
+  })
+
+  it("a flow draws every arrow, including the ones that branch and loop back", () => {
+    const { container } = render(<AgentMarkdown text={fenced("flow", AGENT_BLOCKS.flow.example)} />)
+    const text = container.textContent ?? ""
+    // Every box.
+    for (const label of ["Ticket raised", "Triage", "Answered and resolved", "Split into stories", "Into a sprint"])
+      expect(text, `${label} must be drawn`).toContain(label)
+    // The branch labels, and — the part a vertical layout could quietly lose —
+    // the name of the box a non-consecutive arrow points AT.
+    expect(text).toContain("a question")
+    expect(text).toContain("work to do")
+    expect(text, "the loop back must name where it goes").toContain("sent back")
   })
 
   it("a table block becomes a real <table>, which markdown never managed", () => {

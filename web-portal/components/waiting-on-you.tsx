@@ -27,6 +27,7 @@ import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { Todo } from "@shared/types"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** What a browser will turn into a data URL for us. Generous for a logo or a
  * signed PDF; the door caps it again at 10 MB, which is the cap that counts. */
@@ -60,14 +61,14 @@ export function WaitingOnYou() {
   }
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">{t("We're waiting on you")}</h2>
       <ul className="flex flex-col gap-2">
         {open.map((t) => (
-          <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+          <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
             <div className="min-w-0">
               <p className="font-medium">{t.title}</p>
-              {t.detail && <p className="text-muted-foreground text-sm">{t.detail}</p>}
+              {t.detail && <RichText html={t.detail} className="text-muted-foreground" />}
               <p className="text-muted-foreground text-sm">
                 {t.dueOn ? `By ${formatDate(t.dueOn)}` : "No date on it"}
                 {t.ref ? ` · ${t.ref}` : ""}
@@ -93,14 +94,14 @@ export function WaitingOnYou() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className="gap-1"
                 disabled={busy === t.id}
                 onClick={() => pickers.current[t.id]?.click()}
               >
                 <Paperclip className="size-3.5" />
                 Send a file
               </Button>
-              <Button size="sm" className="gap-1.5" disabled={busy === t.id} onClick={() => complete(t.id)}>
+              <Button size="sm" className="gap-1" disabled={busy === t.id} onClick={() => complete(t.id)}>
                 <Check className="size-3.5" />
                 {busy === t.id ? "Saving…" : "Done"}
               </Button>

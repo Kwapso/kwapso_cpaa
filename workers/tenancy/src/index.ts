@@ -51,6 +51,7 @@
 //   GET  /api/tenancy/processes/comments   -> the conversation on a map (?processId)
 //   POST /api/tenancy/processes/comments   -> comment on a map (clients too)
 //   GET  /api/tenancy/value                -> savings, App -> Process -> Step
+//   GET  /api/tenancy/record-counts        -> one record's child totals, before a tab is clicked
 //   GET  /api/tenancy/rates                -> an account's rate card (?accountId)
 //   POST /api/tenancy/rates                -> add a rate
 //   POST /api/tenancy/rates/update         -> edit a rate
@@ -178,6 +179,7 @@ import {
   postUpdateAccountRate,
   postUpdateInternalRate,
 } from "./routes/money"
+import { getRecordCounts } from "./routes/record-counts"
 import { adminCreateTeam, dbSizes, migrateTeams, moveModule } from "./routes/admin"
 
 /**
@@ -273,6 +275,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/tenancy/processes/comments": { handler: getProcessComments, kind: "read" },
   "POST /api/tenancy/processes/comments": { handler: postProcessComment, kind: "mutation" },
   "GET /api/tenancy/value": { handler: getValue, kind: "read" },
+  // THE BADGES ON A RECORD'S TABS, answered when the record OPENS rather than
+  // when the tab is clicked — the counts are eager, the rows stay lazy. It
+  // crosses three modules, so it is gated per COLLECTION rather than at the door
+  // (R18) and refused to a client login outright. See routes/record-counts.ts.
+  "GET /api/tenancy/record-counts": { handler: getRecordCounts, kind: "read" },
   // THE MONEY. Every door here refuses a client login — the account rate card
   // included, because a client is shown what they bought through the value door's
   // projection, never by knocking on the card itself. `margin` is the figure SCOPE

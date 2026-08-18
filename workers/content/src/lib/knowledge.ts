@@ -110,6 +110,7 @@ import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@sha
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
@@ -174,6 +175,18 @@ export const KNOWLEDGE_KINDS = [
   "app",
   "story",
   "sprint",
+  // THE REST OF WHAT AN AGENCY KNOWS ABOUT A CLIENT. Six kinds that all carry an
+  // account id and none of which the sweep could read: a conversation we had, the
+  // map of what we actually DO for them, the person we talk to, what we are
+  // waiting on them for, and our own jobs about them. `meeting` shipped its
+  // reader before it was named here, so every transcript in the base was being
+  // listed and filtered as a `note` — the coercion in `toSource` below is what
+  // made that silent.
+  "meeting",
+  "process",
+  "contact",
+  "todo",
+  "task",
   // The four that arrive through somebody's own Google connection. Named for
   // what a person would call the thing rather than for the service it came out
   // of — somebody filtering the knowledge base is looking for "an email", and
@@ -478,6 +491,24 @@ function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: s
 /** The sort a source list is keyed by: newest first, id breaking ties. */
 const SOURCE_ORDER = "COALESCE(updated_at, created_at)"
 
+/** WHAT THE KNOWLEDGE LIST MAY BE ORDERED BY (shared/workers/sorting.ts).
+ * `touched` is the fallback — the order this list has always been in — and the
+ * others are the three questions an agency asks of its own history: what is it
+ * called, what kind of thing is it, and what is it FROM (which is not when it was
+ * filed: a contract signed in March indexed in August is March's).
+ *
+ * The keys read the CONVERTED source rather than the raw row, because that is
+ * what `toPage` is handed here — the menu pairs its SQL with the field that
+ * mirrors it, and the field has to be one that exists at the point the cursor is
+ * minted. */
+export const KNOWLEDGE_SORTS: SortMenu<KnowledgeSource> = {
+  touched: { expr: SOURCE_ORDER, dir: "desc", key: (s) => s.updatedAt ?? s.createdAt },
+  added: { expr: "created_at", dir: "desc", key: (s) => s.createdAt },
+  title: { expr: "title", dir: "asc", key: (s) => s.title },
+  kind: { expr: "kind", dir: "asc", key: (s) => s.kind },
+  dated: { expr: "COALESCE(record_date, created_at)", dir: "desc", key: (s) => s.recordDate ?? s.createdAt },
+}
+
 /** What a caller may narrow a source list to: the search box, and the two words
  * a source is filed under. */
 export type SourceFilters = { kind?: string; compartment?: string; q?: string }
@@ -521,12 +552,14 @@ export async function listSources(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: SourceFilters,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<KnowledgeSource> = resolveOrdering(KNOWLEDGE_SORTS, "touched", undefined, undefined)
 ): Promise<Page<KnowledgeSource>> {
   const narrowed = sourcesWhere(guard, filter)
   const where = [...narrowed.sql]
   const params: (string | number)[] = [...narrowed.params]
-  const after = keysetAfter(decodeCursor(cursor), SOURCE_ORDER)
+  // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
+  const after = keysetAfter(decodeCursor(cursor, ordering.sig), ordering.expr, ordering.dir)
   if (after.sql) {
     where.push(after.sql)
     params.push(...after.params)
@@ -536,10 +569,10 @@ export async function listSources(
     guard.databaseId,
     `SELECT ${LIST_COLS} FROM knowledge_sources
       WHERE ${where.join(" AND ")}
-      ORDER BY ${SOURCE_ORDER} DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
+      ${orderBy(ordering)} LIMIT ${PAGE_SIZE + 1}`,
     params
   )
-  return toPage(rows.map(toSource), PAGE_SIZE, (s) => [s.updatedAt ?? s.createdAt, s.id])
+  return toPage(rows.map(toSource), PAGE_SIZE, (s) => [ordering.key(s), s.id], ordering.sig)
 }
 
 /** R16: the exact server COUNT(*) for the badge — never rows.length. Carries the
@@ -1531,6 +1564,13 @@ export function knowledgeAnswer(input: {
    * the passage is what the index remembered, and these two must stay visibly
    * different things. */
   live?: Map<string, { status: string; checkedAt: string }>
+  /** THE ANSWER, ALREADY WRITTEN, when somebody asked for one — composed from the
+   * very passages below and nothing else (lib/knowledge-compose.ts). It arrives as
+   * an INPUT rather than being produced here, which is the whole of R23 in one
+   * line: retrieval still writes nothing, and the decision about whether a written
+   * answer may exist is made in the same breath as `found`. No citation, no
+   * passage, no answer — one decision, not three. */
+  written?: string | null
 }): KnowledgeAnswer {
   const citations: KnowledgeCitation[] = []
   for (const p of input.passages)
@@ -1541,6 +1581,10 @@ export function knowledgeAnswer(input: {
         title: p.title,
         kind: p.kind,
         url: p.url,
+        // THE RECORD ITSELF, one hop past the source. Copied from the passage
+        // rather than worked out again here, so the link under a passage and the
+        // link under its citation can never point at different rows.
+        recordPath: p.recordPath,
         liveStatus: live?.status ?? null,
         checkedAt: live?.checkedAt ?? null,
       })
@@ -1559,6 +1603,10 @@ export function knowledgeAnswer(input: {
             : ""
         }`
       : "The knowledge base has nothing on this. Say so plainly, do not answer from memory.",
+    // A WRITTEN ANSWER CANNOT OUTLIVE ITS SOURCES. It rides the same `found` the
+    // passages do, so there is no input at all — not a bug, not a caller mistake
+    // — that produces confident prose with nothing behind it.
+    answer: found ? (input.written ?? null) : null,
     compartments: input.compartments,
     reason: input.reason,
     records: input.records,
@@ -1718,15 +1766,29 @@ function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; 
 
 /** Answer a question from the team's own material.
  *
- * Never generates prose. It returns the passages and their citations, and the
- * assistant writes the answer with them in front of it — which is what makes
- * "every answer cites its sources" a property of the DATA rather than a habit we
- * hope a model keeps. */
+ * IT STILL GENERATES NO PROSE. It finds the passages and their citations; if the
+ * caller passed a `compose` writer, that writer is handed EXACTLY the evidence the
+ * reader will see and hands back a paragraph — which is R23's own sentence ("the
+ * assistant composes the reply with those in front of it") made into a parameter
+ * instead of a habit. Nothing here can promote a near-miss, invent a source, or
+ * turn a refusal into an answer, because the writer is only ever reached AFTER
+ * `found` is already true. */
 export async function retrieve(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
-  input: { question: string; accountId?: string | null; limit?: number }
+  input: {
+    question: string
+    accountId?: string | null
+    limit?: number
+    /** WRITE THE ANSWER OUT. Absent means the caller wants the evidence only, which
+     * is what every caller wanted until the Knowledge tab started answering in
+     * words — and is still what an assistant wants, because it writes its own
+     * reply. It costs a model call, so the door that supplies it is the door that
+     * gates and meters it (routes/knowledge.ts); this function only decides
+     * WHETHER there is anything worth writing about. */
+    compose?: (material: KnowledgePassage[], sources: KnowledgeCitation[]) => Promise<string | null>
+  }
 ): Promise<KnowledgeAnswer> {
   const question = requireText(input.question, "Question", TEXT_LIMITS.message)
   const want = Math.max(1, Math.min(input.limit ?? DEFAULT_PASSAGES, 20))
@@ -1816,13 +1878,16 @@ export async function retrieve(
     title: row.title,
     kind: row.kind,
     url: row.source_url,
+    // The read above already carries `origin_table` and `origin_row_id` for the
+    // live cross-check, so the link to the record costs nothing extra.
+    recordPath: recordPath(row.origin_table, row.origin_row_id),
     compartment: row.compartment,
     seq: row.seq,
     text: plainText(row.text),
     score: Math.round(score * 1000) / 1000,
   }))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
-  return knowledgeAnswer({
+  const evidence = {
     question,
     compartments: route.compartments,
     reason: route.reason,
@@ -1830,7 +1895,18 @@ export async function retrieve(
     passages,
     candidates: fused.length,
     live,
-  })
+  }
+  // DECIDED FIRST, WRITTEN SECOND, and the order is the law. The seam settles
+  // `found`, which sources are cited and which passages survive; only then is the
+  // writer handed that settled evidence — the same object the reader gets — and
+  // only if there was any. A writer that ran before this decision could be given
+  // material the caller was never going to see.
+  const decided = knowledgeAnswer(evidence)
+  if (!input.compose || !decided.found) return decided
+  const written = await input.compose(decided.passages, decided.citations)
+  // Nothing written (the model was unreachable, or said nothing) is not an error:
+  // the evidence is still the answer, exactly as it was before any of this.
+  return written ? knowledgeAnswer({ ...evidence, written }) : decided
 }
 
 /** THE ORDER THE FUSION DECIDED, joined to the rows the database handed back.
@@ -1881,6 +1957,49 @@ const LIVE_STATUS: Record<string, { table: string; status: string }> = {
   sprints: { table: "sprints", status: `CASE WHEN completed_at IS NULL THEN 'running' ELSE 'completed' END` },
   apps: { table: "apps", status: "stage" },
   accounts: { table: "accounts", status: "status" },
+  meetings: { table: "meetings", status: "status" },
+  tasks: { table: "tasks", status: "status" },
+  todos: {
+    table: "todos",
+    status: `CASE WHEN cancelled_at IS NOT NULL THEN 'called off'
+                  WHEN completed_at IS NOT NULL THEN 'sent to us' ELSE 'still waiting' END`,
+  },
+  // `processes` and `account_links` are absent on purpose: neither has a status
+  // column, and a row with nothing to re-read has nothing to be stale about.
+}
+
+/** WHERE THE RECORD BEHIND A PASSAGE LIVES, IN THIS APP.
+ *
+ * The owner's sentence: "the ability to go and check out the links to the
+ * sources or to those particular records as well." A citation already opens the
+ * SOURCE — the knowledge screen that shows what was indexed and why. This is the
+ * other half: one hop further, to the ticket, the map, the meeting itself.
+ *
+ * A path RELATIVE TO THE TEAM (`tickets/<id>`), because the worker has no
+ * business knowing what a front end's URLs look like beyond the segment, and
+ * both front ends prefix their own. Null for a source with no record screen — a
+ * note somebody typed IS the record, a Google document is reached through `url`,
+ * and a to-do or a contact lives inside another record's page rather than on one
+ * of its own. Null renders no link; it never renders a broken one.
+ *
+ * DERIVED, not decided at the door (R23): the map is here, the one call is in
+ * `retrieve`, and the citation copies what the passage carries. Every segment is
+ * checked against `web/lib/pages.ts` by knowledge-coverage.test.ts, so a page
+ * that is renamed cannot leave a dead link behind. */
+const RECORD_PATH: Record<string, string> = {
+  help: "tickets",
+  stories: "stories",
+  sprints: "sprints",
+  apps: "apps",
+  processes: "processes",
+  meetings: "meetings",
+  accounts: "accounts",
+  tasks: "tasks",
+}
+
+export function recordPath(originTable: string | null, originRowId: string | null): string | null {
+  const segment = originTable ? RECORD_PATH[originTable] : undefined
+  return segment && originRowId ? `${segment}/${originRowId}` : null
 }
 
 async function crossCheck(
