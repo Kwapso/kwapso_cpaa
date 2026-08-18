@@ -953,6 +953,11 @@ export type AppRow = {
   name: string
   url: string | null
   stage: string | null
+  /** THE CLIENT'S OWN MARK, as a `/media/...` path we host. An app is the one
+   * record a person recognises by sight, so this is what the tile shows; where
+   * it is null the tile keeps the stage mark it has always drawn. It rides for
+   * every reader, staffed or not — the overview IS the picture. */
+  logoUrl: string | null
   /** what it costs US to run each month, in cents. `null` on the way OUT to a
    * client login — an internal number, withheld on the row (see listApps). */
   toolCostCentsPerMonth: number | null

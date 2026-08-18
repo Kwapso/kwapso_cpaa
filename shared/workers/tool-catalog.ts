@@ -1616,11 +1616,11 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_app",
     summary:
-      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running, an internal figure, never shown to a client. `stage` is where it has got to, one of the team's App stage values. The four context fields are prose: `about` is what the system is, `clientContext` is the situation it was built into, `solution` is what we did about it, and `keyActors` is who actually uses it. `staffUserIds` is who from OUR team is on it (`leadUserId` names the team lead, who must be one of them) and `stakeholderContactIds` is the client's own people (`mainStakeholderContactId` names the main one, who must be one of them, and is who a resolved ticket on this app is emailed to).",
+      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running, an internal figure, never shown to a client. `stage` is where it has got to, one of the team's App stage values. `logoUrl` is the client's own mark: send a `data:image/png|jpeg|webp;base64,…` URL and the bytes are stored and the row keeps our own path, or send a path we already minted. The four context fields are prose: `about` is what the system is, `clientContext` is the situation it was built into, `solution` is what we did about it, and `keyActors` is who actually uses it. `staffUserIds` is who from OUR team is on it (`leadUserId` names the team lead, who must be one of them) and `stakeholderContactIds` is the client's own people (`mainStakeholderContactId` names the main one, who must be one of them, and is who a resolved ticket on this app is emailed to).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps",
     schema: obj(
       {
-        name: S, accountId: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S,
+        name: S, accountId: S, url: S, stage: S, logoUrl: S, toolCostCentsPerMonth: N, about: S, clientContext: S,
         solution: S, keyActors: S, ...APP_PEOPLE_SCHEMA,
       },
       ["name"]
@@ -1630,6 +1630,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       accountId: opt(i, "accountId"),
       url: opt(i, "url"),
       stage: opt(i, "stage"),
+      logoUrl: opt(i, "logoUrl"),
       toolCostCentsPerMonth: typeof i.toolCostCentsPerMonth === "number" ? i.toolCostCentsPerMonth : undefined,
       about: opt(i, "about"),
       clientContext: opt(i, "clientContext"),
@@ -1642,11 +1643,11 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_app",
     summary:
-      "Edit an app's own details (by id), never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value. The four context fields (`about`, `clientContext`, `solution`, `keyActors`) are prose and are edited here like any other field. `staffUserIds` and `stakeholderContactIds` are each re-sent WHOLE, the set you name replaces the one the app has, and anybody dropped keeps their history rather than being deleted. Leave a list out entirely to change nobody.",
+      "Edit an app's own details (by id), never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value. `logoUrl` follows that rule too: send a `data:` image to replace the mark, send it empty to take the picture away, leave it out to keep the one the app has. The four context fields (`about`, `clientContext`, `solution`, `keyActors`) are prose and are edited here like any other field. `staffUserIds` and `stakeholderContactIds` are each re-sent WHOLE, the set you name replaces the one the app has, and anybody dropped keeps their history rather than being deleted. Leave a list out entirely to change nobody.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/update",
     schema: obj(
       {
-        id: S, name: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S,
+        id: S, name: S, url: S, stage: S, logoUrl: S, toolCostCentsPerMonth: N, about: S, clientContext: S,
         solution: S, keyActors: S, ...APP_PEOPLE_SCHEMA,
       },
       ["id", "name"]
@@ -1656,6 +1657,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       name: str(i, "name"),
       url: sent(i, "url"),
       stage: sent(i, "stage"),
+      logoUrl: sent(i, "logoUrl"),
       toolCostCentsPerMonth: typeof i.toolCostCentsPerMonth === "number" ? i.toolCostCentsPerMonth : undefined,
       about: sent(i, "about"),
       clientContext: sent(i, "clientContext"),

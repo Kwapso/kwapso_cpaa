@@ -47,6 +47,28 @@ the one table whose mapping the owner supplied, and it shows the shape:
 `date` is stored as `j4PZ2`, `description` as `EAyh4`. Every other table will need
 the same treatment: pull the rows, read a handful, and write the mapping down.
 
+## Getting the pictures
+
+The rows are only half of it. Every logo, photo and thumbnail in the export is a
+`storage.googleapis.com/glide-prod…` URL that stops resolving when the Glide
+subscription ends, so the files are rescued and re-hosted separately, in three
+steps:
+
+```bash
+node scripts/glide-files.mjs                  # 194 files onto disk, + a manifest
+node scripts/glide-to-r2.mjs staging          # the safety copy, in a private bucket
+node scripts/glide-visuals.mjs staging        # onto the migrated records themselves
+```
+
+The last one is the one that shows up on screen: it walks the apps, companies and
+people the seed created, and puts each one's picture on its record through the
+ordinary gated door. `--dry-run` says what it would do without writing anything.
+Safe to run twice — a record that already has its picture is left alone — and it
+reads every row back afterwards rather than trusting a 200, because a door that
+predates the column answers cheerfully and stores nothing.
+
+## The decisions
+
 That mapping work is the **field reconciliation**, and it is deliberately a set of
 decisions put to the owner rather than a silent migration. Where a Glide field has
 no home in the customer spine, the answer is either a new column with a reason or

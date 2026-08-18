@@ -811,6 +811,25 @@ forget. An app's account is written once at creation and there is no move-app
 door, moving one would silently republish a whole map, its savings and its
 conversation into somebody else's portal.
 
+**`apps.logo_url` (team migration `0037_app_logo`)** is the client's own mark, and
+it is the one column here whose absence was VISIBLE. The apps screen is a wall of
+tiles precisely because an app is the record a person recognises by sight, and
+every tile drew the same stage glyph, because there was nowhere to put a logo.
+Twenty-six of the twenty-eight apps that came across from Glide carry one
+(`glide/RECONCILIATION.md`), so the rows were waiting for the column rather than
+the other way round; `scripts/glide-visuals.mjs` is what carried them.
+
+It holds a `/media/<teamId>/apps/<ulid>` path and never the picture: the door
+takes a data URL, `storeImageDataUrl` (`shared/workers/image.ts`, the same seam
+`accounts.logo_url` has used since 0024) puts the bytes in R2, and the row keeps
+the path. Storing the data URL instead would be wrong three ways over, and
+`workers/tenancy/test/app-logo.test.ts` holds all three: `safeSrc` refuses a
+`data:` scheme so nothing would render, a bounded list read whole would carry a
+megabyte of base64, and the door's png/jpeg/webp allow-list is what keeps an SVG
+— a script running on the app's own origin — out of the bucket. ONE image column,
+not two: an account has a logo and a cover because a company record has a
+masthead, and an app is only ever a square.
+
 `process_comments` is the conversation on a map: one of the six things a contact
 can do (SCOPE ch.06), and a conversation rather than an edit, it changes no
 duration and cuts no version. A STAFF comment carrying `explains_step_key` is the

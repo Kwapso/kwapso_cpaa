@@ -65,6 +65,7 @@ import {
 } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { appStageMark } from "@shared/app-stages"
+import { AppMark } from "@/components/app-tiles"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
@@ -179,6 +180,10 @@ export function AppDetailScreen({
       name: values.name.trim(),
       url: values.url || null,
       stage: values.stage || null,
+      // Always sent, like the two people lists below: the form hands back either
+      // a newly picked data URL, the path the app already had, or "" for a logo
+      // somebody cleared, and all three are answers the door should hear.
+      logoUrl: values.logoUrl,
       toolCostCentsPerMonth: values.toolCostCentsPerMonth,
       about: values.about || null,
       clientContext: values.clientContext || null,
@@ -410,8 +415,13 @@ export function AppDetailScreen({
   return (
     <RecordScreen
       // An app's own mark is its STAGE mark, from the same shared list the tiles
-      // read, so a system looks the same wherever it appears (G3).
+      // read, so a system looks the same wherever it appears (G3) — and where
+      // the client has given us their logo, that goes in the same square
+      // instead, which is exactly what `leading` was put on RecordHeader for.
+      // `AppMark` decides between the two, so the heading and the tile can never
+      // disagree about which picture an app has.
       mark={appStageMark(app.stage)}
+      leading={<AppMark app={app} className="size-14 text-3xl sm:size-[72px]" />}
       eyebrow={t("App")}
       title={app.name}
       status={[app.stage, accountName || t("Ours, no client"), app.active ? undefined : t("Archived")]
@@ -532,6 +542,7 @@ export function AppDetailScreen({
           accountId: app.accountId ?? "",
           url: app.url ?? "",
           stage: app.stage ?? "",
+          logoUrl: app.logoUrl ?? "",
           // A cost we have never been told is ZERO on the way into the form, not
           // absent: the field asks for an amount, and an amount nobody has given
           // is nothing rather than a blank the door would read as "leave it".

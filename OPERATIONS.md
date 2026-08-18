@@ -116,6 +116,16 @@ New migrations must be applied to BOTH databases before deploying workers that n
 
 **Core migration 0027 (`agent_usage_log` token columns), apply BEFORE deploying data-ops or content (2026-08-18).** The assistant's stable prefix — the tool catalogue plus the system prompt, about nine tenths of every turn's input — is now sent with an Anthropic prompt-cache breakpoint (`AGENT_PROMPT_CACHE`, `off` | `5m` | `1h`, unset means `5m`). Whether that saves anything depends entirely on the HIT RATE, and a hit rate cannot be reconstructed afterwards, so each usage row records what the turn actually cost: `input_tokens`, `output_tokens`, `cache_write_tokens`, `cache_read_tokens`. **WITHOUT it the INSERT in `logUsage` names columns that do not exist, and because recording usage is contractually best-effort it fails SILENTLY — the usage log simply stops filling while the assistant looks perfectly healthy** (the same failure shape as 0014 and 0020). The columns are nullable on purpose: rows written before it were never measured, and a back-filled zero would read as "measured, and it was free".
 
+**Team migration `0037_app_logo`, apply BEFORE deploying tenancy (2026-08-18).**
+`apps.logo_url`, the client's own mark on the app tile. **WITHOUT it every write
+through the apps door 500s on a missing column**, which is the loud failure; the
+quiet one is the other way round — a tenancy worker that predates the column
+answers `POST /api/tenancy/apps/update` with a cheerful `{ ok: true }` and stores
+nothing, so `scripts/glide-visuals.mjs` would report twenty-five logos moved onto
+an apps screen still full of stage glyphs. That script reads every row back for
+exactly this reason and says `UNPROVEN` rather than `moved`. Roll it out with
+`POST /api/tenancy/admin/migrate-teams` (x-admin-key) first, then deploy.
+
 ## Backing up, and getting the rows back
 
 `node scripts/backup.mjs <staging|production>`, read-only, refuses to run against the wrong Cloudflare account, and dumps the core database plus every team database core points at. The restore paths (Time Travel for a live database inside 30 days; a dump for one that is gone), what is deliberately NOT backed up, and the date the restore was last rehearsed all live in **[RESILIENCE.md](RESILIENCE.md)**.
