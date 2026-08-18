@@ -46,6 +46,7 @@ import { CalendarPlus, CheckCheck, ExternalLink, FileText, Pencil, Power, Video 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { OverviewList } from "@/components/overview-list"
+import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { ActivityPanel } from "@/components/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
@@ -57,11 +58,12 @@ import {
   type RecordAction,
 } from "@/components/record-chrome"
 import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey } from "@/lib/live-resources"
+import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
-import { invalidate, primeCache, useCached } from "@shared/web/store"
+import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 // Every URL bound to an attribute goes through the seam, Google's included —
 // see the note in google-source-dialog.tsx for why "it came from Google" is not
@@ -107,6 +109,17 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   // use your connection, and kwapso may put an event in your diary. The door
   // demands both — this only decides whether the button is worth offering.
   const canPush = can("google", "edit") && can("google_events", "create")
+  // THE TIME A MEETING TOOK. `meetings` is one of the four things a work log
+  // may hang off (WORK_LOG_TARGETS), and this is the hours a conversation cost
+  // — written by the transcript import rather than by a person, which is why
+  // the tab reads and never offers to add one: a hand-typed row here would not
+  // carry the marker the transcript writer puts on meeting time, so it would
+  // sit outside the "with or without meeting time" filter the Work logs page
+  // narrows by (9.3) — right in the total and quietly wrong in the split.
+  // Correcting a row is still offered, because a wrong figure is worse.
+  const canSeeTime = can("work", "read")
+  const canEditTime = can("work", "edit")
+  const timeTotal = useCachedValue<number>(workLogsTotalKey("meetings", meetingId))
 
   const accountsQ = useCached<Account[]>(canEdit ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
@@ -306,6 +319,20 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
           ]
         : []),
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
+      // WORK LOGS, wherever time is tracked (CHECKLIST 6.8). The transcript import
+      // has written a row of time against every meeting it read since the diary
+      // shipped, and nothing on the meeting itself showed it.
+      ...(canSeeTime
+        ? [
+            {
+              value: "time",
+              label: t("Work logs"),
+              icon: CONCEPT_ICON.time,
+              badge: formatCount(timeTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       {
         value: "activity",
         label: t("Activity"),
@@ -408,6 +435,20 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
             return <OverviewList items={overviewItems} />
           if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
+          if (panel.value === "time")
+            return (
+              <WorkLogsPanel
+                targetTable="meetings"
+                targetId={meetingId}
+                recordLabel={item.title}
+                canEdit={canEditTime}
+                // Read-only on a meeting — the comment beside `canSeeTime` above
+                // says why the hours here are written by the transcript rather
+                // than by hand.
+                canLog={false}
+                onActivityChanged={() => invalidate(recordActivityKey("meetings", meetingId))}
+              />
+            )
           if (panel.value === "calendar")
             return (
               <CalendarPanel

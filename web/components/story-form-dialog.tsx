@@ -141,9 +141,21 @@ export function StoryFormDialog({
    * fact about where you are standing rather than a question, so the picker is
    * replaced by its name and cannot be changed by accident. */
   fixedApp?: { id: string; name: string }
-  /** The same, from a TICKET: "turn this request into a piece of work". It is
-   * the first of the three ways a ticket becomes a story, and the request behind
-   * the work is the one thing about it nobody should be able to mistype. */
+  /** The same, from a TICKET's own Related stories tab: NEW work that answers
+   * this request.
+   *
+   * READ THE VERB. This is not "turn this request into a piece of work" — that
+   * control (and the prompt after triage) went on 17 Aug 2026 and is not coming
+   * back, because a ticket never BECOMES a story. This is the other sentence,
+   * which survives: a request may need several stories and a story may answer
+   * several requests, so writing another one changes nothing about the ticket at
+   * all. Removing the conversion took this create action with it by accident,
+   * and it is the only way to get a request to triaged from its own record — so
+   * if the two ever look like the same button again, they are not.
+   *
+   * Fixed rather than picked for the ordinary reason: the request behind the
+   * work is a fact about where you are standing, and the one thing about a new
+   * story nobody should be able to mistype. */
   fixedTicket?: { id: string; label: string }
   /** OPEN tickets only (6.4), each tagged with the app it is about. */
   tickets: { id: string; label: string; appId: string | null }[]

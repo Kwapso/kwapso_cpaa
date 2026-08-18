@@ -530,50 +530,6 @@ const tasksListRecipe: ScreenRecipe = {
   ]),
 }
 
-/** One task, as a record: its own fields and its history. A recipe rather than a
- * component for the same reason the four housekeeping details are — there is no
- * control on it the engine has no block for. */
-const taskDetailRecipe: ScreenRecipe = {
-  type: "detail",
-  binding: { module: "tasks" },
-  gate: { module: "work", right: "read" },
-  fields: [],
-  actions: [
-    {
-      id: "tasks.done",
-      label: "Tick it off",
-      action: "tasks.done",
-      variant: "outline",
-      gate: { module: "work", right: "edit" },
-    },
-  ],
-  header: { title: "name", subtitle: "detail" },
-  tabs: [
-    {
-      key: "overview",
-      label: "Overview",
-      icon: CONCEPT_ICON.overview,
-      block: {
-        kind: "description",
-        columns: 1,
-        rows: [
-          { label: "Status", column: "status" },
-          { label: "Who has it", column: "assignee" },
-          { label: "Due", column: "due" },
-          { label: "Detail", column: "detailText" },
-          { label: "Added", column: "created" },
-          { label: "Added by", column: "createdBy" },
-        ],
-      },
-    },
-    {
-      key: "activity",
-      label: "Activity",
-      icon: CONCEPT_ICON.activity,
-      block: { kind: "activity", source: "activity" },
-    },
-  ],
-}
 /* -------------------- the agency's own housekeeping ----------------------- */
 
 /** THE FOUR RECORD SCREENS, AS RECIPES. Each of these details is the record's
@@ -723,7 +679,6 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "sprints.list": sprintsListRecipe,
   "apps.list": appsListRecipe,
   "tasks.list": tasksListRecipe,
-  "tasks.detail": taskDetailRecipe,
   // The diary. Its DETAIL has no recipe: two of its three tabs are prose
   // somebody wrote (the agenda, and the notes afterwards) and its header carries
   // the one button in this module that reaches outside the app — see
@@ -962,35 +917,4 @@ export function withoutActions(recipe: ScreenRecipe, ids: string[]): ScreenRecip
   if (actions.length === 0) return recipe
   const drop = new Set(ids)
   return { ...recipe, actions: actions.filter((a: RecipeAction) => !drop.has(a.id)) }
-}
-
-/** Re-label (and optionally re-style) one action — for a TOGGLE, where the same
- * door does two opposite things and the button has to say which one it will do
- * NEXT (a fresh copy; the base recipe is never mutated).
- *
- * `RecipeAction.label` is a static string in the library, and the library is
- * lego this repo does not edit — so a control whose wording depends on the
- * record's state is the HOST's job, and this is the one seam for it.
- *
- * The task tick is why it exists. It read "Tick it off" whether or not the task
- * was already done: the write toggled correctly underneath, so pressing the
- * unchanged button a second time quietly REOPENED the thing you had just
- * finished — the tester's "it marks as done, but the button to tick it off stays
- * there". R17's shape (an idempotent transition) has a matching obligation on
- * the screen: a control that offers the same move again is a control that reads
- * as though nothing happened. */
-export function withActionLabel(
-  recipe: ScreenRecipe,
-  id: string,
-  label: string,
-  variant?: RecipeAction["variant"]
-): ScreenRecipe {
-  const actions = Array.isArray(recipe.actions) ? recipe.actions : []
-  if (actions.length === 0) return recipe
-  return {
-    ...recipe,
-    actions: actions.map((a: RecipeAction) =>
-      a.id === id ? { ...a, label, ...(variant ? { variant } : {}) } : a
-    ),
-  }
 }

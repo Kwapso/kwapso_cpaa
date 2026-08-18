@@ -97,6 +97,19 @@ export const SprintBurndownChart = dynamic(
   () => chartModule().then((m) => m.SprintBurndownChart),
   { ssr: false, loading: chartLoading }
 )
+/** The Work logs tab's two breakdowns — hours by person, hours by kind of work.
+ * Exported from here for the same reason as the one above: every route into that
+ * module goes through this file, so the shell's graph never touches Recharts. */
+export const HoursByChart = dynamic(() => chartModule().then((m) => m.HoursByChart), {
+  ssr: false,
+  loading: chartLoading,
+})
+/** The weekly series, for a screen drawing it over ONE record rather than the
+ * whole team. Same picture, same lazy boundary, rows the caller has shaped. */
+export const RecordWeeksChart = dynamic(() => chartModule().then((m) => m.WeeksChart), {
+  ssr: false,
+  loading: chartLoading,
+})
 
 /** Whole seconds → the hours a person says out loud. One decimal below ten
  * ("6.5"), none above it ("41") — the same shape the count ladder uses and for

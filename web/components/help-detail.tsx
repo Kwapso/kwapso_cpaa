@@ -50,7 +50,10 @@ import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper } from "@/components/help-status-stepper"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
-import { StoriesPanel } from "@/components/work-panels"
+import { StoryFormDialog } from "@/components/story-form-dialog"
+import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
+import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -139,9 +142,43 @@ export function HelpDetailScreen({
   // right and not the ticket's: answering a request and putting hours on the
   // team's timesheet are two different things a role may grant separately.
   const canLogTime = can("work", "create")
+  // WRITING WORK DOWN IS THE WORK MODULE'S RIGHT, NOT THE TICKET'S. A person who
+  // may read and answer requests is not necessarily a person who may put things
+  // on the team's backlog, so the button on the Related stories tab asks the
+  // right the STORY door itself gates on (`work:create`) rather than any `help:*`
+  // right — the child's right, never the parent's. The door decides either way
+  // (R10); this only decides whether we draw a button that would come back 403.
+  const canWriteWork = can("work", "create")
+  // THE TIME AGAINST THIS REQUEST. Reading it is `work:read` and correcting a row
+  // is `work:edit` — the two rights those doors gate on, and neither of them is a
+  // ticket right: answering a request and reading the team's timesheet are
+  // different things a role may grant separately. A role without `work:read` sees
+  // no tab at all rather than a tab that refuses.
+  const canSeeTime = can("work", "read")
+  const canEditTime = can("work", "edit")
+  // R16: the door's exact COUNT(*) over this record's time, fetched by the panel
+  // and read back here for the badge.
+  const timeTotal = useCachedValue<number>(workLogsTotalKey("help", helpId))
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
+  // NEW WORK AGAINST THIS REQUEST — and this is NOT "make it a story".
+  //
+  // CHECKLIST 3.10 took away three controls that CONVERTED a request into a
+  // piece of work (the button on the title, the prompt after triage, and this
+  // tab's create action), and the first two were right to go: a ticket never
+  // becomes a story, it is answered by however many stories the work turns out
+  // to need. The third was collateral damage. Writing a NEW story that ANSWERS
+  // this request is a different act from turning the request into one, and it is
+  // the act that gets a ticket to triaged: the stepper cannot move until there
+  // is work booked against it, and until 18 Aug 2026 there was no way to book
+  // any from the record you were standing on.
+  //
+  // So the distinction is this, and it is the reason the two must not be
+  // re-merged: the ticket is UNCHANGED by this. Nothing about it is consumed,
+  // renamed or replaced — a second story on the same request is as ordinary as
+  // the first, which is precisely what a conversion could never express.
+  const [storyOpen, setStoryOpen] = React.useState(false)
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
@@ -154,6 +191,10 @@ export function HelpDetailScreen({
   // on the record rather than a field on it. Its exact total badges the tab.
   const storiesTotal = useCachedValue<number | null>(totalKey("stories-ticket", helpId))
   const host = { base: basePath.replace(/\/tickets$/, "") }
+  // WHAT A STORY NEEDS TO BE WRITTEN AT ALL — the same four lists the backlog,
+  // the sprint and the app hand this form. A hook, so it sits above the early
+  // returns below; every list it reads is a cache another screen already holds.
+  const options = useStoryFormOptions(teamId)
 
   // Land on the newest reply, and follow the one you just sent — the same
   // behaviour the client gets on their side of this same conversation, from the
@@ -383,6 +424,22 @@ export function HelpDetailScreen({
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
+      // WORK LOGS, wherever time can be tracked (CHECKLIST 6.8). A ticket has
+      // carried a start/stop timer in its own header since the work engine
+      // shipped, and no screen showed what that timer had produced — so the hours
+      // on a request could be logged and never read back on the record they were
+      // logged against.
+      ...(canSeeTime
+        ? [
+            {
+              value: "time",
+              label: t("Work logs"),
+              icon: CONCEPT_ICON.time,
+              badge: formatCount(timeTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       {
         value: "files",
         label: t("Files and links"),
@@ -555,9 +612,12 @@ export function HelpDetailScreen({
             return <OverviewList items={overviewItems} />
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
-          // THE SECOND WAY IN — a tab on the ticket where MORE work can be
-          // added. One story may answer many tickets and one ticket may need
-          // many stories, so this is a collection with its own create action.
+          // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
+          // answer many tickets and one ticket may need many stories, so this is
+          // a collection with its own create action — and the button is the
+          // create action the comment above it had been promising while handing
+          // the panel no `onNew` at all. See the note on `storyOpen` for why
+          // adding work here is not the "make it a story" that was removed.
           if (t.value === "stories")
             return (
               <StoriesPanel
@@ -565,7 +625,19 @@ export function HelpDetailScreen({
                 ownerId={helpId}
                 filter={{ ticketId: helpId }}
                 host={host}
+                onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
                 emptyText="No work written down against this request yet."
+              />
+            )
+          if (t.value === "time")
+            return (
+              <WorkLogsPanel
+                targetTable="help"
+                targetId={helpId}
+                recordLabel={[ticket.ref, richTextPlain(ticket.description)].filter(Boolean).join(" · ")}
+                canEdit={canEditTime}
+                canLog={canLogTime}
+                onActivityChanged={() => invalidate(recordActivityKey("help", helpId))}
               />
             )
           if (t.value === "files")
@@ -620,6 +692,43 @@ export function HelpDetailScreen({
           createdAt: ticket.createdAt,
           editedByName: ticket.editorName,
           updatedAt: ticket.updatedAt,
+        }}
+      />
+
+      {/* NEW WORK ON THIS REQUEST. The ticket rides in as `fixedTicket`: the
+          request behind the work is a fact about where you are standing, not a
+          question, so it is shown rather than offered and cannot be mistyped.
+          The app is left as a question, because a request about one system is
+          often answered by work on another.
+
+          The story arrives ALREADY RELATED — that relation is the entire point,
+          and it is what makes the list behind this dialog move. `createStoryFrom`
+          drops the backlog and the sprints; the slice this record reads is
+          dropped here, because it is the one cache that knows about this ticket.
+          Everyone else's screen is patched by the publish the door already
+          sends (R1/R15). */}
+      <StoryFormDialog
+          teamId={teamId}
+        open={storyOpen}
+        onOpenChange={setStoryOpen}
+        sprints={options.sprints}
+        apps={options.apps}
+        fixedTicket={{
+          // The same words the picker on this form would have shown, through the
+          // same plain-text seam the header uses — a request written in rich text
+          // must not arrive in the dialog wearing its markup.
+          id: helpId,
+          label: [ticket.ref, richTextPlain(ticket.description)].filter(Boolean).join(" · "),
+        }}
+        tickets={options.tickets}
+        members={options.members}
+        appStaff={options.appStaff}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
+        draftKey={`story:add:ticket:${helpId}`}
+        onSubmit={async (v) => {
+          await createStoryFrom(teamId, { ...v, ticketId: helpId })
+          invalidate(sliceKey("stories-ticket", helpId))
         }}
       />
 

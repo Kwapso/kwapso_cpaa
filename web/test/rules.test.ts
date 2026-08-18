@@ -480,17 +480,29 @@ describe("RULES — the laws of the base", () => {
       // SCREEN (one with a `listRecipe`) the key must appear INSIDE the LoadMore's
       // own props — that is what makes it that collection's paging control.
       //
-      // The two record feeds are excepted on purpose and it is not a loophole:
-      // their control reads `listKey={activity.listKey}`, a value the hook named
-      // `useRecordActivity(` hands them, so the key genuinely is not written at
-      // the call site. For those the file-level check is the strongest honest one
-      // — and R2's own check (record-detail-tabs) already demands a `<LoadMore>`
-      // in every one of those components by name.
-      const wired = componentFiles().some((f) => {
-        const src = read(f)
-        if (!c.listRecipe) return src.includes("<LoadMore") && src.includes(c.webKey)
-        return [...src.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.webKey))
-      })
+      // THE RECORD FEED IS PROVED IN TWO HALVES, IN THE TWO FILES THAT HOLD THEM.
+      //
+      // Its control does not write the key at the call site — it reads
+      // `listKey={activity.listKey}`, a value the hook named `useRecordActivity(`
+      // hands it — so the pairing lives in two files by construction: the hook is
+      // called in each record detail, and the pager is in the ONE activity panel
+      // they all render. This used to be a file-level AND over any component,
+      // which is a weaker sentence than it looks: it passed for two years because
+      // `story-detail.tsx` happened to contain a `<LoadMore>` for its TIME tab and
+      // a `useRecordActivity(` call for its history — two unrelated controls in
+      // one file reading as proof of each other. Moving that time list into a
+      // component of its own is what exposed it, and the fix is to assert the two
+      // halves where they actually are rather than to hunt for a file with both.
+      const wired = !c.listRecipe
+        ? componentFiles().some((f) => read(f).includes(c.webKey)) &&
+          [
+            ...read(join(WEB, "components", "activity-panel.tsx")).matchAll(
+              /<LoadMore[\s\S]{0,400}?\/>/g
+            ),
+          ].some((m) => m[0].includes("activity.listKey"))
+        : componentFiles().some((f) =>
+            [...read(f).matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.webKey))
+          )
       expect(
         wired,
         `${name} pages on the server but nothing in web can reach page two — a <LoadMore> whose listKey is built from ${c.webKey}`

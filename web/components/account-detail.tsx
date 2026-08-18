@@ -56,7 +56,7 @@ import {
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import type { Account, AccountDetail, AccountRate } from "@shared/types"
+import type { Account, AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
 import { moneyText } from "@shared/web/money"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
@@ -75,6 +75,8 @@ import {
 } from "@/components/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/contact-detail"
 import { AppFormDialog } from "@/components/app-form-dialog"
+import { SprintFormDialog } from "@/components/sprint-form-dialog"
+import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { useAssignableMembers } from "@/lib/people"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { RichText } from "@shared/web/rich-text-view"
@@ -85,7 +87,7 @@ import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work
 import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
   RecordFooter,
@@ -98,8 +100,11 @@ import {
   accountKey,
   accountValueKey,
   accountsKey,
+  appsKey,
   listFetch,
   ratesKey,
+  sprintsKey,
+  todosKey,
   totalKey,
 } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -143,6 +148,12 @@ export function AccountDetailScreen({
   const { can } = usePermissions(teamId)
   // Who can be put on an app (8.10), for the record-an-app dialog below.
   const members = useAssignableMembers(teamId)
+  // THE SYSTEMS A SPRINT ON THIS CLIENT COULD COVER. The SAME cache key the
+  // Apps screen (and every other form in the work engine) reads, narrowed here
+  // rather than asked for again: a sprint covers one app and an app belongs to
+  // one account, so offering another client's systems would be offering a row
+  // the door would refuse.
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
   const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")
@@ -166,7 +177,15 @@ export function AccountDetailScreen({
   const canSeeApps = can("processes", "read")
   const canWriteApps = can("processes", "create")
   const canSeeWork = can("work", "read")
+  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Selling a block of work is
+  // `work:create` and asking a client for something is `todos:create` — the
+  // rights the SPRINT door and the TO-DO door gate on. Standing on an account
+  // record is not a right; `accounts:*` says nothing about whether a person may
+  // put work on the backlog. The door decides either way (R10); these only
+  // decide whether we draw a button that would come back a 403.
+  const canWriteWork = can("work", "create")
   const canSeeTodos = can("todos", "read")
+  const canAskTodo = can("todos", "create")
   const canCancelTodo = can("todos", "delete")
   // WHAT THIS CLIENT IS CHARGED. A second module on the same record, like the
   // logins above: reading a phone number and seeing a price are different sized
@@ -208,6 +227,8 @@ export function AccountDetailScreen({
   const [newContactOpen, setNewContactOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [appOpen, setAppOpen] = React.useState(false)
+  const [sprintOpen, setSprintOpen] = React.useState(false)
+  const [todoOpen, setTodoOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
 
   /** Re-read what this screen shows after our own write. (Everyone else's screen
@@ -689,11 +710,19 @@ export function AccountDetailScreen({
                 ownerId={accountId}
                 filter={{ accountId }}
                 host={{ base: basePath.replace(/\/accounts$/, "") }}
+                onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
                 emptyText={`Nothing has been sold to ${account.name} yet.`}
               />
             )
           if (tabItem.value === "todos")
-            return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
+            return (
+              <TodosPanel
+                teamId={teamId}
+                accountId={accountId}
+                canCancel={canCancelTodo}
+                onNew={canAskTodo ? () => setTodoOpen(true) : undefined}
+              />
+            )
           // THE KNOWLEDGE BASE, IN CONTEXT (7.15), THE SAME WAY AN APP DOES IT
           // (8.9). Two things travel and they do different jobs. `accountId`
           // names the COMPARTMENT, so a question typed here cannot be answered
@@ -798,6 +827,71 @@ export function AccountDetailScreen({
           invalidate(sliceKey("apps-account", accountId))
         }}
       />
+
+      {/* MOUNTED ONLY WHEN OPEN, unlike the app and contact dialogs above. These
+          two resolve the team THEMSELVES (`useActiveTeam`) and fetch their own
+          pickers, so keeping them mounted behind a closed dialog would cost every
+          reader of an account record a router subscription and two list reads for
+          a form nobody has asked for. The draft survives either way — it lives in
+          session storage, which is the whole point of Law R7.
+
+          A BLOCK OF WORK SOLD TO THIS CLIENT, written from their own record with
+          the client already chosen. A sprint cannot be moved to another client
+          afterwards (the update door refuses it), so being on the right record
+          when you write it down is the whole safeguard — the same argument the
+          app form above makes. The APP is left as a question: a client has more
+          than one system and the sprint has to say which. */}
+      {sprintOpen && (
+      <SprintFormDialog
+        open={sprintOpen}
+        onOpenChange={setSprintOpen}
+        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === accountId).map((a) => ({ id: a.id, name: a.name }))}
+        fixedAccount={{ id: accountId, name: account.name }}
+        draftKey={`sprint:add:account:${accountId}`}
+        onSubmit={async (v) => {
+          await contentApi.createSprint({
+            name: v.name,
+            goal: v.goal || undefined,
+            sprintType: v.sprintType || undefined,
+            accountId,
+            appId: v.appId || undefined,
+            startsOn: v.startsOn || undefined,
+            endsOn: v.endsOn || undefined,
+            soldPriceCents: v.soldPriceCents,
+            currency: v.currency || undefined,
+          })
+          // The new sprint arrives ALREADY on this client, so the slice this tab
+          // reads is the one cache that has to be told. Everyone else's screen is
+          // patched by the publish the door already sends (R1/R15).
+          invalidate(sliceKey("sprints-account", accountId))
+          invalidate(sprintsKey(teamId))
+          toast.success(t("Sprint started."))
+        }}
+      />
+      )}
+
+      {/* SOMETHING WE NEED FROM THIS CLIENT. Same shape again: the client is a
+          fact about where you are standing, and it is the field that decides
+          whose portal this lands in. */}
+      {todoOpen && (
+      <TodoFormDialog
+        open={todoOpen}
+        onOpenChange={setTodoOpen}
+        fixedAccount={{ id: accountId, name: account.name }}
+        draftKey={`todo:add:account:${accountId}`}
+        onSubmit={async (v: TodoFormValues) => {
+          await contentApi.raiseTodo({
+            accountId,
+            title: v.title,
+            detail: v.detail || undefined,
+            dueOn: v.dueOn ? new Date(v.dueOn).toISOString() : undefined,
+          })
+          invalidate(sliceKey("todos-account", accountId))
+          invalidate(todosKey(teamId))
+          toast.success(t("Asked, and emailed to them."))
+        }}
+      />
+      )}
 
       <ContactLinkDialog
         open={linkOpen}

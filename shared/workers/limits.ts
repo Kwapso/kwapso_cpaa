@@ -142,6 +142,16 @@ export const TICKET_FACET_CAP = 500
  * read to the end of and a count can be trusted. */
 export const TICKET_ATTACHMENT_CAP = 50
 
+/** Rows the work-log summary's two grouped reads may return (R14) — time BY
+ * PERSON and time BY KIND OF WORK, on one record. Both group over sets that
+ * cannot run away: the people are the team's members and the kinds are the
+ * team's own dropdown vocabulary. So the ceiling is generous and exists to make
+ * the bound VISIBLE at the query rather than implied by the shape of the data —
+ * the same argument TICKET_FACET_CAP makes, at the size those two sets actually
+ * are. A chart with fifty bars on it is already unreadable; this is the point
+ * past which it also stops being bounded. */
+export const WORK_LOG_GROUP_CAP = 50
+
 /** Processes one story may link to (CHECKLIST 6.5). "One or more" is the ask; a
  * ceiling is what makes the `IN (...)` proof a bounded statement rather than one
  * with as many placeholders as somebody types. */

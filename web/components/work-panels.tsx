@@ -425,7 +425,16 @@ export function ProcessesPanel({
  * reason — a two-year system accumulates meetings and the oldest is the one
  * somebody is digging for. `total` is the door's exact COUNT(*) over this same
  * filter, parked in the sidecar the tab badge reads (R16). */
-export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHost }) {
+export function AppMeetingsPanel({
+  appId,
+  host,
+  onNew,
+}: {
+  appId: string
+  host: PanelHost
+  /** present = the caller may arrange one from here, and this opens the form */
+  onNew?: () => void
+}) {
   const t = useT()
   const key = sliceKey("meetings-app", appId)
   const q = useCached<Meeting[]>(key, () =>
@@ -442,6 +451,11 @@ export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHo
 
   return (
     <div className="flex flex-col gap-3">
+      {onNew && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <AddButton label={t("Arrange a meeting")} onClick={onNew} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No meetings about this app yet.")}</p>
       ) : (
@@ -481,7 +495,16 @@ export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHo
  * GROWING collection that pages, so "this app's tickets among the newest fifty"
  * would be an answer that looks like an answer. `total` is the door's exact
  * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
-export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHost }) {
+export function AppTicketsPanel({
+  appId,
+  host,
+  onNew,
+}: {
+  appId: string
+  host: PanelHost
+  /** present = the caller may raise one from here, and this opens the form */
+  onNew?: () => void
+}) {
   const t = useT()
   const key = sliceKey("tickets-app", appId)
   const q = useCached<HelpTicket[]>(key, () =>
@@ -499,6 +522,11 @@ export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHos
   // prefix rather than the section we are standing in.
   return (
     <div className="flex flex-col gap-3">
+      {onNew && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <AddButton label={t("Raise a ticket")} onClick={onNew} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing has been raised about this app yet.")}</p>
       ) : (
