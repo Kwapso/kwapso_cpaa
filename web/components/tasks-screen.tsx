@@ -25,13 +25,12 @@ import * as React from "react"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Progress } from "@kwapso/ui/registry/primitives/progress/progress"
-import {
-  ScreenRenderer,
-  type ScreenActionContext,
-  type ScreenIntent,
+import type {
+  ScreenActionContext,
+  ScreenIntent,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 import type { RecipeField, ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { defaultFieldConfig, type CollectionConfig } from "@kwapso/ui/lib/config"
 import { Inbox } from "lucide-react"
 
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
@@ -39,6 +38,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
+import { RecordTable, visibleActions } from "@/components/record-table"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
@@ -304,10 +304,25 @@ export function TasksScreen({
   // tuner stands its own picker down when it can see it is drawing one
   // (`frameSortOptions`); spreading the display on afterwards would hide that
   // fact from it and put two sort controls on one screen.
-  const listRecipe = withDataDrivenCollection(
+  const tableRecipe = withDataDrivenCollection(
     { ...recipe, display: "table" as const, fields: columns },
     data.rows
   )
+  // BOUNDED (R14): the whole list is in the browser, so the headers order it
+  // here and order ALL of it — no `order` prop, `RecordTable` owns the answer.
+  // The door's priority-first default is what the rows arrive in and what the
+  // third click on a header returns to.
+  //
+  // It is NOT the engine's table: `ScreenRenderer` draws headers that cannot
+  // sort, which is what this screen shipped with (record-table.tsx has the
+  // whole sentence, and UI-GAPS #22(b) has the library's half).
+  // Every column orders, and the name it orders by is its own key, because the
+  // comparing happens here over rows that are all here.
+  const tableColumns = tableRecipe.fields.map((f) => ({
+    key: f.column,
+    label: f.field.label,
+    sort: f.column,
+  }))
 
   // THE CALENDAR — the host's own (components/record-calendar.tsx), given the
   // same rows. It wants a bare day, so the deadline's day is what it is keyed on;
@@ -371,12 +386,12 @@ export function TasksScreen({
             emptyText={t("Nothing due this month.")}
           />
         ) : (
-          <ScreenRenderer
-            recipe={listRecipe}
-            data={data}
-            rights={rights}
-            onAction={onAction}
-            onIntent={onIntent}
+          <RecordTable
+            columns={tableColumns}
+            rows={data.rows}
+            config={tableRecipe.collection as CollectionConfig}
+            actions={visibleActions(tableRecipe, rights, onAction)}
+            onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
           />
         )}
       </SectionWithCreate>
