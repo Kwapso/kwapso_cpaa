@@ -113,6 +113,7 @@ import {
 import {
   getRunningTimers,
   getWorkLogs,
+  getWorkLogSummary,
   postAutoStop,
   postLogTime,
   postResolveRunaway,
@@ -353,6 +354,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // TIME. A timer is a work log with no end yet, so there is one table and one
   // pair of doors rather than a timer service beside a timesheet.
   "GET /api/content/work-logs": { handler: getWorkLogs, kind: "read" },
+  // THE NUMBERS ON TOP OF A RECORD'S LIST OF TIME — the same filter the list
+  // above parses, answered in aggregate. Its own door rather than more fields on
+  // the page, because a screen showing the header without the rows (or the rows
+  // without the header) should pay for exactly what it draws.
+  "GET /api/content/work-logs/summary": { handler: getWorkLogSummary, kind: "read" },
   "GET /api/content/work-logs/running": { handler: getRunningTimers, kind: "read" },
   "POST /api/content/work-logs": { handler: postLogTime, kind: "mutation" },
   "POST /api/content/work-logs/start": { handler: postStartTimer, kind: "mutation" },

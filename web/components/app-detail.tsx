@@ -25,6 +25,8 @@ import { Pencil, Power } from "lucide-react"
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/people"
 import { ProcessFormDialog } from "@/components/process-form-dialog"
+import { HelpFormDialog } from "@/components/help-form-dialog"
+import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createSprintFrom } from "@/components/sprints-screen"
@@ -41,7 +43,7 @@ import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
   RecordFooter,
@@ -50,13 +52,22 @@ import {
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
-import { accountsKey, appMoneyKey, appsKey, listFetch, totalKey, valueKey } from "@/lib/live-resources"
+import {
+  accountsKey,
+  appMoneyKey,
+  appsKey,
+  helpKey,
+  listFetch,
+  meetingsKey,
+  totalKey,
+  valueKey,
+} from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { appStageMark } from "@shared/app-stages"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import type { Account, AppRow } from "@shared/types"
+import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
@@ -97,6 +108,14 @@ export function AppDetailScreen({
   // all. The door refuses a client login besides (R24).
   const canSeeMoney = can("commercials", "read")
   const canReadTickets = can("help", "read")
+  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Raising a request about this
+  // system is `help:create` and putting a meeting in the diary is
+  // `meetings:create` — the rights those two doors gate on. `processes:edit`,
+  // which is what lets somebody edit the app record itself, says nothing about
+  // either. The door decides (R10); these only decide whether we draw a button
+  // that would come back a 403.
+  const canRaiseTicket = can("help", "create")
+  const canArrangeMeeting = can("meetings", "create")
   // Who can be put on this app (8.10) — the team, from the cache the members
   // screen already fills.
   const members = useAssignableMembers(teamId)
@@ -107,11 +126,25 @@ export function AppDetailScreen({
     tenancy.accountDetail(clientId as string)
   )
 
+  // WHAT THE TWO NEW FORMS NEED, and nothing more. Both read the SAME cache keys
+  // their own sections read, and both are conditional on the right that draws
+  // the button: a role that cannot arrange a meeting never fetches the purposes.
+  const purposesQ = useCached<MeetingPurpose[]>(
+    canArrangeMeeting ? `purposes:${teamId}` : null,
+    () => listFetch.purposes(teamId)
+  )
+  const selectableQ = useCached<SelectableValue[]>(
+    canRaiseTicket ? `selectable:${teamId}` : null,
+    () => tenancy.selectable().then((r) => r.values)
+  )
+
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
   const [mapOpen, setMapOpen] = React.useState(false)
   const [storyOpen, setStoryOpen] = React.useState(false)
+  const [ticketOpen, setTicketOpen] = React.useState(false)
+  const [meetingOpen, setMeetingOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
 
@@ -419,8 +452,22 @@ export function AppDetailScreen({
                 onNew={canEdit ? () => setMapOpen(true) : undefined}
               />
             )
-          if (t.value === "meetings") return <AppMeetingsPanel appId={appId} host={host} />
-          if (t.value === "tickets") return <AppTicketsPanel appId={appId} host={host} />
+          if (t.value === "meetings")
+            return (
+              <AppMeetingsPanel
+                appId={appId}
+                host={host}
+                onNew={canArrangeMeeting ? () => setMeetingOpen(true) : undefined}
+              />
+            )
+          if (t.value === "tickets")
+            return (
+              <AppTicketsPanel
+                appId={appId}
+                host={host}
+                onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
+              />
+            )
           if (t.value === "value") return <AppMoneyPanel appId={appId} host={host} />
           if (t.value === "knowledge")
             return (
@@ -470,6 +517,66 @@ export function AppDetailScreen({
         }}
         draftKey={`app:edit:${appId}`}
         onSubmit={save}
+      />
+
+      {/* A REQUEST ABOUT THIS SYSTEM, RAISED FROM ITS OWN RECORD. The app rides in
+          as `fixedApp` — which system it is about is a fact about where you are
+          standing, and it is the field that routes the request and decides who
+          gets told when it is answered (5.8). The CLIENT is left as a question:
+          a ticket about one of our systems may be raised on behalf of a client
+          or be our own housekeeping, and the app cannot answer that.
+
+          It arrives already related, which is the entire point: the tab behind
+          this dialog asks the server for `?appId=`, so the new row and the exact
+          count above it move together on the next read. */}
+      <HelpFormDialog
+        open={ticketOpen}
+        onOpenChange={setTicketOpen}
+        teamId={teamId}
+        helpTypeOptions={(selectableQ.data ?? [])
+          .filter((v) => v.type === "Ticket type" && v.active)
+          .map((v) => v.value)}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`help:add:app:${appId}`}
+        onSubmit={async (v) => {
+          await contentApi.createHelp(v)
+          invalidate(sliceKey("tickets-app", appId))
+          invalidate(helpKey(teamId, "all"))
+          toast.success(t("Ticket raised."))
+        }}
+      />
+
+      {/* A MEETING ABOUT THIS SYSTEM, arranged from its own record. Same shape,
+          same reason — and the CLIENT is again left as a question, because a
+          meeting about an app is not always with the client who owns it. */}
+      <MeetingFormDialog
+        open={meetingOpen}
+        onOpenChange={setMeetingOpen}
+        accountOptions={(accountsQ.data ?? [])
+          .filter((a) => a.active && a.accountType === "entity")
+          .map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={[{ id: appId, name: app.name }]}
+        purposeOptions={(purposesQ.data ?? [])
+          .filter((x) => x.active)
+          .map((x) => ({ id: x.id, name: x.name }))}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`meeting:add:app:${appId}`}
+        onSubmit={async (v: MeetingFormValues) => {
+          await contentApi.createMeeting({
+            title: v.title,
+            startsAt: v.startsAt,
+            endsAt: v.endsAt || undefined,
+            accountId: v.accountId || undefined,
+            appId,
+            purposeId: v.purposeId || undefined,
+            location: v.location || undefined,
+            agenda: v.agenda || undefined,
+            notes: v.notes || undefined,
+          })
+          invalidate(sliceKey("meetings-app", appId))
+          invalidate(meetingsKey(teamId))
+          toast.success(t("It's in the diary."))
+        }}
       />
 
       {/* A MAP IS DRAWN FROM THE APP IT BELONGS TO (8.12). Process maps stopped

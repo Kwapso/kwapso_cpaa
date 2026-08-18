@@ -1,6 +1,6 @@
 "use client"
 
-// THE THREE PICTURES, AND NOTHING ELSE — the only file in the agency app that
+// THE PICTURES, AND NOTHING ELSE — the only file in the agency app that
 // touches the library's Chart.
 //
 // WHY IT IS A FILE OF ITS OWN, because it is not tidiness. The whole agency app
@@ -72,6 +72,33 @@ export function WeeksChart({ rows, label }: { rows: { label: string; hours: numb
         series: [{ key: "hours", label, color: "chart-2" }],
         showLegend: false,
         showDots: true,
+        height: BAND_HEIGHT,
+      }}
+    />
+  )
+}
+
+/** HOURS BY SOMETHING — who spent the time on one record, or what kind of work
+ * it was. One bar per group, biggest first, the number ON the bar.
+ *
+ * The same shape as StageChart and deliberately not a pie: these are quantities
+ * a person compares ("Marta did twice what I did"), and a bar is the only chart
+ * anybody reads a comparison off reliably. The ORDER here is the tally's, not a
+ * lifecycle's — unlike the stages above, there is no natural sequence for four
+ * colleagues, so biggest-first is the ordering that carries information. */
+export function HoursByChart({ rows, label }: { rows: { label: string; hours: number }[]; label: string }) {
+  return (
+    <Chart
+      data={rows}
+      config={{
+        ...defaultChartConfig,
+        type: "bar",
+        xKey: "label",
+        series: [{ key: "hours", label, color: "chart-3" }],
+        showLegend: false,
+        showGrid: false,
+        showYAxis: false,
+        showDataLabels: true,
         height: BAND_HEIGHT,
       }}
     />

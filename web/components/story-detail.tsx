@@ -16,19 +16,17 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Check, ClipboardCheck, Pencil } from "lucide-react"
 
-import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
 import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
-import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
+import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
@@ -45,21 +43,15 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { cursorKey, recordTimeKey, storiesKey, totalKey } from "@/lib/live-resources"
+import { storiesKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import type { Story, WorkLog } from "@shared/types"
-import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import type { Story } from "@shared/types"
+import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
-
-/** Whole seconds → the hours and minutes a person would say. */
-function spell(seconds: number): string {
-  const m = Math.round(seconds / 60)
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`
-}
 
 export function StoryDetailScreen({
   teamId,
@@ -77,18 +69,11 @@ export function StoryDetailScreen({
   // knowledge base does for a source past its first page.
   const storyQ = useCached<Story | null>(`story:one:${storyId}`, () => contentApi.storyOne(storyId))
   const activity = useRecordActivity("stories", storyId)
-  // The time on THIS story. Keyed through recordTimeKey rather than the generic
-  // slice key, because that family is the one the live registry drops when any
-  // row of time moves (R15) — a stop pressed on the header bar has to land here.
-  const timeKey = recordTimeKey("stories", storyId)
-  const logsQ = useCached<WorkLog[]>(timeKey, () =>
-    contentApi.workLogs({ filter: { targetTable: "stories", targetId: storyId } }).then((r) => {
-      primeCache(totalKey("time-story", storyId), r.total)
-      primeCache(cursorKey(timeKey), r.nextCursor)
-      return r.logs
-    })
-  )
-  const timeTotal = useCachedValue<number>(totalKey("time-story", storyId))
+  // The exact number of entries on THIS story, for the tab badge (R16). The
+  // WorkLogsPanel below is what fetches it — the panel owns the read, the host
+  // owns the badge, and one exported key function is what keeps the two saying
+  // the same string.
+  const timeTotal = useCachedValue<number>(workLogsTotalKey("stories", storyId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
@@ -100,11 +85,6 @@ export function StoryDetailScreen({
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [reviewOpen, setReviewOpen] = React.useState(false)
-  // THE ROW OF TIME BEING CORRECTED. Held rather than routed through the URL,
-  // for the reason the Stories page's panel holds its own: a correction is a
-  // thing you do to a line you are looking at, and Back should close the form
-  // rather than walk you back through every line you opened.
-  const [editingLog, setEditingLog] = React.useState<WorkLog | null>(null)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/stories$/, "") }
@@ -137,25 +117,6 @@ export function StoryDetailScreen({
     } finally {
       setBusy(false)
     }
-  }
-
-  /** CORRECT A ROW OF TIME, on the record it was logged against. The Time tab
-   * listed the hours and offered nothing to do about a wrong one — so a mistyped
-   * figure could only be fixed from the Stories page, if you knew it was there.
-   * The door keeps the trail (who corrected what, and when). */
-  async function correctTime(values: TimeFormValues) {
-    if (!editingLog) return
-    await contentApi.updateWorkLog({
-      id: editingLog.id,
-      startedAt: values.startedAt,
-      endedAt: values.endedAt,
-      note: values.note,
-      kind: values.kind,
-      billable: values.billable,
-    })
-    invalidate(timeKey)
-    invalidate(`activity:record:stories:${storyId}`)
-    toast.success(t("Time corrected."))
   }
 
   async function save(values: StoryFormValues) {
@@ -378,66 +339,14 @@ export function StoryDetailScreen({
         renderPanel={(t) => {
           if (t.value === "time")
             return (
-              <div className="flex flex-col gap-3">
-                {logsQ.data === undefined ? (
-                  <Skeleton variant="list" lines={3} />
-                ) : logsQ.data.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No time logged against this yet.</p>
-                ) : (
-                  <ul className="flex flex-col gap-1.5">
-                    {logsQ.data.map((l) => (
-                      <li
-                        key={l.id}
-                        className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
-                          l.discarded ? "opacity-60" : ""
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {[l.userName, l.startedAt.slice(0, 10), l.kind, l.note]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                        <span className="text-muted-foreground text-xs">
-                          {l.endedAt ? spell(l.seconds) : "running"}
-                        </span>
-                        {l.discarded && (
-                          <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                            Discarded
-                          </Badge>
-                        )}
-                        {/* FIX A LINE. Only on time that has FINISHED and has
-                            not been binned: a running timer is corrected by
-                            stopping it (the control for that is on the header
-                            bar, on every screen), and a start time you can edit
-                            while the clock is still counting is two people
-                            writing the same number. */}
-                        {canEdit && l.endedAt && !l.discarded && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingLog(l)}
-                            className="shrink-0 gap-1.5"
-                          >
-                            <Pencil className="size-3.5" />
-                            Edit
-                          </Button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {/* R14: time is the fastest-growing row in the work engine, so the
-                    badge above counts rows this list has to be able to reach. */}
-                <LoadMore
-                  listKey={timeKey}
-                  label="Load more time"
-                  fetchPage={(c: string) =>
-                    contentApi
-                      .workLogs({ filter: { targetTable: "stories", targetId: storyId }, cursor: c })
-                      .then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
-                  }
-                />
-              </div>
+              <WorkLogsPanel
+                targetTable="stories"
+                targetId={storyId}
+                recordLabel={story.ref ? `${story.ref} · ${story.title}` : story.title}
+                canEdit={canEdit}
+                canLog={canLogTime}
+                onActivityChanged={() => invalidate(`activity:record:stories:${storyId}`)}
+              />
             )
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
@@ -499,13 +408,6 @@ export function StoryDetailScreen({
           reviewFileName: story.reviewFileName ?? "",
         }}
         onSubmit={sendToReview}
-      />
-      <TimeFormDialog
-        open={!!editingLog}
-        onOpenChange={(o) => !o && setEditingLog(null)}
-        draftKey={editingLog ? `work-log:edit:${editingLog.id}` : undefined}
-        initial={editingLog}
-        onSubmit={correctTime}
       />
     </RecordScreen>
   )

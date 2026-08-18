@@ -33,6 +33,7 @@ import type {
   TeamPulse,
   Todo,
   WorkLog,
+  WorkLogSummary,
   Meeting,
   MeetingPersonLink,
   MeetingPurpose,
@@ -417,6 +418,12 @@ export const content = {
     api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
       `/api/content/work-logs${logQuery(opts.filter, opts.cursor)}`
     ),
+  /** THE NUMBERS ON TOP OF A RECORD'S TIME — the same filter as the page above,
+   * answered in aggregate by the same door's own parser, so the header and the
+   * rows are one question (R16). Never summed in the browser: the list is a
+   * PAGE, so adding up what is loaded would answer about the newest fifty. */
+  workLogSummary: (filter?: LogQuery) =>
+    api<WorkLogSummary>(`/api/content/work-logs/summary${logQuery(filter, null)}`),
   /** One row of time, read back off its own page — there is no by-id door,
    * because a work log is only ever read in a list of its neighbours. */
   workLogOne: (id: string) =>

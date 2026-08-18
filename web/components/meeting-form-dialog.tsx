@@ -72,6 +72,7 @@ export function MeetingFormDialog({
   accountOptions,
   appOptions,
   purposeOptions,
+  fixedApp,
   initial,
   draftKey,
 }: {
@@ -86,6 +87,11 @@ export function MeetingFormDialog({
   appOptions: { id: string; name: string }[]
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeOptions: { id: string; name: string }[]
+  /** Set when the form is opened FROM an app's own screen — the system the
+   * meeting is about is then a fact about where you are standing, so the picker
+   * is replaced by its name. Separate from `initial`, which means EDIT: a create
+   * with one field already answered must not claim to be an edit. */
+  fixedApp?: { id: string; name: string }
   /** Present = EDIT mode (prefilled). */
   initial?: Partial<MeetingFormValues>
   draftKey?: string
@@ -99,7 +105,7 @@ export function MeetingFormDialog({
       startsAt: initial?.startsAt ?? "",
       endsAt: initial?.endsAt ?? "",
       accountId: initial?.accountId || NONE,
-      appId: initial?.appId || NONE,
+      appId: initial?.appId || fixedApp?.id || NONE,
       purposeId: initial?.purposeId || NONE,
       location: initial?.location ?? "",
       agenda: initial?.agenda ?? "",
@@ -120,7 +126,7 @@ export function MeetingFormDialog({
         startsAt: toMoment(values.startsAt),
         endsAt: toMoment(values.endsAt),
         accountId: values.accountId === NONE ? "" : values.accountId,
-        appId: values.appId === NONE ? "" : values.appId,
+        appId: fixedApp ? fixedApp.id : values.appId === NONE ? "" : values.appId,
         purposeId: values.purposeId === NONE ? "" : values.purposeId,
         location: values.location.trim(),
         agenda: richTextValue(values.agenda),
@@ -205,23 +211,29 @@ export function MeetingFormDialog({
         </Select>
       </Field>
       <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
-        <Select
-          value={values.appId}
-          onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-          disabled={busy}
-        >
-          <SelectTrigger id="meeting-app">
-            <SelectValue placeholder={t("Not about one app")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Not about one app")}</SelectItem>
-            {appOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {fixedApp ? (
+          <p className="text-muted-foreground text-sm" id="meeting-app">
+            {fixedApp.name}
+          </p>
+        ) : (
+          <Select
+            value={values.appId}
+            onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="meeting-app">
+              <SelectValue placeholder={t("Not about one app")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>{t("Not about one app")}</SelectItem>
+              {appOptions.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </Field>
       <Field config={purposeField} htmlFor="meeting-purpose" className={fieldSpacing}>
         <Select

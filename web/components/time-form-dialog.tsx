@@ -76,12 +76,22 @@ export function TimeFormDialog({
   open,
   onOpenChange,
   draftKey,
+  fixedTarget,
   initial,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   draftKey?: string
+  /** Set when the form is opened FROM the record's own Work logs tab — what the
+   * time is against is then a fact about where you are standing rather than a
+   * question, so the picker is replaced by its name.
+   *
+   * It is also the ONLY way to log time against a task or a meeting by hand: the
+   * picker below offers stories and tickets, because a list of every task in the
+   * agency is not a control anybody could use. Standing on the record answers
+   * that question better than any dropdown could. */
+  fixedTarget?: { table: string; id: string; label: string }
   /** present = CORRECT this row (prefilled, target fixed); absent = log new time */
   initial?: WorkLog | null
   onSubmit: (values: TimeFormValues) => Promise<void>
@@ -91,16 +101,21 @@ export function TimeFormDialog({
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   // A correction needs neither list: what it is against cannot move, so the two
   // pickers would be two requests to fill a control nobody can use.
-  const storiesQ = useCached<Story[]>(teamId && !isEdit ? storiesKey(teamId) : null, () =>
+  const asking = !isEdit && !fixedTarget
+  const storiesQ = useCached<Story[]>(teamId && asking ? storiesKey(teamId) : null, () =>
     listFetch.stories(teamId as string)
   )
-  const ticketsQ = useCached<HelpTicket[]>(teamId && !isEdit ? helpKey(teamId, "all") : null, () =>
+  const ticketsQ = useCached<HelpTicket[]>(teamId && asking ? helpKey(teamId, "all") : null, () =>
     listFetch.help(teamId as string)
   )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
-      target: initial ? `${initial.targetTable}:${initial.targetId}` : "",
+      target: initial
+        ? `${initial.targetTable}:${initial.targetId}`
+        : fixedTarget
+          ? `${fixedTarget.table}:${fixedTarget.id}`
+          : "",
       startedAt: toLocalInput(initial?.startedAt ?? null),
       endedAt: toLocalInput(initial?.endedAt ?? null),
       note: initial?.note ?? "",
@@ -110,7 +125,11 @@ export function TimeFormDialog({
     open
   )
   const [busy, setBusy] = React.useState(false)
-  const ready = values.target !== "" && values.startedAt !== "" && values.endedAt !== ""
+  // The target is read off the prop rather than the draft when it is fixed: a
+  // draft saved on ANOTHER record before this form knew about fixed targets
+  // would otherwise restore that record's id under this record's label.
+  const target = fixedTarget ? `${fixedTarget.table}:${fixedTarget.id}` : values.target
+  const ready = target !== "" && values.startedAt !== "" && values.endedAt !== ""
 
   // Both loggable kinds in ONE picker, each carrying its table — because the
   // question a person is answering is "what were you working on", not "which
@@ -132,7 +151,7 @@ export function TimeFormDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!ready) return
-    const [targetTable, targetId] = values.target.split(":")
+    const [targetTable, targetId] = target.split(":")
     setBusy(true)
     try {
       await onSubmit({
@@ -180,12 +199,13 @@ export function TimeFormDialog({
       }}
     >
       <Field config={workField} htmlFor="time-target" className={fieldSpacing}>
-        {isEdit ? (
-          // A FACT, NOT A CONTROL. The door corrects a row; it never moves one
-          // from a story to a ticket, so offering the picker here would be
-          // offering a change the server would quietly drop.
+        {isEdit || fixedTarget ? (
+          // A FACT, NOT A CONTROL. On a correction because the door never moves a
+          // row from a story to a ticket, so a picker here would offer a change
+          // the server would quietly drop; on a new entry opened from a record
+          // because the record IS the answer.
           <p id="time-target" className="text-muted-foreground border-border/60 rounded-md border px-3 py-2 text-sm">
-            {initial?.targetLabel ?? "—"}
+            {fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")}
           </p>
         ) : (
           <Select

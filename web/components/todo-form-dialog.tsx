@@ -46,11 +46,18 @@ const dueField = { ...defaultFieldConfig, label: "By when", required: false }
 export function TodoFormDialog({
   open,
   onOpenChange,
+  fixedAccount,
   draftKey,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Set when the form is opened FROM a client's own record — the client is then
+   * a fact about where you are standing rather than a question, so the picker is
+   * replaced by their name and cannot be changed by accident. The same shape
+   * SprintFormDialog and StoryFormDialog use for a fixed app, and for the same
+   * reason: the relation is the whole point of creating it from here. */
+  fixedAccount?: { id: string; name: string }
   draftKey?: string
   onSubmit: (values: TodoFormValues) => Promise<void>
 }) {
@@ -65,7 +72,8 @@ export function TodoFormDialog({
     open
   )
   const [busy, setBusy] = React.useState(false)
-  const ready = values.accountId !== "" && values.title.trim() !== ""
+  const accountId = fixedAccount ? fixedAccount.id : values.accountId
+  const ready = accountId !== "" && values.title.trim() !== ""
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -73,7 +81,7 @@ export function TodoFormDialog({
     setBusy(true)
     try {
       await onSubmit({
-        accountId: values.accountId,
+        accountId,
         title: values.title.trim(),
         detail: richTextValue(values.detail),
         dueOn: values.dueOn,
@@ -109,22 +117,28 @@ export function TodoFormDialog({
       }}
     >
       <Field config={accountField} htmlFor="todo-account" className={fieldSpacing}>
-        <Select
-          value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
-          disabled={busy}
-        >
-          <SelectTrigger id="todo-account">
-            <SelectValue placeholder={t("Pick the client")} />
-          </SelectTrigger>
-          <SelectContent>
-            {companies.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {fixedAccount ? (
+          <p className="text-muted-foreground text-sm" id="todo-account">
+            {fixedAccount.name}
+          </p>
+        ) : (
+          <Select
+            value={values.accountId}
+            onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="todo-account">
+              <SelectValue placeholder={t("Pick the client")} />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </Field>
       <Field config={titleField} htmlFor="todo-title" className={fieldSpacing}>
         <Input

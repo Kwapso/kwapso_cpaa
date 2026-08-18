@@ -877,6 +877,13 @@ export const RECORD_DETAIL_COMPONENTS = [
   // Listed here on 17 Aug 2026, when it grew the people, the tickets tab and the
   // knowledge tab. It had a detail screen for a day without a law walking it.
   "app-detail",
+  // A TASK was the work engine's one recipe detail, and the note that made it one
+  // was true while it was true: "a title, a date and a tick", nothing the engine
+  // had no block for. It grew a WORK LOGS tab on 18 Aug 2026 — a list of time
+  // under three charts, which is not a block the engine has — so the recipe went
+  // and the component came, and the law walks it from the day it arrived rather
+  // than a day later, which is the mistake the two lines above record.
+  "task-detail",
 ] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
@@ -928,12 +935,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // server total like every other record in the app.
   "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
   "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
-  // The work engine's one recipe detail. Its three siblings (an app, a sprint, a
-  // story) are components because each carries a collection tab or a status
-  // track no engine block draws; a task carries neither, so its Overview is a
-  // description block like the housekeeping four above it.
-  "tasks.detail.overview":
-    "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
+  "task-detail.overview":
+    "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its two sibling tabs, work logs and activity, each carry the exact server total like every other record in the app.",
   "meeting-detail.overview":
     "one meeting's client, purpose, when and where, and its audit block — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
   "meeting-detail.notes":

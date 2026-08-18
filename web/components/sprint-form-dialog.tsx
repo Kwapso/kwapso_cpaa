@@ -169,6 +169,7 @@ export function SprintFormDialog({
   onOpenChange,
   apps,
   fixedApp,
+  fixedAccount,
   initial,
   draftKey,
   onSubmit,
@@ -180,6 +181,11 @@ export function SprintFormDialog({
    * fact about where you are standing rather than a question, so the picker is
    * replaced by the app's name and the value cannot be changed by accident. */
   fixedApp?: { id: string; name: string }
+  /** Set when the form is opened FROM a client's own record — the same shape and
+   * the same reason as `fixedApp` above. A sprint is sold TO somebody and cannot
+   * be moved to another client afterwards (the update door refuses it), so being
+   * on the right record when you write it down is the whole safeguard. */
+  fixedAccount?: { id: string; name: string }
   /** Present = EDIT mode (prefilled; client and app shown, not offered). */
   initial?: SprintFormInitial
   draftKey?: string
@@ -228,7 +234,7 @@ export function SprintFormDialog({
         name: values.name.trim(),
         goal: richTextValue(values.goal),
         sprintType: values.sprintType,
-        accountId: values.accountId,
+        accountId: fixedAccount ? fixedAccount.id : values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId,
         startsOn: values.startsOn,
         endsOn: values.endsOn,
@@ -303,9 +309,9 @@ export function SprintFormDialog({
         </Select>
       </Field>
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
-        {initial ? (
+        {initial || fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="sprint-account">
-            {initial.accountName || "Ours, no client"}
+            {fixedAccount ? fixedAccount.name : initial?.accountName || "Ours, no client"}
           </p>
         ) : (
         <Select

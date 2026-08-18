@@ -1364,6 +1364,34 @@ export type TeamPulse = {
   } | null
 }
 
+/** What `GET /api/content/work-logs/summary` answers with — the numbers on top
+ * of one record's list of time.
+ *
+ * EVERY FIGURE IS OVER THE WHOLE FILTER, never the page under it. The list is
+ * keyset-paged (R14), so a browser adding up the rows it happens to hold would
+ * answer "the newest fifty entries" while looking exactly like an answer about
+ * the record. `total` and `totalSeconds` are the SAME two numbers the list door
+ * returns, from the same function, so the badge and the header cannot disagree
+ * (R16).
+ *
+ * NOTHING HERE IS MONEY. What an hour costs us is derived in the one file R24
+ * fences and never travels on this object. */
+export type WorkLogSummary = {
+  /** how many entries — a badge number, bounded like every other count. */
+  total: number
+  /** whole seconds across all of them. EXACT, for the reason PulseWeek says. */
+  totalSeconds: number
+  /** who spent it, biggest first. `userName` is the snapshot on the row, so time
+   * logged by somebody since removed from the team still has a name on it. */
+  people: { userId: string; userName: string | null; seconds: number }[]
+  /** what kind of work it was, biggest first. `null` is the real bucket for time
+   * logged without a kind, which is most of it — not a dropped row. */
+  kinds: { kind: string | null; seconds: number }[]
+  /** the last eight weeks, oldest first — the SAME eight windows Home draws, so
+   * two screens can never be looking at two different Mondays. */
+  weeks: PulseWeek[]
+}
+
 /** The two states a meeting has. Cancelling is not a third one — it is the
  * module's `delete`, and the row survives it. */
 export const MEETING_STATUSES = ["scheduled", "held"] as const

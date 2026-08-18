@@ -8,7 +8,6 @@ import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer
 import { formatActivityWhen, formatDate, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
-import { RichText } from "@shared/web/rich-text-view"
 import type {
   Account,
   ActivityItem,
@@ -19,7 +18,6 @@ import type {
   KnowledgeSource,
   Meeting,
   MeetingPurpose,
-  Task,
   TeamMeta,
   TeamMember,
   TeamRole,
@@ -359,30 +357,6 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
       department: p.department || "—",
       state: p.active ? "Live" : "Archived",
     })),
-  }
-}
-
-/** ONE TASK, as a record. The only work-engine detail that is a recipe rather
- * than a component: an app, a sprint and a story each carry a collection tab or
- * a status track that no engine block draws, and a task carries neither — it is
- * a title, a date and a tick. */
-export function shapeTaskDetail(task: Task, activity: ActivityItem[]): ScreenData {
-  return {
-    record: {
-      id: task.id,
-      name: task.ref ? `${task.ref} · ${task.title}` : task.title,
-      detail: task.status === "done" ? "Done" : "Open",
-      status: task.status === "done" ? "Done" : "Open",
-      assignee: task.assigneeName || "Nobody yet",
-      due: task.dueOn ? formatDate(task.dueOn) : "—",
-      // A React node, not a string: the recipe engine hands whatever the host
-      // puts here straight to the DescriptionList, so a rich-text body renders
-      // as the formatting somebody typed rather than as its own tags.
-      detailText: task.detail ? <RichText html={task.detail} /> : "—",
-      created: formatDateTime(task.createdAt),
-      createdBy: task.createdByName || "—",
-    },
-    sets: { activity: shapeActivity(activity) },
   }
 }
 

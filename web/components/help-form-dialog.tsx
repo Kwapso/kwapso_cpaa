@@ -89,6 +89,7 @@ export function HelpFormDialog({
   onOpenChange,
   onSubmit,
   helpTypeOptions,
+  fixedApp,
   initial,
   draftKey,
   teamId,
@@ -104,6 +105,12 @@ export function HelpFormDialog({
   }) => Promise<void>
   /** The team's active "Ticket type" dropdown values. */
   helpTypeOptions: string[]
+  /** Set when the form is opened FROM an app's own screen — the system the
+   * request is about is then a fact about where you are standing rather than a
+   * question, so the picker is replaced by its name. Separate from `initial`,
+   * which means EDIT: this is a create with one field already answered, and
+   * folding the two together would make a new ticket claim to be an edit. */
+  fixedApp?: { id: string; name: string }
   /** Present = EDIT mode (prefilled). */
   initial?: {
     description: string
@@ -143,7 +150,7 @@ export function HelpFormDialog({
     description: initial?.description ?? "",
     helpType: initial?.helpType || NONE,
     accountId: initial?.accountId || NONE,
-    appId: initial?.appId || NONE,
+    appId: initial?.appId || fixedApp?.id || NONE,
     raisedByContactId: initial?.raisedByContactId || NONE,
   }
   // Per-session draft: restores what you typed if you navigate away and reopen.
@@ -172,7 +179,7 @@ export function HelpFormDialog({
           : values.accountId === NONE
             ? undefined
             : values.accountId,
-        appId: values.appId === NONE ? undefined : values.appId,
+        appId: fixedApp ? fixedApp.id : values.appId === NONE ? undefined : values.appId,
         raisedByContactId:
           values.raisedByContactId === NONE ? undefined : values.raisedByContactId,
       })
@@ -257,25 +264,31 @@ export function HelpFormDialog({
           BELOW it in meaning: the contact list under it depends on which client
           is chosen, so the three read top to bottom as one sentence. */}
       <Field config={appField} htmlFor="help-app" className={fieldSpacing}>
-        <Select
-          value={values.appId || NONE}
-          onValueChange={(appId) => setValues((v) => ({ ...v, appId }))}
-          disabled={busy}
-        >
-          <SelectTrigger id="help-app">
-            <SelectValue placeholder={t("No app")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("No app")}</SelectItem>
-            {(appsQ.data ?? [])
-              .filter((a) => a.active)
-              .map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+        {fixedApp ? (
+          <p className="text-muted-foreground text-sm" id="help-app">
+            {fixedApp.name}
+          </p>
+        ) : (
+          <Select
+            value={values.appId || NONE}
+            onValueChange={(appId) => setValues((v) => ({ ...v, appId }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="help-app">
+              <SelectValue placeholder={t("No app")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>{t("No app")}</SelectItem>
+              {(appsQ.data ?? [])
+                .filter((a) => a.active)
+                .map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        )}
       </Field>
       {/* The picker reads `values.accountId || NONE` rather than the bare value:
           a draft saved in this tab before this field existed restores an object

@@ -378,6 +378,17 @@ export const TIME_SLICE_PREFIX = "time-of:"
 export function recordTimeKey(targetTable: string, targetId: string): string {
   return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}`
 }
+/** THE NUMBERS ABOVE THAT SAME LIST — the aggregate the Work logs tab draws.
+ *
+ * Deliberately INSIDE the same prefix. It is a second read of the same question,
+ * so it goes stale on exactly the same events, and putting it in the family means
+ * the family drop above already covers it — no second listener, no second thing
+ * to remember. A key outside the prefix would be the original bug wearing a new
+ * hat: a stopped timer would update the rows and leave the total above them
+ * reading the number from before. */
+export function recordTimeSummaryKey(targetTable: string, targetId: string): string {
+  return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}:summary`
+}
 /** The agency-internal collections' cache keys. Named functions rather than
  * inline templates for the same reason the accounts and ticket keys are: the
  * live registry, the screen read and the count sidecar all have to say the same
