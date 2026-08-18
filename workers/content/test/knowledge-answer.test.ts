@@ -34,6 +34,9 @@ const passage = (sourceId: string, title: string, text: string, seq = 0): Knowle
   title,
   kind: "note",
   url: null,
+  // A typed note IS the record, so it has no record screen to link to — which
+  // is the case that must stay null rather than guessing a path.
+  recordPath: null,
   compartment: "agency",
   seq,
   text,
@@ -43,6 +46,7 @@ const passage = (sourceId: string, title: string, text: string, seq = 0): Knowle
 const cite = (sourceId: string, title: string, liveStatus: string | null = null): KnowledgeCitation => ({
   sourceId,
   title,
+  recordPath: null,
   kind: "note",
   url: null,
   liveStatus,
