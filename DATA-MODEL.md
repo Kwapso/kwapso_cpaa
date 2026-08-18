@@ -542,6 +542,16 @@ an account therefore re-points nothing. **The loop guard is the write itself**: 
 move rides a recursive `WITH … UPDATE … WHERE NOT EXISTS (ancestors)`, so two
 admins re-parenting at the same instant cannot co-operate their way into a ring
 (CONCURRENCY rule 1); zero rows changed is the refusal, reported as a plain 409.
+**And already-there is not a move** (R17): `setAccountParent` compares the stored
+row's `parent_account_id` first and returns `false` without writing at all, so a
+repeat costs no history row and no live ping. The no-op predicate cannot ride the
+UPDATE the way the archive toggle's does, because on this statement zero rows
+changed already MEANS the ring refusal, and a no-op reported as "that would put
+the account inside itself" is a sentence that isn't true. **Who moves one**: a
+CONTACT is moved from her own record (the parent-account control on her Overview,
+`web/components/contact-detail.tsx`) — people change jobs; a COMPANY is moved by
+the assistant (`set_account_parent`) or an import column, because a company an
+agency takes on is its own thing and its create/edit form deliberately never asks.
 
 **The two ceilings on the tree, said out loud** (R14's premise is that every read
 states its cap): the accounts table is the one self-nesting structure in the base,

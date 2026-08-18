@@ -47,9 +47,16 @@
 // THE COLUMN, THE DOOR AND THE LINE ON THE RECORD ALL STAY. `parent_account_id`
 // is what puts a contact under her company (account-detail's `createContact`
 // writes it in code), the account screen still reads "Parent account · Bergman
-// S.A." on its Overview, and `/api/tenancy/accounts/parent` is still a door — a
-// machine caller building a hierarchy on purpose is not the same act as a person
-// being handed a dropdown they never asked for. What went is the CONTROL.
+// S.A." on its Overview, and `/api/tenancy/accounts/parent` is still a door.
+// What went from THIS FORM is the control, and only from this form: asking a
+// brand new company who its parent is is a question with one honest answer, and
+// asking it again on the way back out is the same question twice.
+//
+// A PERSON DOES GET ASKED, ON HER OWN RECORD (19 Aug 2026 —
+// contact-detail's `moveToCompany`). Taking the picker off the edit half left a
+// contact who changes employer with no screen that could move her, and the note
+// the removing lane wrote said where the answer would have to go if anybody
+// asked: on the CONTACT, not back on a company's form. That is where it is.
 //
 // Unlike `accountType`, the field is not carried through either: `updateAccount`
 // never reads it (a move is its own door — see `setAccountParent`'s note in

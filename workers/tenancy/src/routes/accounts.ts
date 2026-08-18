@@ -353,7 +353,11 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
 }
 
 /** POST /api/tenancy/accounts/parent — move an account (or send it to the top with
- * a null parent). The loop refusal comes back as a plain 409 sentence. */
+ * a null parent). The loop refusal comes back as a plain 409 sentence.
+ *
+ * The human caller is the contact screen's "Which company do they work for?"
+ * control (web/components/contact-detail.tsx); the machine ones are the
+ * assistant's `set_account_parent` and an import column. */
 export async function postAccountParent(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
@@ -364,8 +368,11 @@ export async function postAccountParent(request: Request, env: Env): Promise<Res
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
   const parentAccountId = optionalText(body.parentAccountId, "Parent", TEXT_LIMITS.short) ?? null
-  await setAccountParent(cfg, guard, scope, actor, id, parentAccountId)
-  await publishChange(env, guard.teamId, "accounts", id)
+  // R17: a move to where it already sits changes nothing, so nothing is
+  // published — a ping on an unchanged row is a refetch every open screen pays
+  // for and no reader can see the point of.
+  const moved = await setAccountParent(cfg, guard, scope, actor, id, parentAccountId)
+  if (moved) await publishChange(env, guard.teamId, "accounts", id)
   return json({ ok: true })
 }
 
