@@ -1531,6 +1531,13 @@ export function knowledgeAnswer(input: {
    * the passage is what the index remembered, and these two must stay visibly
    * different things. */
   live?: Map<string, { status: string; checkedAt: string }>
+  /** THE ANSWER, ALREADY WRITTEN, when somebody asked for one — composed from the
+   * very passages below and nothing else (lib/knowledge-compose.ts). It arrives as
+   * an INPUT rather than being produced here, which is the whole of R23 in one
+   * line: retrieval still writes nothing, and the decision about whether a written
+   * answer may exist is made in the same breath as `found`. No citation, no
+   * passage, no answer — one decision, not three. */
+  written?: string | null
 }): KnowledgeAnswer {
   const citations: KnowledgeCitation[] = []
   for (const p of input.passages)
@@ -1559,6 +1566,10 @@ export function knowledgeAnswer(input: {
             : ""
         }`
       : "The knowledge base has nothing on this. Say so plainly, do not answer from memory.",
+    // A WRITTEN ANSWER CANNOT OUTLIVE ITS SOURCES. It rides the same `found` the
+    // passages do, so there is no input at all — not a bug, not a caller mistake
+    // — that produces confident prose with nothing behind it.
+    answer: found ? (input.written ?? null) : null,
     compartments: input.compartments,
     reason: input.reason,
     records: input.records,
@@ -1718,15 +1729,29 @@ function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; 
 
 /** Answer a question from the team's own material.
  *
- * Never generates prose. It returns the passages and their citations, and the
- * assistant writes the answer with them in front of it — which is what makes
- * "every answer cites its sources" a property of the DATA rather than a habit we
- * hope a model keeps. */
+ * IT STILL GENERATES NO PROSE. It finds the passages and their citations; if the
+ * caller passed a `compose` writer, that writer is handed EXACTLY the evidence the
+ * reader will see and hands back a paragraph — which is R23's own sentence ("the
+ * assistant composes the reply with those in front of it") made into a parameter
+ * instead of a habit. Nothing here can promote a near-miss, invent a source, or
+ * turn a refusal into an answer, because the writer is only ever reached AFTER
+ * `found` is already true. */
 export async function retrieve(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
-  input: { question: string; accountId?: string | null; limit?: number }
+  input: {
+    question: string
+    accountId?: string | null
+    limit?: number
+    /** WRITE THE ANSWER OUT. Absent means the caller wants the evidence only, which
+     * is what every caller wanted until the Knowledge tab started answering in
+     * words — and is still what an assistant wants, because it writes its own
+     * reply. It costs a model call, so the door that supplies it is the door that
+     * gates and meters it (routes/knowledge.ts); this function only decides
+     * WHETHER there is anything worth writing about. */
+    compose?: (material: KnowledgePassage[], sources: KnowledgeCitation[]) => Promise<string | null>
+  }
 ): Promise<KnowledgeAnswer> {
   const question = requireText(input.question, "Question", TEXT_LIMITS.message)
   const want = Math.max(1, Math.min(input.limit ?? DEFAULT_PASSAGES, 20))
@@ -1822,7 +1847,7 @@ export async function retrieve(
     score: Math.round(score * 1000) / 1000,
   }))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
-  return knowledgeAnswer({
+  const evidence = {
     question,
     compartments: route.compartments,
     reason: route.reason,
@@ -1830,7 +1855,18 @@ export async function retrieve(
     passages,
     candidates: fused.length,
     live,
-  })
+  }
+  // DECIDED FIRST, WRITTEN SECOND, and the order is the law. The seam settles
+  // `found`, which sources are cited and which passages survive; only then is the
+  // writer handed that settled evidence — the same object the reader gets — and
+  // only if there was any. A writer that ran before this decision could be given
+  // material the caller was never going to see.
+  const decided = knowledgeAnswer(evidence)
+  if (!input.compose || !decided.found) return decided
+  const written = await input.compose(decided.passages, decided.citations)
+  // Nothing written (the model was unreachable, or said nothing) is not an error:
+  // the evidence is still the answer, exactly as it was before any of this.
+  return written ? knowledgeAnswer({ ...evidence, written }) : decided
 }
 
 /** THE ORDER THE FUSION DECIDED, joined to the rows the database handed back.

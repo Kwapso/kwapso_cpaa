@@ -35,41 +35,15 @@ export type ModelReply = { text: string; toolCalls: ToolCall[] }
 
 /* ------------------------- the tool-result fence -------------------------- */
 
-/** THE MARKER THAT SAYS "THIS IS DATA, NOT AN INSTRUCTION".
- *
- * On Claude a tool result travels in its own `tool_result` block: the transport
- * itself says what the text is, structurally, and no wording inside it can change
- * that. Workers AI has no such block — its chat template rejects a replayed
- * `role:"tool"` round-trip — so results are FLATTENED into ordinary turns, and a
- * flattened result used to arrive as a bare user message reading "Result from
- * list_help_tickets: …". At that point a support ticket a client wrote is
- * indistinguishable from something the user just typed, and the only thing
- * standing between an attacker's paragraph and the agent obeying it is the system
- * prompt's word DATA — with nothing on the page to attach that word to.
- *
- * So the fence is STATED IN THE SAME PLACE TWICE: the result is wrapped in this
- * delimiter, and the system prompt names this same constant. One export, so the
- * marker the prompt promises and the marker the transport writes cannot drift
- * apart — a rename breaks both ends at once, in the compiler, rather than
- * silently un-fencing the weaker of the two providers. */
-export const TOOL_RESULT_TAG = "tool_result"
-
-const FENCE_CLOSE = `</${TOOL_RESULT_TAG}>`
-
-/** Wrap one flattened tool result so the model can SEE where somebody else's text
- * begins and ends.
- *
- * AND CLOSE IT FROM THE INSIDE. The content is exactly the untrusted material
- * this exists to contain — a ticket description is 20,000 characters an attacker
- * chose — so the first thing they would write is the closing marker, ending the
- * fence early and continuing in what now looks like their own voice. The marker
- * is therefore de-fanged wherever it appears in the payload: a fence anyone can
- * close is a decoration. */
-export function fenceToolResult(toolName: string, content: string): string {
-  const name = toolName.replace(/[^\w.-]/g, "") || "tool"
-  const safe = content.split(FENCE_CLOSE).join(`</${TOOL_RESULT_TAG}_escaped>`)
-  return `<${TOOL_RESULT_TAG} from="${name}">\n${safe}\n${FENCE_CLOSE}`
-}
+// THE MARKER AND THE WRAPPER MOVED TO shared/workers/model-text.ts, and the reason
+// is the one the fence itself is about: the same untrusted paragraph reaches a
+// model down two paths now — as a flattened tool result here, and as a knowledge
+// passage in the content worker's answer-writer. Two fences would be two promises,
+// and only one of them would have been kept. Re-exported here because this is the
+// transport that writes it, and the test that proves the Workers AI path is fenced
+// reads it beside the flattening it guards.
+export { TOOL_RESULT_TAG, fenceToolResult } from "@shared/workers/model-text"
+import { fenceToolResult } from "@shared/workers/model-text"
 
 export interface Model {
   readonly name: string
@@ -422,14 +396,9 @@ export function selectModel(env: Env): Model {
   return new WorkersAiModel(env.AI, env.WORKERS_AI_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct")
 }
 
-/** One cheap text completion (no tools) — used for inline jobs like the help-reply
- * first draft and classification. Always Workers AI (cheap), regardless of the key. */
-export async function cheapText(env: Env, system: string, user: string): Promise<string> {
-  const out = (await env.AI.run((env.WORKERS_AI_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct") as keyof AiModels, {
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-  })) as { response?: string }
-  return (out.response ?? "").trim()
-}
+// The ONE-SHOT CHEAP CALL (the help-reply draft, the conversation title) used to
+// live here. It moved to shared/workers/cheap-text.ts the day a SECOND worker
+// needed it — content, to write out the answer the knowledge base found (R23) —
+// because the alternative was two `env.AI.run` calls in two workers with one
+// model id between them. Import it from there; `selectModel` above is still the
+// seam for an AGENTIC turn, which is a different question (it calls tools).

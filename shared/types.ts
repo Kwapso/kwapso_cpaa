@@ -842,15 +842,25 @@ export type KnowledgeCitation = {
   checkedAt: string | null
 }
 
-/** What the knowledge base answers with. It never writes prose — the assistant
- * does that, with these passages in front of it — so what a caller receives is
- * the evidence plus the reasoning about WHERE it looked (`reason`), which is the
- * part a person needs to see when the answer is wrong. */
+/** What the knowledge base answers with: the evidence, the reasoning about WHERE
+ * it looked (`reason`), and — when it was asked to write one — the answer itself.
+ *
+ * RETRIEVAL STILL WRITES NOTHING. `answer` is composed by a model that was handed
+ * exactly the `passages` and `citations` below and nothing else, and it is decided
+ * in the SAME seam they are (Law R23), so it cannot exist without them. A caller
+ * that did not ask for it, or a question nothing answers, gets null and the
+ * evidence — which is what this type has always been. */
 export type KnowledgeAnswer = {
   question: string
   found: boolean
   /** the sentence to say when there is nothing — never an invented answer */
   message: string
+  /** THE WRITTEN ANSWER, or null when nobody asked for one, nothing was found, or
+   * the model could not be reached. Markdown, and it may carry the app's visual
+   * blocks (shared/agent-blocks.ts) — the same string shape an assistant reply is,
+   * rendered by the same one renderer. Null is never an error: it means the
+   * passages below are the whole answer, exactly as they were before. */
+  answer: string | null
   /** the compartments searched; empty means the whole knowledge base */
   compartments: string[]
   /** WHY those compartments, in a sentence a person can disagree with */

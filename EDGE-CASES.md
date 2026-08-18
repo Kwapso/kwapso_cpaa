@@ -490,7 +490,11 @@ keyed by `team_id`. It's natural to assume "my 25 free requests", but it's the
 a team database. `agent_usage` is keyed by **`(team_id, period)`** where
 `period` is `YYYY-MM-DD` (the daily free counter); `agent_credits` is keyed by
 `team_id` (the purchasable balance). See `getQuota` / `consumeAiUnit` in
-`workers/data-ops/src/lib/credits.ts` and DATA-MODEL.md.
+`shared/workers/credits.ts` and DATA-MODEL.md. It is SHARED rather than
+data-ops' own because the allowance is spent in more than one place now: by the
+assistant, and by the knowledge base writing an answer out of the passages it found
+(R23). One allowance, one counter, one ceiling — every spender declares the same
+`AGENT_FREE_DAILY` and `credits-invariant.test.ts` compares their configs.
 
 **The rules / subtleties.**
 

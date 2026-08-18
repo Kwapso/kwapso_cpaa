@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 
-const SRC = readFileSync(join(__dirname, "../src/lib/credits.ts"), "utf8")
+const SRC = readFileSync(join(__dirname, "../../../shared/workers/credits.ts"), "utf8")
 
 /** Comments are NOT code: this file's comments DISCUSS every invariant below, so
  * an unstripped scan can be satisfied by prose describing the very line that was
@@ -85,20 +85,48 @@ describe("credit meter money-safety (source invariants)", () => {
 // where it is on — because a var set in the wrong block is exactly the kind of
 // mistake that ships silently and bills someone.
 describe("the no-daily-cap switch", () => {
-  const CFG = readFileSync(join(__dirname, "../wrangler.jsonc"), "utf8")
-  const parsed = JSON.parse(
-    CFG.replace(/(?<![:"])\/\/[^\n]*/g, "")
-  ) as { vars?: Record<string, string>; env?: Record<string, { vars?: Record<string, string> }> }
+  type Cfg = { vars?: Record<string, string>; env?: Record<string, { vars?: Record<string, string> }> }
+  const readCfg = (worker: string): Cfg =>
+    JSON.parse(
+      readFileSync(join(__dirname, "..", "..", worker, "wrangler.jsonc"), "utf8").replace(
+        /(?<![:"])\/\/[^\n]*/g,
+        ""
+      )
+    ) as Cfg
 
-  it("is OFF in the production vars block", () => {
-    expect(
-      parsed.vars?.AGENT_NO_DAILY_CAP,
-      "AGENT_NO_DAILY_CAP must never be set on production — it removes the spend ceiling"
-    ).toBeUndefined()
+  // BOTH SPENDERS, not just this one. data-ops runs the assistant; content writes
+  // the knowledge base's answers (R23). They draw on ONE allowance out of ONE pair
+  // of tables, so a knob set here and forgotten there is a single allowance
+  // enforced at two different heights — and the person who discovers it is the one
+  // who ran out on one screen while the other still said there was plenty.
+  const SPENDERS = ["data-ops", "content"] as const
+
+  it("is OFF in the production vars block, on every worker that spends", () => {
+    for (const w of SPENDERS)
+      expect(
+        readCfg(w).vars?.AGENT_NO_DAILY_CAP,
+        `AGENT_NO_DAILY_CAP must never be set on production — it removes ${w}'s spend ceiling`
+      ).toBeUndefined()
   })
 
   it("is ON in staging, which is the environment that asked for it", () => {
-    expect(parsed.env?.staging?.vars?.AGENT_NO_DAILY_CAP).toBe("true")
+    for (const w of SPENDERS) expect(readCfg(w).env?.staging?.vars?.AGENT_NO_DAILY_CAP, w).toBe("true")
+  })
+
+  it("every spender reads the SAME ceiling — one allowance, one number", () => {
+    for (const block of ["vars", "staging"] as const) {
+      const values = SPENDERS.map((w) => {
+        const cfg = readCfg(w)
+        return block === "vars" ? cfg.vars?.AGENT_FREE_DAILY : cfg.env?.staging?.vars?.AGENT_FREE_DAILY
+      })
+      expect(values[0], `${block}: AGENT_FREE_DAILY must be set on data-ops`).toBeTruthy()
+      expect(
+        new Set(values).size,
+        `${block}: the workers that spend the allowance declare different AGENT_FREE_DAILY values (${values.join(
+          " vs "
+        )}) — that is one daily allowance enforced at two heights`
+      ).toBe(1)
+    }
   })
 
   it("only ever turns on for the exact string 'true'", () => {

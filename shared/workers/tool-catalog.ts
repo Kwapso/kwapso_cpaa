@@ -1423,13 +1423,16 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "ask_knowledge",
     summary:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. It NEVER writes an answer for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one unit of the team's AI allowance and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
-    schema: obj({ q: S, accountId: S, limit: N }, ["q"]),
+    schema: obj({ q: S, accountId: S, limit: N, compose: B }, ["q"]),
     buildQuery: (i) => {
       const q = [`q=${encodeURIComponent(str(i, "q"))}`]
       if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
       if (typeof i.limit === "number") q.push(`limit=${i.limit}`)
+      // The door reads the flag as the literal "1" (R20: a query value is checked
+      // where it sits), so the only truthy spelling this surface sends is that one.
+      if (i.compose === true) q.push("compose=1")
       return `?${q.join("&")}`
     },
     agent: { write: false, summarize: (i) => `Ask the knowledge base: "${str(i, "q").slice(0, 60)}"` },
