@@ -68,6 +68,9 @@
 //   POST /api/content/meetings/update     -> correct it / write the notes up
 //   POST /api/content/meetings/held       -> it happened / it hasn't yet
 //   POST /api/content/meetings/active     -> cancel it / put it back
+//   GET  /api/content/deliverables        -> what we handed over on an app (?appId=, ?id → one)
+//   POST /api/content/deliverables[/update|/active] -> file / correct / archive one
+//   POST /api/content/deliverables/upload-stream -> store the bytes behind one
 //   GET  /api/content/brand-assets        -> the brand library (?id → one)
 //   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
 //   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
@@ -158,6 +161,13 @@ import {
   postSetMeetingActive,
   postUpdateMeeting,
 } from "./routes/meetings"
+import {
+  getDeliverables,
+  postCreateDeliverable,
+  postSetDeliverableActive,
+  postStreamDeliverableFile,
+  postUpdateDeliverable,
+} from "./routes/deliverables"
 import {
   getBrandAssets,
   getBrandAssetsExport,
@@ -444,6 +454,20 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // at all.
   "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendar, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
+
+  // ── WHAT WE HAND OVER ──────────────────────────────────────────────────────
+  // A deliverable belongs to ONE app and every row carries that app's account,
+  // so the fence is built — but no portal door names this module and every door
+  // here refuses a client login (R21), the way the knowledge base's do. Whether
+  // a client may one day see their own handover shelf is a product decision, and
+  // an unmade decision is a closed door.
+  "GET /api/content/deliverables": { handler: getDeliverables, kind: "read" },
+  "POST /api/content/deliverables": { handler: postCreateDeliverable, kind: "mutation" },
+  "POST /api/content/deliverables/update": { handler: postUpdateDeliverable, kind: "mutation" },
+  "POST /api/content/deliverables/active": { handler: postSetDeliverableActive, kind: "mutation" },
+  // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
+  // the same classification the three upload doors below it carry.
+  "POST /api/content/deliverables/upload-stream": { handler: postStreamDeliverableFile, kind: "housekeeping" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
   // Three modules, four tables, and one thing every door below has in common: it

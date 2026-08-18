@@ -155,6 +155,13 @@ export function buildSpineDb(): DatabaseSync {
   // our own admin a role can be given, so a refusal proved with it held is a
   // refusal proved by the DOOR. The narrowing itself is proved separately, by a
   // caller who deliberately does not hold it (todos-tasks.test.ts).
+  // `deliverables` (8.7) is here for BOTH reasons too. For the staff caller it
+  // is the ordinary case — the app's handover shelf is one of the collections a
+  // record's badge door owes, and a role missing the right would turn that into
+  // an assertion about a `null`. For the burglar it is the worst case: the
+  // material IS the client's, so a client role plausibly holding it is the very
+  // thing the door's refusal has to survive. The narrowing itself is proved
+  // separately, by a caller whose right is taken away (deliverables.test.ts).
   const grantAll = (roleId: string) =>
     db.exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
@@ -165,7 +172,7 @@ export function buildSpineDb(): DatabaseSync {
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
               UNION ALL SELECT 'work' UNION ALL SELECT 'all_tasks'
-              UNION ALL SELECT 'todos') m;`)
+              UNION ALL SELECT 'todos' UNION ALL SELECT 'deliverables') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 

@@ -13,6 +13,7 @@
 
 import type {
   BrandAsset,
+  Deliverable,
   DriveFileRow,
   GoogleConnection,
   GoogleService,
@@ -717,6 +718,30 @@ export const content = {
       note: string | null
       meeting: Meeting | null
     }>("/api/content/meetings/transcript", post({ id })),
+
+  /* ------------------------- what we hand over ------------------------------
+   * One app's handover shelf. CAPPED rather than paged (R14): a shelf is
+   * curated, not accumulated. `appId` narrows at the DOOR, so the rows and the
+   * `total` beside them answer the same question (R16). */
+  deliverables: (appId: string) =>
+    api<{ deliverables: Deliverable[]; total: number }>(`/api/content/deliverables?appId=${enc(appId)}`),
+  deliverableOne: (id: string) =>
+    api<{ deliverables: Deliverable[] }>(`/api/content/deliverables?id=${enc(id)}`).then(
+      (r) => r.deliverables[0] ?? null
+    ),
+  createDeliverable: (input: Partial<Deliverable> & { appId: string }) =>
+    api<{ deliverables: Deliverable[]; total: number }>("/api/content/deliverables", post(input)),
+  updateDeliverable: (input: Partial<Deliverable> & { id: string; appId: string }) =>
+    api<{ deliverables: Deliverable[]; total: number }>("/api/content/deliverables/update", post(input)),
+  setDeliverableActive: (id: string, appId: string, active: boolean) =>
+    api<{ deliverables: Deliverable[]; total: number }>(
+      "/api/content/deliverables/active",
+      post({ id, appId, active })
+    ),
+  /** The bytes behind a deliverable (gated deliverables:create), streamed as the
+   * request body. Answers with the /media/internal URL the record then stores. */
+  uploadDeliverableFile: (dataUrl: string) =>
+    sendFile<{ url: string; contentType: string }>("/api/content/deliverables/upload-stream", dataUrl),
 
   /* ------------------- the agency's own housekeeping ------------------------
    * Two modules, both CAPPED rather than paged (R14) — an authored library and a

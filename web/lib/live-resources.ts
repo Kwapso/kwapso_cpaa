@@ -437,6 +437,16 @@ export function recordTimeSummaryKey(targetTable: string, targetId: string): str
 export function brandAssetsKey(teamId: string): string {
   return `brand_assets:${teamId}`
 }
+/** WHAT WE HANDED OVER, ON ONE APP. Its rows live ONLY in a per-app slice,
+ * because a deliverable is never read anywhere but the app it belongs to —
+ * spelled the way `sliceKey` spells every nested collection (`<kind>-of:<id>`),
+ * but written HERE rather than at the call site for the reason the accounts and
+ * ticket keys are: the live registry, the screen read and the count sidecar all
+ * have to say the same string, and three places typing it is three places to
+ * mistype it. */
+export function deliverablesKey(appId: string): string {
+  return `deliverables-app-of:${appId}`
+}
 export function purposesKey(teamId: string): string {
   return `purposes:${teamId}`
 }
@@ -919,6 +929,22 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.staffCertificates().then((r) => r.certificates.find((c) => c.id === id) ?? null),
     fetchList: (t) => listFetch.staffCertificates(t),
     deps: (_t, id) => [`activity:record:staff_certificates:${id}`],
+  },
+  // WHAT WE HANDED OVER — and the ping carries the APP it sits on, not the
+  // deliverable's own id. The same shape `account_rates`, `account_links` and
+  // `portal_users` already have, for the same reason: a deliverable has no list
+  // and no screen of its own, it is only ever read on the app it belongs to, so
+  // the APP is the one row a listener can act on. A ping naming the deliverable
+  // would name a row nothing holds, and the app it hangs off is on that row —
+  // which the listener has not read and never will.
+  deliverables: {
+    key: (t) => appsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.apps().then((r) => r.apps.find((a) => a.id === id) ?? null),
+    fetchList: (t) => listFetch.apps(t),
+    // The shelf itself, and the badge above it. Both are named exactly, because
+    // the ping said which app.
+    deps: (_t, appId) => [deliverablesKey(appId), ...recordCountDeps("deliverables")],
   },
   account_rates: {
     key: (t) => accountsKey(t),

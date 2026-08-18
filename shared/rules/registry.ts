@@ -302,6 +302,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "not a table at all — the module exists to carry ONE switch on the permission sheet (may kwapso send mail as you). There is nothing to import into a right; it is granted on the Roles screen, one role at a time, by somebody who understands what they are granting.",
   google_events:
     "the same as google_mail, and for the same reason: a module that exists to hold one switch (may kwapso put an event in your calendar) has no rows for a file to bring.",
+  deliverables:
+    "a deliverable is MATERIAL — a file we hold or a link we do not — and a CSV can carry the link but never the file, so a file of them would import half the shelf as titles pointing at nothing. And the row that matters cannot be resolved from a spreadsheet at all: a deliverable hangs off exactly one APP, which is an id here and a name in a file, and `apps` is not an import target (it belongs to `processes`, exempt above for its own reason), so there is nothing for a reference to resolve against and every row would have to be re-filed by hand — which is the entire write. The legacy set is EIGHT rows across twenty-eight apps (glide/RECONCILIATION.md), typed in the afternoon somebody decides to. The write an import would replace is: you finish a handover, and you attach it, once, standing on the app it belongs to.",
   commercials:
     "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
@@ -568,6 +570,19 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
+  // WHAT WE HANDED OVER. `null`, and it is the same sentence the module's own
+  // doors already speak: every deliverables handler opens with
+  // refusePortalCaller, so a client login reaches no row here to have a history
+  // of. It is worth writing down WHY it is `null` rather than "account", because
+  // this is the one table in the block above where the rows genuinely are the
+  // client's — the material IS what we hand them — and the answer is still the
+  // one SCOPE ch.06 gives every other feed on that side: a history line reads
+  // "Ana handed over the dispatch walkthrough" and then "Ana archived it", which
+  // names the staff member doing the work and, worse, shows the client us
+  // changing our minds about what we gave them. If the shelf is ever opened to
+  // the portal, the ROWS are the decision; this line is a separate one and stays
+  // `null` unless somebody argues it down.
+  deliverables: { fence: null, why: "a deliverable's history names the staff who filed, corrected and archived it — the client is shown the material itself, which is the part that is theirs, and never our record of changing it (SCOPE ch.06). Every door on the module refuses a client login today, so this is the door's own sentence repeated where the feed can hear it" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R24)" },
   internal_role_rates: { fence: null, why: "what an hour of a ROLE is worth — the second internal rate card, and the number an app's money figure is computed from. The same ruling as the line above it, for the same reason: a client may not see what we think an hour of anybody's time costs, and a history line saying we re-priced it is the same disclosure spread over time (R24)" },
@@ -671,6 +686,11 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_versions: "processes",
   process_steps: "processes",
   process_comments: "processes",
+  // WHAT WE HANDED OVER on an app. Its OWN module and not `processes`, which is
+  // the whole point of it being a module: "Ana handed over the Payroll API
+  // reference" names a deliverable, and a role that may read the app but not its
+  // handover shelf must not read that sentence out of the feed either.
+  deliverables: "deliverables",
   account_rates: "commercials",
   internal_rates: "commercials",
   // Time gates on the same module as the work it is against — a row of hours is

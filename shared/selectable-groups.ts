@@ -35,6 +35,28 @@ export const SELECTABLE_GROUPS = {
    * one implies; the rows themselves are ordinary dropdown values, editable like
    * every other vocabulary. */
   appStage: "App stage",
+  /** WHAT KIND OF THING WE HANDED OVER — the word in small caps on a
+   * deliverable's card. A vocabulary rather than an enum for the same reason
+   * every other word here is one: the owner's list ("handover materials /
+   * handover docs / API documentation / loom or teller reviews / SOPs") ends in
+   * "etc.", and an enum has no room for the etc. */
+  deliverableKind: "Deliverable kind",
 } as const
 
 export type SelectableGroup = (typeof SELECTABLE_GROUPS)[keyof typeof SELECTABLE_GROUPS]
+
+/** The starting vocabulary for `deliverableKind`, in the owner's own words.
+ *
+ * It lives beside the group name rather than loose in the schema because the
+ * migration that ships it to EXISTING teams and the seed a NEWBORN team runs
+ * both read it — and a starting set written twice is a set that ends up
+ * different in a team made yesterday and a team made last month (the duplicate
+ * dropdown values migration 0026 is what that costs). Editable like every other
+ * vocabulary: a team adds its own on the Dropdown values screen. */
+export const DELIVERABLE_KINDS = [
+  "Handover doc",
+  "API documentation",
+  "Video",
+  "SOP",
+  "Other",
+] as const

@@ -39,6 +39,7 @@ import {
   StoriesPanel,
   sliceKey,
 } from "@/components/work-panels"
+import { DeliverablesPanel } from "@/components/deliverables-panel"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
@@ -105,6 +106,7 @@ export function AppDetailScreen({
   const mapsTotal = useCachedValue<number | null>(totalKey("processes-app", appId))
   const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-app", appId))
   const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-app", appId))
+  const deliverablesTotal = useCachedValue<number | null>(totalKey("deliverables-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "edit")
@@ -116,6 +118,10 @@ export function AppDetailScreen({
   // all. The door refuses a client login besides (R24).
   const canSeeMoney = can("commercials", "read")
   const canReadTickets = can("help", "read")
+  // 8.7 — WHAT WE HANDED OVER on this system. Its own module, so a role that may
+  // open an app does not automatically see its handover shelf: without the right
+  // there is no tab at all, rather than a tab that refuses.
+  const canReadDeliverables = can("deliverables", "read")
   // THE RIGHT ON THE CHILD, NEVER THE PARENT. Raising a request about this
   // system is `help:create` and putting a meeting in the diary is
   // `meetings:create` — the rights those two doors gate on. `processes:edit`,
@@ -323,6 +329,20 @@ export function AppDetailScreen({
             },
           ]
         : []),
+      // WHAT WE HANDED OVER (8.7) — the handover docs, API references, recorded
+      // walkthroughs and SOPs filed against this system. Behind the caller's own
+      // deliverables right, exactly like the ticket tab above it.
+      ...(canReadDeliverables
+        ? [
+            {
+              value: "deliverables",
+              label: t("Deliverables"),
+              icon: CONCEPT_ICON.deliverables,
+              badge: formatCount(deliverablesTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       // WHAT IT GIVES BACK (8.13) — hours, and what those hours are worth at the
       // rate of the role that used to spend them. Not a collection and so not
       // counted; see RECORD_TAB_COUNT_EXCEPTIONS.
@@ -476,6 +496,7 @@ export function AppDetailScreen({
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
               />
             )
+          if (t.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
           if (t.value === "value") return <AppMoneyPanel appId={appId} host={host} />
           if (t.value === "knowledge")
             return (

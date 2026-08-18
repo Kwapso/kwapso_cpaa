@@ -165,10 +165,22 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // of a conversation, written for us and often about the client rather than
     // for them, and a fence that showed a contact their own meetings would show
     // them those notes.
+    //
+    // `deliverables` is the NEWEST member and the one whose exclusion would be
+    // most tempting of all — more than `work`, more than `meetings`. The material
+    // is not merely about the client, it IS the client's: a handover doc, an API
+    // reference, a recorded walkthrough, the things we hand over TO them. Every
+    // row even carries their account, so a fence would work. It refuses anyway,
+    // and the reason is that nobody has decided yet: whether a client may see
+    // their own handover shelf is a product question the owner has not answered,
+    // and the base's rule is that an unmade decision is a closed door rather than
+    // an open one. The fence is built and switched off; opening it is a decision
+    // somebody makes on purpose, not one that arrives by default.
     ).toEqual([
       "agent",
       "brand_assets",
       "commercials",
+      "deliverables",
       "delivery",
       "google",
       "knowledge",

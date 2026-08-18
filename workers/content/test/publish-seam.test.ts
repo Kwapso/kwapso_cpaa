@@ -36,6 +36,10 @@ const HOUSEKEEPING = [
   "POST /api/content/brand-assets/upload-stream",
   "POST /api/content/staff/upload",
   "POST /api/content/staff/upload-stream",
+  // The bytes behind a deliverable — a handover PDF, a recorded walkthrough.
+  // Same reasoning, and NO buffered twin: it was written after the pair above
+  // stopped being worth shipping, so there is one door and it streams.
+  "POST /api/content/deliverables/upload-stream",
 ]
 
 publishSeam({

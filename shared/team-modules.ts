@@ -25,6 +25,14 @@ export const TEAM_MODULES = [
   "screens",
   "agent",
   "processes",
+  // WHAT WE HAND OVER on an app (CHECKLIST 8.7). Its own switch and not four
+  // more rights on `processes`, because the two answer different questions
+  // about the same record: `processes` is what an app IS and what its work gave
+  // back; this is the material we handed over on it. An agency wants a
+  // developer to open an app without being able to publish a handover doc
+  // against it, and it wants a delivery lead to file one without being able to
+  // edit the map the savings are computed from.
+  "deliverables",
   "commercials",
   "work",
   // EVERYONE ELSE'S TASKS — a switch over a SIGHT, not over a record. `work`
@@ -105,6 +113,19 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // material, and no client login ever passes one of its doors — which is why
   // it is a second module and not four more rights on the first.
   processes: "Processes",
+  // WHAT WE HANDED OVER. A deliverable is one piece of material on an app — a
+  // handover doc, an API reference, a recorded walkthrough, an SOP — and this
+  // right is what decides whether a role may see the shelf and add to it.
+  //
+  // IT IS THE AGENCY'S SIDE OF THE FENCE TODAY, deliberately. The material is
+  // FOR the client and every row carries their account id, so the fence is
+  // there and correct; what is not there is a portal door, and nothing in the
+  // client portal names this module. Every door on it refuses a client login at
+  // the door (R21), the way the knowledge base's do — the decision to show a
+  // client their own handover shelf is a product decision the owner has not
+  // made, and the base's rule is that an unmade decision is a closed door
+  // rather than an open one.
+  deliverables: "Deliverables",
   commercials: "Rates & margin",
   // THE WORK ENGINE — what we DO, as opposed to what an account asks for. One
   // module covers stories, the sprints they sit in and the time logged against

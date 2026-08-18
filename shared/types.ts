@@ -984,6 +984,38 @@ export type AppRow = {
   editedByName?: string | null
 }
 
+/** A DELIVERABLE: one piece of material we handed over on an app — a handover
+ * doc, an API reference, a recorded walkthrough, an SOP (CHECKLIST 8.7).
+ *
+ * It hangs off exactly one app, always, which is why `appId` is not optional:
+ * the legacy app hung them off apps too, and a handover doc with no system to
+ * hand over is not a record anybody could file. */
+export type Deliverable = {
+  id: string
+  appId: string
+  /** whose system it was built for, copied off the app at creation and never
+   * edited — the account fence, ready, on a module no client door names yet. */
+  accountId: string | null
+  title: string
+  /** the word the card shows in small caps (VIDEO, SOP). A dropdown value from
+   * the team's own "Deliverable kind" vocabulary, so it grows. */
+  kind: string | null
+  /** the day it was handed over, written YYYY-MM-DD. */
+  datedOn: string | null
+  /** THE MATERIAL: an object we host (a /media/internal/… URL the upload door
+   * minted) or a link we do not (a Loom recording, a Google Doc, an API
+   * reference). One field for both shapes — "here is the thing I mean" is one
+   * act, and two fields would be two ways to be wrong about which is set. */
+  url: string | null
+  /** the picture worth showing on the card, when there is one. */
+  imageUrl: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
 /** One process in a list: what it is, and how much of it there is. */
 export type ProcessSummary = {
   id: string

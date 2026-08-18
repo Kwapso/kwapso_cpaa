@@ -29,6 +29,7 @@ import { countSprints, countStories } from "../lib/stories"
 import { countTodos } from "../lib/todos"
 import { countMeetings } from "../lib/meetings"
 import { countWorkLogs, WORK_LOG_TARGETS } from "../lib/work-logs"
+import { countDeliverables } from "../lib/deliverables"
 import type { Env } from "../env"
 
 /** One figure, by the sidecar name the badge reads.
@@ -52,6 +53,9 @@ const COUNTERS: Record<string, RecordCounter> = {
   "meetings-app": (cfg, guard, _s, id) => countMeetings(cfg, guard, { view: "all", appId: id }),
   "tickets-app": (cfg, guard, scope, id) =>
     countTickets(cfg, guard, scope, { tab: "all", view: "live", appId: id }).then((r) => r.total),
+  // WHAT WE HANDED OVER on it — the whole shelf, archived rows included, because
+  // the tab shows those too: a superseded handover doc is still something we sent.
+  "deliverables-app": (cfg, guard, _s, id) => countDeliverables(cfg, guard, { appId: id }),
   // A request's record.
   "stories-ticket": (cfg, guard, _s, id) =>
     countStories(cfg, guard, { ticketId: id, view: "all" }).then((r) => r.total),
