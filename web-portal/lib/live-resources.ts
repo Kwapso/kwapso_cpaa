@@ -48,6 +48,11 @@ export const cacheKeys = {
   todos: "portal:todos",
   delivery: "portal:delivery",
   processComments: (processId: string) => `portal:process-comments:${processId}`,
+  /** What we handed over. ONE key for the whole screen — the door answers about
+   * the company they are standing in and takes no narrowing, so there is no
+   * per-app slice to key by, and switching company clears the cache outright. */
+  deliverables: "portal:deliverables",
+  deliverablesTotal: "portal:deliverables:total",
 }
 
 /** resource → the portal caches a ping on it invalidates. A resource the portal
@@ -74,6 +79,22 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   // just landed may be the explanation for a step that got slower, and that
   // changes what the value screen says beside it.
   process_comments: () => [cacheKeys.value],
+  /** THE MOMENT SOMETHING IS SHARED WITH THEM, their screen says so — which is
+   * the whole reason this resource is worth hearing. The agency presses "Show to
+   * the client" and the card appears where the client is already looking, rather
+   * than the next time they happen to reload.
+   *
+   * The ping carries an APP id, which names nothing a client holds, so the
+   * publisher stamps the ACCOUNT on it and `mayHearChange` fences on that
+   * (`deliverables` is in SCOPE_STAMPED_RESOURCES for exactly this). Both keys
+   * go, rows and total together: they are two halves of one answer and a stale
+   * badge over a fresh list is R16's failure mode arriving by the back door.
+   *
+   * It also fires for changes the client will never see — a deliverable filed
+   * and not shared, a title corrected on a private one. That costs one re-read
+   * that comes back identical, and the alternative is a publisher deciding what
+   * is worth telling them, which is a fence built in the wrong place. */
+  deliverables: () => [cacheKeys.deliverables, cacheKeys.deliverablesTotal],
 }
 
 /** WHAT THIS APP ASKS THE CHANNEL FOR — derived from the listener map, never typed.

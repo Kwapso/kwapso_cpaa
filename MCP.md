@@ -144,7 +144,11 @@ Today it covers:
     `list_process_comments`, `read_value`, `list_account_rates`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_value`
   - what we hand over on a system, `list_deliverables` (`appId` names the app
-    whose handover shelf you want; internal, a client login reaches no door on it)
+    whose handover shelf you want; `id` narrows to one row). The CLIENT's own
+    view of the same shelf is a separate door on the portal and is deliberately
+    NOT on this surface: it answers with strictly less (their account only, the
+    rows marked visible only, no staff names), and this surface holds a staff
+    token, so `list_deliverables` already gives a machine more
   - the knowledge base, `ask_knowledge`, `list_knowledge_sources`,
     `get_knowledge_status`
   - the agency's own housekeeping, `list_marketing_posts`, `list_brand_assets`,
@@ -180,7 +184,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **223 doors, 177 with a tool, 46 with a written reason**, the
+  red build. Today: **225 doors, 178 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -199,7 +203,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 177, **154 are on THIS surface** and 23 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 178, **155 are on THIS surface** and 23 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 
@@ -394,13 +398,18 @@ Today it covers:
     Call it repeatedly to bring in a history. The backward half of the live window
     is why a transcript that lands an hour after a call is ever found.
   - what we hand over, `create_deliverable`, `update_deliverable`,
-    `set_deliverable_active` (`deliverables:*`). A deliverable is one piece of
+    `set_deliverable_active`, `set_deliverable_visibility` (`deliverables:*`). A deliverable is one piece of
     material on an app — a handover doc, an API reference, a recorded
     walkthrough, an SOP — so `appId` rides on all three, and the ACCOUNT it was
     built for is copied off that app rather than sent. Its own module and not
     `processes`: opening an app and publishing against it are two grants. The
     BYTES are a screen action, as with every other upload here; `url` carries a
     link a machine already has, which is what most deliverables are.
+    `set_deliverable_visibility` is the one that hands it over: a deliverable is
+    invisible to the client until `visible` is set true, per row, and the client
+    then reads it in their own portal. It CONFIRMS in that direction only —
+    sharing puts material in somebody else's hands, hiding takes it back — the
+    mirror of `set_deliverable_active`, which confirms on archiving.
   - the agency's own housekeeping, `create_marketing_post`, `update_marketing_post`,
     `set_marketing_post_active` (`marketing:*`); `create_brand_asset`,
     `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);

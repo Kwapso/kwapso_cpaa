@@ -17,6 +17,7 @@
 
 import type {
   AccountDetail,
+  ClientDeliverable,
   HelpAttachment,
   HelpMessage,
   HelpTicket,
@@ -230,4 +231,22 @@ export const delivery = {
         doneStoryCount: number
       }[]
     }>("/api/content/portal/delivery"),
+}
+
+/** WHAT WE HANDED OVER — the client's own half of the handover shelf.
+ *
+ * ONE DOOR, AND IT TAKES NOTHING. No id, no filter, no account: the question is
+ * "what has been shared with the company I am standing in", and the only input
+ * is the caller's own session. That is deliberate rather than minimal — the
+ * account-fence leaks this codebase has had both began with a door that accepted
+ * an id, so a door with no parameters is a door with nothing to get wrong.
+ *
+ * A SHELF, NOT A FEED (R14). Bounded and read whole, like the to-dos above: what
+ * we hand over on a system is a handful of things, and the client's half is
+ * smaller still because it is the subset somebody deliberately shared. `total` is
+ * the door's own exact COUNT over the same two fences the rows came through, so
+ * the heading can never advertise material the list is withholding (R16). */
+export const handover = {
+  deliverables: () =>
+    api<{ deliverables: ClientDeliverable[]; total: number }>("/api/content/portal/deliverables"),
 }

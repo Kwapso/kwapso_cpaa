@@ -734,6 +734,15 @@ export const content = {
       "/api/content/deliverables/active",
       post({ id, appId, active })
     ),
+  /** Client visibility: show one deliverable to the client, or take it back
+   * (gated `deliverables:edit`). Its own door rather than a field on `/update`,
+   * because publishing something to a client is a decision and correcting a
+   * title is a correction. */
+  setDeliverableVisibility: (id: string, appId: string, visible: boolean) =>
+    api<{ deliverables: Deliverable[]; total: number }>(
+      "/api/content/deliverables/visibility",
+      post({ id, appId, visible })
+    ),
   /** The bytes behind a deliverable (gated deliverables:create), streamed as the
    * request body. Answers with the /media/internal URL the record then stores. */
   uploadDeliverableFile: (dataUrl: string) =>

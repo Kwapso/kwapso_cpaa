@@ -70,7 +70,9 @@
 //   POST /api/content/meetings/sync-calendar -> read Google's diary into ours (one way)
 //   GET  /api/content/deliverables        -> what we handed over on an app (?appId=, ?id → one)
 //   POST /api/content/deliverables[/update|/active] -> file / correct / archive one
+//   POST /api/content/deliverables/visibility -> show one to the client, or hide it
 //   POST /api/content/deliverables/upload-stream -> store the bytes behind one
+//   GET  /api/content/portal/deliverables -> the CLIENT's own shelf (account-fenced + shared only)
 //   GET  /api/content/brand-assets        -> the brand library (?id → one)
 //   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
 //   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
@@ -161,9 +163,11 @@ import {
   postUpdateMeeting,
 } from "./routes/meetings"
 import {
+  getClientDeliverables,
   getDeliverables,
   postCreateDeliverable,
   postSetDeliverableActive,
+  postSetDeliverableVisibility,
   postStreamDeliverableFile,
   postUpdateDeliverable,
 } from "./routes/deliverables"
@@ -453,17 +457,28 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
 
   // ── WHAT WE HAND OVER ──────────────────────────────────────────────────────
   // A deliverable belongs to ONE app and every row carries that app's account,
-  // so the fence is built — but no portal door names this module and every door
-  // here refuses a client login (R21), the way the knowledge base's do. Whether
-  // a client may one day see their own handover shelf is a product decision, and
-  // an unmade decision is a closed door.
+  // so the fence was built long before it was switched on. The product decision
+  // came on 18 August 2026 and it was a NARROW yes: the material is the client's,
+  // "but only once we mark it as visible". So the six doors below still refuse a
+  // client login (R21) — they are the agency's own workbench — and the ONE door
+  // after them answers a client, fenced by their account AND by the per-row
+  // sharing switch.
   "GET /api/content/deliverables": { handler: getDeliverables, kind: "read" },
   "POST /api/content/deliverables": { handler: postCreateDeliverable, kind: "mutation" },
   "POST /api/content/deliverables/update": { handler: postUpdateDeliverable, kind: "mutation" },
   "POST /api/content/deliverables/active": { handler: postSetDeliverableActive, kind: "mutation" },
+  // Sharing is its OWN door, not a field on /update — routes/deliverables.ts says
+  // why at length. A mutation like any other: it gates, it publishes, and R17
+  // keeps a double press to one line of history.
+  "POST /api/content/deliverables/visibility": { handler: postSetDeliverableVisibility, kind: "mutation" },
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
   // the same classification the three upload doors below it carry.
   "POST /api/content/deliverables/upload-stream": { handler: postStreamDeliverableFile, kind: "housekeeping" },
+  // THE CLIENT'S HALF. Named `portal/` like `portal/delivery`, and the prefix is
+  // load-bearing rather than decorative: every "does the client's app name the
+  // agency's paths" scan in this repo greps for `/api/content/deliverables`, and
+  // this path deliberately is not one.
+  "GET /api/content/portal/deliverables": { handler: getClientDeliverables, kind: "read" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
   // Three modules, four tables, and one thing every door below has in common: it

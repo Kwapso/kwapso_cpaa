@@ -268,14 +268,20 @@ export function traceFor(
     case "set_triage_duty":
       return { path: seg(teamId, "tickets"), highlight: "main" }
     /* ------------------------- what we hand over ---------------------------- */
-    // All three land on the APP, because a deliverable has no page of its own —
+    // All four land on the APP, because a deliverable has no page of its own —
     // it is a card on the app's handover shelf, which is exactly where a person
-    // sees the filing, the correction or the archiving happen. Every one of the
-    // three tools carries `appId` for that reason (the doors need it too), so
-    // this is a real destination rather than an invented one.
+    // sees the filing, the correction, the archiving or the sharing happen. Every
+    // one of the four tools carries `appId` for that reason (the doors need it
+    // too), so this is a real destination rather than an invented one.
+    //
+    // Sharing lands there for a sharper reason than the other three: it is the
+    // one write on this module whose effect is on the OTHER front door, so the
+    // only place a person can check what it did is the card, which says "Client
+    // can see this" the moment it lands.
     case "create_deliverable":
     case "update_deliverable":
     case "set_deliverable_active":
+    case "set_deliverable_visibility":
       return { path: `${seg(teamId, "apps")}/${str(input, "appId")}`, highlight: "main" }
 
     /* ------------------- the agency's own housekeeping ---------------------- */

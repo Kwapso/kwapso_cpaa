@@ -151,6 +151,21 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/content/todos": "CONTENT",
   "POST /api/content/todos/complete": "CONTENT",
 
+  // ── what we handed over ────────────────────────────────────────────────────
+  // The owner, 18 August 2026, asked whether a client should see deliverables:
+  // "yes of course.. the deliverables are for them! but only once we mark it as
+  // visible yeah?" — a yes with a condition, and the condition is PER ROW.
+  //
+  // So this is ONE line, and it is not the agency's read. `GET
+  // /api/content/deliverables` — the shelf on one app, with our own staff names
+  // on every card and the archived rows still in it — is deliberately still
+  // absent, and still refuses a client login at the door. The line below opens a
+  // door of its own that takes NO parameters and answers exactly one question:
+  // what has been shared with the company this caller is standing in. Two
+  // clauses decide it and both are on the server — their account fence, and
+  // `visible_to_client_at IS NOT NULL`.
+  "GET /api/content/portal/deliverables": "CONTENT",
+
   // ── what they bought ───────────────────────────────────────────────────────
   // Sprints as named blocks with dates and two counts. NOT the agency's sprint
   // door — a different shape, with nowhere to put a price and no story titles in

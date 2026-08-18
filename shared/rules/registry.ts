@@ -450,6 +450,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "accountScopeClause",
     why: "the whole App → Process → Step chain, and the value drilled through it. Every table here carries `account_id` so the fence is the SAME clause the accounts list uses, with no join to forget — and every exported reader takes the caller's AccountScope, which the burglar suite (workers/tenancy/test/account-leak.test.ts) then tries the handle of. A map names how a client's own people work; another client's map is as far out of bounds as their account row.",
   },
+  "workers/content/src/lib/deliverables-client.ts": {
+    fence: "accountScopeClause",
+    why: "what we handed over, as the CLIENT sees it. A file of its own, holding nothing else: the staff readers live in `deliverables.ts` and are reachable from no portal door, because this list is keyed by FILE and the one time it described a file rather than a function (`help.ts`) the leak was one function along. Two fences ride one clause here and neither is optional — `accountScopeClause` on the account the write copied off the app, AND `visible_to_client_at IS NOT NULL`, the owner's 18 Aug 2026 ruling that a deliverable is the client's only once somebody marks it so. A row on the right account that nobody shared is as absent as one belonging to somebody else, and the COUNT is taken over the same clause so the heading cannot advertise material the list withholds.",
+  },
 }
 
 /** EVERY WRITE a CLIENT LOGIN can reach — door → the fence its HANDLER resolves
@@ -599,19 +603,25 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
-  // WHAT WE HANDED OVER. `null`, and it is the same sentence the module's own
-  // doors already speak: every deliverables handler opens with
-  // refusePortalCaller, so a client login reaches no row here to have a history
-  // of. It is worth writing down WHY it is `null` rather than "account", because
-  // this is the one table in the block above where the rows genuinely are the
-  // client's — the material IS what we hand them — and the answer is still the
-  // one SCOPE ch.06 gives every other feed on that side: a history line reads
-  // "Ana handed over the dispatch walkthrough" and then "Ana archived it", which
-  // names the staff member doing the work and, worse, shows the client us
-  // changing our minds about what we gave them. If the shelf is ever opened to
-  // the portal, the ROWS are the decision; this line is a separate one and stays
-  // `null` unless somebody argues it down.
-  deliverables: { fence: null, why: "a deliverable's history names the staff who filed, corrected and archived it — the client is shown the material itself, which is the part that is theirs, and never our record of changing it (SCOPE ch.06). Every door on the module refuses a client login today, so this is the door's own sentence repeated where the feed can hear it" },
+  // WHAT WE HANDED OVER. `null` — and THE DAY THIS LINE ANTICIPATED HAS COME, so
+  // it is worth saying what changed and what did not.
+  //
+  // It used to lean on the module's own doors: every deliverables handler opened
+  // with refusePortalCaller, so a client reached no row here to have a history
+  // of. That is no longer true. On 18 August 2026 the owner opened the shelf —
+  // "the deliverables are for them! but only once we mark it as visible" — and a
+  // client can now read their own company's SHARED rows through
+  // `GET /api/content/portal/deliverables`.
+  //
+  // The old note ended: "If the shelf is ever opened to the portal, the ROWS are
+  // the decision; this line is a separate one and stays `null` unless somebody
+  // argues it down." Nobody has. The ROWS being theirs was never the argument for
+  // showing them our record of CHANGING those rows: a history line reads "Ana
+  // handed over the dispatch walkthrough" and then "Ana archived it", which names
+  // the staff member doing the work (SCOPE ch.06) and shows the client us
+  // changing our minds about what we gave them. Opening the shelf made this line
+  // load-bearing rather than moot, which is a reason to keep it, not to soften it.
+  deliverables: { fence: null, why: "a deliverable's history names the staff who filed, corrected, shared and archived it — the client is shown the material itself, which is the part that is theirs, and never our record of changing it (SCOPE ch.06). The rows ARE now reachable by a client login (the portal shelf, account-fenced and shared-only), which is what makes this line real rather than moot: `null` here is the difference between handing somebody a document and handing them our file about deciding to" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R24)" },
   internal_role_rates: { fence: null, why: "what an hour of a ROLE is worth — the second internal rate card, and the number an app's money figure is computed from. The same ruling as the line above it, for the same reason: a client may not see what we think an hour of anybody's time costs, and a history line saying we re-priced it is the same disclosure spread over time (R24)" },

@@ -26,11 +26,22 @@
 
 import * as React from "react"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Power } from "lucide-react"
+import { Eye, EyeOff, Pencil, Power } from "lucide-react"
 
 import { AddButton } from "@/components/deep-link/screen-bits"
 import {
@@ -82,6 +93,18 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
   const [editing, setEditing] = React.useState<Deliverable | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [find, setFind] = React.useState("")
+  /** THE ONE ACTION ON THIS SCREEN THAT ASKS FIRST, and only in one direction.
+   *
+   * The house rule pairs the destructive colour WITH a confirm; this is neither
+   * destructive nor coloured, and it still asks — because the rule is really
+   * about acts you cannot see the consequences of from here. Archiving fades a
+   * card in front of you. Sharing puts a document in somebody else's hands at a
+   * different hostname, and nothing on this screen would look any different if
+   * you had meant to click the card beside it.
+   *
+   * HIDING DOES NOT ASK. It is the retraction, it moves in the safe direction,
+   * and a confirm in front of it would put a speed bump in front of the fix. */
+  const [sharing, setSharing] = React.useState<Deliverable | null>(null)
 
   /** One write path, and it PRIMES rather than invalidates. Every door here
    * answers with the app's whole shelf and its exact total, so the actor's own
@@ -188,6 +211,31 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                     {[formatDate(d.datedOn), d.active ? null : t("Archived")].filter(Boolean).join(" · ") ||
                       t("No date")}
                   </span>
+                  {/* WHO CAN SEE IT, SAID ON THE CARD. A shared deliverable looks
+                      different from an unshared one at a glance, because the
+                      whole point of a per-record switch is that a shelf holds
+                      both at once — a draft SOP beside the finished one — and
+                      "which of these has the client got?" must be answerable by
+                      looking rather than by clicking each in turn.
+                      Only the SHARED state gets a badge: unshared is the
+                      default and the resting state of most of the shelf, and
+                      badging it would put a label on every card to say nothing
+                      has happened. The archived-and-shared case says so out
+                      loud, because that row is visible in NEITHER place and the
+                      switch still reads on. */}
+                  {d.visibleToClientAt && (
+                    <span className="mt-1 flex flex-wrap items-center gap-1">
+                      <Badge variant="success" className="gap-1">
+                        <Eye className="size-3" />
+                        {t("Client can see this")}
+                      </Badge>
+                      {!d.active && (
+                        <span className="text-muted-foreground text-[11px]">
+                          {t("Hidden while archived")}
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {(canEdit || canArchive) && (
                     <div className="mt-1 flex items-center gap-1">
                       {canEdit && (
@@ -200,6 +248,38 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
                           <Pencil className="size-3.5" />
+                        </Button>
+                      )}
+                      {/* SHOW IT TO THE CLIENT, OR TAKE IT BACK. `deliverables:edit`,
+                          the same right that corrects one — sharing is a different
+                          act, not a harder one. Eye / EyeOff join the house action
+                          mapping (UI-CONVENTIONS) as show-to-client /
+                          hide-from-client; they are not a synonym for the Power
+                          icon beside them, which archives our own row. Sharing
+                          asks first (see `sharing`); hiding just happens. */}
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            d.visibleToClientAt
+                              ? void run(
+                                  () => contentApi.setDeliverableVisibility(d.id, appId, false),
+                                  t("Hidden from the client.")
+                                )
+                              : setSharing(d)
+                          }
+                          aria-label={
+                            d.visibleToClientAt ? t("Hide from the client") : t("Show to the client")
+                          }
+                          className="text-muted-foreground h-auto gap-1 px-2 py-1"
+                        >
+                          {d.visibleToClientAt ? (
+                            <EyeOff className="size-3.5" />
+                          ) : (
+                            <Eye className="size-3.5" />
+                          )}
                         </Button>
                       )}
                       {/* NOT RED, AND NO CONFIRM — deliberately, and it is the
@@ -249,6 +329,43 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
           run(() => contentApi.createDeliverable({ appId, ...v }), t("Filed."))
         }
       />
+      {/* THE ONE CONFIRM ON THIS SCREEN. Not red — nothing is being destroyed —
+          but it asks, because it is the only button here whose effect happens
+          somewhere the person pressing it cannot see. The sentence names the
+          deliverable and says where it lands, so the answer to "which one is
+          this?" is in the question rather than behind it. */}
+      <AlertDialog open={sharing !== null} onOpenChange={(o) => !busy && !o && setSharing(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("Show this to the client?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                "Anyone at this company with a portal login will be able to open “{title}”. You can hide it again at any time."
+              , { title: sharing?.title ?? "" })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={(e) => {
+                e.preventDefault()
+                const d = sharing as Deliverable
+                setSharing(null)
+                void run(
+                  () => contentApi.setDeliverableVisibility(d.id, appId, true),
+                  t("The client can see it now.")
+                )
+              }}
+            >
+              {t("Show to the client")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <InternalRecordDialog
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}

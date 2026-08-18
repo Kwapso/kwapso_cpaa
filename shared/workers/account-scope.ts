@@ -367,6 +367,24 @@ export function scopeStamp(scope: AccountScope): ScopeStamp {
  * into "3 pieces of work, 2 done" while they are looking at it. Without these
  * lines the counts are correct on load and wrong for the rest of the session,
  * which is the exact failure this list exists to prevent. */
+/* Seven, and the seventh is `deliverables`, which arrived the day the handover
+ * shelf was opened to the client (18 Aug 2026, per-row: "only once we mark it as
+ * visible").
+ *
+ * It is on this list for the reason `stories` and `sprints` are, not the reason
+ * `todos` is. The ping carries an APP id — the row the agency's own listener
+ * holds — and an app id tells a client nothing and identifies no owner, so there
+ * is nothing on the event for `mayHearChange` to fence against. The publisher
+ * therefore names the account (routes/deliverables.ts) and this line is what
+ * lets the fence read it.
+ *
+ * WHAT A CLIENT LEARNS FROM HEARING ONE: that something about an app on their own
+ * account changed. They already know their apps. They are NOT told which
+ * deliverable, whether it was shared or hidden, or whether one exists at all —
+ * the ping carries no row data, and the re-read it triggers goes back through
+ * both fences. A deliverable created and never shared moves this ping and
+ * changes nothing the client can see, which is a wasted fetch and not a
+ * disclosure. */
 const SCOPE_STAMPED_RESOURCES = [
   "help",
   "help_threads",
@@ -374,6 +392,7 @@ const SCOPE_STAMPED_RESOURCES = [
   "todos",
   "stories",
   "sprints",
+  "deliverables",
 ] as const
 
 /** The fence, for a LIVE CHANGE PING (`{resource, id, scope}` on a team's channel).

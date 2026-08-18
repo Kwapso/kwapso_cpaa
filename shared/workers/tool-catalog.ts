@@ -1712,6 +1712,32 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
+    // SHOWING ONE TO THE CLIENT, on the machine surface. It is here rather than
+    // absent because the module's other four capabilities are here (R13: shipping
+    // the code ships the capability), and because leaving it out would mean an
+    // assistant could file a handover doc and archive it but not do the one thing
+    // the shelf now exists for.
+    //
+    // IT CONFIRMS IN ONE DIRECTION, and that is the whole of its care. Sharing
+    // hands material to somebody outside the agency; hiding takes it back. So the
+    // confirm rides `visible === true`, the mirror of `set_deliverable_active`,
+    // whose confirm rides the archiving direction. The model reads team text an
+    // attacker can author, and "make every deliverable visible" is a sentence
+    // somebody could plant in a ticket.
+    name: "set_deliverable_visibility",
+    summary:
+      "Show a deliverable to the client (`visible: true`) or take it back (`visible: false`). `id` is the deliverable and `appId` is the app whose shelf it sits on. Off until somebody turns it on: a deliverable is invisible to the client until this is called, and the client then reads it in their own portal alongside the rest of their company's shared material. Withdrawing one is instant and leaves the record untouched. Archiving a deliverable also withdraws it, without changing this switch.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables/visibility",
+    schema: obj({ id: S, appId: S, visible: B }, ["id", "appId", "visible"]),
+    buildBody: (i) => ({ id: str(i, "id"), appId: str(i, "appId"), visible: i.visible === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.visible === true,
+      summarize: (i) =>
+        `${i.visible === true ? "Show" : "Hide"} deliverable ${str(i, "id")} ${i.visible === true ? "to" : "from"} the client`,
+    },
+  },
+  {
     name: "list_processes",
     summary:
       "List process maps, a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps), `archived` ('no' for the maps still in use, 'yes' for the ones put away — a map is archived, never deleted). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'app' or 'steps' (the longest map first). The order is the DOOR's, so it spans every map rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",

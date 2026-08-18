@@ -77,6 +77,13 @@ export const GLOSSARY = {
   // its own or somebody writes "category" on one screen and "type" on the next.
   deliverable: { term: "Deliverable", def: "Something we handed over on an app: a handover doc, an API reference, a recorded walkthrough, an SOP." },
   deliverableKind: { term: "Kind", def: "What sort of thing a deliverable is. Your own list, so you can add one we haven't thought of." },
+  // A GLOSSARY DECISION, MADE ON PURPOSE (Law R6). "The client can see this one"
+  // had no word, and the two obvious coinages — "published", "shared" — are both
+  // synonyms for something. The app already owns this sentence once, on an
+  // account: `priceVisibility` is "the switch that decides whether they see X".
+  // This is the same sentence about a deliverable, so it is the same noun, and
+  // the two read as one idea rather than two inventions.
+  clientVisibility: { term: "Client visibility", def: "The switch on a deliverable that decides whether the client sees it in their portal. Off until you turn it on." },
 
   // THE AGENCY'S OWN HOUSEKEEPING — the words for the three modules that describe
   // how we run ourselves. Every definition here says, or implies, the same thing

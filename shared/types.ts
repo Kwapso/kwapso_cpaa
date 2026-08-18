@@ -1014,11 +1014,43 @@ export type Deliverable = {
   url: string | null
   /** the picture worth showing on the card, when there is one. */
   imageUrl: string | null
+  /** WHEN THIS WAS MADE VISIBLE TO THE CLIENT, or null — which is the default and
+   * the safe state (Client visibility, glossary). A moment rather than a flag so
+   * the client's own screen can say since when; WHO turned it on is a line in the
+   * record's history, not a second copy on the row. */
+  visibleToClientAt: string | null
   active: boolean
   createdAt: string
   creatorName: string | null
   updatedAt: string | null
   editorName: string | null
+}
+
+/** ONE DELIVERABLE, AS THE CLIENT SEES IT — a different shape from `Deliverable`
+ * on purpose, and the shape is half the fencing.
+ *
+ * What is missing is the point. No `creatorName` or `editorName`: SCOPE ch.06 is
+ * that the portal shows the work and never which staff member is doing it, and a
+ * shape with nowhere to put a name cannot leak one by a later careless mapper.
+ * No `active`: an archived deliverable is simply absent, not present-and-faded,
+ * because "we put this away" is our word about our own shelf. No
+ * `visibleToClientAt` as a switch either — every row the client can read is
+ * visible by construction, so it travels as `sharedOn`, which is a date they can
+ * be told rather than a state they could infer things from.
+ *
+ * `appName` rather than `appId` alone: a client reads their handover material by
+ * the system it belongs to, and an id is not a thing anybody recognises. */
+export type ClientDeliverable = {
+  id: string
+  appId: string
+  appName: string | null
+  title: string
+  kind: string | null
+  datedOn: string | null
+  url: string | null
+  imageUrl: string | null
+  /** the day the agency made it visible to them (`visible_to_client_at`). */
+  sharedOn: string
 }
 
 /** One process in a list: what it is, and how much of it there is. */

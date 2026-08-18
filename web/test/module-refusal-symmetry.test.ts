@@ -167,21 +167,30 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // for them, and a fence that showed a contact their own meetings would show
     // them those notes.
     //
-    // `deliverables` is the NEWEST member and the one whose exclusion would be
-    // most tempting of all — more than `work`, more than `meetings`. The material
-    // is not merely about the client, it IS the client's: a handover doc, an API
-    // reference, a recorded walkthrough, the things we hand over TO them. Every
-    // row even carries their account, so a fence would work. It refuses anyway,
-    // and the reason is that nobody has decided yet: whether a client may see
-    // their own handover shelf is a product question the owner has not answered,
-    // and the base's rule is that an unmade decision is a closed door rather than
-    // an open one. The fence is built and switched off; opening it is a decision
-    // somebody makes on purpose, not one that arrives by default.
+    // `deliverables` WAS a member and is not one any more, and this is the one
+    // removal in this file's history that is a feature rather than a regression —
+    // so it is worth saying exactly why, because a shrinking set is otherwise the
+    // failure this pin exists to catch.
+    //
+    // It used to read: "whether a client may see their own handover shelf is a
+    // product question the owner has not answered, and an unmade decision is a
+    // closed door". On 18 August 2026 the owner answered it — "the deliverables
+    // are for them! but only once we mark it as visible" — and the module grew
+    // ONE fenced read (`GET /api/content/portal/deliverables`) beside its five
+    // refusing ones. The derivation asks whether EVERY read refuses; one does
+    // not; so the module drops out. That is the derivation being honest.
+    //
+    // WHAT DROPPING OUT COSTS, AND WHERE IT IS PAID. A module outside this set
+    // has its WRITE doors unchecked here, and every deliverables write is still
+    // purely the agency's — filing, correcting, archiving, and now sharing. That
+    // half is proved in the module's own suite instead
+    // (`workers/content/test/deliverables.test.ts`, "every one of them refuses a
+    // portal caller at the door"), derived from the same route table, and it is
+    // re-stated below so this file does not quietly stop caring.
     ).toEqual([
       "agent",
       "brand_assets",
       "commercials",
-      "deliverables",
       "delivery",
       "google",
       "knowledge",
@@ -227,5 +236,34 @@ describe("a module refuses a client login on both halves, or on neither", () => 
         /refusePortalCaller\s*\(/
       )
     }
+  })
+
+  // THE MIXED MODULE. `deliverables` has five reads that refuse a client login
+  // and ONE that fences them (their own shelf, the rows somebody marked visible),
+  // so the derivation above stops calling it agency-only and stops checking its
+  // writes. Every one of those writes is still purely ours — a client does not
+  // file, correct, archive, or SHARE a deliverable with themselves — so the check
+  // is re-stated here rather than lost.
+  //
+  // Derived from the route table, not from this list: the doors are whichever
+  // ones sit on `/api/content/deliverables`, which is the agency's path and
+  // deliberately not a prefix of the portal's. A sixth write tomorrow is judged
+  // today, and the portal's own read is excluded by its path rather than by
+  // somebody remembering to exclude it.
+  it("the handover shelf refuses a client login on every write, though its reads are mixed", () => {
+    const index = readFileSync(join(ROOT, "workers", "content", "src", "index.ts"), "utf8")
+    const table = /export const ROUTES[^=]*=\s*\{([\s\S]*?)\n\}/.exec(index) as RegExpExecArray
+    const fns = handlers("content")
+    const writes = [...table[1].matchAll(/"([A-Z]+ \/[^"]+)":\s*\{\s*handler:\s*(\w+)/g)].filter(
+      ([, door]) => door.startsWith("POST /api/content/deliverables")
+    )
+    expect(writes.length, "no deliverables write doors found — this scan is reading nothing").toBeGreaterThan(3)
+    const naked = writes
+      .filter(([, , handler]) => !/refusePortalCaller\s*\(/.test(reach(fns, handler)))
+      .map(([, door]) => door)
+    expect(
+      naked,
+      `these doors write to the agency's handover shelf and do not refuse a client login: ${naked.join(", ")}`
+    ).toEqual([])
   })
 })
