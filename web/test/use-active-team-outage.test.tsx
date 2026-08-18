@@ -142,4 +142,29 @@ describe("a failing API is not a signed-out person", () => {
     expect(second.result.current.user, "an outage must not empty the session").not.toBeNull()
     expect(replace).not.toHaveBeenCalledWith("/login")
   })
+
+  // SABOTAGE: remove the try/catch from `refresh` →
+  //   × a background refresh during the outage does not become a second error
+  //     AssertionError: promise rejected "Error: Something went wrong on our
+  //     side. { …(2) }" instead of resolving
+  it("a background refresh during the outage does not become a second error", async () => {
+    const { useActiveTeam: hook, ApiFailure } = await freshHook()
+    me.mockResolvedValue({ user })
+    active.mockResolvedValue(withTeam)
+    const view = renderHook(() => hook())
+    await waitFor(() => expect(view.result.current.loading).toBe(false))
+
+    // A live ping arrives mid-outage. app-shell.tsx calls this as
+    // `void active.refresh()` — six times over — so a rejection here reaches
+    // `unhandledrejection`, and the global reporter beacons it into the central
+    // error store as a BROWSER crash. The server had already logged the same
+    // failure from its own side; the second row explains nothing and costs a
+    // slot in a table with an hourly ceiling.
+    active.mockRejectedValue(new ApiFailure(500, "internal", "Something went wrong on our side."))
+    await expect(view.result.current.refresh()).resolves.toBeUndefined()
+
+    // …and the failed top-up left the session it could not refresh alone.
+    expect(view.result.current.user).not.toBeNull()
+    expect(replace).not.toHaveBeenCalledWith("/login")
+  })
 })

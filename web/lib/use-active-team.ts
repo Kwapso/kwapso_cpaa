@@ -170,12 +170,33 @@ export function useActiveTeam(): ActiveTeam {
   }, [])
 
   const refresh = React.useCallback(async () => {
-    // reload both identity (profile edits) and context (member counts, etc.)
-    const [me, nextCtx] = await Promise.all([auth.me(), tenancy.active()])
-    if (sendToOnboardingIfTeamless(nextCtx)) return
-    setSessionCache({ user: me.user, ctx: nextCtx })
-    setUser(me.user)
-    setCtx(nextCtx)
+    // BEST-EFFORT, AND IT MAY NOT REJECT. Every caller is a live ping in
+    // app-shell.tsx writing `void active.refresh()` — a background top-up of the
+    // identity and the context after somebody else changed something, not an
+    // action a person is waiting on. A rejection from a `void`ed promise has
+    // nowhere to go but `unhandledrejection`, and the global reporter beacons
+    // that into the central store: so a SERVER outage that had already recorded
+    // itself got written down a second time as a browser crash. Twice on
+    // staging — 2026-08-16 14:51 on /settings and 2026-08-17 15:44 on
+    // /accounts — each of them minutes into a failure the worker had already
+    // logged, and neither row said anything the first one hadn't.
+    //
+    // Logging-only, which ERROR-HANDLING.md rule 1 allows by name for a
+    // best-effort side-effect: loud in the console, silent in the store. What
+    // is lost is a refresh, and the next ping does it again. What must NOT
+    // happen here is answering a 401 — that is the LOAD path's decision, made
+    // once with the cache in front of it, and a transient failure is not
+    // allowed to become a sign-out (use-active-team-outage.test.tsx).
+    try {
+      // reload both identity (profile edits) and context (member counts, etc.)
+      const [me, nextCtx] = await Promise.all([auth.me(), tenancy.active()])
+      if (sendToOnboardingIfTeamless(nextCtx)) return
+      setSessionCache({ user: me.user, ctx: nextCtx })
+      setUser(me.user)
+      setCtx(nextCtx)
+    } catch (e) {
+      console.error("active-team refresh failed:", e)
+    }
   }, [sendToOnboardingIfTeamless])
 
   return { loading, user, ctx, switchTeam, createTeam, refresh }
