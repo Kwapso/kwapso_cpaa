@@ -42,6 +42,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { LIST_HARD_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
 import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shared/types"
 
@@ -166,6 +167,24 @@ function toStory(r: StoryRow): Story {
  * keyset cursor needs to page without repeating a row. */
 const STORY_ORDER = "COALESCE(s.rank, s.id)"
 
+/** WHAT THE BACKLOG MAY BE ORDERED BY (shared/workers/sorting.ts), with the
+ * drag-rank as the fallback for the reason above: a screen that asks for no
+ * ordering gets the order somebody arranged by hand.
+ *
+ * `deadline` is the one worth naming. A due date is the question a backlog is
+ * most often asked ("what is late?"), and it is exactly the column the browser
+ * could never sort correctly — the row prints "14 Apr 2025" and the library
+ * compares that as text. Here it is the stored date, compared as a date, over
+ * the whole backlog rather than the loaded page. */
+export const STORY_SORTS: SortMenu<StoryRow> = {
+  rank: { expr: STORY_ORDER, dir: "desc", key: (r) => r.rank ?? r.id },
+  created: { expr: "s.created_at", dir: "desc", key: (r) => r.created_at },
+  deadline: { expr: "s.due_on", dir: "asc", key: (r) => r.due_on },
+  title: { expr: "s.title", dir: "asc", key: (r) => r.title },
+  status: { expr: "s.status", dir: "asc", key: (r) => r.status },
+  assignee: { expr: "s.assignee_name", dir: "asc", key: (r) => r.assignee_name },
+}
+
 /** The facets the list door parses. Declared as a type so the route, the tool
  * and this file cannot drift about what a filter IS (R19). */
 export type StoryFilter = {
@@ -234,10 +253,12 @@ export async function listStories(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: StoryFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<StoryRow> = resolveOrdering(STORY_SORTS, "rank", undefined, undefined)
 ): Promise<Page<Story>> {
-  const pos = decodeCursor(cursor)
-  const after = keysetAfter(pos, STORY_ORDER)
+  // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
+  const pos = decodeCursor(cursor, ordering.sig)
+  const after = keysetAfter(pos, ordering.expr, ordering.dir, "s.id")
   const where = storyWhere(filter)
   const clauses = [where.sql, ...(after.sql ? [after.sql] : [])]
   const rows = await d1Query<StoryRow>(
@@ -245,10 +266,10 @@ export async function listStories(
     guard.databaseId,
     // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
     `SELECT ${STORY_COLS} FROM stories s WHERE ${clauses.join(" AND ")}
-      ORDER BY ${STORY_ORDER} DESC, s.id DESC LIMIT ${PAGE_SIZE + 1}`,
+      ${orderBy(ordering, "s.id")} LIMIT ${PAGE_SIZE + 1}`,
     [...where.params, ...after.params]
   )
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.rank ?? r.id, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return { ...page, rows: page.rows.map(toStory) }
 }
 

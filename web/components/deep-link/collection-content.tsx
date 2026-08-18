@@ -38,6 +38,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, knowledgeKey } from "@/lib/live-resources"
 import { invalidate } from "@shared/web/store"
@@ -365,6 +366,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           listKey={accountsKey(teamId as string)}
           placeholder={t("Search accounts…")}
           noun="accounts"
+          // THE ORDER, asked of the door for the reason the search box is: the
+          // list pages, so ordering the loaded page would arrange the newest
+          // fifty companies under a badge counting all of them.
+          sorts={translatedSorts("accounts", t)}
+          defaultSort={COLLECTION_SORTS.accounts.defaultSort}
           fixed={accountTab === "all" ? undefined : { type: accountTab === "people" ? "individual" : "entity" }}
           facets={[
             {
@@ -497,6 +503,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         {/* R14's other half: the sweep only ever adds, so the search box is
             answered by the door — over every source, not the newest fifty. */}
         <PagedFind<KnowledgeSource>
+          sorts={translatedSorts("knowledge", t)}
+          defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
           listKey={knowledgeKey(teamId as string)}
           placeholder={t("Search the knowledge base…")}
           noun="sources"

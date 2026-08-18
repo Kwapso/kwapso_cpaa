@@ -5,7 +5,7 @@
 
 import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 
-import { formatActivityWhen, formatDate, formatDateTime } from "@shared/web/format"
+import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RichText } from "@shared/web/rich-text-view"
@@ -234,7 +234,10 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // columns"). They ride every row rather than a second shaper, because the
       // three views are three renderings of ONE list — a second shaper is a
       // second idea of what a meeting row is, and the two drift.
-      when: formatDate(m.startsAt),
+      // A TABLE COLUMN, and the one the "All" view is most often ordered by — so
+      // it is the sortable spelling of a date. The subtitle above it keeps
+      // `formatDate`, because that one is read rather than compared.
+      when: formatDateSortable(m.startsAt),
       // The bare day the calendar view keys entries on — it wants a date, not a
       // moment, and formatting it for the grid is the grid's job.
       startsOn: m.startsAt.slice(0, 10),

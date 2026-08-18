@@ -29,6 +29,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { StartTimerStrip } from "@/components/time-panel"
@@ -222,12 +223,18 @@ export function StoriesScreen({
         listKey={storiesKey(teamId)}
         placeholder={t("Search work…")}
         noun="stories"
+        sorts={translatedSorts("stories", t)}
+        defaultSort={COLLECTION_SORTS.stories.defaultSort}
         fetchPage={(query, cursor) =>
           contentApi
             // `view: "all"` while searching: somebody looking for a story by name
             // is as likely to want the finished one, and the everyday backlog
             // hides those.
-            .stories({ filter: { q: query.q, view: "all" }, cursor })
+            .stories({
+              filter: { q: query.q, view: "all" },
+              order: { sort: query.sort, dir: query.dir },
+              cursor,
+            })
             .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor, total: r.total }))
         }
       >

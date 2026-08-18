@@ -27,6 +27,7 @@ import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { savingsView, type SavingsView, type StepFigures } from "@shared/workers/savings"
 import type { AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
@@ -669,6 +670,47 @@ export async function countProcesses(
   )
 }
 
+/** One process, as the list reads it off the join. Named rather than inline
+ * because PROCESS_SORTS reads the same row: a menu entry pairs its SQL with the
+ * field that mirrors it, and it can only do that if the field has a type. */
+type ProcessListRow = {
+  id: string
+  app_id: string
+  app_name: string
+  account_id: string | null
+  name: string
+  description: string | null
+  role_name: string | null
+  deactivated_at: string | null
+  created_at: string
+  version_count: number
+  step_count: number
+}
+
+/** WHAT THE PROCESS LIST MAY BE ORDERED BY (shared/workers/sorting.ts). Four
+ * names, each a column already on the row in front of whoever asked: the map's
+ * own name, the app it hangs off, when it was written down, and how many steps
+ * it has — which is the one an agency actually asks for ("which of these is the
+ * monster?"). `created` is the fallback, because newest-first is the order this
+ * list has always been in. */
+export const PROCESS_SORTS: SortMenu<ProcessListRow> = {
+  created: { expr: "p.created_at", dir: "desc", key: (r) => r.created_at },
+  name: { expr: "p.name", dir: "asc", key: (r) => r.name },
+  app: { expr: "a.name", dir: "asc", key: (r) => r.app_name },
+  // A COUNT is a number, and the cursor's key is text — so the position is
+  // zero-padded on both sides (`printf` in SQL, `padStart` off the row) and the
+  // comparison stays the one the ORDER BY made. Sorting "10" before "9" is the
+  // classic version of the bug this whole lane is about; doing it in the KEYSET
+  // is the version that silently drops rows instead of misplacing them.
+  steps: {
+    expr: `printf('%08d', (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
+             AND s.version_id = (SELECT id FROM process_versions v2 WHERE v2.process_id = p.id
+                                  ORDER BY v2.version_no DESC LIMIT 1)))`,
+    dir: "desc",
+    key: (r) => String(r.step_count ?? 0).padStart(8, "0"),
+  },
+}
+
 /** The team's processes, newest first, PAGED by key.
  *
  * R14: processes GROW with ordinary use — every app of every client grows a map,
@@ -680,27 +722,18 @@ export async function listProcesses(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: ProcessFilters & { cursor?: string | null } = {}
+  opts: ProcessFilters & { cursor?: string | null; ordering?: Ordering<ProcessListRow> } = {}
 ): Promise<Page<ProcessSummary> & { total: number }> {
   const { sql: base, params } = processesWhere(scope, opts)
-  const after = keysetAfter(decodeCursor(opts.cursor), "p.created_at")
+  // The ORDER BY, the keyset predicate and the next cursor's key all come off
+  // ONE ordering, so a sort cannot reach the rows and miss the cursor.
+  const ordering = opts.ordering ?? resolveOrdering(PROCESS_SORTS, "created", undefined, undefined)
+  const after = keysetAfter(decodeCursor(opts.cursor, ordering.sig), ordering.expr, ordering.dir, "p.id")
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
 
   const [rows, counted] = await Promise.all([
     // PAGE_SIZE + 1 is how hasMore is known without a second query.
-    d1Query<{
-      id: string
-      app_id: string
-      app_name: string
-      account_id: string | null
-      name: string
-      description: string | null
-      role_name: string | null
-      deactivated_at: string | null
-      created_at: string
-      version_count: number
-      step_count: number
-    }>(
+    d1Query<ProcessListRow>(
       cfg,
       guard.databaseId,
       `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
@@ -710,7 +743,7 @@ export async function listProcesses(
                  AND s.version_id = (SELECT id FROM process_versions v2 WHERE v2.process_id = p.id
                                       ORDER BY v2.version_no DESC LIMIT 1)) AS step_count
          FROM processes p JOIN apps a ON a.id = p.app_id${pageWhere}
-        ORDER BY p.created_at DESC, p.id DESC LIMIT ${PAGE_SIZE + 1}`,
+        ${orderBy(ordering, "p.id")} LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
     // R16 (amended): the total behind the page — the SAME WHERE and the SAME
@@ -720,7 +753,7 @@ export async function listProcesses(
     countProcesses(cfg, guard, scope, opts),
   ])
 
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return {
     ...page,
     rows: page.rows.map((r) => ({

@@ -27,6 +27,35 @@ export function formatDayMonth(iso?: string | null): string {
     : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
 
+/** "2026-06-13" — a date for a COLUMN SOMEBODY SORTS.
+ *
+ * IT IS THE SAME DECISION `formatActivityWhen` MAKES ONE FUNCTION DOWN, and for
+ * the same reason: the library's collection engine compares a column with
+ * `String(a).localeCompare(String(b))` unless BOTH values are already numbers,
+ * and the library is lego this repo does not edit (UI-GAPS #22 asks for a typed
+ * comparison). So a column showing "14 Apr 2025" sorts alphabetically — April
+ * before January, 2019 between 2018 and 2020 only by luck — and it does it
+ * silently: the rows move, so the control looks like it worked. The owner's
+ * report was "the sort actually doesn't work… I don't see the order changing,
+ * even though I can see that there are different values", which is what a wrong
+ * comparison looks like from the outside.
+ *
+ * A value cannot be both `formatDate`'s and sortable, because the thing being
+ * compared IS the thing being shown. So the value that has to give is the one
+ * whose job is to be compared. Year-month-day, zero-padded, so lexical order is
+ * chronological order — unambiguous in every locale this app is translated into,
+ * which a locale-formatted date in a sortable column is not.
+ *
+ * USE IT ONLY IN A TABLE COLUMN. A date standing alone in a sentence, a subtitle
+ * or a detail is `formatDate`'s, and stays warm. */
+export function formatDateSortable(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 /** "13 Jun 2026, 14:05" — for activity rows where the moment matters. */
 export function formatDateTime(iso?: string | null): string {
   if (!iso) return ""

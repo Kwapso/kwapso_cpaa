@@ -180,7 +180,102 @@ for "how does search work" leaves knowing it exists:
 DATA-MODEL.md § *THE KNOWLEDGE BASE* is the owning reference (the four tables, the
 compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index up.
 
-## Status (updated 2026-08-17)
+## The third question: SORTING (BUILT 2026-08-18)
+
+A collection is asked three things — **which rows** (the filters), **which of
+those** (the search), and **in what order**. This document has always owned the
+first two. The third had no layer, no seam and, in most of the app, no control at
+all, and the reason it went unnoticed for so long is worth stating: sorting looks
+like a presentation detail until you notice it is answered in exactly the same
+place a search is, and can be wrong in exactly the same way.
+
+**The rule is the same sentence as Layer 2's.** A **bounded** collection is
+entirely in the browser, so ordering it there is honest and free (Layer 1). A
+**paged** one is not: the browser holds page one, so a sort applied there arranges
+fifty of 254 rows and calls the result sorted — the same lie the search box told,
+one control along. **A sort on a paged collection is a question for the DOOR.**
+
+- The door's half is `shared/workers/sorting.ts`: a caller sends a NAME
+  (`sort=deadline`), the door looks it up in a `SortMenu` declared in our own
+  source, and no request text ever reaches a statement. Each menu entry pairs its
+  SQL expression with the field that mirrors it off a row, because a keyset page
+  is three things that must agree — the `ORDER BY`, the "everything after this
+  row" predicate, and the value the next cursor is minted from — and written
+  apart they drift into a page two that starts somewhere page one did not stop.
+- The screen's half is `web/lib/collection-sorts.ts` (the names and the words a
+  person reads) and `<PagedFind>`, which carries the sort beside the search box
+  and the filters because they are three halves of one question.
+- **Changing the sort resets to page one, structurally.** A different order is a
+  different question, so it lands in a different cache key with its own cursor
+  sidecar — nothing remembers to reset, because there is nothing to reset. The
+  belt under that brace: every cursor carries the ordering it was minted inside
+  (`<name>:<dir>`), and a door hands back the ordinary `invalid_cursor` 400 for
+  one minted under a different one. A stale cursor does not fail loudly on its
+  own — it silently skips an arbitrary slice and returns a page that reads like
+  an answer, which is worse than an error.
+- **The default order is never sent.** A screen nobody has touched asks the door
+  nothing, reads the collection's own cache key and looks exactly as it did
+  before this existed.
+
+`workers/content/test/paged-sort.test.ts` proves the behaviour end to end against
+a real database — sixty tickets, page size fifty, and the row that has to arrive
+at the top is the one ten rows past the cursor — and `web/test/paged-sort.test.ts`
+proves the wiring: the screen's option names are read against each door's own
+menu, every paged list screen has the control, no sort name reaches a statement
+unvalidated (R20), and no menu names a number R24 keeps off the client's side.
+
+### The census (derived 2026-08-18, from the code)
+
+**Every collection either front door renders**, with what it can be ordered by
+and where that ordering is decided.
+
+| Where | What is drawn | Order decided by |
+| --- | --- | --- |
+| **Six paged list screens** — accounts, tickets, the knowledge base, process maps, the backlog, the diary | recipe → `CollectionFrame` (+ a table on the diary's *All*) | **the DOOR**, `<PagedFind sorts=…>` · five to six named orders each |
+| **Eight bounded list recipes** — members, roles, invites, sprints, apps, tasks, the brand library, meeting purposes | recipe → `CollectionFrame` | **the browser**, honestly: the whole collection is loaded. Options are DERIVED from the recipe's own first field + surviving facets (`frameSortOptions`), so a new column brings its own sort and a list with one sortable column gets no control at all |
+| **The two tables** — Tasks (all views but Calendar), the diary's *All* | recipe `display:"table"` → `DataTable` | the browser, by **clicking a column header**. The engine makes every column sortable; the tuner stands the picker down so a table has one control rather than two. On the diary this orders the loaded page only — the honest, whole-diary order is the `<PagedFind>` control above it (UI-GAPS #22) |
+| **Three calendars** — sprints, tasks, the diary | `CalendarView` | **not sortable, and must not be**: a month grid is ordered by the calendar |
+| **Activity feeds** (every record's Activity tab, the team feed, account activity, assistant usage) | `ActivityFeed` | **not sortable**: a chronological history whose order IS its meaning. The profile screen's own feed runs oldest-first deliberately |
+| **Conversations** — a ticket's thread, a process's comments, the assistant's chat | `TicketThread` / `Comments` / `AgentChat` | **not sortable**: reordering a conversation destroys it |
+| **Ordered things** — a process's steps and versions, an import plan's steps, the assistant's run steps and numbered flows, knowledge passages + citations, the ticket-stage bars | bespoke | **not sortable**: the sequence is the content. A process's step order IS the process; an import's table order is a dependency order; the stage bars are the lifecycle's order and never the tally's, so they stay readable week to week |
+| **The triage queue** | bespoke list | **not sortable**: it is a queue, ordered by who has waited longest, which is the only order that answers the question it exists for |
+| **~30 record panels** — a company's contacts and logins, a story's time, an app's sprints/maps/meetings/tickets, attachments, stakeholders, rate cards, certificates, tokens, Google sources | bespoke `<ul>` rows | **no control**, deliberately for now: each is a short, bounded list inside one record where a person is reading rather than comparing. The ones that PAGE (a story's work logs, an app's tickets and meetings, an account's stories and maps) would need the door treatment, and are named in UI-GAPS #23 rather than left silent |
+| **The whole client portal** — tickets, to-dos, sprints, contacts, the value screen's apps/maps/steps, attachments, the thread | all hand-composed; the portal has **no recipe engine** | **no control**, and only one of them wants it: the tickets list. Named in UI-GAPS #23 |
+
+### Which columns genuinely mis-sorted, and which only looked like it
+
+Measured rather than assumed, because the two are indistinguishable from a
+screenshot and the difference decides what to fix.
+
+- **Genuinely wrong, and silently**: the library compares a column as TEXT unless
+  both values are already numbers, so any column whose value is a *rendered* date
+  sorted alphabetically — April before January, and 2019 between 2018 and 2020
+  only by luck. Three columns did this: **Deadline** and **Closed** on Tasks, and
+  **When** on the diary's *All*. They now render through `formatDateSortable`
+  ("2026-04-14"), which is the same trade `formatActivityWhen` already made in
+  this app and for the same reason: the value being compared IS the value being
+  shown, so the one whose job is to be compared is the one that gives.
+- **Wrong, mildly**: **Department** on Tasks carries the department's own mark
+  before its name ("➤ Sales"), so ordering it groups by mark rather than
+  alphabetically. Left as it is — the mark is a deliberate design decision and
+  the fix needs a per-column sort key the library does not have (UI-GAPS #22).
+- **Correct, and correct by accident**: **Priority** renders as "1 · Whenever" …
+  "4 · Do it now", so the leading digit makes lexical order equal numeric order.
+  It works; it would stop working at ten levels.
+- **Correct all along**: every text column — Task, Who has it, App, Client,
+  Important, Urgent, and the diary's title/client/purpose/where/status/notes.
+- **Not broken at all, and this is the one to be careful about**: on the Tasks
+  *Overdue* tab, Priority reads "1 · Whenever" on every row, Department reads "—"
+  on every row and Who-has-it reads "Nobody yet" on every row. Sorting a column
+  whose every value is identical legitimately changes nothing. The Deadline
+  column in that same screenshot was in correct date order. A control that
+  appears to do nothing is not always a control that does nothing.
+
+The other half of the report — "there are many places where I have no way to sort
+a collection" — was simply true, and the table above is the answer: before this,
+the only sortable thing in either front door was a column header on two screens.
+
+## Status (updated 2026-08-18)
 
 - **Layer 1 + the library search/filter UI**: SHIPPED, the library search/filter
   bar landed and the app turned it on across the BOUNDED collections (members /
@@ -211,3 +306,9 @@ compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index
 - **The fourth layer (the knowledge base)**: BUILT 2026-08-11, retrieval rebuilt onto
   Vectorize 2026-08-12. Governed by Laws R23 and R26; owned by
   DATA-MODEL.md § *THE KNOWLEDGE BASE*.
+- **Sorting**: SHIPPED 2026-08-18 (§ *The third question*). Every PAGED collection
+  orders at its door; every bounded list recipe has a control derived from its own
+  columns; the two tables compare their dates as dates. What is deliberately still
+  unsorted, and why, is in the census above — and the two open pieces (a table
+  header that can ask the door, and the paged panels inside a record) are UI-GAPS
+  #22 and #23 rather than silence.

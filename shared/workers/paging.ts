@@ -31,53 +31,91 @@ export type Page<T> = {
 
 /** The position a cursor names: the last row's sort value + its id (the tiebreak
  * that makes the order total, so two rows sharing a timestamp can't hide each
- * other). */
-type Position = { k: string; id: string }
+ * other) — and, since sorting moved to the door, WHICH ORDER it was minted under.
+ *
+ * `s` is that ordering's signature (`<name>:<dir>`, from shared/workers/sorting).
+ * A position is only meaningful inside the order it was taken in: "everything
+ * after Bergman S.A." is a sentence about an alphabetical list and nonsense about
+ * a newest-first one. It is optional so a cursor minted before this existed —
+ * and every cursor on a door that offers no sorting — still decodes as the
+ * door's default order, which is exactly what it was. */
+type Position = { k: string; id: string; s: string }
 
 /** base64url so a cursor survives a query string untouched. */
 function b64url(s: string): string {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
 
-export function encodeCursor(sortValue: string | null, id: string): string {
-  return b64url(JSON.stringify({ k: sortValue ?? "", id }))
+export function encodeCursor(sortValue: string | null, id: string, sig = ""): string {
+  return b64url(JSON.stringify({ k: sortValue ?? "", id, s: sig }))
 }
 
 /** Decode a client-supplied cursor. Anything malformed is a clean 400, never a
  * 500 and never a silent "start from the top" (a cursor that quietly resets is
- * how a paged list repeats its first page forever). */
-export function decodeCursor(raw: string | null | undefined): Position | null {
+ * how a paged list repeats its first page forever).
+ *
+ * `expectSig` is the ordering the CURRENT request asked for. A cursor is a
+ * position inside ONE order, so handing a newest-first position to an
+ * alphabetical read does not produce a wrong page — it produces a page that
+ * looks right and skips an arbitrary slice of the collection, which is strictly
+ * worse. Mismatched is treated exactly like malformed, because to the person
+ * holding it, it is: the page link they have is no longer a link to a page.
+ * The client re-keys its cache on every sort change (paged-find.tsx) so nothing
+ * should ever reach this — which is the point of having it. */
+export function decodeCursor(raw: string | null | undefined, expectSig = ""): Position | null {
   if (!raw) return null
   try {
     const json = atob(raw.replace(/-/g, "+").replace(/_/g, "/"))
-    const v = JSON.parse(json) as Position
+    const v = JSON.parse(json) as Partial<Position>
     if (typeof v?.k !== "string" || typeof v?.id !== "string" || !v.id) throw new Error("shape")
-    return v
+    // Absent = minted before ordering existed, or by a door that offers none:
+    // that IS the default order, so it matches a request that asked for nothing.
+    const sig = typeof v.s === "string" ? v.s : ""
+    if (sig !== expectSig) throw new Error("ordering")
+    return { k: v.k, id: v.id, s: sig }
   } catch {
     throw new GuardError(400, "invalid_cursor", "That page link is no longer valid. Reload the list.")
   }
 }
 
-/** The keyset predicate for a `ORDER BY <sortExpr> DESC, id DESC` read: every row
- * strictly after the cursor's position. Returns a fragment to AND into the WHERE
- * plus its params — parameterised, never interpolated. */
-export function keysetAfter(pos: Position | null, sortExpr: string): { sql: string; params: string[] } {
+/** The keyset predicate for a `ORDER BY <sortExpr> <dir>, id <dir>` read: every
+ * row strictly after the cursor's position. Returns a fragment to AND into the
+ * WHERE plus its params — parameterised, never interpolated.
+ *
+ * BOTH COMPARISONS FLIP TOGETHER. Walking a descending list means "smaller than
+ * the last one"; walking an ascending one means "larger". The id tiebreak flips
+ * with the key because `orderBy` sorts them the same way — a predicate that
+ * disagreed with the ORDER BY on either half would hide rows at page
+ * boundaries rather than fail, which is the kind of wrong that ships. */
+export function keysetAfter(
+  pos: Position | null,
+  sortExpr: string,
+  dir: "asc" | "desc" = "desc",
+  idExpr = "id"
+): { sql: string; params: string[] } {
   if (!pos) return { sql: "", params: [] }
+  const cmp = dir === "asc" ? ">" : "<"
   return {
-    sql: `(${sortExpr} < ? OR (${sortExpr} = ? AND id < ?))`,
+    sql: `(${sortExpr} ${cmp} ? OR (${sortExpr} = ? AND ${idExpr} ${cmp} ?))`,
     params: [pos.k, pos.k, pos.id],
   }
 }
 
 /** Turn a LIMIT+1 read into a page: the extra row is how we know there's more
- * without a second query. `key` names each row's (sort value, id). */
-export function toPage<T>(rows: T[], limit: number, key: (row: T) => [string | null, string]): Page<T> {
+ * without a second query. `key` names each row's (sort value, id); `sig` stamps
+ * the minted cursor with the ordering it is a position inside. */
+export function toPage<T>(
+  rows: T[],
+  limit: number,
+  key: (row: T) => [string | null, string],
+  sig = ""
+): Page<T> {
   const hasMore = rows.length > limit
   const page = hasMore ? rows.slice(0, limit) : rows
   const last = page[page.length - 1]
   return {
     rows: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeCursor(...key(last)) : null,
+    nextCursor: hasMore && last ? encodeCursor(...key(last), sig) : null,
   }
 }

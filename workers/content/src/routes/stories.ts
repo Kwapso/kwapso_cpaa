@@ -18,6 +18,7 @@
 // one: a fence implies a client can reach these rows through it.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { resolveOrdering } from "@shared/workers/sorting"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
@@ -33,6 +34,7 @@ import {
   listStories,
   setSprintComplete,
   setStoryStatus,
+  STORY_SORTS,
   updateSprint,
   updateStory,
   type StoryFilter,
@@ -73,10 +75,11 @@ async function storyPage(
   cfg: Parameters<typeof listStories>[0],
   guard: Parameters<typeof listStories>[1],
   filter: StoryFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering?: Parameters<typeof listStories>[4]
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
-    listStories(cfg, guard, filter, cursor),
+    listStories(cfg, guard, filter, cursor, ordering),
     countStories(cfg, guard, filter),
   ])
   return pagedJson("stories", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
@@ -101,7 +104,20 @@ export async function getStories(request: Request, env: Env): Promise<Response> 
       { mineTotal: counts.mineTotal }
     )
   }
-  return storyPage(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+  // WHAT ORDER — asked of the door, because the backlog PAGES (R14) and the
+  // 3,677 rows arriving from the previous system are all behind the cursor.
+  return storyPage(
+    cfg,
+    guard,
+    filter,
+    queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+    resolveOrdering(
+      STORY_SORTS,
+      "rank",
+      queryText(url.searchParams.get("sort"), "Sort"),
+      queryText(url.searchParams.get("dir"), "Direction")
+    )
+  )
 }
 
 /** POST /api/content/stories — write one piece of work down (work:create). */

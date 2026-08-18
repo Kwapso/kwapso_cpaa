@@ -145,7 +145,14 @@ function logQuery(filter: LogQuery | undefined, cursor: string | null | undefine
   return s ? `?${s}` : ""
 }
 
-function storyQuery(filter: StoryQuery | undefined, cursor: string | null | undefined): string {
+function storyQuery(
+  filter: StoryQuery | undefined,
+  cursor: string | null | undefined,
+  // The ORDER is not a filter and does not travel in one: a filter says which
+  // rows, this says in what sequence. Kept apart so a caller cannot narrow by
+  // accident while meaning to sort.
+  order?: { sort?: string; dir?: string }
+): string {
   const q = new URLSearchParams()
   if (filter?.status) q.set("status", filter.status)
   if (filter?.ticketId) q.set("ticketId", filter.ticketId)
@@ -154,6 +161,8 @@ function storyQuery(filter: StoryQuery | undefined, cursor: string | null | unde
   if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
   if (filter?.view) q.set("view", filter.view)
   if (filter?.q) q.set("q", filter.q)
+  if (order?.sort) q.set("sort", order.sort)
+  if (order?.dir) q.set("dir", order.dir)
   if (cursor) q.set("cursor", cursor)
   const s = q.toString()
   return s ? `?${s}` : ""
@@ -183,7 +192,12 @@ export const content = {
     /** ONE SYSTEM'S tickets — the app record's Tickets tab (CHECKLIST 8.6). The
      * door narrows and counts the same narrowed question, so the tab badge and
      * the rows under it are one answer (R16). */
-    appId?: string
+    appId?: string,
+    /** WHAT ORDER — a name out of the door's own TICKET_SORTS, with `dir`
+     * flipping it. ONE trailing object rather than two more positional
+     * parameters on a function that already takes eight: the door's default is
+     * the drag-rank, so omitting this is the order the list has always had. */
+    order?: { sort?: string; dir?: string }
   ) =>
     api<
       PagedResponse<{
@@ -197,7 +211,9 @@ export const content = {
         accountId ? `&accountId=${enc(accountId)}` : ""
       }${appId ? `&appId=${enc(appId)}` : ""}${helpType ? `&helpType=${enc(helpType)}` : ""}${
         status ? `&status=${enc(status)}` : ""
-      }${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+      }${order?.sort ? `&sort=${enc(order.sort)}` : ""}${order?.dir ? `&dir=${enc(order.dir)}` : ""}${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+      }`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
@@ -275,9 +291,9 @@ export const content = {
   /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to
    * get the next one. `total`/`mineTotal` are the exact server counts, taken
    * over the SAME filter the page came from. */
-  stories: (opts: { filter?: StoryQuery; cursor?: string | null } = {}) =>
+  stories: (opts: { filter?: StoryQuery; order?: { sort?: string; dir?: string }; cursor?: string | null } = {}) =>
     api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(
-      `/api/content/stories${storyQuery(opts.filter, opts.cursor)}`
+      `/api/content/stories${storyQuery(opts.filter, opts.cursor, opts.order)}`
     ),
   storyOne: (id: string) =>
     api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
@@ -617,12 +633,18 @@ export const content = {
     /** ONE SYSTEM'S diary, for the app record's own Meetings tab. Asked of the
      * SERVER rather than filtered in the browser: the diary pages, so "this
      * app's meetings among the newest fifty" is an answer that looks like one. */
-    appId?: string
+    appId?: string,
+    /** WHAT ORDER — a name out of the door's own MEETING_SORTS, with `dir`
+     * flipping it. One trailing object, as on `help` above and for the same
+     * reason. Omit it for the diary's own order, most recent first. */
+    order?: { sort?: string; dir?: string }
   ) =>
     api<PagedResponse<{ meetings: Meeting[]; weekTotal: number }>>(
       `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
         accountId ? `&accountId=${enc(accountId)}` : ""
-      }${appId ? `&appId=${enc(appId)}` : ""}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      }${appId ? `&appId=${enc(appId)}` : ""}${order?.sort ? `&sort=${enc(order.sort)}` : ""}${
+        order?.dir ? `&dir=${enc(order.dir)}` : ""
+      }${cursor ? `&cursor=${enc(cursor)}` : ""}`
     ),
   /** BRING THE CALENDAR AND THE DIARY INTO STEP, BOTH WAYS (9.7, and the owner's
    * "it should also update consistently if it's a past event").

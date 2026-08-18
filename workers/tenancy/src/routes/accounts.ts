@@ -22,7 +22,9 @@ import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "@shared/workers/image"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
+import { resolveOrdering } from "@shared/workers/sorting"
 import {
+  ACCOUNT_SORTS,
   createAccount,
   getAccount,
   getAccountRow,
@@ -154,6 +156,17 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
   const url = new URL(request.url)
   const page = await listAccounts(cfg, guard, scope, await contactSight(cfg, guard, scope), {
     ...accountQuery(url),
+    // WHAT ORDER — asked of the door because the list PAGES (R14). Sorting the
+    // loaded page sorts fifty of however many there are and calls it sorted,
+    // which is the same lie the search box told before it moved here. The names
+    // are validated at the boundary and looked up in a menu declared in our own
+    // source (ACCOUNT_SORTS) — no request text reaches a statement.
+    ordering: resolveOrdering(
+      ACCOUNT_SORTS,
+      "created",
+      queryText(url.searchParams.get("sort"), "Sort"),
+      queryText(url.searchParams.get("dir"), "Direction")
+    ),
     // Capped like every other query parameter — an opaque cursor is ~70 chars, so a
     // megabyte of it is a bad request, not an atob + JSON.parse of a megabyte.
     cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,

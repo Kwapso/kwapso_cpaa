@@ -110,6 +110,7 @@ import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@sha
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
@@ -490,6 +491,24 @@ function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: s
 /** The sort a source list is keyed by: newest first, id breaking ties. */
 const SOURCE_ORDER = "COALESCE(updated_at, created_at)"
 
+/** WHAT THE KNOWLEDGE LIST MAY BE ORDERED BY (shared/workers/sorting.ts).
+ * `touched` is the fallback — the order this list has always been in — and the
+ * others are the three questions an agency asks of its own history: what is it
+ * called, what kind of thing is it, and what is it FROM (which is not when it was
+ * filed: a contract signed in March indexed in August is March's).
+ *
+ * The keys read the CONVERTED source rather than the raw row, because that is
+ * what `toPage` is handed here — the menu pairs its SQL with the field that
+ * mirrors it, and the field has to be one that exists at the point the cursor is
+ * minted. */
+export const KNOWLEDGE_SORTS: SortMenu<KnowledgeSource> = {
+  touched: { expr: SOURCE_ORDER, dir: "desc", key: (s) => s.updatedAt ?? s.createdAt },
+  added: { expr: "created_at", dir: "desc", key: (s) => s.createdAt },
+  title: { expr: "title", dir: "asc", key: (s) => s.title },
+  kind: { expr: "kind", dir: "asc", key: (s) => s.kind },
+  dated: { expr: "COALESCE(record_date, created_at)", dir: "desc", key: (s) => s.recordDate ?? s.createdAt },
+}
+
 /** What a caller may narrow a source list to: the search box, and the two words
  * a source is filed under. */
 export type SourceFilters = { kind?: string; compartment?: string; q?: string }
@@ -533,12 +552,14 @@ export async function listSources(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: SourceFilters,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<KnowledgeSource> = resolveOrdering(KNOWLEDGE_SORTS, "touched", undefined, undefined)
 ): Promise<Page<KnowledgeSource>> {
   const narrowed = sourcesWhere(guard, filter)
   const where = [...narrowed.sql]
   const params: (string | number)[] = [...narrowed.params]
-  const after = keysetAfter(decodeCursor(cursor), SOURCE_ORDER)
+  // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
+  const after = keysetAfter(decodeCursor(cursor, ordering.sig), ordering.expr, ordering.dir)
   if (after.sql) {
     where.push(after.sql)
     params.push(...after.params)
@@ -548,10 +569,10 @@ export async function listSources(
     guard.databaseId,
     `SELECT ${LIST_COLS} FROM knowledge_sources
       WHERE ${where.join(" AND ")}
-      ORDER BY ${SOURCE_ORDER} DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
+      ${orderBy(ordering)} LIMIT ${PAGE_SIZE + 1}`,
     params
   )
-  return toPage(rows.map(toSource), PAGE_SIZE, (s) => [s.updatedAt ?? s.createdAt, s.id])
+  return toPage(rows.map(toSource), PAGE_SIZE, (s) => [ordering.key(s), s.id], ordering.sig)
 }
 
 /** R16: the exact server COUNT(*) for the badge — never rows.length. Carries the

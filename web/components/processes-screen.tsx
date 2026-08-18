@@ -27,6 +27,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/people"
@@ -157,6 +158,8 @@ export function ProcessesScreen({
         listKey={processesKey(teamId)}
         placeholder={t("Search processes…")}
         noun="maps"
+        sorts={translatedSorts("processes", t)}
+        defaultSort={COLLECTION_SORTS.processes.defaultSort}
         fetchPage={(query, cursor) =>
           tenancy
             .processes({ ...query, cursor })

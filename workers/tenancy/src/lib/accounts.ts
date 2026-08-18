@@ -25,6 +25,7 @@ import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
@@ -195,6 +196,29 @@ export type AccountFilters = {
  * book, but a name already on a record in front of you is still a name. */
 export type ContactSight = { mayListPeople: boolean }
 
+/** WHAT THE ACCOUNTS LIST MAY BE ORDERED BY, and nothing else — the caller sends
+ * one of these NAMES and the SQL beside it is ours (shared/workers/sorting.ts).
+ *
+ * Five columns, and the set is the answer to a question worth asking out loud:
+ * why not every column? Because an ordering is a filter's cousin (R18/R21). It
+ * cannot show a row the fence excluded — the WHERE is untouched — but it CAN make
+ * a value inferable from a position, and this door is on the portal gateway's
+ * surface. Every name here is something the row itself already carries to
+ * whoever can read it: the company's name, its reference, its address, the
+ * team's own word for where it stands, and when it was added. Nothing about
+ * money and nothing about anybody else's account.
+ *
+ * `created` is the fallback because it is the order the list has always been in
+ * (newest first), so a screen that asks for no ordering gets exactly what it
+ * used to get. */
+export const ACCOUNT_SORTS: SortMenu<AccountRow> = {
+  name: { expr: "name", dir: "asc", key: (r) => r.name },
+  created: { expr: "created_at", dir: "desc", key: (r) => r.created_at },
+  updated: { expr: "COALESCE(updated_at, created_at)", dir: "desc", key: (r) => r.updated_at ?? r.created_at },
+  status: { expr: "status", dir: "asc", key: (r) => r.status },
+  code: { expr: "code", dir: "asc", key: (r) => r.code },
+}
+
 function accountsWhere(
   scope: AccountScope,
   opts: AccountFilters,
@@ -244,10 +268,16 @@ export async function listAccounts(
   guard: MemberGuard,
   scope: AccountScope,
   sight: ContactSight,
-  opts: AccountFilters & { cursor?: string | null } = {}
+  opts: AccountFilters & { cursor?: string | null; ordering?: Ordering<AccountRow> } = {}
 ): Promise<Page<Account> & { total: number; entityTotal: number; individualTotal: number }> {
   const { sql: base, params } = accountsWhere(scope, opts, sight)
-  const after = keysetAfter(decodeCursor(opts.cursor), "created_at")
+  // THE ORDER, AND THE THREE PLACES THAT MUST AGREE ON IT. The ORDER BY, the
+  // "everything after this row" predicate and the value the next cursor is
+  // minted from all come off one `Ordering`, so a sort cannot be applied to the
+  // rows and forgotten by the cursor — which is how page two starts somewhere
+  // page one did not stop.
+  const ordering = opts.ordering ?? resolveOrdering(ACCOUNT_SORTS, "created", undefined, undefined)
+  const after = keysetAfter(decodeCursor(opts.cursor, ordering.sig), ordering.expr, ordering.dir)
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
   // THE TWO TAB BADGES, and they are a different question from `total` on
   // purpose. `total` counts what was ASKED FOR (this search, this status, this
@@ -266,7 +296,7 @@ export async function listAccounts(
       cfg,
       guard.databaseId,
       `SELECT ${ACCOUNT_COLUMNS} FROM accounts${pageWhere}
-        ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
+        ${orderBy(ordering)} LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
     // R16 (amended): the total of what THIS caller may see — the same WHERE, so a
@@ -281,7 +311,7 @@ export async function listAccounts(
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${people.sql}`, people.params),
   ])
 
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return {
     ...page,
     rows: page.rows.map((r) => toAccount(r, scope)),
