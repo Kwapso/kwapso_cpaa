@@ -141,30 +141,38 @@ export type RecordAudit = {
  * pushed the record's actual content below the fold.
  *
  * It renders nothing when a record knows neither fact, which is true of rows
- * imported before the audit columns existed. */
+ * imported before the audit columns existed.
+ *
+ * A PERSON AND A TIME ARE JOINED BY THE MIDDOT, NEVER BY A PREPOSITION.
+ * "Created by Alaap K on 5d ago" is not a sentence in English: `on` takes an
+ * absolute date ("on 12 August") and a relative phrase attaches bare. The value
+ * here is `formatRelative`, which is RELATIVE for the first week and an absolute
+ * date after it — so the same line was right on Tuesday and broken on Monday,
+ * which is precisely where this class of bug is born. `·` is already what record
+ * chrome uses to join two facts (the eyebrow, the status line, every attachment
+ * meta line), and it is correct in front of either kind of value.
+ *
+ * ONE ENTRY PER LINE, WITH HOLES IN IT (R28), rather than the three fragments
+ * this used to concatenate. A translator cannot reorder `t("Created by") + name`,
+ * and several of the languages this app speaks need to: the catalogue's own
+ * Japanese for "Created by" is 作成者, a NOUN, which wants the name in front of
+ * it. The old shape also leaked English — `t("on")` was two lowercase letters,
+ * which the extractor refuses as a non-sentence (`isUserVisible`), so it was in
+ * no catalogue and every reader in every language got the English word. */
 export function RecordFooter({ audit }: { audit: RecordAudit }) {
   const t = useT()
   const created = audit.createdAt ? formatRelative(audit.createdAt) : null
   const edited = audit.updatedAt ? formatRelative(audit.updatedAt) : null
   const lines: string[] = []
-  if (audit.createdByName || created) {
-    lines.push(
-      audit.createdByName && created
-        ? `${t("Created by")} ${audit.createdByName} ${t("on")} ${created}`
-        : audit.createdByName
-          ? `${t("Created by")} ${audit.createdByName}`
-          : `${t("Created")} ${created}`
-    )
-  }
-  if (audit.editedByName || edited) {
-    lines.push(
-      audit.editedByName && edited
-        ? `${t("Last edited by")} ${audit.editedByName} ${t("on")} ${edited}`
-        : audit.editedByName
-          ? `${t("Last edited by")} ${audit.editedByName}`
-          : `${t("Last edited")} ${edited}`
-    )
-  }
+  if (audit.createdByName && created)
+    lines.push(t("Created by {name} · {when}", { name: audit.createdByName, when: created }))
+  else if (audit.createdByName) lines.push(t("Created by {name}", { name: audit.createdByName }))
+  else if (created) lines.push(t("Created {when}", { when: created }))
+  if (audit.editedByName && edited)
+    lines.push(t("Last edited by {name} · {when}", { name: audit.editedByName, when: edited }))
+  else if (audit.editedByName)
+    lines.push(t("Last edited by {name}", { name: audit.editedByName }))
+  else if (edited) lines.push(t("Last edited {when}", { when: edited }))
   if (lines.length === 0) return null
   return (
     <footer className="bg-muted text-muted-foreground mt-8 flex flex-wrap gap-x-6 gap-y-1 rounded-xl px-4 py-3 text-xs">
