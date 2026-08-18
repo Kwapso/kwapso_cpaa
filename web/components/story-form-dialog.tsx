@@ -35,18 +35,13 @@ import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/d
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Label } from "@kwapso/ui/registry/primitives/label/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
+import { pickerKey, searchTickets } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -118,6 +113,7 @@ const assigneeField = { ...defaultFieldConfig, label: "Who's doing it", required
 export function StoryFormDialog({
   open,
   onOpenChange,
+  teamId,
   sprints,
   apps,
   fixedApp,
@@ -133,6 +129,9 @@ export function StoryFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** The team whose tickets the request picker searches — tickets PAGE (R14), so
+   * that one question goes to the door rather than to the loaded page. */
+  teamId: string | null
   /** Every sprint the caller could pick, each tagged with which app it is on and
    * its mark. Narrowed to the CHOSEN app here rather than by the caller, so the
    * list updates as the person changes their mind about the app. */
@@ -231,28 +230,32 @@ export function StoryFormDialog({
     }
   }
 
-  /** One picker, four times over — app, sprint, request, person. Each may be left
-   * empty, which the door reads as "not set" rather than "cleared to nothing". */
+  /** One picker, three times over — app, sprint, person. Each may be left empty,
+   * which the door reads as "not set" rather than "cleared to nothing".
+   *
+   * All three are BOUNDED lists the screen already holds (a team's systems, the
+   * sprints that are open, the staff on this app), so their search runs in the
+   * browser and costs nothing. The REQUEST picker below is the odd one out: it
+   * reads tickets, which page, so it asks the door instead. */
   const picker = (
     id: string,
     value: string,
     placeholder: string,
+    searchPlaceholder: string,
     options: { id: string; label: string }[],
     set: (v: string) => void
   ) => (
-    <Select value={value || NONE} onValueChange={(v) => set(v === NONE ? "" : v)} disabled={busy}>
-      <SelectTrigger id={id}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>{placeholder}</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o.id} value={o.id}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <RecordPicker
+      id={id}
+      value={value || NONE}
+      onChange={(v) => set(v === NONE ? "" : v)}
+      options={options.map((o) => ({ value: o.id, label: o.label }))}
+      emptyOption={{ value: NONE, label: placeholder }}
+      placeholder={placeholder}
+      searchPlaceholder={searchPlaceholder}
+      emptyText={t("Nothing matched.")}
+      disabled={busy}
+    />
   )
 
   return (
@@ -286,6 +289,7 @@ export function StoryFormDialog({
             "story-app",
             values.appId,
             "No app yet",
+            t("Search apps…"),
             apps.map((a) => ({ id: a.id, label: a.name })),
             (v) => setValues((s) => ({ ...s, appId: v }))
           )
@@ -302,22 +306,16 @@ export function StoryFormDialog({
         />
       </Field>
       <Field config={typeField} htmlFor="story-type" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="story-type"
           value={values.storyType || NONE}
-          onValueChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
+          onChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
+          options={storyTypes.map((v) => ({ value: v, label: v }))}
+          placeholder={t("Pick one")}
+          searchPlaceholder={t("Search kinds…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="story-type">
-            <SelectValue placeholder={t("Pick one")} />
-          </SelectTrigger>
-          <SelectContent>
-            {storyTypes.map((v) => (
-              <SelectItem key={v} value={v}>
-                {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={detailField} htmlFor="story-detail" className={fieldSpacing}>
         <Notes
@@ -333,6 +331,7 @@ export function StoryFormDialog({
           "story-sprint",
           values.sprintId,
           "No sprint yet",
+          t("Search sprints…"),
           // THE MARK RIDES THE LABEL (CHECKLIST 6.3). A person picking a sprint is
           // choosing between "the one running now" and "the one starting in
           // October", and the two are otherwise two names.
@@ -346,9 +345,23 @@ export function StoryFormDialog({
             {fixedTicket.label}
           </p>
         ) : (
-          picker("story-ticket", values.ticketId, "No ticket", ticketOptions, (v) =>
-            setValues((s) => ({ ...s, ticketId: v }))
-          )
+          /* TICKETS PAGE (R14), so this one asks the DOOR — narrowed to the
+             same app the rest of the form is narrowed to, which is what the
+             in-memory `onThisApp` was doing over a loaded page. `ticketOptions`
+             stays as the list painted before anything is typed. */
+          <RecordPicker
+            id="story-ticket"
+            value={values.ticketId || NONE}
+            onChange={(v) => setValues((s) => ({ ...s, ticketId: v === NONE ? "" : v }))}
+            search={(term) => searchTickets(term, { appId: appId || undefined })}
+            searchKey={pickerKey(`tickets:${appId || "any"}`, teamId)}
+            options={ticketOptions.map((o) => ({ value: o.id, label: o.label }))}
+            emptyOption={{ value: NONE, label: t("No ticket") }}
+            placeholder={t("No ticket")}
+            searchPlaceholder={t("Search tickets…")}
+            emptyText={t("No ticket matched.")}
+            disabled={busy}
+          />
         )}
       </Field>
       {/* CHECKLIST 6.5. The tick is the explicit "no process" Aurora asked for:
@@ -397,6 +410,7 @@ export function StoryFormDialog({
           "story-assignee",
           values.assigneeId,
           "Nobody yet",
+          t("Search people…"),
           assignable.map((m) => ({ id: m.id, label: m.name })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}

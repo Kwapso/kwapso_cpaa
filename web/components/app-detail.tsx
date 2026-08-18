@@ -523,6 +523,7 @@ export function AppDetailScreen({
         }}
       />
       <StoryFormDialog
+        teamId={teamId}
         open={storyOpen}
         onOpenChange={setStoryOpen}
         sprints={options.sprints}

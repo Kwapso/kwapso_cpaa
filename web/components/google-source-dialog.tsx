@@ -48,13 +48,6 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Check, Plus, Search } from "lucide-react"
@@ -62,6 +55,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
 import { ApiFailure, content } from "@/lib/api"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 // EVERY URL THAT REACHES AN ATTRIBUTE GOES THROUGH THE SEAM, including these.
 // Google's own icon host and our own thumbnail path are both perfectly safe
@@ -143,6 +138,7 @@ export function GoogleSourceDialog({
   onOpenChange,
   service,
   draftKey,
+  teamId,
   accountOptions,
   onSubmit,
 }: {
@@ -152,6 +148,9 @@ export function GoogleSourceDialog({
   draftKey?: string
   /** the clients this person may file it under — already fenced by their own
    * read of the accounts door. */
+  /** the team whose clients the picker searches — accounts PAGE (R14). */
+  teamId: string | null
+  /** the clients the screen already holds, painted while the door answers. */
   accountOptions: { id: string; name: string }[]
   onSubmit: (values: GoogleSourceValues) => Promise<void>
 }) {
@@ -427,23 +426,19 @@ export function GoogleSourceDialog({
 
       {/* WHOSE MATERIAL, asked rather than guessed — see the note at the top. */}
       <Field config={filedField} htmlFor="google-source-client" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="google-source-client"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: AGENCY, label: t("Ours, not a client's") }}
+          placeholder={t("Ours, not a client's")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="google-source-client">
-            <SelectValue placeholder={t("Ours, not a client's")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={AGENCY}>{t("Ours, not a client's")}</SelectItem>
-            {accountOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <p className="text-muted-foreground mt-1.5 text-xs">
           {t("Questions about that client are answered from what is in here. Leave it as ours if the")} {noun} {t("is not about one.")}
         </p>

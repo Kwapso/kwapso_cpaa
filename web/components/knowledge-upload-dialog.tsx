@@ -27,6 +27,8 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import {
@@ -65,6 +67,7 @@ export function KnowledgeUploadDialog({
   open,
   onOpenChange,
   onSubmit,
+  teamId,
   accountOptions,
   appOptions,
   draftKey,
@@ -81,6 +84,8 @@ export function KnowledgeUploadDialog({
     visibleToAppId: string
   }) => Promise<void>
   /** the accounts this caller may file under — already fenced by their own read */
+  /** the team whose clients the compartment picker searches (accounts PAGE, R14) */
+  teamId: string | null
   accountOptions: { id: string; name: string }[]
   /** the apps this caller may OPEN (8.11) — the only ones the door will accept
    * as a visibility limit, so the only ones worth offering (12.3) */
@@ -240,23 +245,19 @@ export function KnowledgeUploadDialog({
         />
       </Field>
       <Field config={filedField} htmlFor="knowledge-file-filed" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="knowledge-file-filed"
           value={values.accountId}
-          onValueChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+          onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: AGENCY, label: t("The agency's own") }}
+          placeholder={t("The agency's own")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="knowledge-file-filed">
-            <SelectValue placeholder={t("The agency's own")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={AGENCY}>{t("The agency's own")}</SelectItem>
-            {accountOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <p className="text-muted-foreground mt-1 text-xs">
           {t("Filing it under a client is how a question about them finds it first.")}
         </p>
@@ -287,22 +288,16 @@ export function KnowledgeUploadDialog({
       </Field>
       {values.visibility === "app" && (
         <Field config={appField} htmlFor="knowledge-file-app" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="knowledge-file-app"
             value={values.visibleToAppId}
-            onValueChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
+            onChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
+            options={appOptions.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder={t("Pick the app")}
+            searchPlaceholder={t("Search apps…")}
+            emptyText={t("No app matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="knowledge-file-app">
-              <SelectValue placeholder={t("Pick the app")} />
-            </SelectTrigger>
-            <SelectContent>
-              {appOptions.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
           <p className="text-muted-foreground mt-1 text-xs">
             {t("The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.")}
           </p>

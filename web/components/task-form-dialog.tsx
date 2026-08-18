@@ -28,13 +28,6 @@ import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/d
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Label } from "@kwapso/ui/registry/primitives/label/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Plus } from "lucide-react"
@@ -43,6 +36,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { FilePicker } from "@/components/file-picker"
 import { ApiFailure } from "@/lib/api"
 import { PRIORITY_LABEL, departmentAsks, departmentGlyph, priorityScore } from "@shared/departments"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -87,6 +82,7 @@ export function TaskFormDialog({
   open,
   onOpenChange,
   draftKey,
+  teamId,
   members,
   apps,
   accounts,
@@ -97,6 +93,8 @@ export function TaskFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   draftKey?: string
+  /** the team whose clients the client picker searches — accounts PAGE (R14) */
+  teamId: string | null
   members: { id: string; name: string }[]
   apps: { id: string; name: string }[]
   accounts: { id: string; name: string }[]
@@ -164,28 +162,30 @@ export function TaskFormDialog({
     }
   }
 
-  /** One picker, four times over — person, department, app, client. Each may be
-   * left empty, which the door reads as "not set" rather than "cleared". */
+  /** One picker, three times over — person, department, app. Each may be left
+   * empty, which the door reads as "not set" rather than "cleared". All three are
+   * BOUNDED lists the screen already holds, so the search runs in the browser.
+   * The CLIENT picker below is the odd one out: accounts page, so it asks the
+   * door. */
   const picker = (
     id: string,
     value: string,
     placeholder: string,
+    searchPlaceholder: string,
     options: { id: string; label: string }[],
     set: (v: string) => void
   ) => (
-    <Select value={value || NONE} onValueChange={(v) => set(v === NONE ? "" : v)} disabled={busy}>
-      <SelectTrigger id={id}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>{placeholder}</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o.id} value={o.id}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <RecordPicker
+      id={id}
+      value={value || NONE}
+      onChange={(v) => set(v === NONE ? "" : v)}
+      options={options.map((o) => ({ value: o.id, label: o.label }))}
+      emptyOption={{ value: NONE, label: placeholder }}
+      placeholder={placeholder}
+      searchPlaceholder={searchPlaceholder}
+      emptyText={t("Nothing matched.")}
+      disabled={busy}
+    />
   )
 
   return (
@@ -226,6 +226,7 @@ export function TaskFormDialog({
           "task-assignee",
           values.assigneeId,
           "Nobody yet",
+          t("Search people…"),
           members.map((m) => ({ id: m.id, label: m.name })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}
@@ -235,6 +236,7 @@ export function TaskFormDialog({
           "task-department",
           values.department,
           "No department",
+          t("Search departments…"),
           departments.map((d) => ({ id: d, label: `${departmentGlyph(d)} ${d}`.trim() })),
           (v) => setValues((s) => ({ ...s, department: v, appId: "", accountId: "" }))
         )}
@@ -251,6 +253,7 @@ export function TaskFormDialog({
             "task-app",
             values.appId,
             "Which app is it on?",
+            t("Search apps…"),
             apps.map((a) => ({ id: a.id, label: a.name })),
             (v) => setValues((s) => ({ ...s, appId: v }))
           )}
@@ -267,13 +270,21 @@ export function TaskFormDialog({
           htmlFor="task-account"
           className={fieldSpacing}
         >
-          {picker(
-            "task-account",
-            values.accountId,
-            "Which client is it for?",
-            accounts.map((a) => ({ id: a.id, label: a.name })),
-            (v) => setValues((s) => ({ ...s, accountId: v }))
-          )}
+          {/* ACCOUNTS PAGE (R14), so this one asks the door. `accounts` is the
+              screen's own page one, painted before anything is typed. */}
+          <RecordPicker
+            id="task-account"
+            value={values.accountId || NONE}
+            onChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
+            search={(term) => searchAccounts(term)}
+            searchKey={pickerKey("accounts", teamId)}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            emptyOption={{ value: NONE, label: t("Which client is it for?") }}
+            placeholder={t("Which client is it for?")}
+            searchPlaceholder={t("Search clients…")}
+            emptyText={t("No client matched.")}
+            disabled={busy}
+          />
         </Field>
       )}
       <Field config={dueField} htmlFor="task-due" className={fieldSpacing}>

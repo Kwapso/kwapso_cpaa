@@ -536,6 +536,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         open={editing}
         onOpenChange={setEditing}
         draftKey={`meeting:edit:${meetingId}`}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}

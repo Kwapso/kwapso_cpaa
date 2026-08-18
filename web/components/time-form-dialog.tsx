@@ -23,28 +23,20 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { helpKey, listFetch, storiesKey } from "@/lib/live-resources"
+import { pickerKey, searchWorkTargets } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useCached } from "@shared/web/store"
-import type { HelpTicket, Story, WorkLog } from "@shared/types"
+import type { WorkLog } from "@shared/types"
 import { useT } from "@shared/web/language"
-import { richTextPlain } from "@shared/web/rich-text"
 
 export type TimeFormValues = {
   targetTable: string
@@ -89,14 +81,6 @@ export function TimeFormDialog({
   const t = useT()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
-  // A correction needs neither list: what it is against cannot move, so the two
-  // pickers would be two requests to fill a control nobody can use.
-  const storiesQ = useCached<Story[]>(teamId && !isEdit ? storiesKey(teamId) : null, () =>
-    listFetch.stories(teamId as string)
-  )
-  const ticketsQ = useCached<HelpTicket[]>(teamId && !isEdit ? helpKey(teamId, "all") : null, () =>
-    listFetch.help(teamId as string)
-  )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
@@ -111,23 +95,6 @@ export function TimeFormDialog({
   )
   const [busy, setBusy] = React.useState(false)
   const ready = values.target !== "" && values.startedAt !== "" && values.endedAt !== ""
-
-  // Both loggable kinds in ONE picker, each carrying its table — because the
-  // question a person is answering is "what were you working on", not "which
-  // table does the thing you were working on live in".
-  const options = [
-    ...(storiesQ.data ?? [])
-      .filter((s) => s.status !== "done")
-      .map((s) => ({ value: `stories:${s.id}`, label: s.ref ? `${s.ref} · ${s.title}` : s.title })),
-    ...(ticketsQ.data ?? [])
-      .filter((t) => t.status !== "resolved")
-      .map((t) => ({
-        value: `help:${t.id}`,
-        label: t.ref
-          ? `${t.ref} · ${richTextPlain(t.description).slice(0, 60)}`
-          : richTextPlain(t.description).slice(0, 60),
-      })),
-  ]
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -188,22 +155,21 @@ export function TimeFormDialog({
             {initial?.targetLabel ?? "—"}
           </p>
         ) : (
-          <Select
+          // BOTH HALVES PAGE (R14), so both are asked of their own door. This
+          // used to read the two list caches, which hold page one each — so an
+          // agency past its newest fifty stories could not log time against the
+          // fifty-first, and the control gave no sign of it.
+          <RecordPicker
+            id="time-target"
             value={values.target}
-            onValueChange={(v) => setValues((s) => ({ ...s, target: v }))}
+            onChange={(v) => setValues((s) => ({ ...s, target: v }))}
+            search={(term) => searchWorkTargets(term, { story: t("Story"), ticket: t("Ticket") })}
+            searchKey={pickerKey("work", teamId)}
+            placeholder={t("Pick a story or a ticket")}
+            searchPlaceholder={t("Search work…")}
+            emptyText={t("Nothing matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="time-target">
-              <SelectValue placeholder={t("Pick a story or a ticket")} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         )}
       </Field>
       <Field config={startField} htmlFor="time-start" className={fieldSpacing}>

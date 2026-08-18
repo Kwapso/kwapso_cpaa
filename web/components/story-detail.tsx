@@ -466,6 +466,7 @@ export function StoryDetailScreen({
       />
 
       <StoryFormDialog
+        teamId={teamId}
         open={editOpen}
         onOpenChange={setEditOpen}
         sprints={options.sprints}

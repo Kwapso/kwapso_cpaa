@@ -375,6 +375,7 @@ export function KnowledgeDetailScreen({
         open={editingOpen}
         onOpenChange={setEditingOpen}
         draftKey={`knowledge:edit:${sourceId}`}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
         // Only the apps this caller may OPEN (8.11) — the door refuses any other,
         // so offering one would be offering a refusal.
