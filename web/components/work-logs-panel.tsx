@@ -340,7 +340,7 @@ export function WorkLogsPanel({
           {rows.map((l) => (
             <li
               key={l.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
                 l.discarded ? "opacity-60" : ""
               }`}
             >

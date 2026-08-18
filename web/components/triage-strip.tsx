@@ -54,7 +54,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
   // Nothing waiting AND somebody named is the quiet, ordinary state — one short
   // line, no colour, no call to action.
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm">
       <span className="flex items-center gap-1.5">
         <UserCheck className="size-3.5 shrink-0" />
         {t.onDuty?.userName ? (

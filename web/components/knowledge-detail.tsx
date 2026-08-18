@@ -287,7 +287,7 @@ export function KnowledgeDetailScreen({
                     href={safeHref(item.fileUrl)}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="bg-card flex w-fit max-w-full items-center gap-2 rounded-lg border p-2 text-sm"
+                    className="bg-card flex w-fit max-w-full items-center gap-2 rounded-xl border p-2 text-sm"
                   >
                     <Paperclip className="text-muted-foreground size-4 shrink-0" />
                     <span className="min-w-0 truncate">{item.fileName ?? "Open the file"}</span>

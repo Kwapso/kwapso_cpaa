@@ -47,7 +47,7 @@ export type PanelActions = {
 function Row({ active, children }: { active: boolean; children: React.ReactNode }) {
   return (
     <li
-      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
         active ? "" : "opacity-60"
       }`}
     >

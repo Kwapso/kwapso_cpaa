@@ -118,7 +118,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
           zero or merely incomplete: a partial figure that does not say what it
           left out reads as the whole answer, which is the same bug quieter. */}
       {(roleless.length > 0 || unpricedRoles.length > 0) && (
-        <div className="border-border/60 bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
+        <div className="border-border/60 bg-muted/40 flex flex-col gap-3 rounded-xl border p-4">
           <p className="text-sm font-medium">
             {view.moneyCentsPerMonth === 0
               ? t("There is no money figure yet, and here is what it is waiting on.")
@@ -176,7 +176,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
         {states.map(({ line, state }) => (
           <li
             key={line.processId}
-            className="border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+            className="border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2"
           >
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{line.name}</span>
             <span className="text-muted-foreground truncate text-xs">

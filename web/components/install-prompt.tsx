@@ -109,7 +109,7 @@ export function InstallPrompt() {
 
   return (
     <Sheet open={open} onOpenChange={(o) => (o ? setOpen(true) : dismiss())}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
+      <SheetContent side="bottom" className="rounded-t-xl">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4">
           <SheetHeader className="flex-row items-center gap-3 space-y-0">
             <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">

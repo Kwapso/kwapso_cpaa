@@ -79,7 +79,7 @@ const BAND_HEIGHT = 170
  * own height, so nothing on the page moves when the chunk lands. */
 const chartModule = () => import("@/components/pulse-charts")
 const chartLoading = () => (
-  <Skeleton className="w-full rounded-lg" style={{ height: BAND_HEIGHT }} />
+  <Skeleton className="w-full rounded-xl" style={{ height: BAND_HEIGHT }} />
 )
 
 const StageChart = dynamic(() => chartModule().then((m) => m.StageChart), {
@@ -141,7 +141,7 @@ export function BandCard({ title, children }: { title: string; children: React.R
 export function NothingYet({ what, how }: { what: string; how: string }) {
   return (
     <div
-      className="text-muted-foreground flex flex-col items-start justify-center gap-1 rounded-lg border border-dashed p-4 text-sm"
+      className="text-muted-foreground flex flex-col items-start justify-center gap-1 rounded-xl border border-dashed p-4 text-sm"
       style={{ minHeight: BAND_HEIGHT }}
     >
       <ChartNoAxesColumn aria-hidden className="mb-1 size-5 opacity-60" />

@@ -44,7 +44,7 @@ function Row({
   onClick?: () => void
   children: React.ReactNode
 }) {
-  const className = `border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+  const className = `border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
     active ? "" : "opacity-60"
   } ${onClick ? "hover:bg-muted/40 cursor-pointer text-left" : ""}`
   return (

@@ -62,7 +62,7 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-medium tracking-tight">{team.name}</h1>

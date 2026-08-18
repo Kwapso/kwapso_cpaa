@@ -148,7 +148,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   return (
     <div className="flex flex-col gap-4">
       {busyNote && (
-        <div className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-lg border p-3 text-sm">
+        <div className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-xl border p-3 text-sm">
           <Sparkles className="size-4 animate-pulse" aria-hidden /> {busyNote}
         </div>
       )}
@@ -199,7 +199,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           {files.length > 0 && (
             <div className="flex flex-col gap-2">
               {files.map((f) => (
-                <div key={f.fileId} className="flex items-center gap-2 rounded-lg border p-2.5 text-sm">
+                <div key={f.fileId} className="flex items-center gap-2 rounded-xl border p-2.5 text-sm">
                   <FileSpreadsheet className="text-muted-foreground size-4 shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
                   <span className="text-muted-foreground shrink-0 text-xs">{f.rowCount} {t("rows")}</span>
@@ -237,7 +237,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           </div>
 
           {batch.plan.warnings.map((w, i) => (
-            <p key={i} className="text-destructive bg-destructive/10 rounded-lg p-2.5 text-xs">
+            <p key={i} className="text-destructive bg-destructive/10 rounded-xl p-2.5 text-xs">
               {w}
             </p>
           ))}
@@ -306,8 +306,8 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               })()}
 
               {step.predictedRejects > 0 && (
-                <div className="bg-amber-500/10 flex flex-col gap-1 rounded-lg p-2.5">
-                  <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                <div className="bg-warning/10 flex flex-col gap-1 rounded-xl p-2.5">
+                  <p className="text-xs font-medium text-warning">
                     {step.predictedRejects} of {step.rowCount} {t("row(s) will be skipped")}
                     {step.notes ? `, ${step.notes}` : ""}
                   </p>
@@ -350,7 +350,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           </div>
 
           {report.perTarget.map((t) => (
-            <div key={t.target} className="flex items-center gap-2 rounded-lg border p-2.5 text-sm">
+            <div key={t.target} className="flex items-center gap-2 rounded-xl border p-2.5 text-sm">
               <span className="flex-1 font-medium">{t.targetName}</span>
               <span className="text-muted-foreground text-xs">
                 {t.created} added · {t.skipped} skipped · {t.failed} failed
@@ -371,7 +371,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                   <Download className="size-3.5" aria-hidden /> {t("Download to fix")}
                 </Button>
               </div>
-              <div className="max-h-48 overflow-auto rounded-lg border">
+              <div className="max-h-48 overflow-auto rounded-xl border">
                 {report.rejections.slice(0, 50).map((r, i) => (
                   <div key={i} className="flex gap-2 border-b p-2 text-xs last:border-0">
                     <span className="text-muted-foreground w-24 shrink-0 truncate">
@@ -411,7 +411,7 @@ function PastImports({ teamId }: { teamId: string }) {
       <p className="text-sm font-medium">{t("Past imports")}</p>
       <div className="flex flex-col gap-1.5">
         {batches.map((b) => (
-          <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border p-2.5 text-xs">
+          <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border p-2.5 text-xs">
             <span className="font-medium">{b.by}</span>
             <span className="text-muted-foreground">{formatActivityWhen(b.at)}</span>
             <span className="text-muted-foreground min-w-0 flex-1 truncate">
@@ -420,9 +420,9 @@ function PastImports({ teamId }: { teamId: string }) {
             </span>
             {b.status === "complete" ? (
               <span className="shrink-0">
-                <span className="text-emerald-600 dark:text-emerald-500">{b.created} {t("added")}</span>
+                <span className="text-success">{b.created} {t("added")}</span>
                 {b.skipped + b.failed > 0 && (
-                  <span className="text-amber-600 dark:text-amber-500"> · {b.skipped + b.failed} {t("skipped")}</span>
+                  <span className="text-warning"> · {b.skipped + b.failed} {t("skipped")}</span>
                 )}
               </span>
             ) : (
@@ -479,9 +479,9 @@ function PlanSummary({
 function Stat({ label, value, tone }: { label: string; value: number; tone: "good" | "warn" | "bad" | "muted" }) {
   const color =
     tone === "good"
-      ? "text-emerald-600 dark:text-emerald-500"
+      ? "text-success"
       : tone === "warn"
-        ? "text-amber-600 dark:text-amber-500"
+        ? "text-warning"
         : tone === "bad"
           ? "text-destructive"
           : "text-muted-foreground"

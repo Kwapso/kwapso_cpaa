@@ -51,7 +51,7 @@
 //     paragraph about a problem.
 // The library is a separate repo and is never edited from here, so the thread is
 // assembled from the primitives it does ship (Card, Badge, Textarea, Button) and
-// the bubbles reuse Chat's OWN token vocabulary — same rounded-2xl, same
+// the bubbles reuse Chat's OWN token vocabulary — same corner radius, same
 // bg-primary / bg-muted pair — so the day the library ships a Bubble the swap is
 // mechanical rather than a redesign. The ask is written up in the report.
 
@@ -114,7 +114,7 @@ export function sideFor(authorId: string | null, meId: string): string {
  * these tokens for its me/them pair. Same radius, same surfaces, so the portal
  * and the library don't drift into two chat languages while we wait for a
  * primitive that can do both sides AND a name. */
-const BUBBLE = "max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words"
+const BUBBLE = "max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words"
 const OWN_BUBBLE = `${BUBBLE} bg-primary text-primary-foreground`
 const OTHER_BUBBLE = `${BUBBLE} bg-muted text-foreground`
 

@@ -204,7 +204,7 @@ export function SelectableScreen({
                 {g.items.map((v) => (
                   <li
                     key={v.id}
-                    className={`border-border/60 flex items-center gap-2 rounded-lg border px-3 py-1.5 ${
+                    className={`border-border/60 flex items-center gap-2 rounded-xl border px-3 py-1.5 ${
                       v.active ? "" : "opacity-60"
                     }`}
                   >

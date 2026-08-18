@@ -75,7 +75,7 @@ import { useT } from "@shared/web/language"
  * below it does not jump when the chunk lands. */
 const AppSavingsChart = dynamic(
   () => import("@/components/value-chart").then((m) => m.AppSavingsChart),
-  { ssr: false, loading: () => <Skeleton className="h-[190px] w-full rounded-lg" /> }
+  { ssr: false, loading: () => <Skeleton className="h-[190px] w-full rounded-xl" /> }
 )
 
 /** One step, and the whole sum behind it. This line is the answer to the third

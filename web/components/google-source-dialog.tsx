@@ -391,7 +391,7 @@ export function GoogleSourceDialog({
                   })
                 }
                 disabled={busy}
-                className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-lg px-2 py-1 text-xs"
+                className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-xl px-2 py-1 text-xs"
                 title={t("Take it off the list")}
               >
                 <span className="max-w-[16rem] truncate">{i.name}</span>

@@ -170,7 +170,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         {switching ? (
           <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
             <span className="sr-only">{t("Switching company…")}</span>
-            <Skeleton className="h-8 w-56 rounded-lg" />
+            <Skeleton className="h-8 w-56 rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
           </div>

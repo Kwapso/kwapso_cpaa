@@ -51,7 +51,7 @@ export const STORY_STATUS_LABEL: Record<Story["status"], string> = {
 function Row({ live, children }: { live: boolean; children: React.ReactNode }) {
   return (
     <li
-      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
         live ? "" : "opacity-60"
       }`}
     >

@@ -662,7 +662,7 @@ export function AccountDetailScreen({
                         comes with the hours: a figure a client cannot account
                         for is worse than no figure at all. */}
                     {moneyBack && (
-                      <div className="rounded-lg border p-4">
+                      <div className="rounded-xl border p-4">
                         <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
                         <p className="text-2xl font-semibold tracking-tight tabular-nums">{moneyBack}</p>
                         <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>

@@ -260,18 +260,15 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
  * an entry whose file no longer sets a width fails the build, so a screen that
  * gets fixed cannot leave its pin behind.
  *
- * The six `max-w-2xl` / `max-w-3xl` screens are pinned as a RATCHET, not as an
- * approval — they are the work list in `.session-notes/ui-rearrangement-plan.md`
- * (item W1), and every one of these lines is deleted by the commit that widens
- * its screen. What the pin buys today is that a SEVENTH cannot be added. */
+ * The ratchet CLOSED on 18 Aug 2026. Six screens were pinned here as a work list
+ * rather than as an approval (plan W1); the boot loader deleted `app-shell.tsx`'s
+ * pin when it rewrote the skeleton, and the rearrangement lane deleted the other
+ * five by widening Home, Settings, Profile, Invitations and Kwapso to the shell's
+ * own container. What survives is one entry that is not a page at all, which is
+ * what this list was always meant to hold. */
 export const SCREEN_WIDTH_EXEMPT: Record<string, string> = {
   "web/components/install-prompt.tsx":
     "not a page. It is the install nudge's Sheet content, which is centred and full-width INSIDE the sheet, and a sheet is an overlay with its own measure.",
-  "web/components/screens/home-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
-  "web/components/screens/settings-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
-  "web/components/screens/profile-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
-  "web/components/screens/invitations-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
-  "web/components/screens/kwapso-screen.tsx": "PENDING (plan W1). max-w-3xl, 69% span.",
 }
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,

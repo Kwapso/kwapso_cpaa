@@ -161,7 +161,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {rates.map((r) => (
             <li
               key={r.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
                 r.active ? "" : "opacity-60"
               }`}
             >
@@ -373,7 +373,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
           {rates.map((r) => (
             <li
               key={r.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
                 r.active ? "" : "opacity-60"
               }`}
             >

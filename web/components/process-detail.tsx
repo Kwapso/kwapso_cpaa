@@ -407,7 +407,7 @@ export function ProcessDetailScreen({
                     it qualifies. `whitespace-pre-line` keeps the blank line the
                     caveat is written after. */}
                 {process.description && (
-                  <div className="bg-muted/40 rounded-lg border p-4">
+                  <div className="bg-muted/40 rounded-xl border p-4">
                     <RichText html={process.description} />
                   </div>
                 )}
@@ -457,7 +457,7 @@ export function ProcessDetailScreen({
                     server refuses the write regardless — this is the sentence,
                     not the lock. */}
                 {!isCurrent && (
-                  <p className="text-muted-foreground bg-muted/40 rounded-lg border p-3 text-xs">
+                  <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-xs">
                     This is how the work was described when{" "}
                     {shownVersion ? versionLabel(shownVersion).toLowerCase() : "this version"} was
                     cut{shownVersion ? ` on ${new Date(shownVersion.createdAt).toLocaleDateString()}` : ""}.
@@ -484,7 +484,7 @@ export function ProcessDetailScreen({
                       : "This version has no steps recorded."}
                   </p>
                 ) : (
-                  <div className="rounded-lg border">
+                  <div className="rounded-xl border">
                     {shownSteps.map((step, i) => (
                       <div
                         key={step.id}
@@ -589,7 +589,7 @@ export function ProcessDetailScreen({
                     there is, and a comparison that showed only surviving steps
                     would leave it out. */}
                 {saving && saving.steps.length > 0 && (
-                  <div className="rounded-lg border p-4">
+                  <div className="rounded-xl border p-4">
                     <p className="text-muted-foreground text-sm">
                       Time given back, every month, {baseline ? versionLabel(baseline) : "the baseline"}{" "}
                       minus {current ? versionLabel(current) : "today"}
@@ -620,7 +620,7 @@ export function ProcessDetailScreen({
                   the times they were agreed at, version 1 is how the work was done before us, and
                   every saving is measured from it.
                 </p>
-                <div className="rounded-lg border">
+                <div className="rounded-xl border">
                   {versions.map((v) => (
                     <div
                       key={v.id}

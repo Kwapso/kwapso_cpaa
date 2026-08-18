@@ -142,7 +142,7 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
 function TableBlock({ block }: { block: Extract<AgentBlock, { kind: "table" }> }) {
   return (
     <BlockFrame title={block.title}>
-      <div className="rounded-lg border">
+      <div className="rounded-xl border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -245,7 +245,7 @@ function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) 
           const jumps = block.edges.filter((e) => e.from === node.id && e !== onward)
           return (
             <div key={node.id} className="flex min-w-0 flex-col">
-              <div className="rounded-md border px-3 py-2">
+              <div className="rounded-xl border px-3 py-2">
                 <div className="text-sm text-foreground">{node.label}</div>
                 {node.note && <div className="text-xs text-muted-foreground">{node.note}</div>}
               </div>

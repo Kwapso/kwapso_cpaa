@@ -327,7 +327,7 @@ export function RecordCalendar({
                 <div
                   key={key}
                   className={[
-                    "flex min-h-20 flex-col gap-1 rounded-lg border p-1.5 transition-colors hover:border-[#a8a59f] hover:bg-accent",
+                    "flex min-h-20 flex-col gap-1 rounded-xl border p-1.5 transition-colors hover:border-[#a8a59f] hover:bg-accent",
                     d.getMonth() === month.getMonth() ? "" : "opacity-40",
                     // kwapso: mango never as a border — today's square is a solid
                     // mango-soft fill, exactly as the library's calendar had it.

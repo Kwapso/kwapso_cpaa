@@ -86,7 +86,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
   if (!ctx) return null
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
+    <div className="flex w-full flex-col gap-10">
       {/* Invitations sit at the top: an invitation is something waiting for you,
           and a thing waiting for you should not be below the housekeeping. It
           disappears when there is none, which is nearly always. */}

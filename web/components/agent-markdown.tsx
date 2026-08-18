@@ -38,7 +38,7 @@ export function AgentMarkdown({ text }: { text: string }) {
           return (
             <pre
               key={i}
-              className="my-2 overflow-x-auto rounded-lg border bg-muted p-3 text-xs whitespace-pre-wrap text-muted-foreground"
+              className="my-2 overflow-x-auto rounded-xl border bg-muted p-3 text-xs whitespace-pre-wrap text-muted-foreground"
             >
               {seg.text}
             </pre>

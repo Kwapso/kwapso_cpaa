@@ -120,7 +120,7 @@ export function KnowledgeAsk({
   }
 
   return (
-    <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+    <div className="bg-card flex flex-col gap-3 rounded-xl border p-4">
       <form onSubmit={(e) => void ask(e)} className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={question}
