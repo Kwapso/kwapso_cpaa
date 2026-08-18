@@ -372,3 +372,24 @@ Nobody asked for these. They are the faults the work walked into.
 | 25.1 | The Kwapso logo loop becomes the loader when the app boots | **BUILDING**, ported out of the 1 MB export into dependency-free SVG that paints before the app loads. The file you sent is not being shipped |
 | 25.2 | A new account is always a company, with no type dropdown on create or edit | **BUILDING**. Edit already had none |
 | 25.3 | A contact created under an account is always a person | **BUILDING**, and it needs a new capability: today "Add contact" only links somebody who already exists |
+
+## 26 · The knowledge base, after you tested it on two real accounts
+
+| # | The thing | Status |
+|---|---|---|
+| 26.1 | Anything with a client's id on it is searchable from that client's record | **BUILDING**, and it was not. Six kinds were indexed. Processes and their steps — which IS the scope — were never in there at all, nor tasks, work logs, to-dos, contacts or the rate card |
+| 26.2 | The material is rich enough to answer with | **BUILDING**, and this is the real fault behind both your screenshots. The whole indexed text of an account was its name, "is a company we work with", its reference and its status. The search worked perfectly and returned the only thing it had |
+| 26.3 | Every passage links to the record it came from | **BUILDING** |
+| 26.4 | Drive, Gmail, Chat, Calendar and transcripts are searched too | **DONE** for the four Google kinds; transcripts ride the meeting record |
+| 26.5 | A written answer, not a list of sources | **BUILDING**, on the cheapest model, one call per ask. It spends the allowance, which the screen used to say it did not |
+| 26.6 | Charts, flows and diagrams appear when they help, with no toggle | **BUILDING**, extending the four block kinds the assistant already draws rather than a second vocabulary |
+| 26.7 | The client portal gets none of this yet | **CHANGED**, your decision. It has no knowledge surface at all today, and none is being added — the fence is being built as if a client could reach it tomorrow, so switching it on later is a decision rather than a rebuild |
+| 26.8 | A re-index after the text changes | **TO DO**, existing rows carry a content hash and would be skipped as unchanged. One command after deploy |
+
+## 27 · Tabs
+
+| # | The thing | Status |
+|---|---|---|
+| 27.1 | A record's tab badges appear on arrival, not after you click the tab | **BUILDING**, you reported it. The badge reads a number out of the cache and never fetches it, so only the tab you clicked could have one. Contacts was the exception because its total rides the record's own read |
+| 27.2 | An empty tab and an uncounted tab stop looking the same | **BUILDING**, they render identically today, which is why a blank badge read as "nothing in there" |
+| 27.3 | The rows still load only when you open the tab | **BUILDING**, unchanged. Counts eagerly, rows lazily, exactly as you put it |
