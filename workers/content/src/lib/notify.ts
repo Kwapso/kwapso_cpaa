@@ -13,6 +13,7 @@ import { brand } from "@shared/brand"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
+import { audienceOf, clientUserIds, frontDoorOrigin, recordLink } from "@shared/workers/record-link"
 import type { Env } from "../env"
 
 /** Look up email + display name for tagged ids — restricted to ACTIVE members of
@@ -45,22 +46,12 @@ async function lookupUsers(
   return out
 }
 
-/** Which of these people are CLIENT logins (a `portal_users` row, TEAM DB)?
- *
- * Same fail-closed reading as the guard corridor: portal-ness is decided by the
- * PRESENCE of a row, never by its absence, so a revoked login is still a client
- * and never silently becomes staff for the purpose of who may be named to them. */
-async function portalUserIds(cfg: D1Rest, guard: MemberGuard, ids: string[]): Promise<Set<string>> {
-  const unique = [...new Set(ids)].filter(Boolean)
-  if (!unique.length) return new Set()
-  const rows = await d1Query<{ user_id: string }>(
-    cfg,
-    guard.databaseId,
-    `SELECT user_id FROM portal_users WHERE user_id IN (${unique.map(() => "?").join(", ")})`,
-    unique
-  )
-  return new Set(rows.map((r) => r.user_id))
-}
+// WHICH OF THESE PEOPLE ARE CLIENT LOGINS is now ONE function for the whole
+// fleet — `clientUserIds` in shared/workers/record-link.ts. It was written here
+// first, to decide who a staff member may be NAMED to; it turned out to be the
+// same question as which front door to link somebody at, and a security read that
+// exists twice is a security read that holds until somebody writes the second
+// copy from memory (the argument shared/workers/front-door.ts already makes).
 
 /** How many sends run at once, and how many one call will run at all.
  *
@@ -151,7 +142,7 @@ export async function notifyReplyAndMentions(
     // CLIENT recipient only — staff still see each other's names, and a client's
     // own colleague is still named to them (calling a colleague "kwapso" would be
     // a lie about who is talking, not anonymity).
-    const clients = await portalUserIds(cfg, guard, [author.id, ...recipients])
+    const clients = await clientUserIds(cfg, guard.databaseId, [author.id, ...recipients])
     const authorIsClient = clients.has(author.id)
     const preview = snippet(body)
 
@@ -170,11 +161,34 @@ export async function notifyReplyAndMentions(
         const intro = isMention
           ? `${who} mentioned you in a support ticket reply on ${name} (${brand.name}): "${preview}"`
           : `${who} replied to your support ticket on ${name} (${brand.name}): "${preview}"`
+        // THE WAY BACK TO THE TICKET, at the recipient's OWN front door. One
+        // reply notice goes to staff and to clients in the same send, and the
+        // same ticket has two addresses — so the audience is decided per person,
+        // off the read above, and never once for the whole send.
+        const audience = audienceOf(clients, id)
+        const link = recordLink(env, audience, {
+          kind: "ticket",
+          teamId,
+          id: ticket.id,
+        })
         await send(env, u.email, subject, {
           heading,
           intro,
-          footnote: "Open the ticket to read the full conversation and reply.",
-        }).catch((e) => console.error("help reply notice failed:", e))
+          ctaLabel: link?.label,
+          ctaUrl: link?.url,
+          // THE LINE THAT USED TO INSTRUCT AN IMPOSSIBLE ACTION. It read "Open
+          // the ticket to read the full conversation and reply" in an email that
+          // contained no link of any kind — the copy told a person to do
+          // something the message made impossible, which is worse than saying
+          // nothing. It is a statement of fact now, true with the button and
+          // true without it, and the instruction is the button.
+          footnote: "Everything that's been said is on the ticket.",
+        },
+        // The LOGO is resolved against the same front door, so a client's copy of
+        // this email names the agency's hostname nowhere at all — not in a link,
+        // and not in an image source either.
+        frontDoorOrigin(env, audience)
+        ).catch((e) => console.error("help reply notice failed:", e))
       })
     )
   } catch (e) {
@@ -376,6 +390,16 @@ export async function notifyTodoRaised(
     const people = await accountInboxes(env, cfg, guard, todo.account_id)
     if (!people.length) return
     const name = await teamName(env, guard.teamId)
+    // EVERY RECIPIENT IS A CLIENT, by construction — accountInboxes reads
+    // `portal_users`, so there is no staff address in this list and no per-person
+    // audience question to ask. The portal has no to-do detail screen and one is
+    // not invented here: the item sits on the portal home, above their own
+    // requests ("Waiting on you"), which is where this lands them.
+    const link = recordLink(env, "portal", {
+      kind: "todo",
+      teamId: guard.teamId,
+      accountId: todo.account_id,
+    })
     // NO STAFF NAME ANYWHERE IN IT. SCOPE ch.06 — the portal never says which
     // staff member is doing the work — and an email is a surface that leaves the
     // building, which is exactly where that promise is easiest to drop.
@@ -383,8 +407,10 @@ export async function notifyTodoRaised(
       send(env, p.email, `${brand.name}: we need something from you`, {
         heading: "One thing from you",
         intro: `${todo.title}${todo.due_on ? `, by ${todo.due_on.slice(0, 10)}` : ""}.`,
-        footnote: `Open ${todo.ref ? `${todo.ref} ` : ""}in your ${name} portal to mark it done, and send the file with it if there is one.`,
-      }).catch((e) => console.error("to-do notice failed:", e))
+        ctaLabel: link?.label,
+        ctaUrl: link?.url,
+        footnote: `${todo.ref ? `${todo.ref}. ` : ""}Mark it done in your ${name} portal, and send the file with it if there is one.`,
+      }, frontDoorOrigin(env, "portal")).catch((e) => console.error("to-do notice failed:", e))
     )
   } catch (e) {
     console.error("to-do notify failed:", e)
@@ -454,12 +480,21 @@ export async function sendTriageDigest(
       lines.push(
         `No time was logged last week by: ${digest.missingTime.join(", ")}.`
       )
+    // STAFF, AND ONLY STAFF — the caller has already subtracted every client
+    // login from `to` (see morningDigest), so this is an agency link by the same
+    // reasoning that makes the digest internal in the first place.
+    const link = recordLink(env, "agency", { kind: "ticketList", teamId })
     await sendToMany("triage digest", to, (p) =>
       send(env, p.email, `${team}: this morning`, {
           heading: digest.onDutyName ? `${digest.onDutyName} is on triage this week` : "Nobody is on triage this week",
           intro: lines.join(" "),
+          ctaLabel: link?.label,
+          ctaUrl: link?.url,
+          // The button says "open Tickets", so the footnote no longer repeats it.
+          // What is left is the one thing a button cannot do: ask somebody to fix
+          // the reason this mail is addressed to everybody.
           footnote: digest.onDutyName
-            ? "Open Tickets to read them."
+            ? undefined
           : "Put somebody on triage duty in Tickets, a backlog with no owner is the one nobody clears.",
       }).catch((e) => console.error("triage digest failed:", e))
     )
@@ -509,6 +544,12 @@ export async function notifyTicketResolved(
     if (!people.length) return
     const name = await teamName(env, guard.teamId)
     const asked = snippet(ticket.description)
+    // A CLIENT LINK, ALWAYS — resolutionInboxes reads `portal_users`, so every
+    // address here belongs to somebody who reads us through the portal. The
+    // ticket id it carries is the ticket this email is already about, and the
+    // recipients were derived from that ticket's own account, so the URL says
+    // nothing the body does not (R21).
+    const link = recordLink(env, "portal", { kind: "ticket", id: ticketId })
     await sendToMany("resolution notice", people, (p) =>
       send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref}, ` : ""}answered`, {
         heading: "We've come back to you",
@@ -516,8 +557,10 @@ export async function notifyTicketResolved(
         // a resolution arriving with no reminder of the question is a paragraph
         // people have to go and look something up to understand.
         intro: `You asked: "${asked}"\n\n${resolution}`,
-        footnote: "Open the ticket if you want to reply, the whole conversation is there.",
-      }).catch((e) => console.error("resolution notice failed:", e))
+        ctaLabel: link?.label,
+        ctaUrl: link?.url,
+        footnote: "The whole conversation is on the ticket, if you want to reply.",
+      }, frontDoorOrigin(env, "portal")).catch((e) => console.error("resolution notice failed:", e))
     )
   } catch (e) {
     console.error("resolution notify failed:", e)

@@ -13,7 +13,7 @@ engine lane has not landed it yet, build your side and say so.
 
 ## 0 · The rules
 
-- `CLAUDE.md` holds the Laws of the Base, **R1–R28**, machine-checked.
+- `CLAUDE.md` holds the Laws of the Base, **R1–R29**, machine-checked.
 - **`npm run check` must exit 0**, captured unpiped: `npm run check > /tmp/x.log 2>&1; echo $?`. A piped run reports the pipe's status and has read green over a failing build in this repo.
 - **Every test proven to bite**: break the thing, watch it go RED, restore, quote the red output. Watch the specific trap this codebase keeps hitting: `expect(indexOf(x)).toBeLessThan(indexOf(y))` passes LOUDEST when `x` is absent, because `indexOf` returns −1. Assert presence first — `workers/tenancy/test/grant-ceiling.test.ts` has the helper that does it right.
 - **`@kwapso/ui` is a separate repo.** Never edit it from here.

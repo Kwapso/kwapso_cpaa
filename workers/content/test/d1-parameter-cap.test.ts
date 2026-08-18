@@ -141,6 +141,13 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       "tenancy/src/routes/accounts.ts: batch":
         "the same: a slice of idBatches, bounded by the cap it exists to respect",
+      // The third one, and the one that proves the suite earns its keep: the
+      // "who here is a client login" read (R29's front-door decision) started
+      // life bound over its whole list, which was fine for a ticket's fifty
+      // mentions and five times D1's ceiling for the morning digest's five
+      // hundred team members. This suite caught it before it shipped.
+      "shared/workers/record-link.ts: batch":
+        "a slice of idBatches again — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       // PROVEN, and by the caller's own ceiling rather than by a claim: the size
       // alarm reads the growth trend for the databases that crossed 80% TONIGHT,
       // and `checkDatabaseSizes` stops writing alarms at CRON_ALERT_CAP (50). The
