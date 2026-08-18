@@ -14,7 +14,7 @@
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP, idBatches } from "@shared/workers/limits"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, type AccountScope } from "@shared/workers/account-scope"
@@ -68,8 +68,12 @@ function accountFields(body: Record<string, unknown>) {
     country: optionalText(body.country, "Country", TEXT_LIMITS.short),
     industry: optionalText(body.industry, "Industry", TEXT_LIMITS.short),
     about: optionalText(body.about, "About", TEXT_LIMITS.long),
-    logoUrl: optionalText(body.logoUrl, "Logo", TEXT_LIMITS.long),
-    coverUrl: optionalText(body.coverUrl, "Cover image", TEXT_LIMITS.long),
+    // THE TWO PICTURES ARE NOT PROSE, and the cap has to know it: a picked file
+    // arrives here as a data URL and the prose cap refused every one of them
+    // before the store seam below could turn it into an object
+    // (`imageFieldLimit` carries the whole argument).
+    logoUrl: optionalText(body.logoUrl, "Logo", imageFieldLimit(body.logoUrl)),
+    coverUrl: optionalText(body.coverUrl, "Cover image", imageFieldLimit(body.coverUrl)),
     code: optionalText(body.code, "Reference", TEXT_LIMITS.short),
     currency: optionalText(body.currency, "Currency", TEXT_LIMITS.short),
     locale: optionalText(body.locale, "Language", TEXT_LIMITS.short),

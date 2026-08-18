@@ -7,6 +7,7 @@
 // and throw a GuardError the worker already maps to a clean 400 — one validation seam.
 
 import { GuardError } from "./gating"
+import { MAX_IMAGE_BYTES } from "./image"
 
 // Sane per-kind caps — generous for prose, tight for short labels.
 export const TEXT_LIMITS = {
@@ -36,6 +37,36 @@ export const TEXT_LIMITS = {
  * contract this was sized for. Above it the upload is REFUSED, in words, saying
  * how big it was and what to do; nothing is ever silently trimmed. */
 export const DOCUMENT_LIMIT_BYTES = 1_500_000
+
+/** THE CAP ON A PICTURE FIELD — in the units of whatever actually arrived,
+ * because two different things arrive through the same field.
+ *
+ * `logoUrl` (and `coverUrl`, and an app's mark) carries EITHER the file a person
+ * just picked, as a `data:` URL on its way to R2, OR the `/media/...` path the
+ * row already holds and the form handed straight back. One character cap cannot
+ * be right for both, and the one that was there — `TEXT_LIMITS.long`, the PROSE
+ * cap — was right for neither. 20,000 characters is about 14 KB of image, and
+ * the picker's own output is a 512px JPEG at 30–80 KB, so every real logo came
+ * back "Logo is too long (max 20000 characters)" and `storeImageDataUrl`, the
+ * seam that exists to turn those bytes into an object, was never reached. The
+ * comment at the call site said the byte cap downstream was the one that
+ * mattered. It was. It never got a turn: the prose cap sat 166× below it.
+ *
+ * So the cap follows the SHAPE. A data URL is measured against exactly what the
+ * store seam will take — `MAX_IMAGE_BYTES`, base64-expanded, DERIVED so the two
+ * cannot drift — which leaves the real refusal where it belongs, in bytes, off
+ * the encoded text, before anything decodes. Anything else is a path, and a path
+ * is a link.
+ *
+ * One generous cap for both would have been a line shorter and would have put a
+ * different hole in: `logo_url` is a COLUMN, read on every row of every list,
+ * and a value that is not a data URL passes through the store seam untouched and
+ * lands in it. Megabytes of "not a data URL" is the row-bloat-or-500 this whole
+ * file was written to stop. */
+export const imageFieldLimit = (value: unknown): number =>
+  typeof value === "string" && value.startsWith("data:")
+    ? Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 64 // base64 expansion + the `data:image/jpeg;base64,` header
+    : TEXT_LIMITS.link
 
 const NUL = String.fromCharCode(0)
 const stripNul = (s: string) => s.split(NUL).join("")

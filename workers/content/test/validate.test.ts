@@ -10,7 +10,8 @@ import { describe, expect, it } from "vitest"
 import { sourceFiles } from "@shared/rules/source-scan"
 import { GuardError } from "@shared/workers/gating"
 import { MENTIONS_LIMIT } from "@shared/workers/limits"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { dataUrlBytes, MAX_IMAGE_BYTES } from "@shared/workers/image"
+import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 const NUL = String.fromCharCode(0)
 
@@ -93,6 +94,52 @@ describe("queryText — the QUERY half of the same boundary", () => {
     expect(queryText("   ", "Id")).toBeUndefined()
     expect(queryText("  01H  ", "Id")).toBe("01H")
     expect(queryText(`a${NUL}b`, "Id")).toBe("ab")
+  })
+})
+
+// THE CAP ON A PICTURE FIELD. This is the one that shipped wrong: the account
+// and app logo doors capped a picked image with `TEXT_LIMITS.long`, the PROSE
+// cap, so a 512px JPEG — the exact thing the browser's picker produces — was
+// refused as "Logo is too long (max 20000 characters)" one line before the seam
+// that would have stored it. It survived a green build because the suite that
+// proves a logo becomes an object used a ONE-PIXEL PNG, which is 110 characters.
+// So the number is locked against the byte cap it must clear, in both
+// directions: big enough for a real photo, and NOT big enough to let megabytes
+// of something-that-is-not-an-image into a column read on every list row.
+describe("imageFieldLimit — a picture is measured as a picture, a path as a link", () => {
+  it("clears the store seam's own byte cap for a data URL, so the bytes decide", () => {
+    // A data URL carrying MAX_IMAGE_BYTES of image must fit under the character
+    // cap — otherwise the refusal happens here, in the wrong units, and
+    // `storeImageDataUrl` never sees the picture.
+    const biggest = `data:image/jpeg;base64,${"A".repeat(Math.ceil(MAX_IMAGE_BYTES / 3) * 4)}`
+    expect(dataUrlBytes(biggest)).toBeGreaterThanOrEqual(MAX_IMAGE_BYTES)
+    expect(biggest.length).toBeLessThanOrEqual(imageFieldLimit(biggest))
+    expect(optionalText(biggest, "Logo", imageFieldLimit(biggest))).toBe(biggest)
+  })
+
+  it("takes a real picked logo, the size the door actually refused", () => {
+    // ~60 KB of base64 — a downsized 512px JPEG, three times over the prose cap.
+    const picked = `data:image/jpeg;base64,${"A".repeat(60_000)}`
+    expect(picked.length, "the case that was failing must still be over the prose cap").toBeGreaterThan(
+      TEXT_LIMITS.long
+    )
+    expect(optionalText(picked, "Logo", imageFieldLimit(picked))).toBe(picked)
+  })
+
+  it("holds a stored path to the link cap — a column is not a place for megabytes", () => {
+    expect(imageFieldLimit("/media/T/accounts/01H?v=1")).toBe(TEXT_LIMITS.link)
+    // Anything that is not a data URL passes THROUGH the store seam untouched
+    // and lands in the column, so a single generous cap for both would have put
+    // the row-bloat back that this whole file exists to stop.
+    const huge = "x".repeat(TEXT_LIMITS.link + 1)
+    expect(thrown(() => optionalText(huge, "Logo", imageFieldLimit(huge)))?.status).toBe(400)
+  })
+
+  it("judges the value, never the field it arrived in (a non-string is still a 400)", () => {
+    for (const bad of [12345, ["a"], { x: 1 }, true]) {
+      expect(imageFieldLimit(bad)).toBe(TEXT_LIMITS.link)
+      expect(thrown(() => optionalText(bad, "Logo", imageFieldLimit(bad)))?.status).toBe(400)
+    }
   })
 })
 

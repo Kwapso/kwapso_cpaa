@@ -22,7 +22,7 @@
 // is the assumption two leaks in this codebase were built on.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -142,14 +142,17 @@ export async function postCreateApp(request: Request, env: Env): Promise<Respons
     accountId: optionalText(body.accountId, "Account", TEXT_LIMITS.short),
     url: optionalText(body.url, "Address", TEXT_LIMITS.link),
     stage: optionalText(body.stage, "Stage", TEXT_LIMITS.short),
-    // The picked file is a data URL here and an object in R2 by the time the
-    // row is written. `TEXT_LIMITS.long` because a downsized 512px JPEG is
-    // ~60 KB of base64 — the byte cap that actually matters is the store seam's
-    // (MAX_IMAGE_BYTES), measured off the encoded text before anything decodes.
+    // The picked file is a data URL here and an object in R2 by the time the row
+    // is written. The cap is `imageFieldLimit`'s, not the prose one: a downsized
+    // 512px JPEG is ~60 KB of base64 and `TEXT_LIMITS.long` is 20,000
+    // CHARACTERS, so the line that was here refused every real logo three lines
+    // above the seam that would have stored it. The byte cap that actually
+    // matters is still the store seam's (MAX_IMAGE_BYTES), measured off the
+    // encoded text before anything decodes — it just has to be reachable.
     logoUrl: await storeImageDataUrl(
       env.MEDIA,
       mediaKey(guard.teamId, "apps"),
-      optionalText(body.logoUrl, "Logo", TEXT_LIMITS.long),
+      optionalText(body.logoUrl, "Logo", imageFieldLimit(body.logoUrl)),
       REFUSE_IMAGE
     ),
     toolCostCentsPerMonth:
@@ -249,7 +252,7 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
         ? ((await storeImageDataUrl(
             env.MEDIA,
             mediaKey(guard.teamId, "apps"),
-            optionalText(body.logoUrl, "Logo", TEXT_LIMITS.long),
+            optionalText(body.logoUrl, "Logo", imageFieldLimit(body.logoUrl)),
             REFUSE_IMAGE
           )) ?? null)
         : undefined,
