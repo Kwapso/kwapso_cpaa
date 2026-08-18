@@ -27,6 +27,18 @@ export function formatDayMonth(iso?: string | null): string {
     : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
 
+/** "14:05" — the clock time alone, for a row whose DAY is already said.
+ *
+ * Its own formatter for the same reason `formatDayMonth` is: an agenda groups
+ * its rows under the day, so every row repeating "13 Jun 2026" is a fact nobody
+ * is reading four times down one screen — but the TIME is the whole reason a
+ * person opens the day at all. Still the reader's own locale, still one place. */
+export function formatTime(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { timeStyle: "short" })
+}
+
 /** "13 Jun 2026, 14:05" — for activity rows where the moment matters. */
 export function formatDateTime(iso?: string | null): string {
   if (!iso) return ""

@@ -39,8 +39,10 @@ const DATE_FIELDS = [
   "resolvedAt",
 ]
 
-/** The formatters that make a date readable — all from the one file. */
-const FORMATTED = /format(Date|DateTime|Relative|ActivityWhen)\s*\(/
+/** The formatters that make a date readable — all from the one file. `formatTime`
+ * is here because an AGENDA row says the clock time alone under a heading that
+ * already said the day; it is the same seam, so it satisfies the same rule. */
+const FORMATTED = /format(Date|DateTime|Time|Relative|ActivityWhen)\s*\(/
 
 const ROOTS = [
   join(__dirname, "..", "components"),
@@ -82,7 +84,7 @@ describe("no screen shows a raw timestamp", () => {
     const shared = sourceFiles(join(__dirname, "..", "..", "shared", "web"), { extensions: [".ts"] })
     const format = shared.find((f) => f.rel.endsWith("format.ts"))
     expect(format, "shared/web/format.ts has moved — this suite is scanning for the wrong name").toBeTruthy()
-    for (const fn of ["formatDate", "formatDateTime"])
+    for (const fn of ["formatDate", "formatDateTime", "formatTime"])
       expect(format!.source, `${fn} is gone from the shared formatter`).toContain(`export function ${fn}`)
   })
 })

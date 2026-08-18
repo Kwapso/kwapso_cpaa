@@ -25,10 +25,6 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { CalendarSync } from "lucide-react"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  CalendarView,
-  defaultCalendarViewConfig,
-} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   ScreenRenderer,
@@ -44,16 +40,17 @@ import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
+import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
-import { appsKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
+import { appsKey, cursorKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
 import { field, withDataDrivenCollection } from "@/lib/screens"
 import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
-import { formatDate } from "@shared/web/format"
+import { formatDate, formatTime } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
 /** THE WEEK WE ARE IN, Monday to Sunday, in UTC — the same boundary
@@ -67,6 +64,40 @@ function inThisWeek(startsAt: string): boolean {
   end.setUTCDate(end.getUTCDate() + 7)
   const at = Date.parse(startsAt)
   return at >= start.getTime() && at < end.getTime()
+}
+
+/** WHAT THE MONTH IN FRONT OF YOU DOES NOT SAY (R14).
+ *
+ * The diary PAGES, newest first, so the rows in hand run from the furthest-out
+ * meeting back to wherever the cursor stopped. A month grid drawn over that is
+ * honest about the months it has read and silently wrong about every month
+ * before them: an empty square in March reads as "we did not meet", when what it
+ * means is "nobody has read March yet". A calendar that quietly answers a
+ * question it has not asked is worse than one that refuses.
+ *
+ * So the calendar renders this under the grid exactly on the months that start
+ * before the oldest row loaded — and this renders NOTHING when the cursor says
+ * the whole diary is already in hand, because then an empty March really is an
+ * empty March. Its own component so the cursor can be read with a hook: the
+ * calendar sits inside PagedFind's render prop, where a hook cannot go. */
+function EarlierNotLoaded({
+  listKey,
+  fetchPage,
+}: {
+  listKey: string
+  fetchPage: (cursor: string) => Promise<{ rows: Meeting[]; nextCursor: string | null }>
+}) {
+  const t = useT()
+  const cursor = useCachedValue<string | null>(cursorKey(listKey))
+  if (!cursor) return null
+  return (
+    <>
+      <p className="text-muted-foreground text-sm">
+        {t("Earlier meetings haven't been loaded yet, so this month may not be the whole of it.")}
+      </p>
+      <LoadMore listKey={listKey} fetchPage={fetchPage} label={t("Load more meetings")} />
+    </>
+  )
 }
 
 /** WHAT "ALL" SHOWS (CHECKLIST 9.1: "all, with far more columns"). The two-field
@@ -260,6 +291,21 @@ export function MeetingsScreen({
           // boundary is the same one the door computes — Monday, in UTC.
           const shown = view === "week" ? rows.filter((m) => inThisWeek(m.startsAt)) : rows
           const data = shapeMeetingsList(shown)
+          // THE CALENDAR'S ROWS — the shaper's, so a meeting reads the same in
+          // the grid as it does in the list underneath (a cancelled one still
+          // says so). The one thing the shaper has no column for is the CLOCK
+          // TIME, which is the whole point of an agenda row, so it is looked up
+          // beside it rather than shaped a second way.
+          const startsAtById = new Map(shown.map((m) => [m.id, m.startsAt]))
+          const calendarEntries: CalendarEntry[] = (data.rows ?? []).map((r) => ({
+            id: String(r.id),
+            day: String(r.startsOn ?? ""),
+            title: String(r.name ?? ""),
+            accent: String(r.state ?? ""),
+            detail: [formatTime(startsAtById.get(String(r.id))), String(r.client ?? "")]
+              .filter(Boolean)
+              .join(" · "),
+          }))
           // ALL shows far more columns (9.1). The other two views stay the
           // two-line list a person scans, which is the rulebook's own rule about
           // a table being for scanning and a list for reading.
@@ -275,20 +321,16 @@ export function MeetingsScreen({
             <>
               <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
                 {view === "calendar" ? (
-                  <CalendarView
-                    data={(data.rows ?? []).map((r) => ({
-                      id: String(r.id),
-                      date: String(r.startsOn ?? ""),
-                      title: String(r.name ?? ""),
-                      accent: String(r.state ?? ""),
-                    }))}
-                    config={{
-                      ...defaultCalendarViewConfig,
-                      dateField: "date",
-                      titleField: "title",
-                      accentField: "accent",
-                      weekStartsOn: "monday",
-                    }}
+                  <RecordCalendar
+                    entries={calendarEntries}
+                    onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
+                    emptyText={t("Nothing in the diary this month.")}
+                    unloaded={
+                      <EarlierNotLoaded
+                        listKey={found.listKey ?? meetingsKey(teamId)}
+                        fetchPage={found.fetchPage}
+                      />
+                    }
                   />
                 ) : (
                   <ScreenRenderer
@@ -302,12 +344,18 @@ export function MeetingsScreen({
               </SectionWithCreate>
 
               {/* R14: the heading counts the WHOLE diary, so the list under it has to be
-                  able to reach all of it — page one, then Load more. */}
-              <LoadMore
-                listKey={found.listKey ?? meetingsKey(teamId)}
-                fetchPage={found.fetchPage}
-                label={t("Load more meetings")}
-              />
+                  able to reach all of it — page one, then Load more.
+                  NOT ON THE CALENDAR, because the calendar carries its own: the
+                  grid knows which month you are reading and can offer the button
+                  on exactly the months that need it, beside the sentence saying
+                  why. Two of the same button on one screen is one too many. */}
+              {view !== "calendar" && (
+                <LoadMore
+                  listKey={found.listKey ?? meetingsKey(teamId)}
+                  fetchPage={found.fetchPage}
+                  label={t("Load more meetings")}
+                />
+              )}
             </>
           )
         }}
