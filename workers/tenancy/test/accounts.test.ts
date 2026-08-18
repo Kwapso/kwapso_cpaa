@@ -93,10 +93,41 @@ describe("the hierarchy: unlimited depth, but never a loop", () => {
   })
 
   it("still allows a real move, and a move back to the top", async () => {
-    await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, IDS.burglarAccount)
+    expect(await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, IDS.burglarAccount)).toBe(true)
     expect(parentOf(IDS.victimChild)).toBe(IDS.burglarAccount)
-    await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, null)
+    expect(await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, null)).toBe(true)
     expect(parentOf(IDS.victimChild)).toBeNull()
+  })
+
+  // R17 — MOVING SOMEBODY TO WHERE THEY ALREADY ARE IS NOT A MOVE. It matters on
+  // this door more than on a toggle, because the contact screen's control is what
+  // a person opens to CHECK who somebody works for: they look at the picker,
+  // decide it was right, and press Save. A record that grows an "Aurora moved
+  // Marta under Bergman S.A." line every time somebody checks is a history nobody
+  // can read — and the route publishes off this same answer, so a no-op is also a
+  // live ping every open screen would pay for and no reader could see the point of.
+  //
+  // Said twice on purpose: once for a real parent, once for the top level, because
+  // `null` is the value a careless `if (parent)` guard would get wrong.
+  it("moves nothing, and writes no history, when it is already there", async () => {
+    const history = () =>
+      (db().prepare("SELECT COUNT(*) n FROM activity WHERE type = 'Account moved'").get() as { n: number }).n
+
+    await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, IDS.burglarAccount)
+    const after = history()
+    // A count that is zero either side proves nothing — this asserts the history
+    // is being written at all before it asserts that a repeat does not add to it.
+    expect(after, "no history row for a real move — this check has gone blind").toBeGreaterThan(0)
+
+    expect(await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, IDS.burglarAccount)).toBe(false)
+    expect(parentOf(IDS.victimChild)).toBe(IDS.burglarAccount)
+    expect(history(), "a repeat of the same move wrote a second history row").toBe(after)
+
+    // …and the top level, where "already there" is a null rather than an id.
+    await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, null)
+    const atTop = history()
+    expect(await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, null)).toBe(false)
+    expect(history(), "sending an account to the top twice wrote it down twice").toBe(atTop)
   })
 
   // The ring test is a RECURSIVE walk up the tree, and the tree is the one

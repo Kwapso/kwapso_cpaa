@@ -759,6 +759,22 @@ export async function updateAccount(
  * MAX_ACCOUNT_DEPTH. Hitting the ceiling REFUSES the move (`OR depth >= ?` in the
  * ring test): past it the walk can no longer prove the tree is ring-free, and a
  * guard that can't prove safety must fail closed, not fall through to "fine".
+ *
+ * RETURNS WHETHER ANYTHING ACTUALLY MOVED (R17). Putting a contact under the
+ * company she is already at is not a move, and now writes nothing at all: no
+ * UPDATE, no history row, and the route publishes no ping. It matters here more
+ * than on a toggle, because this is the one control a person uses to CORRECT a
+ * mistake — they open the picker, look at it, decide it was right after all, and
+ * press Save. A record that grows an "Aurora moved Marta under Bergman S.A." line
+ * every time somebody checks is a history nobody can read.
+ *
+ * WHY THE PREDICATE CANNOT RIDE THE UPDATE the way setAccountActive's does: zero
+ * rows changed is ALREADY the refusal below. A no-op would come back as "that
+ * would put the account inside itself", which is untrue and alarming. So the
+ * before-image answers it, one statement earlier. Two people moving the same
+ * contact at the same instant is unaffected — the ring guard is still the WRITE
+ * itself, and the worst a lost race can cost is one duplicate history row saying
+ * the same true thing twice, never a ring and never a wrong parent.
  */
 export async function setAccountParent(
   cfg: D1Rest,
@@ -767,9 +783,14 @@ export async function setAccountParent(
   actor: Actor,
   id: string,
   parentAccountId: string | null
-): Promise<void> {
-  const before = await accountOrThrow(cfg, guard, scope, id)
+): Promise<boolean> {
+  // THE STORED ROW, not the caller's view of it — a write's before-image is what
+  // the database holds (see accountRowOrThrow), and this one is compared against.
+  const before = await accountRowOrThrow(cfg, guard, scope, id)
   if (parentAccountId) requireAccountInScope(scope, parentAccountId, "That parent account")
+
+  // R17 — already there is not a move.
+  if (before.parent_account_id === parentAccountId) return false
 
   const fence = accountScopeClause(scope, "id")
   const parentFence = accountScopeClause(scope, "p.id")
@@ -822,6 +843,7 @@ export async function setAccountParent(
     relatedTable: "accounts",
     relatedRowId: id,
   })
+  return true
 }
 
 /** Archive / restore an account. R17: the current-status predicate rides the

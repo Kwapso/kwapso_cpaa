@@ -60,9 +60,19 @@ function Row({
   )
 }
 
-/** WHICH COMPANIES THIS PERSON BELONGS TO — the link table read from the person's
- * side. This is the list that made one table the right answer: Marta is a contact
- * of Bergman and of Delaval, and a parent pointer has room for one of them.
+/** WHICH COMPANIES THIS PERSON IS A CONTACT OF — the link table read from the
+ * person's side. This is the list that made one table the right answer: Marta is
+ * a contact of Bergman and of Delaval, and a parent pointer has room for one of
+ * them.
+ *
+ * NOT THE SAME QUESTION AS WHO THEY WORK FOR, which is the parent account and has
+ * its own control on the Overview (contact-detail's `moveToCompany`). The two
+ * agree for most people and they are different facts: leaving Bergman for Delaval
+ * moves the parent, and may well leave the Bergman link exactly where it is,
+ * because we still talk to her about Bergman. The line under this list says so
+ * once, so a reader who came here looking for the employer knows where it is —
+ * rather than this tab growing a second control that writes the same column from
+ * a different screen.
  *
  * Read-only on purpose. A link is made and unmade on the COMPANY's Contacts tab,
  * where the question is "who is inside this company?" — the write belongs beside
@@ -82,27 +92,32 @@ export function CompaniesPanel({
       </p>
     )
   return (
-    <ul className="divide-border divide-y rounded-xl border">
-      {companies.map((c) => (
-        <Row key={c.id} active={c.active} onClick={() => onOpen(c.accountId)}>
-          <span className="min-w-0 flex-1 truncate text-sm">{c.personName}</span>
-          {c.relationship && (
-            <span className="text-muted-foreground text-xs">{c.relationship}</span>
-          )}
-          {c.isMainStakeholder && (
-            <Badge variant="secondary" className="text-[10px]">
-              {t("Main contact")}
-            </Badge>
-          )}
-          {!c.active && (
-            <Badge variant="outline" className="text-muted-foreground text-[10px]">
-              {t("No longer")}
-            </Badge>
-          )}
-          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-        </Row>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <ul className="divide-border divide-y rounded-xl border">
+        {companies.map((c) => (
+          <Row key={c.id} active={c.active} onClick={() => onOpen(c.accountId)}>
+            <span className="min-w-0 flex-1 truncate text-sm">{c.personName}</span>
+            {c.relationship && (
+              <span className="text-muted-foreground text-xs">{c.relationship}</span>
+            )}
+            {c.isMainStakeholder && (
+              <Badge variant="secondary" className="text-[10px]">
+                {t("Main contact")}
+              </Badge>
+            )}
+            {!c.active && (
+              <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                {t("No longer")}
+              </Badge>
+            )}
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+          </Row>
+        ))}
+      </ul>
+      <p className="text-muted-foreground text-sm">
+        {t("The companies they're a contact of. Who they work for is on the Overview.")}
+      </p>
+    </div>
   )
 }
 

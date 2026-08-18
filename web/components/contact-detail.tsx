@@ -20,6 +20,22 @@
 // question "who exactly is signing in?" and answered it with a list. A login
 // belongs to somebody with a name.
 //
+// TWO DIFFERENT QUESTIONS ABOUT COMPANIES, and this screen answers both without
+// confusing them. WHO THEY WORK FOR is the parent account: one company, the one
+// the address book files them under and the one whose Contacts tab groups them
+// in. THE COMPANIES THEY ARE A CONTACT OF are the links, plural, on the
+// Companies tab and in the chips under the title — Marta can be a contact of
+// Bergman and of Delaval at once, which is the thing a single pointer cannot say
+// and the reason both exist.
+//
+// THE EMPLOYER IS THE ONE THAT GETS A CONTROL HERE. The parent picker came off
+// the account form on 18 Aug 2026 on the owner's ruling — right for a company,
+// which is its own thing and never a subsidiary of one already on the books —
+// and it left a person who changes jobs with no screen that could move her. The
+// answer was never to put the picker back on a company's form; it is this, on
+// the person. The links keep their own control where it belongs, on the
+// COMPANY's Contacts tab, beside the list it changes. Nothing here writes one.
+//
 // Host-composed rather than a recipe, for the reason the account screen is: three
 // of these tabs are collections with their own actions, and no engine block draws
 // one. Its counts are exact server totals through the one formatCount seam (R16),
@@ -52,6 +68,8 @@ import {
   type PanelActions,
 } from "@/components/account-detail-panels"
 import { CompaniesPanel, ContactMeetingsPanel, ContactTicketsPanel } from "@/components/contact-panels"
+import { RecordPicker } from "@/components/record-picker"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { TodosPanel } from "@/components/work-panels"
 import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
@@ -93,7 +111,7 @@ export function ContactDetailScreen({
   onSaved: () => void
 }) {
   const t = useT()
-  const { account, companies, portalUsers } = detail
+  const { account, parent, companies, portalUsers } = detail
   const accountId = account.id
 
   const activity = useRecordActivity("accounts", accountId)
@@ -132,6 +150,17 @@ export function ContactDetailScreen({
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [busy, setBusy] = React.useState(false)
 
+  // WHICH COMPANY THEY WORK FOR, as the picker holds it while somebody decides.
+  // `""` is the picker's own "no company" row and the door's `null`. It re-seeds
+  // from the record whenever the record changes, so somebody else's move landing
+  // through the live layer moves this control too rather than leaving a stale
+  // name sitting over a row that has already gone somewhere else.
+  const atCompany = account.parentAccountId ?? ""
+  const [company, setCompany] = React.useState(atCompany)
+  React.useEffect(() => {
+    setCompany(atCompany)
+  }, [atCompany])
+
   const refresh = React.useCallback(() => {
     invalidate(accountKey(accountId))
     invalidate(`activity:record:accounts:${accountId}`)
@@ -159,10 +188,11 @@ export function ContactDetailScreen({
 
   const actions: PanelActions = { busy, ask: setConfirm, act: run }
 
-  // No MOVE half: the form no longer offers a parent picker, on either kind of
-  // account (18 Aug 2026 — account-form-dialog's header). A contact's company is
-  // written when she is created on that company's Contacts tab, and read back on
-  // the Overview below.
+  // The edit form has no MOVE half and is not getting one back: it stopped
+  // offering a parent picker on either kind of account (18 Aug 2026 —
+  // account-form-dialog's header), because a company an agency takes on is a
+  // company. Moving a PERSON is a different sentence and it is its own control,
+  // below the Overview list — see `moveToCompany`.
   async function save(values: AccountFormValues) {
     // An emptied box is NULL, not a missing key: the door treats a field it never
     // heard about as "leave it alone", so clearing one is something this form has
@@ -186,6 +216,29 @@ export function ContactDetailScreen({
     toast.success(t("Contact updated."))
   }
 
+  /** MOVE THEM TO THE COMPANY THEY WORK FOR — people change jobs, and until now
+   * the only thing that could say so was the assistant or an import.
+   *
+   * It is the PARENT pointer, not a link. The two are different facts and this
+   * screen shows both: the parent is the one company she sits under, which is
+   * what the address book files her by and what a company's Contacts tab groups
+   * her into; the links on the Companies tab are the companies she is a contact
+   * of, and she can hold several of those at once. So this control moves her
+   * employer and touches no link — a person who leaves Bergman for Delaval is
+   * still, quite possibly, someone we talk to about Bergman.
+   *
+   * The three refusals are all the door's, said in its own words: it will not
+   * put her under herself, will not close a ring, and will not reach an account
+   * outside the caller's fence. Choosing the company she is already at is not a
+   * refusal at all — it moves nothing and writes nothing (R17). */
+  async function moveToCompany() {
+    await run(
+      () => tenancy.setAccountParent(accountId, company || null),
+      t("Contact moved."),
+      t("Couldn't move the contact.")
+    )
+  }
+
   /** THE COMPANY A LOGIN IS RECORDED AGAINST. A person's login is stored on the
    * PERSON — that is what the fence walks from — but the grant is MADE on a
    * company, which is what the door checks the granter's own reach against. The
@@ -207,13 +260,14 @@ export function ContactDetailScreen({
     .filter(Boolean)
     .join(", ")
 
+  // WHICH COMPANY THEY WORK FOR — the parent account, and it is not the same
+  // question the Companies tab answers. This row used to list the LINKS under the
+  // singular word "Company", which was the third place on this one screen saying
+  // the same thing (the chips under the title say it, the Companies tab says it
+  // with a count) — while the fact that decides where the address book FILES her,
+  // and where she appears on a company's Contacts tab, was on no screen at all.
   const overviewItems = [
-    {
-      label: t("Company"),
-      value: companies.length
-        ? companies.filter((c) => c.active).map((c) => c.personName).join(", ") || "—"
-        : "Works on their own",
-    },
+    { label: t("Parent account"), value: parent ? parent.name : t("No company yet") },
     { label: t("Email"), value: account.email || "—" },
     { label: t("Phone"), value: account.phone || "—" },
     { label: t("Where they are"), value: where || "—" },
@@ -390,6 +444,59 @@ export function ContactDetailScreen({
             return (
               <div className="flex flex-col gap-4">
                 <OverviewList items={overviewItems} />
+                {/* WHO THEY WORK FOR, and the one control that can change it.
+                    People change jobs; before this, moving one was a sentence
+                    somebody said to the assistant. It sits under the row it
+                    edits, and it stays a two-step — pick, then press — because
+                    where a person sits decides what a client login can see.
+
+                    IT OFFERS COMPANIES AND NOTHING ELSE (`type: "entity"`), which
+                    is what makes "put her under herself" unreachable from this
+                    screen rather than merely refused by the door: a contact is a
+                    person, and no person is in this list. Archived companies are
+                    left out too (`searchAccounts` asks the door for the live
+                    ones) — a put-away company is not something new work is filed
+                    against — while somebody ALREADY under one still reads it by
+                    name here, from the record's own parent, and can be moved off
+                    it. The remaining refusals belong to the door: a ring, and an
+                    account outside the caller's fence. */}
+                {canEdit && (
+                  <div className="flex flex-col gap-3 rounded-xl border p-4">
+                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      {t("Parent account")}
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <RecordPicker
+                        ariaLabel={t("Parent account")}
+                        value={company}
+                        onChange={setCompany}
+                        search={(term) => searchAccounts(term, { type: "entity" })}
+                        searchKey={pickerKey("companies", teamId)}
+                        selectedLabel={parent?.name}
+                        emptyOption={{ value: "", label: t("No company yet") }}
+                        placeholder={t("Choose a company")}
+                        searchPlaceholder={t("Search clients…")}
+                        emptyText={t("No client matched.")}
+                        disabled={busy}
+                        className="w-full sm:w-80"
+                      />
+                      <Button
+                        size="sm"
+                        disabled={busy || company === atCompany}
+                        onClick={() => void moveToCompany()}
+                        className="gap-1 self-start sm:self-auto"
+                      >
+                        {busy ? <Spinner /> : <Pencil className="size-3.5" />}
+                        {t("Save")}
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      {t(
+                        "The company they work for. Being a contact of a company is a separate thing, and the same person can be a contact of several."
+                      )}
+                    </p>
+                  </div>
+                )}
                 {account.about && (
                   <div className="rounded-xl border p-4">
                     <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
