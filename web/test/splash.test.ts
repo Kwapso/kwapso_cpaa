@@ -37,6 +37,7 @@ import { describe, expect, it } from "vitest"
 import { stripComments } from "@shared/rules/source-scan"
 import {
   ARCS,
+  DETAIL_TIERS,
   GEOMETRY,
   MARK_INAPP_START_MS,
   SCENES,
@@ -229,6 +230,48 @@ describe("the five scenes are compressed, and all five are still there", () => {
   })
 })
 
+// THE ONE JUDGEMENT IN THIS FILE THAT IS ABOUT A DEVICE, so it is the one most
+// likely to be edited by feel later. Three properties keep it honest: the table
+// is ordered (first match wins, so an out-of-order bound is a tier nothing can
+// ever reach), no smaller screen is ever asked for more work than a bigger one,
+// and the widest tier is still the authored composition rather than something
+// that drifted while the phone was being tuned.
+describe("the detail tiers", () => {
+  it("is ordered, so every tier is reachable", () => {
+    const bounds = DETAIL_TIERS.map(([b]) => b)
+    expect(
+      [...bounds].sort((a, b) => a - b),
+      "the tiers are out of order — first match wins, so a tier behind a wider one is dead"
+    ).toEqual(bounds)
+  })
+
+  it("never asks a smaller screen for more than a bigger one", () => {
+    for (let i = 1; i < DETAIL_TIERS.length; i++) {
+      const [bound, samples, sweeps] = DETAIL_TIERS[i - 1]
+      expect(samples, `the tier under ${bound}px draws more shutter samples than the one above it`).toBeLessThanOrEqual(
+        DETAIL_TIERS[i][1]
+      )
+      expect(sweeps, `the tier under ${bound}px draws more sub-arcs than the one above it`).toBeLessThanOrEqual(
+        DETAIL_TIERS[i][2]
+      )
+    }
+  })
+
+  it("still ends on the composition as it was authored", () => {
+    const [, samples, sweeps] = DETAIL_TIERS[DETAIL_TIERS.length - 1]
+    expect(samples, "the widest tier no longer draws the authored twelve shutter samples").toBe(12)
+    expect(sweeps, "the widest tier no longer draws the authored nine sub-arcs").toBe(9)
+  })
+
+  // Spliced, not retyped — the same reason the score is.
+  it("ships as this module's own numbers, not a second copy", () => {
+    expect(
+      markLoopScript(),
+      "the animator carries its own copy of the tiers — one of the two will be the one nobody edits"
+    ).toContain(`var DT=${JSON.stringify(DETAIL_TIERS)}`)
+  })
+})
+
 describe("the inline script", () => {
   const js = splashScript()
 
@@ -395,9 +438,14 @@ describe("what the compiler actually shipped", () => {
 // the effect never ran again because its dependency list is empty. No error, no
 // warning, no failing test — just a logo that does not turn.
 //
-// The splash is not exposed to this (it is server-rendered and never re-renders)
-// and the difference is invisible at the call site, which is exactly why it is
-// worth a rule rather than a comment.
+// This paragraph used to end "the splash is not exposed to this, being
+// server-rendered and never re-rendered". It was, measurably: React re-applied
+// `#ks-splash` at 286ms on a laptop and 348ms on a phone and the mark froze for
+// the rest of every boot. The splash cannot take this component's way out — it
+// has to be painted by the parser — so it heals instead, and the case above
+// ("carries on when its whole subtree is replaced underneath it") is that.
+// The difference is invisible at the call site, which is exactly why both
+// halves are a rule rather than a comment.
 describe("the app's own loader keeps its subtree away from React", () => {
   const src = stripComments(readFileSync(join(ROOT, "shared", "web", "mark-loader.tsx"), "utf8"))
 
@@ -472,8 +520,20 @@ describe("the placeholder the owner is meant to change", () => {
 // the picture at one moment is different from the picture at another.
 describe("the animator, run", () => {
   /** Evaluate the shipped script text and mount it on the shipped markup.
-   * Returns the cast group and a `step(ms)` that advances the clock. */
-  function mount(opts?: { loop?: boolean; at?: number }) {
+   * Returns the cast group and a `step(ms)` that advances the clock.
+   *
+   * `screen` is the second argument because the animator now reads TWO things
+   * off layout, once, at start-up: how wide the viewport is (which detail tier
+   * this is) and how big the mark was actually drawn (how far off-frame the
+   * pieces can start without starting off the phone). jsdom has no layout at
+   * all — `getBoundingClientRect` is all zeros and `innerWidth` is a fixed
+   * 1024 — so a test that wants to be on a phone has to say so. Left out, the
+   * run lands where it always did: no rect, so no clamp, and the authored
+   * fly-in. */
+  function mount(
+    opts?: { loop?: boolean; at?: number },
+    screen?: { width: number; height: number; box: number }
+  ) {
     const frames: Array<(t: number) => void> = []
     const real = window.requestAnimationFrame
     window.requestAnimationFrame = ((cb: (t: number) => void) => {
@@ -490,6 +550,17 @@ describe("the animator, run", () => {
     host.innerHTML = splashInner({ kind: "mark" })
     document.body.appendChild(host)
 
+    const realSize = { width: window.innerWidth, height: window.innerHeight }
+    const setSize = (w: number, h: number) => {
+      Object.defineProperty(window, "innerWidth", { value: w, configurable: true })
+      Object.defineProperty(window, "innerHeight", { value: h, configurable: true })
+    }
+    if (screen) {
+      setSize(screen.width, screen.height)
+      const svg = host.querySelector("svg")!
+      svg.getBoundingClientRect = (() => ({ width: screen.box, height: screen.box })) as never
+    }
+
     const base = performance.now()
     const stop = window.__ksMark!(host, opts)
     const step = (ms: number) => {
@@ -504,6 +575,7 @@ describe("the animator, run", () => {
       pending: () => frames.length,
       restore: () => {
         window.requestAnimationFrame = real
+        if (screen) setSize(realSize.width, realSize.height)
         host.remove()
       },
     }
@@ -517,6 +589,25 @@ describe("the animator, run", () => {
     [...cast(host).querySelectorAll<SVGElement>("path,circle")].filter(
       (p) => p.style.display !== "none"
     )
+
+  /** How much of a turn is being exposed on screen right now, in degrees — the
+   * widest single streak. A visible rim circle is a whole turn by definition;
+   * otherwise every arc here is `M x y A r r 0 f 1 x2 y2`, so the angle between
+   * its two endpoints IS its width. */
+  const exposure = (host: HTMLElement) => {
+    let best = 0
+    for (const e of drawn(host)) {
+      if (e.tagName.toLowerCase() === "circle") return 360
+      const d = e.getAttribute("d") ?? ""
+      if (d.split("M").length > 2) return 360 // the two-arc full circle
+      const n = d.match(/-?[\d.]+/g)?.map(Number)
+      if (!n || n.length < 9) continue
+      let w = ((Math.atan2(n[8], n[7]) - Math.atan2(n[1], n[0])) * 180) / Math.PI
+      while (w < 0) w += 360
+      best = Math.max(best, w)
+    }
+    return best
+  }
 
   it("parses, publishes exactly one global, and takes the cast over", () => {
     const m = mount()
@@ -618,6 +709,158 @@ describe("the animator, run", () => {
     expect(one.pending(), "a one-shot run queued another frame past its own end").toBe(0)
     one.restore()
     m.restore()
+  })
+
+  // WHAT THE OWNER SAW ON HIS PHONE, AS ARITHMETIC.
+  //
+  // The authored shutter is a function of SPEED alone (`w*.042`), which is only
+  // the right exposure if the frames arrive at the rate it was tuned against.
+  // On a laptop they do. On a phone parsing 700KB of bundle behind the splash
+  // they arrive at about half that, and the mark then turns further between two
+  // frames than the blur drawn to cover the gap — so the two exposures do not
+  // touch and the ring reads as a strobe rather than a smear. Measured on the
+  // narrowest piece through the spin-up: at 30 frames a second, 23% of frames
+  // were covered before this, 100% after. It is invisible at 60fps, which is
+  // exactly why it was invisible to us.
+  //
+  // The invariant is one sentence: DROPPING A FRAME MUST WIDEN THE EXPOSURE,
+  // NOT WIDEN THE JUMP. This drives the same moment of the spin-up at 60 and at
+  // 20 frames a second and fails if the picture is the same, because "the same"
+  // is precisely what a speed-only shutter produces.
+  it("widens the exposure when frames come slower, rather than jumping", () => {
+    const at = (fps: number, ms: number) => {
+      const m = mount()
+      for (let t = 0; t <= ms; t += 1000 / fps) m.step(t)
+      const e = exposure(m.host)
+      m.restore()
+      return e
+    }
+    const fast = at(60, 2100)
+    const slow = at(20, 2100)
+    expect(fast, "nothing is being exposed in the middle of the spin-up at all").toBeGreaterThan(0)
+    // A MARGIN, AND NOT `> fast`, because `> fast` passes on the broken code.
+    // The two runs land a fraction of a float apart, so a speed-only shutter
+    // still gives two numbers that differ — measured, 291.6° against 293.8°,
+    // and the bare comparison went green on exactly the code this is here to
+    // catch. Frame-aware, the same pair is 301.5° against a full 360°: the slow
+    // run has smeared right through to the uniform rim. Twenty degrees sits an
+    // order of magnitude above the noise and well below the signal.
+    expect(
+      slow - fast,
+      "dropping frames no longer widens the exposure — the shutter is back to being a function of speed alone, and a dropped frame is a visible jump again"
+    ).toBeGreaterThan(20)
+  })
+
+  // THE ONE THAT WAS ACTUALLY BROKEN ON THE REAL BUILD, ON EVERY DEVICE.
+  //
+  // `SplashScreen` hands the mark to React through `dangerouslySetInnerHTML`,
+  // and React re-applies that on the first update after hydration even when the
+  // string is unchanged — replacing the whole <svg> and throwing away the pool
+  // the animator installed. Measured on the exported app: 286ms on a laptop,
+  // 348ms on a phone, after which the mark stood still at its resting pose for
+  // the remaining three seconds. mark-loader.tsx documents this exact fault and
+  // states the splash is immune to it because it is server-rendered and never
+  // re-renders. It is not immune, and nothing threw, so nothing noticed.
+  //
+  // This is that moment: the host's markup is replaced underneath a running
+  // animator, exactly as React does it, and the animation has to carry on.
+  it("carries on when its whole subtree is replaced underneath it", () => {
+    const m = mount()
+    m.step(1900)
+    const before = drawn(m.host).map((e) => e.outerHTML).join("|")
+    expect(before.length, "nothing was on screen before the subtree was replaced").toBeGreaterThan(0)
+
+    // what React does: the same string, applied again
+    m.host.innerHTML = splashInner({ kind: "mark" })
+    expect(
+      m.host.querySelector(".ks-rest"),
+      "this test no longer reproduces the fault — the resting mark is not back"
+    ).toBeTruthy()
+
+    m.step(2400)
+    expect(
+      m.host.querySelector(".ks-rest"),
+      "the animator never took the cast back — the mark is frozen at the resting pose, which is what shipped"
+    ).toBeNull()
+    const after = drawn(m.host).map((e) => e.outerHTML).join("|")
+    expect(after.length, "nothing is on screen after the subtree was replaced").toBeGreaterThan(0)
+    expect(after, "the picture stopped moving after the subtree was replaced").not.toBe(before)
+    m.restore()
+  })
+
+  // The other half of healing, and the reason it triggers on the RESTING MARK
+  // rather than on merely being detached. A pool that has been replaced by
+  // ANOTHER run's pool must be left alone: a bare "if detached, take it back"
+  // has two loops tearing the same cast apart every frame, forever.
+  it("does not fight another run for the same host", () => {
+    const m = mount()
+    m.step(600)
+    const mine = cast(m.host).firstChild
+    // what a second run leaves behind: a pool, and no resting mark
+    cast(m.host).textContent = ""
+    const theirs = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    cast(m.host).appendChild(theirs)
+    m.step(900)
+    expect(
+      cast(m.host).firstChild,
+      "the detached run grabbed the cast back off another run — they will now do this to each other every frame"
+    ).toBe(theirs)
+    expect(cast(m.host).firstChild).not.toBe(mine)
+    m.restore()
+  })
+
+  // A phone gets a lighter composition ON PURPOSE. Asserted through the
+  // animator's own allocation rather than by re-reading DETAIL_TIERS, because a
+  // test that recomputes the table it is checking proves only that the table
+  // exists.
+  it("gives a phone less to draw and leaves a laptop the authored composition", () => {
+    const pool = (width: number, height: number, box: number) => {
+      const m = mount(undefined, { width, height, box })
+      m.step(300)
+      const n = cast(m.host).querySelectorAll("path,circle").length
+      m.restore()
+      return n
+    }
+    const phone = pool(375, 812, 210)
+    const tablet = pool(768, 1024, 320)
+    const laptop = pool(1440, 900, 320)
+    const [, samples, sweeps] = DETAIL_TIERS[DETAIL_TIERS.length - 1]
+    expect(
+      laptop,
+      "a laptop is no longer drawing the composition as authored — twelve shutter samples, nine sub-arcs, one rim"
+    ).toBe(samples * 3 + sweeps * 3 + 1)
+    expect(tablet, "an iPad is being asked for as much as a laptop").toBeLessThan(laptop)
+    expect(phone, "a phone is being asked for as much as an iPad").toBeLessThan(tablet)
+  })
+
+  // The fly-in is in viewBox units, so what it means on screen depends on how
+  // big the box was drawn — and `min(56vmin,320px)` draws it at 210px on a
+  // 375px phone against 320px on everything wider. Measured with getBBox in
+  // both engines, the fly-in's ink spanned 456px on that 375px screen and hung
+  // 72px past the left edge: pieces appearing at the bezel instead of arriving
+  // across the dark. It must pull IN on a phone and must not move at all on a
+  // laptop, where the composition already fits with room to spare.
+  it("starts the fly-in inside a narrow screen, and nowhere else", () => {
+    const start = (width: number, height: number, box: number) => {
+      const m = mount(undefined, { width, height, box })
+      m.step(0)
+      const t = drawn(m.host)[0]!.getAttribute("transform")!
+      const hit = /translate\((-?[\d.]+) (-?[\d.]+)\)/.exec(t)
+      expect(hit, `the first piece has no usable position at ${width}px: ${t}`).toBeTruthy()
+      m.restore()
+      return Math.hypot(Number(hit![1]) - 540, Number(hit![2]) - 540)
+    }
+    const laptop = start(1440, 900, 320)
+    const phone = start(375, 812, 210)
+    expect(
+      laptop,
+      "the laptop's fly-in has been retuned — it fits already, and it is the author's number"
+    ).toBeGreaterThan(900)
+    expect(phone, "the pieces still start off the side of a phone").toBeLessThan(laptop)
+    expect(
+      phone,
+      "the phone's fly-in has been pulled in so far it is no longer an arrival from off-frame"
+    ).toBeGreaterThan(500)
   })
 
   it("keeps going forever when the app's own loader asks it to loop", () => {
