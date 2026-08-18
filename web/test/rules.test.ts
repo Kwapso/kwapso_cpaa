@@ -1544,3 +1544,48 @@ describe("RULES — the laws of the base", () => {
     }
   })
 })
+
+/** A GROUP OF CONTROLS IS NOT ONE CONTROL, and the required ring says so.
+ *
+ * `Field` draws `required-ring` — a hairline box at the input's corner radius —
+ * around whatever it wraps, whenever the field is required. That is right for a
+ * single input and wrong for a stack of checkboxes: the ring boxes the WHOLE
+ * group including the gaps, and because the stack carries no padding of its own
+ * the boxes sit flush against the hairline and read as breaking out of it. The
+ * owner reported exactly that on the New story form.
+ *
+ * The library already anticipated it — `FieldShape` has a `group` value whose
+ * own comment says "a ring would box the WHOLE group in gold… so there is no
+ * ring — the label's asterisk carries required instead". Nothing declared it:
+ * 138 Field call sites and not one passed a shape. So this is not a library
+ * gap, it is a call site that never answered a question it was asked.
+ *
+ * Derived, so a fifth cannot be added: any Field wrapping more than one
+ * Checkbox / RadioGroup / ToggleGroup must say `shape="group"` (or turn the
+ * ring off itself). */
+describe("required-ring: a group says it is a group", () => {
+  it("no Field boxes a group of controls in the single-control ring", () => {
+    const offenders: string[] = []
+    const files = [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+    ]
+    for (const f of files) {
+      const src = readFileSync(f.path, "utf8")
+      for (const m of src.matchAll(/<Field\b[^>]*>/g)) {
+        const tag = m[0]
+        const end = src.indexOf("</Field>", m.index! + tag.length)
+        const body = src.slice(m.index! + tag.length, end < 0 ? undefined : end)
+        const composite =
+          /<Checkbox\b/.test(body) || /<RadioGroup\b/.test(body) || /<ToggleGroup\b/.test(body)
+        if (!composite) continue
+        if (tag.includes('shape="group"') || tag.includes("ringed={false}")) continue
+        offenders.push(`${f.path.slice(ROOT.length + 1)}:${src.slice(0, m.index!).split("\n").length}`)
+      }
+    }
+    expect(
+      offenders,
+      `these Fields wrap a group of controls and let the required ring box the whole stack — pass shape="group": ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+})

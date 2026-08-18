@@ -366,7 +366,7 @@ export function AppFormDialog({
           because the library ships no multi-select and the rulebook is explicit
           that nothing here edits the library — the same shape the story form
           already uses for the processes it touches. */}
-      <Field config={staffField} htmlFor="app-staff" className={fieldSpacing}>
+      <Field config={staffField} shape="group" htmlFor="app-staff" className={fieldSpacing}>
         <div className="flex flex-col gap-2" id="app-staff">
           {members.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nobody on the team yet.")}</p>
@@ -415,7 +415,7 @@ export function AppFormDialog({
       {/* THEIR PEOPLE (8.5), from the client's own contacts. Absent entirely on
           one of our own systems, which has no client to have contacts at. */}
       {clientId && (
-        <Field config={stakeholderField} htmlFor="app-stakeholders" className={fieldSpacing}>
+        <Field config={stakeholderField} shape="group" htmlFor="app-stakeholders" className={fieldSpacing}>
           <div className="flex flex-col gap-2" id="app-stakeholders">
             {contacts.length === 0 ? (
               <p className="text-muted-foreground text-sm">

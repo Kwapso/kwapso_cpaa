@@ -380,7 +380,7 @@ export function StoryFormDialog({
           an empty list on its own is refused by the door, so a person cannot skip
           the question by not answering it. Ticking it hides the list, because a
           list you have just said you are not using is noise. */}
-      <Field config={processField} htmlFor="story-processes" className={fieldSpacing}>
+      <Field config={processField} shape="group" htmlFor="story-processes" className={fieldSpacing}>
         <div className="flex flex-col gap-2" id="story-processes">
           <label className="flex items-center gap-2 text-sm">
             <Checkbox

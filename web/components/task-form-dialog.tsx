@@ -300,7 +300,7 @@ export function TaskFormDialog({
           and "urgent" are different questions and the old picker asked one. The
           line underneath says which of the four the two ticks make, so nobody has
           to know the arithmetic to use it. */}
-      <Field config={priorityField} htmlFor="task-important" className={fieldSpacing}>
+      <Field config={priorityField} shape="group" htmlFor="task-important" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Checkbox
