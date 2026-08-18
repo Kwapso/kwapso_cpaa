@@ -5,13 +5,24 @@
 // indefinitely. Two failure modes follow a deploy, and this heals both:
 //
 //  1. A chunk the old shell asks for is gone (route the user hadn't visited yet,
-//     or a lazy import). The dynamic import throws a ChunkLoadError. We catch it
-//     and reload ONCE — the fresh shell names the new chunks. A sessionStorage
-//     flag stops a reload loop if the reload itself can't recover.
+//     or a lazy import). The dynamic import throws a ChunkLoadError. We reload
+//     ONCE — the fresh shell names the new chunks — and a sessionStorage
+//     timestamp stops a reload loop if the reload itself can't recover.
 //  2. Nothing is broken yet, but a newer build exists. On focus/return we ask
 //     the origin for the current shell and compare its build fingerprint to the
 //     one we booted with; if it moved, we offer a gentle "reload" toast rather
 //     than yanking the page out from under the user mid-task.
+//
+// WHERE (1) ARRIVES FROM IS THE PART THAT WAS WRONG. The two listeners below
+// hear `window.onerror` and `unhandledrejection` — and a missing chunk almost
+// never comes through either, because the promise that failed belongs to a lazy
+// ROUTE and React consumes it: the throw lands in React's render phase, which
+// fires neither event. So the healer was wired to two signals the failure does
+// not use, and the ErrorBoundary — the one thing that does see it — showed a
+// crash card and stopped. Three of them on staging on 2026-08-17, forty seconds
+// apart, the last with a hand-typed `?v=2` on the URL, which is what somebody
+// does when the app is broken and reloading has not helped. `healStaleShell` is
+// exported for exactly that caller.
 //
 // The fingerprint is the hashed `main-app` chunk src (App-Router static export
 // has no __NEXT_DATA__ / buildId in the HTML). Renders nothing.
@@ -21,10 +32,13 @@ import * as React from "react"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { useT } from "@shared/web/language"
 
-// Reload-loop guard: set just before the chunk-error reload, cleared once a
-// fresh load runs this module again. If it's still set, the reload didn't fix
-// it — stop reloading and let the error surface normally.
-const RELOAD_GUARD = "version_watch_reloaded"
+// Reload-loop guard: WHEN we last reloaded to heal a stale shell. It is a
+// timestamp rather than a flag, and nothing clears it on mount, because the
+// thing it has to survive IS the reload — a flag cleared by the fresh load is
+// cleared before the fresh load reaches the route that is still broken, which
+// makes it a loop guard that guards nothing.
+const RELOAD_MARK = "version_watch_reloaded_at"
+const RELOAD_COOLDOWN_MS = 30_000
 // Don't poke the origin more than once a minute, however often focus fires.
 const POLL_THROTTLE_MS = 60_000
 
@@ -35,9 +49,9 @@ function buildIdFrom(html: string): string | null {
   return m ? m[0] : null
 }
 
-// A failed dynamic import / missing chunk — the signature of a stale shell
-// reaching for a deploy that's gone. Matches the modern bundler error shapes.
-function isChunkError(err: unknown, message?: string): boolean {
+/** A failed dynamic import / missing chunk — the signature of a stale shell
+ * reaching for a deploy that's gone. Matches the modern bundler error shapes. */
+export function isStaleShellError(err: unknown, message?: string): boolean {
   const name = err instanceof Error ? err.name : ""
   const msg = (err instanceof Error ? err.message : message) ?? ""
   return (
@@ -48,21 +62,28 @@ function isChunkError(err: unknown, message?: string): boolean {
   )
 }
 
+/** Heal a stale shell by replacing it: reload ONCE. Returns true when a reload
+ * is on its way, so a caller can say "a new version is ready" instead of
+ * "something broke". Refuses within the cooldown — if the fresh shell hit the
+ * same wall, reloading again would only spin. */
+export function healStaleShell(err: unknown, message?: string): boolean {
+  if (!isStaleShellError(err, message)) return false
+  const last = Number(sessionStorage.getItem(RELOAD_MARK) ?? 0)
+  if (Date.now() - last < RELOAD_COOLDOWN_MS) return false
+  sessionStorage.setItem(RELOAD_MARK, String(Date.now()))
+  location.reload()
+  return true
+}
+
 export function VersionWatch() {
   const t = useT()
   React.useEffect(() => {
-    // A fresh load got here — the previous reload (if any) succeeded.
-    sessionStorage.removeItem(RELOAD_GUARD)
-
-    // (a) Heal a stale shell that hits a missing chunk: reload once.
-    const onChunkError = (err: unknown, message?: string) => {
-      if (!isChunkError(err, message)) return
-      if (sessionStorage.getItem(RELOAD_GUARD)) return // already tried — don't loop
-      sessionStorage.setItem(RELOAD_GUARD, "1")
-      location.reload()
-    }
-    const onError = (ev: ErrorEvent) => onChunkError(ev.error, ev.message)
-    const onRejection = (ev: PromiseRejectionEvent) => onChunkError(ev.reason)
+    // (a) Heal a stale shell that hits a missing chunk: reload once. These two
+    // catch the cases that DO reach the window — a bare `import()` in an event
+    // handler, a script tag — while the ErrorBoundary catches the render-phase
+    // one through the same seam.
+    const onError = (ev: ErrorEvent) => void healStaleShell(ev.error, ev.message)
+    const onRejection = (ev: PromiseRejectionEvent) => void healStaleShell(ev.reason)
 
     // (b) Notice a newer build on return-to-tab and offer a reload.
     const bootId = buildIdFrom(document.documentElement.outerHTML)

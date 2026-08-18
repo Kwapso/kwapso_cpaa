@@ -143,6 +143,19 @@ place:
   (`web/app/layout.tsx`) around the routed screens AND the co-pilot host, so a
   render throw becomes a readable "something went wrong here + Try again" card and
   reports through `reportError` to the central `error_logs`. Never a blank page.
+- **…and it HEALS one class rather than reporting it (added 2026-08-18).** A
+  render throw that is really a STALE SHELL — the tab holds an old build and asks
+  for a chunk this deploy no longer has — is not a bug in the screen, and the
+  boundary is the only thing in the tree that sees it. `componentDidCatch` reports
+  first (the beacon survives an unload, so the row is kept: "how often does a
+  deploy strand an open tab" needs an answer), then hands the error to
+  `healStaleShell` from `web/components/version-watch.tsx`, which reloads once
+  behind a 30-second cooldown; `render` says "A new version of the app is ready."
+  rather than printing a chunk id at a manager. Earned by three rows on staging on
+  2026-08-17, forty seconds apart, the middle one carrying a hand-typed `?v=2` —
+  the guard for this shipped on 2026-06-30 and had never once fired, because it
+  was bound to `window.onerror` and `unhandledrejection` and React's render phase
+  dispatches neither. See EDGE-CASES.md § *version-watch*.
 - **Prevention:** the crash class was a hook called BELOW a top-level early return
   (React #310/#300, the hook count changes between renders). `web/test/hooks-order.test.ts`
   walks every component/hook in `web/` and fails any `use*()` (or `React.use*()`)

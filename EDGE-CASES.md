@@ -82,11 +82,25 @@ edits, not one.**
 is no service worker, a long-lived tab holds the **old shell + its hashed
 chunks** across a deploy. `web/components/version-watch.tsx` handles the two
 failure modes: (1) a `ChunkLoadError` from a now-missing chunk → reload **once**
-(a `sessionStorage` guard, `version_watch_reloaded`, stops a reload loop); (2)
-on focus/return, fetch `/` and compare the `main-app-<hash>.js` fingerprint, if
-it moved, offer a **gentle "reload" toast**, never a surprise reload mid-task.
-Don't mistake this for cache-busting: it heals an *already-stale* tab; it does
-not make cross-route navigation soft.
+(a `sessionStorage` timestamp, `version_watch_reloaded_at`, and a 30-second
+cooldown stop a reload loop); (2) on focus/return, fetch `/` and compare the
+`main-app-<hash>.js` fingerprint, if it moved, offer a **gentle "reload" toast**,
+never a surprise reload mid-task. Don't mistake this for cache-busting: it heals
+an *already-stale* tab; it does not make cross-route navigation soft.
+
+**…and (1) arrives through the ErrorBoundary, not through `window.onerror`.**
+Fixed 2026-08-18, and the trap is worth stating because the code looked right for
+months. A missing chunk almost always belongs to a **lazy route**: React consumes
+the rejected import and re-throws it in the RENDER phase, which dispatches
+neither `error` nor `unhandledrejection` — so version-watch's own two listeners
+never heard the failure they exist for, and `web/components/error-boundary.tsx`
+showed a crash card reading "Loading chunk 67631 failed." at a manager. The heal
+is therefore invited in from `componentDidCatch` (`healStaleShell`, exported from
+version-watch, one seam, one cooldown), and the boundary renders "A new version
+of the app is ready." instead of the stack for that one class. The window
+listeners stay: a bare `import()` in an event handler does reach them. Locked by
+`web/test/stale-shell-heals.test.tsx`. **The client portal has no version-watch
+at all** — the same stale tab there still ends at a crash card (UI-GAPS).
 
 **The AI co-pilot is mounted at the ROOT, and its open state persists.** The
 assistant panel is the one surface that spans *all* screens, so it lives in a single
