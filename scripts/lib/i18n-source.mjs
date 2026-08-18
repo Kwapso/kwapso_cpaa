@@ -34,6 +34,15 @@ export const VISIBLE_PROPS = new Set([
   "description",
   "alt",
   "emptyText",
+  // WHAT CONNECTING A SERVICE LETS US SEE (google-connections.tsx). Four
+  // sentences, and they were user-visible prose sitting outside the catalogue —
+  // so somebody reading the app in German was told in English what kwapso may
+  // read from their mailbox. The sentence a person needs MOST in their own
+  // language is the one about their own privacy. Narrow by construction: the
+  // only string-literal `scope` props in either front door are those four, and
+  // the prose guard already refuses an OAuth scope like `gmail.modify` (dotted
+  // id, no spaces).
+  "scope",
   "cta",
   "submitLabel",
   "confirmLabel",

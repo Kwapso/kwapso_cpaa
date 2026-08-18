@@ -68,7 +68,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 // today; the rule is not about today. It is about the fact that "this one came
 // from somewhere trustworthy" is a judgement the next reader has to re-make on
 // every line, and a seam call is a judgement nobody has to re-make.
-import { safeSrc } from "@/lib/rich-text"
+import { safeSrc } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 

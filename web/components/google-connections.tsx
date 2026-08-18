@@ -50,10 +50,28 @@ import { useT } from "@shared/web/language"
 
 /** The word a person reads for each service, and the sentence saying what
  * connecting it actually lets kwapso see. The second half matters more than the
- * first: "Gmail" tells somebody nothing about what they are agreeing to. */
+ * first: "Gmail" tells somebody nothing about what they are agreeing to.
+ *
+ * THIS SENTENCE IS A PROMISE AND IT HAS TO STAY TRUE. Gmail's read "Only mail to
+ * or from someone on one of your accounts" for as long as the known-contact
+ * fence was the only one. It stopped being true the day the transcript hunt
+ * added a SECOND fence (`googleNoticeQuery`, workers/content/src/lib/google-api.ts)
+ * over four Google robot senders — narrow, hard-coded in the server, unreachable
+ * from any request, and used by exactly one caller, but outside the sentence all
+ * the same. The widening was invisible precisely BECAUSE the first fence works:
+ * Google's own no-reply addresses are nobody's contact, so nothing about the old
+ * rule hinted that a notice could ever be read.
+ *
+ * A privacy sentence that is 99% true is worse than a longer one that is true,
+ * because the person reading it has no way to find the 1%. If a third fence is
+ * ever added, this sentence changes in the same commit. */
 const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
   drive: { label: "Drive", scope: "Only the folders you share below, nothing else in your Drive." },
-  gmail: { label: "Gmail", scope: "Only mail to or from someone on one of your accounts." },
+  gmail: {
+    label: "Gmail",
+    scope:
+      "Mail to or from someone on one of your accounts, plus Google's own notices about shared documents and recordings.",
+  },
   calendar: { label: "Calendar", scope: "Your own calendar, so meetings and sprints can be read and added." },
   chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
@@ -169,7 +187,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                       ? live.lastUsedAt
                         ? `Last used ${formatActivityWhen(live.lastUsedAt)}`
                         : "Never used yet"
-                      : SERVICE_COPY[service].scope}
+                      : t(SERVICE_COPY[service].scope)}
                   </span>
                   <div className="flex items-center gap-2">
                     {live && NAMED.includes(service) && (
@@ -226,7 +244,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   <div className="flex flex-col gap-1 pl-1">
                     {named.length === 0 ? (
                       <p className="text-muted-foreground text-xs">
-                        {t("Nothing shared yet —")} {SERVICE_COPY[service].scope}
+                        {t("Nothing shared yet —")} {t(SERVICE_COPY[service].scope)}
                       </p>
                     ) : (
                       named.map((s) => (

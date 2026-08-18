@@ -60,13 +60,12 @@ import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
-import { richTextValue } from "@shared/web/rich-text"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 // Every URL bound to an attribute goes through the seam, Google's included —
 // see the note in google-source-dialog.tsx for why "it came from Google" is not
 // a reason to skip it.
-import { safeHref, safeSrc } from "@/lib/rich-text"
+import { richTextValue, safeHref, safeSrc } from "@shared/web/rich-text"
 import { useT } from "@shared/web/language"
 
 export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; meetingId: string }) {
