@@ -205,9 +205,9 @@ export function useScreenData({
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
     helpArchived: useCachedValue<number>(enabled ? totalKey("help-archived", teamId as string) : null),
     accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
-    // The All / Companies / People strip's other two badges — exact, from the
+    // The Companies / Contacts / All strip's other two badges — exact, from the
     // same read as the rows, and both zero-safe: without the contacts right the
-    // people count comes back 0 beside a list with no people in it.
+    // contacts count comes back 0 beside a list with no contacts in it.
     accountsEntity: useCachedValue<number>(enabled ? totalKey("accounts-entity", teamId as string) : null),
     accountsIndividual: useCachedValue<number>(
       enabled ? totalKey("accounts-individual", teamId as string) : null

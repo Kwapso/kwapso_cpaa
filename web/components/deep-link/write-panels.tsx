@@ -249,14 +249,14 @@ export function WritePanels({
         onSubmit={(title, description) => runAction("roles.create", { title, description })}
       />
 
-      {/* Add an account (?panel=add&module=accounts) — gated by create. The parent
-       * picker offers the accounts already loaded on the list behind it; the
-       * statuses are the ones this team already uses, so they stay consistent. */}
+      {/* Add an account (?panel=add&module=accounts) — gated by create. No parent
+       * picker: a new account is a new company and sits on its own (18 Aug 2026 —
+       * account-form-dialog's header). The statuses are the ones this team already
+       * uses, so they stay consistent. */}
       <AccountFormDialog
         open={query.panel === "add" && query.module === "accounts" && can("accounts", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `account:new:${teamId}` : undefined}
-        parentOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         statusOptions={[
           ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
         ]}

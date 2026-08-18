@@ -177,12 +177,13 @@ export function useScreenActions(teamId: string | null) {
   const createAccount = React.useCallback(
     async (values: AccountFormValues) => {
       if (!teamId) return
-      // No `code`: the door mints the reference from the name (BERG, BERG2 on a
-      // clash), because nobody types one — see account-form-dialog's header.
+      // No `code` and no `parentAccountId`: the door mints the reference from the
+      // name (BERG, BERG2 on a clash) and a new account sits on its own, because
+      // neither is a question the form asks — see account-form-dialog's header.
+      // The door still reads both; nothing here answers them.
       await tenancy.createAccount({
         accountType: values.accountType,
         name: values.name.trim(),
-        parentAccountId: values.parentAccountId || undefined,
         email: values.email.trim() || undefined,
         phone: values.phone.trim() || undefined,
         street: values.street.trim() || undefined,

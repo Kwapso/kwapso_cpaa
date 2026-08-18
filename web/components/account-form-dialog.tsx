@@ -36,10 +36,27 @@
 // here rather than passed in, because this dialog is mounted by the deep-link
 // host and its call sites hand it only the two option lists they already hold.
 //
-// The parent account is edited here too, because "who does this sit under" is part
-// of the record, not a separate errand. The caller decides what that means: on an
-// edit it moves the account FIRST (that's the move the server can refuse — putting
-// an account inside itself), so a refusal changes nothing at all.
+// THE PARENT PICKER IS GONE TOO, and it is the same ruling one field along
+// (18 Aug 2026): "each new account created will be its own thing. It will have
+// no parent because it's literally a brand new company." A company an agency
+// takes on is a company, not a subsidiary of one already on the books, so the
+// form stopped asking a question whose honest answer was always "none" — and it
+// stopped asking it on the EDIT half as well, because a control nobody wanted on
+// the way in is not one they wanted on the way back.
+//
+// THE COLUMN, THE DOOR AND THE LINE ON THE RECORD ALL STAY. `parent_account_id`
+// is what puts a contact under her company (account-detail's `createContact`
+// writes it in code), the account screen still reads "Parent account · Bergman
+// S.A." on its Overview, and `/api/tenancy/accounts/parent` is still a door — a
+// machine caller building a hierarchy on purpose is not the same act as a person
+// being handed a dropdown they never asked for. What went is the CONTROL.
+//
+// Unlike `accountType`, the field is not carried through either: `updateAccount`
+// never reads it (a move is its own door — see `setAccountParent`'s note in
+// workers/tenancy/src/lib/accounts.ts), so a form that stopped sending it cannot
+// zero anything. The two halves of CHECKLIST 3.13 are "does the door read it?"
+// and "does the form still answer it?" — here the first is no, so the second is
+// moot.
 //
 // Shared FormShell layout (Law R4) + a per-session draft (Law R7 · CACHING.md §11).
 
@@ -74,7 +91,6 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
 const nameField = { ...defaultFieldConfig, label: "Name", required: true }
-const parentField = { ...defaultFieldConfig, label: "Parent account", required: false }
 const emailField = { ...defaultFieldConfig, label: "Email", required: false }
 const phoneField = { ...defaultFieldConfig, label: "Phone", required: false }
 const streetField = { ...defaultFieldConfig, label: "Street", required: false }
@@ -102,8 +118,6 @@ export type AccountFormValues = {
    * because the Industry field is only a company's question. */
   accountType: "entity" | "individual"
   name: string
-  /** "" = top level */
-  parentAccountId: string
   email: string
   phone: string
   street: string
@@ -124,7 +138,6 @@ export type AccountFormValues = {
 const EMPTY: AccountFormValues = {
   accountType: "entity",
   name: "",
-  parentAccountId: "",
   email: "",
   phone: "",
   street: "",
@@ -148,7 +161,6 @@ export function AccountFormDialog({
   open,
   onOpenChange,
   initial,
-  parentOptions,
   statusOptions,
   onSubmit,
   draftKey,
@@ -157,9 +169,6 @@ export function AccountFormDialog({
   onOpenChange: (open: boolean) => void
   /** present = edit mode (prefilled); absent = create mode */
   initial?: AccountFormValues | null
-  /** the accounts this one may sit under (the caller leaves out the record itself;
-   * a move that would close a loop is refused by the server, in plain words). */
-  parentOptions: { id: string; name: string }[]
   /** statuses already in use on this team, offered as a pick-or-type list. */
   statusOptions: string[]
   onSubmit: (values: AccountFormValues) => Promise<void>
@@ -302,26 +311,6 @@ export function AccountFormDialog({
           disabled={busy}
           autoFocus
         />
-      </Field>
-
-      <Field config={parentField} htmlFor="account-parent" className={fieldSpacing}>
-        <Select
-          value={values.parentAccountId || NONE}
-          onValueChange={(v) => set({ parentAccountId: v === NONE ? "" : v })}
-          disabled={busy}
-        >
-          <SelectTrigger id="account-parent">
-            <SelectValue placeholder={t("Sits on its own")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Sits on its own")}</SelectItem>
-            {parentOptions.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </Field>
 
       <Field config={emailField} htmlFor="account-email" className={fieldSpacing}>
