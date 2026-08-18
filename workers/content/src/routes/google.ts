@@ -91,7 +91,7 @@ import {
   knownContactQuery,
 } from "../lib/google-api"
 import { knownContactEmails } from "../lib/google-read"
-import { findTranscript, transcriptText } from "../lib/google-transcript"
+import { findTranscript } from "../lib/google-transcript"
 import { claimCalendarEvent, getMeeting } from "../lib/meetings"
 import { getSprint } from "../lib/stories"
 import type { Env } from "../env"
@@ -1144,7 +1144,9 @@ export async function getGoogleEventTranscript(request: Request, env: Env): Prom
       name: found.name,
       url: found.url,
       foundBy: found.foundBy,
-      text: await transcriptText(env, cfg, guard, found.fileId),
+      // The hunt read it — a candidate it could not read is not a transcript, so
+      // this is never the empty string (lib/google-transcript.ts).
+      text: found.text,
     },
   })
 }

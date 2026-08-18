@@ -19,6 +19,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
 const calendarCalls = vi.hoisted(() => ({ n: 0 }))
+/** What Google's diary holds, per test — see "everything on the calendar" below. */
+const diary = vi.hoisted(() => ({ events: [] as Record<string, unknown>[] }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
@@ -39,6 +41,15 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
     // Every call makes a NEW entry, exactly as Google does — so if the door ever
     // stopped claiming the event id on the row, this fixture would happily hand
     // back a second one and the test below would see it.
+    // A FAITHFUL WINDOW. The sweep reads three ranges (a fortnight back, four
+    // weeks forward, and the horizon beyond), so a fixture that answered all
+    // three with the same entry would hand the same event to the loop twice and
+    // test a collision rather than the rule.
+    calendarList: async (_t: string, range: { from?: string; to?: string }) =>
+      diary.events.filter((e) => {
+        const at = Date.parse(e.start as string)
+        return (!range.from || at >= Date.parse(range.from)) && (!range.to || at < Date.parse(range.to))
+      }),
     calendarCreate: async (_t: string, input: { summary: string; start: string; end: string }) => {
       calendarCalls.n++
       return {
@@ -110,6 +121,7 @@ const historyCount = (id: string) =>
 beforeEach(() => {
   published = []
   calendarCalls.n = 0
+  diary.events = []
   holder.db = buildSpineDb()
   // BOTH roles hold every meeting right, plus the two Google switches — so a
   // refusal below is the DOOR's and never the role's. Asserted, not assumed.
@@ -360,5 +372,117 @@ describe("R1 — every write publishes", () => {
     await call(IDS.staffUser, "POST /api/content/meetings/active", { id: m.id, active: false })
     expect(published.filter((p) => p.resource === "meetings").length).toBe(3)
     for (const p of published) expect(p.id, "row-level, so an open list patches ONE row").toBe(m.id)
+  })
+})
+
+// ── EVERYTHING ON THE CALENDAR REACHES THE DIARY ─────────────────────────────
+//
+// THE OWNER'S BUG, in his own diary. He asked why "FluClinic: Client selectable
+// data" — a real meeting on 18 August, organised by a colleague, him an accepted
+// guest, on his primary calendar, at the right hour — was not in kwapso. It read
+// back perfectly from Google every time anybody looked.
+//
+// The line was `if (!event.recurringEventId) continue`. `syncCalendar` only ever
+// made a record for an instance of a REPEATING series, so of the 21 rows it had
+// mirrored, 21 were recurring and 0 were one-offs. Worse than absent: the
+// knowledge sweep reads every event, so the app could ANSWER questions about a
+// meeting it refused to SHOW him.
+//
+// His instruction settles what replaces it, and it is not a narrower rule but
+// the absence of one: "I want everything that's in my Google Calendar to sync
+// here, whether they're past events, new events, whatever." A guest-list test
+// was written first and thrown away — it would have kept out the block somebody
+// puts in their own day, which is a judgement nobody asked us to make.
+
+/** One entry as Google returns it, with only what the sweep reads.
+ *
+ * The times are RELATIVE to now — two days out, inside the sweep's forward
+ * window — because the window straddles today and a fixture pinned to a date
+ * would start failing on its own the week after it was written. */
+const SOON = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+const entry = (over: Record<string, unknown>) => ({
+  id: "E1",
+  summary: "FluClinic: Client selectable data",
+  description: "",
+  start: SOON.toISOString(),
+  end: new Date(SOON.getTime() + 3_600_000).toISOString(),
+  timeZone: "Asia/Kolkata",
+  allDay: false,
+  url: "https://calendar.example/E1",
+  joinUrl: null,
+  organizer: { email: "ishita@kwapso.com", name: "Ishita" },
+  location: "",
+  status: "confirmed",
+  meetingCode: "",
+  // The bug, in one field: nothing repeats here.
+  recurringEventId: "",
+  recurrence: [],
+  // Fixed on purpose: idempotence is decided by this stamp NOT moving.
+  updatedAt: "2026-08-18T08:00:00.000Z",
+  attendees: [],
+  attachments: [],
+  ...over,
+})
+
+const connectCalendar = () =>
+  db().exec(
+    `INSERT INTO google_connections (id, user_id, service, google_email, scopes, access_token,
+       access_expires_at, refresh_token, created_at, creator_id)
+     VALUES ('C_CAL', '${IDS.staffUser}', 'calendar', 'me@kwapso.app', 'scope', 'plain',
+       '${new Date(Date.now() + 3_600_000).toISOString()}', 'plain-refresh', '2026-01-01', '${IDS.staffUser}');`
+  )
+
+const diaryTitles = () =>
+  (db().prepare("SELECT title FROM meetings ORDER BY title").all() as { title: string }[]).map((r) => r.title)
+
+describe("the sweep brings in everything, not only the repeating entries", () => {
+  beforeEach(connectCalendar)
+
+  it("a ONE-OFF meeting becomes a record — the entry he could not find", async () => {
+    // No `recurringEventId` anywhere on it. This is the whole bug.
+    diary.events = [
+      entry({
+        attendees: [
+          { email: "ishita@kwapso.com", name: "Ishita", response: "accepted", organizer: true, optional: false },
+        ],
+      }),
+    ]
+
+    const res = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+
+    expect(res.status).toBe(200)
+    expect((await res.json()) as { created: number }).toMatchObject({ created: 1 })
+    expect(diaryTitles()).toContain("FluClinic: Client selectable data")
+  })
+
+  it("an entry with no guests at all comes in too — 'everything' was meant literally", async () => {
+    diary.events = [entry({ id: "E2", summary: "Write the deck" })]
+    await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    expect(diaryTitles()).toContain("Write the deck")
+  })
+
+  it("a repeating instance still comes in, so nothing that worked stopped working", async () => {
+    diary.events = [entry({ id: "E3", summary: "Monday stand-up", recurringEventId: "SERIES_1" })]
+    await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    expect(diaryTitles()).toContain("Monday stand-up")
+  })
+
+  it("an entry already called off is NOT created just to be cancelled", async () => {
+    diary.events = [entry({ id: "E4", summary: "Abandoned call", status: "cancelled" })]
+    const res = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    expect((await res.json()) as { created: number }).toMatchObject({ created: 0 })
+    expect(diaryTitles()).toHaveLength(0)
+  })
+
+  it("an entry with no title gets words rather than a blank, and sweeping twice writes once (R17)", async () => {
+    diary.events = [entry({ id: "E5", summary: "" })]
+    await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    expect(diaryTitles()).toEqual(["A meeting with no title"])
+
+    // IDEMPOTENT. Google's `updated` has not moved, so the second sweep must
+    // touch nothing at all — no second row, no second activity line, no ping.
+    const again = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    expect((await again.json()) as { created: number; updated: number }).toMatchObject({ created: 0, updated: 0 })
+    expect(diaryTitles()).toHaveLength(1)
   })
 })

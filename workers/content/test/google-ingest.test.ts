@@ -24,7 +24,14 @@
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
+const holder = vi.hoisted(() => ({
+  db: null as DatabaseSync | null,
+  /** Ids Google STOPS LISTING — which on its own proves nothing at all. */
+  unlisted: new Set<string>(),
+  /** Ids Google positively says have gone: in the bin, called off, or 404.
+   * The only signal that may retire a source. */
+  binned: new Set<string>(),
+}))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
@@ -50,8 +57,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/google-api")>()
   return {
     ...actual,
+    googlePresence: async (_s: string, _t: string, id: string) =>
+      holder.binned.has(id) ? "gone" : "there",
     driveList: async (_t: string, folderIds: string[]) =>
-      folderIds.flatMap((folderId) =>
+      folderIds.filter((f) => !holder.unlisted.has(f)).flatMap((folderId) =>
         folderId === "FOLDER_CLIENT"
           ? [
               {
@@ -78,7 +87,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       fileId === "FILE_1"
         ? "The dispatch screen keeps logging drivers out. Agreed to move the driver app forward."
         : "Books I mean to read.",
-    gmailSearch: async () => [
+    gmailSearch: async () =>
+      holder.unlisted.has("MAIL_1")
+        ? []
+        : [
       {
         id: "MAIL_1",
         threadId: "TH_1",
@@ -87,10 +99,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         subject: "Re: the dispatch screen",
         snippet: "a snippet",
         date: "Tue, 4 Aug 2026 10:04:00 +0000",
-        url: "https://mail.example/MAIL_1",
-        text: "",
-      },
-    ],
+            url: "https://mail.example/MAIL_1",
+            text: "",
+          },
+        ],
     gmailMessage: async () => ({
       id: "MAIL_1",
       threadId: "TH_1",
@@ -102,7 +114,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       url: "https://mail.example/MAIL_1",
       text: "We agreed on the fourth of August to park the reporting work.",
     }),
-    calendarList: async () => [
+    calendarList: async () =>
+      holder.unlisted.has("EVENT_1")
+        ? []
+        : [
       {
         id: "EVENT_1",
         summary: "Quarterly review",
@@ -116,10 +131,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         // field carrying both beats two fields that can disagree).
         attendees: [
           { email: "luis@bergman.example", name: "Luis", response: "accepted", organizer: false, optional: false, resource: false },
-          { email: "me@kwapso.app", name: "Me", response: "accepted", organizer: true, optional: false, resource: false },
+              { email: "me@kwapso.app", name: "Me", response: "accepted", organizer: true, optional: false, resource: false },
+            ],
+          },
         ],
-      },
-    ],
     chatMessages: async () => [
       {
         id: "MSG_2",
@@ -245,6 +260,8 @@ function connect(userId: string) {
 
 beforeEach(() => {
   holder.db = buildSpineDb()
+  holder.unlisted.clear()
+  holder.binned.clear()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
      INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m5', '${IDS.team}', '${OTHER_STAFF}', '${IDS.adminRole}', '2026-01-01');
@@ -527,5 +544,102 @@ describe("Google comes into step when you open the app (14.12)", () => {
     const res = await sync(OTHER_STAFF, { onlyIfStale: true })
     expect(res.results).toEqual([])
     expect(res.skipped).toBe(false)
+  })
+})
+
+// ── LETTING GO OF DELETED GOOGLE MATERIAL ────────────────────────────────────
+//
+// THE ASYMMETRY THAT CAUSED IT. Every kind this app owns the rows of retires
+// itself: an archived ticket comes back from its own table with a column set,
+// and `IngestRow.retired` deactivates the source — "the difference between 'the
+// assistant stops quoting it' and 'the assistant quotes it forever because the
+// sweep never visits it again'", in that field's own words.
+//
+// Google's four kinds are not a table this app walks. They are a LISTING, and a
+// deleted file is not in it — so the sweep moved forward past a source it would
+// never be handed again, and a document the owner deleted stayed answerable
+// indefinitely. `knowledge-google.ts` set no `retired` and had no `trashed`, 404
+// or gone handling of any kind.
+//
+// THE HARD PART IS NOT NOTICING. It is REFUSING to act on the wrong evidence: a
+// source can be missing from a listing because a window moved, a page filled, a
+// query stopped matching, or Google was unwell for ninety seconds. Retiring on
+// absence would empty a person's whole index during an outage and record it as
+// housekeeping. So absence makes a CANDIDATE and only a positive answer retires
+// — which is what the two sets in the fixture above are for, and why the second
+// test here matters more than the first.
+
+/** Is this source still quotable? A retired one keeps its row and its history
+ * and simply stops being read — never deleted, exactly as everywhere else. */
+const live = (originRowId: string) =>
+  (
+    db()
+      .prepare("SELECT deactivated_at AS d FROM knowledge_sources WHERE origin_row_id = ?")
+      .get(originRowId) as { d: string | null } | undefined
+  )?.d === null
+
+const sweep = () => call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+
+describe("Google material that has GONE stops being quoted", () => {
+  const FILE = `${IDS.staffUser}:FILE_1`
+  const MAIL = `${IDS.staffUser}:MAIL_1`
+  const EVENT = `${IDS.staffUser}:EVENT_1`
+
+  it("a deleted document, a binned mail and a cancelled meeting are all retired", async () => {
+    await sweep()
+    expect(live(FILE) && live(MAIL) && live(EVENT), "all three should be quotable to begin with").toBe(true)
+
+    // He deletes the file, bins the mail and calls the meeting off. Google stops
+    // listing them AND says positively what happened to each.
+    for (const id of ["FOLDER_CLIENT", "MAIL_1", "EVENT_1"]) holder.unlisted.add(id)
+    for (const id of ["FILE_1", "MAIL_1", "EVENT_1"]) holder.binned.add(id)
+    await sweep()
+
+    expect(live(FILE), "a deleted Drive file must stop answering").toBe(false)
+    expect(live(MAIL), "a binned mail must stop answering").toBe(false)
+    expect(live(EVENT), "a cancelled meeting must stop answering").toBe(false)
+    // RETIRED, NOT DELETED — the row and its history survive.
+    expect(sources().some((s) => s.origin_row_id === FILE)).toBe(true)
+  })
+
+  it("ABSENCE IS NOT DELETION — a source Google merely stopped listing survives", async () => {
+    await sweep()
+    // The window moved, the page filled, Google had a bad minute: every one of
+    // these looks exactly like this. Nothing is added to `binned`, so nothing
+    // was ever positively said to have gone.
+    for (const id of ["FOLDER_CLIENT", "MAIL_1", "EVENT_1"]) holder.unlisted.add(id)
+    await sweep()
+
+    expect(live(FILE), "an outage must not empty somebody's knowledge base").toBe(true)
+    expect(live(MAIL)).toBe(true)
+    expect(live(EVENT)).toBe(true)
+  })
+
+  it("a Chat space he has switched off is retired without asking Google anything", async () => {
+    await sweep()
+    const SPACE = `${IDS.staffUser}:S_SPACE_${IDS.staffUser}`
+    expect(live(SPACE)).toBe(true)
+
+    // A Chat source IS a space somebody named here, so the positive signal is a
+    // fact in this app's own database rather than a question for Google.
+    db().exec(`UPDATE google_sources SET deactivated_at = '2026-08-18' WHERE id = 'S_SPACE_${IDS.staffUser}';`)
+    await sweep()
+
+    expect(live(SPACE), "unshared here means unquotable here").toBe(false)
+  })
+
+  it("the chunks go with it, because the chunks are what an answer is built from", async () => {
+    await sweep()
+    holder.unlisted.add("FOLDER_CLIENT")
+    holder.binned.add("FILE_1")
+    await sweep()
+
+    const left = db()
+      .prepare(
+        `SELECT count(*) AS n FROM knowledge_chunks
+          WHERE source_id = (SELECT id FROM knowledge_sources WHERE origin_row_id = ?)`
+      )
+      .get(FILE) as { n: number }
+    expect(left.n, "a retired source must leave nothing quotable behind").toBe(0)
   })
 })

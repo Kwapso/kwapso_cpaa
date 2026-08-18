@@ -20,9 +20,17 @@
 // AbortSignal timeout, through the single `googleFetch` below.
 //
 // R14's SPIRIT, on the other axis: an external read is as unbounded as a SELECT.
-// Every list here carries a page size and asks for ONE page. A door that walked
-// Google's pagination would be a door whose cost is set by how much material
-// somebody happens to have.
+// Every list here carries a page size and a CEILING, and the ceiling is ours
+// rather than Google's — a door that walked Google's pagination to the end would
+// be a door whose cost is set by how much material somebody happens to have.
+//
+// One page is the ceiling for Drive, Gmail and Chat, where the order is "newest
+// first" and the tail is genuinely the material nobody is asking about. The
+// DIARY is the exception and it was found the hard way: it is ordered by start
+// time, so its tail is TOMORROW, and a busy fortnight silently lost the far end
+// of the window. It walks up to CALENDAR_MAX_PAGES and says so in the tail when
+// it stops early — a bounded read that drops rows without saying so is exactly
+// the fault R14 is about.
 
 import { GuardError } from "@shared/workers/gating"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
@@ -32,12 +40,51 @@ import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
  * would be paying for material nobody reads. */
 const GOOGLE_PAGE_SIZE = 50
 
-/** Known contacts one Gmail query may name. A Gmail search string has a real
- * length limit, and an agency with 2,000 contacts would otherwise build a query
- * Google refuses — which would read, from the outside, exactly like "you have no
- * mail from anybody". Bounded, and the boundedness is reported to the caller so
+/** THE WAYS A KNOWN CONTACT CAN BE ON A MESSAGE.
+ *
+ * `cc` was missing until 2026-08-18, and the gap was invisible because the two
+ * terms that were there are the two anybody would think of. Real evidence off
+ * the owner's own mailbox: `cc:alaap@kwapso.com` returns "Re: Declined: Strategy
+ * Session w kwapso" — Alexander writing to an external address with him copied
+ * in. Mail he can see, about his own agency, that kwapso could not find. A
+ * three-way thread where the client replies to a colleague and copies you is not
+ * an edge case; it is how half of an agency's mail arrives.
+ *
+ * `bcc` is deliberately absent and always will be: Gmail does not index it on
+ * received mail, so the term would widen the query string without widening the
+ * answer. */
+const CONTACT_DIRECTIONS = ["from", "to", "cc"] as const
+
+/** THE MOST TERMS ONE GMAIL QUERY MAY CARRY — the real ceiling, and the one the
+ * contact cap is now DERIVED from rather than kept in step with by hand.
+ *
+ * A Gmail search string has a length limit, and an agency with 2,000 contacts
+ * would otherwise build a query Google refuses — which reads, from the outside,
+ * exactly like "you have no mail from anybody". The worst failure shape there
+ * is: a fence that is working perfectly and an inbox that appears empty.
+ *
+ * Eighty is not a guess. It is the size of the query this product has been
+ * asking Google with — forty contacts in two directions — and answering with,
+ * so it is the one length there is evidence for. Adding `cc` above would have
+ * taken the same forty contacts to a hundred and twenty terms and roughly 3,500
+ * characters, well past anything that has ever been tried here.
+ *
+ * WHY THE BUDGET IS IN TERMS AND THE CAP IS ARITHMETIC. The next person to add a
+ * fourth direction cannot forget to shrink the cap, because there is nothing to
+ * remember: the query gets narrower in contacts instead of longer in characters,
+ * automatically. A number that has to be kept in step by hand is a number that
+ * one day is not. */
+const GMAIL_QUERY_TERM_CAP = 80
+
+/** Known contacts one Gmail query may name — DERIVED from the two constants
+ * above, and today twenty-six (80 ÷ 3, rounded down: 78 terms). Down from forty,
+ * because the third direction has to be paid for out of the same budget, and a
+ * fence that covers twenty-six contacts three ways sees strictly more mail than
+ * one that covered forty two ways.
+ *
+ * Bounded, and the boundedness is reported to the caller (`contactsCapped`), so
  * the narrowing is never silent. */
-export const GMAIL_CONTACT_CAP = 40
+export const GMAIL_CONTACT_CAP = Math.floor(GMAIL_QUERY_TERM_CAP / CONTACT_DIRECTIONS.length)
 
 /** One shared call. Every Google request in the product goes through it, so the
  * timeout and the error shape are decided once.
@@ -132,13 +179,35 @@ export type DriveFile = {
   /** bytes, when Google states one. A Google Doc has no size (it is not a file
    * in the ordinary sense), so this is null far more often than it is not. */
   sizeBytes: number | null
+  /** THE FILE THIS ONE IS ONLY A POINTER TO, when it is one — and null for every
+   * ordinary file.
+   *
+   * A Drive SHORTCUT is a real file with a real id, a real name and a real link,
+   * and Google returns it from a folder listing exactly as it returns a document.
+   * It simply has no content: its mime type is
+   * `application/vnd.google-apps.shortcut` and the words live at
+   * `shortcutDetails.targetId`.
+   *
+   * WHY IT IS ON THE SHAPE RATHER THAN HIDDEN IN THE READ. On 2026-08-18 a
+   * meeting's transcript was found through a named folder, filed with a
+   * plausible name and a working link, and read back as ZERO characters — the
+   * folder held a shortcut to the document, not the document. The same file read
+   * 13,128 characters when the calendar entry's own attachment named the real id.
+   * Nothing failed: a pointer answered every question we asked it except the one
+   * that mattered. A caller that keeps a file id (the transcript on a meeting, a
+   * knowledge source) wants the DOCUMENT's id, so it is handed the target. */
+  targetId: string | null
 }
 
 /** What we ask Google for about a file, in ONE place. Spelled once because it is
  * used by four reads and a mask that drifts between them is a field that is
- * present on one screen and mysteriously absent on the next. */
+ * present on one screen and mysteriously absent on the next.
+ *
+ * `shortcutDetails/targetId` is on it for the reason `targetId` above gives, and
+ * it is FREE for every other file: Google omits the whole object rather than
+ * charging for an empty one. */
 const DRIVE_FILE_FIELDS =
-  "id,name,mimeType,modifiedTime,webViewLink,iconLink,thumbnailLink,size,owners(displayName)"
+  "id,name,mimeType,modifiedTime,webViewLink,iconLink,thumbnailLink,size,owners(displayName),shortcutDetails/targetId"
 
 /** One Google file row → our shape. The single mapper, for the same reason the
  * field mask above is a single string. */
@@ -146,7 +215,9 @@ function toDriveFile(raw: unknown, folderId: string): DriveFile {
   const f = raw as Record<string, unknown>
   const owners = Array.isArray(f.owners) ? f.owners : []
   const size = Number(f.size)
+  const shortcut = (f.shortcutDetails ?? {}) as Record<string, unknown>
   return {
+    targetId: str(shortcut.targetId) || null,
     id: str(f.id),
     name: str(f.name),
     mimeType: str(f.mimeType),
@@ -346,15 +417,24 @@ const DRIVE_TEXT_CAP = 100_000
  * (its bytes are not a document); anything else is downloaded as-is, and a
  * binary that has no text is honestly empty rather than mojibake. */
 export async function driveFileText(token: string, fileId: string): Promise<string> {
-  const meta = (await googleFetch(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=mimeType,name&supportsAllDrives=true`,
-    token
-  )) as { mimeType?: unknown }
-  const mime = str(meta.mimeType)
+  // A SHORTCUT IS FOLLOWED BEFORE ANYTHING IS READ, and this is the whole reason
+  // the metadata call asks for a third field.
+  //
+  // A shortcut's mime type starts `application/vnd.google-apps` exactly as a Doc
+  // does, so the branch below sent it to `export` — which Google refuses,
+  // because there is nothing to export from a pointer. The refusal is a non-2xx,
+  // the non-2xx is the honest "" of an image or a zip, and the caller therefore
+  // received an empty string for a document with thirteen thousand words in it.
+  // Silent, plausible, and wrong in the one direction that matters: it looked
+  // like a file with no text rather than a file we did not open.
+  //
+  // ONE HOP, NOT A WALK. Drive does not let a shortcut point at a shortcut, so a
+  // second resolution would only exist to survive something Google cannot make.
+  const { mime, id } = await driveReadable(token, fileId)
   const isGoogleDoc = mime.startsWith("application/vnd.google-apps")
   const url = isGoogleDoc
-    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain&supportsAllDrives=true`
-    : `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`
+    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}/export?mimeType=text/plain&supportsAllDrives=true`
+    : `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`
   const res = await fetch(url, {
     // R11.
     signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
@@ -380,6 +460,36 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   // loop, which is right; one awkward file no longer does.
   if (!res.ok) return ""
   return (await res.text()).slice(0, DRIVE_TEXT_CAP)
+}
+
+/** Google's own mime type for a POINTER to a file. Named beside the folder one
+ * above, and for the same reason: it is spelled in two places and a typo in
+ * either is a silently wrong answer rather than an error. */
+const DRIVE_SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
+
+/** WHICH FILE ACTUALLY HOLDS THE WORDS — the id `driveFileText` reads from, and
+ * the type it has to read it as.
+ *
+ * For nearly every file this is the file itself and one call. For a shortcut it
+ * is the second call that makes the difference between a document and an empty
+ * string; a shortcut whose target we cannot read is returned as itself, so the
+ * read below fails the ordinary honest way rather than throwing here. */
+async function driveReadable(token: string, fileId: string): Promise<{ mime: string; id: string }> {
+  const ask = async (id: string) =>
+    (await googleFetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=mimeType,name,shortcutDetails/targetId&supportsAllDrives=true`,
+      token
+    )) as { mimeType?: unknown; shortcutDetails?: unknown }
+  const meta = await ask(fileId)
+  const mime = str(meta.mimeType)
+  if (mime !== DRIVE_SHORTCUT_MIME) return { mime, id: fileId }
+  const target = str(((meta.shortcutDetails ?? {}) as Record<string, unknown>).targetId)
+  if (!target) return { mime, id: fileId }
+  try {
+    return { mime: str((await ask(target)).mimeType), id: target }
+  } catch {
+    return { mime, id: fileId }
+  }
 }
 
 /** Put a file INTO a folder the caller named. Multipart because Drive wants the
@@ -508,10 +618,14 @@ export type MailMessage = {
  * THE KNOWN-CONTACT FENCE, and the only place it is decided.
  *
  * The owner's rule is "only mail to or from a known contact at one of the
- * accounts". So the query is BUILT from those addresses — `{from:a to:a from:b
- * …}`, Gmail's OR group — and anything the caller asked for is ANDed with it.
- * That ordering is the whole guarantee: a caller cannot widen a query they can
- * only add terms to.
+ * accounts". So the query is BUILT from those addresses — `{from:a to:a cc:a
+ * from:b …}`, Gmail's OR group — and anything the caller asked for is ANDed with
+ * it. That ordering is the whole guarantee: a caller cannot widen a query they
+ * can only add terms to.
+ *
+ * "TO OR FROM" IS THREE TERMS, NOT TWO. `cc` is one of the ways a message is
+ * addressed to somebody — see CONTACT_DIRECTIONS — and leaving it out was a
+ * narrowing of the owner's own rule rather than an enforcement of it.
  *
  * No contacts → NO SEARCH AT ALL. Not "search everything", not "search with an
  * empty group" (which Gmail reads as no restriction). The empty case is the one
@@ -521,7 +635,7 @@ export type MailMessage = {
 export function knownContactQuery(contacts: string[]): string | null {
   const usable = contacts.map((c) => c.trim().toLowerCase()).filter(Boolean).slice(0, GMAIL_CONTACT_CAP)
   if (usable.length === 0) return null
-  const terms = usable.flatMap((c) => [`from:${c}`, `to:${c}`])
+  const terms = usable.flatMap((c) => CONTACT_DIRECTIONS.map((d) => `${d}:${c}`))
   return `{${terms.join(" ")}}`
 }
 
@@ -1077,16 +1191,48 @@ export async function calendarList(
   token: string,
   range: { from?: string; to?: string; showDeleted?: boolean }
 ): Promise<CalendarEvent[]> {
-  const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events")
-  if (range.from) url.searchParams.set("timeMin", range.from)
-  if (range.to) url.searchParams.set("timeMax", range.to)
-  url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
-  url.searchParams.set("singleEvents", "true")
-  url.searchParams.set("orderBy", "startTime")
-  if (range.showDeleted) url.searchParams.set("showDeleted", "true")
-  const data = (await googleFetch(url.toString(), token)) as { items?: unknown }
-  return (Array.isArray(data.items) ? data.items : []).map(toEvent)
+  const out: CalendarEvent[] = []
+  let pageToken = ""
+  for (let page = 0; page < CALENDAR_MAX_PAGES; page++) {
+    const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+    if (range.from) url.searchParams.set("timeMin", range.from)
+    if (range.to) url.searchParams.set("timeMax", range.to)
+    url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
+    url.searchParams.set("singleEvents", "true")
+    url.searchParams.set("orderBy", "startTime")
+    if (range.showDeleted) url.searchParams.set("showDeleted", "true")
+    if (pageToken) url.searchParams.set("pageToken", pageToken)
+    const data = (await googleFetch(url.toString(), token)) as { items?: unknown; nextPageToken?: unknown }
+    for (const item of Array.isArray(data.items) ? data.items : []) out.push(toEvent(item))
+    pageToken = str(data.nextPageToken)
+    if (!pageToken) return out
+  }
+  // THE CAP WAS REACHED AND GOOGLE STILL HAS MORE. The one case this whole
+  // function exists to stop being silent about — said in the tail, with the
+  // window rather than the query string, because a diary's contents are the
+  // person's and the dates are ours.
+  console.error(
+    `[google] calendar window truncated at ${CALENDAR_MAX_PAGES * GOOGLE_PAGE_SIZE} events (${range.from ?? "any"} → ${range.to ?? "any"})`
+  )
+  return out
 }
+
+/** HOW MANY PAGES OF ONE DIARY WINDOW THIS APP WILL WALK.
+ *
+ * R14, on the axis this file's header calls "the other one": a read that stops
+ * at fifty is a bounded cost, and a read that stops at fifty WITHOUT SAYING SO
+ * is the fault the law exists for. `maxResults=50` and no `pageToken` is exactly
+ * that — a fortnight with fifty-one entries in it loses the tail, the sweep
+ * reports success, and the meetings that never appeared are the ones nobody
+ * knows to look for.
+ *
+ * Five pages, so two hundred and fifty entries per window. The windows measured
+ * on a real diary returned 43 and 21, so this is an order of magnitude of
+ * headroom rather than a number anybody will meet; and the cost stays OURS
+ * rather than being set by how busy somebody happens to be, which is the promise
+ * the header makes on behalf of every list in this file. When it is met, the
+ * tail is dropped LOUDLY — which is the whole difference. */
+const CALENDAR_MAX_PAGES = 5
 
 export async function calendarCreate(
   token: string,
@@ -1348,7 +1494,14 @@ export type ChatSpace = {
 export type ChatMessage = {
   id: string
   space: string
+  /** WHO SAID IT, in something a person can read. Google's own `displayName`
+   * where there is one and an honest description of the speaker where there is
+   * not — never `users/112978…`. See `toChatSender`. */
   sender: string
+  /** FALSE WHEN WE MADE THE LABEL UP — the same flag, for the same reason, as
+   * `ChatSpace.named`. A screen that cannot tell Google's word from ours is a
+   * screen that will one day present a guess as a fact. */
+  senderNamed: boolean
   text: string
   createdAt: string | null
 }
@@ -1409,15 +1562,49 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
   const data = (await googleFetch(url.toString(), token)) as { messages?: unknown }
   return (Array.isArray(data.messages) ? data.messages : []).map((raw) => {
     const m = raw as Record<string, unknown>
-    const sender = (m.sender ?? {}) as Record<string, unknown>
     return {
       id: str(m.name),
       space: spaceName,
-      sender: str(sender.displayName) || str(sender.name),
+      ...toChatSender(m.sender),
       text: str(m.text),
       createdAt: str(m.createTime) || null,
     }
   })
+}
+
+/**
+ * WHO SAID IT — the same fix as `toChatSpace`, one layer down, and it was left
+ * behind by that one.
+ *
+ * THE BUG, in the owner's own words about his own screen: the space names were
+ * put right and the senders still read `users/112978…`. The old mapping was
+ * `displayName || name`, which reads as a sensible fallback and is not one —
+ * Google's `messages.list` populates `displayName` for an APP and leaves it
+ * empty for a person, so the fallback fired for every human being in the
+ * conversation and printed a resource id where a name belonged.
+ *
+ * WHAT WE CAN AND CANNOT KNOW HERE, said plainly. The connection holds
+ * `chat.spaces.readonly` and `chat.messages`, neither of which returns a
+ * membership. Turning `users/112978…` into "Ana Ruiz" needs
+ * `chat.memberships.readonly` — a wider grant, from every connected person,
+ * re-consented — and this app does not ask for it. So the choice is between an
+ * id, an invented name, and an honest description of the speaker, and this takes
+ * the third exactly as the space fix did.
+ *
+ * `type` IS THE ONE THING GOOGLE DOES TELL US, and it is worth saying: "an app
+ * in this space" and "somebody in this space" are different readers of a
+ * conversation, and a transcript that ran the two together would read as a
+ * person talking to themselves. The id remains the answer of last resort, for a
+ * sender Google described in no way at all — but it now arrives labelled as one
+ * rather than dressed as a name.
+ */
+function toChatSender(raw: unknown): { sender: string; senderNamed: boolean } {
+  const s = (raw ?? {}) as Record<string, unknown>
+  const given = str(s.displayName)
+  if (given) return { sender: given, senderNamed: true }
+  const type = str(s.type)
+  const described = type === "BOT" ? "An app" : type === "HUMAN" ? "Somebody in this space" : ""
+  return { sender: described || str(s.name), senderNamed: false }
 }
 
 /**
@@ -1449,8 +1636,122 @@ export async function chatPost(token: string, spaceName: string, text: string): 
   return {
     id: str(data.name),
     space: spaceName,
+    // OUR OWN NAME, and `named` because it is: we know exactly who said this one.
     sender: "kwapso",
+    senderNamed: true,
     text: str(data.text) || text,
     createdAt: str(data.createTime) || null,
+  }
+}
+
+// ── HAS IT GONE? ─────────────────────────────────────────────────────────────
+//
+// THE QUESTION THE KNOWLEDGE BASE HAS TO ASK, and the only shape of answer it
+// may act on.
+//
+// Every other kind of material in this app is a row in a table the sweep walks,
+// so "it was archived" is a column the sweep READS. Google's four kinds are not:
+// they are a live listing, and a file somebody deleted is simply not in it. The
+// sweep walks forward past a source it will never see again, and the assistant
+// goes on quoting a document that no longer exists — indefinitely, because
+// nothing ever tells the index to let go.
+//
+// ABSENCE IS NOT DELETION, and that is the whole reason this is a separate call
+// rather than a set subtraction. An item can be missing from a listing because
+// it fell outside a window, because it slid past a page cap, because a query
+// stopped matching it, or because Google had a bad minute. Retiring on absence
+// would empty somebody's index during an outage and call it tidying up.
+//
+// So the answer is THREE-VALUED and only one of the three does anything:
+//
+//   • "gone"    — Google said so. In the bin, called off, or no longer there at
+//                 all (404). The source is retired: it stops being quoted, and
+//                 the row and its history survive, because nothing here deletes.
+//   • "there"   — Google handed it over. Nothing happens.
+//   • "unknown" — anything else, including a refusal (403) and a timeout. A
+//                 refusal is genuinely ambiguous: sharing withdrawn and a Shared
+//                 Drive having a policy look identical from here, and one of
+//                 those is not a deletion. Nothing happens, and the next sweep
+//                 asks again — the cheapest possible way to be wrong.
+
+/** What Google says about one item we still hold a source for. */
+export type GooglePresence = "gone" | "there" | "unknown"
+
+/** Which services can be asked this question directly. Chat is absent on
+ * purpose: a Chat source is a SPACE somebody named in kwapso, so the positive
+ * signal for it is the named source being switched off — a fact in this app's
+ * own database, which lib/knowledge-google.ts reads without asking Google at
+ * all. */
+export type ProbableService = "drive" | "gmail" | "calendar"
+
+/** Where each service is asked, and what its answer looks like when the thing is
+ * in the bin rather than missing. Data rather than a switch, so the three read
+ * as one decision and a fourth cannot be added without stating both halves. */
+const PRESENCE_PROBES: Record<
+  ProbableService,
+  { url: (id: string) => string; goneWhen: (body: Record<string, unknown>) => boolean }
+> = {
+  // Drive's bin is a flag on the file, not a different place: a trashed file is
+  // still fetchable, still named, and still emphatically not something the owner
+  // can see any more.
+  drive: {
+    url: (id) =>
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=trashed&supportsAllDrives=true`,
+    goneWhen: (b) => b.trashed === true,
+  },
+  // Gmail's bin is a LABEL, and a message keeps its id in it. `minimal` is the
+  // cheapest format that carries labels and carries no body — this asks whether
+  // a message exists, and reading its words to find that out would be paying for
+  // somebody's mail to check that it is still theirs.
+  gmail: {
+    url: (id) =>
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=minimal`,
+    goneWhen: (b) => (Array.isArray(b.labelIds) ? b.labelIds : []).includes("TRASH"),
+  },
+  // A cancelled event is the one of the three that is not deleted at all: Google
+  // keeps it and marks it off, which is exactly what `showDeleted` on the diary
+  // sweep exists to see. Same fact, asked one event at a time.
+  calendar: {
+    url: (id) =>
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`,
+    goneWhen: (b) => str(b.status) === "cancelled",
+  },
+}
+
+/**
+ * ASK GOOGLE ABOUT ONE ITEM WE STILL HOLD.
+ *
+ * NOT THROUGH `googleFetch`, and that is the one thing worth explaining. That
+ * function maps every non-2xx onto the product's own words — a 502 for the
+ * caller, a 409 for a dead grant — which is right for a door somebody is
+ * standing at and useless here: this call's entire purpose is to tell 404 apart
+ * from every other failure, and `googleFetch` has already thrown that
+ * distinction away by the time it returns. It carries its own R11 timeout for
+ * the same reason every other fetch in this file does.
+ *
+ * Nothing about a person's material is read: two of the three probes name a
+ * single field, and none asks for a body.
+ */
+export async function googlePresence(
+  service: ProbableService,
+  token: string,
+  externalId: string
+): Promise<GooglePresence> {
+  const probe = PRESENCE_PROBES[service]
+  try {
+    const res = await fetch(probe.url(externalId), {
+      // R11 — a hung Google socket must not stall the sweep.
+      signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    // NOT THERE AT ALL. The only status this reads as an answer rather than as a
+    // failure — 403 and 5xx are both "ask again later" (see the essay above).
+    if (res.status === 404) return "gone"
+    if (!res.ok) return "unknown"
+    return probe.goneWhen((await res.json()) as Record<string, unknown>) ? "gone" : "there"
+  } catch {
+    // A timeout, a torn socket, a body that is not JSON. None of them is Google
+    // saying the material has gone.
+    return "unknown"
   }
 }
