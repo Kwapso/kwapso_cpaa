@@ -8,13 +8,13 @@
 // for who created the row — they are looking for what was agreed. The agenda sits
 // above the notes because that is the order the two were written in.
 //
-// THE ONE BUTTON THAT REACHES OUTSIDE THIS APP is here too: "Add to my calendar".
-// It needs a connected Calendar account and the "Calendar on your behalf" right,
-// and pressing it twice makes ONE entry — the door claims the event id on the row
-// under a `google_event_id IS NULL` predicate, so the second press is answered
-// with the entry that already exists.
+// NOTHING HERE REACHES OUTSIDE THIS APP ANY MORE. There was an "Add to my
+// calendar" button; the calendar is one-way as of 18 August 2026, so a meeting
+// arranged here stays here and a meeting arranged in Google arrives here on the
+// next sweep with its guests, its join link and its attachments. Reading the
+// transcript is the one action left that talks to Google, and it only reads.
 //
-// AND THERE IS A FOURTH TAB NOW: the diary entry itself. The owner asked for the
+// AND THERE IS A FOURTH TAB: the diary entry itself. The owner asked for the
 // link that opens the meeting in Google Calendar and for "location, stakeholders,
 // or any other calendar data or metadata… pulled in and organised correctly", and
 // this is where organised correctly lands. It is a TAB rather than more rows on

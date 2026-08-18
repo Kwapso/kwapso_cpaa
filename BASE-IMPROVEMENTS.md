@@ -370,13 +370,23 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 
 ---
 
-## OPEN, the Google connector layer (the knowledge base's other half)
+## CLOSED, the Google connector layer (the knowledge base's other half)
+
+> **This whole section is HISTORY as of 2026-08-18.** The connector layer shipped
+> on 12 August (per-person OAuth, `google_connections`, the Drive / Gmail /
+> Calendar / Chat sources) and everything below describes the world before it. Two
+> things it predicted are now settled differently and are worth reading against
+> the note: the six sources are built, and **Calendar is NOT two-way** — the owner
+> retired the write half on 18 August, so the calendar is read-only and the "two-way
+> write half… deserves its own design" paragraph at the end of this section
+> describes work that will not be done. Kept because the SEAM argument in the
+> middle is exactly how it was built.
 
 The knowledge base shipped on 2026-08-11 reading the app's OWN rows, tickets and
 their conversations, learning articles, accounts. `.plans/BUILD-2-knowledge-base.md`
-§3 also asks for six Google sources (Calendar two-way, Drive folders, Drive files,
-Gmail threads, Chat spaces, Meet transcripts). Those are NOT built, and this is the
-note that says so out loud rather than leaving a reader to notice.
+§3 also asks for six Google sources (Calendar, Drive folders, Drive files,
+Gmail threads, Chat spaces, Meet transcripts). Those were NOT built when this was
+written, and this is the note that said so out loud.
 
 **Why not.** There are no Google credentials in this environment and nothing that
 could be verified against Google's APIs, so it would be a few thousand lines that
@@ -407,6 +417,8 @@ account with domain-wide delegation for the organisation layer, a `knowledge_con
 table (per team: kind, owner, refresh token, scopes, status, last error), token
 refresh with R11 timeouts, and, for Calendar, the two-way write half, which is
 the only one of the six that is not just ingestion and deserves its own design.
+*(That last clause is the one the 18 August ruling reversed: the write half WAS
+built and has been removed. The calendar is ingestion and nothing else.)*
 Note that `workers/auth/src/lib/google.ts` (Google SIGN-IN, landed 2026-08-11)
 already establishes a Google client in this project; the data scopes are a
 different consent screen, but not a different account.

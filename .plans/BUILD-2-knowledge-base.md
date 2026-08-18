@@ -123,7 +123,7 @@ From the briefing, all selected:
 
 | Source | What it must do |
 |---|---|
-| **Calendar** | Sprints and to-dos as events — **two-way**. The owner overrode the one-way option in writing: *"it must be a two way sync.. changes in app affect google calendar and vice versa."* |
+| **Calendar** | ~~Sprints and to-dos as events — **two-way**~~. **REVERSED BY THE OWNER, 18 August 2026**: *"just remember we want a one-way sync of whatever is in Google Calendar… anything in my calendar should be up to date here. That's all."* Kwapso now reads a diary and never writes one, and the write half that was built to satisfy the original instruction has been removed. The instruction this row recorded — *"it must be a two way sync.. changes in app affect google calendar and vice versa"* — is history, kept because it is why the write half existed at all. |
 | **Drive** | A folder per account, auto-created |
 | **Drive files** | Searchable in the app |
 | **Gmail threads** | Searchable |
@@ -213,7 +213,7 @@ of 100 with 87 doors and zero silent ones.
    sweep, R11 timeouts, R12 failure recording.
 7. **The six Google sources**, in the owner's order of value: Meet transcripts and
    Drive first (they feed the story-drafting flow), then Gmail, Chat, Calendar
-   two-way, Drive folder auto-creation.
+   (~~two-way~~ one-way — see the table above), Drive folder auto-creation.
 8. **The two bulk flows** — triage, and stories from a transcript.
 9. **The backfill** — ingest the agency's real history so the knowledge base is
    *already useful* on the day they move in. This is the constraint that makes

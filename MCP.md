@@ -363,15 +363,17 @@ Today it covers:
     CORRECTING a row that already exists is `work:edit` and has deliberately no tool
     at all — see the exclusions below.
   - the triage rota, `set_triage_duty` (`help:edit`), beside the `get_triage` read.
-  - meetings, `create_meeting`, `update_meeting`, `set_meeting_held`,
-    `set_meeting_active` (`meetings:create` / `:edit` / `:edit` / `:delete`;
-    cancelling IS this module's delete and the row survives it), and
-    `add_meeting_to_calendar`, which opens on `meetings:read` and then demands
-    `google:edit` and the events switch at the door itself. `read_meeting_transcript`
-    is the other direction: it opens on `meetings:edit`, demands `google:read` at
-    the door, and one call ticks the meeting held AND writes a row of time for each
+  - meetings, `create_meeting`, `update_meeting`, `set_meeting_active`
+    (`meetings:create` / `:edit` / `:delete`; cancelling IS this module's delete
+    and the row survives it). There is no `set_meeting_held` and no
+    `add_meeting_to_calendar`: a meeting's own start time says whether it has
+    happened, and nothing in this product writes to a calendar.
+    `read_meeting_transcript` opens on `meetings:edit`, demands `google:read` at
+    the door, and one call writes a row of time for each
     of OUR OWN people who was in the room — never the client's, because a client's
-    hour is not our cost. It is idempotent, so a second read does nothing.
+    hour is not our cost. It is idempotent, so a second read does nothing: the
+    claim rides `transcript_captured_at IS NULL`, which is a fact about the JOB
+    rather than about the meeting, so nobody's hours can be doubled.
     The hunt itself is three, in an order of proof, the file Google attached to the
     calendar entry, then a document in a shared Drive folder, then a notice from
     Google in the caller's own mail, and `foundBy` says which one found it.
@@ -379,14 +381,18 @@ Today it covers:
     both on `meetings:read`: the WORDS of a call, kept on the record so any
     colleague who may read meetings can read them, and which of the addresses on
     the invitation are our own members or contacts on our accounts.
-    `sync_calendar_series` brings the caller's calendar and the diary into step
-    over a window reaching a fortnight back and four weeks forward: repeating
-    entries become real records, every meeting in the window has its Google facts
-    refreshed, an entry called off in Google is cancelled here, and the instances
-    beyond the horizon come back read-only. One-off entries are never imported,
-    though a one-off already in the diary is kept up to date like any other. The
-    backward half is why a transcript that lands an hour after a call is ever
-    found.
+    `sync_calendar_series` reads the caller's Google Calendar INTO the diary, one
+    way, always. Over a LIVE window reaching a fortnight back and four weeks
+    forward: every entry with no record becomes one, repeating or not, past or
+    future; every meeting in the window has its Google facts refreshed (the
+    description, the location, the guests and what each answered, the organiser,
+    the join link, the attachments, the link back to the entry); an entry called
+    off in Google is cancelled here; and entries beyond the horizon come back
+    read-only in `ahead`. It ALSO walks one slice of the caller's whole calendar —
+    five years back to a year ahead — resuming from where the last call stopped,
+    so `swept` says how far it has got and `caughtUp` says when it has finished.
+    Call it repeatedly to bring in a history. The backward half of the live window
+    is why a transcript that lands an hour after a call is ever found.
   - what we hand over, `create_deliverable`, `update_deliverable`,
     `set_deliverable_active` (`deliverables:*`). A deliverable is one piece of
     material on an app — a handover doc, an API reference, a recorded
@@ -413,9 +419,8 @@ Today it covers:
     same unattended. `sync_google_knowledge` does the same for the Google material
     the CALLER has already connected — their own Drive folders, the mail with a
     known contact, their diary — acting as that person and gated `knowledge:create`
-    **and** `google:read`. Read the Google paragraph below before you use it: it and
-    `add_meeting_to_calendar` are the two tools on this surface that touch Google,
-    and the posture around them is under review.
+    **and** `google:read`. Read the Google paragraph below before you use it: it is
+    the ONE tool on this surface that touches Google at all.
 
   **`ask_knowledge` never writes prose.** It answers with the passages it found and
   the SOURCES they came from, plus the compartment it searched and the sentence
@@ -541,30 +546,29 @@ genuinely uncertain, natural-language actions through `agent_chat` instead: it p
 you approve with `agent_confirm`.
 
 **Google is almost entirely off this surface, and that is on purpose, but read
-the exception.** The twenty-six tools that BROWSE and CHANGE a person's Drive,
-Gmail, Calendar and Chat (`google_drive_files`, `google_mail_search`,
-`google_send_mail`, `google_chat_post` and the rest) belong to the **in-app
-assistant** and to nothing else: no MCP tool forwards to any of those doors. A
-personal access token is a
+the exception.** The twenty tools that BROWSE and CHANGE a person's Drive, Gmail
+and Chat (`google_drive_files`, `google_mail_search`, `google_send_mail`,
+`google_chat_post` and the rest) belong to the **in-app assistant** and to nothing
+else: no MCP tool forwards to any of those doors. A personal access token is a
 secret pasted into somebody's CI config, and the blast radius of a leaked one
 must not include a mailbox. If you need Google material browsed through a
 machine, ask the assistant, `agent_chat` reaches those tools under the same
 rights, with the same confirm rules (mail always asks), and spends the team's AI
 allowance while doing so.
 
-**Two tools DO cross that line, and the sentence above used to deny it.** They
-are gated exactly as their doors are and neither reaches anybody else's account,
-but both belong in front of you rather than in a catalogue you skim:
+**The calendar is not on that list in either direction, because nothing writes to
+it any more.** Six calendar tools sat in the assistant's set and a seventh,
+`add_meeting_to_calendar`, was the one write tool on THIS surface. All seven went
+on 18 August 2026 with the doors under them: kwapso reads a diary and never writes
+one. The open question this section used to hold — whether pushing a meeting from
+a machine was right when pushing a sprint was assistant-only — is answered by
+neither being possible. `google_calendar_events` and `google_meeting_transcript`
+remain, and both are reads, on the assistant's side.
 
-- **`add_meeting_to_calendar`** forwards to `POST /api/content/google/calendar/meeting`
- , a real Google door. It writes one entry, for a meeting already booked in
-  kwapso, into the CALLER's own calendar, behind `meetings:read` + `google:edit` +
-  the events switch, refusing a portal caller, and claiming the event id under a
-  `google_event_id IS NULL` predicate so pressing it twice makes one entry. Its
-  identical twin `google_sprint_to_calendar`, the same act for a sprint, the same
-  three gates, is assistant-only. **One of those two placements is wrong and it is
-  the owner's call which:** either a sprint should be pushable from a machine too,
-  or a meeting should not be.
+**ONE tool still crosses the line into Google, and the sentence above used to deny
+it.** It is gated exactly as its door is and reaches nobody else's account, but it
+belongs in front of you rather than in a catalogue you skim:
+
 - **`sync_google_knowledge`** does not browse Google, but it does READ it: gated
   `knowledge:create` **and** `google:read`, it sweeps the caller's own connected
   Drive folders, the mail with a known contact and their diary into the knowledge
@@ -574,17 +578,21 @@ but both belong in front of you rather than in a catalogue you skim:
   delete) but is not nothing, and is not what "the MCP catalogue exposes none of
   them" led a reader to expect.
 
-Both are recorded here rather than quietly removed because taking a capability off
-a published surface breaks somebody's script, and that is a decision with an owner.
+It is recorded here rather than quietly removed because taking a capability off a
+published surface breaks somebody's script, and that is a decision with an owner.
+The seven calendar tools ARE that decision, made by the owner in words, and a
+script that called one now gets a clean refusal rather than a silent no-op.
 
 **What the assistant can now do there, and what it still cannot.** The module used
 to be able to read all four services and write only three things, a file into a
-named folder, a draft, an event. It can now also rewrite a file, make a folder,
+named folder, a draft, an event. The event half is gone (the calendar is
+read-only); it can now also rewrite a file, make a folder,
 file a message or a whole conversation into Drive as a readable document, reply
-inside a thread, put a Gmail label on a message or take it off, change an event's
-title, times, guests or location, call an event off, list every Chat space the
-person can see, and reach a meeting's transcript from the diary entry rather than
-by already knowing which document it is. Two of those tools exist only so the
+inside a thread, put a Gmail label on a message or take it off, list every Chat
+space the person can see, and reach a meeting's transcript from the diary entry
+rather than by already knowing which document it is. It could once change an
+event's title, times, guests or location and call one off; it cannot, because the
+calendar is read-only in this product. Two of those tools exist only so the
 others are safe to have: `google_drive_trash` and `google_chat_delete` undo what
 kwapso itself wrote, the bin rather than a delete, and only a message this app
 sent. What it still cannot do is unchanged and is the point: connect an account,
@@ -758,33 +766,27 @@ of that allowance; `get_import` re-reads the same plan for free. A client that d
    admin tier). So give a machine token that right only when the integration genuinely
    manages roles; a read/import/export integration never needs it.
 
-### An open question, decided, the calendar tool on this surface
+### An open question, answered by the owner, the calendar tool on this surface
 
-`add_meeting_to_calendar` is on the machine catalogue. `google_sprint_to_calendar`
-is not, it is the in-app assistant's only. The two do the same kind of act,
-open with the same three gates, and were written the same day, and nothing
-recorded which placement was intended. That asymmetry was raised with the owner
-on 2026-08-14.
+This section used to hold a live question: `add_meeting_to_calendar` was on the
+machine catalogue and its twin `google_sprint_to_calendar` was the in-app
+assistant's alone, the two did the same kind of act behind the same three gates,
+and nothing recorded which placement was intended. The question underneath it was
+*should an outside developer holding a personal access token be able to write into
+a colleague's calendar?*
 
-**The decision is to leave both where they are, for now, and the reason is a
-measurement rather than a preference.** Nothing can reach that tool today: the
-team holds **zero** Google connections (verification is still with Google) and
-**zero** live machine tokens, and the tool additionally needs a connected
-Calendar account and the "Calendar on your behalf" right. So the exposure is not
-small, it is nil, while taking the tool off this surface is genuinely not a
-small change. There is no opt-out in the catalogue: every `SHARED_TOOLS` entry
-becomes an MCP tool (`workers/mcp/src/lib/tools.ts`, `MCP_TOOLS`), so removing
-one means a new field on the shared type, a filter, and amendments to the R9,
-R19 and R22 parity checks plus the tool census in this file. That is four laws
-moved to close a door nobody is standing at, on the surface that is hardest to
-test.
+**Answered on 2026-08-18, and wider than the question asked:** *"disable the
+ability to create, edit, or delete anything in the calendar from the frontend…
+just make it one-way so we only grab and update the information."* Neither tool
+exists now, on either surface, and neither do the doors under them. Removing one
+tool would have meant a new field on the shared type, a filter, and amendments to
+the R9, R19 and R22 parity checks; removing the DOORS meant none of that, because
+a tool with no door is not a narrowing anybody has to describe — the parity checks
+derive their obligations from the doors themselves and simply have fewer.
 
-**Revisit the day Google verification lands**, before the first person connects
-a Calendar, not after. The question to answer then is the one the owner should
-answer with the facts in front of him: *should an outside developer holding a
-personal access token be able to write into a colleague's calendar?* If the
-answer is no, the work above is what it costs, and it is much cheaper to do
-while the answer is still hypothetical than once integrations depend on it.
+The lesson worth keeping: an asymmetry nobody can explain is usually two things
+that should both go, or both stay. Six weeks of "one of these placements is wrong
+and it is the owner's call which" ended with the owner deleting the category.
 
 ---
 

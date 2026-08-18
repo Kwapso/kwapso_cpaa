@@ -1608,11 +1608,18 @@ UPDATE knowledge_sources SET content_hash = NULL, indexed_at = NULL, chunk_count
 -- Cancelling is \`deactivated_at\` like every other retirement in the base — the
 -- row survives, so a client asking "didn't we have a call in March?" is answerable
 -- either way.
+--   SUPERSEDED 18 Aug 2026 (see 0037): the held status is retired and nothing
+--   reads \`status\` or \`held_at\` any more — a meeting's own \`starts_at\` says
+--   whether it has happened. The columns stay, because what people ticked while
+--   the idea existed is still history. The sentence about cancelling still holds.
 --
 -- \`google_event_id\` is what makes the calendar push idempotent. Pressing "put it
 -- in my calendar" twice must not make two entries, and the row is the only place
 -- that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing —
 -- Google holding two copies of one meeting is not the same kind of harmless).
+--   SUPERSEDED 18 Aug 2026: there is no calendar push, the calendar is one-way.
+--   The column and its unique index do the same work from the other direction —
+--   they are how the sweep recognises an entry it has already made a record of.
 CREATE TABLE meetings (
   id TEXT PRIMARY KEY,
   ref TEXT,

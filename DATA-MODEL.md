@@ -938,13 +938,21 @@ can answer *"what did we agree in March"*.
 - **`purpose_id`** points at the `meeting_purposes` taxonomy (§ *the agency's own
   housekeeping*), so "why did we meet" is a dropdown value rather than a fifth
   spelling typed into a title.
-- **`status` is two words, not five**, scheduled, or held. Cancelling is
-  `deactivated_at` like every other retirement here, so a client asking "didn't we
-  have a call in March?" is answerable either way.
-- **`google_event_id` is what makes the calendar push idempotent.** Pressing "put
-  it in my calendar" twice must not make two entries, and the row is the only place
-  that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing;
-  Google holding two copies of one meeting is not the same kind of harmless).
+- **`status` and `held_at` are kept and mean nothing (18 Aug 2026).** They held a
+  meeting's `scheduled` / `held` flag, and the flag is retired: a meeting's own
+  `starts_at` already says whether it has happened, so a column somebody had to
+  tick was a second source of truth for a question the clock answers, and the two
+  disagreed in both directions (a March meeting nobody ticked read as upcoming for
+  ever; one ticked on Monday morning left the day it belonged to). Nothing reads
+  either column now. They survive because they record what people ticked while the
+  idea existed, which is the same reason nothing here is ever deleted. Cancelling
+  was never one of the words: it is `deactivated_at`, like every other retirement
+  here, so "didn't we have a call in March?" is answerable either way.
+- **`google_event_id` is how the sweep recognises an entry it already has.** It is
+  UNIQUE (partial, so the majority of rows with no entry are not competing for one
+  NULL), which is what stops one diary entry becoming two meetings however many
+  times the sweep runs. It was invented for a "put it in my calendar" button that
+  no longer exists; the idempotence outlived the write it was invented for.
 - **The `google_*` columns are a MIRROR of the diary entry** (team migration
   `0035_calendar_depth_and_file_shares`): the join link, the organiser, the guest
   list and what each person answered (`google_attendees_json`), whatever is
@@ -952,15 +960,23 @@ can answer *"what did we agree in March"*.
   `google_synced_at` saying when all of that was last true. They exist because the
   alternative is that a meeting can only say who was in the room to the one person
   whose connection pushed it, live, one call per meeting — a record of a
-  conversation with the conversation left out. **Nothing writes to Google through
-  them**; the four calendar doors do that against the live entry, so there is no
-  direction in which the mirror can disagree with Google and win.
+  conversation with the conversation left out. **Nothing writes to Google, from
+  here or from anywhere**: the four calendar write doors that used to are gone
+  (18 Aug 2026), so Google's diary is the source and every one of these columns is
+  a copy of it.
 - **`from_calendar` decides what a re-sync may overwrite.** Two kinds of meeting
-  carry an event id and they are not the same record: one was typed here and
-  pushed out, the other was read IN off somebody's diary. Google owns the words of
-  a row it authored, kwapso owns the words of a row it authored, and `notes` is
-  never touched by any sync — it is the one column in this module that only a
-  person writes.
+  carry an event id and they are not the same record: one was typed here, the other
+  was read IN off somebody's diary. Google owns the words of a row it authored,
+  kwapso owns the words of a row it authored, and `notes` is never touched by any
+  sync — it is the one column in this module that only a person writes.
+- **`google_connections.calendar_swept_through` is how far the whole-calendar walk
+  has read** (team migration `0037_calendar_one_way`). The sweep does two windows:
+  a LIVE one every call (a fortnight back, four weeks on) and one ninety-day SLICE
+  of the wider window — five years back to a year ahead — resuming from this
+  moment. Forward-only, so it cannot leave a gap behind it, and it stops at the
+  last entry actually read when a slice holds more than one bounded read will walk.
+  It sits on the CONNECTION because the walk is one person's own diary read with
+  one person's own token. NULL means "never walked", read as the floor.
 - **`transcript_text` is what was SAID, kept here rather than fetched.** That is
   what makes it readable by every colleague whose role can read meetings instead
   of only by whoever holds the Drive connection — and it is what makes it
@@ -1140,19 +1156,25 @@ is the person's own diary.
   join to answer the cheapest question in the module would be a join on every
   list.
 
-**Permissions: three modules, because the owner named three switches.** `google`
-(read what you shared · **create = connect an account** and name a folder or
-space · edit = write back through it · delete = disconnect or stop sharing),
-plus `google_mail` and `google_events`, which exist to carry ONE right each,
-may kwapso send mail as you, and may it put an event in your calendar. Separate
-from each other and from `agent`, so granting somebody the assistant does not
-grant the assistant their outbox. A module whose four rights are not all
-meaningful is not new here: nothing reads `agent:edit` either.
+**Permissions: two modules. It was three.** `google` (read what you shared ·
+**create = connect an account** and name a folder or space · edit = write back
+through it · delete = disconnect or stop sharing), plus `google_mail`, which
+exists to carry ONE right: may kwapso send mail as you. Separate from `agent`, so
+granting somebody the assistant does not grant the assistant their outbox. A
+module whose four rights are not all meaningful is not new here: nothing reads
+`agent:edit` either.
 
-**Not importable** (three `CATALOG_EXEMPT` lines). A connection is a CAPABILITY,
+**`google_events` was the third and is gone** (migration
+`0037_calendar_one_way`). It carried "kwapso may put an EVENT in your calendar",
+and the calendar became read-only on 18 August 2026 — so it guarded nothing. A
+switch that switches nothing is worse than no switch: somebody grants it, expects
+a capability, and gets silence. The migration deletes its `role_permissions` rows
+from every existing team.
+
+**Not importable** (two `CATALOG_EXEMPT` lines). A connection is a CAPABILITY,
 not a record, the row is worthless without the token inside it, and that token
 can only be minted by a person standing at Google's consent screen saying yes.
-The two switch modules have no rows at all.
+The switch module has no rows at all.
 
 **No client-portal exposure, on any door.** Clients get no assistant and no
 Google surface; every handler opens with `refusePortalCaller` and both tables are

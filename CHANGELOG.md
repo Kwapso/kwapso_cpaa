@@ -20,6 +20,46 @@ and costs one command each.
 
 ---
 
+## The calendar becomes one-way, 18 Aug 2026
+The owner, twice in one day: *"disable the ability to create, edit, or delete
+anything in the calendar from the frontend… scour through our entire
+documentation and just make it one-way so we only grab and update the
+information"*, and *"this held mark is held release. I don't care. It's too
+complicated."*
+
+Two things went, and they went for different reasons. **The calendar's write half
+is gone entirely** — five functions in `lib/google-api.ts`, seven doors, eight
+tools across the assistant and the MCP surface, the "Add to my calendar" action,
+and the `google_events` permission ("Calendar on your behalf") that guarded them.
+The refusal is a missing function rather than a condition somebody can invert,
+which is the shape R24 already uses for internal money. The app's Google grant
+still asks for the read/write `calendar.events` scope, because Google will not
+downgrade an existing grant and narrowing it would sign every connected person
+out of their calendar until they reconnected; OPERATIONS.md records what that
+switch would cost, so it stays the owner's decision.
+
+**The `held` status is retired**, and the insight that made it simple is that a
+meeting's own start time already says whether it has happened. A status column
+was a second source of truth for a question the clock answers, and the two
+disagreed in both directions. The `upcoming` view, the account rollup's "we last
+met", the diary's state column and the meeting summary all key on `starts_at`
+now; the notes are always editable, because nothing could ever know the
+writing-up was finished. The columns stay, because what people ticked while the
+idea existed is still history. The transcript import's idempotence never rode the
+status — it rides `transcript_captured_at IS NULL`, a fact about the job rather
+than about the meeting — so nobody's hours can be doubled, and a test now proves
+it rather than the reading being trusted.
+
+**And the read went the other way.** "Everything in my calendar" is now true in
+practice: past and future, one-offs included, over a window five years back and a
+year ahead, walked one ninety-day slice per call from a cursor on the caller's own
+connection (`0037_calendar_one_way`). Forward-only, so it cannot leave a gap
+behind it, and it stops at the last entry actually read when a slice holds more
+than one bounded read will walk — bounded per request (R14), complete by
+repetition.
+
+---
+
 ## Three modules leave, 17 Aug 2026
 The owner retired Marketing, Learning and the Delivery method page. Only one of
 them took anything with it. Learning's 41 articles had already been indexed into

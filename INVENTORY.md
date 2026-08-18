@@ -66,7 +66,7 @@ in walk past a mailbox consent screen.
 | Client | Used by | Scopes | Google review |
 |---|---|---|---|
 | **`kwapso-signin`** | `workers/auth`, the sign-in button | basic profile only | none needed |
-| **`kwapso sync`** | `workers/content`, per-person Drive / Gmail / Calendar / Chat connections | `drive.readonly`, `drive.file`, `gmail.readonly`, `gmail.compose`, `gmail.send`, `calendar.events`, `chat.messages`, `chat.spaces.readonly`, plus `openid email` on each | **yes**, these are sensitive scopes and the client goes through verification |
+| **`kwapso sync`** | `workers/content`, per-person Drive / Gmail / Calendar / Chat connections | `drive.readonly`, `drive.file`, `gmail.readonly`, `gmail.compose`, `gmail.send`, `calendar.events`, `chat.messages`, `chat.spaces.readonly`, plus `openid email` on each | **yes**, these are sensitive scopes and the client goes through verification. `calendar.events` is read/write and the app only READS a calendar (one-way since 18 Aug 2026) — narrowing it to `calendar.events.readonly` would force every connected person to reconnect, so it is the owner's call; OPERATIONS.md says what it costs |
 
 Rebuilding these from nothing means: create a Google Cloud project, configure the
 OAuth consent screen (External), create each client as a Web application, register
