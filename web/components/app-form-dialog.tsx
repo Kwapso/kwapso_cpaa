@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -43,8 +44,9 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
-import type { SelectableValue, TeamMember } from "@shared/types"
+import type { SelectableValue } from "@shared/types"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
@@ -141,19 +143,6 @@ export function useAppStages(teamId: string): { value: string; mark: string }[] 
   return rows.length > 0 ? rows : APP_STAGES.map((s) => ({ value: s.name, mark: s.mark }))
 }
 
-/** THE TEAM, for the "who is on it" list (8.10). Its own hook beside the stage
- * one so every screen that can record an app asks the same question of the same
- * cache — the members list four other screens already hold, so opening the
- * dialog costs a round trip only on a page that has never needed it. */
-export function useTeamMembers(teamId: string): { id: string; name: string }[] {
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
-    tenancy.members().then((r) => r.members)
-  )
-  return (membersQ.data ?? []).map((m) => ({
-    id: m.userId,
-    name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
-  }))
-}
 
 export function AppFormDialog({
   open,
@@ -256,9 +245,9 @@ export function AppFormDialog({
         stage: values.stage.trim(),
         toolCostCentsPerMonth:
           values.cost.trim() !== "" && Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : 0,
-        about: values.about.trim(),
-        clientContext: values.clientContext.trim(),
-        solution: values.solution.trim(),
+        about: richTextValue(values.about),
+        clientContext: richTextValue(values.clientContext),
+        solution: richTextValue(values.solution),
         keyActors: values.keyActors.trim(),
         staffUserIds: values.staffUserIds,
         leadUserId: lead,
@@ -346,33 +335,30 @@ export function AppFormDialog({
         </Select>
       </Field>
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
-        <Textarea
-          id="app-about"
-          rows={3}
-          value={values.about}
-          onChange={(e) => setValues((s) => ({ ...s, about: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.about}
+          onChange={(html) => setValues((s) => ({ ...s, about: html }))}
           placeholder={t("What this system does, and for whom.")}
-          disabled={busy}
+          className="min-h-32"
         />
       </Field>
       <Field config={contextField} htmlFor="app-client-context" className={fieldSpacing}>
-        <Textarea
-          id="app-client-context"
-          rows={3}
-          value={values.clientContext}
-          onChange={(e) => setValues((s) => ({ ...s, clientContext: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.clientContext}
+          onChange={(html) => setValues((s) => ({ ...s, clientContext: html }))}
           placeholder={t("How they were working before, and what it was costing them.")}
-          disabled={busy}
+          className="min-h-32"
         />
       </Field>
       <Field config={solutionField} htmlFor="app-solution" className={fieldSpacing}>
-        <Textarea
-          id="app-solution"
-          rows={3}
-          value={values.solution}
-          onChange={(e) => setValues((s) => ({ ...s, solution: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.solution}
+          onChange={(html) => setValues((s) => ({ ...s, solution: html }))}
           placeholder={t("What we built, and the decisions behind it.")}
-          disabled={busy}
+          className="min-h-32"
         />
       </Field>
       <Field config={actorsField} htmlFor="app-key-actors" className={fieldSpacing}>

@@ -34,6 +34,7 @@ import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -506,7 +507,7 @@ export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHos
             <Row key={ticket.id} live={!ticket.archivedAt}>
               <div className="min-w-0 flex-1">
                 <OpenLink
-                  label={ticket.description}
+                  label={richTextPlain(ticket.description)}
                   onOpen={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
                 />
                 <p className="text-muted-foreground truncate text-xs">

@@ -21,7 +21,7 @@
 import { ChevronRight } from "lucide-react"
 
 import { softNavigate } from "@/lib/nav"
-import { safeHref } from "@/lib/rich-text"
+import { safeHref } from "@shared/web/rich-text"
 import { appStageMark } from "@shared/app-stages"
 import type { AppRow } from "@shared/types"
 import { useT } from "@shared/web/language"

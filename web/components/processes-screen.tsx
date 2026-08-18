@@ -28,7 +28,8 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
-import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { ValuePanel } from "@/components/value-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -84,7 +85,7 @@ export function ProcessesScreen({
 }) {
   const t = useT()
   // Who can be put on an app (8.10), for the record-an-app dialog below.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   // Page one, and its next cursor parked in the sidecar <LoadMore> reads (R14).
   // The same fetcher primes the exact `total:` sidecar the heading badges (R16).
   const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
@@ -108,6 +109,9 @@ export function ProcessesScreen({
         name: values.name,
         description: values.description || undefined,
         baselineLabel: values.baselineLabel || undefined,
+        // The form has always asked; now it is also sent. Without it the map
+        // is born with no role, and no role means no rate means no money.
+        roleName: values.roleName || undefined,
       })
       invalidate(processesKey(teamId))
       invalidate(valueKey(teamId))

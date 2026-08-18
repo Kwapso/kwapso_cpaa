@@ -69,10 +69,11 @@ import {
 } from "@/components/account-detail-panels"
 import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/contact-detail"
-import { AppFormDialog, useTeamMembers } from "@/components/app-form-dialog"
+import { AppFormDialog } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
-import { RichText } from "@/components/rich-text"
-import { safeSrc } from "@/lib/rich-text"
+import { RichText } from "@shared/web/rich-text-view"
+import { safeSrc } from "@shared/web/rich-text"
 import { ValuePanel } from "@/components/value-panel"
 import { createAppFrom } from "@/components/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
@@ -135,7 +136,7 @@ export function AccountDetailScreen({
 
   const { can } = usePermissions(teamId)
   // Who can be put on an app (8.10), for the record-an-app dialog below.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")
@@ -287,7 +288,7 @@ export function AccountDetailScreen({
       />
     )
 
-  // THE STORED PATH, through the one URL boundary (lib/rich-text safeSrc): the
+  // THE STORED PATH, through the one URL boundary (shared/web/rich-text safeSrc): the
   // column is ordinary text a machine caller can write, so what reaches a `src`
   // is checked here rather than trusted because we happen to have written it.
   const cover = safeSrc(account.coverUrl)

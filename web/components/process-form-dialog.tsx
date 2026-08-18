@@ -22,12 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -105,7 +106,7 @@ export function ProcessFormDialog({
       await onSubmit({
         appId: values.appId,
         name: values.name.trim(),
-        description: values.description.trim(),
+        description: richTextValue(values.description),
         roleName: values.roleName.trim(),
         baselineLabel: values.baselineLabel.trim(),
       })
@@ -188,13 +189,12 @@ export function ProcessFormDialog({
         />
       </Field>
       <Field config={descField} htmlFor="process-description" className={fieldSpacing}>
-        <Textarea
-          id="process-description"
-          value={values.description}
-          onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.description}
+          onChange={(html) => setValues((s) => ({ ...s, description: html }))}
           placeholder={t("Who does it, when, and what it's for.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       {!editing && (

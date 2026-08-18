@@ -5,7 +5,7 @@
 // real components instead of paragraphs of figures. So this splits the reply into
 // segments (web/lib/agent-segments) and renders each one the right way:
 //
-//   text  → the existing escape-first markdown path (@/lib/agent-markdown-html),
+//   text  → the existing escape-first markdown path (@shared/web/markdown-html),
 //           injected with RichText's PROSE classes so a reply reads like any other
 //           rich text in the app.
 //   block → a real component (@/components/agent-blocks). React children, never
@@ -22,10 +22,10 @@
 
 import * as React from "react"
 
-import { toHtml } from "@/lib/agent-markdown-html"
+import { toHtml } from "@shared/web/markdown-html"
 import { splitReply } from "@/lib/agent-segments"
 import { AgentBlockView } from "@/components/agent-blocks"
-import { PROSE } from "@/components/rich-text"
+import { PROSE } from "@shared/web/rich-text-view"
 
 export function AgentMarkdown({ text }: { text: string }) {
   const segments = React.useMemo(() => splitReply(text), [text])

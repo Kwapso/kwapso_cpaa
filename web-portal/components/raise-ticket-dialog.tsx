@@ -20,12 +20,13 @@ import {
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Plus } from "lucide-react"
 
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { ApiFailure } from "@/lib/api"
 import { useT } from "@shared/web/language"
@@ -52,7 +53,7 @@ export function RaiseTicketDialog({
     e.preventDefault()
     setBusy(true)
     try {
-      await onSubmit({ description: values.description.trim() })
+      await onSubmit({ description: richTextValue(values.description) })
       clearDraft()
       onOpenChange(false)
       toast.success(t("Sent. We'll come back to you here."))
@@ -78,19 +79,17 @@ export function RaiseTicketDialog({
       }
       submit={{
         busy: busy,
-        disabled: !values.description.trim(),
+        disabled: !richTextValue(values.description),
         icon: <Plus className="size-3.5" />,
       }}
     >
       <Field config={descField} htmlFor="ticket-desc" className={fieldSpacing}>
-        <Textarea
-          id="ticket-desc"
-          value={values.description}
-          onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.description}
+          onChange={(html) => setValues((v) => ({ ...v, description: html }))}
           placeholder={t("For example: the new booking page is showing last month's prices.")}
-          disabled={busy}
-          rows={5}
-          autoFocus
+          className="min-h-32"
         />
       </Field>
     </FormShellDialog>

@@ -106,6 +106,7 @@ import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** How a version is named out loud, everywhere on this screen: its number, then
  * what somebody called it. Written once so the picker, the banner and the
@@ -413,9 +414,7 @@ export function ProcessDetailScreen({
                     caveat is written after. */}
                 {process.description && (
                   <div className="bg-muted/40 rounded-lg border p-4">
-                    <p className="text-sm leading-relaxed whitespace-pre-line">
-                      {process.description}
-                    </p>
+                    <RichText html={process.description} />
                   </div>
                 )}
                 <OverviewList items={overviewItems} />
@@ -521,7 +520,10 @@ export function ProcessDetailScreen({
                               {hoursText(stepSecondsPerMonth(step))} a month
                             </p>
                             {step.description && (
-                              <p className="text-muted-foreground mt-1 text-xs">{step.description}</p>
+                              <RichText
+                                html={step.description}
+                                className="text-muted-foreground mt-1 text-xs"
+                              />
                             )}
                           </div>
                         </div>

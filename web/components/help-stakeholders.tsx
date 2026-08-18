@@ -19,9 +19,10 @@ import {
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { UserPlus } from "lucide-react"
 
-import type { HelpStakeholder, TeamMember } from "@shared/types"
+import type { HelpStakeholder } from "@shared/types"
+import type { PickablePerson } from "@/lib/people"
 import { ApiFailure } from "@/lib/api"
-import { letterMark, personName } from "@/lib/identity"
+import { letterMark } from "@/lib/identity"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
 
@@ -39,7 +40,8 @@ export function HelpStakeholders({
   onAdd,
 }: {
   stakeholders: HelpStakeholder[]
-  members: TeamMember[]
+  /** Already narrowed to who can be given work — see lib/people. */
+  members: PickablePerson[]
   canAdd: boolean
   onAdd: (userId: string) => Promise<void>
 }) {
@@ -48,7 +50,7 @@ export function HelpStakeholders({
   const [busy, setBusy] = React.useState(false)
 
   const existing = new Set(stakeholders.map((s) => s.userId))
-  const addable = members.filter((m) => !existing.has(m.userId))
+  const addable = members.filter((m) => !existing.has(m.id))
 
   async function add() {
     if (!picked) return
@@ -100,8 +102,8 @@ export function HelpStakeholders({
             </SelectTrigger>
             <SelectContent>
               {addable.map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {personName(m)}
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
                 </SelectItem>
               ))}
             </SelectContent>

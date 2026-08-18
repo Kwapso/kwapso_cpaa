@@ -38,7 +38,7 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
-import { personName } from "@/lib/identity"
+import { assignableMembers } from "@/lib/people"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
@@ -56,6 +56,8 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
+import { richTextPlain } from "@shared/web/rich-text"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -294,10 +296,14 @@ export function HelpDetailScreen({
   if (ticketsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!ticket) return <p className="text-muted-foreground text-sm">{t("That ticket no longer exists.")}</p>
 
-  // self-tag fix: you can't @mention yourself
-  const mentionableMembers: TicketMember[] = (membersQ.data ?? [])
-    .filter((m) => m.userId !== myUserId)
-    .map((m) => ({ id: m.userId, name: personName(m) }))
+  // WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
+  // ordinary team member and used to be offered here, which would have put a
+  // "you were mentioned" email in a client's inbox about our internal note —
+  // and the portal has never offered mentions in the other direction, on
+  // purpose. The one seam decides (lib/people).
+  const mentionableMembers: TicketMember[] = assignableMembers(membersQ.data).filter(
+    (m) => m.id !== myUserId
+  )
 
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
@@ -496,7 +502,10 @@ export function HelpDetailScreen({
       eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
         .filter(Boolean)
         .join(" · ")}
-      title={ticket.description}
+      // The description is rich text now, and a TITLE is one line: the words,
+      // without the markup they were typed with. The body renders formatted in
+      // the conversation below, which is where a person reads it.
+      title={richTextPlain(ticket.description)}
       // D5: one line, three facts at most.
       status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
         .filter(Boolean)
@@ -536,7 +545,7 @@ export function HelpDetailScreen({
             return (
               <HelpStakeholders
                 stakeholders={stakeholdersQ.data ?? []}
-                members={membersQ.data ?? []}
+                members={assignableMembers(membersQ.data)}
                 canAdd={can("help", "read")}
                 onAdd={addStakeholder}
               />
@@ -544,7 +553,7 @@ export function HelpDetailScreen({
           return (
             <TicketThread
               ticket={{
-                description: ticket.description,
+                description: <RichText html={ticket.description} />,
                 type: ticket.helpType || "General",
                 status: TO_LIBRARY[ticket.status],
                 fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,

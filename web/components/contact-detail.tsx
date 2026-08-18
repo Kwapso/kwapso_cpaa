@@ -55,7 +55,7 @@ import { CompaniesPanel, ContactMeetingsPanel, ContactTicketsPanel } from "@/com
 import { TodosPanel } from "@/components/work-panels"
 import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
-import { RichText } from "@/components/rich-text"
+import { RichText } from "@shared/web/rich-text-view"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import {

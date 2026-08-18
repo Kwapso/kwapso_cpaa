@@ -4,13 +4,17 @@
 import { fail, json } from "@shared/workers/http"
 import { publishChange, publishUserChange } from "@shared/workers/realtime"
 import { changeMemberRole, listMembers, removeMember } from "../lib/members"
+import { accountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { queryText } from "@shared/workers/validate"
 import type { Env } from "../env"
 
 export async function getMembers(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "team_members", "read")
-  const members = await listMembers(env, cfg, guard)
+  // The scope is the caller's: the row now says whether each member is a CLIENT
+  // login, and that fact comes off the customer spine, which is only ever read
+  // through the one fenced file.
+  const members = await listMembers(env, cfg, guard, await accountScope(cfg, guard))
   // ?id=<userId> → just that member (for row-level live patching); same filter
   // as the list, so a no-longer-active member yields [] and the client drops it.
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
@@ -27,7 +31,7 @@ export async function postMemberRole(request: Request, env: Env): Promise<Respon
   // Carry the affected userId so other clients can refresh that member's
   // activity feed (activity:user:<id>) in addition to the member + role lists.
   await publishChange(env, guard.teamId, "members", body.userId, "edit")
-  return json({ members: await listMembers(env, cfg, guard) })
+  return json({ members: await listMembers(env, cfg, guard, await accountScope(cfg, guard)) })
 }
 
 export async function postMemberRemove(request: Request, env: Env): Promise<Response> {
@@ -41,5 +45,5 @@ export async function postMemberRemove(request: Request, env: Env): Promise<Resp
   // Cross-team: the REMOVED person rides their own user channel — their other
   // devices update the team switcher and leave this team's screens (decision #8).
   await publishUserChange(env, body.userId, "teams", guard.teamId, "remove")
-  return json({ members: await listMembers(env, cfg, guard) })
+  return json({ members: await listMembers(env, cfg, guard, await accountScope(cfg, guard)) })
 }

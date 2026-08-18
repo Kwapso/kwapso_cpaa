@@ -80,6 +80,7 @@ import { STATUS_WORDS } from "@/components/ticket-row"
 import { TicketAttachments } from "@/components/ticket-attachments"
 import type { PortalReady } from "@/components/portal-shell"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** WHICH SIDE A MESSAGE SITS ON — and why it is this way round.
  *
@@ -242,7 +243,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         <Badge variant={status.variant} className="w-fit">
           {t(status.label)}
         </Badge>
-        <p className="break-words">{ticket.description}</p>
+        <RichText html={ticket.description} className="break-words" />
       </Card>
 
       {/* THE ONE THING A CLIENT DOES TO A TICKET'S STATE (CHECKLIST 5.13).

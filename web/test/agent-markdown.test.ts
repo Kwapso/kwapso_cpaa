@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { toHtml } from "@/lib/agent-markdown-html"
+import { toHtml } from "@shared/web/markdown-html"
 
 describe("AgentMarkdown toHtml — XSS-safe", () => {
   it("neutralizes an attribute-breakout link (a stray quote in the href)", () => {

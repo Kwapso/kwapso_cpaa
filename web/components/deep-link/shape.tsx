@@ -7,6 +7,8 @@ import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer
 
 import { formatActivityWhen, formatDate, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"
+import { richTextPlain } from "@shared/web/rich-text"
+import { RichText } from "@shared/web/rich-text-view"
 import type {
   Account,
   ActivityItem,
@@ -130,7 +132,7 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
       // which is why a page of tickets read as a wall of text with no shape. It
       // has not been lost: it leads the eyebrow on the record's own screen (D4),
       // where a person looks when a client rings up saying it out loud.
-      name: truncate(t.description),
+      name: truncate(richTextPlain(t.description)),
       // ONE LINE, TWO FACTS. How far along, and what kind. The story counts and
       // the archived flag went with the same edit: a subtitle carrying four
       // facts is table content smuggled into a list (K2).
@@ -373,7 +375,10 @@ export function shapeTaskDetail(task: Task, activity: ActivityItem[]): ScreenDat
       status: task.status === "done" ? "Done" : "Open",
       assignee: task.assigneeName || "Nobody yet",
       due: task.dueOn ? formatDate(task.dueOn) : "—",
-      detailText: task.detail || "—",
+      // A React node, not a string: the recipe engine hands whatever the host
+      // puts here straight to the DescriptionList, so a rich-text body renders
+      // as the formatting somebody typed rather than as its own tags.
+      detailText: task.detail ? <RichText html={task.detail} /> : "—",
       created: formatDateTime(task.createdAt),
       createdBy: task.createdByName || "—",
     },

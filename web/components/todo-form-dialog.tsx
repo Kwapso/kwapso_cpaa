@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -30,6 +30,7 @@ import { ApiFailure } from "@/lib/api"
 import { accountsKey, listFetch } from "@/lib/live-resources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { Account } from "@shared/types"
@@ -74,7 +75,7 @@ export function TodoFormDialog({
       await onSubmit({
         accountId: values.accountId,
         title: values.title.trim(),
-        detail: values.detail.trim(),
+        detail: richTextValue(values.detail),
         dueOn: values.dueOn,
       })
       clearDraft()
@@ -136,13 +137,12 @@ export function TodoFormDialog({
         />
       </Field>
       <Field config={detailField} htmlFor="todo-detail" className={fieldSpacing}>
-        <Textarea
-          id="todo-detail"
-          value={values.detail}
-          onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.detail}
+          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
           placeholder={t("Where to find it, what format, who to ask.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       <Field config={dueField} htmlFor="todo-due" className={fieldSpacing}>

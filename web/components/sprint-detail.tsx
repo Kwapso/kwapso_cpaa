@@ -51,6 +51,7 @@ import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** Whole cents → what a person would say. The FORMATTING is the shared seam
  * (shared/web/money.ts) now that the two rate cards render prices of their own;
@@ -139,7 +140,7 @@ export function SprintDetailScreen({
     { label: t("Kind"), value: kindLine },
     { label: t("Client"), value: sprint.accountName || "Ours, no client" },
     { label: t("App"), value: sprint.appName || "—" },
-    { label: t("What it's for"), value: sprint.goal || "—" },
+    { label: t("What it's for"), value: sprint.goal ? <RichText html={sprint.goal} /> : "—" },
     {
       label: t("Runs"),
       value:

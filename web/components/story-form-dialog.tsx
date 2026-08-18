@@ -42,12 +42,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -212,7 +213,7 @@ export function StoryFormDialog({
     try {
       await onSubmit({
         title: values.title.trim(),
-        detail: values.detail.trim(),
+        detail: richTextValue(values.detail),
         sprintId: values.sprintId,
         appId,
         ticketId: fixedTicket ? fixedTicket.id : values.ticketId,
@@ -319,13 +320,12 @@ export function StoryFormDialog({
         </Select>
       </Field>
       <Field config={detailField} htmlFor="story-detail" className={fieldSpacing}>
-        <Textarea
-          id="story-detail"
-          value={values.detail}
-          onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.detail}
+          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
           placeholder={t("What good looks like when it's finished.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       <Field config={sprintField} htmlFor="story-sprint" className={fieldSpacing}>

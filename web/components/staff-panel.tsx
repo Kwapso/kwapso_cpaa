@@ -32,7 +32,7 @@ import { staffCertificatesKey, staffProfilesKey, totalKey } from "@/lib/live-res
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { safeHref } from "@/lib/rich-text"
+import { safeHref } from "@shared/web/rich-text"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { StaffCertificate, StaffProfile } from "@shared/types"
 import { useT } from "@shared/web/language"

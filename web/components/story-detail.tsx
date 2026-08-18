@@ -52,6 +52,7 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Story, WorkLog } from "@shared/types"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** Whole seconds → the hours and minutes a person would say. */
 function spell(seconds: number): string {
@@ -193,7 +194,7 @@ export function StoryDetailScreen({
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story
     // with no sprint has no deadline to show, which is the honest answer.
     { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
-    { label: t("Detail"), value: story.detail || "—" },
+    { label: t("Detail"), value: story.detail ? <RichText html={story.detail} /> : "—" },
     {
       label: t("Processes it changes"),
       value: story.changesNoStep

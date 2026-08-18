@@ -40,7 +40,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ExternalLink, PenLine, Send } from "lucide-react"
 
 import { ApiFailure, content } from "@/lib/api"
-import { safeHref } from "@/lib/rich-text"
+import { safeHref } from "@shared/web/rich-text"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"

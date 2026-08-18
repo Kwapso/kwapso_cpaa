@@ -21,12 +21,13 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -99,7 +100,7 @@ export function StepFormDialog({
     try {
       await onSubmit({
         name: values.name.trim(),
-        description: values.description.trim(),
+        description: richTextValue(values.description),
         secondsPerRun: minutes * 60,
         runsPerMonth: runs,
       })
@@ -141,13 +142,12 @@ export function StepFormDialog({
         />
       </Field>
       <Field config={descField} htmlFor="step-description" className={fieldSpacing}>
-        <Textarea
-          id="step-description"
-          value={values.description}
-          onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.description}
+          onChange={(html) => setValues((s) => ({ ...s, description: html }))}
           placeholder={t("Anything worth remembering about how it's done.")}
-          disabled={busy}
-          rows={2}
+          className="min-h-32"
         />
       </Field>
       <Field config={minutesField} htmlFor="step-minutes" className={fieldSpacing}>

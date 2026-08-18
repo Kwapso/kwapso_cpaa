@@ -24,6 +24,7 @@ import { totalKey } from "@/lib/live-resources"
 import { sliceKey } from "@/components/work-panels"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** The two slice kinds these panels cache under. Named constants because the
  * live registry has to invalidate them by PREFIX when any ticket or meeting
@@ -135,7 +136,7 @@ export function ContactTicketsPanel({
       {q.data.map((ticket) => (
         <Row key={ticket.id} onClick={() => softNavigate(`${ticketsBase}/${ticket.id}`)}>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm">{ticket.description}</p>
+            <p className="truncate text-sm">{richTextPlain(ticket.description)}</p>
             <p className="text-muted-foreground truncate text-xs">
               {[ticket.helpType, ticket.status, formatDate(ticket.createdAt)].filter(Boolean).join(" · ")}
             </p>

@@ -28,8 +28,9 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import {
   Select,
   SelectContent,
@@ -127,7 +128,7 @@ export function KnowledgeFormDialog({
     try {
       await onSubmit({
         title: values.title.trim(),
-        body: values.body.trim(),
+        body: richTextValue(values.body),
         sourceUrl: values.sourceUrl.trim(),
         accountId: values.accountId === AGENCY ? "" : values.accountId,
         visibility: values.visibility,
@@ -183,13 +184,12 @@ export function KnowledgeFormDialog({
         />
       </Field>
       <Field config={bodyField} htmlFor="knowledge-body" className={fieldSpacing}>
-        <Textarea
-          id="knowledge-body"
-          value={values.body}
-          onChange={(e) => setValues((v) => ({ ...v, body: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.body}
+          onChange={(html) => setValues((v) => ({ ...v, body: html }))}
           placeholder={t("Write it the way you would explain it to a new colleague.")}
-          disabled={busy || textOwnedElsewhere}
-          rows={8}
+          className="min-h-32"
         />
       </Field>
       <Field config={linkField} htmlFor="knowledge-link" className={fieldSpacing}>

@@ -19,6 +19,7 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { departmentAsks, priorityScore } from "@shared/departments"
 import type { Task, TaskViewName } from "@shared/types"
 
@@ -242,6 +243,12 @@ export type TaskInput = {
   detail?: string
   dueOn?: string
   assigneeId?: string
+  /** REQUIRED whenever `assigneeId` is set, and never read off the request
+   * body: the door resolves it from the team's member list (routes/todos.ts)
+   * and hands it here. It used to fall back to `actor.name`, which is how a
+   * task written FOR somebody kept the name of whoever wrote it. The only
+   * caller was already correct; the fallback was the next caller's bug, so
+   * it is gone and the insert refuses a nameless assignee outright. */
   assigneeName?: string
   accountId?: string
   important?: boolean
@@ -310,7 +317,7 @@ export async function createTask(
     `INSERT INTO tasks (id, ref, account_id, app_id, title, detail, assignee_id, assignee_name, due_on,
   important, urgent, department, file_url, file_name,
   status, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(input.title)}, ${sqlString(input.detail ?? null)}, ${sqlString(input.assigneeId ?? null)}, ${sqlString(input.assigneeId ? (input.assigneeName ?? actor.name) : null)}, ${sqlString(input.dueOn ?? null)}, ${input.important ? 1 : 0}, ${input.urgent ? 1 : 0}, ${sqlString(input.department ?? null)}, ${sqlString(input.fileUrl ?? null)}, ${sqlString(input.fileName ?? null)}, 'open', ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(input.title)}, ${sqlString(input.detail ?? null)}, ${sqlString(input.assigneeId ?? null)}, ${sqlString(input.assigneeId ? requireText(input.assigneeName, "Assignee", TEXT_LIMITS.short) : null)}, ${sqlString(input.dueOn ?? null)}, ${input.important ? 1 : 0}, ${input.urgent ? 1 : 0}, ${sqlString(input.department ?? null)}, ${sqlString(input.fileUrl ?? null)}, ${sqlString(input.fileName ?? null)}, 'open', ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Task created",

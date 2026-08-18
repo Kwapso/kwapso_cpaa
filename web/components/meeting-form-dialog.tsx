@@ -25,12 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
@@ -122,8 +123,8 @@ export function MeetingFormDialog({
         appId: values.appId === NONE ? "" : values.appId,
         purposeId: values.purposeId === NONE ? "" : values.purposeId,
         location: values.location.trim(),
-        agenda: values.agenda.trim(),
-        notes: values.notes.trim(),
+        agenda: richTextValue(values.agenda),
+        notes: richTextValue(values.notes),
       })
       clearDraft()
       onOpenChange(false)
@@ -251,23 +252,21 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={agendaField} htmlFor="meeting-agenda" className={fieldSpacing}>
-        <Textarea
-          id="meeting-agenda"
-          value={values.agenda}
-          onChange={(e) => setValues((s) => ({ ...s, agenda: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.agenda}
+          onChange={(html) => setValues((s) => ({ ...s, agenda: html }))}
           placeholder={t("What we mean to cover.")}
-          disabled={busy}
-          rows={3}
+          className="min-h-32"
         />
       </Field>
       <Field config={notesField} htmlFor="meeting-notes" className={fieldSpacing}>
-        <Textarea
-          id="meeting-notes"
-          value={values.notes}
-          onChange={(e) => setValues((s) => ({ ...s, notes: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.notes}
+          onChange={(html) => setValues((s) => ({ ...s, notes: html }))}
           placeholder={t("What was said and decided.")}
-          disabled={busy}
-          rows={4}
+          className="min-h-32"
         />
       </Field>
     </FormShellDialog>

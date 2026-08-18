@@ -301,6 +301,11 @@ export async function postCreateProcess(request: Request, env: Env): Promise<Res
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     baselineLabel: optionalText(body.baselineLabel, "Baseline name", TEXT_LIMITS.short),
+    // WHO DOES THIS WORK (8.13), on the way IN. The edit door has taken it
+    // since the role rate card shipped and this one did not, so the answer a
+    // person typed into "Who does it" on the New process form was thrown away
+    // and every map started unpriced.
+    roleName: optionalText(body.roleName, "Who does it", TEXT_LIMITS.short),
   })
   await publishChange(env, guard.teamId, "processes", id, "add")
   return json({ id })
