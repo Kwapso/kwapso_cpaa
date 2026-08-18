@@ -65,6 +65,7 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { useDebouncedCallback } from "@kwapso/ui/registry/primitives/use-debounce/use-debounce"
 import { Check, ChevronsUpDown, X } from "lucide-react"
 
+import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
@@ -74,38 +75,6 @@ export type PickerOption = {
   value: string
   label: string
   hint?: string
-}
-
-/** Tailwind's `sm` breakpoint, from below. One number, named once, so the sheet
- * and any future phone behaviour cannot drift apart from the CSS. */
-const PHONE_QUERY = "(max-width: 639px)"
-
-/** The live query, or null where there is no such thing — the static export's
- * render pass has no window at all, and jsdom (every suite in `web/test`) has a
- * window with no `matchMedia` on it. Both answer "not a phone", which is the
- * right answer: neither one is. */
-function phoneQuery(): MediaQueryList | null {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null
-  return window.matchMedia(PHONE_QUERY)
-}
-
-function subscribePhone(onChange: () => void): () => void {
-  const mq = phoneQuery()
-  mq?.addEventListener("change", onChange)
-  return () => mq?.removeEventListener("change", onChange)
-}
-
-/** Is this a phone-width screen? `useSyncExternalStore` rather than an effect so
- * the FIRST render already knows: an effect would paint the popover, then swap
- * it for the sheet, and the swap is visible. The server snapshot is `false`
- * because the static export has no window; hydration corrects it in the same
- * commit, and nothing is open at that point anyway. */
-function useIsPhone(): boolean {
-  return React.useSyncExternalStore(
-    subscribePhone,
-    () => phoneQuery()?.matches ?? false,
-    () => false
-  )
 }
 
 export function RecordPicker({

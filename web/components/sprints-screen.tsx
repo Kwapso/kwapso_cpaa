@@ -30,10 +30,6 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
-  CalendarView,
-  defaultCalendarViewConfig,
-} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
-import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
@@ -48,6 +44,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 // the header of pulse-charts.tsx for the 114 kB that costs.
 import { BandCard, SprintBurndownChart } from "@/components/pulse"
 import { CountedAbove } from "@/components/counted-tabs"
+import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import {
   SprintFormDialog,
@@ -274,20 +271,25 @@ export function SprintsScreen({
     ],
   }
 
-  // THE MONTH GRID — the library's own calendar-view, given the same rows. It is
-  // SINGLE-DATE: one `dateField`, one square, so it cannot draw the span between
-  // a sprint's start and its end. A sprint therefore sits on the day it STARTS,
-  // which is the date a team actually plans around; both dates are still on the
-  // row's own line everywhere else. A sprint nobody has given a start date is
-  // left off rather than parked on a day it has no claim to, and the kind
-  // colour-codes the entry — the one thing you can read from across a room.
-  const calendarRows = sprints
+  // THE CALENDAR — the host's own (components/record-calendar.tsx), given the
+  // same rows. It is SINGLE-DATE: one day, one square, so it cannot draw the span
+  // between a sprint's start and its end. A sprint therefore sits on the day it
+  // STARTS, which is the date a team actually plans around; both dates are still
+  // on the row's own line everywhere else, and on the agenda's second line here.
+  // A sprint nobody has given a start date is left off rather than parked on a
+  // day it has no claim to, and the kind colour-codes the entry — the one thing
+  // you can read from across a room.
+  //
+  // AND EVERY ONE OF THEM OPENS, by the same `open` intent the overview list
+  // below already fires: a calendar is a way IN to sprints, not a picture of them.
+  const calendarEntries: CalendarEntry[] = sprints
     .filter((s) => s.startsOn)
     .map((s) => ({
       id: s.id,
-      date: (s.startsOn as string).slice(0, 10),
+      day: (s.startsOn as string).slice(0, 10),
       title: s.ref ? `${s.ref} · ${s.name}` : s.name,
       accent: s.sprintType ?? "",
+      detail: sprintLine(s),
     }))
 
   // THE OVERVIEW — state first, kind second. Two levels because the two
@@ -377,15 +379,10 @@ export function SprintsScreen({
           {view === "overview" ? (
             overview
           ) : view === "calendar" ? (
-            <CalendarView
-              data={calendarRows}
-              config={{
-                ...defaultCalendarViewConfig,
-                dateField: "date",
-                titleField: "title",
-                accentField: "accent",
-                weekStartsOn: "monday",
-              }}
+            <RecordCalendar
+              entries={calendarEntries}
+              onOpen={(id) => onIntent({ kind: "open", module: "sprints", id })}
+              emptyText={t("No sprints start this month.")}
             />
           ) : (
             // ALL SPRINTS — the engine's own flat list, with the search and the

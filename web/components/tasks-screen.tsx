@@ -30,10 +30,6 @@ import {
   type ScreenActionContext,
   type ScreenIntent,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import {
-  CalendarView,
-  defaultCalendarViewConfig,
-} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
 import type { RecipeField, ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Inbox } from "lucide-react"
@@ -42,6 +38,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
+import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
@@ -305,17 +302,22 @@ export function TasksScreen({
     fields: columns,
   }
 
-  // THE MONTH GRID — the library's own calendar-view, given the same rows. It
-  // wants a bare date, so the deadline's day is what it is keyed on; the
-  // department colour-codes the entry, which is the one thing you can read from
-  // across a room.
-  const calendarRows = tasksQ.data
+  // THE CALENDAR — the host's own (components/record-calendar.tsx), given the
+  // same rows. It wants a bare day, so the deadline's day is what it is keyed on;
+  // the department colour-codes the entry, which is the one thing you can read
+  // from across a room. The second line is what the AGENDA has room for and a
+  // square has not: how urgent it is, and whose it is.
+  //
+  // AND EVERY ONE OF THEM OPENS. `onOpen` is the engine's own `open` intent, so
+  // a task reached from a square lands on exactly the screen the list reaches.
+  const calendarEntries: CalendarEntry[] = tasksQ.data
     .filter((r) => r.dueOn)
     .map((r) => ({
       id: r.id,
-      date: (r.dueOn as string).slice(0, 10),
-      title: r.title,
+      day: (r.dueOn as string).slice(0, 10),
+      title: r.ref ? `${r.ref} · ${r.title}` : r.title,
       accent: r.department ?? "",
+      detail: [PRIORITY_LABEL[r.priority], r.assigneeName].filter(Boolean).join(" · "),
     }))
 
   return (
@@ -356,15 +358,10 @@ export function TasksScreen({
         }
       >
         {view === "calendar" ? (
-          <CalendarView
-            data={calendarRows}
-            config={{
-              ...defaultCalendarViewConfig,
-              dateField: "date",
-              titleField: "title",
-              accentField: "accent",
-              weekStartsOn: "monday",
-            }}
+          <RecordCalendar
+            entries={calendarEntries}
+            onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
+            emptyText={t("Nothing due this month.")}
           />
         ) : (
           <ScreenRenderer
