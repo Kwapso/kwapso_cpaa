@@ -7,7 +7,9 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "lucide-react"
+import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 
+import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
 
 /** A state with nothing in it still gets a face. One glyph in the leading slot,
@@ -27,6 +29,52 @@ function StateLine({
   return (
     <p className={`flex items-center gap-2 text-sm ${colour}`}>
       <Icon aria-hidden className="size-4 shrink-0" />
+      {children}
+    </p>
+  )
+}
+
+/** A COLLECTION WITH NOTHING IN IT — the same face `StateLine` gives a refusal
+ * or a 404, for the far commoner state: a panel, a tab or a list that is empty
+ * because nothing has happened yet.
+ *
+ * WHY IT IS A SEAM AND NOT A CLASS NAME. There were twenty-five of these
+ * written out by hand across the agency screens, every one a bare grey `<p>`,
+ * and a lone line of grey text in the middle of a card reads as a screen that
+ * FAILED rather than one with nothing on it yet — which is precisely the screen
+ * a brand-new team meets on every page. `StateLine` above has said so in a
+ * comment since the deep-link states were extracted; nothing else could reach
+ * it.
+ *
+ * THE GLYPH IS DERIVED, never chosen here. It comes from `CONCEPT_ICON` — the
+ * one icon vocabulary (UI-CONVENTIONS §4) — keyed by the concept the empty
+ * collection is OF, so the face on "no meetings yet" is the face the rail, the
+ * heading and the tab already wear for a meeting. A caller cannot pick a glyph
+ * that disagrees with the rest of the app, because there is nowhere to pick one.
+ *
+ * IT IS `aria-hidden`, like every other mark on both front doors: the sentence
+ * beside it carries the whole meaning, and a screen reader announcing "calendar
+ * clock, no meetings with them yet" is one fact read twice.
+ *
+ * WHAT IT IS NOT FOR: a refusal ("you can't see the team"), a 404 ("that ticket
+ * no longer exists") or a caption under a number. Those are `NoAccess`,
+ * `NotFound` and ordinary copy — an empty collection is a state a person can
+ * fix, and the three above are not. */
+export function EmptyLine({
+  concept,
+  children,
+}: {
+  /** the CONCEPT_ICON key for what this collection holds — `meetings`, `tickets`,
+   * `time`. Typed to the vocabulary so a key it has no entry for cannot be
+   * passed, which is the difference between "no glyph" and "a wrong one". */
+  concept: keyof typeof CONCEPT_ICON
+  children: React.ReactNode
+}) {
+  return (
+    <p className="text-muted-foreground flex items-center gap-2 text-sm">
+      <span aria-hidden className="shrink-0">
+        <DynamicIcon name={CONCEPT_ICON[concept] as IconName} className="size-4" fallback={() => null} />
+      </span>
       {children}
     </p>
   )

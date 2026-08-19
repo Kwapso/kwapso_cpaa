@@ -45,7 +45,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { BandCard, SprintBurndownChart } from "@/components/pulse"
 import { CountedAbove } from "@/components/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { EmptyLine, SectionWithCreate } from "@/components/deep-link/screen-bits"
 import {
   SprintFormDialog,
   sprintTypeName,
@@ -338,7 +338,7 @@ export function SprintsScreen({
 
   const overview = (
     <div className="flex flex-col gap-10">
-      {sprints.length === 0 && <p className="text-muted-foreground text-sm">{t("No sprints yet.")}</p>}
+      {sprints.length === 0 && <EmptyLine concept="sprints">{t("No sprints yet.")}</EmptyLine>}
       {SPRINT_STATES.map((state) => {
         const inState = sprints.filter((s) => sprintState(s, today) === state)
         if (inState.length === 0) return null

@@ -34,7 +34,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { StatGrid, defaultStatGridConfig } from "@kwapso/ui/registry/collections/stat-grid/stat-grid"
 import { Pencil } from "lucide-react"
 
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { BandCard, HoursByChart, NothingYet, RecordWeeksChart, hoursSpoken } from "@/components/pulse"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
@@ -334,7 +334,7 @@ export function WorkLogsPanel({
       )}
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("No time logged against this yet.")}</p>
+        <EmptyLine concept="time">{t("No time logged against this yet.")}</EmptyLine>
       ) : (
         <ul className="divide-border divide-y rounded-xl border">
           {rows.map((l) => (

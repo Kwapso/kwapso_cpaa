@@ -22,6 +22,7 @@ import { formatDate } from "@shared/web/format"
 import { softNavigate } from "@/lib/nav"
 import { totalKey } from "@/lib/live-resources"
 import { sliceKey } from "@/components/work-panels"
+import { EmptyLine } from "@/components/deep-link/screen-bits"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { richTextPlain } from "@shared/web/rich-text"
@@ -142,7 +143,7 @@ export function ContactTicketsPanel({
   if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   if (q.data.length === 0)
-    return <p className="text-muted-foreground text-sm">{t("No tickets raised for them yet.")}</p>
+    return <EmptyLine concept="tickets">{t("No tickets raised for them yet.")}</EmptyLine>
   // Tickets live at their own top-level URL; the account list's base is the
   // sibling form we arrived through, so the section swap keeps the same shape.
   const ticketsBase = basePath.replace(/\/accounts$/, "/tickets")
@@ -182,7 +183,7 @@ export function ContactMeetingsPanel({
   if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   if (q.data.length === 0)
-    return <p className="text-muted-foreground text-sm">{t("No meetings with them yet.")}</p>
+    return <EmptyLine concept="meetings">{t("No meetings with them yet.")}</EmptyLine>
   const meetingsBase = basePath.replace(/\/accounts$/, "/meetings")
   return (
     <ul className="divide-border divide-y rounded-xl border">

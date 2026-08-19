@@ -83,7 +83,10 @@ export function TaskDetailScreen({
   const overviewItems = [
     { label: t("Status"), value: done ? t("Done") : t("Open") },
     { label: t("Who has it"), value: task.assigneeName || t("Nobody yet") },
-    { label: t("Due"), value: task.dueOn ? formatDate(task.dueOn) : "" },
+    // DEADLINE, the same word the tasks table, the sort control and the form
+    // all use for this column (CHECKLIST 2.5). It read "Due" here, which is a
+    // second word for one fact on the record whose table says the first.
+    { label: t("Deadline"), value: task.dueOn ? formatDate(task.dueOn) : "" },
     // A React node, not a string: a rich-text body renders as the formatting
     // somebody typed rather than as its own tags.
     { label: t("Detail"), value: task.detail ? <RichText html={task.detail} /> : "" },

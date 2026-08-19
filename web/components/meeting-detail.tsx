@@ -48,6 +48,7 @@ import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-
 import { OverviewList } from "@/components/overview-list"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { ActivityPanel } from "@/components/activity-panel"
+import { EmptyLine } from "@/components/deep-link/screen-bits"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import {
@@ -658,7 +659,7 @@ function CalendarPanel({
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-sm font-medium">{t("Who was invited")}</h2>
         {people.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("Nobody else is on the invitation.")}</p>
+          <EmptyLine concept="members">{t("Nobody else is on the invitation.")}</EmptyLine>
         ) : (
           <div className="flex flex-col rounded-xl border">
             {people.map((g) => {

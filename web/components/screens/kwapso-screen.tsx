@@ -29,6 +29,7 @@ import { ChevronRight, Palette, Pencil } from "lucide-react"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"
 import { OverviewList } from "@/components/overview-list"
+import { EmptyLine } from "@/components/deep-link/screen-bits"
 import { brandAssetsKey, listFetch } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -178,7 +179,7 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
         </Button>
       </div>
       {newest.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing in the brand library yet.")}</p>
+        <EmptyLine concept="brand">{t("Nothing in the brand library yet.")}</EmptyLine>
       ) : (
         <ul className="divide-border flex flex-col divide-y">
           {newest.map((a) => (

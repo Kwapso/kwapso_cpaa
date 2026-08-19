@@ -34,7 +34,7 @@ import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo }
 import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** The four states a story moves through, in the words a person reads. The
@@ -370,7 +370,7 @@ export function AppsPanel({
         </div>
       )}
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing built for")} {accountName} {t("yet.")}</p>
+        <EmptyLine concept="apps">{t("Nothing built for")} {accountName} {t("yet.")}</EmptyLine>
       ) : (
         <RowList>
           {rows.map((a) => (
@@ -513,7 +513,7 @@ export function AppMeetingsPanel({
         </div>
       )}
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("No meetings about this app yet.")}</p>
+        <EmptyLine concept="meetings">{t("No meetings about this app yet.")}</EmptyLine>
       ) : (
         <RowList>
           {rows.map((m) => (
@@ -583,7 +583,7 @@ export function AppTicketsPanel({
         </div>
       )}
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing has been raised about this app yet.")}</p>
+        <EmptyLine concept="tickets">{t("Nothing has been raised about this app yet.")}</EmptyLine>
       ) : (
         <RowList>
           {rows.map((ticket) => (
@@ -665,7 +665,7 @@ export function TodosPanel({
         </div>
       )}
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing outstanding with a client.")}</p>
+        <EmptyLine concept="todos">{t("Nothing outstanding with a client.")}</EmptyLine>
       ) : (
         <RowList>
           {rows.map((todo) => (
