@@ -1223,6 +1223,15 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the guest list mirrored from the calendar entry, which the calendar read CAPS — so its length is a ceiling, not a count (R16), and an invitation with sixty people on it would badge fifty. The tab lists them, and a list you can see the end of does not need a number on it. Shown only when the meeting is in a calendar at all.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
+  // TWO VIEWS OF ONE COLLECTION, not two collections. The Steps tab already
+  // carries the exact server count of the version on screen (`shownStepCount`),
+  // and R16's whole sentence is "exactly once" — badging the switch would print
+  // the same number twice on one screen, three lines apart, which is the fault
+  // that law was written about rather than a way of obeying it.
+  "process-detail.list":
+    "the LIST view of a process's steps. It is a view switch inside the Steps tab, not a collection tab: the count belongs to the tab above it and is already shown there, and a number on both would be R16's own failure case (the same total, twice, on one screen).",
+  "process-detail.map":
+    "the MAP view of the same steps, drawn as a route rather than a list. Same collection, same count, same reason as `process-detail.list` — and it writes nothing, so there is not even a second thing to count.",
   "app-detail.overview":
     "one system's own fields — whose it is, its stage, the four paragraphs of context, the four prose fields and the address, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
   "app-detail.impact":

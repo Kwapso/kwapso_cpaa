@@ -102,6 +102,7 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { RichText } from "@shared/web/rich-text-view"
+import { ProcessMap } from "@/components/process-map"
 
 /** How a version is named out loud, everywhere on this screen: its number, then
  * what somebody called it. Written once so the picker, the banner and the
@@ -148,6 +149,18 @@ export function ProcessDetailScreen({
     () => tenancy.processDetail(processId, versionId ?? undefined)
   )
   const shown = versionId ? olderQ : detailQ
+
+  // THE PICTURE OR THE LIST, and the version to compare the picture against.
+  //
+  // The list stays the default and stays exactly as it was: it is the thing you
+  // edit, and the map writes nothing. The switch is a view over the same steps,
+  // which is why nothing under it moves when you flip.
+  const [asMap, setAsMap] = React.useState(false)
+  const [againstId, setAgainstId] = React.useState<string | null>(null)
+  const againstQ = useCached<ProcessDetail>(
+    againstId ? processVersionKey(processId, againstId) : null,
+    () => tenancy.processDetail(processId, againstId ?? undefined)
+  )
 
   const commentsQ = useCached<{ comments: ProcessComment[]; total: number }>(
     processCommentsKey(processId),
@@ -449,6 +462,22 @@ export function ProcessDetailScreen({
                       className="w-[19rem] max-w-full"
                     />
                   </div>
+                  <div className="flex items-center gap-2">
+                    {/* THE VIEW SWITCH. A TabsView rather than two buttons —
+                        R3 forbids a hand-rolled toggle, and this is exactly the
+                        shape it means. */}
+                    <TabsView
+                      config={{
+                        ...defaultTabsConfig,
+                        tabs: [
+                          { value: "list", label: t("List"), icon: "list", badge: "", badgeVariant: "" as const },
+                          { value: "map", label: t("Map"), icon: "git-branch", badge: "", badgeVariant: "" as const },
+                        ],
+                      }}
+                      value={asMap ? "map" : "list"}
+                      onValueChange={(v) => setAsMap(v === "map")}
+                    />
+                  </div>
                   {canCreate && isCurrent && (
                     <AddButton
                       label={t("Add step")}
@@ -485,6 +514,36 @@ export function ProcessDetailScreen({
                   </div>
                 ) : shownSteps === undefined ? (
                   <Skeleton variant="list" lines={4} />
+                ) : asMap && shownSteps.length > 0 ? (
+                  // THE PICTURE. Same steps, same read — it is a view, not a
+                  // second source, so flipping the switch cannot show you
+                  // something the list disagrees with.
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <span className="text-muted-foreground shrink-0 text-sm">{t("Compare with")}</span>
+                      <RecordPicker
+                        value={againstId ?? ""}
+                        onChange={(v) => setAgainstId(v || null)}
+                        options={versions
+                          .filter((v) => v.id !== shownVersion?.id)
+                          .map((v) => ({ value: v.id, label: versionLabel(v) }))}
+                        placeholder={t("Nothing — just show this one")}
+                        searchPlaceholder={t("Search versions…")}
+                        emptyText={t("Nothing matched.")}
+                        className="w-[19rem] max-w-full"
+                      />
+                    </div>
+                    <ProcessMap
+                      left={againstId ? (againstQ.data?.steps ?? null) : null}
+                      right={shownSteps}
+                      leftLabel={
+                        againstId
+                          ? versionLabel(versions.find((v) => v.id === againstId) ?? shownVersion!)
+                          : undefined
+                      }
+                      rightLabel={shownVersion ? versionLabel(shownVersion) : undefined}
+                    />
+                  </div>
                 ) : shownSteps.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {isCurrent

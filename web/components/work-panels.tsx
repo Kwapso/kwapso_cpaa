@@ -105,6 +105,33 @@ function OpenLink({ label, onOpen }: { label: string; onOpen: () => void }) {
   )
 }
 
+/** THE ARROW AT THE END OF A ROW, AND IT DOES SOMETHING.
+ *
+ * It was a bare `<ChevronRight>` — no click target, no label, not inside a
+ * button. The owner reported the Processes row as "unable to expand", which is
+ * exactly right and exactly the fault: a chevron is the universal "this opens"
+ * glyph, so a decorative one is a promise the row does not keep. Only the NAME
+ * was clickable, which is a small target and an invisible rule.
+ *
+ * It is not an expander — the row opens the record, and the row's own list has
+ * no steps in it to expand (the door returns a count, not the steps). So it does
+ * what it looks like it does, and says so to a screen reader. */
+function OpenChevron({ label, onOpen }: { label: string; onOpen: () => void }) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={t("Open {name}", { name: label })}
+      // 44px touch floor (UI-RULEBOOK S6) without growing the row: the box is
+      // padding, the glyph stays the size it was.
+      className="text-muted-foreground hover:text-foreground -m-2 shrink-0 p-2"
+    >
+      <ChevronRight className="size-4" />
+    </button>
+  )
+}
+
 /** What a panel needs from whoever hung it. `base` is the URL PREFIX the person
  * is already in — "" at the top level (so a link reads /stories/<id>) or
  * "/t/<teamId>" inside a team — so a cross-link never bounces them between the
@@ -488,7 +515,10 @@ export function ProcessesPanel({
                   ].join(" · ")}
                 </p>
               </div>
-              <ChevronRight className="text-muted-foreground size-4" />
+              <OpenChevron
+                label={p.name}
+                onOpen={() => softNavigate(`${host.base}/processes/${p.id}`)}
+              />
             </Row>
           ))}
         </RowList>
