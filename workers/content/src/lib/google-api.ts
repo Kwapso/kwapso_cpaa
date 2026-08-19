@@ -147,11 +147,34 @@ async function googleFetch(
     console.error(
       `google ${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname} → ${res.status}: ${said.slice(0, 400)}`
     )
-    if (res.status === 401 || res.status === 403)
+    // 401 AND 403 ARE DIFFERENT SENTENCES, and conflating them cost a night.
+    //
+    // 401 is "these credentials are dead" — a fact about the CONNECTION, true of
+    // every call it will ever make. 403 is "not this one" — a fact about the
+    // RESOURCE, and the next call may be fine.
+    //
+    // They shared a code until 20 Aug 2026, which was harmless while every read
+    // was a single call. The moment the Drive walk started opening folders
+    // nobody named, it had to tolerate a 403 (a shortcut whose target moved, a
+    // subfolder shared with its parent and not with this person) — and
+    // tolerating 403 by code meant tolerating 401 with it. A revoked Drive token
+    // then presented as an EMPTY FOLDER: no error, no lastError on the
+    // connection, no red anywhere, and a knowledge base quietly reading nothing.
+    //
+    // The caller-facing message for 401 is unchanged. What is new is that 403
+    // says something a loop can act on without also swallowing the one error
+    // that means "stop, and tell somebody".
+    if (res.status === 401)
       throw new GuardError(
         409,
         "google_access_lost",
         "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings."
+      )
+    if (res.status === 403)
+      throw new GuardError(
+        403,
+        "google_forbidden",
+        "Google wouldn't allow that — this item may not be shared with you."
       )
     throw new GuardError(502, "google_refused", "Google couldn't answer that just now. Try again.")
   }
@@ -377,8 +400,19 @@ export async function driveList(
           files?: unknown
           nextPageToken?: unknown
         }
-      } catch {
-        break
+      } catch (e) {
+        // ONE FOLDER'S REFUSAL IS SWALLOWED. A DEAD CONNECTION IS NOT.
+        //
+        // `google_forbidden` is 403 — this item is not shared with this person —
+        // and skipping it is right: the walk opens folders nobody named, and
+        // among a few hundred there is reliably one of those. Anything else
+        // rethrows, and the one that matters is `google_access_lost` (401): a
+        // revoked token would otherwise be swallowed once per folder and the
+        // whole listing would come back EMPTY AND SUCCESSFUL — a knowledge base
+        // reading nothing, with nothing anywhere saying why. That is a worse
+        // failure than the one this catch was added to fix.
+        if ((e as { code?: string })?.code === "google_forbidden") break
+        throw e
       }
       for (const raw of Array.isArray(data.files) ? data.files : [])
         rows.push(raw as Record<string, unknown>)
