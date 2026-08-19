@@ -22,12 +22,14 @@
 //     combinations rather than trusted to look alike.
 import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
 
 import { PRIORITY_LABEL, priorityScore } from "@shared/departments"
 
-const LIB = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "lib", "tasks.ts")
+// `__dirname`, as every other source-reading test in this worker does: the
+// content workspace is typed for the Workers runtime, where `node:url` and
+// `import.meta.url` are not declared.
+const LIB = join(__dirname, "..", "src", "lib", "tasks.ts")
 
 describe("the Eisenhower score is derived on every read", () => {
   it("is the agency's own formula, over all four combinations", () => {
