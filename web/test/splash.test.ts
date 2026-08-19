@@ -2,29 +2,41 @@
 // THE MACHINE THAT WROTE IT.
 //
 // A boot loader is the one piece of UI nobody notices working and everybody
-// notices stuck. It covers the whole viewport at the highest z-index in the app,
-// it is on screen before any of our code runs, and every one of its failure
-// modes is invisible in a dev build:
+// notices stuck. It is on screen before any of our code runs, it is the first
+// thing anybody sees of this product, and every one of its failure modes is
+// invisible in a dev build:
 //
 //   1. It mounts on ONE door. The agency app opens on the brand and the client
 //      portal opens on a white flash — the same class of half-rebrand that made
 //      shared/web/pwa.ts a single file, found only by whoever happens to open
 //      the other hostname.
-//   2. It never leaves. The whole exit path is a CSS animation, so if the fill
-//      mode or the visibility stop is edited away, the app is permanently behind
-//      an invisible sheet — with scripting disabled, or the bundle 404ing, there
-//      is nothing else to clear it.
-//   3. The script removes the node instead of hiding it, and React's hydration
-//      finds a tree that moved underneath it.
+//   2. It is not in the exported HTML, so nothing is on screen until the bundle
+//      lands — which is the entire wait it exists to cover. A loader that waits
+//      for JavaScript has failed at the one job it has.
+//   3. It is in the HTML but it does not MOVE until the bundle lands, which
+//      looks exactly like a frozen logo and has shipped here twice.
 //   4. Somebody swaps `splashSource` to a video on a CDN, and the screen that
 //      exists to hide a network wait becomes a network wait.
-//   5. NEW, AND THE REASON THIS FILE GREW A JSDOM SECTION. The animation is no
-//      longer CSS — it is four kilobytes of JavaScript injected as script TEXT,
-//      and script text is not type-checked, not linted and not parsed until a
-//      browser reaches it. A stray comma in it is a build that passes every
-//      check in this repo and a boot screen that is a frozen logo. So the last
-//      describe RUNS the thing: it evaluates the shipped string, mounts it on
-//      the shipped markup, and drives the clock.
+//   5. THE REASON THIS FILE HAS A JSDOM SECTION. The animation is not CSS — it
+//      is four kilobytes of JavaScript injected as script TEXT, and script text
+//      is not type-checked, not linted and not parsed until a browser reaches
+//      it. A stray comma in it is a build that passes every check in this repo
+//      and a boot screen that is a frozen logo. So the last describe RUNS the
+//      thing: it evaluates the shipped string, mounts it on the shipped markup,
+//      and drives the clock.
+//
+// AND THERE USED TO BE A SIXTH, WHICH IS WHY HALF THIS FILE IS SHORTER THAN IT
+// WAS. Two copies of the mark animated at once on every boot: a fixed
+// full-viewport overlay (`#ks-splash`) with its own animator run, its own opaque
+// field and its own 3.8-second timer, and — behind it, invisible for about 2.7
+// seconds of that — the app's own `MarkLoader`. It cost roughly a third of the
+// frame rate at 20× CPU throttle. The overlay is deleted, and with it every case
+// here about a sheet leaving the screen: its tap-to-skip, its safety timeout,
+// its fill mode, its theme pre-resolution. A loading screen that IS the page's
+// content is taken away by React when there is something to show, so the whole
+// question "how does this get out of the way again" no longer has an answer to
+// get wrong. What replaced those cases is the one below that says there may only
+// ever be ONE run on a host, enforced by the animator rather than by agreement.
 //
 // So: both layouts derived from their own source, the stylesheet and the script
 // read as the shipped strings, the score proved to be a WARP of the author's
@@ -32,24 +44,20 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 import {
   ARCS,
   DETAIL_TIERS,
   GEOMETRY,
-  MARK_INAPP_START_MS,
   SCENES,
   SPLASH_AUTHORED_MS,
   SPLASH_MARK_MS,
-  SPLASH_REVEAL_AT_MS,
-  SPLASH_REVEAL_MS,
-  SPLASH_TOTAL_MS,
   assertSameOrigin,
   markLoopScript,
+  markScript,
   splashInner,
-  splashScript,
   splashStyle,
 } from "@shared/web/splash"
 
@@ -61,61 +69,94 @@ const LAYOUTS = [
 
 describe("both front doors open on the same frame", () => {
   for (const [door, path] of LAYOUTS) {
-    it(`${door}'s root layout imports and renders SplashScreen`, () => {
+    it(`${door}'s root layout imports and renders MarkRuntime`, () => {
       const src = stripComments(readFileSync(path, "utf8"))
       expect(
         src,
-        `${door} must import the shared splash — a second copy is how a rebrand half-succeeds`
-      ).toContain('from "@shared/web/splash-screen"')
-      expect(src, `${door} imports SplashScreen but never renders it`).toMatch(/<SplashScreen\s*\/>/)
+        `${door} must import the shared mark runtime — a second copy is how a rebrand half-succeeds`
+      ).toContain('from "@shared/web/mark-runtime"')
+      expect(src, `${door} imports MarkRuntime but never renders it`).toMatch(/<MarkRuntime\s*\/>/)
     })
 
-    // It is fixed and full-viewport, so DOM order does not decide what covers
-    // what — but it does decide what the PARSER reaches first, which is the only
-    // reason this thing beats the bundle to the screen.
+    // DOM ORDER IS THE WHOLE CONTRACT NOW, and it is a different contract from
+    // the one the overlay had. The overlay was first in the body because the
+    // parser had to PAINT it first. This is first in the body because it
+    // PUBLISHES the animator, and the loader further down the same body is what
+    // gets painted — so the animator has to exist by the time the document
+    // finishes parsing, which is the moment it starts the mark.
     it(`${door} renders it as the first thing in the body`, () => {
       const src = stripComments(readFileSync(path, "utf8"))
       const body = src.indexOf("<body")
-      const splash = src.indexOf("<SplashScreen")
-      const anythingElse = src.slice(body).search(/<(?!body|SplashScreen)[A-Z]/)
-      expect(splash, "SplashScreen is rendered before <body> opens").toBeGreaterThan(body)
+      const runtime = src.indexOf("<MarkRuntime")
+      const anythingElse = src.slice(body).search(/<(?!body|MarkRuntime)[A-Z]/)
+      expect(runtime, "MarkRuntime is rendered before <body> opens").toBeGreaterThan(body)
       expect(
-        splash - body,
-        `${door} renders another component before the splash — the parser reaches it later than it needs to`
+        runtime - body,
+        `${door} renders another component before the mark runtime — the animator is published later than it needs to be`
       ).toBeLessThanOrEqual(anythingElse)
     })
   }
+
+  // FAILURE MODE 6, AS A RULE RATHER THAN A MEMORY. The overlay is deleted; a
+  // layout that renders a second full-screen mark of its own has re-created it,
+  // and the symptom — two animations, one of them invisible — is the kind of
+  // thing nobody files as a bug because the screen looks right.
+  it("neither door has grown a second mark of its own", () => {
+    for (const [door, path] of LAYOUTS) {
+      const src = stripComments(readFileSync(path, "utf8"))
+      expect(src, `${door} still renders the deleted splash overlay`).not.toContain("ks-splash")
+      expect(
+        src,
+        `${door}'s layout draws the mark itself — the app has two animations again, and one of them will be behind the other`
+      ).not.toContain("MarkLoader")
+    }
+  })
 })
 
-describe("it leaves on its own, with no JavaScript at all", () => {
+// WHAT IS ON SCREEN BEFORE ANY OF OUR CODE HAS RUN.
+//
+// Failure modes 2 and 3. The animation is JavaScript, so "with no JavaScript at
+// all" cannot mean a moving mark — it means the mark AT REST, in the HTML,
+// drawn by the parser and not assembled by a script. That used to be the
+// overlay's markup; it is now `MarkLoader`'s, server-rendered into the exported
+// page of every route that has to wait, which is every route but the sign-in
+// screen and the 404 (both of which have real content to paint instead).
+describe("the parser paints a correct mark before anything runs", () => {
   const css = splashStyle()
 
-  it("ends the overlay's animation on visibility:hidden", () => {
-    expect(
-      css,
-      "the exit keyframe no longer hides the overlay — with scripting off, the app is behind a permanent sheet"
-    ).toMatch(/@keyframes ks-splash-out\{[\s\S]{0,80}\bto\{[^}]*visibility:\s*hidden/)
+  // THE OVERLAY IS NOT ALLOWED BACK BY THE SIDE DOOR. Every one of these was
+  // load-bearing for a fixed sheet over the app, and every one of them is a
+  // symptom of somebody re-introducing one.
+  it("has no sheet over the app, and so nothing that has to clear itself", () => {
+    for (const gone of ["#ks-splash", "ks-splash-out", "position:fixed", "z-index", "visibility:hidden"])
+      expect(
+        css,
+        `the stylesheet is back to covering the app with "${gone}" — a loading screen that is the page's own content is removed by React, and an overlay is the thing that has to remember to leave`
+      ).not.toContain(gone)
   })
 
-  it("holds that final frame (a fill mode), rather than snapping back", () => {
-    const rule = /#ks-splash\{[^}]*animation:\s*ks-splash-out[^;}]*\b(both|forwards)\b/
-    expect(
-      css,
-      "without a forwards/both fill the overlay reappears the instant the animation ends"
-    ).toMatch(rule)
+  // The loader fills the screen it is the only thing on. `svh` and not `vh`:
+  // on iOS `vh` is the tallest the viewport ever gets, so a field measured in
+  // it has a seam across the bottom on the one page you cannot scroll.
+  it("fills the viewport it is the whole of", () => {
+    expect(css, "the loader no longer fills the screen — the field ends mid-page").toContain(
+      "min-height:100svh"
+    )
+    expect(css, "the mark is not centred in it").toContain("place-items:center")
   })
 
-  it("starts the reveal at the moment the constants say it does", () => {
-    const delay = /animation:\s*ks-splash-out\s+(\d+)ms\s+\S+\s+(\d+)ms/.exec(css)
-    expect(delay, "the exit animation's shorthand no longer parses — this scan is reading the wrong shape").toBeTruthy()
-    expect(Number(delay![1])).toBe(SPLASH_REVEAL_MS)
-    expect(Number(delay![2])).toBe(SPLASH_REVEAL_AT_MS)
+  // THE THEME, ANSWERED THREE WAYS AND IN THIS ORDER. The media query is the
+  // one that works with scripting off; the two class rules come after it and
+  // beat it on specificity, so an explicit choice wins in both directions.
+  it("is the right colour in both themes, chosen or inherited", () => {
+    const media = css.indexOf("@media (prefers-color-scheme:dark)")
+    expect(media, "no OS-preference fallback — with scripting off the dark screen gets the light mark").toBeGreaterThan(-1)
+    for (const rule of ["html.light .ks-mark-host", "html.dark .ks-mark-host"])
+      expect(
+        css.indexOf(rule),
+        `${rule} is missing or sits above the media query — an explicit theme choice loses to the OS preference`
+      ).toBeGreaterThan(media)
   })
-
-  // The animation is JavaScript now, so "no JavaScript" has to mean something
-  // other than "a still overlay that never goes". What the parser paints is the
-  // mark AT REST, and it is in the HTML — not assembled by the script.
-  //
   // AND IT IS THE LOGO, WHICH IS NOT THE SAME PICTURE AS THE LOCK. The
   // composition strobe-locks to a -56.25° pose the author calls "looking
   // straight up"; the logo (public/icons/kwapso-mark.png) is the unrotated one,
@@ -148,43 +189,62 @@ describe("it leaves on its own, with no JavaScript at all", () => {
   })
 })
 
-// THE OWNER'S DIRECTION, AS A TEST RATHER THAN A COMMENT.
+// THE LOADER LASTS AS LONG AS THE WAIT, AND NOTHING ELSE DECIDES.
 //
-//   "can we ensure that the loading screen … stays long enough for one complete
-//    loop of the animation, or maybe we enter the app just as the last part of
-//    the animation of the logo breaking apart happens, like in the last 0.75
-//    seconds remaining?"
+// The overlay had a `setTimeout(f, 3800)` and a CSS fade, because a sheet over
+// the app has to be told when to go. That timer was also the mechanism for the
+// owner's direction at the time — "stays long enough for one complete loop … we
+// enter the app just as the last part of the animation of the logo breaking
+// apart happens". With the sheet gone the direction has no mechanism and no
+// subject: the loading screen IS the page, and the page is replaced the instant
+// there is something to put there. On a fast boot that is less than one pass; on
+// a slow one it is several, because the mark loops. Nothing is ever cut off
+// mid-beat to reveal something, because nothing is being revealed.
 //
-// Both halves of that sentence are invariants, and neither is safe as prose. The
-// first — the animation is never cut off — dies quietly the moment somebody
-// shortens the overlay to make the app feel faster, and the only symptom is a
-// logo that stops mid-spin. The second is arithmetic between constants, and
-// arithmetic between constants is exactly what drifts when one of them is tuned
-// by feel.
-describe("the app arrives THROUGH the release, not after it", () => {
-  it("never takes the screen away before the mark has finished", () => {
-    const end = SPLASH_REVEAL_AT_MS + SPLASH_REVEAL_MS
-    expect(
-      end,
-      `the overlay is gone at ${end}ms but the mark runs to ${SPLASH_MARK_MS}ms — the animation would be cut off mid-beat`
-    ).toBeGreaterThanOrEqual(SPLASH_MARK_MS)
+// What IS worth locking is the other half — that nothing anywhere schedules the
+// loader's own disappearance. A timer here is a screen that clears itself while
+// the app is still loading, which is a blank page, and it is the single most
+// likely thing for somebody to add back while trying to make the app feel
+// faster.
+describe("the loader is taken away by the app, never by a clock", () => {
+  const SOURCES = ["shared/web/splash.ts", "shared/web/mark-loader.tsx", "shared/web/mark-runtime.tsx"]
+
+  it("schedules nothing, in any of its own files", () => {
+    for (const f of SOURCES) {
+      const src = stripComments(readFileSync(join(ROOT, f), "utf8"))
+      expect(
+        src,
+        `${f} sets a timer — the only thing a loading screen can do on a clock is disappear while the app is still loading`
+      ).not.toMatch(/setTimeout|setInterval/)
+    }
   })
 
-  // Not "roughly during the last beat" — ON the frame the lock lets go. The
-  // reveal window and the Dissolve are the same window, by construction.
-  it("begins the reveal on the exact frame the Dissolve begins", () => {
-    const beforeDissolve = SCENES.slice(0, -1).reduce((n, s) => n + s.played, 0)
-    expect(
-      Math.round(beforeDissolve * 1000),
-      "the reveal no longer coincides with the release — the app would appear against a finished screen"
-    ).toBe(SPLASH_REVEAL_AT_MS)
-    expect(SPLASH_REVEAL_MS).toBeGreaterThanOrEqual(600)
-    expect(SPLASH_REVEAL_MS).toBeLessThanOrEqual(900)
+  // Not "hides nothing" — the animator hides its own pool elements every frame,
+  // which is how the three exposure regimes switch over. What it must not do is
+  // take the HOST off the screen: the overlay did that (`e.style.display="none"`
+  // on the node it owned, plus a `remove()` it was careful never to call because
+  // React hydrates the subtree), and a loader that is the page's own content has
+  // React to do it properly.
+  it("never takes its own host out of the document", () => {
+    for (const f of SOURCES) {
+      const src = stripComments(readFileSync(join(ROOT, f), "utf8"))
+      expect(
+        src,
+        `${f} removes a node — React owns this subtree, and a tree that moved between server render and hydration is a mismatch`
+      ).not.toMatch(/\.remove\(\)|removeChild/)
+      expect(
+        src,
+        `${f} hides the loader itself — that is the overlay's exit coming back, and it can only ever fire while the app is still loading`
+      ).not.toMatch(/host\.style|host\.hidden|e\.style\.display="none"\s*;?\s*if/)
+    }
   })
 
-  it("is on screen for the three-to-four seconds the owner asked for", () => {
-    expect(SPLASH_TOTAL_MS).toBeGreaterThanOrEqual(3000)
-    expect(SPLASH_TOTAL_MS).toBeLessThanOrEqual(4000)
+  it("still plays the whole of the owner's arc, as a loop rather than a hold", () => {
+    expect(
+      SPLASH_MARK_MS,
+      "one pass of the mark is no longer the three-to-four seconds the owner asked for"
+    ).toBeGreaterThanOrEqual(3000)
+    expect(SPLASH_MARK_MS).toBeLessThanOrEqual(4000)
   })
 })
 
@@ -216,17 +276,19 @@ describe("the five scenes are compressed, and all five are still there", () => {
 
   it("plays for exactly as long as the stylesheet and the script believe", () => {
     expect(Math.round(SCENES.reduce((n, s) => n + s.played, 0) * 1000)).toBe(SPLASH_MARK_MS)
-    expect(splashScript()).toContain(`setTimeout(f,${SPLASH_TOTAL_MS})`)
   })
 
-  // The in-app loader picks the animation up mid-movement, not at the fly-in,
-  // so the handover from the ident reads as one continuous thing.
-  it("hands the app's own loader the spin-up, not the beginning", () => {
-    expect(MARK_INAPP_START_MS).toBeGreaterThan(0)
+  // THE MARK STARTS AT THE BEGINNING, and the deletion forced that rather than
+  // taste. It used to join at the spin-up (`at: MARK_INAPP_START_MS`) because
+  // the ident had just played the fly-in over the top of it, and replaying it
+  // would have read as the app restarting. There is no ident in front of it any
+  // more, so joining mid-movement would mean nobody ever sees the beat the
+  // composition opens with — the one beat EVERY boot is long enough for.
+  it("starts the one loader at the fly-in, not part-way through", () => {
     expect(
-      MARK_INAPP_START_MS,
-      "the in-app mark joins before the spin-up — it would replay the fly-in and read as a restart"
-    ).toBe(Math.round((SCENES[0].played + SCENES[1].played) * 1000))
+      markScript(),
+      "the bootstrap seeks into the composition — with no ident in front of it, the fly-in would never be seen"
+    ).not.toContain("at:")
   })
 })
 
@@ -273,63 +335,60 @@ describe("the detail tiers", () => {
 })
 
 describe("the inline script", () => {
-  const js = splashScript()
+  const js = markScript()
 
-  // Failure mode 3. The layout is server-rendered and then hydrated; a node that
-  // the script deleted in between is a tree React did not expect.
-  it("hides the node instead of removing it, so hydration finds what it rendered", () => {
-    expect(js, "the splash script must not remove its own node — React hydrates this subtree").not.toMatch(
-      /removeChild|\.remove\(\)/
-    )
-    expect(js).toContain('style.display="none"')
-  })
-
-  it("tears down both document listeners on the way out", () => {
-    const added = [...js.matchAll(/addEventListener\("(\w+)"/g)].map((m) => m[1])
-    const removed = [...js.matchAll(/removeEventListener\("(\w+)"/g)].map((m) => m[1])
-    expect(added.length, "the skip listeners are gone — a tap no longer dismisses the splash").toBeGreaterThan(0)
-    for (const ev of added)
-      expect(removed, `"${ev}" is added at the document but never removed — the app carries it all session`).toContain(
-        ev
-      )
-  })
-
-  // A tap hides the overlay; the frame loop behind it would otherwise keep
-  // running, invisible, on the screen that just replaced it.
-  it("stops the animation when the splash is skipped", () => {
+  // FAILURE MODE 3, AND THE WHOLE REASON THIS SCRIPT STILL EXISTS AT ALL.
+  // `MarkLoader` starts the animator in an effect, and an effect runs at
+  // hydration — which is the wait the loader is covering for. Measured on the
+  // real export, hydration lands at 286ms on a laptop and 348ms on a phone with
+  // a warm cache, and on the cold connection this screen exists for it is
+  // however long the bundle takes. Without these four lines the parser paints a
+  // mark that then stands perfectly still for all of it, which is
+  // indistinguishable from the frozen logo that has shipped here twice.
+  it("starts the mark itself, without waiting for React", () => {
+    expect(js, "the bootstrap no longer looks for the loader").toContain(".ks-mark-stage")
     expect(
       js,
-      "the skip handler hides the overlay without calling the animator's stop — the loop runs on behind it"
-    ).toMatch(/style\.display="none";if\(s\)s\(\)/)
+      "the bootstrap never calls the animator — the mark would not move until hydration"
+    ).toContain("__ksMark")
+    expect(js, "the mark does not loop — it would stop mid-wait on a slow boot").toContain("loop:!0")
   })
 
-  it("gives up after the full duration even if nothing is ever tapped", () => {
-    expect(js).toContain(`setTimeout(f,${SPLASH_TOTAL_MS})`)
-  })
-
-  // It is injected as script TEXT. The interpolations are this module's own
-  // numbers; anything else here would be executing a string from elsewhere.
-  it("interpolates nothing but its own timing constants", () => {
-    const holes = js.split(String(SPLASH_TOTAL_MS)).join("").replace(/"theme"|"ks-lit"|"ks-splash"/g, "")
-    expect(holes, "the script text carries a value from outside this module").not.toMatch(
-      /\$\{|location\./
+  // This script is FIRST in the body and the loader is further down it, so at
+  // the moment it runs `.ks-mark-stage` has not been parsed yet. DCL fires when
+  // the HTML is finished and does not wait for the async bundle, so it is early
+  // by construction; the readyState branch covers a document already past it.
+  it("waits for the document, and only for the document", () => {
+    expect(js, "the bootstrap runs before the loader has been parsed, and finds nothing").toContain(
+      "DOMContentLoaded"
     )
+    expect(
+      js,
+      "no readyState branch — on an already-parsed document DOMContentLoaded never fires again"
+    ).toContain('d.readyState==="loading"')
+    expect(
+      js,
+      "the bootstrap waits on load, which waits on the very bundle it is covering for"
+    ).not.toMatch(/addEventListener\("load"/)
   })
 
-  // Reduced motion is honoured in the ANIMATOR, not only in the stylesheet —
-  // the stylesheet can no longer stop a JavaScript loop.
+  // It is injected as script TEXT, so anything interpolated into it is a value
+  // being executed. There is nothing left to interpolate but the animator.
+  it("interpolates nothing at all", () => {
+    expect(
+      js.slice(js.indexOf("!function(){var d=document")),
+      "the bootstrap carries a value from outside this module"
+    ).not.toMatch(/\$\{|location\./)
+  })
+
+  // Reduced motion is honoured in the ANIMATOR, not in the stylesheet — a
+  // stylesheet cannot stop a JavaScript loop, and there is no CSS animation
+  // left anywhere for a media query to shorten.
   it("refuses to animate for anyone who asked for less motion", () => {
     expect(
       markLoopScript(),
-      "the animator no longer checks prefers-reduced-motion — a 3.8s spin is not optional for everybody"
+      "the animator no longer checks prefers-reduced-motion — a spinning mark is not optional for everybody"
     ).toContain("prefers-reduced-motion: reduce")
-  })
-
-  it("shortens the hold under reduced motion too", () => {
-    const block = /@media\s*\(prefers-reduced-motion:\s*reduce\)\{([\s\S]*)$/.exec(splashStyle())?.[1] ?? ""
-    const early = /#ks-splash\{animation-delay:(\d+)ms\}/.exec(block)
-    expect(early, "reduced motion no longer shortens the hold").toBeTruthy()
-    expect(Number(early![1])).toBeLessThan(SPLASH_MARK_MS)
   })
 })
 
@@ -342,124 +401,104 @@ describe("the inline script", () => {
 // actually gets fat. The measured figure is in the failure message.
 describe("the whole opening frame is small enough to inline", () => {
   it("fits in ten kilobytes of CSS + markup + script", () => {
-    const bytes = Buffer.byteLength(splashStyle() + splashInner() + splashScript(), "utf8")
-    expect(bytes, `the inline splash payload is ${bytes} bytes`).toBeLessThan(10 * 1024)
+    const bytes = Buffer.byteLength(splashStyle() + splashInner() + markScript(), "utf8")
+    expect(bytes, `the inline mark payload is ${bytes} bytes`).toBeLessThan(10 * 1024)
   })
 })
 
-// SKIPPING IS SOMETHING A PERSON DOES, NOT SOMETHING THAT HAPPENS TO THEM.
+// THE MARK HAS TO BE MOVING BEFORE REACT EXISTS, AND THAT IS NOT A PREFERENCE.
 //
-// The splash used to dismiss on `pointerdown` at the document — which is not a
-// gesture anybody performs on purpose. A thumb resting on the glass while a
-// phone loads is a pointerdown. The first millimetre of a scroll is a
-// pointerdown. On a laptop nobody touches anything, so the ident played to the
-// end and looked perfect; on a phone it could vanish before the fly-in
-// finished, which from the owner's side reads as "the loader doesn't run on
-// mobile" — close to his actual words.
+// This replaces the suite that used to be here, which drove three real gestures
+// through the overlay's tap-to-skip. There is no overlay and nothing to skip;
+// what is worth running instead is the thing the overlay used to do for free and
+// now has to be done deliberately — starting the animation without React.
 //
-// The other tests in this file READ the inline script. These RUN it, on the
-// markup that ships, and put three real gestures through it: a phone being
-// held, a scroll beginning, and somebody actually asking for it to go. The
-// clock is faked because the difference between a rest and a tap is duration
-// and nothing else — a rest is a press and a lift in nearly the same place.
-describe("skipping the splash is a deliberate act", () => {
-  // CLEANUP IS UNCONDITIONAL, and that is not tidiness. `boot()` puts a node
-  // with the id the script looks up into the document; a case that FAILS never
-  // reaches its own restore, so the node survives, and the next `boot()` leaves
-  // `getElementById` resolving to the dead one. The first version of this suite
-  // did exactly that, and breaking one guard on purpose turned four unrelated
-  // cases red — which would have read as "the fix broke everything" rather than
-  // "one test found its bug".
+// The other tests in this file READ the bootstrap. These RUN it, on a document
+// shaped like the exported page: the script first, the loader further down it,
+// and no bundle anywhere. `take()` empties `.ks-cast` and installs its own pool
+// the moment a run starts, so "the resting mark is gone" is exactly "the
+// animator has this host".
+describe("the mark is moving before the bundle arrives", () => {
   const opened: Array<() => void> = []
   afterEach(() => {
     while (opened.length) opened.pop()!()
   })
 
-  /** Evaluate the shipped inline script against the shipped markup. */
-  function boot() {
-    // Only what the script itself uses. rAF is left alone deliberately: the
-    // animator is stubbed out below and a faked rAF here would fight it.
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] })
-    const realRaf = window.requestAnimationFrame
-    window.requestAnimationFrame = (() => 0) as typeof window.requestAnimationFrame
+  /** A document that looks like an exported page. `parsing` puts it in the state
+   * it is ACTUALLY in when this script runs on a real load — mid-parse, with the
+   * loader not yet reached — which is the branch that matters and the one jsdom
+   * would otherwise never take, because a test document is always complete. */
+  function page({ parsing = false, loader = true } = {}) {
+    const frames: Array<(t: number) => void> = []
+    const real = window.requestAnimationFrame
+    window.requestAnimationFrame = ((cb: (t: number) => void) => {
+      frames.push(cb)
+      return frames.length
+    }) as typeof window.requestAnimationFrame
     window.cancelAnimationFrame = (() => {}) as typeof window.cancelAnimationFrame
     delete (window as { __ksMark?: unknown }).__ksMark
 
-    const host = document.createElement("div")
-    host.id = "ks-splash"
-    host.innerHTML = splashInner({ kind: "mark" })
-    document.body.appendChild(host)
-    // eslint-disable-next-line no-new-func -- the point is to run the shipped text
-    new Function(splashScript())()
+    if (parsing) Object.defineProperty(document, "readyState", { value: "loading", configurable: true })
+
+    let host: HTMLDivElement | null = null
+    let stage: HTMLDivElement | null = null
+    if (loader) {
+      host = document.createElement("div")
+      host.className = "ks-mark-host"
+      stage = document.createElement("div")
+      stage.className = "ks-mark-stage"
+      stage.innerHTML = splashInner({ kind: "mark" })
+      host.appendChild(stage)
+      document.body.appendChild(host)
+    }
+
+    // eslint-disable-next-line no-new-func -- the point of this suite is to parse and run the shipped text
+    new Function(markScript())()
 
     opened.push(() => {
-      window.requestAnimationFrame = realRaf
-      host.remove()
-      vi.useRealTimers()
+      window.requestAnimationFrame = real
+      if (parsing) delete (document as unknown as Record<string, unknown>).readyState
+      host?.remove()
     })
-    return { host, gone: () => host.style.display === "none" }
+    return {
+      stage,
+      frames,
+      /** the animator has taken this host over */
+      running: () => !!stage && !stage.querySelector(".ks-rest") && frames.length > 0,
+    }
   }
 
-  /** jsdom has no PointerEvent constructor, so the two fields the script reads
-   * are put on a plain event — which is all it ever touches. */
-  const press = (type: string, x: number, y: number, id = 1) => {
-    const ev = new Event(type, { bubbles: true, cancelable: true })
-    Object.assign(ev, { clientX: x, clientY: y, pointerId: id })
-    return ev
-  }
-
-  it("plays on under a thumb resting on the screen", () => {
-    const m = boot()
-    m.host.dispatchEvent(press("pointerdown", 180, 600))
-    vi.advanceTimersByTime(1500) // holding the phone
-    m.host.dispatchEvent(press("pointerup", 181, 602)) // and taking the thumb off
+  it("takes the loader over the moment the document is parsed", () => {
+    const m = page({ parsing: true })
     expect(
-      m.gone(),
-      "holding the device dismissed the loader — this is the gesture nobody performs on purpose"
+      m.running(),
+      "the bootstrap started before the loader was parsed — on a real page it would have found nothing"
     ).toBe(false)
-  })
-
-  it("plays on when a scroll starts", () => {
-    const m = boot()
-    m.host.dispatchEvent(press("pointerdown", 180, 600))
-    vi.advanceTimersByTime(80)
-    m.host.dispatchEvent(press("pointerup", 184, 500)) // travelled 100px
-    expect(m.gone(), "a swipe dismissed the loader — that is a scroll, not a tap").toBe(false)
-  })
-
-  // How a scroll usually arrives on iOS: the browser takes the gesture over and
-  // there is never an up at all. The press must be FORGOTTEN, or an unrelated
-  // lift later completes it.
-  it("forgets a press the browser took over", () => {
-    const m = boot()
-    m.host.dispatchEvent(press("pointerdown", 180, 600))
-    m.host.dispatchEvent(press("pointercancel", 180, 600))
-    vi.advanceTimersByTime(40)
-    m.host.dispatchEvent(press("pointerup", 180, 600))
-    expect(m.gone(), "a cancelled gesture was completed by a later lift").toBe(false)
-  })
-
-  it("goes when somebody actually taps it", () => {
-    const m = boot()
-    m.host.dispatchEvent(press("pointerdown", 180, 600))
-    vi.advanceTimersByTime(90)
-    m.host.dispatchEvent(press("pointerup", 183, 602))
+    document.dispatchEvent(new Event("DOMContentLoaded"))
     expect(
-      m.gone(),
-      "a deliberate tap no longer dismisses the loader — the skip has to still work, or it is not a courtesy"
+      m.running(),
+      "the mark is not turning when the HTML finishes — it would stand still until the bundle lands, which is the wait it exists to cover"
     ).toBe(true)
   })
 
-  it("goes on a keypress, which nobody does by accident", () => {
-    const m = boot()
-    m.host.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }))
-    expect(m.gone(), "the keyboard skip is gone").toBe(true)
+  it("starts immediately on a document that is already past that", () => {
+    const m = page()
+    expect(
+      m.running(),
+      "DOMContentLoaded has already fired and will not fire again — the mark never starts"
+    ).toBe(true)
   })
 
-  it("goes on its own if nobody touches anything at all", () => {
-    const m = boot()
-    vi.advanceTimersByTime(SPLASH_TOTAL_MS)
-    expect(m.gone(), "the splash outlived its own timeout").toBe(true)
+  // The sign-in screen and the 404 render real content rather than a loader, so
+  // there is nothing on the page to animate. It must publish the animator
+  // anyway: a client-side navigation from there to a screen that DOES wait
+  // reaches `MarkLoader`, which asks for it by name.
+  it("publishes the animator on a page with no loader, and does not reach for one", () => {
+    const m = page({ loader: false })
+    expect(typeof window.__ksMark, "the animator was not published on a page with no loader").toBe(
+      "function"
+    )
+    expect(m.frames.length, "something is animating on a page that has no mark on it").toBe(0)
   })
 })
 
@@ -507,7 +546,11 @@ describe("skipping the splash is a deliberate act", () => {
 function staleExport(exported: string): boolean {
   try {
     const built = statSync(exported).mtimeMs
-    return [join(ROOT, "shared", "web", "splash.ts"), join(ROOT, "shared", "web", "mark-loader.tsx")].some(
+    return [
+      join(ROOT, "shared", "web", "splash.ts"),
+      join(ROOT, "shared", "web", "mark-loader.tsx"),
+      join(ROOT, "shared", "web", "mark-runtime.tsx"),
+    ].some(
       (src) => existsSync(src) && statSync(src).mtimeMs > built
     )
   } catch {
@@ -526,9 +569,9 @@ describe("what the compiler actually shipped", () => {
   ] as const
 
   const cases: Array<[string, string, string]> = [
-    ["the stylesheet", splashStyle(), "#ks-splash,.ks-mark-host{"],
+    ["the stylesheet", splashStyle(), ".ks-mark-host{"],
     ["the resting mark", splashInner(), "<svg viewBox="],
-    ["the animator", splashScript(), "!function(){if(window.__ksMark)"],
+    ["the animator", markScript(), "!function(){if(window.__ksMark)"],
   ]
 
   for (const [door, exported] of DOORS) {
@@ -565,40 +608,66 @@ describe("what the compiler actually shipped", () => {
   }
 })
 
-// THE IN-APP LOADER FROZE ON THE REAL BUILD AND ON NOTHING ELSE.
+// THE LOADER PUTS ITS MARK IN THE HTML, AND THAT DECISION HAS BEEN BOTH WAYS.
 //
-// `MarkLoader` rendered the mark through `dangerouslySetInnerHTML`, which reads
-// as the obvious thing to do — the splash does exactly that. On the built app it
-// was a still logo every time. React re-applies `dangerouslySetInnerHTML` on the
-// first update after hydration even when the string is unchanged, and that
-// update arrives about two milliseconds after mount; it replaced the sixty-four
-// element pool the animator had just installed with the three resting arcs, and
-// the effect never ran again because its dependency list is empty. No error, no
-// warning, no failing test — just a logo that does not turn.
+// `MarkLoader` rendered the mark through `dangerouslySetInnerHTML` first, and it
+// was a still logo on every built app: React re-applies that on the first update
+// after hydration even when the string is unchanged, and that update arrives
+// about two milliseconds after mount. It replaced the sixty-four element pool
+// the animator had just installed with the three resting arcs, and the effect
+// never ran again because its dependency list is empty. No error, no warning, no
+// failing test — a logo that does not turn.
 //
-// This paragraph used to end "the splash is not exposed to this, being
-// server-rendered and never re-rendered". It was, measurably: React re-applied
-// `#ks-splash` at 286ms on a laptop and 348ms on a phone and the mark froze for
-// the rest of every boot. The splash cannot take this component's way out — it
-// has to be painted by the parser — so it heals instead, and the case above
-// ("carries on when its whole subtree is replaced underneath it") is that.
-// The difference is invisible at the call site, which is exactly why both
-// halves are a rule rather than a comment.
-describe("the app's own loader keeps its subtree away from React", () => {
+// The fix at the time was to render EMPTY and let the effect own the subtree.
+// That was right while an OVERLAY was what the parser painted. It is wrong now
+// that this is: an empty box in the exported HTML is a blank screen until the
+// bundle lands, which is the entire wait this exists to cover. So the markup is
+// back in the server render and the fault is answered where it actually lives —
+// the animator notices its own group has been detached and takes the cast back
+// (`take()` in splash.ts, and the case below that drives it).
+//
+// Both halves are a rule rather than a comment because the difference is
+// invisible at the call site: an empty box and a full one render identically the
+// moment React arrives, and the whole cost is paid before it does.
+describe("the app's own loader is in the exported HTML", () => {
   const src = stripComments(readFileSync(join(ROOT, "shared", "web", "mark-loader.tsx"), "utf8"))
 
-  it("never hands the mark to dangerouslySetInnerHTML", () => {
+  it("server-renders the mark, so the parser paints it", () => {
     expect(
       src,
-      "MarkLoader renders the mark through React again — the first post-hydration update will wipe the animator's pool and the mark will stand still"
-    ).not.toContain("dangerouslySetInnerHTML")
+      "the loader renders an empty box — nothing is on screen until the bundle lands, which is the wait it exists to cover"
+    ).toMatch(/dangerouslySetInnerHTML=\{\{\s*__html:\s*splashInner\(\)/)
   })
 
-  it("writes the markup and starts the animator in the same effect", () => {
-    expect(src, "the host is never filled — the loader would be an empty box").toMatch(
-      /\.innerHTML\s*=\s*splashInner\(\)/
-    )
+  // Found by running it: the inline bootstrap starts the animation before React
+  // arrives, so the animator has already emptied `.ks-cast` and installed its
+  // pool by the time hydration compares the DOM to the server render. React
+  // logs a mismatch it says it "won't patch up" — on the very first screen of
+  // the app, every cold load, on both doors. It is noise rather than a fault
+  // (the next update re-applies the markup and `take()` heals it), and noise on
+  // the boot screen is the kind that gets learned rather than fixed.
+  it("tells React the mark will not match, because it has been moving since before hydration", () => {
+    expect(
+      src,
+      "no suppressHydrationWarning — every cold boot logs a hydration mismatch, because the animation legitimately started before React did"
+    ).toContain("suppressHydrationWarning")
+  })
+
+  it("asks for the animator instead of shipping a second one", () => {
     expect(src, "the animator is never asked for").toContain("__ksMark")
+    expect(
+      src,
+      "the loader loops nothing — a wait longer than one pass would end on a still mark"
+    ).toContain("loop: true")
+  })
+
+  // The host is found from OUTSIDE React — by the inline bootstrap, before this
+  // component exists — so the class is a contract and not styling.
+  it("carries the class the bootstrap finds it by", () => {
+    expect(
+      src,
+      "the stage lost its class — the inline script can no longer find the loader, and the mark stands still until hydration"
+    ).toContain('className="ks-mark-stage"')
   })
 
   it("says the app is loading without describing the animation", () => {
@@ -669,7 +738,7 @@ describe("the animator, run", () => {
    * run lands where it always did: no rect, so no clamp, and the authored
    * fly-in. */
   function mount(
-    opts?: { loop?: boolean; at?: number },
+    opts?: { loop?: boolean },
     screen?: { width: number; height: number; box: number }
   ) {
     const frames: Array<(t: number) => void> = []
@@ -1002,10 +1071,59 @@ describe("the animator, run", () => {
   })
 
   it("keeps going forever when the app's own loader asks it to loop", () => {
-    const m = mount({ loop: true, at: MARK_INAPP_START_MS })
+    const m = mount({ loop: true })
     m.step(SPLASH_MARK_MS * 3)
     expect(m.pending(), "the looping loader stopped — the app's wait would freeze mid-spin").toBe(1)
     expect(drawn(m.host).length).toBeGreaterThan(0)
+    m.restore()
+  })
+
+  // ── THE DEFECT THIS WHOLE CHANGE WAS ABOUT, AS AN INVARIANT ─────────────
+  //
+  // Two copies of the mark used to animate at once on every boot, because two
+  // callers each started their own run and neither knew about the other. The
+  // overlay is deleted, so today there is only one caller per host — but there
+  // are still TWO ways a run begins (the inline bootstrap at DOMContentLoaded,
+  // and MarkLoader's effect at hydration), and on a cold load both fire on the
+  // same element. Making the second impossible belongs in the animator, because
+  // an agreement between call sites is exactly what failed last time.
+  it("hands a second caller the first caller's run, rather than starting another", () => {
+    const m = mount({ loop: true })
+    m.step(300)
+    const pool = cast(m.host).firstChild
+    const again = window.__ksMark!(m.host, { loop: true })
+    expect(
+      cast(m.host).childNodes.length,
+      "a second call installed a second pool — that is two animations on one element, which is the defect this replaced"
+    ).toBe(1)
+    expect(cast(m.host).firstChild, "the second call threw the first run's pool away").toBe(pool)
+
+    // And it is the SAME run, so whoever holds either handle can stop it. If it
+    // were a no-op instead, MarkLoader's cleanup would leave the bootstrap's
+    // loop ticking after the app had arrived.
+    again()
+    m.step(600)
+    expect(
+      m.pending(),
+      "stopping through the second caller's handle left the run going — the loop outlives the screen"
+    ).toBe(0)
+    m.restore()
+  })
+
+  // The other half of the same worry, for the run nobody is holding. On a cold
+  // load the bootstrap starts a run before React exists; if React then replaces
+  // that host with a different element instead of hydrating it, the original
+  // handle is gone and nothing would ever stop the loop.
+  it("stops itself when its host leaves the document", () => {
+    const m = mount({ loop: true })
+    m.step(300)
+    expect(m.pending(), "the run was not going in the first place").toBe(1)
+    m.host.remove()
+    m.step(600)
+    expect(
+      m.pending(),
+      "the run carried on after its host was removed — an invisible rAF loop, forever, which is precisely what this change was made to stop"
+    ).toBe(0)
     m.restore()
   })
 

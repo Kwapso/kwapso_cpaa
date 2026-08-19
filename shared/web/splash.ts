@@ -1,46 +1,54 @@
-// shared/web/splash.ts — THE OPENING FRAME, ON EVERY FRONT DOOR.
+// shared/web/splash.ts — THE ONE ANIMATION, ON EVERY FRONT DOOR.
 //
 // The kwapso mark accretes out of the dark, builds torque until the rim smears
 // into a solid ring, strobe-locks to one frozen upward-facing frame, and then
-// lets go — the lock smearing into a long-exposure ring that falls dark as the
-// app arrives through it. It is the owner's own composition (an 1080-square,
-// 11.4-second, five-scene piece), re-implemented here with no React, no runtime
-// and no library: the whole thing is arithmetic and one <svg>.
+// lets go — the lock smearing into a long-exposure ring that falls dark. It is
+// the owner's own composition (an 1080-square, 11.4-second, five-scene piece),
+// re-implemented here with no React, no runtime and no library: the whole thing
+// is arithmetic and one <svg>.
 //
-// THREE PROPERTIES THIS FILE EXISTS TO HOLD, none of them obvious:
+// ── THERE USED TO BE TWO OF IT ON SCREEN AT ONCE ──────────────────────────
 //
-//  1. IT PAINTS BEFORE THE APP DOES. The markup below is rendered by the ROOT
-//     LAYOUT, which means it is baked into the exported .html the gateway serves
-//     — it is on screen at first paint, before a single byte of the React bundle
-//     has been fetched. A splash that waits for JavaScript has failed at the one
-//     job it has. The SVG in the HTML is the mark AT REST, correctly oriented,
-//     drawn by the parser; the inline script only takes it over and moves it.
-//     So there is no frame in which nothing is on screen.
+// This file shipped an OVERLAY — `#ks-splash`, a fixed full-viewport ident with
+// its own copy of the mark, its own animator run, its own opaque field and its
+// own 3.8-second timer — and the app ALSO drew the mark for its own boot states
+// (`MarkLoader`). Both ran during every boot: two element pools, two rAF loops,
+// two of the same picture, one of them behind an opaque sheet. Measured at 20×
+// CPU throttle it cost about a third of the frame rate, and roughly 2.7 seconds
+// of the second copy was drawn where nobody could see it.
 //
-//  2. IT LEAVES WITHOUT BEING TOLD. The overlay's own CSS animation ends on
-//     `visibility: hidden` with a forwards fill, so it clears itself with
-//     scripting disabled, with the bundle 404ing, with React never hydrating,
-//     and with the animator having thrown on its first line. The ANIMATION is
-//     the only thing here that needs JavaScript; the LEAVING never does. The
-//     inline script adds the two courtesies CSS cannot: a tap or a keypress
-//     skips it, and the node is display:none'd at the end so it stops being a
-//     thing at all. It NEVER removes the node — React hydrates this tree, and a
-//     node that vanished between server render and hydration is a mismatch.
+// The overlay is gone. What is left is the half that was already everywhere:
+// the mark, drawn by `MarkLoader`, which every route that has to wait already
+// server-renders. It kept the overlay's whole job, because the overlay's job was
+// never the overlay:
+//
+//  1. IT PAINTS BEFORE THE APP DOES. `MarkLoader` renders the resting mark into
+//     the exported .html the gateway serves, so it is on screen at first paint,
+//     before a byte of the React bundle has been fetched. A loader that waits for
+//     JavaScript has failed at the one job it has. And it MOVES before the bundle
+//     too: the inline script below publishes the animator and starts it on the
+//     host as soon as the document is parsed (`markScript`), which is many
+//     seconds earlier than hydration on the connection this exists for.
+//
+//  2. IT LEAVES WHEN THE APP IS READY, and not on a timer. That is the whole
+//     reason the overlay could be deleted rather than re-timed: a loading screen
+//     that IS the page's content is unmounted by React the moment there is
+//     something to show. There is no sheet left over the app to clear, so the
+//     entire class of "the overlay never left" — the fill mode, the tap-to-skip,
+//     the safety timeout, the display:none — has nothing to fail at.
 //
 //  3. IT IS ONE FILE, NOT TWO. The agency app and the client portal are the same
 //     product wearing two permissions, and their opening frame is the same frame.
 //     shared/web/pwa.ts learned this the hard way — the identity used to be two
 //     byte-identical copies and a rebrand half-succeeded. So both root layouts
-//     import SplashScreen from here, and web/test/splash.test.ts fails if one of
+//     import MarkRuntime from here, and web/test/splash.test.ts fails if one of
 //     them stops.
 //
-// AND ONE MORE, NEW: the animator this file inlines is also what the APP'S OWN
-// boot states draw (shared/web/mark-loader.tsx → ShellLoading, the portal's
-// session wait). It is published once as `window.__ksMark`, from markup that is
-// already in every exported page, so the in-app loader costs the React bundle
-// nothing and cannot drift from the splash. The handover reads as one continuous
-// movement: the ident dissolves and the app's own wait already has the mark
-// turning (MARK_INAPP_START_MS below).
+//  4. ONE HOST, ONE RUN — now structurally, not by convention. `__ksMark`
+//     remembers the run it started on a host and hands the same one back to the
+//     next caller, so the bootstrap below and `MarkLoader`'s own effect cannot
+//     produce two. That is the defect above turned into something a future
+//     caller cannot re-commit by accident.
 //
 // TO CHANGE THE ANIMATION, CHANGE `splashSource` BELOW — that is the whole
 // interface, and it is deliberately the only one. Today it is the built-in mark.
@@ -50,7 +58,7 @@
 //     export const splashSource: SplashSource = { kind: "video", src: "/splash/loop.mp4" }
 //
 // Nothing else moves — not a layout, not a component, not a test. The source
-// must be a same-origin path (it is asserted below): a splash that reaches out
+// must be a same-origin path (it is asserted below): a loader that reaches out
 // to another host has re-introduced the wait it was built to hide, and would be
 // the one remote fetch on a door that otherwise makes none.
 
@@ -78,8 +86,8 @@ import { brand } from "../brand"
 //                            a law and not a keyframe
 //   Lock      3.4s → 0.68s   a HOLD. Holding is the one thing you can cut to a
 //                            fifth and lose nothing but the holding
-//   Dissolve  1.2s → 0.75s   gets the most of that compression back, because the
-//                            app arrives THROUGH it (see SPLASH_REVEAL_AT_MS)
+//   Dissolve  1.2s → 0.75s   gets the most of that compression back: it is the
+//                            beat the app most often arrives during
 //
 // Speed is not the same as haste: every easing curve, every mass proxy and the
 // damped settle are the author's, unchanged, and the warp is per-scene so the
@@ -95,39 +103,16 @@ export const SCENES = [
 const total = (pick: (s: (typeof SCENES)[number]) => number) =>
   Math.round(SCENES.reduce((n, s) => n + pick(s), 0) * 1000)
 
-/** How long the mark runs, start to finish — the sum of the played column, not a
- * number typed beside it. The owner asked for "three to four seconds". */
+/** How long one pass of the mark takes, start to finish — the sum of the played
+ * column, not a number typed beside it. The owner asked for "three to four
+ * seconds", and that is now the length of the LOOP rather than the length of a
+ * wait: the loader is on screen for exactly as long as the app takes to arrive,
+ * which on a fast boot is less than one pass and on a slow one is several. */
 export const SPLASH_MARK_MS = total((s) => s.played)
 
 /** The authored length of the piece, for anyone checking that the warp is a warp
  * and not a rewrite. */
 export const SPLASH_AUTHORED_MS = total((s) => s.authored)
-
-/** How long the app takes to arrive: the Dissolve, exactly. */
-export const SPLASH_REVEAL_MS = Math.round(SCENES[SCENES.length - 1].played * 1000)
-
-/** WHEN the app starts arriving — and the number that carries the owner's
- * direction, so it is derived rather than typed:
- *
- *   "we enter the app just as the last part of the animation of the logo
- *    breaking apart happens, like in the last 0.75 seconds remaining"
- *
- * The reveal does not WAIT for the release, it RIDES it: the overlay begins
- * dissolving on the frame the lock lets go, and for three quarters of a second
- * the ring is smearing outward across the app rather than across a black
- * rectangle. Subtraction, not a constant — and because both terms come from the
- * score above, the instruction stays true if the score is ever retuned. */
-export const SPLASH_REVEAL_AT_MS = SPLASH_MARK_MS - SPLASH_REVEAL_MS
-
-/** Total time from first paint to an app you can touch. A tap cuts it short at
- * any point. */
-export const SPLASH_TOTAL_MS = SPLASH_MARK_MS
-
-/** Where the app's OWN boot states join the loop (shared/web/mark-loader.tsx).
- * Not zero, and that is the whole point: the splash has just finished, so
- * starting the in-app mark from the fly-in would read as the ident restarting.
- * It picks the animation up at the spin-up instead. */
-export const MARK_INAPP_START_MS = Math.round((SCENES[0].played + SCENES[1].played) * 1000)
 
 /** HOW MUCH EXPOSURE A SCREEN GETS, and the one thing in this file that is a
  * judgement about a DEVICE rather than about the composition.
@@ -334,65 +319,55 @@ function markSvg(): string {
 
 /* --------------------------------- render --------------------------------- */
 
-/** The stylesheet, as a string, injected inline by SplashScreen.
+/** The stylesheet, as a string, injected inline by MarkRuntime.
  *
- * Every rule is scoped under #ks-splash or .ks-mark-host so nothing here can
- * reach the app, and the whole thing is about a kilobyte because it ships in
- * every exported page.
+ * Every rule is scoped under `.ks-mark-host` so nothing here can reach the app,
+ * and the whole thing is well under a kilobyte because it ships in every
+ * exported page.
  *
- * THE COLOURS ARE TWO CUSTOM PROPERTIES AND NOTHING ELSE READS A HEX. That is
- * what lets one animator serve two situations: over the splash's own field the
- * mark is mango on near-black (the authored `onyx`), and inside the app the same
- * markup inherits whatever the theme has already decided — mango on the dark
- * screen, charcoal on the light one, because mango on near-white is not a mark,
- * it is a suggestion.
+ * THE COLOURS ARE THREE CUSTOM PROPERTIES AND NOTHING ELSE READS A HEX. The
+ * field and the two glows are the composition's own (an ident is shown against
+ * black); the mark and the amber field are the BRAND's, so a re-skin reaches the
+ * opening frame. Mango on the dark screen, charcoal on the light one — mango on
+ * near-white is not a mark, it is a suggestion.
  *
- * The splash cannot ask the app what theme it is: next-themes writes its class
- * onto <html> from a script the parser has not reached yet. So the inline script
- * resolves it the way next-themes does (the stored choice, then the OS
- * preference) and puts `ks-lit` on the overlay before the first frame — the
- * right colour immediately, rather than the wrong one corrected. With scripting
- * off there is no stored choice to read, so the media query is the fallback, and
- * the default with neither is the authored onyx.
- *
- * `ease-in` on the reveal, not `linear`, and the reason is contrast rather than
- * taste. A straight cross-fade puts the field at half strength halfway through
- * the release — and in LIGHT mode the screen underneath is a pale mango wash, so
- * a charcoal ring over it at half opacity lands on nearly the value of the app
- * behind it. Ease-in holds the field near full for most of the reveal and drops
- * it in the last quarter, so the release plays out against something it can be
- * seen against and the app still arrives during it.
+ * THREE WAYS THE THEME IS ANSWERED, AND THE ORDER MATTERS. The media query is
+ * the one that works with scripting off; the two `html.light` / `html.dark`
+ * rules come after it and beat it on specificity, so an explicit choice wins in
+ * both directions. This can lean on next-themes' class where the overlay could
+ * not: next-themes writes it from a blocking script that sits ABOVE the loader
+ * in the body, so the class is already on <html> when the parser reaches the
+ * mark. The overlay was FIRST in the body and had to resolve the theme itself —
+ * nine lines of script that went with it.
  *
  * REDUCED MOTION IS THE RESTING FRAME, not a shorter spin: the animator refuses
  * to start (it asks the same media query), so what stays on screen is the mark
- * the parser drew — still, upright, correct — and the overlay leaves early.
+ * the parser drew — still, upright, correct.
  *
  * `overflow:visible` is load-bearing, not tidying. The pieces fly in from a
  * radius of 1010 in a 1080 box — outside the viewBox — so a clipped SVG would
- * hold them at the frame edge until they popped into existence. And the widths
- * are set so the mark itself lands at about 180px, which is the size the splash
- * this replaces drew it at: the mark is only 55% of its own viewBox, because the
- * rest of that box is the room the pieces arrive across. */
+ * hold them at the frame edge until they popped into existence. And the width is
+ * set so the mark itself lands at about 180px: the mark is only 55% of its own
+ * viewBox, because the rest of that box is the room the pieces arrive across.
+ *
+ * `100svh` and not `100vh`, because on iOS Safari `vh` is the tallest the
+ * viewport ever gets and the address bar is over the bottom of it at rest —
+ * a field measured in `vh` is a field with a seam across it until you scroll,
+ * and a boot screen is the one page you cannot scroll. */
 export function splashStyle(): string {
-  return `#ks-splash,.ks-mark-host{--ks-field:${FIELD_DARK};--ks-mark:${brand.accentHex.primary};--ks-glow:${GLOW_DARK}}
-#ks-splash.ks-lit,.ks-mark-host{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT}}
-.dark .ks-mark-host{--ks-mark:${brand.accentHex.primary}}
-#ks-splash{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:var(--ks-field);animation:ks-splash-out ${SPLASH_REVEAL_MS}ms ease-in ${SPLASH_REVEAL_AT_MS}ms both}
-@keyframes ks-splash-out{from{opacity:1}to{opacity:0;visibility:hidden}}
-#ks-splash svg,#ks-splash video,#ks-splash img{width:min(56vmin,320px);height:auto;overflow:visible;display:block}
-.ks-mark-host{display:grid;place-items:center}
-.ks-mark-host svg{width:min(34vmin,190px);height:auto;overflow:visible;display:block}
-.ks-mark-host .ks-amb{display:none}
-@media (prefers-color-scheme:light){#ks-splash{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT}}}
-@media (prefers-reduced-motion:reduce){#ks-splash{animation-delay:520ms}}`
+  return `.ks-mark-host{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT};min-height:100svh;display:grid;place-items:center;background:var(--ks-field)}
+@media (prefers-color-scheme:dark){.ks-mark-host{--ks-field:${FIELD_DARK};--ks-mark:${brand.accentHex.primary};--ks-glow:${GLOW_DARK}}}
+html.light .ks-mark-host{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT}}
+html.dark .ks-mark-host{--ks-field:${FIELD_DARK};--ks-mark:${brand.accentHex.primary};--ks-glow:${GLOW_DARK}}
+.ks-mark-host svg,.ks-mark-host video,.ks-mark-host img{width:min(56vmin,320px);height:auto;overflow:visible;display:block}`
 }
 
-/** What sits inside the overlay, for whichever source is configured.
+/** What sits inside the loader, for whichever source is configured.
  *
  * `muted` + `playsinline` are not optional on the video branch: without both,
  * iOS refuses to autoplay and the opening frame is a still with a play button on
- * it. `loop` because a supplied file would be a loop; the overlay's own fade is
- * what ends it, not the clip. */
+ * it. `loop` because the loader is on screen for as long as the app takes, which
+ * is a length no clip can know in advance. */
 export function splashInner(source: SplashSource = splashSource): string {
   if (source.kind === "video")
     return `<video src="${source.src}" autoplay muted loop playsinline aria-hidden="true"></video>`
@@ -431,6 +406,21 @@ export function splashInner(source: SplashSource = splashSource): string {
 // one rim) and then only writes attributes, because this runs while the browser
 // is still fetching and parsing the bundle it is covering for, and a loader that
 // slows the load down has picked the wrong fight.
+//
+// ONE HOST, ONE RUN, AND IT IS THE FUNCTION THAT GUARANTEES IT — not the two
+// callers agreeing. A host that already has a live run gets that run's own stop
+// function back, so the inline bootstrap (which starts the mark the moment the
+// document is parsed) and `MarkLoader`'s effect (which starts it at hydration,
+// and stops it on unmount) are the SAME run whichever order they arrive in. Two
+// copies of this animation used to run at once during every boot; making a
+// second one impossible is cheaper than remembering not to ask for one.
+//
+// AND IT STOPS ITSELF WHEN ITS HOST LEAVES THE DOCUMENT. A run whose host was
+// unmounted with nobody holding its stopper is a rAF loop that ticks forever on
+// a detached tree — invisible, permanent, and exactly the cost this change was
+// made to remove. `isConnected===false` rather than `!isConnected`, so a browser
+// that has never heard of the property keeps animating rather than stopping on
+// the first frame.
 //
 // It is injected as script TEXT, so it is written as one expression with no
 // template holes. The single interpolation is the score — this module's own
@@ -501,6 +491,9 @@ function markLoopBody(): string {
     'function sh(e,on){if(e.__k!==on){e.__k=on;e.style.display=on?"":"none"}}' +
     'W.__ksMark=function(host,o){o=o||{};var noop=function(){};' +
     'if(!host||!W.requestAnimationFrame)return noop;' +
+    // The second caller on this host gets the FIRST caller's run back. See the
+    // note above: this is the invariant, not a courtesy.
+    'if(host.__ksRun)return host.__ksRun;' +
     'var svg=host.querySelector("svg");if(!svg)return noop;' +
     'var cast=svg.querySelector(".ks-cast");if(!cast)return noop;' +
     'try{if(W.matchMedia&&W.matchMedia("(prefers-reduced-motion: reduce)").matches)return noop}catch(_){}' +
@@ -535,18 +528,16 @@ function markLoopBody(): string {
     'rim.setAttribute("stroke","var(--ks-mark)");rim.style.display="none";rim.__k=false;' +
     // TAKING THE CAST OVER IS SOMETHING THIS HAS TO BE ABLE TO DO TWICE.
     //
-    // `SplashScreen` hands the mark to React through `dangerouslySetInnerHTML`,
-    // and React re-applies that on the first update after hydration even when
-    // the string has not changed. It replaces the whole <svg>, which throws
-    // away the pool this just installed AND detaches every node cached below —
-    // and it is measured, on the real export, on both front doors, at 286ms on
-    // a laptop and 348ms on a phone: the mark stopped a third of a second in
-    // and stood at the resting pose for the remaining three seconds. Every
-    // boot, on every device, since the animator was written. It is the same
-    // fault mark-loader.tsx documents at length, and the comment there — that
-    // the splash is not exposed to it because it is server-rendered and never
-    // re-renders — is the assumption that turned out to be false. Nothing
-    // errored, which is why nothing caught it.
+    // `MarkLoader` hands the mark to React through `dangerouslySetInnerHTML` —
+    // it has to, because the parser must find the resting mark already in the
+    // exported HTML — and React re-applies that on the first update after
+    // hydration even when the string has not changed. It replaces the whole
+    // <svg>, which throws away the pool this just installed AND detaches every
+    // node cached below. Measured on the real export, on both front doors, at
+    // 286ms on a laptop and 348ms on a phone: the mark stopped a third of a
+    // second in and stood at the resting pose for the rest of the boot. Every
+    // boot, on every device, and nothing errored, which is why nothing caught
+    // it.
     //
     // So the animator does not assume it owns the subtree: it re-acquires and
     // re-installs whenever its own group has been detached. `isConnected===false`
@@ -621,9 +612,13 @@ function markLoopBody(): string {
     'op(room,ex);op(halo,(.1+cl(sm/260,0,1)*.34)*nr*ex);' +
     'ctr(rimg,vx,vy);op(rimg,cl(sm/120,0,1)*.16*nr*ex);' +
     'ctr(hair,vx,vy);op(hair,L*cl((w-2600)/3000,0,1)*.05*ex)}}' +
-    'var t0=(o.at||0)/1000,live=1,id=0,' +
+    'var live=1,id=0,' +
     'base=(W.performance&&performance.now?performance.now():Date.now());' +
-    'function tick(now){if(!live)return;var el=(now-base)/1000+t0;' +
+    'var stop=function(){live=0;host.__ksRun=null;if(id)W.cancelAnimationFrame(id)};' +
+    'function tick(now){if(!live)return;' +
+    // The host was unmounted and nobody stopped us. Nothing is on screen, so
+    // neither is this.
+    'if(host.isConnected===false)return stop();var el=(now-base)/1000;' +
     // Heal on the RESTING MARK, not merely on being detached — that narrowness
     // is the whole safety of it. `.ks-rest` is in `splashInner` and in nothing
     // else, so its presence says precisely "somebody re-applied the server
@@ -634,9 +629,8 @@ function markLoopBody(): string {
     'if(g.isConnected===false){var c2=host.querySelector(".ks-cast");' +
     'if(c2&&c2.querySelector(".ks-rest"))take()}' +
     'var pl=o.loop?el%PLAY:mn(el,PLAY);draw(warp(pl));' +
-    'if(!o.loop&&el>=PLAY){live=0;return}id=W.requestAnimationFrame(tick)}' +
-    'id=W.requestAnimationFrame(tick);' +
-    'return function(){live=0;if(id)W.cancelAnimationFrame(id)}}'
+    'if(!o.loop&&el>=PLAY)return stop();id=W.requestAnimationFrame(tick)}' +
+    'id=W.requestAnimationFrame(tick);host.__ksRun=stop;return stop}'
   )
 }
 
@@ -645,73 +639,48 @@ export function markLoopScript(): string {
   return `!function(){if(window.__ksMark)return;${markLoopBody()}}()`
 }
 
-/** The inline script: publish the animator, resolve the theme, start the mark,
- * and add the two things CSS cannot do.
+/** The inline script: publish the animator, then START it on the loader the
+ * exported page already carries — without waiting for React.
  *
- * The theme is read the way next-themes reads it — the stored choice first, the
- * OS preference second — because next-themes' own script sits further down the
- * document than this one and has not run yet.
+ * ── WHY THIS EXISTS AT ALL, WHEN `MarkLoader` STARTS THE MARK ITSELF ───────
  *
- * Capture-phase listeners so a tap anywhere skips before the app beneath can act
- * on it, and every one of them is torn down on the way out so the app is not
- * left holding document-level listeners for the rest of the session. Skipping
- * also STOPS the animator: a loop still running behind an invisible overlay is
- * a loop still costing frames on the screen that replaced it.
+ * Because `MarkLoader` starts it at HYDRATION, and hydration is the thing the
+ * loader is covering for. Measured on the real export, hydration lands at 286ms
+ * on a laptop and 348ms on a phone with a warm cache — and on the cold, slow
+ * connection this screen exists for, it is however long 700KB of bundle takes.
+ * Without this the parser paints a mark that then stands perfectly still for all
+ * of it, which is the exact symptom the owner reported the last time the boot
+ * loader broke. So the animation and the bundle race, and the animation wins by
+ * everything except a cache hit.
  *
- * ── A TAP HAS TO BE A TAP, AND `pointerdown` IS NOT ONE ───────────────────
+ * `DOMContentLoaded` and not "now", because this script is FIRST in the body and
+ * the loader is further down it: at this instant `.ks-mark-stage` has not been
+ * parsed yet. DCL fires when the HTML is finished (35KB, already downloaded) and
+ * it does not wait for the async bundle scripts, so it is early by construction.
+ * The `readyState` branch covers being re-run against a document that is already
+ * past that point.
  *
- * This dismissed on `pointerdown` at the document, which is the gesture nobody
- * performs on purpose. A thumb resting on the glass while a phone loads is a
- * pointerdown. The first millimetre of a scroll is a pointerdown. Neither is a
- * person asking for the animation to stop — the first is a person HOLDING THEIR
- * PHONE — and from the other side it reads as "the loader doesn't run on
- * mobile", which is close to the owner's actual words. On a laptop nobody
- * touches anything, which is why it only ever looked broken on a phone.
+ * IT DOES NOT NEED A STOPPER. `__ksMark` hands the same run to `MarkLoader` when
+ * it hydrates, so the component's own cleanup stops it on unmount; and if the
+ * bundle never arrives at all, the run ends itself the moment its host leaves
+ * the document. There is nothing left over either way.
  *
- * So the skip is the three conditions that separate a tap from being held:
+ * ── WHAT USED TO BE HERE, AND WHY IT ISN'T ────────────────────────────────
  *
- *   · it ends on `pointerup`, not on the press — a press that never lifts is
- *     somebody holding the device, and the animation plays on under their thumb;
- *   · the lift is within 10px of the press (the same slop iOS itself uses for a
- *     tap), so a scroll — which travels, and on iOS usually arrives as a
- *     `pointercancel` and never an up at all — is not a skip;
- *   · and it lands within 600ms, because a rest ends in a lift too. Somebody
- *     holding the phone and then taking their thumb off is a down and an up in
- *     nearly the same place; only the DURATION tells the two apart. 600ms is
- *     generous for a deliberate tap (they run 50–200ms) and far short of a rest.
- *
- * A press that is cancelled, or whose up belongs to a different pointer, is
- * forgotten rather than remembered — otherwise a cancelled scroll could be
- * completed later by an unrelated lift.
- *
- * The keyboard keeps its immediate skip: there is no such thing as accidentally
- * leaning on a key while holding a laptop, and a keypress is deliberate by
- * construction.
- *
- * `display:none` rather than `remove()`: React hydrates this subtree, and a node
- * that disappeared between server render and hydration is a mismatch — see the
- * header. The try/catch cannot swallow the EXIT, because the exit is the CSS
- * animation and nothing in here touches it. */
-export function splashScript(): string {
+ * Nine lines resolving the theme the way next-themes resolves it (the overlay
+ * was above next-themes' own script and could not ask), a capture-phase
+ * tap-to-skip carefully tuned to tell a deliberate tap from a thumb resting on
+ * the glass, a keydown skip, four listener teardowns, and a `setTimeout` that
+ * hid the overlay after 3.8 seconds no matter what. All of it was the cost of
+ * putting a SHEET over the app: every line answers "how does this get out of the
+ * way again". A loading screen that is the page's own content is taken away by
+ * React when there is something to show, so none of those questions has an
+ * answer to get wrong. */
+export function markScript(): string {
   return (
     `${markLoopScript()};` +
-    `!function(){var d=document,e=d.getElementById("ks-splash");if(!e)return;var s=null;` +
-    `try{var m=null;try{m=localStorage.getItem("theme")}catch(_){}` +
-    `if(m!=="dark"&&(m==="light"||!(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)))` +
-    `e.className="ks-lit";s=window.__ksMark(e)}catch(_){}` +
-    // `pi=-1` is the "no press in progress" sentinel: a real pointerId is never
-    // negative, so one comparison covers both "nothing is down" and "this up
-    // belongs to a different finger".
-    `var px=0,py=0,pt=0,pi=-1;` +
-    `var f=function(){e.style.display="none";if(s)s();` +
-    `d.removeEventListener("pointerdown",D,!0);d.removeEventListener("pointerup",U,!0);` +
-    `d.removeEventListener("pointercancel",C,!0);d.removeEventListener("keydown",f,!0)};` +
-    `var D=function(v){pi=v.pointerId;px=v.clientX;py=v.clientY;pt=Date.now()};` +
-    `var C=function(){pi=-1};` +
-    `var U=function(v){if(v.pointerId!==pi)return;pi=-1;` +
-    `if(Date.now()-pt>600||Math.abs(v.clientX-px)>10||Math.abs(v.clientY-py)>10)return;f()};` +
-    `d.addEventListener("pointerdown",D,!0);d.addEventListener("pointerup",U,!0);` +
-    `d.addEventListener("pointercancel",C,!0);d.addEventListener("keydown",f,!0);` +
-    `setTimeout(f,${SPLASH_TOTAL_MS})}()`
+    `!function(){var d=document,go=function(){var h=d.querySelector(".ks-mark-stage");` +
+    `if(h&&window.__ksMark)window.__ksMark(h,{loop:!0})};` +
+    `if(d.readyState==="loading")d.addEventListener("DOMContentLoaded",go);else go()}()`
   )
 }

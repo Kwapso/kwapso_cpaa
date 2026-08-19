@@ -4,8 +4,9 @@
 // Real landing logic lives in the shell (which decides between the door, the
 // name question, the "nothing here yet" screen, and the app).
 //
-// This is the first React frame of a cold start — the splash is still dissolving
-// over it — so it draws the same mark, still turning, rather than a spinner.
+// This is the first React frame of a cold start, and the mark it draws is the
+// one the parser already painted and the inline script already set turning — the
+// same element, adopted rather than restarted.
 
 import * as React from "react"
 import { useRouter } from "next/navigation"

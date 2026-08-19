@@ -1,65 +1,67 @@
 "use client"
 
-// MarkLoader — the app's OWN "we are starting" screen, drawn by the same mark
-// the splash draws.
+// MarkLoader — THE app's "we are starting" screen. There is exactly one, and
+// this is it.
 //
-// WHY THIS BORROWS A GLOBAL INSTEAD OF IMPORTING AN ANIMATOR. The composition is
-// already in every exported page: `SplashScreen` inlines it in the <body> of the
-// document, before React exists, because that is the only way a boot loader can
-// be on screen before the bundle is. Publishing it a second time — as a module
-// this component imports — would ship the same four kilobytes twice, once in the
-// HTML and once in the JavaScript, and give the two copies a way to disagree
-// about the timing. So the animator is published ONCE as `window.__ksMark`, and
-// this component asks for it. The React bundle carries the markup string and
-// eleven lines of wiring, and nothing else.
+// It used to be the second of two. A fixed full-viewport overlay (`#ks-splash`)
+// drew the same mark over the top of this one for the first 3.8 seconds of every
+// boot, so two element pools and two requestAnimationFrame loops ran at once —
+// about a third of the frame rate at 20× CPU throttle, and roughly 2.7 seconds
+// of this copy drawn behind an opaque field where nobody could see it. The
+// overlay is gone and this kept its job, which is why the notes below read as
+// though this file grew: it did.
 //
-// It cannot be missing: the layout that renders this app renders SplashScreen
+// WHY THIS BORROWS A GLOBAL INSTEAD OF IMPORTING AN ANIMATOR. The animator has
+// to be in the exported HTML — that is the only way a boot loader can be moving
+// before the bundle is. Publishing it a second time, as a module this component
+// imports, would ship the same four kilobytes twice and give the two copies a
+// way to disagree about the timing. So it is published ONCE as `window.__ksMark`
+// (shared/web/mark-runtime.tsx) and this component asks for it. The React bundle
+// carries the markup string and six lines of wiring, and nothing else.
+//
+// It cannot be missing: the layout that renders this app renders MarkRuntime
 // too. But it can be REFUSED — `__ksMark` returns a no-op for reduced motion,
 // for a browser with no requestAnimationFrame, and for markup it does not
 // recognise — and in every one of those cases what stays on screen is the mark
 // at rest, upright and correct, exactly as the parser drew it. There is no state
 // in which this renders nothing.
 //
-// WHERE IN THE LOOP IT JOINS. `MARK_INAPP_START_MS`, the spin-up — not zero. A
-// person reaching this has just watched the ident finish; starting the mark from
-// the fly-in again would read as the app restarting rather than continuing.
+// WHY THE MARKUP IS SERVER-RENDERED AGAIN, HAVING ONCE BEEN A BUG. This did
+// render the SVG through `dangerouslySetInnerHTML`, and it was a frozen logo on
+// the real build every time: React re-applies `dangerouslySetInnerHTML` on the
+// FIRST update after hydration even when the string has not changed, and that
+// update lands about two milliseconds after mount. It replaced the sixty-four
+// element pool the animator had just installed with the three resting arcs, and
+// the effect never ran again, because its dependency list is empty and the
+// component never remounted. Nothing errored; the mark simply stopped.
 //
-// WHY THE EFFECT WRITES THE MARKUP AND THE JSX DOES NOT. This rendered the SVG
-// through `dangerouslySetInnerHTML` first, and it was a frozen logo on the real
-// build every time — while working perfectly in every test. React re-applies
-// `dangerouslySetInnerHTML` on the FIRST update after hydration even when the
-// string has not changed, and that update lands about two milliseconds after
-// mount (whatever the session hook sets next). It replaced the sixty-four
-// element pool the animator had just installed with the three resting arcs the
-// server rendered, and the effect never ran again, because its dependency list
-// is empty and the component never remounted. Nothing errored; the mark simply
-// stopped.
+// The fix at the time was to render EMPTY and let the effect own the subtree,
+// which worked and cost one frame of an empty box. It is no longer the right
+// trade, because the overlay used to be what the parser painted and now this is:
+// an empty box in the HTML is a blank screen until the bundle arrives, which is
+// the whole thing a boot loader exists to prevent. So the markup is back in the
+// server render, and the fault is answered where it actually lives — the
+// animator NOTICES its own group has been detached and takes the cast back
+// (`take()` in splash.ts, written for the overlay, which had no other option).
+// The cost is one frame, measured; the gain is a mark painted at 0ms on every
+// route that waits.
 //
-// So React is not given the subtree at all: the host renders EMPTY, and the
-// effect owns everything inside it. There is nothing for a re-render to
-// re-apply, and it is one fewer dangerouslySetInnerHTML in a client component.
-// The cost is one frame of an empty box on mount, inside a container that is
-// already full height, so nothing moves.
-//
-// AND THE SPLASH WAS EXPOSED TO IT AFTER ALL. This note used to end by saying
-// the splash could not be caught by any of the above, being server-rendered and
-// never re-rendered. That was an assumption, and it was wrong: on the built app
-// React re-applied `#ks-splash`'s markup at 286ms on a laptop and 348ms on a
-// phone, throwing the animator's pool away and leaving a frozen logo for the
-// rest of the boot — every boot, on every device. The splash cannot render
-// empty the way this component does (it has to be painted by the parser, before
-// React exists), so it takes the other route: the animator notices its own
-// group has been detached and takes the cast back. See `take()` in splash.ts.
+// WHERE IN THE LOOP IT JOINS: the beginning, and it loops. It is the opening
+// frame now, not a continuation of one, so it starts at the fly-in — and it runs
+// for exactly as long as the app takes to arrive rather than for a fixed 3.8
+// seconds, because it is the page's own content and React takes it away when
+// there is something to show.
 
 import * as React from "react"
 
-import { MARK_INAPP_START_MS, splashInner } from "./splash"
+import { splashInner } from "./splash"
 
 declare global {
   interface Window {
-    /** Published by the splash's inline script (shared/web/splash.ts). Drives an
-     * `.ks-cast` inside the host's <svg>; returns the function that stops it. */
-    __ksMark?: (host: Element, opts?: { loop?: boolean; at?: number }) => () => void
+    /** Published by the inline script (shared/web/splash.ts → MarkRuntime).
+     * Drives an `.ks-cast` inside the host's <svg>; returns the function that
+     * stops it. One run per host: a second caller gets the first run back. */
+    __ksMark?: (host: Element, opts?: { loop?: boolean }) => () => void
   }
 }
 
@@ -80,23 +82,39 @@ export function MarkLoader({
   React.useEffect(() => {
     const node = host.current
     if (!node) return
-    // The resting mark first, so there is something correct on screen even if
-    // the animator refuses (reduced motion, no rAF) or has somehow not been
-    // published. `splashInner` is a module constant built from constants —
-    // there is no value from anywhere else in it.
-    node.innerHTML = splashInner()
-    return window.__ksMark?.(node, { loop: true, at: MARK_INAPP_START_MS })
+    // Not necessarily a NEW run: on a cold load the inline script already
+    // started this exact host at DOMContentLoaded, and gets handed back here so
+    // that unmounting still stops it. On a client-side navigation there was no
+    // inline start and this is the one that begins it.
+    return window.__ksMark?.(node, { loop: true })
   }, [])
 
   return (
-    <div
-      className={`flex min-h-[100svh] items-center justify-center p-6 ${className}`}
-      aria-busy="true"
-    >
+    // The field, the size and the centring are all in the one stylesheet
+    // (splashStyle) rather than in Tailwind classes here, because the ident's
+    // onyx and amber are colour LITERALS — the composition's own, not the app's
+    // tokens — and R32 allows those in exactly one file, which is splash.ts.
+    <div className={`ks-mark-host ${className}`} aria-busy="true">
       {/* Decorative, and announced separately: a screen reader should hear that
-       * the app is starting, not a description of an animation. Empty in JSX —
-       * see the header for why React is not allowed to own what is in here. */}
-      <div ref={host} className="ks-mark-host" aria-hidden="true" />
+       * the app is starting, not a description of an animation. The animator
+       * finds this by class from outside React, so the class is part of the
+       * contract and not styling.
+       *
+       * `suppressHydrationWarning` because by the time React gets here the
+       * animation has ALREADY been running for however long the bundle took:
+       * the inline bootstrap started it at DOMContentLoaded and the animator
+       * emptied `.ks-cast` and installed its own pool. So the DOM legitimately
+       * does not match what the server rendered, and React logs a mismatch it
+       * says it "won't patch up" — which is noise, and noise on the first screen
+       * of the app is the kind that gets learned rather than fixed. It patches
+       * it up anyway on the next update, and `take()` puts the pool back. */}
+      <div
+        ref={host}
+        className="ks-mark-stage"
+        aria-hidden="true"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: splashInner() }}
+      />
       <span className="sr-only" aria-live="polite">
         {label}
       </span>

@@ -4,8 +4,8 @@ import { Toaster } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ThemeProvider } from "@kwapso/ui/registry/tokens/theme-provider"
 
 import { BrandTheme } from "@shared/web/brand-theme"
+import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"
-import { SplashScreen } from "@shared/web/splash-screen"
 
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ErrorReporter } from "@/components/error-reporter"
@@ -28,9 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="bg-background min-h-[100svh] antialiased">
         {/* The client's front door opens on the same frame the agency's does —
-         * one product, one ident. FIRST in the body so the parser paints it
-         * before anything else exists. shared/web/splash.ts. */}
-        <SplashScreen />
+         * one product, one ident, one animation. FIRST in the body so the
+         * animator is published before the parser reaches the loader further
+         * down it. shared/web/splash.ts. */}
+        <MarkRuntime />
         <BrandTheme />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ErrorReporter />
