@@ -66,6 +66,29 @@ export async function listSelectable(cfg: D1Rest, guard: MemberGuard): Promise<S
 
 /** Add a value to a type group (pick-or-create the type by name). Rejects empty
  * input and an exact (type,value) that's already active. Returns the new id. */
+/** ONE VALUE, BY ID — what a live ping actually needs.
+ *
+ * The `?id=` door used to answer this by loading every row (`LIST_HARD_CAP`, a
+ * thousand) plus an exact `COUNT(*)`, and filtering to one in JavaScript. That is
+ * two round trips and a whole vocabulary to patch a single row, and it ran on
+ * EVERY connected browser on EVERY edit — including the browser that made the
+ * edit, which has no echo suppression and so re-read the list it had just been
+ * handed in the mutation response. The screen was doing three full reads of the
+ * same table to rename one word. */
+export async function selectableOne(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  id: string
+): Promise<SelectableValue | null> {
+  const rows = await d1Query<Row>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ? LIMIT 1`,
+    [id]
+  )
+  return rows[0] ? toValue(rows[0]) : null
+}
+
 /** Export-only reader: every value's full row (type, value, active + audit block). */
 export type SelectableExportRow = {
   type: string
@@ -173,13 +196,25 @@ export async function updateSelectable(
   const v = value.trim()
   if (!v) throw new GuardError(400, "invalid_input", "A dropdown value can't be empty.")
 
-  const rows = await d1Query<Row>(
+  // TWO FACTS, ONE ROUND TRIP. The row being renamed and the row that would
+  // collide with it used to be two sequential queries, and every query here is a
+  // full HTTPS call to the D1 REST door — the reason saving an edit felt slow was
+  // never the writing, it was the queuing. A two-term UNION ALL is well inside
+  // D1's five-term compound limit, and `clash` is the discriminator that says
+  // which question each row answers.
+  const rows = await d1Query<Row & { clash: number }>(
     cfg,
     guard.databaseId,
-    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ? AND deactivated_at IS NULL`,
-    [id]
+    `SELECT ${COLUMNS}, 0 AS clash FROM selectable_data WHERE id = ? AND deactivated_at IS NULL
+      UNION ALL
+     SELECT ${COLUMNS}, 1 AS clash FROM selectable_data
+      WHERE deactivated_at IS NULL AND id <> ? AND value = ?
+        AND type = (SELECT type FROM selectable_data WHERE id = ?)`,
+    [id, id, v, id]
   )
-  const row = rows[0]
+  // UNION ALL promises no order, so the rows are told apart by what they say
+  // rather than by where they landed.
+  const row = rows.find((r) => r.clash === 0)
   if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
 
   // A RENAME MAY NOT MERGE TWO WORDS INTO ONE. `createSelectable` has always
@@ -187,15 +222,8 @@ export async function updateSelectable(
   // the group holding two live rows with the same value — two tabs, two marks,
   // one word. It matters more now that the rename moves records: the merge would
   // be silent AND permanent.
-  if (v !== row.value) {
-    const clash = await d1Query<{ id: string }>(
-      cfg,
-      guard.databaseId,
-      "SELECT id FROM selectable_data WHERE type = ? AND value = ? AND deactivated_at IS NULL AND id <> ?",
-      [row.type, v, id]
-    )
-    if (clash[0]) throw new GuardError(409, "duplicate", `"${v}" is already in ${row.type}.`)
-  }
+  if (v !== row.value && rows.some((r) => r.clash === 1))
+    throw new GuardError(409, "duplicate", `"${v}" is already in ${row.type}.`)
 
   const now = new Date().toISOString()
   // THE RECORDS THAT STORED THE OLD WORD, in the same script as the rename, so a
@@ -240,6 +268,26 @@ export async function setSelectableActive(
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
 
+  // A DEFAULT VALUE CANNOT BE SWITCHED OFF WHILE IT IS STILL A DEFAULT. The
+  // built-in vocabularies ship with `is_default = 1` and everything a person adds
+  // is born 0, so the app has always KNOWN which words are its own furniture and
+  // has never defended them: one click could retire "Bug" and take the tab, the
+  // mark and the picker entry with it.
+  //
+  // The guard is deliberately a TWO-STEP rather than an outright refusal — take
+  // the default mark off, then switch it off — because "you may never remove this"
+  // is a rule the owner of a team should be able to overrule about their own
+  // vocabulary. It stops the accident, not the intention. Renaming is untouched:
+  // a default value may be called whatever the team calls it (`updateSelectable`
+  // carries its records with it), which is the same freedom the locked Admin role
+  // has over its own title.
+  if (!active && row.is_default === 1)
+    throw new GuardError(
+      409,
+      "default_value",
+      `"${row.value}" is one of the defaults, so it can't be switched off. Take the default mark off it first if you really want it gone.`
+    )
+
   // R17: current-status predicate → a repeat moves zero rows → no activity row,
   // no publish (the route reads the boolean). History records events, not clicks.
   const now = new Date().toISOString()
@@ -256,6 +304,54 @@ export async function setSelectableActive(
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Dropdown value activated" : "Dropdown value deactivated",
     description: `${actor.name} ${active ? "restored" : "removed"} the "${row.value}" ${row.type} value`,
+    relatedTable: "selectable_data",
+    relatedRowId: id,
+  })
+  return true
+}
+
+/** Mark a value as one of the team's defaults, or take that mark off.
+ *
+ * `is_default` is not new — it has been on `selectable_data` since the table was
+ * written, set to 1 by every seeded vocabulary and 0 by `createSelectable`. What
+ * was missing is that NOTHING read it: the column recorded which words the app
+ * shipped with and then let a single click retire any of them.
+ *
+ * So this is the switch beside the guard in `setSelectableActive`, and the pair
+ * is the same shape `member_roles.is_default` has always had for the locked Admin
+ * role — a flag on the row, a refusal that reads it, and no hard-coded list of
+ * protected names anywhere.
+ *
+ * R17: the current-state predicate rides the UPDATE, so marking a default value
+ * as default again moves zero rows and writes no history. */
+export async function setSelectableDefault(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  id: string,
+  isDefault: boolean
+): Promise<boolean> {
+  const rows = await d1Query<Row>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ?`,
+    [id]
+  )
+  const row = rows[0]
+  if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
+
+  const now = new Date().toISOString()
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE selectable_data SET is_default = ?, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND is_default <> ? RETURNING id`,
+    [isDefault ? 1 : 0, now, id, isDefault ? 1 : 0]
+  )
+  if (!changed[0]) return false
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: isDefault ? "Dropdown value made a default" : "Dropdown value no longer a default",
+    description: `${actor.name} ${isDefault ? "made" : "stopped treating"} the "${row.value}" ${row.type} value ${isDefault ? "one of the defaults" : "as one of the defaults"}`,
     relatedTable: "selectable_data",
     relatedRowId: id,
   })

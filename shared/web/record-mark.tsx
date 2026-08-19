@@ -17,18 +17,33 @@
 // THE RULE, in one sentence: a record shows its picture, and where it has none it
 // shows a deliberate mark in the same box, at the same size, in the same slot.
 //
-// A PERSON, A COMPANY AND A THING ARE DIFFERENT KINDS OF RECORD and keep their
-// own treatment, because consistency means one rule applied consistently, not one
-// picture everywhere:
+// THE BOX AND THE FIT ARE TWO QUESTIONS, and reading them as one is what this
+// component got wrong first. The BOX says what KIND OF RECORD this is. The FIT
+// says what kind of PICTURE it is holding. They correlate — most circles hold
+// faces and most squares hold wordmarks — but they are not the same question,
+// and the day they disagreed the coupling had to go:
 //
-//   • a PERSON is a circle, and their photo fills it (`object-cover` — a face
-//     cropped to a circle is what a face in a circle is). No photo → initials.
-//   • a COMPANY, an APP, an ASSET is a rounded square, and its logo is shown
-//     WHOLE inside it (`object-contain`). A wordmark is the usual case and
-//     cropping one to a square is how a logo becomes unreadable.
+//   • the BOX. A CLIENT is a rounded square, whether it is a company or a sole
+//     trader, because both sit in one column of one list and two shapes there
+//     read as two kinds of thing when the product has one. A PERSON IN THEIR OWN
+//     RIGHT — a team member, a staff profile — stays a circle. An APP, an ASSET
+//     is a rounded square like the client it belongs to.
+//   • the FIT. A FACE is cropped to its box (`object-cover`) — a face shown whole
+//     inside a square is a face with grey bars down its sides. A LOGO is shown
+//     WHOLE (`object-contain`); a wordmark is the usual case and cropping one to
+//     a square is how a logo becomes unreadable.
 //   • the FALLBACK is the record type's own glyph where the type has one (the
 //     team's type mark, an app's stage mark), and the first letter of its name
 //     where it does not. Never an empty box, and never a broken picture.
+//
+// WHY THE TWO CAME APART. Accounts were drawn a circle for an individual and a
+// square for a company, which is the honest rule and was, side by side in one
+// list, the wrong-looking one. Squaring the individuals is a one-word change —
+// except that 31 of the 106 individual accounts hold a REAL FACE in `logo_url`
+// (`scripts/glide-visuals.mjs` put them there), so squaring them while the fit
+// still followed the shape would have letterboxed all 31 in the same commit that
+// was meant to tidy them up. Hence `fit`: the caller squares the box and keeps
+// the crop, and neither decision is hidden inside the other.
 //
 // A PICTURE THAT FAILS TO LOAD FALLS BACK TO THE MARK. That is the whole reason
 // this holds state rather than being a ternary, and the reason it is a component
@@ -68,6 +83,7 @@ export function RecordMark({
   mark,
   name,
   shape = "square",
+  fit,
   size = "row",
   className = "",
 }: {
@@ -80,14 +96,22 @@ export function RecordMark({
   mark?: string | null
   /** The record's name — the last resort is its first letter. */
   name?: string | null
-  /** A person is a circle; everything else is a rounded square (R31: two radii). */
+  /** The BOX. A person in their own right is a circle; a client, an app, an asset
+   * — everything else — is a rounded square (R31: two radii). */
   shape?: "square" | "round"
+  /** The FIT, when it does not follow the box. Defaults to the shape's own answer
+   * (a circle crops, a square contains), which is right nearly everywhere; pass it
+   * explicitly for the case the default gets wrong — a FACE drawn in a SQUARE,
+   * which is every individual client on the accounts list. */
+  fit?: "cover" | "contain"
   size?: keyof typeof BOX
   className?: string
 }) {
   const [broken, setBroken] = React.useState(false)
   const picture = safeSrc(stored ?? undefined)
   const round = shape === "round"
+  // The fit follows the box unless the caller separates them.
+  const cover = (fit ?? (round ? "cover" : "contain")) === "cover"
   // The mark first, then the initial, then a neutral placeholder glyph. Every
   // branch puts SOMETHING in the box: a record with no type, no picture and no
   // name is still a record, and an empty grey square reads as a screen that
@@ -108,7 +132,7 @@ export function RecordMark({
           key={picture}
           src={picture}
           alt=""
-          className={`size-full ${round ? "object-cover" : "object-contain"}`}
+          className={`size-full ${cover ? "object-cover" : "object-contain"}`}
           onError={() => setBroken(true)}
         />
       ) : (

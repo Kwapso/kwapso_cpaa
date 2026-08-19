@@ -387,11 +387,14 @@ export function ContactDetailScreen({
 
   return (
     <RecordScreen
-      // A PERSON IS A CIRCLE, and their photo fills it. It is the same
-      // `logo_url` column a company's mark lives in — one table, one door — and
+      // THE SAME SQUARE THE ACCOUNTS LIST DRAWS. It is the same `logo_url`
+      // column a company's mark lives in — one table, one door — and
       // `scripts/glide-visuals.mjs` carried thirty-one real faces into it, none
-      // of which this screen has ever drawn. No photo falls back to the initial.
-      leading={<RecordMark picture={account.logoUrl} name={account.name} shape="round" size="band" />}
+      // of which this screen has ever drawn. The band follows the row rather
+      // than disagreeing with it: a record cannot be a circle on its own screen
+      // and a square in the list that links to it. `fit` keeps the face cropped.
+      // No photo falls back to the initial.
+      leading={<RecordMark picture={account.logoUrl} name={account.name} fit="cover" size="band" />}
       eyebrow={[
         t("Contact"),
         account.active ? null : t("Archived"),

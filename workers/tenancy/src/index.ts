@@ -145,6 +145,7 @@ import {
   getSelectableExport,
   postCreateSelectable,
   postSetSelectableActive,
+  postSetSelectableDefault,
   postUpdateSelectable,
 } from "./routes/selectable"
 import {
@@ -253,6 +254,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/selectable": { handler: postCreateSelectable, kind: "mutation" },
   "POST /api/tenancy/selectable/update": { handler: postUpdateSelectable, kind: "mutation" },
   "POST /api/tenancy/selectable/active": { handler: postSetSelectableActive, kind: "mutation" },
+  "POST /api/tenancy/selectable/default": { handler: postSetSelectableDefault, kind: "mutation" },
   // PROCESS MAPS — App → Process → Step, the versions cut over them, and the
   // savings drilled through all three. Reads are fenced by the caller's account
   // set (a contact sees their company's maps); every AUTHORING write refuses a

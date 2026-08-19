@@ -188,6 +188,15 @@ export const tenancy = {
       body: JSON.stringify({ id, value, mark }),
     }),
 
+  /** Mark a dropdown value as one of the team's defaults, or take the mark off.
+   * Needs selectable_data:edit. A default value refuses to be switched off while
+   * the mark is on — this is how a team takes the protection off. */
+  setSelectableDefault: (id: string, isDefault: boolean) =>
+    api<{ values: SelectableValue[] }>("/api/tenancy/selectable/default", {
+      method: "POST",
+      body: JSON.stringify({ id, isDefault }),
+    }),
+
   /** Deactivate / reactivate a dropdown value (deactivate-only). Needs
    * selectable_data:delete. Returns the refreshed value list. */
   setSelectableActive: (id: string, active: boolean) =>
