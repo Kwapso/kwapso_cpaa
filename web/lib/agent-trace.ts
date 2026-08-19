@@ -77,6 +77,7 @@ export function traceFor(
     // Any dropdown write → the Dropdown values screen (one screen, no per-value URL).
     case "create_dropdown_value":
     case "update_dropdown_value":
+    case "set_dropdown_default":
     case "set_dropdown_active":
       return { path: seg(teamId, "dropdowns"), highlight: "main" }
 

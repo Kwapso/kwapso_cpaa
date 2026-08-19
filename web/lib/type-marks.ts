@@ -20,6 +20,10 @@ export const MARK_GROUP = {
   ticket: "Ticket type",
   story: "Story type",
   sprint: "Sprint type",
+  /** The three states a sprint is IN, as opposed to the kind of block it is. A
+   * `"labels"` group: the code derives the state and this only supplies the word
+   * a person reads and the glyph beside it (shared/selectable-homes.ts). */
+  sprintStatus: "Sprint status",
 } as const
 
 export type MarkGroup = (typeof MARK_GROUP)[keyof typeof MARK_GROUP]

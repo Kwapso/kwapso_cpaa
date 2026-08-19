@@ -184,7 +184,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **227 doors, 180 with a tool, 47 with a written reason**, the
+  red build. Today: **228 doors, 181 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -203,7 +203,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 180, **156 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 181, **157 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 
@@ -295,7 +295,7 @@ Today it covers:
   - accounts, `create_account`, `update_account`, `set_account_parent`,
     `set_account_active`, `link_contact`, `set_contact_link_active`
   - portal access, `grant_portal_access`, `set_portal_access_active`
-  - dropdown values, `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_active`
+  - dropdown values, `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_default`, `set_dropdown_value_active`. A value marked as one of the team's defaults refuses to switch off — `set_dropdown_value_default` is how the mark comes off, and renaming a default is always allowed
   - process maps, `create_app`, `update_app`, `set_app_active`, `create_process`,
     `update_process`, `set_process_active`, `add_process_step`, `update_process_step`,
     `remove_process_step`, `cut_process_version`, `comment_on_process` (all need

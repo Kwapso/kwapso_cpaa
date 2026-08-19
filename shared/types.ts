@@ -1292,6 +1292,10 @@ export type WorkLog = {
   /** what the thing it is against is CALLED, so a list of time reads as a list
    * of work rather than a list of ids. */
   targetLabel: string | null
+  /** The target's own short reference (`BERG-T0412`). NULL when the record has
+   * no account, or its account has no short code — the agency's own work, most
+   * often. Callers fall back to the label rather than showing a blank. */
+  targetRef: string | null
   userId: string
   userName: string | null
   /** the kind of work, so the margin can group by it. Null until a team starts
@@ -1316,6 +1320,10 @@ export type RunningTimer = {
   targetTable: string
   targetId: string
   targetLabel: string | null
+  /** The target's own short reference (`BERG-T0412`). NULL when the record has
+   * no account, or its account has no short code — the agency's own work, most
+   * often. Callers fall back to the label rather than showing a blank. */
+  targetRef: string | null
   startedAt: string
   /** whole seconds elapsed at the moment the server answered */
   elapsedSeconds: number

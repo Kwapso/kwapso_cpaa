@@ -54,15 +54,16 @@ import {
   type SprintTypeOption,
 } from "@/components/sprint-form-dialog"
 import { sprintLine, sprintLineInKindGroup } from "@/components/work-panels"
-import { content as contentApi } from "@/lib/api"
+import { content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { withDataDrivenCollection } from "@/lib/screens"
-import type { AppRow, Sprint } from "@shared/types"
+import type { AppRow, SelectableValue, Sprint } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
 import { type Translate } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { useLanguage } from "@shared/web/language"
 
 /* --------------------------- where a sprint is up to ---------------------- */
@@ -192,11 +193,17 @@ function progressTrailing(s: Sprint, t: Translate): React.ReactNode {
 
 /* --------------------------------- the rows -------------------------------- */
 
-/** One sprint, as a row. Everything a person would say about one out loud. */
-function shapeSprints(sprints: Sprint[], today: string) {
+/** One sprint, as a row. Everything a person would say about one out loud.
+ *
+ * `marks` is the SPRINT TYPE's glyph, keyed by the word the row stores. The
+ * Overview view has drawn it since v0.11.0 and this list did not, so the same
+ * sprint led with a picture under one tab and with text under the next. */
+function shapeSprints(sprints: Sprint[], today: string, marks?: Map<string, string>) {
   return {
     rows: sprints.map((s) => ({
       id: s.id,
+      // THE GLYPH THE ROW IS KNOWN BY (recipe `leading`). A NODE, not a string.
+      mark: <RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? "?"} />,
       name: s.ref ? `${s.ref} · ${s.name}` : s.name,
       detail: sprintLine(s),
       // Facet columns (read by the filter engine, not the renderer). The status
@@ -260,6 +267,12 @@ export function SprintsScreen({
   // same cache the start-a-sprint form reads, so the picker and these rows can
   // never show two different pictures for one word.
   const kinds = useSprintTypes(teamId)
+  // The SAME cache key `useSprintTypes` reads, so this is free — it wants the
+  // raw rows rather than the sprint-type projection, because the state glyphs
+  // live in a different group of the same vocabulary.
+  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
   const [view, setView] = React.useState("overview")
   const [addOpen, setAddOpen] = React.useState(false)
 
@@ -269,7 +282,12 @@ export function SprintsScreen({
   const sprints = sprintsQ.data
   const today = todayKey()
   const byKind = new Map(kinds.map((k) => [k.value, k]))
-  const data = shapeSprints(sprints, today)
+  // The same map the Overview groups read, in the shape `RecordMark` wants.
+  const kindMarks = new Map(kinds.filter((k) => k.mark).map((k) => [k.value, k.mark as string]))
+  // The glyph for the STATE a sprint is in, keyed by the heading word itself —
+  // which is why the vocabulary holds exactly the three `STATE_HEADING` words.
+  const stateMarks = markMap(selectableQ.data, MARK_GROUP.sprintStatus)
+  const data = shapeSprints(sprints, today, kindMarks)
   const listRecipe = withDataDrivenCollection(recipe, data.rows)
 
   // R16: ONE number, on all three tabs, and it is the door's exact COUNT(*) —
@@ -346,7 +364,18 @@ export function SprintsScreen({
           <section key={state} className="flex flex-col gap-4">
             {/* K6: a plain state heading — no chip, no rule and no count of its
                 own. The collection's one number is on the strip above (R16). */}
-            <h2 className="text-lg font-medium">{t(STATE_HEADING[state])}</h2>
+            <h2 className="flex items-center gap-2 text-lg font-medium">
+                  {/* AURORA'S ASK: a mark on the state, not the bare word. It is
+                      `aria-hidden` with the heading right beside it — the pair
+                      UI-CONVENTIONS §5 requires — and it comes from the Dropdown
+                      values screen, so changing it is two clicks and no deploy. */}
+                  {stateMarks.get(STATE_HEADING[state]) && (
+                    <span aria-hidden className="text-base leading-none">
+                      {stateMarks.get(STATE_HEADING[state])}
+                    </span>
+                  )}
+                  {t(STATE_HEADING[state])}
+                </h2>
             {groupByKind(inState, byKind, lang, t("No type said")).map((group) => (
               <div key={group.key} className="flex flex-col gap-2">
                 <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
@@ -414,11 +443,11 @@ export function SprintsScreen({
           ) : (
             // ALL SPRINTS — the engine's own flat list, with the search and the
             // Client / App / Status filters the recipe declares. Its rows carry
-            // no mark: the renderer maps a row to a title and a subtitle and has
-            // no leading slot to put one in, and a mark pushed into the title
-            // string would be a pictograph inside a sentence, which is the one
-            // shape UI-CONVENTIONS §5 refuses. The kind is still the first word
-            // of every row's summary line, so nothing is lost but the picture.
+            // the sprint type's mark in the leading slot, the same glyph the
+            // Overview groups lead with. (This note used to say the renderer had
+            // no leading slot to put one in. That stopped being true in library
+            // v0.11.0, and the sentence outlived the fact by a release — which is
+            // the failure mode UI-GAPS.md's own rot checks exist to catch.)
             <ScreenRenderer
               recipe={listRecipe}
               data={data}

@@ -87,6 +87,7 @@ type LogRow = {
   target_table: string
   target_id: string
   target_label: string | null
+  target_ref: string | null
   user_id: string
   user_name: string | null
   kind: string | null
@@ -105,9 +106,22 @@ const LABEL_SQL = `CASE ${Object.entries(WORK_LOG_TARGETS)
   .map(([table, def]) => `WHEN w.target_table = '${table}' THEN (SELECT t.${def.label} FROM ${table} t WHERE t.id = w.target_id)`)
   .join(" ")} END`
 
+/** THE SHORT REFERENCE beside the label, built the same way and for the same
+ * reason. Every one of the four targets carries a `ref` (`lib/refs.ts` mints
+ * `BERG-T0412`, `BERG-S0188`, …), it is drawn on all five of their own screens,
+ * and the one place it never reached was the running timer — where a person
+ * with two clocks going has nothing but two durations to tell them apart.
+ *
+ * It is NULLABLE and often null on purpose: a ref needs an account with a short
+ * code, so the agency's own internal work has none. Callers fall back to the
+ * label, which is why this is an extra column rather than a replacement. */
+const REF_SQL = `CASE ${Object.keys(WORK_LOG_TARGETS)
+  .map((table) => `WHEN w.target_table = '${table}' THEN (SELECT t.ref FROM ${table} t WHERE t.id = w.target_id)`)
+  .join(" ")} END`
+
 const LOG_COLS = `w.id, w.target_table, w.target_id, w.user_id, w.user_name, w.kind, w.note,
   w.started_at, w.ended_at, w.seconds, w.billable, w.discarded_at, w.account_id,
-  ${LABEL_SQL} AS target_label`
+  ${LABEL_SQL} AS target_label, ${REF_SQL} AS target_ref`
 
 function toLog(r: LogRow): WorkLog {
   return {
@@ -115,6 +129,7 @@ function toLog(r: LogRow): WorkLog {
     targetTable: r.target_table,
     targetId: r.target_id,
     targetLabel: r.target_label,
+    targetRef: r.target_ref,
     userId: r.user_id,
     userName: r.user_name,
     kind: r.kind,
@@ -425,6 +440,7 @@ export async function runningTimers(cfg: D1Rest, guard: MemberGuard): Promise<Ru
       targetTable: r.target_table,
       targetId: r.target_id,
       targetLabel: r.target_label,
+    targetRef: r.target_ref,
       startedAt: r.started_at,
       elapsedSeconds: elapsed,
       runaway: elapsed > RUNAWAY_HOURS * 3600,

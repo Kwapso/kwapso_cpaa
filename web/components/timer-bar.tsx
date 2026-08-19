@@ -58,8 +58,40 @@ function targetPath(t: RunningTimer, teamId: string): string {
         ? "stories"
         : t.targetTable === "tasks"
           ? "tasks"
-          : null
+          : // MEETINGS WERE MISSING, and they are a real work-log target
+            // (`WORK_LOG_TARGETS` in workers/content/src/lib/work-logs.ts) — a
+            // transcript capture writes one per attendee. So a meeting timer's
+            // "return to what it is timing" quietly landed on the backlog.
+            t.targetTable === "meetings"
+            ? "meetings"
+            : null
   return segment ? `/t/${teamId}/${segment}/${t.targetId}` : `/t/${teamId}/stories`
+}
+
+/** WHAT THE BADGE CALLS THE THING IT IS TIMING, shortest honest answer first.
+ *
+ * A person running two clocks saw two durations and nothing else — the label was
+ * in the native `title` tooltip, which is invisible on a phone and needs a hover
+ * everywhere else. The short reference is the right size for a pill and is the
+ * name these records are already known by on their own screens.
+ *
+ * It is NULLABLE, and often null: a ref needs an account with a short code, so
+ * the agency's own work has none. Then the label, clipped — a ticket's label is
+ * its whole description, which is why nobody put it here in the first place.
+ * Then the kind of record, which is always true and never nothing. */
+function badgeName(t: RunningTimer): string {
+  if (t.targetRef) return t.targetRef
+  const label = t.targetLabel?.trim()
+  if (label) return label.length > 18 ? `${label.slice(0, 17)}…` : label
+  return t.targetTable === "help"
+    ? "ticket"
+    : t.targetTable === "stories"
+      ? "story"
+      : t.targetTable === "tasks"
+        ? "task"
+        : t.targetTable === "meetings"
+          ? "meeting"
+          : "work"
 }
 
 export function TimerBar({
@@ -118,12 +150,17 @@ export function TimerBar({
           >
             <button
               type="button"
-              className="flex items-center gap-1 font-medium tabular-nums"
+              className="flex items-center gap-1 font-medium"
               title={timer.targetLabel ?? t("Open what this is timing")}
               onClick={() => onNavigate?.(targetPath(timer, teamId))}
             >
               <Timer className="size-3.5" />
-              {clockFrom(elapsed)}
+              {/* WHICH RECORD, then how long. The name is what tells two running
+                  clocks apart; the duration is what people watch. `tabular-nums`
+                  stays on the DIGITS only, so the name is not letter-spaced like
+                  a spreadsheet. */}
+              <span className="max-w-[9ch] truncate sm:max-w-[14ch]">{badgeName(timer)}</span>
+              <span className="tabular-nums">{clockFrom(elapsed)}</span>
             </button>
             <Button
               variant="ghost"

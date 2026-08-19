@@ -132,14 +132,41 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     ).toBe(true)
   })
 
-  it("#19 · the collection frame's empty state is still a bare string", () => {
+  it("#19 · SHIPPED — an empty state carries its concept glyph, and every recipe feeds one", () => {
+    // The library half: the config declares the slot and the frame renders it.
     const config = library("lib", "config.ts")
     expect(config, "CollectionConfig must still declare emptyText").toMatch(/emptyText:\s*string/)
     expect(
       /emptyIcon/.test(config),
-      "GOOD NEWS: the collection config now takes an `emptyIcon`. Give every recipe collection the " +
-        "section's own CONCEPT_ICON (web/lib/pages.ts) and delete UI-GAPS #19."
-    ).toBe(false)
+      "CollectionConfig no longer takes an `emptyIcon` — every recipe's empty state is a bare grey sentence again"
+    ).toBe(true)
+    const frame = library("registry", "collections", "collection-frame", "collection-frame.tsx")
+    expect(
+      /config\.emptyIcon/.test(frame),
+      "the collection frame no longer reads `emptyIcon`, so the slot is declared and drawn by nobody"
+    ).toBe(true)
+
+    // AND THE HOST HALF, which is the part that puts a glyph on a screen. A
+    // recipe that names none renders exactly what it rendered before, so the
+    // library shipping the slot is worth precisely the recipes that use it.
+    const recipes = readFileSync(join(ROOT, "web", "lib", "screens.ts"), "utf8")
+    expect(
+      /emptyIcon:\s*opts\.icon\s*\?\s*CONCEPT_ICON\[/.test(recipes),
+      "listCollection no longer resolves its icon through CONCEPT_ICON — the empty state and the nav rail can now drift"
+    ).toBe(true)
+
+    // EVERY list recipe, not most of them. A brand-new team sees the empty state
+    // of every screen in the app on its first day, and one bare sentence among
+    // fourteen glyphs reads as the broken one.
+    const calls = [...recipes.matchAll(/listCollection\([\s\S]*?\n\s*\)|listCollection\([^\n]*\)/g)]
+      .map((m) => m[0])
+      .filter((c) => !c.includes("emptyText: string") && !c.includes("…"))
+    const bare = calls.filter((c) => !c.includes("icon:"))
+    expect(
+      bare.length,
+      `${bare.length} list recipe(s) still have no concept glyph on their empty state:\n  ` +
+        bare.map((c) => c.split("\n")[0].slice(0, 80)).join("\n  ")
+    ).toBe(0)
   })
 
   // ── #20 · A BIG NUMBER ───────────────────────────────────────────────────
@@ -162,19 +189,24 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // …and the flag list itself cannot drift away from the four checks above. An
   // entry silently deleted here would leave the check standing over nothing;
   // an entry marked shipped would leave the check contradicting the document.
-  it("UI-GAPS.md still carries the ONE gap the library has not closed", () => {
+  it("UI-GAPS.md agrees with the four checks above — all four slots are closed", () => {
     const gaps = readFileSync(join(ROOT, "UI-GAPS.md"), "utf8")
-    // THREE OF THE FOUR SHIPPED in library v0.11.0 (19 Aug 2026) and are now
-    // asserted above as WIRED rather than as missing. #19 — the collection
-    // frame's empty state — is the one still owed, so it is the only one this
-    // list may name. A shipped gap left in here would be a flag pointing at
-    // nothing, which is the rot this whole file exists to prevent.
-    for (const n of [19]) {
+    // ALL FOUR ARE NOW SHIPPED — #16, #18 and #20 in library v0.11.0 and #19 in
+    // v0.12.0 (19 Aug 2026) — and each is asserted above as WIRED rather than as
+    // missing. So this list is the other direction of the same bookkeeping: a
+    // row still flagged for the library would be a flag pointing at nothing,
+    // and a row deleted outright would leave its check standing over a gap
+    // nobody records. Both are the rot this file exists to prevent.
+    for (const n of [16, 18, 19, 20]) {
       const row = gaps.split("\n").find((line) => line.startsWith(`| ${n} |`))
       expect(row, `UI-GAPS.md has no row ${n} — this suite is checking a gap nobody records`).toBeTruthy()
       expect(
         (row as string).includes("flag for the library"),
-        `UI-GAPS #${n} is no longer flagged for the library, but the slot is still missing here`
+        `UI-GAPS #${n} is still flagged for the library, but the check above asserts the slot is shipped AND fed`
+      ).toBe(false)
+      expect(
+        /SHIPPED in the library/.test(row as string),
+        `UI-GAPS #${n} does not record which library version closed it`
       ).toBe(true)
     }
   })
