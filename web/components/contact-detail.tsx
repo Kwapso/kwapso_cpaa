@@ -60,7 +60,7 @@ import {
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { KeyRound, Pencil, Power } from "lucide-react"
 
-import type { Account, AccountDetail } from "@shared/types"
+import type { AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
 import {
   PortalAccessPanel,
@@ -71,7 +71,6 @@ import { CompaniesPanel, ContactMeetingsPanel, ContactTicketsPanel } from "@/com
 import { RecordPicker } from "@/components/record-picker"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { TodosPanel } from "@/components/work-panels"
-import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { RecordMark } from "@shared/web/record-mark"
 import { RichText } from "@shared/web/rich-text-view"
@@ -85,11 +84,11 @@ import {
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
-import { accountKey, accountsKey, listFetch, totalKey } from "@/lib/live-resources"
+import { accountKey, accountsKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
@@ -116,10 +115,9 @@ export function ContactDetailScreen({
   const accountId = account.id
 
   const activity = useRecordActivity("accounts", accountId)
-  // Page one of the accounts list, already warm from the collection screen — it
-  // feeds the parent picker and the statuses in use, so opening this record
-  // costs no extra round trip.
-  const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
+  // A READ OF PAGE ONE STOOD HERE, for the parent picker and the statuses in
+  // use. The statuses went with the column (0042) and the picker gets its own
+  // list, so this record now opens without it.
 
   const { can } = usePermissions(teamId)
   const canEdit = can("accounts", "edit")
@@ -211,7 +209,6 @@ export function ContactDetailScreen({
       logoUrl: values.logoUrl || null,
       coverUrl: values.coverUrl || null,
       locale: values.locale.trim() || null,
-      status: values.status.trim() || undefined,
     })
     refresh()
     toast.success(t("Contact updated."))
@@ -256,7 +253,6 @@ export function ContactDetailScreen({
     )
   }
 
-  const statusText = accountStatus(account.status)
   const where = [account.street, account.postalCode, account.city, account.country]
     .filter(Boolean)
     .join(", ")
@@ -274,12 +270,7 @@ export function ContactDetailScreen({
     { label: t("Where they are"), value: where || "—" },
     { label: t("Language"), value: account.locale || "Ours" },
     { label: t("Reference"), value: account.code || "—" },
-    { label: t("Status"), value: statusText || "—" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
-  ]
-
-  const statusOptions = [
-    ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
   ]
 
   const tabsConfig = {
@@ -409,7 +400,7 @@ export function ContactDetailScreen({
         .filter(Boolean)
         .join(" · ")}
       title={account.name}
-      status={[account.email, statusText].filter(Boolean).join(" · ")}
+      status={account.email ?? ""}
       actions={
         <>
           {canEdit && (
@@ -579,9 +570,7 @@ export function ContactDetailScreen({
           logoUrl: account.logoUrl ?? "",
           coverUrl: account.coverUrl ?? "",
           locale: account.locale ?? "",
-          status: account.status ?? "",
         }}
-        statusOptions={statusOptions}
         onSubmit={save}
       />
 

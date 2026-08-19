@@ -109,7 +109,6 @@ const aboutField = { ...defaultFieldConfig, label: "About", required: false }
 const languageField = { ...defaultFieldConfig, label: "Language", required: false }
 const logoField = { ...defaultFieldConfig, label: "Logo", required: false }
 const coverField = { ...defaultFieldConfig, label: "Cover image", required: false }
-const statusField = { ...defaultFieldConfig, label: "Status", required: false }
 
 // Radix Select can't hold an empty value, so "not chosen" is a sentinel. One
 // constant for all four pickers — four spellings of the same idea is how one of
@@ -139,7 +138,6 @@ export type AccountFormValues = {
   coverUrl: string
   /** the language this account is written to (a BCP-47 tag, or "" for ours) */
   locale: string
-  status: string
 }
 
 const EMPTY: AccountFormValues = {
@@ -156,7 +154,6 @@ const EMPTY: AccountFormValues = {
   logoUrl: "",
   coverUrl: "",
   locale: "",
-  status: "",
 }
 
 /** The first letters of a name, for the logo placeholder. */
@@ -168,7 +165,6 @@ export function AccountFormDialog({
   open,
   onOpenChange,
   initial,
-  statusOptions,
   onSubmit,
   draftKey,
 }: {
@@ -176,8 +172,6 @@ export function AccountFormDialog({
   onOpenChange: (open: boolean) => void
   /** present = edit mode (prefilled); absent = create mode */
   initial?: AccountFormValues | null
-  /** statuses already in use on this team, offered as a pick-or-type list. */
-  statusOptions: string[]
   onSubmit: (values: AccountFormValues) => Promise<void>
   /** stable id for per-session draft persistence; omit to disable. */
   draftKey?: string
@@ -400,22 +394,6 @@ export function AccountFormDialog({
         (v) => set({ locale: v }),
         t("Ours")
       )}
-
-      <Field config={statusField} htmlFor="account-status" className={fieldSpacing}>
-        <Input
-          id="account-status"
-          list="account-statuses"
-          value={values.status}
-          onChange={(e) => set({ status: e.target.value })}
-          placeholder="active_client"
-          disabled={busy}
-        />
-        <datalist id="account-statuses">
-          {statusOptions.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      </Field>
 
       <Field config={aboutField} htmlFor="account-about" className={fieldSpacing}>
         <Notes

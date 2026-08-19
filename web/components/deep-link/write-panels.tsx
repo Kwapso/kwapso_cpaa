@@ -251,15 +251,11 @@ export function WritePanels({
 
       {/* Add an account (?panel=add&module=accounts) — gated by create. No parent
        * picker: a new account is a new company and sits on its own (18 Aug 2026 —
-       * account-form-dialog's header). The statuses are the ones this team already
-       * uses, so they stay consistent. */}
+       * account-form-dialog's header). */}
       <AccountFormDialog
         open={query.panel === "add" && query.module === "accounts" && can("accounts", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `account:new:${teamId}` : undefined}
-        statusOptions={[
-          ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
-        ]}
         onSubmit={createAccount}
       />
 

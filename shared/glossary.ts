@@ -81,7 +81,7 @@ export const GLOSSARY = {
   citation: { term: "Citation", def: "The source an answer came from. Every answer names its own; an answer with no source isn't one." },
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },
-  status: { term: "Status", def: "Where a record sits in its lifecycle, a ticket runs new to resolved; an account is a prospect, a client, or a past client." },
+  status: { term: "Status", def: "Where a record sits in its lifecycle, a ticket runs new to resolved. An account has none: it is live, or it is archived." },
   // ONE WORD FOR WHAT SORT OF THING A RECORD IS (R6, decided 2026-08-19). A
   // ticket said Type, a sprint and a story said Kind, a deliverable said Kind
   // and a brand asset said Category — four words for one field, on screens a

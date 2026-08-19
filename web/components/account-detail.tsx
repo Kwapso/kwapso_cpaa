@@ -56,7 +56,7 @@ import {
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import type { Account, AccountDetail, AccountRate, AppRow } from "@shared/types"
+import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
 import { RecordCover, RecordMark } from "@shared/web/record-mark"
 import { moneyText } from "@shared/web/money"
@@ -84,7 +84,6 @@ import { RichText } from "@shared/web/rich-text-view"
 import { ValuePanel } from "@/components/value-panel"
 import { createAppFrom } from "@/components/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
-import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
@@ -134,9 +133,9 @@ export function AccountDetailScreen({
   // COUNT(*) for the tab badge, and the cursor the feed below spends. Hand-rolling
   // this read is what let a badge and its feed disagree elsewhere.
   const activity = useRecordActivity("accounts", accountId)
-  // The same page-one cache the list screen holds — it feeds the parent picker and
-  // the statuses already in use, so opening this record adds no round-trip.
-  const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
+  // A READ OF PAGE ONE STOOD HERE, for the parent picker and the statuses in
+  // use. The statuses went with the column (0042) and the picker gets its own
+  // list, so this record now opens without it.
   // TOTAL IMPACT — the hours this client's apps have given back, and the money
   // that is worth, from the ONE savings door (it narrows by account, so the
   // arithmetic here is the same arithmetic the maps screen shows for everybody).
@@ -291,7 +290,6 @@ export function AccountDetailScreen({
       logoUrl: values.logoUrl || null,
       coverUrl: values.coverUrl || null,
       locale: values.locale.trim() || null,
-      status: values.status.trim() || undefined,
     })
     refresh()
     toast.success(t("Account updated."))
@@ -376,7 +374,6 @@ export function AccountDetailScreen({
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   const { account, parent, links, linksTotal } = detailQ.data
-  const statusText = accountStatus(account.status)
 
   // A PERSON IS A DIFFERENT SCREEN. One table, one door, one read — and from here
   // two compositions, because a contact has no sprints, no rate card and no
@@ -417,12 +414,7 @@ export function AccountDetailScreen({
     { label: t("Phone"), value: account.phone || "—" },
     { label: t("Address"), value: where || "—" },
     { label: t("Language"), value: account.locale || "Ours" },
-    { label: t("Status"), value: statusText || "—" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
-  ]
-
-  const statusOptions = [
-    ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
   ]
 
   const tabsConfig = {
@@ -460,6 +452,27 @@ export function AccountDetailScreen({
               label: t("Apps"),
               icon: CONCEPT_ICON.apps,
               badge: formatCount(appsTotal),
+              badgeVariant: "" as const,
+            },
+            // WHAT IT HAS BEEN WORTH, on a tab of its own (19 Aug 2026). It was
+            // the fourth block on Overview — under the cover, eight admin fields
+            // and a free-text About — which is where the headline number of the
+            // whole product had been sitting. The owner asked where it was.
+            //
+            // "Value" is the word, not "Impact" or "Savings": the CLIENT PORTAL
+            // already calls this exact screen Value with this exact piggy-bank
+            // mark, and one thing gets one word on both front doors (R34).
+            //
+            // Behind `canSeeApps` because the arithmetic IS the apps' — every
+            // saving is a step on a process map on one of their systems, so a
+            // role that cannot see the systems cannot see their sum. No badge: a
+            // tab badge is an exact server COUNT of rows (R16), and this tab
+            // holds one derivation rather than a collection.
+            {
+              value: "value",
+              label: t("Value"),
+              icon: CONCEPT_ICON.value,
+              badge: "",
               badgeVariant: "" as const,
             },
           ]
@@ -582,7 +595,6 @@ export function AccountDetailScreen({
         .filter(Boolean)
         .join(" · ")}
       title={account.name}
-      status={statusText || undefined}
       actions={
         <>
           {canEdit && (
@@ -639,30 +651,29 @@ export function AccountDetailScreen({
                     <RichText html={account.about} />
                   </div>
                 )}
-                {/* WHAT WE HAVE GIVEN THEM BACK, summed across their apps — the
-                    question a client asks first and the one the whole product is
-                    for. The panel carries the caption that makes the number
-                    honest (R25); it is never assembled here. */}
-                {canSeeApps && (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                      {t("What this has been worth")}
-                    </p>
-                    <ValuePanel view={valueQ.data} />
-                    {/* THE SAME HOURS, IN MONEY. Not a second calculation — it is
-                        the drill-down's own total multiplied by what this client
-                        agreed to pay for an hour of the work, which is why it is
-                        only shown when there IS a rate card to multiply by. The
-                        caption comes with it (R25) for exactly the reason it
-                        comes with the hours: a figure a client cannot account
-                        for is worse than no figure at all. */}
-                    {moneyBack && (
-                      <div className="rounded-xl border p-4">
-                        <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
-                        <p className="text-2xl font-semibold tracking-tight tabular-nums">{moneyBack}</p>
-                        <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
-                      </div>
-                    )}
+              </div>
+            )
+
+          // WHAT WE HAVE GIVEN THEM BACK, summed across their apps — the
+          // question a client asks first and the one the whole product is for.
+          // The panel carries the caption that makes the number honest (R25); it
+          // is never assembled here.
+          if (tabItem.value === "value")
+            return (
+              <div className="flex flex-col gap-4">
+                <ValuePanel view={valueQ.data} />
+                {/* THE SAME HOURS, IN MONEY. Not a second calculation — it is the
+                    drill-down's own total multiplied by what this client agreed
+                    to pay for an hour of the work, which is why it is only shown
+                    when there IS a rate card to multiply by. The caption comes
+                    with it (R25) for exactly the reason it comes with the hours:
+                    a figure a client cannot account for is worse than no figure
+                    at all. */}
+                {moneyBack && (
+                  <div className="rounded-xl border p-4">
+                    <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
+                    <p className="text-2xl font-semibold tracking-tight tabular-nums">{moneyBack}</p>
+                    <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
                   </div>
                 )}
               </div>
@@ -734,7 +745,6 @@ export function AccountDetailScreen({
                 context={[
                   `the client ${account.name}`,
                   account.industry ? `in ${account.industry}` : null,
-                  statusText || null,
                 ]
                   .filter(Boolean)
                   .join(", ")}
@@ -798,9 +808,7 @@ export function AccountDetailScreen({
           logoUrl: account.logoUrl ?? "",
           coverUrl: account.coverUrl ?? "",
           locale: account.locale ?? "",
-          status: account.status ?? "",
         }}
-        statusOptions={statusOptions}
         onSubmit={save}
       />
 

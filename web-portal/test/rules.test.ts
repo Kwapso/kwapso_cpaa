@@ -312,11 +312,15 @@ describe("portal rules the agency app doesn't have", () => {
   })
 
   // THE SAME SENTENCE, ONE TABLE OVER. An account row is mostly the client's own
-  // information — which is why the portal opens the door — but four of its fields
-  // are the agency's record ABOUT them: the commercial `status` (prospect /
-  // client / past client), `commercialsVisible` (our switch governing what money
-  // they see), and the two audit names. Plus `grantedByName` on a login row: which
-  // staff member handed out the sign-in.
+  // information — which is why the portal opens the door — but three of its
+  // fields are the agency's record ABOUT them: `commercialsVisible` (our switch
+  // governing what money they see) and the two audit names. Plus `grantedByName`
+  // on a login row: which staff member handed out the sign-in.
+  //
+  // THERE WERE FOUR. The commercial `status` (prospect / client / past client)
+  // was redacted here until 0042 retired the column. It is now on no row at all,
+  // ours or theirs — which is the stronger guarantee, and the reason it is not in
+  // the list below: a field the seam never builds cannot be forgotten by it.
   //
   // The repo had already ruled on exactly these fields one layer up.
   // shared/rules/registry.ts closes the portal's activity feed because an
@@ -339,7 +343,7 @@ describe("portal rules the agency app doesn't have", () => {
     }
     const account = seamBody("function toAccount(")
     expect(account, "toAccount must decide about a client login at all").toContain('scope.kind === "portal"')
-    for (const field of ["commercialsVisible", "status", "createdByName", "editedByName"])
+    for (const field of ["commercialsVisible", "createdByName", "editedByName"])
       expect(account, `${field} is the agency's, and must not be sent to a client login`).toMatch(
         new RegExp(`${field}: ours \\? null :`)
       )

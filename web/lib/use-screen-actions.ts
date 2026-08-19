@@ -197,7 +197,6 @@ export function useScreenActions(teamId: string | null) {
         logoUrl: values.logoUrl || undefined,
         coverUrl: values.coverUrl || undefined,
         locale: values.locale.trim() || undefined,
-        status: values.status.trim() || undefined,
       })
       primeCache(accountsKey(teamId), await listFetch.accounts(teamId))
       toast.success(t("Added {name}.", { name: values.name.trim() }))

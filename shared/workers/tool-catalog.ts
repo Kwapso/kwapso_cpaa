@@ -95,7 +95,6 @@ const accountFields = (i: Record<string, unknown>): Record<string, unknown> => (
   currency: sent(i, "currency"),
   locale: sent(i, "locale"),
   timezone: sent(i, "timezone"),
-  status: sent(i, "status"),
 })
 
 /** WHO IS ON AN APP — the four fields the app doors read off the body for the
@@ -126,7 +125,7 @@ const appPeopleBody = (i: Record<string, unknown>): Record<string, unknown> => (
 const ACCOUNT_FIELD_SCHEMA = {
   code: S, email: S, phone: S, street: S, postalCode: S, city: S, country: S,
   industry: S, about: S, logoUrl: S, coverUrl: S, currency: S, locale: S,
-  timezone: S, status: S,
+  timezone: S,
 }
 
 /** THE AGENCY-INTERNAL BODIES. One builder per door shape, so create and edit
@@ -138,6 +137,7 @@ const brandAssetBody = (i: Record<string, unknown>): Record<string, unknown> => 
   category: opt(i, "category"),
   description: opt(i, "description"),
   fileUrl: opt(i, "fileUrl"),
+  colorHex: opt(i, "colorHex"),
 })
 
 /** WHAT WE HANDED OVER, as a body. The APP rides on both writes — the create
@@ -347,12 +347,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client', as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code', 'status' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question, how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question, how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
-    schema: obj({ q: S, type: S, status: S, archived: S, parentId: S, sort: S, dir: S, cursor: S }),
+    schema: obj({ q: S, type: S, archived: S, parentId: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "status", "archived", "parentId", "sort", "dir", "cursor"])
+      for (const key of ["q", "type", "archived", "parentId", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -2072,9 +2072,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_brand_asset",
     summary:
-      "Add something to the brand library (name required). `category` is picked-or-created as a dropdown value. `fileUrl` may be a link anywhere; uploading the bytes themselves is a screen action, not a tool.",
+      "Add something to the brand library (name required). `category` is picked-or-created as a dropdown value. `fileUrl` may be a link anywhere; uploading the bytes themselves is a screen action, not a tool. An asset that IS a colour carries `colorHex` (`#RRGGBB`) instead of a file — a swatch is drawn from the value, never fetched from a website.",
     binding: "CONTENT", method: "POST", path: "/api/content/brand-assets",
-    schema: obj({ name: S, category: S, description: S, fileUrl: S }, ["name"]),
+    schema: obj({ name: S, category: S, description: S, fileUrl: S, colorHex: S }, ["name"]),
     buildBody: (i) => brandAssetBody(i),
     agent: { write: true, confirm: false, summarize: (i) => `Add "${str(i, "name")}" to the brand library` },
   },
@@ -2082,7 +2082,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "update_brand_asset",
     summary: "Edit a brand asset (by id). Same fields as creating one.",
     binding: "CONTENT", method: "POST", path: "/api/content/brand-assets/update",
-    schema: obj({ id: S, name: S, category: S, description: S, fileUrl: S }, ["id", "name"]),
+    schema: obj({ id: S, name: S, category: S, description: S, fileUrl: S, colorHex: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), ...brandAssetBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit brand asset ${str(i, "id")}` },
   },

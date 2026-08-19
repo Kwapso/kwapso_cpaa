@@ -13,7 +13,6 @@ import { describe, expect, it } from "vitest"
 import {
   HELP_STATUS,
   INVITE_STATUS,
-  accountStatus,
   shapeAccountsList,
   shapeActivity,
   shapeHelpList,
@@ -308,7 +307,6 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   locale: null,
   timezone: null,
   commercialsVisible: false,
-  status: "client",
   active: true,
   ...over,
 })
@@ -317,12 +315,15 @@ describe("shapeAccountsList", () => {
   // K1: three facts at most. The reference CODE left the line on 17 Aug 2026 —
   // it is a lookup key, not something anybody scans a list for — and it leads
   // the eyebrow on the account's own screen instead.
-  it("says what a row IS on one line — kind and status, never the code", () => {
+  it("says what a row IS on one line — its kind, never the code and never a status", () => {
     const rows = shapeAccountsList([
-      account({ id: "a1", name: "Bergman S.A.", code: "BERG", status: "past_client" }),
+      account({ id: "a1", name: "Bergman S.A.", code: "BERG" }),
     ]).rows
     expect(rows?.[0].name).toBe("Bergman S.A.")
-    expect(rows?.[0].detail).toBe("Company · Past client")
+    // NO STATUS (0042). Whether an account is live is the archive flag, and the
+    // NAME carries that as "(archived)" — so a live account says nothing about
+    // its state, which is the honest thing for a fact true of almost every row.
+    expect(rows?.[0].detail).toBe("Company")
     // …AND NOTHING ELSE. The row used to carry `type` / `status` / `archived`
     // for the frame's own filter bar to sieve — which on a PAGED collection
     // narrowed the loaded fifty. Those three are the DOOR's filters now
@@ -369,11 +370,3 @@ describe("shapeAccountsList", () => {
   })
 })
 
-describe("accountStatus", () => {
-  it("tidies the team's own word without translating it", () => {
-    expect(accountStatus("past_client")).toBe("Past client")
-    expect(accountStatus("prospect")).toBe("Prospect")
-    expect(accountStatus("")).toBe("")
-    expect(accountStatus(null)).toBe("")
-  })
-})

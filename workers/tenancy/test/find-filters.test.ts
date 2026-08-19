@@ -86,10 +86,6 @@ describe("an accounts filter narrows the rows AND the count", () => {
     expect(companies).not.toContain("A_LIVE_ONE")
   })
 
-  it("status: the team's own word, matched as it is stored", async () => {
-    expect(await findAccounts({ status: "past_client" })).toEqual(inTheDatabase("status = 'past_client'"))
-  })
-
   it("archived: either pile on its own", async () => {
     expect(await findAccounts({ archived: "yes" })).toEqual(inTheDatabase("deactivated_at IS NOT NULL"))
     expect(await findAccounts({ archived: "no" })).toEqual(inTheDatabase("deactivated_at IS NULL"))
@@ -102,14 +98,16 @@ describe("an accounts filter narrows the rows AND the count", () => {
   })
 
   it("a filter that matches nothing says nothing — not everything", async () => {
-    expect(await findAccounts({ status: "no_such_standing" })).toEqual([])
+    expect(await findAccounts({ parentId: "no_such_account" })).toEqual([])
   })
 
   it("the EXPORT narrows by the same sentence — one filter, two doors", async () => {
     // The list and the CSV are built from one `accountsWhere`, so "export what
-    // I'm looking at" cannot mean something else. Proved for the two filters that
-    // arrived with the find bar, as search-literal.test.ts proves it for `q`.
-    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { status: "past_client" })
-    expect(rows.map((r) => r.id).sort()).toEqual(inTheDatabase("status = 'past_client'"))
+    // I'm looking at" cannot mean something else. Proved on `archived`, as
+    // search-literal.test.ts proves it for `q`. It used to be proved on `status`,
+    // which 0042 retired — the sentence this test makes is about the SEAM, so it
+    // holds on whichever filter is asked through it.
+    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { archived: "yes" })
+    expect(rows.map((r) => r.id).sort()).toEqual(inTheDatabase("deactivated_at IS NOT NULL"))
   })
 })

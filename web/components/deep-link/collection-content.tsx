@@ -48,7 +48,6 @@ import { GoogleSyncButton } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
-  accountStatus,
   shapeAccountsList,
   shapeInvitesList,
   shapeKnowledgeList,
@@ -397,14 +396,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
           fixed={accountTab === "all" ? undefined : { type: accountTab === "contacts" ? "individual" : "entity" }}
           // THE DOOR'S OWN FILTERS, named once in lib/collection-filters.ts
-          // beside every other paged collection's. `status` is the only one whose
-          // options are ROWS: the word is the team's own ("past_client"), and no
-          // list in a source file keeps up with a vocabulary a team edits.
-          facets={translatedFacets("accounts", t, {
-            status: [...new Set(loaded.map((a) => a.status).filter((s): s is string => !!s))].map(
-              (s) => ({ value: s, label: accountStatus(s) })
-            ),
-          })}
+          // beside every other paged collection's. A `status` facet stood here
+          // and went with the column (0042) — its options were ROWS, which is
+          // what let one free-text field grow four spellings of two ideas.
+          facets={translatedFacets("accounts", t, {})}
           fetchPage={(query, cursor) =>
             tenancy
               .accounts({ ...query, cursor })

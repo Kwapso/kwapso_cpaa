@@ -34,22 +34,22 @@ const INTERNAL_VOCABULARY: { type: string; value: string }[] = [
   { type: "Company size", value: "More than 500" },
 ]
 
-/** The vocabulary a COMPANY record picks from — the industry it is in, and the
- * word for where the relationship stands. Both are ordinary dropdown values a
- * team edits on its own screen; these are a starting set, not an enum. The three
- * statuses are the words the front end reads (SCOPE: an active client, a past
- * client, one that is put away) — stored as written, tidied for display by
- * `accountStatus` rather than mapped through a table that would need keeping in
- * step with whatever a team renames them to. */
+/** The vocabulary a COMPANY record picks from — the industry it is in. Ordinary
+ * dropdown values a team edits on its own screen; a starting set, not an enum.
+ *
+ * THREE `Account status` VALUES SAT HERE TOO, and 0042 retired them with the
+ * column they filled. Whether an account is live is `deactivated_at` and always
+ * was, so the status was a second answer to a question already answered — and
+ * because it was free text behind a pick-or-TYPE box, 24 companies grew four
+ * spellings of two ideas, one of them the raw token `active_client` somebody
+ * copied out of the form's own placeholder. One of the three values was
+ * literally `archived`, competing with the flag underneath it. */
 const COMPANY_VOCABULARY: { type: string; value: string }[] = [
   { type: "Industry", value: "Manufacturing" },
   { type: "Industry", value: "Retail" },
   { type: "Industry", value: "Hospitality" },
   { type: "Industry", value: "Professional services" },
   { type: "Industry", value: "Construction" },
-  { type: "Account status", value: "active_client" },
-  { type: "Account status", value: "past_client" },
-  { type: "Account status", value: "archived" },
 ]
 
 /** THE SPRINT-TYPE CATALOGUE — the ten ways the agency runs an engagement.
@@ -342,9 +342,16 @@ CREATE INDEX idx_import_batches_creator ON data_import_batches (creator_id, crea
 -- route addresses a row by its ULID \`id\`, so re-coding an account can never
 -- re-point its tickets, its files or its history.
 --
--- \`status\` is the commercial lifecycle (prospect → client → past client), an
--- editable vocabulary. \`deactivated_at\` is ARCHIVE — the everyday remove, which
--- keeps the row, its children and its history intact.
+-- \`deactivated_at\` is ARCHIVE — the everyday remove, which keeps the row, its
+-- children and its history intact. It is the ONLY thing that says whether an
+-- account is live.
+--
+-- \`status\` is still a column and is read by NOTHING (0042). History stays true —
+-- dropping a column is the one migration you cannot take back — but the app no
+-- longer writes it, reads it, filters on it, sorts by it or shows it. It had
+-- been a free-text second answer to the question the flag above already
+-- answers, and free text is how it grew four spellings of two ideas. The same
+-- shape as \`meetings.status\`, retired for the same reason.
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY,
   account_type TEXT NOT NULL CHECK (account_type IN ('entity', 'individual')),
@@ -1802,10 +1809,12 @@ SELECT lower(hex(randomblob(16))), r.id, 'contacts', r.is_default, r.is_default,
    SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'contacts'
  );
 
--- The two vocabularies the company form now picks from. Country already had a
--- group (0018); Industry and Account status are new, and all three are ordinary
--- dropdown values a team edits on its own Dropdown values screen. Pick-or-create,
--- so a team that already typed its own words keeps them.
+-- The vocabularies the company form picks from. Country already had a group
+-- (0018); Industry is new, and both are ordinary dropdown values a team edits on
+-- its own Dropdown values screen. Pick-or-create, so a team that already typed
+-- its own words keeps them. (An Account status group was seeded here too, and
+-- 0042 deactivates it — a team upgraded through this migration ran it, so those
+-- rows exist and have to be put away rather than never written.)
 --
 -- ONE STATEMENT PER VALUE, generated from an array — D1's compound-SELECT
 -- ceiling is FIVE terms, and 0018 is the migration that learned it the hard way.
@@ -2772,6 +2781,100 @@ UPDATE meetings
    AND substr(ends_at, -6, 1) IN ('+', '-')
    AND substr(ends_at, -3, 1) = ':'
    AND strftime('%Y-%m-%dT%H:%M:%fZ', ends_at) IS NOT NULL;
+`,
+  },
+  {
+    // ONE FACT, NOT TWO. An account was carrying its own free-text `status`
+    // beside `deactivated_at`, and the two answered the same question: is this
+    // account live? The flag is the half that is true — it is what the Archive
+    // button writes, what the list filters on and what every child row survives.
+    //
+    // WHAT THE SECOND ANSWER COST, measured on the live data before this ran:
+    // 24 companies held FOUR spellings of two ideas — `client` (13),
+    // `past client` (6), `active` (4) and `active_client` (1, the raw token
+    // somebody copied out of the form's own placeholder, because the field was
+    // a pick-or-TYPE box). All 106 contacts said `active`, which is 106 rows
+    // carrying no information and one word printed on every row of the list.
+    // And not one of the 130 accounts had ever been archived, so the mechanism
+    // that DOES answer the question had never been used.
+    //
+    // THE COLUMN STAYS. Dropping one is the migration you cannot take back
+    // (0024 says the same about `address`), and the words a team typed are their
+    // record of what they once thought. Nothing reads it: the row type, the
+    // SELECT, the sort, the door's filter, create, update, the audit diff, the
+    // CSV column, the two MCP tools and both detail screens all lost it in the
+    // same commit. The same shape as `meetings.status`, retired before it.
+    //
+    // WHAT THIS DOES RUN is the half that would otherwise rot in front of a
+    // person: the `Account status` dropdown group. It is CONFIG, not a customer
+    // record, and left alone it would sit on the Dropdown values screen offering
+    // to edit a vocabulary nothing consumes. Deactivated rather than deleted —
+    // the same choice 0034 made for two retired ticket types — so the rows and
+    // their history survive and the screen stops offering them.
+    //
+    // Re-runnable: the predicate excludes what it has already put away.
+    version: "0042_account_status_retired",
+    sql: `
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'),
+       deactivator_name = 'System'
+ WHERE type = 'Account status'
+   AND deactivated_at IS NULL;
+`,
+  },
+  {
+    // A COLOUR IS NOT A PICTURE OF A COLOUR.
+    //
+    // Twenty-four of the twenty-five `Color` rows in the brand library held a
+    // LINK to a flat rectangle rendered by somebody else's website. Every other
+    // category — Avatar, Graphic, Icon, Isotype, Kit, Logo, Presentation, 46
+    // rows — is hosted here. Colour was the whole of the library's external
+    // surface, and the hex was sitting in the URL the entire time.
+    //
+    // NINE OF THE TWENTY-FOUR WERE ON A TYPOSQUAT: `corhexa.com`, which is not
+    // `colorhexa.com` and is not ours. A domain we do not control, named one
+    // letter away from one we meant, returning bytes into the agency's own brand
+    // library. Nothing rendered them as an image — a brand asset's `file_url` is
+    // shown as TEXT today — so this was dormant rather than live. It would not
+    // have stayed dormant: the collection row is getting a picture slot (the
+    // library's `leading`, UI-GAPS #16), and `brand.list` carrying "the asset's
+    // own file" is named in that entry as one of the four lists that gain one.
+    // The fix lands before the thing that would have made it matter.
+    //
+    // The two hosts wrote two shapes — `…/FDE0F8.png` and `…/png/600x300/f4c600`
+    // — and both end in the six hex digits, before an optional `.png`. So: strip
+    // the extension, take six, and guard each character one at a time. SIX
+    // SEPARATE SINGLE-CHARACTER GLOBS rather than one six-class pattern, because
+    // D1 refuses that as "LIKE or GLOB pattern too complex" — the whole
+    // statement fails and the migration dies, which is a worse outcome than any
+    // colour. A row that does not match keeps its URL and is converted by
+    // nobody: losing a link is cheap, inventing a colour is not.
+    //
+    // `file_url` is CLEARED on the rows that convert. The link is what the fix is
+    // about; leaving it would leave the typosquat in the database, one query away
+    // from whatever reads `file_url` next.
+    //
+    // Re-runnable: `color_hex IS NULL` excludes everything a previous pass did.
+    version: "0043_a_colour_is_not_a_picture",
+    sql: `
+ALTER TABLE brand_assets ADD COLUMN color_hex TEXT;
+
+UPDATE brand_assets
+   SET color_hex = '#' || upper(substr(
+         CASE WHEN lower(file_url) LIKE '%.png'
+              THEN substr(file_url, 1, length(file_url) - 4)
+              ELSE file_url END, -6)),
+       file_url = NULL
+ WHERE category = 'Color'
+   AND color_hex IS NULL
+   AND file_url IS NOT NULL
+   AND (file_url LIKE '%colorhexa.com/%' OR file_url LIKE '%corhexa.com/%')
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -1, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -2, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -3, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -4, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -5, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -6, 1) GLOB '[0-9A-Fa-f]';
 `,
   },
 ]

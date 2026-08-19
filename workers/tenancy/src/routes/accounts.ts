@@ -78,7 +78,6 @@ function accountFields(body: Record<string, unknown>) {
     currency: optionalText(body.currency, "Currency", TEXT_LIMITS.short),
     locale: optionalText(body.locale, "Language", TEXT_LIMITS.short),
     timezone: optionalText(body.timezone, "Time zone", TEXT_LIMITS.short),
-    status: optionalText(body.status, "Status", TEXT_LIMITS.short),
   }
 }
 
@@ -171,20 +170,20 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
  * export door narrow by the same words, so "export what I'm looking at" and
  * "list what I'm looking at" can never mean two different things.
  *
- * `status` and `archived` joined the original three when the screen's filter bar
- * moved to the door: a facet applied to the loaded PAGE narrows fifty rows under
- * a badge counting all of them, which is the same sentence R14 already says
- * about search. A filter a person can pick has to be one the server can apply. */
+ * `archived` joined the original three when the screen's filter bar moved to the
+ * door: a facet applied to the loaded PAGE narrows fifty rows under a badge
+ * counting all of them, which is the same sentence R14 already says about
+ * search. A filter a person can pick has to be one the server can apply.
+ *
+ * A `status` filter stood beside it until 0042, when the column it read went:
+ * whether an account is live is the archive flag, and asking it twice is how one
+ * free-text field grew four spellings of two ideas. */
 function accountQuery(url: URL): AccountFilters {
   const rawType = queryText(url.searchParams.get("type"), "Type")
   const rawArchived = queryText(url.searchParams.get("archived"), "Archived")
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
     type: rawType === "entity" || rawType === "individual" ? rawType : undefined,
-    // The team's OWN word for where an account stands ("past_client") — stored as
-    // written, so it is matched as written rather than mapped to an enum we'd
-    // then have to keep in step with a dropdown somebody edits.
-    status: queryText(url.searchParams.get("status"), "Status"),
     archived: rawArchived === "yes" || rawArchived === "no" ? rawArchived : undefined,
     parentId: queryText(url.searchParams.get("parentId"), "Parent"),
   }
@@ -202,7 +201,7 @@ function accountQuery(url: URL): AccountFilters {
  * worst of the three possible answers, and worse here than anywhere: the columns
  * lead with the import format, so re-importing a silently-truncated export is
  * data loss wearing a round trip's clothes. Over the cap the caller narrows with
- * q / type / status / archived / parentId (the same five the screen's find bar
+ * q / type / archived / parentId (the same four the screen's find bar
  * and `list_accounts` take), or reads the paged list. Both surfaces get this
  * same sentence from this same door. */
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
@@ -227,13 +226,13 @@ export async function getAccountsExport(request: Request, env: Env): Promise<Res
   const csv = toCsv(
     [
       "name", "accountType", "code", "email", "phone", "street", "postalCode", "city",
-      "country", "industry", "about", "status",
+      "country", "industry", "about",
       "parent_account_id", "currency", "locale", "timezone", "commercials_visible",
       "active", "created_at", "created_by", "updated_at", "updated_by",
     ],
     rows.map((r) => [
       r.name, r.accountType, r.code, r.email, r.phone, r.street, r.postalCode, r.city,
-      r.country, r.industry, r.about, r.status,
+      r.country, r.industry, r.about,
       r.parentAccountId, r.currency, r.locale, r.timezone, r.commercialsVisible,
       r.active, r.createdAt, r.createdByName, r.updatedAt, r.editedByName,
     ])

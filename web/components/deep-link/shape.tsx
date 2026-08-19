@@ -258,13 +258,6 @@ export const ACCOUNT_TYPE: Record<Account["accountType"], string> = {
   individual: "Person",
 }
 
-/** A stored status ("past_client") as a person reads it ("Past client"). The
- * value is the team's own word, so we only tidy it — never translate it. */
-export function accountStatus(raw: string | null): string {
-  const s = (raw ?? "").replace(/[_-]+/g, " ").trim()
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""
-}
-
 export function shapeAccountsList(
   accounts: Account[],
   /** Say which account each row sits under. FALSE when the rows are already
@@ -291,14 +284,19 @@ export function shapeAccountsList(
         // Archived rows stay visible (archive-never-delete), flagged like retired
         // roles and articles are.
         name: a.active ? a.name : `${a.name} (archived)`,
-        // K1: three facts, no more. What it is, where it stands, and where it
-        // sits in the tree. The CODE left the line — it is a lookup key, not
-        // something anybody scans a list for, and it leads the eyebrow on the
-        // record's own screen. The parent stayed, because "under Bergman S.A."
-        // is a fact about this row that no other row carries.
-        detail:
-          [ACCOUNT_TYPE[a.accountType], accountStatus(a.status), parent].filter(Boolean).join(" · ") ||
-          "—",
+        // K1: what it is, and where it sits in the tree. The CODE left the line
+        // — it is a lookup key, not something anybody scans a list for, and it
+        // leads the eyebrow on the record's own screen. The parent stayed,
+        // because "under Bergman S.A." is a fact about this row that no other
+        // row carries.
+        //
+        // AND THE STATUS LEFT IT TOO (0042). Whether an account is live is the
+        // archive flag, which the NAME already carries as "(archived)" one line
+        // up — so a live account says nothing about its state, which is the
+        // honest thing for a fact that is true of almost every row. It had been
+        // a free-text column that drifted into four spellings of two ideas, and
+        // every one of 106 contacts read "Active".
+        detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "—",
       }
     }),
   }
@@ -353,7 +351,12 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
     rows: items.map((a) => ({
       id: a.id,
       name: a.active ? a.name : `${a.name} (archived)`,
-      detail: a.category || a.description || "—",
+      // A COLOUR SAYS ITS VALUE. Twelve rows named "1".."12" read as twelve
+      // identical lines saying "Color" until 0043 gave them the hex they had
+      // always carried inside a URL. The swatch itself needs the library's
+      // leading slot (UI-GAPS #16); the WORD does not, and a hex is a thing a
+      // person copies far more often than they look at.
+      detail: a.colorHex || a.category || a.description || "—",
       category: a.category || "—",
       state: a.active ? "Live" : "Archived",
     })),
@@ -368,7 +371,9 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): S
       detail: asset.category || "No type said",
       category: asset.category || "—",
       description: asset.description || "—",
-      file: asset.fileUrl || "No file yet",
+      // A COLOUR IS THE ASSET, not a file of it (0043). The two are exclusive by
+      // construction: the migration cleared `file_url` on every row it converted.
+      file: asset.colorHex || asset.fileUrl || "No file yet",
       created: formatDateTime(asset.createdAt),
       createdBy: asset.creatorName || "—",
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt) : "—",

@@ -37,7 +37,6 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
       { value: "created", label: "Newest first", defaultDir: "desc" },
       { value: "name", label: "Name", defaultDir: "asc" },
       { value: "code", label: "Reference", defaultDir: "asc" },
-      { value: "status", label: "Status", defaultDir: "asc" },
       { value: "updated", label: "Recently changed", defaultDir: "desc" },
     ],
   },

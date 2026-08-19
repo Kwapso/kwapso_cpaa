@@ -533,15 +533,34 @@ Purpose: every company and every person kwapso works with, in **one** table
 `parent_account_id` (a **self-pointer**: a holding company's businesses, a
 business's divisions, nesting is deep, but not unlimited; the two ceilings are
 below), `name`, `email`, `phone`, `address`, `code`,
-`currency`, `locale`, `timezone`, `commercials_visible`, `status` (the commercial
-lifecycle: prospect → client → past client). **`code` is a REFERENCE, never an
-identifier**, staff assign it when work starts (BERG), it is unique-when-present
+`currency`, `locale`, `timezone`, `commercials_visible`. **`code` is a REFERENCE,
+never an identifier**, staff assign it when work starts (BERG), it is unique-when-present
 (a partial unique index, so two people can't mint the same one at the same
 instant) and nullable, and every route addresses a row by its ULID `id`. Re-coding
 an account therefore re-points nothing. **The loop guard is the write itself**: a
 move rides a recursive `WITH … UPDATE … WHERE NOT EXISTS (ancestors)`, so two
 admins re-parenting at the same instant cannot co-operate their way into a ring
 (CONCURRENCY rule 1); zero rows changed is the refusal, reported as a plain 409.
+**`status` is kept and means nothing (0042, 19 Aug 2026).** It held the commercial
+lifecycle — prospect → client → past client — as free text behind a pick-or-TYPE
+box, and it was a second answer to a question `deactivated_at` already answered:
+is this account live? The two drifted exactly as a second source of truth does.
+On the live data the day it was retired, 24 companies held FOUR spellings of two
+ideas (`client` 13, `past client` 6, `active` 4, `active_client` 1 — the raw token
+copied out of the form's own placeholder), all 106 contacts said `active`, which
+is 106 rows carrying no information and one word printed on every row of the list,
+and not one of the 130 accounts had ever been archived, so the mechanism that DOES
+answer the question had never been used. One of the three seeded dropdown values
+was literally `archived`, competing with the flag underneath it.
+
+Nothing reads the column now — not the row type, the SELECT, the sort menu, the
+door's filter, create, update, the audit diff, the CSV column, the two MCP tools
+or either detail screen. It survives because it records what people typed while
+the idea existed, which is the same reason nothing here is ever deleted, and the
+same shape `meetings.status` already has (§ *meetings*). The `Account status`
+dropdown group is DEACTIVATED by the migration rather than deleted, so it stops
+being offered on the Dropdown values screen without losing its history.
+
 **And already-there is not a move** (R17): `setAccountParent` compares the stored
 row's `parent_account_id` first and returns `false` without writing at all, so a
 repeat costs no history row and no live ping. The no-op predicate cannot ride the
@@ -1024,6 +1043,29 @@ row would mean granting the right to read every note ever taken in order to let
 somebody see the list of purposes.
 ### brand_assets + meeting_purposes + staff_profiles + staff_certificates. KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`). THE AGENCY'S OWN HOUSEKEEPING
 
+**A colour is not a picture of a colour (`0043`, 19 Aug 2026).** Twenty-four of
+the twenty-five `Color` rows held a LINK to a flat rectangle rendered by another
+website, and **nine were on `corhexa.com` — a typosquat of `colorhexa.com`**, a
+domain we do not control, one letter from the one we meant, serving bytes into
+the agency's own brand library. Every other category (46 rows across seven types)
+was already hosted here, so colour was the whole of the library's external
+surface — and the hex sat in the URL the entire time.
+
+Nothing rendered those URLs as an image: a brand asset's file shows as TEXT, so
+this was **dormant rather than live**. It would not have stayed dormant. The
+collection row is getting a picture slot (UI-GAPS #16), and that entry names
+`brand.list` carrying "the asset's own file" as one of the four lists that gain
+one. The fix landed before the thing that would have made it matter.
+
+`color_hex` is `#RRGGBB`, normalised on the way in by `safeColorHex` (three-digit
+shorthand expanded, anything else dropped rather than refused — the same choice
+`safeExternalLink` makes beside it, and for the same reason: the field is
+optional and losing a bad value costs nothing). The migration converted both URL
+shapes the two hosts wrote, cleared `file_url` on every row it touched, and left
+the one colour we host and every non-colour row alone. Proved row by row in
+`workers/tenancy/test/colour-is-not-a-picture.test.ts`, including the trap: a
+logo whose URL happens to end in six valid hex digits.
+
 Four tables, three permission modules, and the agency-internal side of the legacy
 Glide app finally landed. What they have in common is the whole of their security
 story: **none of them carries an `account_id`**, because none of these rows
@@ -1037,7 +1079,7 @@ structural shape R24 uses for margin, applied to a different secret.
 
 | Table | Module | From (Glide) | Rows | What it is |
 |---|---|---|---|---|
-| `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere. |
+| `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere; `color_hex` (`0043`) holds a colour that IS the asset, and the two are exclusive — the migration cleared the URL on every row it converted. |
 | `meeting_purposes` | `delivery` | `purposes` | 27 | Why the agency meets, and the department it belongs to. |
 | `staff_profiles` | `staff_profiles` | `users` (six profile columns) | 6 | The person behind the member row: personality type, what they are best at, what they find hard, who they look up to, a photo. |
 | `staff_certificates` | `staff_profiles` | `certificates` | 5 | A qualification somebody holds, issuer, granted, lapses, the paper itself. |

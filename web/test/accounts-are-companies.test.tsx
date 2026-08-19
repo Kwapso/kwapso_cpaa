@@ -91,7 +91,6 @@ const PERSON: AccountFormValues = {
   logoUrl: "",
   coverUrl: "",
   locale: "",
-  status: "",
 }
 
 describe("the account form no longer asks what kind of account it is making", () => {
@@ -130,7 +129,6 @@ describe("the account form no longer asks what kind of account it is making", ()
           open
           onOpenChange={() => {}}
           initial={initial}
-          statusOptions={[]}
           onSubmit={async () => {}}
         />
       )
@@ -150,7 +148,6 @@ describe("the account form no longer asks what kind of account it is making", ()
           open
           onOpenChange={() => {}}
           initial={initial}
-          statusOptions={[]}
           onSubmit={onSubmit}
         />
       )
@@ -168,7 +165,6 @@ describe("the account form no longer asks what kind of account it is making", ()
       <AccountFormDialog
         open
         onOpenChange={() => {}}
-        statusOptions={[]}
         onSubmit={async () => {}}
       />
     )
@@ -186,7 +182,6 @@ describe("the account form no longer asks what kind of account it is making", ()
       <AccountFormDialog
         open
         onOpenChange={() => {}}
-        statusOptions={[]}
         onSubmit={onSubmit}
       />
     )
@@ -209,7 +204,6 @@ describe("the account form no longer asks what kind of account it is making", ()
         open
         onOpenChange={() => {}}
         draftKey={draftKey}
-        statusOptions={[]}
         onSubmit={onSubmit}
       />
     )
@@ -234,7 +228,6 @@ describe("the account form no longer asks what kind of account it is making", ()
         open
         onOpenChange={() => {}}
         initial={PERSON}
-        statusOptions={[]}
         onSubmit={onSubmit}
       />
     )

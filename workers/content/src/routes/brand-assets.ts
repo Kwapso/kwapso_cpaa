@@ -45,9 +45,9 @@ export async function getBrandAssetsExport(request: Request, env: Env): Promise<
   if (!complete)
     return exportTooLarge(EXPORT_HARD_CAP, "brand assets", "Archive the material you no longer use, then export again.")
   const csv = toCsv(
-    ["name", "category", "description", "fileUrl", "active", "created_at", "created_by", "updated_at", "updated_by"],
+    ["name", "category", "description", "fileUrl", "colorHex", "active", "created_at", "created_by", "updated_at", "updated_by"],
     rows.map((a) => [
-      a.name, a.category, a.description, a.file_url,
+      a.name, a.category, a.description, a.file_url, a.color_hex,
       a.deactivated_at == null, a.created_at, a.creator_name, a.updated_at, a.editor_name,
     ])
   )

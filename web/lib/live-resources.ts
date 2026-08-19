@@ -218,13 +218,28 @@ export const listFetch = {
   // R14: meetings are PAGED — an event is never curated away, so the door answers
   // with a cursor rather than a ceiling. Page one lands in the cache, its next
   // cursor in the sidecar <LoadMore> reads, exactly like tickets and sources.
-  meetings: (teamId: string) =>
-    contentApi.meetings().then((r) => {
+  meetings: (teamId: string, view?: MeetingListView) =>
+    contentApi.meetings(view === "week" ? { view: "week" } : {}).then((r) => {
+      if (view === "week") {
+        // THE WEEK ASKED OF THE DOOR, as its own read (19 Aug 2026). It used to
+        // be the newest page filtered in the browser, on the stated assumption
+        // that "the week sits inside the newest page for any agency that has not
+        // held fifty meetings since Monday". The diary is ordered by START TIME,
+        // DESCENDING, so the newest page is the furthest-out FUTURE — and once
+        // the calendar sweep brought in repeating entries, page one ran from
+        // June 2027 to August 2027 and not one of its fifty rows was in this
+        // week. The badge said 11 and the list was empty.
+        //
+        // `total` here IS the week's count: the door counted the same question
+        // it listed. One answer, which is what R16 asks for.
+        primeCache(totalKey("meetings-week", teamId), r.total)
+        primeCache(cursorKey(meetingsKey(teamId, "week")), r.nextCursor)
+        return r.meetings
+      }
       primeCache(totalKey("meetings", teamId), r.total)
-      // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1). The three-view
-      // strip badges two server counts and asks for one page — the week is
-      // decided by the door, so the badge and the rows can never mean two
-      // different weeks (R16).
+      // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1). The badge on a
+      // tab nobody has opened still has to be exact, so the whole diary's read
+      // carries the week's count beside its own (R16).
       primeCache(totalKey("meetings-week", teamId), r.weekTotal)
       primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
       return r.meetings
@@ -310,9 +325,19 @@ export function tasksKey(teamId: string, view: TaskView = "open"): string {
   return view === "open" ? `tasks:${teamId}` : `tasks-${view}:${teamId}`
 }
 
-/** The diary's cache key (the paged meetings list). */
-export function meetingsKey(teamId: string): string {
-  return `meetings:${teamId}`
+/** WHICH SLICE OF THE DIARY A KEY NAMES. The whole diary, or the week the reader
+ * is standing in — the one view whose rows the whole diary's newest page cannot
+ * be trusted to contain (see `listFetch.meetings`). */
+export type MeetingListView = "week"
+
+/** The diary's cache key (the paged meetings list). The WHOLE diary keeps the
+ * bare key it has always had, so every listener, sidecar, prewarm and detail
+ * screen that names `meetings:<team>` still lands on it — the same arrangement
+ * `tasksKey` makes for its everyday pile. The week's own list sits under
+ * `meetings-week:`, which the registry's `slicePrefix: "meetings-"` already
+ * drops and re-reads on any meetings ping, so it stays live (R15). */
+export function meetingsKey(teamId: string, view?: MeetingListView): string {
+  return view === "week" ? `meetings-week:${teamId}` : `meetings:${teamId}`
 }
 
 /** WHICH OF ONE MEETING'S GUESTS WE KNOW — its own key because it is its own
