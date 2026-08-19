@@ -96,7 +96,9 @@ describe("assignableMembers — our people, and only ours", () => {
   it("falls back to the email when there is no name yet, and survives no list", () => {
     expect(
       assignableMembers([person({ userId: "u-1", firstName: null, lastName: null, email: "new@kwapso.app" })])
-    ).toEqual([{ id: "u-1", name: "new@kwapso.app" }])
+      // `photo` rides along now (R35) — a person's face is carried to every
+      // picker that offers them, rather than dropped one line before it.
+    ).toEqual([{ id: "u-1", name: "new@kwapso.app", photo: null }])
     expect(assignableMembers(undefined)).toEqual([])
   })
 })

@@ -42,6 +42,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
+import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -123,6 +125,7 @@ export function StoryFormDialog({
   appStaff,
   processes,
   storyTypes,
+  typeMarks,
   initial,
   draftKey,
   onSubmit,
@@ -136,7 +139,7 @@ export function StoryFormDialog({
    * its mark. Narrowed to the CHOSEN app here rather than by the caller, so the
    * list updates as the person changes their mind about the app. */
   sprints: (SprintOption & { appId: string | null })[]
-  apps: { id: string; name: string }[]
+  apps: PickableRecord[]
   /** Set when the form is opened FROM an app's own screen — the app is then a
    * fact about where you are standing rather than a question, so the picker is
    * replaced by its name and cannot be changed by accident. */
@@ -159,7 +162,7 @@ export function StoryFormDialog({
   fixedTicket?: { id: string; label: string }
   /** OPEN tickets only (6.4), each tagged with the app it is about. */
   tickets: { id: string; label: string; appId: string | null }[]
-  members: { id: string; name: string }[]
+  members: PickablePerson[]
   /** WHO IS ON EACH APP (CHECKLIST 6.6) — app id → the staff user ids on it. The
    * assignee picker narrows to the chosen app's people, and the DOOR refuses
    * anybody else, so this is the courtesy half of a rule that is enforced on the
@@ -171,6 +174,11 @@ export function StoryFormDialog({
   processes: { id: string; name: string; appId: string | null }[]
   /** The team's own `Story type` dropdown values (6.2). */
   storyTypes: string[]
+  /** THE GLYPH BESIDE EACH WORD (R35). A map rather than richer options,
+   * because the words come from the door and the marks come from the team's
+   * own vocabulary cache — two reads the screen already holds, and joining
+   * them here would make the dialog fetch. */
+  typeMarks?: Map<string, string>
   /** Present = editing an existing story. */
   initial?: StoryFormValues
   draftKey?: string
@@ -322,7 +330,7 @@ export function StoryFormDialog({
           id="story-type"
           value={values.storyType || NONE}
           onChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
-          options={storyTypes.map((v) => ({ value: v, label: v }))}
+          options={storyTypes.map((v) => ({ value: v, label: v, mark: typeMarks?.get(v) ?? null }))}
           // THE PICKER HAS TO BE TOLD WHAT "NOTHING" IS. It decides whether
           // something is chosen by comparing the value against `emptyOption`,
           // so a sentinel passed without one is a value it has never heard of:

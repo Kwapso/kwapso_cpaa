@@ -68,13 +68,34 @@ import { Check, ChevronsUpDown, X } from "lucide-react"
 import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { RecordMark } from "@shared/web/record-mark"
 
 /** One row in the list. `hint` is the second line — an email, a code, the client
- * a person belongs to: whatever makes two people called Marta tellable apart. */
+ * a person belongs to: whatever makes two people called Marta tellable apart.
+ *
+ * AND THE THING'S OWN FACE (R35). A record is known by its picture as much as by
+ * its name, and until 19 Aug 2026 this type had nowhere to put one — so all
+ * thirty-three pickers in the app offered a column of bare words, while the very
+ * same records carried logos and glyphs on the list two clicks away. Two pickers
+ * worked around it by writing the emoji into `label`, which is a pictograph
+ * inside a sentence and the one shape UI-CONVENTIONS §5 refuses.
+ *
+ * The three fields are `RecordMark`'s own, passed straight through, so a picker
+ * row and a collection row are drawn by the same component and cannot drift:
+ * `picture` is a stored path (a logo, a photo), `mark` is the type's glyph, and
+ * the record's own `label` is the last resort — its first letter. All optional:
+ * a role, a meeting purpose and a process version genuinely have no picture, and
+ * an option with none renders exactly what it rendered before. */
 export type PickerOption = {
   value: string
   label: string
   hint?: string
+  /** the stored path to this record's own picture, if it has one */
+  picture?: string | null
+  /** the record type's glyph — a ticket type's emoji, an app's stage mark */
+  mark?: string | null
+  /** a person in their own right is a circle; a client, an app, a thing is not */
+  shape?: "square" | "round"
 }
 
 export function RecordPicker({
@@ -207,6 +228,20 @@ export function RecordPicker({
       className="min-h-11 items-start gap-2 py-2.5 sm:min-h-0 sm:py-1.5"
     >
       <Check className={value === o.value ? "mt-0.5 opacity-100" : "mt-0.5 opacity-0"} />
+      {/* THE RECORD'S OWN FACE, in the slot an icon would take (R35). Drawn only
+          when the option carries one, so a list of roles or versions is exactly
+          as dense as it was. `size="row"` is the same box the collections use —
+          a picker row and a list row are the same record at the same size. */}
+      {(o.picture || o.mark) && (
+        <RecordMark
+          picture={o.picture}
+          mark={o.mark}
+          name={o.label}
+          shape={o.shape}
+          size="row"
+          className="mt-0.5 size-6 text-sm"
+        />
+      )}
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{o.label}</span>
         {o.hint && <span className="text-muted-foreground truncate text-xs">{o.hint}</span>}

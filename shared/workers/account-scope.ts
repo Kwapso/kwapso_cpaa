@@ -49,9 +49,22 @@ export type AccountScope =
       /** the account row that IS this person (null only if their grant is gone) */
       personAccountId: string | null
       /** null = the whole account's world; a value narrows them to named Apps
-       * (SCOPE ch.03 "per-person restriction"). Carried, not yet enforced — the
-       * Apps module lands later and is the only thing that can honour it. */
+       * (SCOPE ch.03 "per-person restriction"). */
       appRestriction: string | null
+      /** THE SAME FACT, PARSED — the app ids this person may see, or null for
+       * "all of their company's".
+       *
+       * ENFORCED SINCE 19 Aug 2026, and the note it replaces is the reason this
+       * field exists separately. It read: "Carried, not yet enforced — the Apps
+       * module lands later and is the only thing that can honour it." The Apps
+       * module landed; the sentence did not move; and the setting stayed on the
+       * grant screen and in an MCP tool, accepting a value, storing it, showing
+       * it back — and changing nothing. A control that lies is worse than a
+       * missing one, because somebody sets it and believes a person is fenced.
+       *
+       * An EMPTY array is a real answer and means "no apps", not "all apps" —
+       * fail-closed, the same shape `accountIds: []` already has. */
+      appIds: string[] | null
       /** every company this person may stand in, id-ordered so the fallback pick
        * is the same on every request (a switcher that moved you on refresh would
        * be a bug you could not reproduce). */
@@ -87,7 +100,9 @@ const SCOPE_HARD_CAP = 500
  *
  * An EMPTY list is never rendered: both callers answer `0 = 1` before reaching
  * here, because `IN ()` is not valid SQL. */
-function idList(accountIds: string[]): string {
+/** Ids, quoted and joined for an IN list. Exported so a door that has to PROVE
+ * a set of ids exists can build the same list the fence does. */
+export function idList(accountIds: string[]): string {
   return accountIds.map((id) => sqlString(id)).join(", ")
 }
 
@@ -230,6 +245,7 @@ export async function accountScope(cfg: D1Rest, guard: MemberGuard): Promise<Acc
       kind: "portal",
       personAccountId: row.account_id,
       appRestriction: null,
+      appIds: null,
       roots: [],
       currentAccountId: null,
       accountIds: [],
@@ -258,6 +274,7 @@ export async function accountScope(cfg: D1Rest, guard: MemberGuard): Promise<Acc
     kind: "portal",
     personAccountId: row.account_id,
     appRestriction: row.app_restriction,
+    appIds: parseAppRestriction(row.app_restriction),
     roots,
     currentAccountId: current,
     accountIds: [...ids],
@@ -280,6 +297,43 @@ export function accountScopeClause(
   // return shape (always empty now) so every call site keeps spreading it and
   // nothing has to know which half of the clause carries values.
   return { sql: `${column} IN (${idList(scope.accountIds)})`, params: [] }
+}
+
+/** THE RESTRICTION, AS IDS. Stored as a comma-separated list on one TEXT column
+ * — one column rather than a join table because it is at most a handful of ids
+ * per login and it is read on every single portal request; a second table would
+ * be a second round trip on the hot path to answer a question this size.
+ *
+ * A blank or absent value is null, which means "everything their company has".
+ * Anything else is split, trimmed and emptied of blanks — so a trailing comma or
+ * a stray space cannot silently produce an id that matches nothing and fence a
+ * person out of their own world. */
+export function parseAppRestriction(raw: string | null | undefined): string[] | null {
+  if (raw == null) return null
+  const ids = raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+  return ids.length ? ids : null
+}
+
+/** THE APP FENCE, beside the account fence and never instead of it.
+ *
+ * `column` is always a code literal naming an app id column. Returns an empty
+ * clause for staff and for a client with no restriction — both of whom see their
+ * whole world — and `0 = 1` can never happen here, because an empty restriction
+ * parses to null rather than to an empty list (see `parseAppRestriction`).
+ *
+ * IT IS AN AND, NOT AN OR. A restricted client is still inside their account
+ * fence: this narrows what they see WITHIN their company, and a call site that
+ * used it instead of `accountScopeClause` would hand one company's app to
+ * another company's contact who happened to be restricted to the same id. */
+export function appScopeClause(
+  scope: AccountScope,
+  column: string
+): { sql: string; params: string[] } {
+  if (scope.kind === "staff" || !scope.appIds) return { sql: "", params: [] }
+  return { sql: `${column} IN (${idList(scope.appIds)})`, params: [] }
 }
 
 /** Is this account inside the caller's fence? */

@@ -25,6 +25,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { toMoment } from "@shared/web/format"
@@ -80,12 +81,12 @@ export function MeetingFormDialog({
   teamId: string | null
   /** the clients the screen already holds — painted while the door's first
    * answer arrives, and where an edited meeting's client gets its NAME. */
-  accountOptions: { id: string; name: string }[]
+  accountOptions: PickableRecord[]
   /** the systems a meeting can be filed against — the same bounded apps list
    * every other form in the work engine picks from. */
-  appOptions: { id: string; name: string }[]
+  appOptions: PickableRecord[]
   /** why we meet, out of the settled taxonomy under Delivery method. */
-  purposeOptions: { id: string; name: string }[]
+  purposeOptions: PickableRecord[]
   /** Set when the form is opened FROM an app's own screen — the system the
    * meeting is about is then a fact about where you are standing, so the picker
    * is replaced by its name. Separate from `initial`, which means EDIT: a create
@@ -206,7 +207,7 @@ export function MeetingFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
           emptyOption={{ value: NONE, label: t("Nobody, it is ours") }}
           placeholder={t("Nobody, it is ours")}
           searchPlaceholder={t("Search accounts…")}
@@ -219,7 +220,7 @@ export function MeetingFormDialog({
           id="meeting-app"
           value={values.appId}
           onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-          options={appOptions.map((a) => ({ value: a.id, label: a.name }))}
+          options={appOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
           emptyOption={{ value: NONE, label: t("Not about one app") }}
           placeholder={t("Not about one app")}
           searchPlaceholder={t("Search apps…")}

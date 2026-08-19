@@ -16,6 +16,8 @@
 import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
 import {
   accountScopeClause,
+  idList,
+  parseAppRestriction,
   requireAccountInScope,
   requireStandableRoot,
   type AccountScope,
@@ -1223,6 +1225,29 @@ export async function grantPortalAccess(
   const already = "That person already has portal access."
   if (live[0]) throw new GuardError(409, "duplicate", already)
 
+  // Normalise first, then prove: split, trim, drop blanks. Nothing named is
+  // "the whole account's world" and stays null.
+  const wanted = parseAppRestriction(input.appRestriction ?? null)
+  let restriction: string | null = null
+  if (wanted) {
+    const live = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14: bounded by the caller's own list, which is at most a handful.
+      `SELECT id FROM apps WHERE account_id = ? AND id IN (${idList(wanted)}) LIMIT ${LIST_HARD_CAP}`,
+      [account.id]
+    )
+    const found = new Set(live.map((r) => r.id))
+    const missing = wanted.filter((x: string) => !found.has(x))
+    if (missing.length)
+      throw new GuardError(
+        400,
+        "unknown_app",
+        `That restriction names ${missing.length} system${missing.length === 1 ? "" : "s"} this client does not have. Pick from their own apps.`
+      )
+    restriction = wanted.join(",")
+  }
+
   const id = ulid()
   const now = new Date().toISOString()
   await refusingDuplicate(already, () =>
@@ -1230,7 +1255,12 @@ export async function grantPortalAccess(
       id,
       account_id: input.personAccountId, // the PERSON — see the note above
       user_id: input.userId,
-      app_restriction: input.appRestriction ?? null,
+      // THE RESTRICTION, NORMALISED AND PROVEN. Free text until 19 Aug 2026 and
+      // read by nothing; now it fences every portal door that names an app, so
+      // what goes in has to be app ids that exist on this client's account. A
+      // typo used to be harmless because nothing read it — now a typo would be a
+      // person quietly fenced out of their own systems.
+      app_restriction: restriction,
       created_at: now,
       creator_id: actor.id,
       creator_email: actor.email,

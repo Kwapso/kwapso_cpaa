@@ -113,6 +113,8 @@ import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/s
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
+import type { SelectableValue } from "@shared/types"
 
 export function AccountDetailScreen({
   teamId,
@@ -126,6 +128,13 @@ export function AccountDetailScreen({
   basePath: string
 }) {
   const t = useT()
+  // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
+  // nested panel on it. The same key the Dropdown values manager writes, so
+  // an emoji changed there reaches these rows with no deploy.
+  const teamVocabulary = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+
   const detailQ = useCached<AccountDetail>(accountKey(accountId), () =>
     tenancy.accountDetail(accountId)
   )
@@ -717,6 +726,7 @@ export function AccountDetailScreen({
           if (tabItem.value === "sprints")
             return (
               <SprintsPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.sprint)}
                 ownerKind="account"
                 ownerId={accountId}
                 filter={{ accountId }}

@@ -9,6 +9,7 @@ import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } fr
 import { personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
+import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 import type {
   Account,
   ActivityItem,
@@ -66,6 +67,10 @@ export function shapeMembersList(members: TeamMember[]): ScreenData {
   return {
     rows: members.map((m) => ({
       id: m.userId,
+      // A PERSON'S FACE (R35). `imageUrl` arrived on every one of these rows and
+      // was drawn on the profile menu, the staff panel and a ticket's
+      // stakeholders — and not on the list of the team itself.
+      mark: <RecordMark picture={m.imageUrl} name={personName(m)} shape="round" />,
       name: personName(m),
       detail: `${m.roleTitle} · joined ${formatDate(m.joinedAt)}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -78,6 +83,10 @@ export function shapeRolesList(roles: TeamRole[]): ScreenData {
   return {
     rows: roles.map((r) => ({
       id: r.id,
+      // No picture exists for a role, and that is not a reason to draw nothing:
+      // the initial in the same box every other row uses is what keeps a list of
+      // roles the same shape as a list of anything else (R35).
+      mark: <RecordMark name={r.title} />,
       name: r.active ? r.title : `${r.title} (inactive)`,
       detail: r.description || `${r.memberCount} member${r.memberCount === 1 ? "" : "s"}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -90,6 +99,7 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
   return {
     rows: invites.map((i) => ({
       id: i.id,
+      mark: <RecordMark name={i.email} shape="round" />,
       email: i.email,
       detail: `${i.roleTitle} · ${INVITE_STATUS[i.status]}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -156,6 +166,47 @@ export function shapeHelpList(
 /** What a source IS, in the words a person uses for it. A `note` is something
  * somebody wrote here; everything else MIRRORS a row the app already owns, and
  * saying which row it mirrors is the honest answer to "why does it know that?". */
+/** WHAT A PIECE OF KNOWLEDGE CAME FROM, as a glyph (R35).
+ *
+ * The knowledge base is the one collection where every row is a DIFFERENT KIND
+ * of thing — a calendar entry beside a ticket beside a file somebody uploaded —
+ * and it was the one collection where every row looked identical: a title, then
+ * "From a calendar entry · The agency" in grey. The word is doing all the work,
+ * and it is the third thing your eye reaches.
+ *
+ * A LUCIDE NAME, NOT AN EMOJI, and that is the one real decision here. The marks
+ * elsewhere in this app are the TEAM's — a ticket type's glyph is theirs to set
+ * on the Dropdown values screen. A source's kind is not: the code owns the list
+ * (`KNOWLEDGE_KIND` above, held to the sweep by knowledge-coverage.test.ts), so
+ * its icon belongs with the code, in the same vocabulary the nav rail uses for
+ * the same concepts. Where a kind IS one of the app's own records — a ticket, a
+ * story, an account — it borrows that section's own icon, so the thing looks the
+ * same in the knowledge base as it does in the rail.
+ *
+ * Held to KNOWLEDGE_KIND by the same coverage test: a kind with a word and no
+ * glyph would draw an initial, which reads as a bug rather than as a default. */
+export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
+  note: "sticky-note",
+  file: "file",
+  article: "book-open",
+  // The app's own records borrow the rail's icon for the same concept.
+  ticket: "life-buoy",
+  account: "building-2",
+  contact: "contact",
+  app: "app-window",
+  process: "route",
+  sprint: "calendar-range",
+  story: "hammer",
+  meeting: "calendar-clock",
+  todo: "inbox",
+  task: "list-todo",
+  // The four that arrive through somebody's own Google connection.
+  document: "file-text",
+  email: "mail",
+  event: "calendar",
+  message: "message-square",
+}
+
 export const KNOWLEDGE_KIND: Record<string, string> = {
   note: "Note",
   file: "From a file",
@@ -203,6 +254,16 @@ export function shapeKnowledgeList(
   return {
     rows: sources.map((s) => ({
       id: s.id,
+      mark: (
+        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl">
+          <DynamicIcon
+            name={(KNOWLEDGE_KIND_ICON[s.kind] ?? "file") as IconName}
+            aria-hidden
+            className="size-4"
+            fallback={() => null}
+          />
+        </span>
+      ),
       // A source taken AWAY from the assistant stays in the list (deactivate-not-
       // delete) and says so, the same way a retired article does — seeing what
       // you excluded is half of trusting what you did not.
@@ -223,6 +284,9 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
   return {
     rows: meetings.map((m) => ({
       id: m.id,
+      // WHO IT WAS WITH, as a picture. A diary scanned by date still wants to
+      // say at a glance whose call it was (R35).
+      mark: <RecordMark name={m.accountName ?? m.title} />,
       // A CANCELLED meeting stays in the list (deactivate-not-delete) and says
       // so — "didn't we have a call in March?" is answered either way, and the
       // answer "yes, and we called it off" is a different one from silence.
@@ -380,12 +444,17 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
   return {
     rows: items.map((a) => ({
       id: a.id,
+      mark: <RecordMark picture={a.fileUrl} name={a.name} />,
       name: a.active ? a.name : `${a.name} (archived)`,
       // A COLOUR SAYS ITS VALUE. Twelve rows named "1".."12" read as twelve
       // identical lines saying "Color" until 0043 gave them the hex they had
-      // always carried inside a URL. The swatch itself needs the library's
-      // leading slot (UI-GAPS #16); the WORD does not, and a hex is a thing a
-      // person copies far more often than they look at.
+      // always carried inside a URL. The WORD is still worth having — a hex is a
+      // thing a person copies far more often than they look at.
+      //
+      // AND THE SWATCH, at last. This comment promised it "needs the library's
+      // leading slot (UI-GAPS #16)"; #16 shipped, and the sentence outlived the
+      // fact — which is precisely the rot that gap's own check exists to catch,
+      // one level below where it was looking.
       detail: a.colorHex || a.category || a.description || "—",
       category: a.category || "—",
       state: a.active ? "Live" : "Archived",
@@ -416,6 +485,7 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
   return {
     rows: items.map((p) => ({
       id: p.id,
+      mark: <RecordMark name={p.name} />,
       name: p.active ? p.name : `${p.name} (archived)`,
       detail: p.department || p.description || "—",
       department: p.department || "—",

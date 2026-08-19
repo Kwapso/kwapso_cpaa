@@ -57,6 +57,7 @@ import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
 import { ApiFailure, content } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 // EVERY URL THAT REACHES AN ATTRIBUTE GOES THROUGH THE SEAM, including these.
 // Google's own icon host and our own thumbnail path are both perfectly safe
@@ -157,7 +158,7 @@ export function GoogleSourceDialog({
   /** the team whose clients the picker searches — accounts PAGE (R14). */
   teamId: string | null
   /** the clients the screen already holds, painted while the door answers. */
-  accountOptions: { id: string; name: string }[]
+  accountOptions: PickableRecord[]
   onSubmit: (values: GoogleSourceValues) => Promise<void>
 }) {
   const t = useT()
@@ -438,7 +439,7 @@ export function GoogleSourceDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
           emptyOption={{ value: AGENCY, label: t("Ours, not a client's") }}
           placeholder={t("Ours, not a client's")}
           searchPlaceholder={t("Search accounts…")}

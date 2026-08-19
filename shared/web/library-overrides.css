@@ -12,10 +12,23 @@
  *     .glass { background-color: color-mix(in oklch, var(--card) 94%, transparent) }
  *
  * It was written on 2026-06-30 because the library's `.glass` was frosted at 72%
- * opacity and dialog text was hard to read against the moving background. That
- * was true then. The library has since replaced `.glass` with a flat, FULLY
- * OPAQUE paper surface, and its own comment quotes the brand book while doing
- * it: "No frosted-glass cards, no translucent panels."
+ * opacity and dialog text was hard to read against the moving background.
+ *
+ * IT WAS DELETED ON 2026-08-10 ON A CLAIM THAT WAS NOT TRUE, and the claim is
+ * kept here because the correction is the useful part. The sentence said the
+ * library had "replaced `.glass` with a flat, FULLY OPAQUE paper surface", and
+ * quoted a brand line about no translucent panels. Neither was so: `.glass` was
+ * still a 72% `color-mix` in v0.11.0 and is still one now, and the library's own
+ * comment beside it says the opposite ("a translucent pane that blurs what's
+ * behind it"). So from 10 Aug the app had no opaque dialog surface from either
+ * side, and on 19 Aug the app-creation form was reported unreadable over the
+ * client logo grid — nine days, on a screen anybody could have opened.
+ *
+ * IT IS FIXED IN THE LIBRARY NOW (v0.13.0), which is the right home: dialog,
+ * sheet and alert-dialog carry `bg-card` like the five floating primitives that
+ * were corrected in June, and a census walks all eight so the ninth cannot be
+ * missed. That is why this file is still empty — not because the problem went
+ * away on its own, but because it was fixed one level down.
  *
  * So the override stopped fixing anything and started causing something. Six
  * percent of translucency does not read as translucency — it reads as a COLOUR,

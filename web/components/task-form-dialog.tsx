@@ -38,6 +38,8 @@ import { ApiFailure } from "@/lib/api"
 import { PRIORITY_LABEL, departmentAsks, departmentGlyph, priorityScore } from "@shared/departments"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
+import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -96,9 +98,9 @@ export function TaskFormDialog({
   draftKey?: string
   /** the team whose clients the client picker searches — accounts PAGE (R14) */
   teamId: string | null
-  members: { id: string; name: string }[]
-  apps: { id: string; name: string }[]
-  accounts: { id: string; name: string }[]
+  members: PickablePerson[]
+  apps: PickableRecord[]
+  accounts: PickableRecord[]
   departments: string[]
   /** whoever is opening the form — a new task is theirs until they say otherwise */
   defaultAssigneeId: string
@@ -285,7 +287,7 @@ export function TaskFormDialog({
             onChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
             search={(term) => searchAccounts(term)}
             searchKey={pickerKey("accounts", teamId)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            options={accounts.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             emptyOption={{ value: NONE, label: t("Which client is it for?") }}
             placeholder={t("Which client is it for?")}
             searchPlaceholder={t("Search accounts…")}

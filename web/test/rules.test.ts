@@ -618,6 +618,79 @@ describe("RULES — the laws of the base", () => {
   // The registry's own comment lists what was deliberately left off it and why
   // ("client", "option", "request"); the short version is that a word people
   // exempt their way past is worse than no word at all.
+  // ── R35 · A RECORD NEVER APPEARS WITHOUT ITS FACE ────────────────────────
+  //
+  // Checked at the three places a visual can be LOST, rather than by inspecting
+  // markup. There is no honest regex for "this JSX is a record row" — `.map(x =>
+  // <li>` matches attachment lists, reply threads, comment feeds and step lists,
+  // none of which are records — so a scan written that way would either miss the
+  // rows that matter or flag the ones that do not, and a rule that cries wolf is
+  // a rule people delete.
+  //
+  // The three chokepoints are real because the codebase already made them real:
+  // one picker type every searchable dropdown funnels through (`record-picker`
+  // is the only composer of `command`, enforced above), one recipe file, and one
+  // shared nested row. A field that is not carried cannot be forgotten later; it
+  // is already gone.
+  it("records-carry-their-face: the three places a visual can be lost all declare it (R35)", () => {
+    // 1 · THE PICKER'S OPTION TYPE. Thirty-three pickers pass through it, and
+    // until 19 Aug 2026 it had no field for a picture at all — so none of them
+    // COULD have drawn one.
+    const picker = read(join(WEB, "components", "record-picker.tsx"))
+    for (const field of ["picture", "mark", "shape"])
+      expect(
+        new RegExp(`\\n\\s*${field}\\??:`).test(picker),
+        `PickerOption must declare \`${field}\` — a picker option that cannot carry a visual makes every dropdown in the app a column of words`
+      ).toBe(true)
+    expect(
+      /<RecordMark/.test(picker),
+      "the picker no longer draws a RecordMark, so its options declare a visual nothing renders"
+    ).toBe(true)
+
+    // 2 · THE RECORD TYPE THE DIALOGS SHARE. Nine dialogs said `{ id; name }[]`
+    // and were handed rows carrying a logo, which the type discarded one line
+    // before the component.
+    const pickable = read(join(WEB, "lib", "pickable.ts"))
+    expect(
+      /logoUrl\??:/.test(pickable),
+      "PickableRecord must carry the record's picture, or every dialog that takes one loses it at the boundary"
+    ).toBe(true)
+    const members = read(join(WEB, "lib", "members.ts"))
+    expect(
+      /photo\??:/.test(members),
+      "PickablePerson must carry the person's photo — it dropped `imageUrl` for a year, one line before every picker that offers a person"
+    ).toBe(true)
+
+    // 3 · EVERY LIST RECIPE NAMES ITS LEADING COLUMN. Not most of them: a person
+    // sees these lists side by side, and one bare row among fourteen reads as the
+    // broken one.
+    const recipes = read(join(WEB, "lib", "screens.ts"))
+    // A RECIPE is a `…Recipe: ScreenRecipe = {…}` declaration — not any block
+    // that happens to mention `listCollection` in a comment, which is what a
+    // looser split caught on the first run.
+    const bare = [...recipes.matchAll(/const (\w*Recipe): ScreenRecipe = \{([\s\S]*?)\n\}/g)]
+      .filter(([, , body]) => body.includes("listCollection(") && !body.includes('leading: "mark"'))
+      .map(([, name]) => name)
+    expect(
+      bare.length,
+      `${bare.length} list recipe(s) draw rows with no leading visual:\n  ${bare.join("\n  ")}`
+    ).toBe(0)
+    const allRecipes = [...recipes.matchAll(/const (\w*Recipe): ScreenRecipe = \{([\s\S]*?)\n\}/g)].filter(
+      ([, , body]) => body.includes("listCollection(")
+    )
+    expect(allRecipes.length, "no list recipes found — this check is measuring nothing").toBeGreaterThan(5)
+
+    // 4 · THE ONE SHARED NESTED ROW REQUIRES ITS MARK. Required, not optional:
+    // `null` is a real answer said out loud at the call site, and an omitted
+    // optional prop says nothing at all — which is exactly how twenty panels came
+    // to draw bare words without anybody deciding to.
+    const panels = read(join(WEB, "components", "work-panels.tsx"))
+    expect(
+      /\n\s*mark: React\.ReactNode \| null\n/.test(panels),
+      "the shared nested Row must take its mark as a REQUIRED prop — an optional one is a rule a twenty-first panel can skip in silence"
+    ).toBe(true)
+  })
+
   it("glossary-in-copy: no screen says a known synonym for a glossary term (R6/R33)", () => {
     const strings: string[] = JSON.parse(read(join(ROOT, "shared", "i18n-strings.json")))
     // The census must not go blind: an empty catalogue would pass this silently.
@@ -1972,6 +2045,7 @@ describe("RULES — the laws of the base", () => {
       "client-reachable-doors", // R21: the client-reach scan above
       "two-radii", // R31: the radius-vocabulary grep above
       "closed-palette", // R32: the ramp + hex-literal grep above
+      "records-carry-their-face", // R35: the three-chokepoint scan above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
       "cited-answers", // R23: workers/content/test/cited-answers.test.ts
       "internal-money-never-in-portal", // R24: the import-graph scan above

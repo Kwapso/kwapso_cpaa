@@ -12,7 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@kwapso/ui": "github:alaap-swift-struck/swift-struck-ui#v0.12.0",
+    "@kwapso/ui": "github:alaap-swift-struck/swift-struck-ui#v0.14.0",
     "lucide-react": "^1.17.0",
     "next": "^15.1.6",
     "react": "^19.0.0",

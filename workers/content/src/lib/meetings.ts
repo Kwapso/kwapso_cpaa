@@ -251,6 +251,15 @@ export type MeetingFilter = {
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
    * 'all' shows the lot, cancelled ones included. */
   view?: string
+  /** ONE CALENDAR MONTH, `YYYY-MM`. The diary is ordered by start time DESCENDING
+   * and it PAGES, so "the month on screen" is not a question the loaded page can
+   * answer: on 19 Aug 2026 page one ran from June 2027 to August 2027 while the
+   * month being drawn — August 2026 — held 61 meetings nobody had asked for. The
+   * calendar asks the DOOR for its month, exactly as the week view does.
+   *
+   * Validated at the door (`^\d{4}-\d{2}$`), so what reaches the SQL is two
+   * numbers and a hyphen. */
+  month?: string
   q?: string
 }
 
@@ -296,6 +305,16 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   // somebody is IN, not the days that are left of it.
   if (filter.view === "week") {
     const { from, to } = thisWeek()
+    where.push("m.starts_at >= ? AND m.starts_at < ?")
+    params.push(from, to)
+  }
+  // THE MONTH A CALENDAR IS SHOWING. A half-open range, so a meeting at
+  // 23:59:59 on the 31st belongs to the month and one at 00:00 on the 1st of the
+  // next does not — the boundary a date picker and a person both assume.
+  if (filter.month) {
+    const [y, mo] = filter.month.split("-").map(Number)
+    const from = `${filter.month}-01T00:00:00.000Z`
+    const to = mo === 12 ? `${y + 1}-01-01T00:00:00.000Z` : `${y}-${String(mo + 1).padStart(2, "0")}-01T00:00:00.000Z`
     where.push("m.starts_at >= ? AND m.starts_at < ?")
     params.push(from, to)
   }

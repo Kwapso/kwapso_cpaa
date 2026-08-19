@@ -74,6 +74,8 @@ import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/t
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
+import { StakeholdersPanel } from "@/components/stakeholders-panel"
 
 export function AppDetailScreen({
   teamId,
@@ -88,6 +90,13 @@ export function AppDetailScreen({
   const t = useT()
   // The apps set is bounded and read whole, so the record comes out of the same
   // cache the list holds — opening one costs no round-trip.
+  // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
+  // nested panel on it. The same key the Dropdown values manager writes, so
+  // an emoji changed there reaches these rows with no deploy.
+  const teamVocabulary = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
@@ -250,19 +259,17 @@ export function AppDetailScreen({
   // same read the form uses to offer them, so the name a person picked and the
   // name they are shown are the one answer.
   const memberNames = new Map(members.map((m) => [m.id, m.name]))
+  // Their faces, from the same read (R35).
+  const memberPhotos = new Map(members.map((m) => [m.id, m.photo ?? null]))
   const contactNames = new Map(
     (contactsQ.data?.links ?? []).map((l) => [l.personAccountId, l.personName])
   )
-  const staffLine = app.staff.length
-    ? app.staff
-        .map((p) => `${memberNames.get(p.userId) ?? "Somebody"}${p.isLead ? " (team lead)" : ""}`)
-        .join(", ")
-    : "Nobody yet"
-  const stakeholderLine = app.stakeholders.length
-    ? app.stakeholders
-        .map((p) => `${contactNames.get(p.contactId) ?? "Somebody"}${p.isMain ? " (main)" : ""}`)
-        .join(", ")
-    : "Nobody yet"
+  // THE TWO COMMA-JOINED LINES ARE GONE — see the Stakeholders tab below. They
+  // were two Overview fields reading "Alaap K, Alexander Stadlmair, Aurora
+  // Thalassa" and "Paras Maroo (main), Petya Bletsova": the people who own this
+  // system, flattened into prose you could not click, with the two sides told
+  // apart only by which label they sat under.
+  const peopleCount = app.staff.length + app.stakeholders.length
 
   // THE CONTEXT AN APP CARRIES, above the housekeeping. The four prose fields
   // are what somebody joining the account reads first and what the assistant
@@ -279,11 +286,6 @@ export function AppDetailScreen({
     },
     { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : "—" },
     { label: t("Key actors"), value: app.keyActors || "—" },
-    // WHO IS ON IT, both sides (8.10 + 8.5). High on the Overview rather than
-    // under the audit block: "who do I ask about this?" is the question a person
-    // opens an app record to answer.
-    { label: t("Who is on it"), value: staffLine },
-    { label: t("Their contacts"), value: stakeholderLine },
     { label: t("Address"), value: app.url || "—" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
@@ -305,6 +307,23 @@ export function AppDetailScreen({
         label: t("Stories"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        // WHO OWNS THIS SYSTEM, on a tab of its own (19 Aug 2026). It was two
+        // comma-joined Overview fields — a list of people you could not click,
+        // sitting between "Key actors" and "Address" like housekeeping. "Who do
+        // I ask about this?" is one of the two questions an app record exists to
+        // answer, and it was the one you had to read prose for.
+        //
+        // THE BADGE IS BOTH SIDES ADDED UP, and it is an exact server total
+        // rather than a page length (R16): `staff` and `stakeholders` arrive as
+        // whole sets on the app row — the door reads them per app, not per page
+        // — so this is one of the few tabs where a local length IS the count.
+        value: "stakeholders",
+        label: t("Stakeholders"),
+        icon: CONCEPT_ICON.contacts,
+        badge: formatCount(peopleCount),
         badgeVariant: "" as const,
       },
       {
@@ -463,6 +482,7 @@ export function AppDetailScreen({
           if (panel.value === "sprints")
             return (
               <SprintsPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.sprint)}
                 ownerKind="app"
                 ownerId={appId}
                 filter={{ appId }}
@@ -474,6 +494,7 @@ export function AppDetailScreen({
           if (panel.value === "stories")
             return (
               <StoriesPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
                 ownerKind="app"
                 ownerId={appId}
                 filter={{ appId }}
@@ -501,12 +522,24 @@ export function AppDetailScreen({
           if (panel.value === "tickets")
             return (
               <AppTicketsPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.ticket)}
                 appId={appId}
                 host={host}
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
               />
             )
           if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
+          if (panel.value === "stakeholders")
+            return (
+              <StakeholdersPanel
+                staff={app.staff}
+                stakeholders={app.stakeholders}
+                memberNames={memberNames}
+                memberPhotos={memberPhotos}
+                contactNames={contactNames}
+                host={host}
+              />
+            )
           if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />
           if (panel.value === "knowledge")
             return (

@@ -94,7 +94,7 @@ export function HelpStakeholders({
           <RecordPicker
             value={picked}
             onChange={setPicked}
-            options={addable.map((m) => ({ value: m.id, label: m.name }))}
+            options={addable.map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
             placeholder={t("Pick someone to keep in the loop")}
             searchPlaceholder={t("Search members…")}
             emptyText={t("Nobody here matched.")}

@@ -29,6 +29,7 @@ import { AppMark } from "@/components/app-tiles"
 import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosKey, totalKey } from "@/lib/live-resources"
+import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
 import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
 import { formatDate } from "@shared/web/format"
@@ -55,9 +56,29 @@ export const STORY_STATUS_LABEL: Record<Story["status"], string> = {
  * cues at every boundary — a drawn line AND a space — where N6 allows exactly
  * one, and it did it seven times in this file alone. The COLLECTION is the block
  * that earns a container; a row inside one is a row. */
-function Row({ live, children }: { live: boolean; children: React.ReactNode }) {
+function Row({
+  live,
+  mark,
+  children,
+}: {
+  live: boolean
+  /** THE RECORD'S OWN FACE, and it is a REQUIRED prop on purpose (R35).
+   *
+   * A record is known by its picture as much as by its name, and these nested
+   * lists were the largest place in the app where it was missing: a story inside
+   * a sprint, a ticket inside an app, a contact inside an account — the same
+   * record that leads with its glyph on its own collection led with nothing here.
+   *
+   * REQUIRED rather than optional because that is the only version of this rule a
+   * twenty-first panel cannot quietly skip. `null` is a real answer and says so
+   * out loud at the call site; an omitted optional prop says nothing at all, and
+   * "did you remember?" is exactly the question source-scanning cannot ask. */
+  mark: React.ReactNode | null
+  children: React.ReactNode
+}) {
   return (
     <li className={`flex flex-wrap items-center gap-2 px-3 py-2 ${live ? "" : "opacity-60"}`}>
+      {mark}
       {children}
     </li>
   )
@@ -80,6 +101,33 @@ function OpenLink({ label, onOpen }: { label: string; onOpen: () => void }) {
       className="hover:text-primary min-w-0 flex-1 truncate text-left text-sm underline-offset-2 hover:underline"
     >
       {label}
+    </button>
+  )
+}
+
+/** THE ARROW AT THE END OF A ROW, AND IT DOES SOMETHING.
+ *
+ * It was a bare `<ChevronRight>` — no click target, no label, not inside a
+ * button. The owner reported the Processes row as "unable to expand", which is
+ * exactly right and exactly the fault: a chevron is the universal "this opens"
+ * glyph, so a decorative one is a promise the row does not keep. Only the NAME
+ * was clickable, which is a small target and an invisible rule.
+ *
+ * It is not an expander — the row opens the record, and the row's own list has
+ * no steps in it to expand (the door returns a count, not the steps). So it does
+ * what it looks like it does, and says so to a screen reader. */
+function OpenChevron({ label, onOpen }: { label: string; onOpen: () => void }) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={t("Open {name}", { name: label })}
+      // 44px touch floor (UI-RULEBOOK S6) without growing the row: the box is
+      // padding, the glyph stays the size it was.
+      className="text-muted-foreground hover:text-foreground -m-2 shrink-0 p-2"
+    >
+      <ChevronRight className="size-4" />
     </button>
   )
 }
@@ -134,6 +182,7 @@ export function StoriesPanel({
   ownerKind,
   ownerId,
   filter,
+  marks,
   host,
   onNew,
   emptyText,
@@ -142,6 +191,11 @@ export function StoriesPanel({
   ownerKind: "sprint" | "app" | "ticket"
   ownerId: string
   filter: { sprintId?: string; appId?: string; ticketId?: string }
+  /** THE TEAM'S GLYPH FOR EACH TYPE (R35), handed in rather than fetched.
+   * A panel hangs off three different records and has no team id of its own;
+   * the screens that mount it all hold the vocabulary already, so passing it
+   * costs nothing and fetching it here would cost a round trip per panel. */
+  marks?: Map<string, string>
   host: PanelHost
   /** present = the caller may add work here, and this opens the form */
   onNew?: () => void
@@ -175,7 +229,7 @@ export function StoriesPanel({
       ) : (
         <RowList>
           {rows.map((s) => (
-            <Row key={s.id} live={s.status !== "done"}>
+            <Row key={s.id} live={s.status !== "done"} mark={<RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? s.title} />}>
               <div className="min-w-0 flex-1">
                 <OpenLink
                   label={s.ref ? `${s.ref} · ${s.title}` : s.title}
@@ -271,6 +325,7 @@ export function SprintsPanel({
   ownerKind,
   ownerId,
   filter,
+  marks,
   host,
   onNew,
   emptyText,
@@ -278,6 +333,11 @@ export function SprintsPanel({
   ownerKind: "app" | "account"
   ownerId: string
   filter: { appId?: string; accountId?: string }
+  /** THE TEAM'S GLYPH FOR EACH TYPE (R35), handed in rather than fetched.
+   * A panel hangs off three different records and has no team id of its own;
+   * the screens that mount it all hold the vocabulary already, so passing it
+   * costs nothing and fetching it here would cost a round trip per panel. */
+  marks?: Map<string, string>
   host: PanelHost
   onNew?: () => void
   emptyText: string
@@ -307,7 +367,7 @@ export function SprintsPanel({
       ) : (
         <RowList>
           {rows.map((s) => (
-            <Row key={s.id} live={!s.completedAt}>
+            <Row key={s.id} live={!s.completedAt} mark={<RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? s.name} />}>
               <div className="min-w-0 flex-1">
                 <OpenLink
                   label={s.ref ? `${s.ref} · ${s.name}` : s.name}
@@ -374,7 +434,7 @@ export function AppsPanel({
       ) : (
         <RowList>
           {rows.map((a) => (
-            <Row key={a.id} live={a.active}>
+            <Row key={a.id} live={a.active} mark={null}>
               {/* THE SAME RECORD, THE SAME SQUARE. These rows and the tiles on
                   the apps screen list the identical AppRow, and only one of them
                   drew the client's mark — so an app was a picture on one screen
@@ -442,7 +502,7 @@ export function ProcessesPanel({
       ) : (
         <RowList>
           {rows.map((p) => (
-            <Row key={p.id} live={p.active}>
+            <Row key={p.id} live={p.active} mark={<RecordMark name={p.name} />}>
               <div className="min-w-0 flex-1">
                 <OpenLink
                   label={p.name}
@@ -455,7 +515,10 @@ export function ProcessesPanel({
                   ].join(" · ")}
                 </p>
               </div>
-              <ChevronRight className="text-muted-foreground size-4" />
+              <OpenChevron
+                label={p.name}
+                onOpen={() => softNavigate(`${host.base}/processes/${p.id}`)}
+              />
             </Row>
           ))}
         </RowList>
@@ -517,7 +580,7 @@ export function AppMeetingsPanel({
       ) : (
         <RowList>
           {rows.map((m) => (
-            <Row key={m.id} live={m.active}>
+            <Row key={m.id} live={m.active} mark={<RecordMark name={m.accountName ?? m.title} />}>
               <div className="min-w-0 flex-1">
                 <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
                 <p className="text-muted-foreground truncate text-xs">
@@ -552,10 +615,16 @@ export function AppMeetingsPanel({
  * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
 export function AppTicketsPanel({
   appId,
+  marks,
   host,
   onNew,
 }: {
   appId: string
+  /** THE TEAM'S GLYPH FOR EACH TYPE (R35), handed in rather than fetched.
+   * A panel hangs off three different records and has no team id of its own;
+   * the screens that mount it all hold the vocabulary already, so passing it
+   * costs nothing and fetching it here would cost a round trip per panel. */
+  marks?: Map<string, string>
   host: PanelHost
   /** present = the caller may raise one from here, and this opens the form */
   onNew?: () => void
@@ -587,7 +656,7 @@ export function AppTicketsPanel({
       ) : (
         <RowList>
           {rows.map((ticket) => (
-            <Row key={ticket.id} live={!ticket.archivedAt}>
+            <Row key={ticket.id} live={!ticket.archivedAt} mark={<RecordMark mark={marks?.get(ticket.helpType ?? "") ?? null} name={ticket.helpType ?? "?"} />}>
               <div className="min-w-0 flex-1">
                 <OpenLink
                   label={richTextPlain(ticket.description)}
@@ -669,7 +738,7 @@ export function TodosPanel({
       ) : (
         <RowList>
           {rows.map((todo) => (
-            <Row key={todo.id} live={!todo.completedAt && !todo.cancelled}>
+            <Row key={todo.id} live={!todo.completedAt && !todo.cancelled} mark={<RecordMark name={todo.title} />}>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
                 <p className="text-muted-foreground truncate text-xs">

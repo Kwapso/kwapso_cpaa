@@ -21,7 +21,7 @@
 // at creation and never edited (there is no move-app door — see the migration).
 
 import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
-import { accountScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
+import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
@@ -81,9 +81,16 @@ async function insertRow(
  * them cannot be asked differently (R16). */
 function appsWhere(scope: AccountScope, opts: { accountId?: string }): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "account_id")
+    // AND THE APP FENCE (SCOPE ch.03 "per-person restriction"). A client login
+    // may be narrowed to named apps; a staff caller and an unrestricted client
+    // both get an empty clause, so this changes nothing for either. It is an AND
+    // beside the account fence and never instead of it — see appScopeClause.
+  const apps = appScopeClause(scope, "id")
   return {
-    sql: where([fence.sql, opts.accountId ? "account_id = ?" : undefined]),
-    params: opts.accountId ? [...fence.params, opts.accountId] : [...fence.params],
+    sql: where([fence.sql, apps.sql, opts.accountId ? "account_id = ?" : undefined]),
+    params: opts.accountId
+      ? [...fence.params, ...apps.params, opts.accountId]
+      : [...fence.params, ...apps.params],
   }
 }
 
@@ -646,8 +653,13 @@ export type ProcessFilters = { q?: string; appId?: string; archived?: string }
 
 function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "p.account_id")
-  const filters: string[] = []
-  const params: string[] = [...fence.params]
+    // AND THE APP FENCE (SCOPE ch.03 "per-person restriction"). A client login
+    // may be narrowed to named apps; a staff caller and an unrestricted client
+    // both get an empty clause, so this changes nothing for either. It is an AND
+    // beside the account fence and never instead of it — see appScopeClause.
+  const apps = appScopeClause(scope, "p.app_id")
+  const filters: string[] = apps.sql ? [apps.sql] : []
+  const params: string[] = [...fence.params, ...apps.params]
   if (opts.q) {
     // ESCAPED — `%` and `_` are LIKE's own wildcards, so an unescaped needle
     // answers a different question than the one typed, and a pattern of nothing

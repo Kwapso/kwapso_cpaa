@@ -272,6 +272,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "glossary-in-copy",
     status: "enforced",
   },
+  {
+    id: "R35",
+    dimension: "ui",
+    law: "A RECORD NEVER APPEARS WITHOUT ITS FACE. Wherever a record or a dropdown value is shown to be chosen or scanned — a picker option, a row in a collection, a row in a nested panel inside another record's screen — it is drawn with its visual beside its name: its own picture where it has one, its type's glyph where the type has one, and its initial where it has neither. Never nothing, and never the glyph written INTO the words (a pictograph inside a sentence is the one shape UI-CONVENTIONS §5 refuses). Enforced at the three places it can be lost rather than by inspecting markup: `PickerOption` and `PickableRecord` must DECLARE the visual fields, so a type cannot drop a picture before a component sees it; every list recipe must name its `leading` column; and the one shared nested row (`Row` in work-panels.tsx) takes its mark as a REQUIRED prop, with `null` a real and visible answer.",
+    why: "A visual is a key identifier, not decoration on the main page — the owner said so three times across two rounds, and each time the fix was applied where he pointed and nowhere else. The census on 19 Aug 2026 found the true size: THIRTY-THREE pickers, not one of which could show a visual at all, because `PickerOption` had no field for one; ten of fourteen list recipes naming no leading column; around twenty nested panels drawing bare words for records that lead with a glyph on their own screen; and `PickablePerson` dropping `imageUrl` one line before every picker that offers a person. WHY THE CHECK IS POSITIONAL RATHER THAN VISUAL: there is no honest regex for 'this JSX is a record row' — `.map(x => <li>` matches attachments, replies, comments and steps, none of which are records. So the rule stands on the three CHOKEPOINTS instead, which is the same move `record-picker.tsx` being the only composer of `command` already makes: a field that is not carried cannot be forgotten later, it is already gone, and a required prop cannot be skipped by a twenty-first panel. TWO PICKERS HAD WORKED AROUND THE MISSING SLOT by concatenating the emoji into the label, which put a pictograph in the search index and on the trigger; both now pass it as a mark.",
+    checkId: "records-carry-their-face",
+    status: "enforced",
+  },
 ]
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back
@@ -1215,8 +1223,17 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the guest list mirrored from the calendar entry, which the calendar read CAPS — so its length is a ceiling, not a count (R16), and an invitation with sixty people on it would badge fifty. The tab lists them, and a list you can see the end of does not need a number on it. Shown only when the meeting is in a calendar at all.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
+  // TWO VIEWS OF ONE COLLECTION, not two collections. The Steps tab already
+  // carries the exact server count of the version on screen (`shownStepCount`),
+  // and R16's whole sentence is "exactly once" — badging the switch would print
+  // the same number twice on one screen, three lines apart, which is the fault
+  // that law was written about rather than a way of obeying it.
+  "process-detail.list":
+    "the LIST view of a process's steps. It is a view switch inside the Steps tab, not a collection tab: the count belongs to the tab above it and is already shown there, and a number on both would be R16's own failure case (the same total, twice, on one screen).",
+  "process-detail.map":
+    "the MAP view of the same steps, drawn as a route rather than a list. Same collection, same count, same reason as `process-detail.list` — and it writes nothing, so there is not even a second thing to count.",
   "app-detail.overview":
-    "one system's own fields — whose it is, its stage, the four paragraphs of context, who is on it from both sides, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
+    "one system's own fields — whose it is, its stage, the four paragraphs of context, the four prose fields and the address, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
   "app-detail.impact":
     "the hours this app gives back every month and what they are worth at the rate of the role that used to spend them (8.13). An arithmetic over the app's process maps, drilled process by process — the lines are the sum's own working, not a collection of records, and a badge over them would be counting the number of terms in an addition.",
   "app-detail.knowledge":

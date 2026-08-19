@@ -33,6 +33,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -170,7 +171,7 @@ export function SprintFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  apps: { id: string; name: string }[]
+  apps: PickableRecord[]
   /** Set when the form is opened FROM an app's own screen — the app is then a
    * fact about where you are standing rather than a question, so the picker is
    * replaced by the app's name and the value cannot be changed by accident. */
@@ -285,6 +286,10 @@ export function SprintFormDialog({
             value: option.value,
             label: sprintTypeLabel(option, lang),
             hint: option.standardDays === null ? undefined : `${option.standardDays} days`,
+            // The glyph was ON this object the whole time and stopped one line
+            // short of the picker (R35) — the sprints screen draws it, the
+            // dialog that chooses the same type drew a word.
+            mark: option.mark,
           }))}
           emptyOption={{ value: NONE, label: t("Not said") }}
           placeholder={t("Not said")}
@@ -327,7 +332,7 @@ export function SprintFormDialog({
             id="sprint-app"
             value={values.appId || NONE}
             onChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
-            options={apps.map((a) => ({ value: a.id, label: a.name }))}
+            options={apps.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             emptyOption={{ value: NONE, label: t("No app yet") }}
             placeholder={t("No app yet")}
             searchPlaceholder={t("Search apps…")}

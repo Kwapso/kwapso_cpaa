@@ -83,6 +83,7 @@ export function HelpFormDialog({
   onOpenChange,
   onSubmit,
   helpTypeOptions,
+  typeMarks,
   fixedApp,
   initial,
   draftKey,
@@ -99,6 +100,11 @@ export function HelpFormDialog({
   }) => Promise<void>
   /** The team's active "Ticket type" dropdown values. */
   helpTypeOptions: string[]
+  /** THE GLYPH BESIDE EACH WORD (R35). A map rather than richer options,
+   * because the words come from the door and the marks come from the team's
+   * own vocabulary cache — two reads the screen already holds, and joining
+   * them here would make the dialog fetch. */
+  typeMarks?: Map<string, string>
   /** Set when the form is opened FROM an app's own screen — the system the
    * request is about is then a fact about where you are standing rather than a
    * question, so the picker is replaced by its name. Separate from `initial`,
@@ -230,7 +236,7 @@ export function HelpFormDialog({
           id="help-type"
           value={values.helpType}
           onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
-          options={helpTypeOptions.map((v) => ({ value: v, label: v }))}
+          options={helpTypeOptions.map((v) => ({ value: v, label: v, mark: typeMarks?.get(v) ?? null }))}
           emptyOption={{ value: NONE, label: t("No type") }}
           placeholder={t("Choose a type (optional)")}
           searchPlaceholder={t("Search types…")}

@@ -24,6 +24,7 @@ const portal: AccountScope = {
   kind: "portal",
   personAccountId: "PERSON",
   appRestriction: null,
+  appIds: null,
   roots: ["BERGMAN"],
   currentAccountId: "BERGMAN",
   accountIds: ["BERGMAN", "BERGMAN_SUB", "PERSON"],

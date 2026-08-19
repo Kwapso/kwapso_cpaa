@@ -25,6 +25,7 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
+import { RecordMark } from "@shared/web/record-mark"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
@@ -49,6 +50,8 @@ function shapeProcessesList(processes: ProcessSummary[]) {
   return {
     rows: processes.map((p) => ({
       id: p.id,
+      // The system it runs inside, as a picture (R35).
+      mark: <RecordMark name={p.appName ?? p.name} />,
       // Archived maps stay visible (archive-never-delete), flagged like retired
       // roles and articles are.
       name: p.active ? p.name : `${p.name} (archived)`,

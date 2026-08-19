@@ -41,6 +41,8 @@ import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue } from "@shared/types"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
+import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue, safeSrc } from "@shared/web/rich-text"
 import { fileToDataUrl } from "@/lib/image"
@@ -163,10 +165,10 @@ export function AppFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  accounts: { id: string; name: string }[]
+  accounts: PickableRecord[]
   /** the team, for the "who is on it" list (8.10). Every member is offerable —
    * staffing is not a permission, it is a rota. */
-  members: { id: string; name: string }[]
+  members: PickablePerson[]
   /** Present = editing an existing app. The ACCOUNT picker disappears in that
    * mode rather than being disabled: whose system it is was decided once, there
    * is no door to change it, and a greyed-out control that can never be used is
@@ -331,7 +333,7 @@ export function AppFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term, { type: "entity" })}
           searchKey={pickerKey("companies", teamId)}
-          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          options={accounts.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
           placeholder={t("One of ours")}
           searchPlaceholder={t("Search companies…")}
           emptyText={t("No company matched.")}
@@ -347,10 +349,12 @@ export function AppFormDialog({
           id="app-stage"
           value={values.stage}
           onChange={(v) => setValues((s) => ({ ...s, stage: v }))}
-          options={stages.map((s) => ({
-            value: s.value,
-            label: s.mark ? `${s.mark} ${t(s.value)}` : t(s.value),
-          }))}
+          // THE GLYPH IN THE SLOT, not in the sentence (R35). It used to be
+          // concatenated into the label — `${mark} ${word}` — which is a
+          // pictograph inside a sentence, the one shape UI-CONVENTIONS §5
+          // refuses, and it also meant the trigger and the search index both
+          // carried an emoji nobody typed.
+          options={stages.map((s) => ({ value: s.value, label: t(s.value), mark: s.mark }))}
           placeholder={t("Not said")}
           searchPlaceholder={t("Search stages…")}
           emptyText={t("Nothing matched.")}
@@ -457,7 +461,7 @@ export function AppFormDialog({
             onChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
             options={members
               .filter((m) => values.staffUserIds.includes(m.id))
-              .map((m) => ({ value: m.id, label: m.name }))}
+              .map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
             emptyOption={{ value: NOBODY, label: t("Nobody yet") }}
             placeholder={t("Nobody yet")}
             searchPlaceholder={t("Search members…")}

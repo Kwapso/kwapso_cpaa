@@ -18,7 +18,7 @@
 // (WORK_LOG_TARGETS in lib/work-logs.ts) rather than here, because that is the
 // door somebody would have to get past.
 
-import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
+import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
@@ -315,6 +315,9 @@ export async function clientSprints(
   scope: AccountScope
 ): Promise<ClientSprint[]> {
   const fence = accountScopeClause(scope, "sp.account_id")
+  // A restricted client sees the blocks of work on THEIR systems. A sprint with
+  // no app is company-wide and stays.
+  const apps = appScopeClause(scope, "sp.app_id")
   const rows = await d1Query<{
     ref: string | null
     name: string
@@ -333,9 +336,9 @@ export async function clientSprints(
        (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id) AS story_count,
        (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id AND s.status = 'done') AS done_story_count
      FROM sprints sp
-     WHERE sp.deactivated_at IS NULL${fence.sql ? ` AND ${fence.sql}` : ""}
+     WHERE sp.deactivated_at IS NULL${fence.sql ? ` AND ${fence.sql}` : ""}${apps.sql ? ` AND (sp.app_id IS NULL OR ${apps.sql})` : ""}
      ORDER BY sp.starts_on DESC, sp.id DESC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
-    fence.params
+    [...fence.params, ...apps.params]
   )
   return rows.map((r) => ({
     ref: r.ref,

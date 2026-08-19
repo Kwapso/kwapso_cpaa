@@ -13,7 +13,7 @@
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { TASK_VIEWS, type HelpTicket, type TaskViewName } from "@shared/types"
+import { TASK_VIEWS, type HelpTicket, type Meeting, type TaskViewName } from "@shared/types"
 import { RECORD_CHILDREN } from "@shared/record-counts"
 import { cachedKeys, primeCache, readCache } from "@shared/web/store"
 
@@ -70,6 +70,12 @@ export async function loadMore<T>(
 /** List fetchers that prime their collection's `total:` sidecar as they load —
  * shared by the screen reads (use-screen-data) and reconnect catch-up below, so
  * a total can never go stale while its list is fresh. */
+/** HOW MANY PAGES ONE MONTH OF THE DIARY MAY COST. Five, which at the door's
+ * page size is far past any real month — August 2026, the busiest in the test
+ * data, is 61 meetings and fits in two. It exists so a runaway import cannot
+ * turn one calendar square into a hundred requests. */
+const CALENDAR_MONTH_PAGES = 5
+
 export const listFetch = {
   roles: (teamId: string) =>
     tenancy.roles().then((r) => {
@@ -244,6 +250,25 @@ export const listFetch = {
       primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
       return r.meetings
     }),
+  /** ONE MONTH, WHOLE — every meeting in it, not the first page of it.
+   *
+   * The door pages, and a month can exceed one page (August 2026 holds 61), so
+   * this follows the cursor until the month is complete. Bounded at
+   * CALENDAR_MONTH_PAGES: a month past that is not a diary, it is an import
+   * gone wrong, and drawing 500 chips in a grid would help nobody. What it
+   * cannot show it does not pretend to — the count above the calendar is the
+   * door's own and stays honest either way. */
+  meetingsMonth: async (_teamId: string, month: string) => {
+    const rows: Meeting[] = []
+    let cursor: string | null = null
+    for (let page = 0; page < CALENDAR_MONTH_PAGES; page++) {
+      const r = await contentApi.meetings({ view: "all", month, cursor })
+      rows.push(...r.meetings)
+      cursor = r.nextCursor ?? null
+      if (!cursor) break
+    }
+    return rows
+  },
   // Sprints are BOUNDED, not paged (a block of sold work grows at the speed of
   // contracts), so there is no cursor sidecar to prime — just the exact total.
   sprints: (teamId: string) =>
@@ -338,6 +363,24 @@ export type MeetingListView = "week"
  * drops and re-reads on any meetings ping, so it stays live (R15). */
 export function meetingsKey(teamId: string, view?: MeetingListView): string {
   return view === "week" ? `meetings-week:${teamId}` : `meetings:${teamId}`
+}
+
+/** ONE MONTH OF THE DIARY, for the calendar grid and its agenda.
+ *
+ * Its own key, under the `meetings-` prefix the registry already slices on, so a
+ * meeting that moves patches the month a person is looking at without anything
+ * new being registered (R15).
+ *
+ * WHY A MONTH IS ITS OWN READ. The diary is ordered by start time DESCENDING and
+ * it PAGES, so "the newest fifty" is the furthest-out FUTURE. On 19 Aug 2026 that
+ * page ran from June 2027 to August 2027, while the month the calendar was
+ * DRAWING — August 2026 — held 61 meetings it had never asked for. The grid and
+ * the agenda both showed an empty month over a badge reading 436. The week view
+ * had exactly this fault and was fixed on its own; the calendar reads the same
+ * page and was not, which is why this comment names the shape rather than the
+ * instance. */
+export function meetingsMonthKey(teamId: string, month: string): string {
+  return `meetings-month:${teamId}:${month}`
 }
 
 /** WHICH OF ONE MEETING'S GUESTS WE KNOW — its own key because it is its own

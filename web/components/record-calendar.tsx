@@ -197,6 +197,7 @@ export function RecordCalendar({
   emptyText,
   unloaded,
   maxPerDay = 3,
+  onMonthChange,
 }: {
   /** every record with a date, in any order — the grid buckets them itself */
   entries: CalendarEntry[]
@@ -214,6 +215,17 @@ export function RecordCalendar({
   unloaded?: React.ReactNode
   /** how many entries a square shows before it collapses to "+N more" */
   maxPerDay?: number
+  /** WHICH MONTH IS ON SCREEN, told to the host as `YYYY-MM`, on mount and on
+   * every move.
+   *
+   * The calendar owns the month — a person moves it with the arrows, and that is
+   * the right place for it. But a screen over a PAGED collection cannot answer
+   * for a month it was never given: the diary pages newest-first, so the rows in
+   * hand are the furthest-out future and the month being drawn is usually not
+   * among them. Without this, the grid renders whatever happened to be loaded and
+   * calls the rest an empty month. So the calendar says what it is showing, and
+   * the screen goes and gets it. */
+  onMonthChange?: (month: string) => void
 }) {
   const t = useT()
   const isPhone = useIsPhone()
@@ -222,6 +234,12 @@ export function RecordCalendar({
   // The moment somebody picks, their pick wins and stops moving under them.
   const [picked, setPicked] = React.useState<Mode | null>(null)
   const [month, setMonth] = React.useState(() => startOfMonth(new Date()))
+  // Told on mount as well as on every move: the first month a person sees is a
+  // month somebody has to fetch, and it is the one they see most often.
+  const monthTag = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`
+  React.useEffect(() => {
+    onMonthChange?.(monthTag)
+  }, [monthTag, onMonthChange])
   // Which day the "+N more" control opened, or null. One piece of state: the
   // dialog IS the overflow, so there is no second way to be looking at a day.
   const [openDay, setOpenDay] = React.useState<string | null>(null)

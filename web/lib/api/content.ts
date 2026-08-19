@@ -696,6 +696,10 @@ export const content = {
       appId?: string
       /** why we met — the meeting purpose's own id */
       purposeId?: string
+      /** ONE CALENDAR MONTH, `YYYY-MM` — what a calendar grid is actually asking.
+       * Not a narrowing of the loaded page: the diary pages newest-first, so the
+       * month on screen is very often not in the page in hand at all. */
+      month?: string
       /** where it stands: scheduled, held, or called off */
       status?: string
       /** WHAT ORDER — a name out of the door's own MEETING_SORTS, with `dir`
