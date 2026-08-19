@@ -23,7 +23,7 @@
 import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
 import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
-import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
+import { d1Query, likeLiteral, type D1Rest, sqlString } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
@@ -79,7 +79,35 @@ async function insertRow(
 /** THE APPS THIS CALLER MAY SEE, AS A QUESTION — the account fence plus the
  * optional narrowing to one client, written once so the rows and the count over
  * them cannot be asked differently (R16). */
-function appsWhere(scope: AccountScope, opts: { accountId?: string }): { sql: string; params: string[] } {
+/** IS THIS APP SOMEBODY ELSE'S? The staffing fence, as SQL.
+ *
+ * The owner's ruling (19 Aug 2026) was to fence the agency side too, and the
+ * naive reading of that would have emptied the screen: on staging, 28 live apps
+ * and exactly TWO with anybody staffed on them. A fence that hides 26 of 28
+ * systems on the day it ships is a wall, and a wall gets switched off.
+ *
+ * So the rule is: an app WITH staff belongs to its staff (plus an admin). An app
+ * with NOBODY on it is not a secret, it is unassigned — it stays visible, and
+ * the moment somebody is put on it the fence closes around it. That degrades in
+ * the right direction: the more the rota is filled in, the tighter it gets, and
+ * nothing has to be back-filled first for the app to keep working.
+ *
+ * A CLIENT LOGIN IS NOT SUBJECT TO IT. The account fence has already decided
+ * which apps they may see and every one is their own system; staffing is OUR
+ * rota, and applying it to them would hide a client's own app because none of
+ * our people had been assigned yet. */
+function staffedFence(guard: MemberGuard, scope: AccountScope, admin: boolean): string {
+  if (scope.kind === "portal" || admin) return ""
+  return `(NOT EXISTS (SELECT 1 FROM app_staff st WHERE st.app_id = apps.id AND st.deactivated_at IS NULL)
+    OR EXISTS (SELECT 1 FROM app_staff st WHERE st.app_id = apps.id AND st.user_id = ${sqlString(guard.userId)} AND st.deactivated_at IS NULL))`
+}
+
+function appsWhere(
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: { accountId?: string },
+  admin: boolean
+): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "account_id")
     // AND THE APP FENCE (SCOPE ch.03 "per-person restriction"). A client login
     // may be narrowed to named apps; a staff caller and an unrestricted client
@@ -87,7 +115,7 @@ function appsWhere(scope: AccountScope, opts: { accountId?: string }): { sql: st
     // beside the account fence and never instead of it — see appScopeClause.
   const apps = appScopeClause(scope, "id")
   return {
-    sql: where([fence.sql, apps.sql, opts.accountId ? "account_id = ?" : undefined]),
+    sql: where([fence.sql, apps.sql, staffedFence(guard, scope, admin), opts.accountId ? "account_id = ?" : undefined]),
     params: opts.accountId
       ? [...fence.params, ...apps.params, opts.accountId]
       : [...fence.params, ...apps.params],
@@ -104,17 +132,20 @@ function appsWhere(scope: AccountScope, opts: { accountId?: string }): { sql: st
  * the tab is opened (shared/record-counts.ts) — the whole point being not to
  * pull the rows to learn how many there are.
  *
- * IT DOES NOT SUBTRACT RECORD-LEVEL VISIBILITY, and that is deliberate rather
- * than an oversight: `listApps` withholds four context FIELDS from a reader who
- * is not staffed on an app (8.11), and everyone still SEES the app. The row is
- * in the list either way, so the count over the list is the count. */
+ * IT SUBTRACTS RECORD-LEVEL VISIBILITY SINCE 19 Aug 2026, and the note it
+ * replaces is worth keeping: it used to say the opposite, because staffing was a
+ * FIELD redaction — everyone saw every app, and a non-staffed reader lost four
+ * context fields off the row. The owner asked for the agency side to be fenced
+ * as well, so the row itself can now be absent, and a count that ignored that
+ * would advertise apps the list refuses to show (R16's own sentence). Same
+ * WHERE, therefore, and it has to stay the same WHERE. */
 export async function countApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   opts: { accountId?: string } = {}
 ): Promise<number> {
-  const q = appsWhere(scope, opts)
+  const q = appsWhere(guard, scope, opts, await isAdmin(cfg, guard))
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
@@ -133,7 +164,10 @@ export async function listApps(
   scope: AccountScope,
   opts: { accountId?: string } = {}
 ): Promise<{ rows: AppRow[]; total: number }> {
-  const { sql, params } = appsWhere(scope, opts)
+  // The admin answer is needed BEFORE the query, because it decides the WHERE
+  // rather than only what is stripped off a row afterwards.
+  const admin = scope.kind === "portal" ? true : await isAdmin(cfg, guard)
+  const { sql, params } = appsWhere(guard, scope, opts, admin)
   const [rows, counted] = await Promise.all([
     d1Query<{
       id: string
@@ -184,11 +218,14 @@ export async function listApps(
   // already decided which apps they may see at all, and every one of those is
   // their own system; staffing is OUR rota, and applying it to them would hide a
   // client's own app from them because none of our people had been assigned yet.
-  const [openAll, staffedIds, people] = await Promise.all([
-    scope.kind === "portal" ? Promise.resolve(true) : isAdmin(cfg, guard),
+  // `admin` was already resolved above, for the WHERE — reused rather than
+  // asked twice, and reusing it is what guarantees the row filter and the field
+  // redaction can never disagree about who this caller is.
+  const [staffedIds, people] = await Promise.all([
     scope.kind === "portal" ? Promise.resolve(new Set<string>()) : staffedAppIds(cfg, guard),
     appPeople(cfg, guard),
   ])
+  const openAll = admin
   return {
     rows: rows.map((r) => {
       const canOpen = openAll || staffedIds.has(r.id)
@@ -210,7 +247,18 @@ export async function listApps(
         // It is withheld HERE, on the row, rather than at the three call sites — a
         // redaction you have to remember is one somebody forgets (the same argument
         // toAccount makes one table over, and the reason R24 exists).
-        toolCostCentsPerMonth: scope.kind === "portal" ? null : r.tool_cost_cents_per_month,
+        // WHAT IT COSTS US TO RUN, and it is now the same answer as the URL and
+        // the prose: only for somebody on this app, or an admin (owner, 19 Aug
+        // 2026 — "yes of course" to fencing the agency side).
+        //
+        // It was withheld from a CLIENT and sent to every single staff member
+        // holding `processes:read`, which is the wrong half: a client seeing our
+        // hosting bill is the obvious leak, and a whole agency seeing the running
+        // cost of twenty-eight systems they are not on is the quiet one. It is
+        // the number the margin is computed from (R24's neighbourhood), and R24's
+        // own argument is that an internal figure travels further than anybody
+        // expects unless something stops it.
+        toolCostCentsPerMonth: scope.kind === "portal" || !canOpen ? null : r.tool_cost_cents_per_month,
         // The four context fields go to a client login as well. They are the
         // agency's description of the client's OWN system and the situation it was
         // built into — the same material the portal's value screen already names

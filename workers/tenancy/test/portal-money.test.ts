@@ -169,14 +169,33 @@ describe("the value read: what a client sees, and what they never do", () => {
 
   // WHAT AN APP COSTS US is on a row a client CAN read, which is why it is
   // withheld on the row rather than at the call site.
-  it("the app list a client reads carries no tool cost", async () => {
+  // WHAT AN APP COSTS US TO RUN, and who may read it. The rule CHANGED on 19 Aug
+  // 2026 and this test changed with it: the cost used to be withheld from a
+  // client and sent to every staff member holding `processes:read`, which is the
+  // wrong half of the problem. A client seeing our hosting bill is the obvious
+  // leak; a whole agency seeing the running cost of twenty-eight systems nobody
+  // put them on is the quiet one, and it is the number the margin is computed
+  // from. It is now the same answer as the URL and the prose fields: the people
+  // on this app, plus an admin.
+  it("the tool cost reaches the people on the app, and nobody else", async () => {
     const { status, text } = await call(req("GET /api/tenancy/apps"), IDS.victimUser)
     expect(status).toBe(200)
-    expect(text).toContain(IDS.victimApp) // they see their own system…
+    expect(text).toContain(IDS.victimApp) // a client still sees their own system…
     expect(text).toContain('"toolCostCentsPerMonth":null') // …and not what it costs us
     expect(text).not.toContain("42000")
 
-    const staff = await call(req("GET /api/tenancy/apps"), IDS.staffUser)
-    expect(staff.text).toContain("42000")
+    // A STAFF MEMBER WHO IS NOT ON IT gets the same null. This is the half that
+    // is new, and the half a field redaction cannot be trusted to keep on its
+    // own — it lives in a `.map()`, which is exactly the shape a refactor drops.
+    const off = await call(req("GET /api/tenancy/apps"), IDS.staffUser)
+    expect(off.text, "a colleague who is not on this app reads no running cost").not.toContain("42000")
+
+    // …and the person actually on it does.
+    db().exec(
+      `INSERT INTO app_staff (id, app_id, user_id, is_lead, created_at)
+       VALUES ('AS_TEST', '${IDS.victimApp}', '${IDS.staffUser}', 0, '2026-01-01');`
+    )
+    const on = await call(req("GET /api/tenancy/apps"), IDS.staffUser)
+    expect(on.text, "the people on an app read what it costs to run").toContain("42000")
   })
 })
