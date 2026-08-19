@@ -665,8 +665,27 @@ export async function accessTokenFor(
   await d1ExecScript(
     cfg,
     guard.databaseId,
+    // `last_used_at` MOVES HERE TOO, and not only on a write.
+    //
+    // It was stamped by `recordGoogleAct` alone — which every WRITE door calls
+    // and no read does — so it meant "last time kwapso put something INTO
+    // Google". The settings card renders it as "Last used…" or "Never used
+    // yet", and a person reads that as "is this connection working?".
+    //
+    // So a Chat connection that had answered several hundred reads in one night
+    // sat on the screen saying "Never used yet", which is indistinguishable from
+    // one that has never worked. On the morning of 20 Aug 2026 that mattered
+    // more than usual: three connections really WERE dead, and the one that was
+    // fine looked exactly the same. The whole lesson of that night was that a
+    // screen telling a comfortable lie about a connection costs days.
+    //
+    // Here rather than on every read, because this write already exists — a
+    // refresh happens about hourly under use and stamps nothing extra to do it.
+    // The sentence it now tells is "the last time this connection successfully
+    // produced a token", which is what the card was always trying to say.
     `UPDATE google_connections SET access_token = ${sqlString(await sealToken(env, tokens.accessToken))},
-        access_expires_at = ${sqlString(tokens.expiresAt)}, last_error = NULL
+        access_expires_at = ${sqlString(tokens.expiresAt)}, last_error = NULL,
+        last_used_at = ${sqlString(new Date().toISOString())}
       WHERE id = ${sqlString(row.id)};`
   )
   // THE STORED `scopes` IS WHAT CONSENT GRANTED, and it is not overwritten here
