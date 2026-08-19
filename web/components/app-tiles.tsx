@@ -20,7 +20,7 @@
 // the same tiles for one client's systems.
 
 import * as React from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Lock } from "lucide-react"
 
 import { softNavigate } from "@/lib/nav"
 import { safeHref } from "@shared/web/rich-text"
@@ -96,7 +96,20 @@ export function AppTiles({
                 {app.active ? client : `${client} · ${t("archived")}`}
               </span>
             </span>
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            {/* THE CHEVRON IS A PROMISE THAT THIS OPENS. On an app the reader is
+                not on, it opens onto a refusal — so the tile says so before the
+                click rather than after it. Four bugs this month were controls
+                that looked like they worked and did not; this is the same shape
+                caught early. An admin and anybody on the app see the chevron,
+                which is nearly everyone, so the lock is rare by design. */}
+            {app.canOpen ? (
+              <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            ) : (
+              <Lock
+                className="text-muted-foreground size-4 shrink-0"
+                aria-label={t("You're not on this app")}
+              />
+            )}
           </a>
         )
       })}
