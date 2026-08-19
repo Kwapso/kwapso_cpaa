@@ -52,8 +52,10 @@ const MAY_INJECT: Record<string, string> = {
     "THE seam. Both branches produce known-safe HTML: sanitizeRichHtml (parse detached → allow-list) for a body with tags, toHtml (escape-first markdown) for one without.",
   "web/components/agent-markdown.tsx":
     "the assistant's own reply, through the same escape-first toHtml — the text is escaped before any markup is added, so its output is safe by construction",
-  "shared/web/splash-screen.tsx":
-    "three module constants (the splash CSS, its markup and its script) written in this repo — no value from a request or a row reaches them",
+  "shared/web/mark-runtime.tsx":
+    "two module constants (the mark's CSS and its animator script) written in this repo — no value from a request or a row reaches them",
+  "shared/web/mark-loader.tsx":
+    "the mark's own markup, a module constant built from module constants (shared/web/splash.ts → splashInner). It is server-rendered on purpose: an empty box in the exported HTML is a blank screen until the bundle lands.",
   "shared/web/brand-theme.tsx":
     "a CSS string built from shared/brand.ts, a build-time constant",
 }

@@ -562,9 +562,9 @@ export function AppShell({
  * you are about to be sent to onboarding instead. It drew a sidebar and a list
  * for people who were on their way somewhere else.
  *
- * So the brief first load shows what the boot screen a second ago was showing,
- * still turning. Only the FIRST screen reaches this — the session is cached
- * after that. */
+ * So the brief first load shows the mark, which IS the boot screen — the same
+ * element the parser painted, still turning, never restarted. Only the FIRST
+ * screen reaches this; the session is cached after that. */
 export function ShellLoading() {
   const t = useT()
   return <MarkLoader label={t("Loading…")} />

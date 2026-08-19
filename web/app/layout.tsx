@@ -4,8 +4,8 @@ import { AmbientBackground } from "@kwapso/ui/registry/primitives/ambient-backgr
 import { Toaster } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ThemeProvider } from "@kwapso/ui/registry/tokens/theme-provider"
 import { BrandTheme } from "@shared/web/brand-theme"
+import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"
-import { SplashScreen } from "@shared/web/splash-screen"
 import { AgentHost } from "@/components/agent-host"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ErrorReporter } from "@/components/error-reporter"
@@ -31,10 +31,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-[100svh] antialiased">
-        {/* FIRST IN THE BODY, and that is the point: the parser paints it before
-         * it has read the rest of the document, let alone fetched the bundle. It
-         * clears itself after ~3.7s (or on a tap) — shared/web/splash.ts. */}
-        <SplashScreen />
+        {/* The mark's stylesheet and its animator, FIRST in the body: the
+         * animator has to be published before the parser reaches the loader
+         * further down, so the mark is already turning when the bundle is still
+         * being fetched. There is no overlay here any more and nothing to clear
+         * — the loader is the page's own content. shared/web/splash.ts. */}
+        <MarkRuntime />
         <BrandTheme />
         {/* defaultTheme="system" = follow the device's day/night setting; a
          * ModeToggle (in the app bar + on the auth screens) lets people

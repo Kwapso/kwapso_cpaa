@@ -103,9 +103,12 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
 
   // THE APP IS STARTING. Not one screen's own wait — nothing is drawn yet and
   // nothing is known yet, including whether there is anything here for this
-  // person — so it wears the mark the front door opened on rather than a spinner
-  // in an empty page. The mid-switch wait further down is the opposite case and
-  // stays a skeleton: the page IS drawn, and what is coming has a shape.
+  // person — so it wears the mark the front door opens on rather than a spinner
+  // in an empty page. It is the SAME animation, not a second one wearing the
+  // same picture, and it is the one place that proves it: signing in happens
+  // long after a cold boot is over, so this wait has to stand up on its own.
+  // The mid-switch wait further down is the opposite case and stays a skeleton:
+  // the page IS drawn, and what is coming has a shape.
   if (session.state === "loading" || session.state === "signed-out")
     return <MarkLoader label={t("Loading…")} />
 
