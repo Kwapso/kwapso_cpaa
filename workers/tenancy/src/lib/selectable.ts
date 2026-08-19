@@ -16,6 +16,7 @@ import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import type { SelectableValue } from "@shared/types"
+import { storedWordColumns } from "@shared/selectable-homes"
 import { GuardError, type MemberGuard } from "./permissions"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 
@@ -140,7 +141,26 @@ export async function createSelectable(
   return id
 }
 
-/** Rename a value (its type/group stays). Needs a non-empty value. */
+/** Rename a value (its type/group stays), AND CARRY THE RECORDS WITH IT.
+ *
+ * A record stores its dropdown value as the WORD — `help.help_type` holds
+ * `'Request'` on 107 tickets — so the spelling is the only thing joining a record
+ * to its vocabulary. Renaming the row alone left every one of those records
+ * behind: still saying the old word, their tab gone, their mark gone, and a new
+ * tab beside them counting nothing.
+ *
+ * So the rename rewrites them, in the SAME script, derived from
+ * `VOCABULARY_HOMES` rather than a list kept here — a group whose home is
+ * undeclared fails a check rather than silently rewriting nothing (R6's shape:
+ * the map is the source, the code reads it).
+ *
+ * A group of `"labels"` rewrites nothing and is not a gap: the code owns those
+ * states and the row only supplies the word a person reads, which was always a
+ * lookup. Same for a group that backs nothing.
+ *
+ * The mark needs no clause at all, and never did — it lives only on this row and
+ * is read by the word, so changing an emoji already reached every record. That
+ * asymmetry is exactly what made the fault hard to see. */
 export async function updateSelectable(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -162,11 +182,38 @@ export async function updateSelectable(
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
 
+  // A RENAME MAY NOT MERGE TWO WORDS INTO ONE. `createSelectable` has always
+  // refused a duplicate and this did not, so renaming "Issue" to "Request" left
+  // the group holding two live rows with the same value — two tabs, two marks,
+  // one word. It matters more now that the rename moves records: the merge would
+  // be silent AND permanent.
+  if (v !== row.value) {
+    const clash = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      "SELECT id FROM selectable_data WHERE type = ? AND value = ? AND deactivated_at IS NULL AND id <> ?",
+      [row.type, v, id]
+    )
+    if (clash[0]) throw new GuardError(409, "duplicate", `"${v}" is already in ${row.type}.`)
+  }
+
   const now = new Date().toISOString()
+  // THE RECORDS THAT STORED THE OLD WORD, in the same script as the rename, so a
+  // reader can never catch the vocabulary and the records disagreeing. Only when
+  // the word actually changed — a mark-only edit rewrites nothing.
+  const carry =
+    v === row.value
+      ? ""
+      : storedWordColumns(row.type)
+          .map(
+            (h) =>
+              `\nUPDATE ${h.table} SET ${h.column} = ${sqlString(v)} WHERE ${h.column} = ${sqlString(row.value)};`
+          )
+          .join("")
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE selectable_data SET value = ${sqlString(v)}, ${mark === undefined ? "" : `mark = ${sqlString(mark?.trim() || null)}, `}updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE selectable_data SET value = ${sqlString(v)}, ${mark === undefined ? "" : `mark = ${sqlString(mark?.trim() || null)}, `}updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};${carry}`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Dropdown value edited",
