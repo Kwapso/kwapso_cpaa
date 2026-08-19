@@ -35,7 +35,7 @@
 // work and never which staff member is doing it, and the cheapest way to keep a
 // promise about a field is not to read the column.
 
-import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
+import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import type { MemberGuard } from "@shared/workers/gating"
@@ -109,7 +109,12 @@ function clientWhere(scope: AccountScope): { sql: string; params: string[] } {
   // Staff get no clause at all (they are meant to see every account); a client
   // login gets the IN list over the world they are standing in.
   if (fence.sql) where.push(fence.sql)
-  return { sql: ` WHERE ${where.join(" AND ")}`, params: fence.params }
+  // AND THE APP FENCE, for a client restricted to named systems. A deliverable
+  // with no app stays visible to them: a handover doc filed against the account
+  // rather than a system is the company's, not one system's.
+  const apps = appScopeClause(scope, "d.app_id")
+  if (apps.sql) where.push(`(d.app_id IS NULL OR ${apps.sql})`)
+  return { sql: ` WHERE ${where.join(" AND ")}`, params: [...fence.params, ...apps.params] }
 }
 
 /** Everything shared with the company this client is standing in, newest first.

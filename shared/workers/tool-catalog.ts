@@ -494,7 +494,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "grant_portal_access",
     summary:
-      "Give someone at an account a login to the client portal. `accountId` is the account they'll see; `personAccountId` is the person, picked off that account's own records, the door reads their email from there, so it never takes a typed-in address. They must have signed in here at least once, and a member of your own team is refused.",
+      "Give someone at an account a login to the client portal. `accountId` is the account they'll see; `personAccountId` is the person, picked off that account's own records, the door reads their email from there, so it never takes a typed-in address. They must have signed in here at least once, and a member of your own team is refused. `appRestriction` narrows them to named systems INSIDE that account: a comma-separated list of app ids from `list_apps`, each of which must belong to this client or the grant is refused. Leave it out for their whole company's world, which is the usual case.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/portal-users",
     schema: obj({ accountId: S, personAccountId: S, appRestriction: S }, ["accountId", "personAccountId"]),
     buildBody: (i) => ({

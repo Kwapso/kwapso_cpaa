@@ -17,7 +17,7 @@
 //     until the agent worker exists — a ticket always opens regardless.
 
 import { listGaps, triageGaps } from "@shared/triage-readiness"
-import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
+import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -316,6 +316,11 @@ export function ticketFence(
   const col = (name: string) => (table ? `${table}.${name}` : name)
   const parts = [
     accountScopeClause(scope, col("account_id")),
+    // A RESTRICTED CLIENT SEES ONLY THEIR APPS' TICKETS. A ticket with no app is
+    // left OUT for them rather than in: "everything on the two systems you look
+    // after" is the sentence the restriction makes, and a request nobody has
+    // filed against a system yet is not on one of them.
+    appScopeClause(scope, col("app_id")),
     tab === "mine" ? mineClause(guard, scope, col) : { sql: "", params: [] },
   ].filter((p) => p.sql)
   return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
