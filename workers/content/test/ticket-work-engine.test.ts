@@ -175,8 +175,15 @@ describe("the seven states", () => {
   // CHECKLIST 5.11: reading a request is the one judgement nothing can infer, and
   // it must never drag a started one backwards.
   it("marks a ticket triaged once, and never pulls a started one back", async () => {
+    // COMPLETE, because triage refuses anything less — see the gate's own test.
     const id = (await ticketIds(
-      await call(IDS.staffUser, "POST /api/content/help", { description: "Somebody read this" })
+      await call(IDS.staffUser, "POST /api/content/help", {
+        description: "Somebody read this",
+        helpType: "Question",
+        accountId: IDS.victimAccount,
+        appId: IDS.victimApp,
+        raisedByContactId: IDS.victimPerson,
+      })
     ))[0]
     expect((await call(IDS.staffUser, "POST /api/content/help/triage-read", { id })).status).toBe(200)
     expect(row(id).status).toBe("triaged")

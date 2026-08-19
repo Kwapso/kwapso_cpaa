@@ -38,7 +38,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
-import { AlarmClock, MailOpen } from "lucide-react"
+import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Send } from "lucide-react"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
@@ -53,6 +53,10 @@ import { tenancy } from "@/lib/api/tenancy"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { shapeHelpList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi } from "@/lib/api"
+import type { TriageWaiting } from "@/lib/api/content"
+import type { TriageGap } from "@shared/triage-readiness"
+import { HelpFormDialog } from "@/components/help-form-dialog"
+import { TriageReplyDialog } from "@/components/triage-reply-dialog"
 import {
   helpFacetFilter,
   helpFacetKey,
@@ -209,7 +213,13 @@ export function TicketsCollection({
         </div>
 
         {facet === TRIAGE ? (
-          <TriageQueue teamId={teamId} canTriage={can("help", "edit")} />
+          <TriageQueue
+            teamId={teamId}
+            canTriage={can("help", "edit")}
+            canEdit={can("help", "edit")}
+            helpTypeOptions={helpTypeOptions}
+            onOpen={(id) => onIntent({ kind: "open", module: "help", id })}
+          />
         ) : scopedQ.error ? (
           <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
         ) : scopedQ.data === undefined ? (
@@ -328,10 +338,35 @@ export function TicketsCollection({
  *
  * "Mark it read" is the one judgement in the whole ticket lifecycle that nothing
  * can infer. Every stage after it happens by itself. */
-function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean }) {
+function TriageQueue({
+  teamId,
+  canTriage,
+  canEdit,
+  helpTypeOptions,
+  onOpen,
+}: {
+  teamId: string
+  canTriage: boolean
+  canEdit: boolean
+  helpTypeOptions: string[]
+  onOpen: (id: string) => void
+}) {
   const t = useT()
   const triageQ = useCached(triageKey(teamId), () => contentApi.triage())
   const [busy, setBusy] = React.useState<string | null>(null)
+  const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
+  const [replying, setReplying] = React.useState<TriageWaiting | null>(null)
+
+  /** WHAT THE ROW IS STILL MISSING, in the reader's own language. The gaps
+   * themselves are decided by the door (shared/triage-readiness.ts) and arrive
+   * as machine words; only the wording is chosen here, because a worker's
+   * strings are outside the translation catalogue and a screen's are not. */
+  const GAP_WORD: Record<TriageGap, string> = {
+    type: t("a ticket type"),
+    client: t("a client"),
+    app: t("an app"),
+    raisedBy: t("who raised it"),
+  }
 
   async function markRead(id: string) {
     setBusy(id)
@@ -345,6 +380,33 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
     } finally {
       setBusy(null)
     }
+  }
+
+  /** Edit the ticket without leaving the queue. The SAME dialog and the SAME
+   * door the ticket's own screen uses — triage was the one place in the app that
+   * could see a request and not change it, which is what made the readiness rule
+   * feel like a wall rather than a step. */
+  async function saveEdit(input: {
+    description: string
+    helpType?: string
+    accountId?: string
+    appId?: string
+    raisedByContactId?: string
+  }) {
+    if (!editing) return
+    await contentApi.updateHelp({ id: editing.id, ...input })
+    invalidate(triageKey(teamId))
+    invalidate(helpKey(teamId, "all"))
+    toast.success(t("Ticket updated."))
+  }
+
+  /** Answer it without leaving the queue. The same door the ticket's own thread
+   * posts through — this is a shorter route to it, not a second one. */
+  async function sendReply(body: string) {
+    if (!replying) return
+    await contentApi.replyHelp(replying.id, body)
+    invalidate(helpKey(teamId, "all"))
+    toast.success(t("Reply sent."))
   }
 
   if (triageQ.data === undefined) return <Skeleton variant="list" lines={3} />
@@ -365,17 +427,66 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
       {view.waiting.map((w) => (
         <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
           <AlarmClock className="text-destructive size-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-sm">
-            {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
-          </span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-sm">
+              {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
+            </span>
+            {/* WHY IT CANNOT MOVE, said on the row. A ticket used to sit here
+                with a button that would fail and no explanation — the owner
+                asked for a pre-triage state, and what was actually missing was
+                never a state but a REASON. */}
+            {w.missing.length > 0 && (
+              <span className="text-muted-foreground block truncate text-xs">
+                {t("Needs {gaps} before it can be triaged", {
+                  gaps: w.missing.map((g) => GAP_WORD[g]).join(", "),
+                })}
+              </span>
+            )}
+          </div>
           <span className="text-muted-foreground text-xs tabular-nums">
             {t("{days} days · {when}", { days: w.days, when: formatRelative(w.createdAt, t) })}
           </span>
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(w)}
+              className="shrink-0 gap-1"
+            >
+              <Pencil className="size-3.5" />
+              {t("Edit")}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setReplying(w)}
+            className="shrink-0 gap-1"
+          >
+            <Send className="size-3.5" />
+            {t("Reply")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpen(w.id)}
+            className="shrink-0 gap-1"
+          >
+            <ArrowUpRight className="size-3.5" />
+            {t("Open")}
+          </Button>
           {canTriage && (
             <Button
               variant="outline"
               size="sm"
-              disabled={busy === w.id}
+              disabled={busy === w.id || w.missing.length > 0}
+              title={
+                w.missing.length > 0
+                  ? t("Needs {gaps} before it can be triaged", {
+                      gaps: w.missing.map((g) => GAP_WORD[g]).join(", "),
+                    })
+                  : undefined
+              }
               onClick={() => void markRead(w.id)}
               className="shrink-0 gap-1"
             >
@@ -385,6 +496,31 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
           )}
         </li>
       ))}
+      <HelpFormDialog
+        open={editing !== null}
+        onOpenChange={(o) => !o && setEditing(null)}
+        draftKey={`help:triage:${editing?.id ?? "none"}`}
+        teamId={teamId}
+        helpTypeOptions={helpTypeOptions}
+        initial={
+          editing
+            ? {
+                description: editing.description,
+                helpType: editing.helpType ?? undefined,
+                accountId: editing.accountId ?? undefined,
+                appId: editing.appId ?? undefined,
+                raisedByContactId: editing.raisedByContactId ?? undefined,
+              }
+            : undefined
+        }
+        onSubmit={saveEdit}
+      />
+      <TriageReplyDialog
+        open={replying !== null}
+        onOpenChange={(o) => !o && setReplying(null)}
+        draftKey={`help:triage-reply:${replying?.id ?? "none"}`}
+        onSubmit={sendReply}
+      />
     </ul>
   )
 }

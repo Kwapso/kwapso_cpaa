@@ -439,11 +439,28 @@ bucket name follows the table, are a deferred hook, see AGENT-MODULES-PLAN.)
 2026-08-11. SCOPE ch.07). The same table, grown into the thing the scope
 describes; there is no second ticket beside it, and there never will be.
 
-- **The five states.** `status` now runs `new` → `triaged` → `in_progress` →
-  `ready` → `resolved`. The two old names moved onto the two that mean the same
-  thing: `open` → `new`, `reopened` → `triaged`. Reopening still happens, a
-  staff member moves a resolved ticket back to `triaged`, it just is not a state
-  of its own any more, and there is deliberately no client-side reopen button.
+- **The seven states.** `status` runs `awaiting_validation` → `new` → `triaged`
+  → `scheduled` → `in_progress` → `ready` → `resolved`. This line said FIVE for a
+  year after two of them shipped, which is the quiet way a document goes wrong:
+  nothing broke, and anybody reading it built on a state machine the code had
+  already left behind. `awaiting_validation` is the client's main stakeholder not
+  having said yes yet (Aurora's ruling: extras, requests and feedback wait;
+  questions and issues go straight in). `scheduled` is stories existing AND at
+  least one of them booked into a sprint — both halves in one read, because
+  either alone is a different and wrong sentence — flipped by itself in
+  `lib/ready-flip` `scheduledFlip`. **SCOPE ch.07 still shows five and calls
+  "planned for sprint 4" a note rather than a state; the code and CHECKLIST 5.3
+  are the current answer, and the figure there is the older one.**
+- **`new` IS THE PRE-TRIAGE STATE** (owner, 19 Aug 2026). A ticket does not leave
+  it until it names a ticket type, a client, an app and who raised it. One rule,
+  `shared/triage-readiness.ts`, refused by `markTriaged` (so the agent and MCP
+  obey it too) and reported field-by-field on the triage row. No `draft` status
+  was added: `new` already meant "raised, nobody has read it", which is the same
+  sentence, and what was missing was never the state but the REASON.
+- The two old names moved onto the two that mean the same thing: `open` → `new`,
+  `reopened` → `triaged`. Reopening still happens, a staff member moves a
+  resolved ticket back to `triaged`, it just is not a state of its own any more,
+  and there is deliberately no client-side reopen button.
 - **`ref`**, the number the client quotes (`BERG-T0412`): the account's own short
   code, a `T`, and a sequence counted PER ACCOUNT. Null when there is nothing to
   build one from (the agency's own tickets carry no account; a client may have no

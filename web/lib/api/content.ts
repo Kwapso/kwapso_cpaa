@@ -11,6 +11,7 @@
 // the DIRECTORY, not one file, so a door added in a new domain file is covered
 // the day it lands.
 
+import type { TriageGap } from "@shared/triage-readiness"
 import type {
   BrandAsset,
   Deliverable,
@@ -148,6 +149,21 @@ function logQuery(filter: LogQuery | undefined, cursor: string | null | undefine
 }
 
 /** Content worker — Tickets, the work engine and the knowledge base. */
+/** ONE WAITING TICKET, as the triage door hands it over. `missing` is the
+ * door's own answer (shared/triage-readiness.ts) rather than the screen's. */
+export type TriageWaiting = {
+  id: string
+  ref: string | null
+  description: string
+  createdAt: string
+  days: number
+  missing: TriageGap[]
+  helpType: string | null
+  accountId: string | null
+  appId: string | null
+  raisedByContactId: string | null
+}
+
 export const content = {
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
@@ -347,7 +363,12 @@ export const content = {
        * `waiting` is empty when they are not. A screen that hid a list it had
        * already been handed would be a curtain rather than a rule. */
       yours: boolean
-      waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
+      /** Each waiting ticket carries WHAT IS STILL MISSING before it may be
+       * triaged, decided by the door through shared/triage-readiness.ts, plus the
+       * four fields themselves so the queue can open an edit form already filled
+       * in. The screen never works the gaps out for itself — it would be a second
+       * opinion about a rule the door enforces. */
+      waiting: TriageWaiting[]
       total: number
     }>(`/api/content/triage${week ? `?week=${enc(week)}` : ""}`),
   setTriageDuty: (userId: string, week?: string) =>

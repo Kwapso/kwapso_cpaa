@@ -11,6 +11,7 @@
 // would turn an internal prompt into a promise we never made. The digest goes to
 // the person on duty; the list is a screen only staff can open.
 
+import { triageGaps, type TriageGap } from "@shared/triage-readiness"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { ulid } from "@shared/workers/id"
@@ -39,8 +40,26 @@ export function weekStart(at: Date): string {
 export type TriageView = {
   /** whose week it is, or null when nobody has been named yet */
   onDuty: { userId: string; userName: string | null; weekStart: string } | null
-  /** the tickets that have been sitting in `new` past the threshold */
-  waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
+  /** the tickets that have been sitting in `new` past the threshold, each
+   * carrying WHAT IS STILL MISSING before it may be triaged (shared/triage-
+   * readiness.ts). The gaps ride the row rather than being worked out on the
+   * screen, because the DOOR refuses by the same function — a queue that drew
+   * its own conclusion could offer a button the door would reject. */
+  waiting: {
+    id: string
+    ref: string | null
+    description: string
+    createdAt: string
+    days: number
+    missing: TriageGap[]
+    /** The four readiness fields themselves, so the queue can open an edit form
+     * already filled in rather than fetching the ticket back one row at a time.
+     * They are read for `missing` anyway — carrying them costs nothing. */
+    helpType: string | null
+    accountId: string | null
+    appId: string | null
+    raisedByContactId: string | null
+  }[]
   /** R16: the exact server count of those, over the same question */
   total: number
   /** IS THIS CALLER THE ONE ON DUTY (CHECKLIST 5.11: "only the person on duty
@@ -82,12 +101,25 @@ export async function needsTriage(
   at: Date
 ): Promise<{ waiting: TriageView["waiting"]; total: number }> {
   const cutoff = new Date(at.getTime() - TRIAGE_AFTER_DAYS * 86_400_000).toISOString()
-  const rows = await d1Query<{ id: string; ref: string | null; description: string; created_at: string }>(
+  const rows = await d1Query<{
+    id: string
+    ref: string | null
+    description: string
+    created_at: string
+    help_type: string | null
+    account_id: string | null
+    app_id: string | null
+    raised_by_contact_id: string | null
+  }>(
     cfg,
     guard.databaseId,
     // `archived_at IS NULL`: a ticket somebody deliberately put away is not one
     // nobody has looked at.
-    `SELECT id, ref, description, created_at FROM help
+    //
+    // The four readiness columns come back with the row so the queue can say
+    // WHY a ticket cannot move. Four more columns on a capped read, not a
+    // second query.
+    `SELECT id, ref, description, created_at, help_type, account_id, app_id, raised_by_contact_id FROM help
       WHERE status = 'new' AND archived_at IS NULL AND created_at < ?
       ORDER BY created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [cutoff]
@@ -105,6 +137,16 @@ export async function needsTriage(
       description: r.description,
       createdAt: r.created_at,
       days: Math.floor((at.getTime() - Date.parse(r.created_at)) / 86_400_000),
+      missing: triageGaps({
+        helpType: r.help_type,
+        accountId: r.account_id,
+        appId: r.app_id,
+        raisedByContactId: r.raised_by_contact_id,
+      }),
+      helpType: r.help_type,
+      accountId: r.account_id,
+      appId: r.app_id,
+      raisedByContactId: r.raised_by_contact_id,
     })),
     total: counted[0]?.n ?? 0,
   }

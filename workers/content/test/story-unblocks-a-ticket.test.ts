@@ -56,9 +56,16 @@ const status = (id: string) =>
 
 /** Raise a request, and read it — the furthest a ticket with no work can get. */
 async function aTriagedTicket(): Promise<string> {
+  // A COMPLETE ticket, because triage now refuses an incomplete one: a type, a
+  // client, an app and who raised it (shared/triage-readiness.ts). This fixture
+  // used to name only the client, which was enough when reading a request was
+  // unconditional and is exactly what the gate exists to stop.
   const res = await call(IDS.staffUser, "POST /api/content/help", {
     description: "The dispatch board will not load on a phone",
+    helpType: "Question",
     accountId: IDS.victimAccount,
+    appId: IDS.victimApp,
+    raisedByContactId: IDS.victimPerson,
   })
   const id = ((await res.json()) as { tickets: { id: string }[] }).tickets[0].id
   await call(IDS.staffUser, "POST /api/content/help/triage-read", { id })

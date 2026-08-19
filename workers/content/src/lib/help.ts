@@ -16,6 +16,7 @@
 //   • the AI agent's first-draft reply is a HOOK (maybeDraftFirstReply) left off
 //     until the agent worker exists — a ticket always opens regardless.
 
+import { listGaps, triageGaps } from "@shared/triage-readiness"
 import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollectionWith, reportedTotal } from "@shared/workers/count"
@@ -1165,6 +1166,30 @@ export async function markTriaged(
   id: string
 ): Promise<{ moved: boolean; accountId: string | null }> {
   const before = await ticketOrThrow(cfg, guard, scope, id)
+
+  // THE PRE-TRIAGE GATE (owner, 19 Aug 2026). A ticket does not leave `new`
+  // until it names a type, a client, an app and who raised it. Checked HERE
+  // rather than at the door for `refuseUnreviewable`'s reason: there is more
+  // than one way to reach this function — the triage screen, the agent, an MCP
+  // tool — and one of them will be written by somebody who has never read the
+  // route file. The rule rides the model.
+  //
+  // It REPORTS rather than just refusing. A ticket that could not move used to
+  // sit in the queue saying nothing about why, which is the whole reason a
+  // pre-triage state was asked for: the state was never missing, the reason was.
+  const gaps = triageGaps({
+    helpType: before.help_type,
+    accountId: before.account_id,
+    appId: before.app_id,
+    raisedByContactId: before.raised_by_contact_id,
+  })
+  if (gaps.length)
+    throw new GuardError(
+      409,
+      "not_ready_for_triage",
+      `This one still needs ${listGaps(gaps)} before it can be triaged. Set them on the ticket and try again.`
+    )
+
   const now = new Date().toISOString()
   const changed = await d1Query<{ id: string }>(
     cfg,
