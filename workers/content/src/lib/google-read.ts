@@ -38,6 +38,7 @@ import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
+import type { ChatMessage } from "./google-api"
 import {
   chatMessages,
   driveFileText,
@@ -190,6 +191,76 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
   return new Set(rows.map((r) => r.google_event_id))
 }
 
+/**
+ * A SPACE'S MESSAGES, FOLDED INTO CONVERSATIONS.
+ *
+ * ── WHY A MESSAGE IS THE WRONG UNIT ─────────────────────────────────────────
+ *
+ * Chat was filed one source per message, and a chat message is mostly not a
+ * thing anybody can answer from. Read off the owner's own spaces on 20 Aug 2026:
+ * "yes!", "working.", "👏👏👏👏👏", "safe journey". Each of those was its own
+ * source, its own passage and its own competitor for room in an answer — while
+ * the exchange that gave them meaning was scattered across four other sources
+ * that retrieval had no reason to return together.
+ *
+ * Google hands us the grouping for free: every message carries `thread.name`,
+ * and nothing had ever read it. A thread is what a person means by "that
+ * conversation about the voucher quantity", and it is the unit they would go
+ * looking for.
+ *
+ * ── WHAT A FOLDED THREAD IS ─────────────────────────────────────────────────
+ *
+ * The whole exchange, oldest first, each line attributed to whoever said it, as
+ * one body. So a passage that comes back from retrieval carries the question AND
+ * the answer AND who gave it — which is the shape the owner asked for ("they
+ * don't know who sent what message") and the shape a citation can point at.
+ *
+ * The thread's OWN id is the source id, so re-reading a space that has gained a
+ * reply updates the conversation in place rather than filing a second copy of
+ * it — the content hash changes, the source does not multiply. Its timestamp is
+ * the LATEST message, because a conversation is as recent as its last reply and
+ * the sweep's cursor orders by exactly that.
+ *
+ * A message Google gives no thread for is its own conversation of one, which is
+ * both true and the safe default.
+ */
+function chatThreads(messages: ChatMessage[]): ChatMessage[] {
+  const byThread = new Map<string, ChatMessage[]>()
+  for (const m of messages) {
+    const key = m.thread || m.id
+    byThread.set(key, [...(byThread.get(key) ?? []), m])
+  }
+  const out: ChatMessage[] = []
+  for (const [thread, group] of byThread) {
+    // Oldest first: a conversation reads forwards, and the API hands them back
+    // newest first.
+    const ordered = [...group].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))
+    const first = ordered[0]
+    const last = ordered[ordered.length - 1]
+    if (!first || !last) continue
+    // WHO IS IN IT, in the order they first spoke, for the title. A conversation
+    // between two people is named by both of them rather than by whoever
+    // happened to reply last.
+    const voices = [...new Set(ordered.map((m) => m.sender).filter(Boolean))]
+    out.push({
+      ...first,
+      id: thread,
+      sender: voices.join(", "),
+      // Named only if EVERY voice is — a conversation half of whose speakers are
+      // "Somebody in this space" is not attributed, and saying it is would be
+      // the one thing this lane must never do.
+      senderNamed: ordered.every((m) => m.senderNamed),
+      text: ordered.map((m) => `${m.sender}: ${m.text}`).join("\n"),
+      // AS RECENT AS ITS LAST REPLY, which is what the sweep's cursor orders by.
+      createdAt: last.createdAt,
+      // The link opens the thread at its first message, which is where a person
+      // wants to start reading it.
+      url: first.url,
+    })
+  }
+  return out
+}
+
 export async function readGoogleMaterial(
   env: GoogleEnv,
   cfg: D1Rest,
@@ -325,7 +396,8 @@ export async function readGoogleMaterial(
     const token = await tokenOrNull(env, cfg, guard, "chat")
     if (token)
       for (const space of (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active))
-        for (const message of await chatMessages(token, space.externalId))
+        // ONE SOURCE PER CONVERSATION, NOT PER MESSAGE. See `chatThreads`.
+        for (const message of chatThreads(await chatMessages(token, space.externalId)))
           items.push({
             service: "chat",
             sourceId: space.id,

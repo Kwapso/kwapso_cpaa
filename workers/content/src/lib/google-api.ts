@@ -1707,6 +1707,10 @@ export type ChatMessage = {
   senderNamed: boolean
   text: string
   createdAt: string | null
+  /** THE CONVERSATION THIS MESSAGE IS PART OF (`spaces/…/threads/…`), or "".
+   *  Chat returns it on every message and nothing read it until 20 Aug 2026 —
+   *  see `shapeChatThreads`, which is where it earns its place. */
+  thread: string
   /** BACK TO THE MESSAGE ITSELF, in Google Chat. Every other Google kind carried
    * one of these from the day it was written — Drive its `webViewLink`, Gmail
    * and Calendar their own — and Chat carried `null`, so a message the assistant
@@ -1782,6 +1786,7 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
       ...toChatSender(m.sender, members),
       text: str(m.text),
       createdAt: str(m.createTime) || null,
+      thread: str((m.thread as Record<string, unknown> | undefined)?.name),
       url: chatMessageUrl(id),
     }
   })
@@ -1804,22 +1809,86 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
  * IMPROVEMENT to a message, so it may not be allowed to cost one.
  */
 async function chatMembers(token: string, spaceName: string): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
+  const ids: string[] = []
   const url = new URL(`https://chat.googleapis.com/v1/${encodeURI(spaceName)}/members`)
   url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
-  // Google returns a membership's member as an embedded user; asking for the
-  // name and the display name keeps the response small.
   try {
     const data = (await googleFetch(url.toString(), token)) as { memberships?: unknown }
     for (const raw of Array.isArray(data.memberships) ? data.memberships : []) {
       const member = ((raw as Record<string, unknown>).member ?? {}) as Record<string, unknown>
+      // HUMANS ONLY. An app in a space already carries its own display name on
+      // the message, and asking the directory about one returns nothing.
+      if (str(member.type) !== "HUMAN") continue
       const id = str(member.name)
-      const shown = str(member.displayName)
-      if (id && shown) out.set(id, shown)
+      if (id) ids.push(id)
     }
   } catch {
-    // An older grant, or a space whose membership this person may not list. The
-    // messages are still worth having with a described speaker on them.
+    // An older grant, or a space whose membership this person may not list.
+    return new Map()
+  }
+  return peopleNames(token, ids)
+}
+
+/**
+ * RESOURCE IDS → NAMES, through the People API.
+ *
+ * ── WHY THIS CALL EXISTS AT ALL, measured rather than assumed ───────────────
+ *
+ * The obvious place for a name is the message, and Google leaves it empty there
+ * for every human. The next obvious place is the membership, so the app asked
+ * for `chat.memberships.readonly` and the owner re-approved his connection for
+ * it — and Google's `spaces.members.list` answered:
+ *
+ *   {"name":"users/100183613978081019947","type":"HUMAN"}
+ *
+ * The roster, with no names on it. There is no Chat scope that returns one.
+ *
+ * So the directory is the third place and the only one that has the answer. A
+ * Chat user id IS a People resource id, which is what makes this a lookup rather
+ * than a search: `users/112978…` becomes `people/112978…` and comes back with
+ * the name that person uses everywhere else in Google.
+ *
+ * ── HOW IT FAILS ────────────────────────────────────────────────────────────
+ *
+ * Silently, and to the honest description. This is an IMPROVEMENT to a message,
+ * so it may never cost one: an older grant without the directory scope, a
+ * project where the People API is not switched on, an external member who is not
+ * in this directory — each returns no name for that person and the message still
+ * arrives saying "Somebody in this space", which is the truth rather than a
+ * guess. The one thing it must never do is invent a name, because a wrong
+ * attribution in a quoted conversation is worse than no attribution at all.
+ */
+async function peopleNames(token: string, userIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (userIds.length === 0) return out
+  // Batched: one call for a whole space's roster rather than one per person.
+  // Google caps `resourceNames` at 200 per request, which is far above the page
+  // of memberships this is ever handed.
+  const url = new URL("https://people.googleapis.com/v1/people:batchGet")
+  for (const id of userIds.slice(0, 200))
+    url.searchParams.append("resourceNames", id.replace(/^users\//, "people/"))
+  url.searchParams.set("personFields", "names,emailAddresses")
+  try {
+    const data = (await googleFetch(url.toString(), token)) as { responses?: unknown }
+    for (const raw of Array.isArray(data.responses) ? data.responses : []) {
+      const r = raw as Record<string, unknown>
+      const person = (r.person ?? {}) as Record<string, unknown>
+      const names = Array.isArray(person.names) ? (person.names as Record<string, unknown>[]) : []
+      const emails = Array.isArray(person.emailAddresses)
+        ? (person.emailAddresses as Record<string, unknown>[])
+        : []
+      // The person's own display name, or their address when the directory
+      // holds one and no name — an address is still an answer to "who said
+      // that?", and it is Google's word rather than ours.
+      const shown = str(names[0]?.displayName) || str(emails[0]?.value)
+      // `requestedResourceName` is the id WE asked about, which is the key the
+      // caller has. `person.resourceName` can differ (Google resolves merged
+      // profiles), so keying on it would silently miss.
+      const asked = str(r.requestedResourceName) || str(person.resourceName)
+      if (asked && shown) out.set(asked.replace(/^people\//, "users/"), shown)
+    }
+  } catch {
+    // See the header: a missing name is a described speaker, never a wrong one.
   }
   return out
 }
@@ -1920,6 +1989,7 @@ export async function chatPost(token: string, spaceName: string, text: string): 
     senderNamed: true,
     text: str(data.text) || text,
     createdAt: str(data.createTime) || null,
+    thread: str((data.thread as Record<string, unknown> | undefined)?.name),
     url: chatMessageUrl(str(data.name)),
   }
 }

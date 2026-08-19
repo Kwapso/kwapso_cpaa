@@ -152,6 +152,19 @@ const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
     // what Google actually gave against this list, so a stale grant is visible
     // on the connections screen rather than silent.
     "https://www.googleapis.com/auth/chat.memberships.readonly",
+    // AND THE DIRECTORY, because the memberships scope alone does not answer the
+    // question. Measured against Google on 20 Aug 2026: `spaces.members.list`
+    // returns `{"name":"users/100183…","type":"HUMAN"}` and NO display name —
+    // the roster, without the names. So the Chat API cannot say who somebody is
+    // at all, with any scope, and the only place a Workspace colleague's name
+    // lives is the directory.
+    //
+    // `directory.readonly` is read-only and is the person's OWN organisation's
+    // directory — the same names they see in every Google product all day. It is
+    // the narrowest thing that turns `users/112978…` into "Aurora Thalassa",
+    // which is the whole of the owner's complaint that the assistant "doesn't
+    // know who sent what message".
+    "https://www.googleapis.com/auth/directory.readonly",
   ],
 }
 
