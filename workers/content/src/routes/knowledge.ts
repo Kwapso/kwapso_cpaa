@@ -49,6 +49,7 @@ import { extractFile, unreadableNote } from "../lib/knowledge-files"
 import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
 import type { Env } from "../env"
+import { INGEST_SOURCES_PER_PRESS } from "@shared/workers/limits"
 
 /** GET /api/content/knowledge — the sources, newest first (?id → just that one).
  * Filters: `kind`, `compartment`, `q`. R14: sources GROW with ordinary use (the
@@ -283,7 +284,13 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
   const startedAt = Date.now()
   const SYNC_BUDGET_MS = 50_000
   const SYNC_MAX_PASSES = 40
-  let sweep = await sweepGoogle(env, cfg, guard, { onlyIfStale: body.onlyIfStale === true })
+  let sweep = await sweepGoogle(env, cfg, guard, {
+    onlyIfStale: body.onlyIfStale === true,
+    // A PRESS IS NOT A TICK. Every pass re-lists the whole of each service
+    // before filing anything, so the listing dominates — a bigger slice is a
+    // quarter of the round trips for the same result.
+    limit: INGEST_SOURCES_PER_PRESS,
+  })
   let indexed = sweep.results.reduce((sum, r) => sum + r.indexed, 0)
   let passes = 1
   while (
@@ -295,7 +302,7 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
     // `onlyIfStale` is deliberately NOT carried into the later passes: it exists
     // to stop a browser asking twice on one page load, and a pass that has just
     // finished writing is not stale in the sense that flag is about.
-    sweep = await sweepGoogle(env, cfg, guard, {})
+    sweep = await sweepGoogle(env, cfg, guard, { limit: INGEST_SOURCES_PER_PRESS })
     indexed += sweep.results.reduce((sum, r) => sum + r.indexed, 0)
     passes += 1
   }

@@ -1933,7 +1933,7 @@ export async function retrieve(
     reader.params
   )
 
-  const ranked = rankPassages(fused, rows)
+  const ranked = diversify(rankPassages(fused, rows), want)
   const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => ({
     sourceId: row.source_id,
     title: row.title,
@@ -1986,6 +1986,62 @@ export async function retrieve(
  * one `env.AI.run` here, and the harness that measured it is kept), or a bigger
  * question set showing the loss is our sample rather than the model. It stays on
  * Cloudflare either way — no outside provider sees this text. */
+/** HOW MANY PASSAGES MAY COME FROM SOURCES SHARING ONE TITLE.
+ *
+ * Two, because one is too few — a document and its follow-up genuinely both
+ * answer some questions — and three is already a page of the same thing. */
+const PASSAGES_PER_TITLE = 2
+
+/**
+ * DON'T SPEND THE WHOLE ANSWER ON ONE THING SAID FIVE TIMES.
+ *
+ * ── WHAT THIS FIXES, read off a real answer ─────────────────────────────────
+ *
+ * Asked "summarise what happened in the Team Assembly meeting", the base
+ * returned six passages and five of them were the SAME recurring meeting —
+ * different rows, identical titles, and every one of them a future instance
+ * that had not happened yet. The one source that described what was actually
+ * said got the remaining slot.
+ *
+ * That is not a scoring bug: a recurring series really does produce many rows
+ * that match "Team Assembly" equally well, and the ranking is right that they
+ * all match. It is a SELECTION bug. Six of the best matches is not the same
+ * thing as the best six-passage answer, and the difference is exactly what a
+ * person means when they say an answer was unhelpful.
+ *
+ * ── HOW ──────────────────────────────────────────────────────────────────────
+ *
+ * Best first, taking at most two passages from any set of sources that share a
+ * title, and then — only if that left fewer than were asked for — filling the
+ * rest from what was skipped, best first again. So diversity is preferred and
+ * never PAID for: an answer can still be six passages from one document when
+ * one document is genuinely all there is.
+ *
+ * Deliberately on the TITLE and not the source id: several passages from one
+ * long document are a good answer to a question about that document, and
+ * capping those would make a fifty-page contract quotable twice. What is being
+ * spread is the ANSWER across the things it is about.
+ */
+function diversify(
+  ranked: { row: ScoredRow; score: number }[],
+  want: number
+): { row: ScoredRow; score: number }[] {
+  const seen = new Map<string, number>()
+  const kept: { row: ScoredRow; score: number }[] = []
+  const skipped: { row: ScoredRow; score: number }[] = []
+  for (const item of ranked) {
+    const key = (item.row.title ?? "").trim().toLowerCase()
+    const used = seen.get(key) ?? 0
+    if (used < PASSAGES_PER_TITLE) {
+      seen.set(key, used + 1)
+      kept.push(item)
+    } else skipped.push(item)
+  }
+  // Never fewer than the caller asked for while candidates remain: the cap is a
+  // preference between equals, not a reason to answer with less.
+  return kept.length >= want ? kept : [...kept, ...skipped]
+}
+
 function rankPassages(
   fused: { id: string; score: number }[],
   rows: ScoredRow[]

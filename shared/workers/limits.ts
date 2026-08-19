@@ -125,6 +125,22 @@ export const CRON_GROWTH_CAP = 200
  * The rest stay pending and are accepted from the invites inbox. */
 export const INVITE_SWEEP_CAP = 25
 
+/** ROWS ONE INTERACTIVE CATCH-UP FILES PER KIND, PER PASS.
+ *
+ * The background tick uses `INGEST_SOURCES_PER_TICK` (25) and should: it runs
+ * every fifteen minutes and its job is to stay level, not to catch up.
+ *
+ * A person PRESSING "bring it in" is a different act. Every pass re-lists the
+ * whole of each service before it files anything — a Drive walk of up to a
+ * hundred and twenty calls, a mailbox of ten pages — so the listing dominates
+ * and 25 rows per pass means paying that cost forty times to file a thousand
+ * sources. Four times the slice is a quarter of the listings for the same work,
+ * and the writing itself is the cheap half.
+ *
+ * Still bounded, and bounded by the same reasoning as the tick: it has to fit
+ * inside one request with room for the embedding calls each row costs. */
+export const INGEST_SOURCES_PER_PRESS = 100
+
 /* ---- How much of a mailbox the knowledge base may read --------------------- */
 
 /** PAGES OF MAIL ONE SWEEP LISTS, fifty to a page.
