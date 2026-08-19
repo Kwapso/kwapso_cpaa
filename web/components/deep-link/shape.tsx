@@ -8,6 +8,7 @@ import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer
 import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
+import { RecordMark } from "@shared/web/record-mark"
 import type {
   Account,
   ActivityItem,
@@ -121,10 +122,21 @@ function truncate(text: string, max = 80): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean
 }
 
-export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
+export function shapeHelpList(
+  tickets: HelpTicket[],
+  /** The team's own glyph per ticket kind, from `markMap`. Passed in rather than
+   * read here: a shaper takes rows and returns rows, and the vocabulary is a
+   * cache the screen already holds. Absent → every row shows its initial, which
+   * is what a team that has set no glyphs should see. */
+  marks?: Map<string, string>
+): ScreenData {
   return {
     rows: tickets.map((t) => ({
       id: t.id,
+      // The kind's mark in the leading slot — the same glyph the tab strip
+      // carries, so the row and the tab cannot disagree about what a Question
+      // looks like.
+      mark: <RecordMark mark={marks?.get(t.helpType ?? "") ?? null} name={t.helpType ?? "?"} />,
       // THE TITLE, AND ONLY THE TITLE (UI-RULEBOOK K1, CHECKLIST 11.9). The
       // reference used to be prefixed into it — `BERG-T0412 · Can you check…` —
       // which is why a page of tickets read as a wall of text with no shape. It
@@ -281,6 +293,19 @@ export function shapeAccountsList(
           : ""
       return {
         id: a.id,
+        // THE SQUARE THE ROW IS KNOWN BY (recipe `leading`, library v0.11.0). A
+        // NODE, not a URL — the slot renders whatever the column holds, so a bare
+        // `logoUrl` here would print the path as text. A person is a circle and a
+        // company a rounded square, which is the one rule `RecordMark` exists to
+        // keep (shared/web/record-mark.tsx); a row with no picture gets the
+        // initial rather than an empty box.
+        mark: (
+          <RecordMark
+            picture={a.logoUrl}
+            name={a.name}
+            shape={a.accountType === "individual" ? "round" : "square"}
+          />
+        ),
         // Archived rows stay visible (archive-never-delete), flagged like retired
         // roles and articles are.
         name: a.active ? a.name : `${a.name} (archived)`,

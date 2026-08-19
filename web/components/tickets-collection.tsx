@@ -49,6 +49,8 @@ import { EmptyLine, SectionWithCreate } from "@/components/deep-link/screen-bits
 import { TriageStrip } from "@/components/triage-strip"
 import { TicketStagesCard } from "@/components/pulse"
 import { CONCEPT_ICON } from "@/lib/pages"
+import { tenancy } from "@/lib/api/tenancy"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { shapeHelpList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
@@ -66,7 +68,7 @@ import { formatCount } from "@shared/web/format-count"
 import { formatRelative } from "@shared/web/format"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import type { HelpTicket } from "@shared/types"
+import type { HelpTicket, SelectableValue } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** The two facets that are STAGES rather than kinds, and the tab each one is.
@@ -109,6 +111,14 @@ export function TicketsCollection({
 
   // THE TWO SCOPE CACHES: each is a server scope with its own page. There were
   // three until "My tickets" went (live-resources.ts says why).
+  // The team's own glyphs, scanned once for the whole strip rather than once
+  // per tab. The vocabulary is a cache this screen's siblings already hold and
+  // the live registry keeps current, so an emoji edited on the Dropdown values
+  // screen repaints these tabs on the next ping.
+  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+  const ticketMarks = markMap(selectableQ.data, MARK_GROUP.ticket)
   const allQ = useCached<HelpTicket[]>(helpKey(teamId, "all"), () => listFetch.help(teamId))
   const archivedQ = useCached<HelpTicket[]>(
     helpScope === "archived" ? helpKey(teamId, "archived") : null,
@@ -160,10 +170,18 @@ export function TicketsCollection({
     variant: "pill" as const,
     tabs: [
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
+      // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
+      // library v0.11.0 and drew nothing for a pictograph, so ⚠️ beside Issue and
+      // ❓ beside Question were stored on the dropdown row and rendered on no tab
+      // — the owner edited an emoji and watched it change nowhere. It is a NODE
+      // now, and the glyph comes from the vocabulary rather than from a map here,
+      // so a team that renames a type or picks a new emoji is obeyed without a
+      // deploy. A type with no mark passes "" and the tab is the word alone,
+      // exactly as before.
       ...helpTypeOptions.map((v) => ({
         value: `type:${v}`,
         label: v,
-        icon: "",
+        icon: ticketMarks.get(v) ?? "",
         badge: formatCount(byType?.[v]),
         badgeVariant: "" as const,
       })),
@@ -173,9 +191,10 @@ export function TicketsCollection({
       // four KIND tabs beside it carry the team's own type MARKS on every other
       // surface (a ticket's header band, its detail) and cannot carry one here:
       // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
-      // renders nothing at all. Logged as UI-GAPS #18 rather than worked around
-      // by writing a glyph into the LABEL, which is the one shape
-      // UI-CONVENTIONS §5 refuses (a pictograph inside a sentence).
+      // Triage's own idea has a CONCEPT icon (a lucide name), which the same
+      // prop still resolves — a string is read as a name and a node is drawn as
+      // given, so the two kinds of mark sit on one strip without either being
+      // written into a LABEL, the one shape UI-CONVENTIONS §5 refuses.
       { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
     ],
   }
@@ -237,7 +256,7 @@ export function TicketsCollection({
             {(found) => {
               const rows = found.active ? found.rows : scopedQ.data
               if (rows === null || rows === undefined) return <Skeleton variant="list" lines={4} />
-              const data = shapeHelpList(rows)
+              const data = shapeHelpList(rows, ticketMarks)
               const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
               return (
                 <>

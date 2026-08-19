@@ -324,12 +324,18 @@ describe("shapeAccountsList", () => {
     // NAME carries that as "(archived)" — so a live account says nothing about
     // its state, which is the honest thing for a fact true of almost every row.
     expect(rows?.[0].detail).toBe("Company")
-    // …AND NOTHING ELSE. The row used to carry `type` / `status` / `archived`
-    // for the frame's own filter bar to sieve — which on a PAGED collection
-    // narrowed the loaded fifty. Those three are the DOOR's filters now
-    // (web/lib/collection-filters.ts), so a shaped row is what the screen shows
-    // and no longer half a filter index nothing reads.
-    expect(Object.keys(rows?.[0] ?? {}).sort()).toEqual(["detail", "id", "name"])
+    // …AND NOTHING ELSE THE SCREEN DOES NOT DRAW. The row used to carry `type` /
+    // `status` / `archived` for the frame's own filter bar to sieve — which on a
+    // PAGED collection narrowed the loaded fifty. Those three are the DOOR's
+    // filters now (web/lib/collection-filters.ts), so a shaped row is what the
+    // screen shows and no longer half a filter index nothing reads.
+    //
+    // `mark` is the fourth and it IS drawn: the recipe names it as the row's
+    // leading column (library v0.11.0), and it holds a NODE rather than a URL —
+    // the slot renders whatever the column carries, so a bare `logoUrl` here
+    // would print the path in the box.
+    expect(Object.keys(rows?.[0] ?? {}).sort()).toEqual(["detail", "id", "mark", "name"])
+    expect(rows?.[0].mark, "the leading column must hold a node, not a string").toBeTypeOf("object")
   })
 
   it("names the parent when it is on the page, and still says nested when it isn't", () => {

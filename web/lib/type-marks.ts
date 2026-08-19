@@ -32,7 +32,12 @@ export function typeMark(
   value: string | null | undefined
 ): string | null {
   if (!value) return null
-  const row = values?.find((v) => v.type === group && v.value === value)
+  // ACTIVE ROWS ONLY. `Ticket type` in the live data holds ELEVEN rows for five
+  // live words — retired duplicates of Bug, Extra, Feedback and Question, left by
+  // a seed whose duplicate guard only ever checked live rows. So "the row with
+  // this value" is not one row, and an unfiltered find answers from whichever
+  // came first: a retired row with no glyph, hiding the live one that has one.
+  const row = values?.find((v) => v.type === group && v.value === value && v.active)
   return row?.mark || null
 }
 
@@ -44,7 +49,9 @@ export function markMap(
 ): Map<string, string> {
   const out = new Map<string, string>()
   for (const v of values ?? []) {
-    if (v.type === group && v.mark) out.set(v.value, v.mark)
+    // Active only, for the reason `typeMark` gives — and last-write-wins here
+    // would be the same coin flip in a different shape.
+    if (v.type === group && v.active && v.mark) out.set(v.value, v.mark)
   }
   return out
 }

@@ -70,23 +70,40 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // has nowhere to go, and the workaround — writing the glyph into the title —
   // is the ONE shape §5 refuses. Widened 19 Aug 2026: the same missing slot
   // costs a PICTURE too, on four lists whose rows arrive carrying one.
-  it("#16 · List HAS a leading slot, and renderList still passes nothing to it", () => {
-    // The half that makes the fix one line. If this ever fails, the entry's
-    // "the library already HAS the slot" has gone false and the plan changes.
+  it("#16 · SHIPPED — renderList fills the leading slot, and the host feeds it", () => {
     const list = library("registry", "collections", "list", "list.tsx")
-    expect(list, "ListItem must still declare `leading` — UI-GAPS #16 stands on it").toMatch(
+    expect(list, "ListItem must still declare `leading` — the slot the row is drawn in").toMatch(
       /leading\?:\s*React\.ReactNode/
     )
-
+    // THE LIBRARY HALF, shipped in v0.11.0: the renderer reads a column off the
+    // row and hands it to the slot.
     const body = renderListBody()
-    // It builds a `<List>`, or this is not the function the gap is about.
     expect(body, "renderList must still render the library List").toContain("<List")
     expect(
-      /leading\s*:/.test(body),
-      "GOOD NEWS: `renderList` now passes a `leading` to List. Feed it the type mark " +
-        "(web/lib/type-marks.ts + shared/web/record-mark.tsx), close CHECKLIST 11.8's row half, " +
-        "and delete UI-GAPS #16 in the same commit."
-    ).toBe(false)
+      /leading:\s*leadingOf\(row\)/.test(body),
+      "renderList no longer passes a leading node to List — the row marks have gone dark"
+    ).toBe(true)
+
+    // AND THE HOST HALF, which is the part that actually puts a picture on a
+    // screen. A recipe naming no `leading` column draws nothing, so the library
+    // shipping the slot is worth exactly as much as the recipes that use it.
+    const recipes = readFileSync(join(ROOT, "web", "lib", "screens.ts"), "utf8")
+    const fed = [...recipes.matchAll(/leading:\s*"(\w+)"/g)].map((m) => m[1])
+    expect(
+      fed.length,
+      "no list recipe names a `leading` column — the slot is open and every row is text again"
+    ).toBeGreaterThan(0)
+
+    // …and the column it names is a NODE the shaper builds, not a URL. Pointing
+    // it at `logoUrl` renders the path as text in the slot, which is the one
+    // failure mode the library's own note warns about.
+    const shape = readFileSync(join(ROOT, "web", "components", "deep-link", "shape.tsx"), "utf8")
+    for (const column of new Set(fed))
+      expect(
+        new RegExp(`${column}:\\s*<`).test(shape),
+        `recipes name \`${column}\` as the leading column, but shape.tsx does not build a NODE for it — ` +
+          "a bare string there renders as text in the slot rather than as a mark"
+      ).toBe(true)
   })
 
   // ── #18 · A TAB ──────────────────────────────────────────────────────────
@@ -94,28 +111,27 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // §5 gives a mark to — the same glyph the ticket's own header band draws.
   // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
   // renders nothing at all.
-  it("#18 · TabsTrigger takes a node, and TabsView still narrows it to a lucide name", () => {
+  it("#18 · SHIPPED — a tab takes a node, and the ticket kinds carry their marks", () => {
     const tabs = library("registry", "primitives", "tabs", "tabs.tsx")
-    // The half that makes the fix one line: the trigger's own slot is already a
-    // node, so only the config-driven wrapper narrows it.
-    expect(tabs, "TabsTrigger must still take `icon?: React.ReactNode`").toMatch(
-      /icon\?:\s*React\.ReactNode/
-    )
-    // …and the wrapper still turns a STRING into an icon and nothing else.
     expect(
-      /icon:\s*string/.test(tabs),
-      "GOOD NEWS: `TabItem.icon` is no longer typed `string`. Put the team's type mark on the " +
-        "Tickets type tabs (web/components/tickets-collection.tsx) and delete UI-GAPS #18."
+      /icon\?:\s*(React\.)?ReactNode/.test(tabs),
+      "TabItem no longer takes a node — the type marks on the ticket strip have gone dark"
     ).toBe(true)
-    expect(tabs, "TabsView must still resolve the name through DynamicIcon").toContain("DynamicIcon")
+
+    // The host half: the strip reads the glyph out of the TEAM'S vocabulary
+    // rather than a map in the component, which is what makes an emoji edited on
+    // the Dropdown values screen reach the tab without a deploy.
+    const strip = readFileSync(join(ROOT, "web", "components", "tickets-collection.tsx"), "utf8")
+    expect(
+      /icon:\s*ticketMarks\.get\(/.test(strip),
+      "the ticket type tabs no longer carry the team's own mark"
+    ).toBe(true)
+    expect(
+      strip.includes("markMap("),
+      "the strip must read its glyphs through the one type-mark seam (web/lib/type-marks.ts)"
+    ).toBe(true)
   })
 
-  // ── #19 · AN EMPTY STATE ─────────────────────────────────────────────────
-  // Every empty state the host composes itself leads with a glyph
-  // (components/deep-link/screen-bits.tsx), because a lone line of grey text
-  // reads as a screen that FAILED rather than one with nothing on it yet — and
-  // that is precisely the screen a brand-new team sees on every page. A recipe
-  // cannot say it.
   it("#19 · the collection frame's empty state is still a bare string", () => {
     const config = library("lib", "config.ts")
     expect(config, "CollectionConfig must still declare emptyText").toMatch(/emptyText:\s*string/)
@@ -127,31 +143,33 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   })
 
   // ── #20 · A BIG NUMBER ───────────────────────────────────────────────────
-  // The Home band's four cards are Open tickets, Work in hand, Admin due and
-  // Hours this week — every one of them a CONCEPT that already owns an icon in
-  // `CONCEPT_ICON`. Writing a glyph into `label` would be emoji in copy, which
-  // §5 forbids outright.
-  it("#20 · a stat card still has no slot but the trend arrow", () => {
+  it("#20 · SHIPPED — a stat card takes a glyph, and the numbers band carries one", () => {
     const grid = library("registry", "collections", "stat-grid", "stat-grid.tsx")
-    // The census must not go blind: this is the interface the gap is about.
-    expect(grid, "StatItem must still be the shape UI-GAPS #20 describes").toContain(
+    expect(grid, "StatItem must still be the shape this check reads").toContain(
       "export interface StatItem"
     )
     const from = grid.indexOf("export interface StatItem")
     const item = grid.slice(from, grid.indexOf("}", from))
+    expect(/icon/.test(item), "StatItem no longer takes an icon").toBe(true)
+
+    const panel = readFileSync(join(ROOT, "web", "components", "work-logs-panel.tsx"), "utf8")
     expect(
-      /icon/.test(item),
-      "GOOD NEWS: `StatItem` now takes an icon. Give the pulse band its concept icons " +
-        "(web/components/pulse.tsx) and delete UI-GAPS #20."
-    ).toBe(false)
+      (panel.match(/icon:\s*<DynamicIcon name=\{CONCEPT_ICON\./g) ?? []).length,
+      "the numbers band's cards no longer carry their concept icons"
+    ).toBeGreaterThanOrEqual(3)
   })
 
   // …and the flag list itself cannot drift away from the four checks above. An
   // entry silently deleted here would leave the check standing over nothing;
   // an entry marked shipped would leave the check contradicting the document.
-  it("UI-GAPS.md still carries all four, flagged for the library", () => {
+  it("UI-GAPS.md still carries the ONE gap the library has not closed", () => {
     const gaps = readFileSync(join(ROOT, "UI-GAPS.md"), "utf8")
-    for (const n of [16, 18, 19, 20]) {
+    // THREE OF THE FOUR SHIPPED in library v0.11.0 (19 Aug 2026) and are now
+    // asserted above as WIRED rather than as missing. #19 — the collection
+    // frame's empty state — is the one still owed, so it is the only one this
+    // list may name. A shipped gap left in here would be a flag pointing at
+    // nothing, which is the rot this whole file exists to prevent.
+    for (const n of [19]) {
       const row = gaps.split("\n").find((line) => line.startsWith(`| ${n} |`))
       expect(row, `UI-GAPS.md has no row ${n} — this suite is checking a gap nobody records`).toBeTruthy()
       expect(

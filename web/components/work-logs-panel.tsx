@@ -31,7 +31,10 @@ import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 import { StatGrid, defaultStatGridConfig } from "@kwapso/ui/registry/collections/stat-grid/stat-grid"
+
+import { CONCEPT_ICON } from "@/lib/pages"
 import { Pencil } from "lucide-react"
 
 import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
@@ -111,10 +114,18 @@ const ENOUGH_TO_CHART = 4
 function Numbers({ summary }: { summary: WorkLogSummary }) {
   const t = useT()
   const items = [
+    // THE GLYPH BESIDE EACH NUMBER (library v0.11.0: `StatItem.icon`). Until it
+    // shipped, a stat card's only graphic was the trend arrow — and the delta is
+    // OFF here, so these three carried no mark at all while every concept they
+    // name owns one in `CONCEPT_ICON`. Writing a glyph into the LABEL is the one
+    // shape UI-CONVENTIONS §5 refuses, so they went without.
+    //
+    // `aria-hidden`: the label says the same thing in words, right beside it.
     {
       id: "hours",
       label: t("Hours logged"),
       value: hoursSpoken(summary.totalSeconds),
+      icon: <DynamicIcon name={CONCEPT_ICON.time as IconName} className="size-4" aria-hidden />,
       delta: "",
       trend: "flat" as const,
     },
@@ -122,6 +133,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       id: "entries",
       label: t("Entries"),
       value: formatCount(summary.total) || "0",
+      icon: <DynamicIcon name={CONCEPT_ICON.dropdowns as IconName} className="size-4" aria-hidden />,
       delta: "",
       trend: "flat" as const,
     },
@@ -129,6 +141,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       id: "people",
       label: t("Members on it"),
       value: formatCount(summary.peopleTotal) || "0",
+      icon: <DynamicIcon name={CONCEPT_ICON.members as IconName} className="size-4" aria-hidden />,
       delta: "",
       trend: "flat" as const,
     },

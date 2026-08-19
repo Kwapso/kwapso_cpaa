@@ -166,7 +166,11 @@ const teamDetailRecipe: ScreenRecipe = {
       gate: { module: "teams", right: "edit" },
     },
   ],
-  header: { title: "name", avatar: "image" },
+  // A TEAM IS A COMPANY-SHAPED RECORD, so its mark is a rounded square and its
+  // logo is shown WHOLE (library v0.11.0 `avatarShape`). A wordmark cropped to a
+  // circle is a wordmark nobody can read — the same rule `RecordMark` keeps for
+  // every bespoke screen, finally sayable on a recipe one.
+  header: { title: "name", avatar: "image", avatarShape: "square" as const },
   tabs: [
     {
       key: "overview",
@@ -348,6 +352,10 @@ const ticketsListRecipe: ScreenRecipe = {
   binding: { module: "tickets" },
   gate: { module: "help", right: "read" },
   fields: [field("name", "Ticket"), field("detail", "Details")],
+  // THE TICKET'S KIND, as the glyph the team chose for it — the same ⚠️ / ❓ / 💭
+  // the tab strip above now carries, so the row and the tab agree without either
+  // writing a pictograph into a sentence (UI-CONVENTIONS §5).
+  leading: "mark",
   actions: [],
   // NO FACET HERE, and this one is a REMOVAL rather than a move. The stage a
   // ticket is at is already narrowed by the sub-tab strip below the header
@@ -373,6 +381,16 @@ const accountsListRecipe: ScreenRecipe = {
   binding: { module: "accounts" },
   gate: { module: "accounts", right: "read" },
   fields: [field("name", "Account"), field("detail", "Details")],
+  // THE COMPANY'S OWN LOGO, in the row (library v0.11.0). `renderList` had no
+  // leading slot until then, so 17 of 24 companies and 31 of 106 contacts carried
+  // a picture the door sent and no list drew — the owner asked why there were no
+  // placeholders or images anywhere, and this was the answer.
+  //
+  // It names a column holding a NODE, not a URL: point it at `logoUrl` and the
+  // slot renders the URL as text. `shapeAccountsList` puts a `RecordMark` there,
+  // which is also what makes a company a rounded square and a person a circle —
+  // one rule, one component, every surface (shared/web/record-mark.tsx).
+  leading: "mark",
   actions: [],
   // NO FACETS HERE, and that is the fix rather than a loss: type / status /
   // archived are the door's OWN filters now, asked from the host's find bar
