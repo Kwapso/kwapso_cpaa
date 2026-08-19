@@ -54,7 +54,9 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "lucide-react"
 
+import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"
+import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "./deep-link/shape"
 import { useT } from "@shared/web/language"
 import { safeHref } from "@shared/web/rich-text"
 import { AgentMarkdown } from "@/components/agent-markdown"
@@ -248,7 +250,27 @@ export function KnowledgeAsk({
                 <p className="text-xs font-medium">{t("Where this came from")}</p>
                 <ul className="flex flex-col gap-1">
                   {answer.citations.map((c) => (
-                    <li key={c.sourceId} className="text-sm">
+                    <li key={c.sourceId} className="flex items-start gap-2 text-sm">
+                      {/* THE SOURCE'S OWN FACE, and what KIND of thing it is.
+                          R35 applies here as much as to any list — a citation IS
+                          a record appearing — and this is the list where it
+                          matters most: "where did that come from?" is the whole
+                          question a person is asking when they read this block,
+                          and until now the answer was a bare title that looked
+                          identical whether it came from a call, a contract, a
+                          chat conversation or a ticket. The owner asked for "a
+                          very good understanding of what is coming from where".
+                          Same glyph vocabulary as the knowledge base's own list,
+                          so a source looks the same wherever it is shown. */}
+                      <span className="bg-muted text-muted-foreground mt-0.5 grid size-5 shrink-0 place-items-center rounded-xl">
+                        <DynamicIcon
+                          name={(KNOWLEDGE_KIND_ICON[c.kind] ?? "file") as IconName}
+                          aria-hidden
+                          className="size-3"
+                          fallback={() => null}
+                        />
+                      </span>
+                      <span className="min-w-0">
                       <button
                         type="button"
                         onClick={() => onOpenSource(c.sourceId)}
@@ -256,6 +278,10 @@ export function KnowledgeAsk({
                       >
                         {c.title}
                       </button>
+                      <span className="text-muted-foreground text-xs">
+                        {" · "}
+                        {t(KNOWLEDGE_KIND[c.kind] ?? c.kind)}
+                      </span>
                       {/* WHAT THE LIVE ROW SAYS RIGHT NOW, when it says
                           anything. The passage is what was indexed; this is what
                           is true today, and the two disagreeing is exactly the
@@ -267,6 +293,7 @@ export function KnowledgeAsk({
                         </span>
                       )}
                       <OpenTheRecord from={c} onOpenRecord={onOpenRecord} />
+                      </span>
                     </li>
                   ))}
                 </ul>

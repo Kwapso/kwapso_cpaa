@@ -279,9 +279,16 @@ export function googleIngestKinds(
       kind: KIND_OF.chat,
       stateKey: googleStateKey("chat", guard.userId),
       table: "google_chat",
-      label: "Chat spaces",
+      label: "Chat conversations",
       windowed: true,
-      textVersion: 1,
+      // 2 SINCE 20 AUG 2026 — the unit changed from a space to a thread and the
+      // body changed with it, so every stored cursor has to rewind. Without the
+      // bump the sweep kept the position it had reached over the OLD rows, found
+      // almost every conversation to be "before" it, and filed one thread out of
+      // a hundred while reporting itself caught up. Measured live: `read: 1,
+      // indexed: 1, caughtUp: true` against five spaces holding fifty messages
+      // each.
+      textVersion: 2,
       // ONE SOURCE PER CONVERSATION — not per message, and no longer per space.
       //
       // PER MESSAGE was wrong for the reason this comment has always given: a
