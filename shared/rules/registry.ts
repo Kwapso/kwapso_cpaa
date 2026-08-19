@@ -1183,7 +1183,9 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
-    "one company's own fields — its reference, its industry, its postal address, its language, where it sits, the paragraph about it, and the hours its apps have given back. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+    "one company's own fields — its reference, its industry, its postal address, its language, where it sits, and the paragraph about it. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+  "account-detail.value":
+    "what this client's apps have given back: the hours, their step-by-step derivation, and the same hours in money. It is one ARITHMETIC, not a set of rows — the steps under it are the workings of a single figure, so a count on the tab would number the sum's terms rather than anything a person asked for. It sat at the bottom of Overview until 19 Aug 2026, under the cover, eight fields and the About, which is where the headline number of the whole product had been living.",
   "account-detail.knowledge":
     "the knowledge base asked IN CONTEXT (12.1): a question box that already knows which client it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count.",
   "contact-detail.overview":

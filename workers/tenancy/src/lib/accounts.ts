@@ -49,7 +49,6 @@ type AccountRow = {
   locale: string | null
   timezone: string | null
   commercials_visible: number
-  status: string
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -62,7 +61,7 @@ type AccountRow = {
  * on created_at, so it is selected once here rather than twice at the call site. */
 const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone,
   street, postal_code, city, country, industry, about, logo_url, cover_url, code,
-  currency, locale, timezone, commercials_visible, status, deactivated_at,
+  currency, locale, timezone, commercials_visible, deactivated_at,
   created_at, creator_name, updated_at, editor_name`
 
 // THE ADDRESS IS FOUR FIELDS NOW, and `address` is not one of them. The column
@@ -74,12 +73,9 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
 /** WHAT AN ACCOUNT ROW SAYS, AND TO WHOM.
  *
  * Most of this row is the client's own information, which is exactly why the
- * portal opens the door: their name, address, reference, the people in it. Four
+ * portal opens the door: their name, address, reference, the people in it. Three
  * fields on it are not theirs at all — they are the AGENCY'S RECORD ABOUT THEM:
  *
- *   • `status` — the commercial lifecycle. "prospect", "client", "past client"
- *     is our view of the relationship, and a client reading "prospect" about
- *     themselves has learned something we never chose to tell them.
  *   • `commercialsVisible` — our own switch governing what money they may see.
  *     A setting about somebody is not a setting for them to read.
  *   • `createdByName` / `editedByName` — which staff member opened the record and
@@ -89,7 +85,7 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
  * THE REPO ALREADY SAYS THIS, ABOUT THE HISTORY OF THESE VERY FIELDS. The portal
  * has no activity feed, and shared/rules/registry.ts gives the reason: "an
  * account's history names the staff who edited the record and shows the agency's
- * own before/after values (status moves, commercial flags) — none of which is the
+ * own before/after values (commercial flags) — none of which is the
  * client's to read." The history was closed and the CURRENT values rode out on
  * the row underneath it, which is the whole finding: the portal drew none of
  * this, and the server sent all of it.
@@ -124,7 +120,6 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     locale: r.locale,
     timezone: r.timezone,
     commercialsVisible: ours ? null : r.commercials_visible === 1,
-    status: ours ? null : r.status,
     active: r.deactivated_at == null,
     createdAt: r.created_at,
     createdByName: ours ? null : r.creator_name,
@@ -159,20 +154,22 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
  * GROWING_COLLECTIONS row in shared/rules/registry.ts, which also holds the
  * check to a client that can actually reach page two.
  *
- * `q` searches name, code and email. `type` narrows to entities or individuals,
- * `status` to the team's own word for where an account stands. Archived rows are
- * included by default and carry `active` (the manager greys them with a Restore
- * button — the same shape as a retired role); `archived` asks for one of the two
- * piles on its own. */
-/** WHAT A CALLER MAY NARROW an accounts read to — the fence plus the five
+ * `q` searches name, code and email. `type` narrows to entities or individuals.
+ * Archived rows are included by default and carry `active` (the manager greys
+ * them with a Restore button — the same shape as a retired role); `archived`
+ * asks for one of the two piles on its own.
+ *
+ * THERE WAS A `status` FILTER HERE, and it went with the field (0042). Whether
+ * an account is active was being answered twice — by a free-text column that
+ * drifted into four spellings of two ideas, and by the archive flag underneath
+ * it — and the flag is the half that is true. */
+/** WHAT A CALLER MAY NARROW an accounts read to — the fence plus the four
  * filters, built ONCE so the paged list and the CSV export can never disagree
  * about what a filter means. They are the same question asked for a screen and
  * for a file; two copies of this would be two answers waiting to drift. */
 export type AccountFilters = {
   q?: string
   type?: "entity" | "individual"
-  /** the team's own word for where an account stands, matched as stored */
-  status?: string
   /** "yes" = only the put-away ones, "no" = only the live ones, absent = both */
   archived?: "yes" | "no"
   parentId?: string
@@ -215,7 +212,6 @@ export const ACCOUNT_SORTS: SortMenu<AccountRow> = {
   name: { expr: "name", dir: "asc", key: (r) => r.name },
   created: { expr: "created_at", dir: "desc", key: (r) => r.created_at },
   updated: { expr: "COALESCE(updated_at, created_at)", dir: "desc", key: (r) => r.updated_at ?? r.created_at },
-  status: { expr: "status", dir: "asc", key: (r) => r.status },
   code: { expr: "code", dir: "asc", key: (r) => r.code },
 }
 
@@ -248,10 +244,6 @@ function accountsWhere(
     filters.push("account_type = ?")
     params.push(opts.type)
   }
-  if (opts.status) {
-    filters.push("status = ?")
-    params.push(opts.status)
-  }
   // ARCHIVED IS A FILTER, NOT A FENCE. Both states stay listable (deactivate,
   // never delete) — this only says which of the two the caller asked for, so the
   // exact total beside it counts the same question the rows answer.
@@ -280,8 +272,8 @@ export async function listAccounts(
   const after = keysetAfter(decodeCursor(opts.cursor, ordering.sig), ordering.expr, ordering.dir)
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
   // THE TWO TAB BADGES, and they are a different question from `total` on
-  // purpose. `total` counts what was ASKED FOR (this search, this status, this
-  // type) so the rows and the number beside them agree. These two count the
+  // purpose. `total` counts what was ASKED FOR (this search, this type, this
+  // pile) so the rows and the number beside them agree. These two count the
   // COLLECTION — how many companies and how many people there are — because they
   // sit on a tab strip somebody has not pressed yet, and a badge that changed
   // while you typed would be answering the question you are about to ask rather
@@ -518,7 +510,6 @@ export async function createAccount(
     currency?: string
     locale?: string
     timezone?: string
-    status?: string
   }
 ): Promise<string> {
   if (input.parentAccountId) {
@@ -550,7 +541,6 @@ export async function createAccount(
     currency: input.currency ?? null,
     locale: input.locale ?? null,
     timezone: input.timezone ?? null,
-    status: input.status ?? "active",
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,
@@ -632,9 +622,9 @@ type Patch = string | null | undefined
  * all three — a data-loss bug that had nothing to do with the agent.
  *
  * So absence now means absence. `undefined` keeps what is there (`before`), and
- * clearing a field is something a caller has to SAY, by sending it empty. `status`
- * and `commercialsVisible` already worked this way; the other seven now agree
- * with them, which is the point — one rule for the whole record, not two. */
+ * clearing a field is something a caller has to SAY, by sending it empty.
+ * `commercialsVisible` already worked this way; the others now agree with it,
+ * which is the point — one rule for the whole record, not two. */
 export async function updateAccount(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -657,7 +647,6 @@ export async function updateAccount(
     currency?: Patch
     locale?: Patch
     timezone?: Patch
-    status?: Patch
     commercialsVisible?: boolean
   }
 ): Promise<void> {
@@ -686,11 +675,6 @@ export async function updateAccount(
     currency: keep(input.currency, before.currency),
     locale: keep(input.locale, before.locale),
     timezone: keep(input.timezone, before.timezone),
-    // Status is the one field with no "cleared" state to reach: the column is NOT
-    // NULL with a default, so an empty status is not a blank commercial stage, it
-    // is a constraint violation and a 500. Absent OR empty both keep what's there
-    // — the behaviour it has always had, said out loud rather than left to `??`.
-    status: input.status ?? before.status,
   }
 
   const changed = await refusingDuplicate(REFERENCE_TAKEN, () =>
@@ -699,7 +683,7 @@ export async function updateAccount(
       guard.databaseId,
       `UPDATE accounts SET name = ?, email = ?, phone = ?, street = ?, postal_code = ?, city = ?,
          country = ?, industry = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
-         locale = ?, timezone = ?, status = ?, commercials_visible = ?, ${audit.sql}
+         locale = ?, timezone = ?, commercials_visible = ?, ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
       [
         input.name,
@@ -717,7 +701,6 @@ export async function updateAccount(
         next.currency,
         next.locale,
         next.timezone,
-        next.status,
         input.commercialsVisible === undefined ? before.commercials_visible : input.commercialsVisible ? 1 : 0,
         ...audit.params,
         ...fence.params,
@@ -732,7 +715,6 @@ export async function updateAccount(
     { label: "Reference", from: before.code, to: next.code },
     { label: "Email", from: before.email, to: next.email },
     { label: "Phone", from: before.phone, to: next.phone },
-    { label: "Status", from: before.status, to: next.status },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Account edited",
@@ -1311,9 +1293,9 @@ export async function setPortalAccessActive(
 /** One account inside the fence AS STORED, or a clean 404 (identical to a made-up
  * id). The raw row, deliberately: a WRITE's before-image has to be what is in the
  * database, not what this caller is allowed to be told about it — `toAccount`
- * withholds `status` and `commercialsVisible` from a client login, and an edit
- * that carried those forward from a redacted view would blank a NOT NULL column
- * and flip a commercial flag nobody touched. Readers want `accountOrThrow`. */
+ * withholds `commercialsVisible` from a client login, and an edit that carried
+ * that forward from a redacted view would flip a commercial flag nobody
+ * touched. Readers want `accountOrThrow`. */
 async function accountRowOrThrow(
   cfg: D1Rest,
   guard: MemberGuard,

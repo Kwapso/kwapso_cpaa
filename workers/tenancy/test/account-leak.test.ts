@@ -818,9 +818,14 @@ describe("a portal grant on a nested company does not climb to its parent", () =
 // The fence above answers "whose rows?". This answers the other half: given a row
 // that IS theirs, which of its columns are theirs. Most of an account is the
 // client's own information — that is why the portal opens the door at all — but
-// four fields on it are the agency's record about them: `status` (prospect /
-// client / past client), `commercialsVisible` (our switch governing what money
-// they see), and the two audit names, plus `grantedByName` on every login row.
+// three fields on it are the agency's record about them: `commercialsVisible`
+// (our switch governing what money they see) and the two audit names, plus
+// `grantedByName` on every login row.
+//
+// THERE WERE FOUR. `status` — the agency's word for where the relationship stood
+// — was redacted here until 0042 retired the column; it is now sent to nobody at
+// all, which is the stronger version of the same guarantee. A field the row does
+// not carry cannot be leaked by a projection somebody forgets to apply.
 //
 // The repo had already ruled on exactly these fields, one layer up. The portal
 // has no activity feed, and shared/rules/registry.ts gives the reason in so many
@@ -833,21 +838,20 @@ describe("a portal grant on a nested company does not climb to its parent", () =
 describe("an account row does not carry the agency's own view of the client", () => {
   /** Values a client must never read back, planted on every row so the assertions
    * are about a redaction rather than about an empty fixture. */
-  const STATUS = "prospect"
   const OPENED_BY = "Nils Opener"
   const TOUCHED_BY = "Nora Editor"
 
   beforeEach(() => {
     const db = holder.db as DatabaseSync
     db.exec(
-      `UPDATE accounts SET status = '${STATUS}', commercials_visible = 1,
+      `UPDATE accounts SET commercials_visible = 1,
          creator_name = '${OPENED_BY}', editor_name = '${TOUCHED_BY}';
        UPDATE portal_users SET creator_name = '${OPENED_BY}';`
     )
   })
 
-  /** Every agency-only value, in one place, so a test cannot check three of four. */
-  const AGENCY_ONLY = [STATUS, OPENED_BY, TOUCHED_BY]
+  /** Every agency-only value, in one place, so a test cannot check two of three. */
+  const AGENCY_ONLY = [OPENED_BY, TOUCHED_BY]
 
   // THE CONTROL. Each assertion below is "this string is absent", and a door that
   // answered nothing at all would satisfy every one of them. So first: the agency
@@ -871,7 +875,8 @@ describe("an account row does not carry the agency's own view of the client", ()
       '"commercialsVisible":true'
     )
     expect(text).toContain('"commercialsVisible":null')
-    expect(text).toContain('"status":null')
+    // …and `status` is on NO row now, ours or theirs (0042).
+    expect(text).not.toContain('"status"')
   })
 
   it("nor through the detail door the portal actually calls — on EVERY row it opens", async () => {
@@ -891,20 +896,21 @@ describe("an account row does not carry the agency's own view of the client", ()
         expect(text, `the detail door sent a client login the agency's "${secret}"`).not.toContain(secret)
 
       const detail = JSON.parse(text) as {
-        account: { name: string; status: string | null; createdByName: string | null; editedByName: string | null }
-        parent: { status: string | null; createdByName: string | null } | null
+        account: { name: string; createdByName: string | null; editedByName: string | null }
+        parent: { createdByName: string | null } | null
         portalUsers: { grantedByName: string | null }[]
       }
       expect(detail.account.name, "the door answered with a real record").toBeTruthy()
-      expect(detail.account.status).toBeNull()
       expect(detail.account.createdByName).toBeNull()
       expect(detail.account.editedByName).toBeNull()
       // The PARENT is a second row built by a second query — the place a
       // redaction applied "at the call site" is the one somebody forgets.
       if (detail.parent) {
         parents++
-        expect(detail.parent.status, "the parent row goes through the projection too").toBeNull()
-        expect(detail.parent.createdByName).toBeNull()
+        expect(
+          detail.parent.createdByName,
+          "the parent row goes through the projection too"
+        ).toBeNull()
       }
       // Who handed out the login is a staff decision with a staff name on it.
       for (const p of detail.portalUsers) {

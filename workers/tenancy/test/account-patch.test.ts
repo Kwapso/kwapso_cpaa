@@ -141,19 +141,21 @@ describe("clearing a field is something the caller has to say", () => {
   })
 })
 
-describe("status has no empty state to reach", () => {
-  // The column is NOT NULL DEFAULT 'active'. Treating "" as "clear it" would turn
-  // a blank dropdown into a constraint violation — a 500 where the caller only
-  // meant "leave it". Absent and empty both keep what is there.
-  it("an empty status keeps the current one instead of failing", async () => {
-    const res = await post({ id: IDS.victimAccount, name: "Bergman", status: "" })
+describe("a status sent to the door is ignored, not written and not refused", () => {
+  // 0042 RETIRED `status`. The column is still on the table so history stays
+  // true, and nothing in the app reads or writes it — but an OLD caller can
+  // still send one: a saved MCP client, a script, a queued agent turn written
+  // against last week's schema. Two failures are possible and both are worse
+  // than doing nothing: refusing the whole edit over a field nobody needs, or
+  // quietly writing to a column the app has stopped believing.
+  //
+  // The rest of the edit must land, which is what makes this a test rather than
+  // a shrug — a door that ignored the whole body would satisfy half of it.
+  it("the edit lands and the retired column is untouched", async () => {
+    const before = account().status
+    const res = await post({ id: IDS.victimAccount, name: "Bergman Renamed", status: "past_client" })
     expect(res.status, await res.text()).toBe(200)
-    expect(account().status).toBe("client")
-  })
-
-  it("a real status still moves it", async () => {
-    const res = await post({ id: IDS.victimAccount, name: "Bergman", status: "past_client" })
-    expect(res.status).toBe(200)
-    expect(account().status).toBe("past_client")
+    expect(account().name, "the fields the door DOES read must still be written").toBe("Bergman Renamed")
+    expect(account().status, "a retired column must not move").toBe(before)
   })
 })

@@ -81,10 +81,6 @@ const YES_NO: FacetOption[] = [
  * and is written down in `UNFILTERED` beside the check. */
 export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   accounts: [
-    // The team's OWN word for where an account stands ("past_client"), so the
-    // options are rows rather than an enum here: no list in this file could keep
-    // up with a vocabulary the team edits.
-    { field: "status", label: "Status" },
     { field: "archived", label: "Archived", options: YES_NO },
   ],
   knowledge: [

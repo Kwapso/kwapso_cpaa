@@ -533,15 +533,34 @@ Purpose: every company and every person kwapso works with, in **one** table
 `parent_account_id` (a **self-pointer**: a holding company's businesses, a
 business's divisions, nesting is deep, but not unlimited; the two ceilings are
 below), `name`, `email`, `phone`, `address`, `code`,
-`currency`, `locale`, `timezone`, `commercials_visible`, `status` (the commercial
-lifecycle: prospect → client → past client). **`code` is a REFERENCE, never an
-identifier**, staff assign it when work starts (BERG), it is unique-when-present
+`currency`, `locale`, `timezone`, `commercials_visible`. **`code` is a REFERENCE,
+never an identifier**, staff assign it when work starts (BERG), it is unique-when-present
 (a partial unique index, so two people can't mint the same one at the same
 instant) and nullable, and every route addresses a row by its ULID `id`. Re-coding
 an account therefore re-points nothing. **The loop guard is the write itself**: a
 move rides a recursive `WITH … UPDATE … WHERE NOT EXISTS (ancestors)`, so two
 admins re-parenting at the same instant cannot co-operate their way into a ring
 (CONCURRENCY rule 1); zero rows changed is the refusal, reported as a plain 409.
+**`status` is kept and means nothing (0042, 19 Aug 2026).** It held the commercial
+lifecycle — prospect → client → past client — as free text behind a pick-or-TYPE
+box, and it was a second answer to a question `deactivated_at` already answered:
+is this account live? The two drifted exactly as a second source of truth does.
+On the live data the day it was retired, 24 companies held FOUR spellings of two
+ideas (`client` 13, `past client` 6, `active` 4, `active_client` 1 — the raw token
+copied out of the form's own placeholder), all 106 contacts said `active`, which
+is 106 rows carrying no information and one word printed on every row of the list,
+and not one of the 130 accounts had ever been archived, so the mechanism that DOES
+answer the question had never been used. One of the three seeded dropdown values
+was literally `archived`, competing with the flag underneath it.
+
+Nothing reads the column now — not the row type, the SELECT, the sort menu, the
+door's filter, create, update, the audit diff, the CSV column, the two MCP tools
+or either detail screen. It survives because it records what people typed while
+the idea existed, which is the same reason nothing here is ever deleted, and the
+same shape `meetings.status` already has (§ *meetings*). The `Account status`
+dropdown group is DEACTIVATED by the migration rather than deleted, so it stops
+being offered on the Dropdown values screen without losing its history.
+
 **And already-there is not a move** (R17): `setAccountParent` compares the stored
 row's `parent_account_id` first and returns `false` without writing at all, so a
 repeat costs no history row and no live ping. The no-op predicate cannot ride the

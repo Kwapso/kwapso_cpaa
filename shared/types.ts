@@ -681,10 +681,6 @@ export type Account = {
   /** may this account see money figures on its own work? `null` on the way OUT
    * to a client login — the agency's own switch ABOUT them, never for them. */
   commercialsVisible: boolean | null
-  /** the commercial lifecycle (prospect / client / past client). `null` on the
-   * way OUT to a client login: our view of the relationship is not their reading.
-   * See toAccount in workers/tenancy/src/lib/accounts.ts. */
-  status: string | null
   /** false once archived (deactivate-never-delete) */
   active: boolean
   /** the audit block, for the detail Overview tab (the same shape every record
