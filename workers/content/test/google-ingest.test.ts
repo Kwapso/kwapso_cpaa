@@ -415,30 +415,94 @@ describe("what actually gets read", () => {
   })
 })
 
-describe("a schedule cannot sweep somebody's mailbox", () => {
+// THE RULING CHANGED ON 19 AUG 2026, and this block changed with it.
+//
+// It used to assert that a schedule reads NOBODY's Google. The owner asked for
+// the opposite — "whatever makes it more seamless is better" — so what has to be
+// defended is no longer "never", it is "only ever as a named person who
+// connected their own account, and only ever what that person's own token can
+// see". A cron that swept Google under a system identity would be the thing this
+// block still exists to prevent; a cron that sweeps as Marta, using Marta's
+// token, seeing Marta's material, is what was asked for.
+//
+// The two structural tests below did not change at all, and that is the point of
+// having written them structurally: the SHARED knowledge sweep still cannot name
+// a Google kind. What was added is a separate call in the cron handler beside it
+// (lib/google-autopilot.ts), which is why the separation held while the posture
+// moved.
+describe("a schedule sweeps Google only as the person whose connection it is", () => {
   it("the shared sweep's kind list does not contain a single Google kind", () => {
     const shared = INGEST_KINDS.map((k) => k.kind)
     for (const google of GOOGLE_SOURCE_KINDS)
       expect(shared, `${google} must not be reachable from the cron's own list`).not.toContain(google)
   })
 
-  // THE SECOND LINE OF DEFENCE, named as such. This one CANNOT fail while the
-  // guard is a user id no row can hold — which is exactly why it is not the
-  // assertion this design rests on: a silent no-op and a working separation look
-  // identical from here. It is worth keeping because it proves the fallback is
-  // fail-CLOSED (nothing, rather than somebody's mail under a system account),
-  // and worth labelling because a green tick that cannot go red is a green tick
-  // somebody will mistake for proof.
-  it("fails closed anyway: the cron's guard resolves no connection, so nothing is read", async () => {
-    // The scheduled handler, called exactly as wrangler calls it — the real
-    // guard it builds, the real teams read, the real sweepAll.
-    db().exec(`UPDATE teams SET db_status = 'ready' WHERE id = '${IDS.team}';`)
-    await (
+  const runCron = () =>
+    (
       worker as unknown as {
-        scheduled: (c: { cron: string }, e: unknown) => Promise<void>
+        scheduled: (c: { cron: string; scheduledTime: number }, e: unknown) => Promise<void>
       }
-    ).scheduled({ cron: "*/15 * * * *" }, env(IDS.staffUser))
-    expect(sources().length, "a cron has no person to be, so it reads nobody's Google").toBe(0)
+    ).scheduled({ cron: "*/15 * * * *", scheduledTime: Date.parse("2026-08-19T09:00:00Z") }, env(IDS.staffUser))
+
+  // FAIL-CLOSED IS STILL THE FLOOR. A team where nobody has connected Google
+  // reads nothing at all — the sweep has no person to be, and does not invent
+  // one. This is the assertion that would catch a future edit reaching for a
+  // system identity because the loop looked empty.
+  it("reads nothing at all for a team where nobody has connected Google", async () => {
+    db().exec(`UPDATE teams SET db_status = 'ready' WHERE id = '${IDS.team}';`)
+    // Deactivated rather than deleted — google_sources references them, and
+    // 'switched off' is the real-world shape of this anyway (somebody revoked
+    // access) rather than a row vanishing.
+    db().exec(`UPDATE google_connections SET deactivated_at = '2026-08-01';`)
+    await runCron()
+    expect(sources().length, "no connection means no person, and no person means no read").toBe(0)
+  })
+
+  // AND THE POSTURE THE OWNER ASKED FOR: with a connection, the schedule brings
+  // that person's material in without anybody pressing anything — and it arrives
+  // owned by THEM, which is the proof it was read with their token rather than
+  // under some team-wide identity.
+  it("sweeps as the connected person, and what arrives is theirs", async () => {
+    // The staff user is already connected by the fixture — that is the state
+    // this whole suite is about.
+    db().exec(`UPDATE teams SET db_status = 'ready' WHERE id = '${IDS.team}';`)
+    await runCron()
+    const brought = sources().filter((s) => GOOGLE_SOURCE_KINDS.includes(s.kind as never))
+    expect(brought.length, "a connected person's material comes in on the schedule").toBeGreaterThan(0)
+  })
+
+  // NO DUPLICATES, PROVED RATHER THAN ASSUMED — the owner's own condition. The
+  // sweep is run TWICE over the same material; the second pass must add nothing,
+  // because `knowledge_sources` is keyed on (origin_table, origin_row_id) and a
+  // transcript is claimed by an UPDATE carrying its own precondition.
+  it("runs twice and adds nothing the second time", async () => {
+    // The staff user is already connected by the fixture — that is the state
+    // this whole suite is about.
+    db().exec(`UPDATE teams SET db_status = 'ready' WHERE id = '${IDS.team}';`)
+    await runCron()
+    const first = sources().length
+    expect(first, "the first pass must actually do something, or this proves nothing").toBeGreaterThan(0)
+    await runCron()
+    expect(sources().length, "a second pass over the same material writes no second row").toBe(first)
+  })
+
+  // THE IDENTITY IS NEVER INVENTED. Read off the file rather than exercised,
+  // because the failure this guards against is a future edit that reaches for a
+  // `system:` id when the connection loop is inconvenient — and that edit would
+  // pass every behavioural test above on a team that happens to have a
+  // connection. The user id must come from the connections table.
+  it("the autopilot's guard takes its user id from a connection, never a system name", async () => {
+    const { readFileSync } = await import("node:fs")
+    const { join } = await import("node:path")
+    const src = readFileSync(join(__dirname, "..", "src", "lib", "google-autopilot.ts"), "utf8")
+    const at = src.indexOf("for (const userId of people)")
+    expect(at, "the per-person loop must exist — it is the whole mechanism").toBeGreaterThan(-1)
+    const body = src.slice(at)
+    expect(body).toContain("userId }")
+    expect(
+      /userId:\s*"system:/.test(body),
+      "no Google read may be made under a system identity — the token belongs to a person"
+    ).toBe(false)
   })
 
   // THE ASSERTION THE DESIGN ACTUALLY RESTS ON, and it took a sabotage to get it

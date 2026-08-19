@@ -65,6 +65,7 @@ type MeetingRow = {
   transcript_captured_at: string | null
   transcript_url: string | null
   transcript_found_by: string | null
+  knowledge_indexed_at: string | null
   recurring_event_id: string | null
   google_join_url: string | null
   google_organizer: string | null
@@ -85,7 +86,18 @@ type MeetingRow = {
 
 /** The two names ride the read rather than a second lookup: a meeting is only
  * ever useful with the client and the purpose spelled out, and a list of fifty
- * would otherwise be a hundred round trips through the REST door. */
+ * would otherwise be a hundred round trips through the REST door.
+ *
+ * AND `knowledge_indexed_at`, WHICH ANSWERS THE ONE QUESTION A PERSON COULD NOT
+ * ASK. "We fetched the transcript from Google" and "the words are answerable"
+ * are two different facts, and every screen only ever showed the first — so
+ * somebody who had read a transcript had no way to tell whether asking the
+ * knowledge base about it would find anything.
+ *
+ * It reads `indexed_at` rather than testing that the row EXISTS, and the
+ * difference matters: a source is upserted the moment the sweep sees it and
+ * indexed some moments later, so the row alone would say yes during exactly the
+ * window when the true answer is still no. */
 const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id, m.agenda, m.notes, m.location,
   m.starts_at, m.ends_at, m.google_event_id, m.google_event_url,
   m.transcript_file_id, m.transcript_captured_at, m.transcript_url, m.transcript_found_by,
@@ -94,6 +106,9 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
   m.google_status, m.google_recurrence, m.google_time_zone, m.google_updated_at, m.google_synced_at,
   m.from_calendar,
   m.created_at, m.creator_name, m.updated_at, m.editor_name, m.deactivated_at,
+  (SELECT ks.indexed_at FROM knowledge_sources ks
+    WHERE ks.origin_table = 'meetings' AND ks.origin_row_id = m.id
+      AND ks.deactivated_at IS NULL) AS knowledge_indexed_at,
   (SELECT a.name FROM accounts a WHERE a.id = m.account_id) AS account_name,
   (SELECT ap.name FROM apps ap WHERE ap.id = m.app_id) AS app_name,
   (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name`
@@ -201,6 +216,7 @@ function toMeeting(r: MeetingRow): Meeting {
     transcriptCapturedAt: r.transcript_captured_at,
     transcriptUrl: r.transcript_url,
     transcriptFoundBy: r.transcript_found_by,
+    knowledgeIndexedAt: r.knowledge_indexed_at ?? null,
     recurringEventId: r.recurring_event_id,
     googleJoinUrl: r.google_join_url,
     googleOrganizer: r.google_organizer,
@@ -1294,6 +1310,7 @@ export async function readTranscript(
     transcript_note: string | null
     transcript_url: string | null
     transcript_found_by: string | null
+  knowledge_indexed_at: string | null
     transcript_captured_at: string | null
   }>(
     cfg,

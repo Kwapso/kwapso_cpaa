@@ -1650,6 +1650,12 @@ export type Meeting = {
    * same thing — the first is a fact and the other two are matches — so the
    * screen says which. Null until one is captured. */
   transcriptFoundBy: string | null
+  /** WHEN THE WORDS BECAME ANSWERABLE — null until the knowledge sweep has
+   * indexed this meeting. Distinct from `transcriptCapturedAt`, which only says
+   * the transcript was fetched from Google: for a window between the two, the
+   * meeting HAS its transcript and asking the knowledge base about it still
+   * finds nothing. That gap was invisible on every screen. */
+  knowledgeIndexedAt: string | null
   /* THE WORDS THEMSELVES ARE NOT HERE, and that is deliberate. A page of the
    * diary is fifty meetings; a transcript is up to a megabyte. Putting one on
    * the other would make the list read the heaviest response in the app to show

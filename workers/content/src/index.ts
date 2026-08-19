@@ -235,6 +235,7 @@ import {
   postGoogleSource,
   postGoogleSourceActive,
 } from "./routes/google"
+import { googleAutopilot } from "./lib/google-autopilot"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { clientUserIds } from "@shared/workers/record-link"
@@ -671,6 +672,36 @@ export default {
         const results = await sweepAll(env, d1ConfigFrom(env), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0)
         if (indexed > 0) await publishChange(env, team.id, "knowledge")
+
+        // AND GOOGLE BRINGS ITSELF IN (owner, 19 Aug 2026). This cannot run under
+        // the guard above: `userId` there is `system:knowledge-sweep`, a value no
+        // user row can hold, so `accessTokenFor` would resolve nothing. Every
+        // Google read in this app is somebody's OWN, which makes the automatic
+        // version a loop over connected people rather than one team-wide call —
+        // see lib/google-autopilot.ts for what that changes and why nothing it
+        // writes can happen twice.
+        const auto = await googleAutopilot(
+          env,
+          d1ConfigFrom(env),
+          { id: team.id, databaseId: team.database_id },
+          new Date(controller.scheduledTime)
+        )
+        // A captured transcript changes a meeting AND puts words in the knowledge
+        // base on the next pass, so both listeners are told.
+        if (auto.captured > 0) {
+          await publishChange(env, team.id, "meetings")
+          await publishChange(env, team.id, "knowledge")
+        }
+        // R12: every failure recorded, per person, so one expired token is
+        // visible without being fatal. `googleAutopilot` throws nothing — it
+        // returns what went wrong so this loop keeps going.
+        for (const err of auto.errors)
+          await recordWorkerError(
+            env.DB,
+            "content",
+            `cron/google-autopilot (${team.id}/${err.userId}/${err.where})`,
+            new Error(err.message)
+          )
         // A kind that failed recorded itself on its own row (knowledge_ingest);
         // it is recorded HERE too, because that row is only read by someone who
         // already suspects something, and the 90-day error log is where anyone

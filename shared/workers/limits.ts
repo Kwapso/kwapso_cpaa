@@ -125,6 +125,33 @@ export const CRON_GROWTH_CAP = 200
  * The rest stay pending and are accepted from the invites inbox. */
 export const INVITE_SWEEP_CAP = 25
 
+/* ---- Google brings itself in, on a schedule (owner, 19 Aug 2026) ----------- */
+
+/** HOW MANY CONNECTED PEOPLE one team's tick acts as. Every Google read in this
+ * app uses ONE PERSON'S OWN connection, so an automatic sweep has to be a loop
+ * over people rather than a single team-wide call — there is no team-wide Google
+ * credential and deliberately never was. Small, because the loop is per team and
+ * the tick is every fifteen minutes: five people is twenty a hour each, which is
+ * far more often than anybody's calendar changes. */
+export const GOOGLE_SWEEP_PEOPLE_PER_TICK = 5
+
+/** HOW MANY MEETINGS one person's tick tries a transcript for. A try that finds
+ * nothing writes nothing and costs one Google round trip, so this is the number
+ * that keeps a quiet tick cheap. */
+export const TRANSCRIPT_SWEEP_PER_PERSON = 3
+
+/** THE HORIZON — how far back the sweep keeps looking for a transcript.
+ *
+ * This is the number that stops it hunting forever. A meeting whose transcript
+ * never appears (nobody recorded it; Gemini was off; it was a phone call) would
+ * otherwise be retried every fifteen minutes for the life of the product, and
+ * the cost of that is not the compute, it is that the queue never drains and the
+ * newest meetings sit behind a permanent backlog of ones that will never resolve.
+ * Fourteen days is well past when Google posts a recording — it is usually
+ * minutes and occasionally hours — and past it the manual button on the meeting
+ * is still there for the one somebody actually wants. */
+export const TRANSCRIPT_HORIZON_DAYS = 14
+
 /** @mentions one help reply may carry. Each mention becomes a row in an `IN (...)`
  * lookup AND an email, so an uncapped list is both an unbounded statement and an
  * unbounded send from a trusted sender. */

@@ -504,6 +504,19 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                       <Badge variant="outline" className="text-[10px]">
                         {FOUND_BY[item.transcriptFoundBy ?? ""] ?? t("Found in Google")}
                       </Badge>
+                      {/* AND WHETHER THE WORDS ARE ANSWERABLE, which is a
+                          different fact from having fetched them and was shown
+                          nowhere. The sweep indexes a captured transcript within
+                          the quarter hour, so "not yet" is a real and temporary
+                          state rather than a failure — it says so. */}
+                      <Badge
+                        variant={item.knowledgeIndexedAt ? "secondary" : "outline"}
+                        className="text-[10px]"
+                      >
+                        {item.knowledgeIndexedAt
+                          ? t("In the knowledge base")
+                          : t("Not in the knowledge base yet")}
+                      </Badge>
                       {item.transcriptUrl && (
                         <a
                           href={safeHref(item.transcriptUrl)}
