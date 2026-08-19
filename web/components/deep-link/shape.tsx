@@ -9,6 +9,7 @@ import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } fr
 import { personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
+import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 import type {
   Account,
   ActivityItem,
@@ -165,6 +166,47 @@ export function shapeHelpList(
 /** What a source IS, in the words a person uses for it. A `note` is something
  * somebody wrote here; everything else MIRRORS a row the app already owns, and
  * saying which row it mirrors is the honest answer to "why does it know that?". */
+/** WHAT A PIECE OF KNOWLEDGE CAME FROM, as a glyph (R35).
+ *
+ * The knowledge base is the one collection where every row is a DIFFERENT KIND
+ * of thing — a calendar entry beside a ticket beside a file somebody uploaded —
+ * and it was the one collection where every row looked identical: a title, then
+ * "From a calendar entry · The agency" in grey. The word is doing all the work,
+ * and it is the third thing your eye reaches.
+ *
+ * A LUCIDE NAME, NOT AN EMOJI, and that is the one real decision here. The marks
+ * elsewhere in this app are the TEAM's — a ticket type's glyph is theirs to set
+ * on the Dropdown values screen. A source's kind is not: the code owns the list
+ * (`KNOWLEDGE_KIND` above, held to the sweep by knowledge-coverage.test.ts), so
+ * its icon belongs with the code, in the same vocabulary the nav rail uses for
+ * the same concepts. Where a kind IS one of the app's own records — a ticket, a
+ * story, an account — it borrows that section's own icon, so the thing looks the
+ * same in the knowledge base as it does in the rail.
+ *
+ * Held to KNOWLEDGE_KIND by the same coverage test: a kind with a word and no
+ * glyph would draw an initial, which reads as a bug rather than as a default. */
+export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
+  note: "sticky-note",
+  file: "file",
+  article: "book-open",
+  // The app's own records borrow the rail's icon for the same concept.
+  ticket: "life-buoy",
+  account: "building-2",
+  contact: "contact",
+  app: "app-window",
+  process: "route",
+  sprint: "calendar-range",
+  story: "hammer",
+  meeting: "calendar-clock",
+  todo: "inbox",
+  task: "list-todo",
+  // The four that arrive through somebody's own Google connection.
+  document: "file-text",
+  email: "mail",
+  event: "calendar",
+  message: "message-square",
+}
+
 export const KNOWLEDGE_KIND: Record<string, string> = {
   note: "Note",
   file: "From a file",
@@ -212,7 +254,16 @@ export function shapeKnowledgeList(
   return {
     rows: sources.map((s) => ({
       id: s.id,
-      mark: <RecordMark name={s.title} />,
+      mark: (
+        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl">
+          <DynamicIcon
+            name={(KNOWLEDGE_KIND_ICON[s.kind] ?? "file") as IconName}
+            aria-hidden
+            className="size-4"
+            fallback={() => null}
+          />
+        </span>
+      ),
       // A source taken AWAY from the assistant stays in the list (deactivate-not-
       // delete) and says so, the same way a retired article does — seeing what
       // you excluded is half of trusting what you did not.

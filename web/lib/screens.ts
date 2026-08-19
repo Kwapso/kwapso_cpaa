@@ -434,7 +434,18 @@ const accountsListRecipe: ScreenRecipe = {
  * above. */
 const knowledgeListRecipe: ScreenRecipe = {
   type: "list",
-  display: "list",
+  // CARDS, not a list, and this is the one collection that earns them.
+  //
+  // Every other collection here is a list of ONE kind of thing — tickets, or
+  // stories, or accounts — where the rows differ by their words. The knowledge
+  // base is the opposite: a calendar entry beside a ticket beside a file
+  // somebody uploaded, and until 19 Aug 2026 every one of them looked identical,
+  // a title over "From a calendar entry · The agency" in grey. The thing that
+  // tells them apart was the third thing your eye reached and it was a WORD.
+  //
+  // A card gives the source's own glyph room to be seen before the title is
+  // read, which is the whole point of drawing it (R35).
+  display: "cards",
   surface: "none",
   binding: { module: "knowledge" },
   gate: { module: "knowledge", right: "read" },
