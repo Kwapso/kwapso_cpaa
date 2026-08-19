@@ -170,9 +170,11 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    aren't re-argued; it does not describe the eras that shipped after it. There is
    deliberately no single "what's next" file. Open work lives beside the thing
    it's open on: **UI-GAPS.md** (library gaps), **EDGE-CASES.md** (the deferred
-   perf wins), **AGENT-MODULES-PLAN.md** (the deferred agent hooks), and
-   **BASE-IMPROVEMENTS.md** (what each audit round changed). For what is true
-   today: this file → BASE-MANUAL.md.
+   perf wins), **AGENT-MODULES-PLAN.md** (the deferred agent hooks),
+   **[ADVISORIES.md](ADVISORIES.md)** (every dependency advisory, and the proof
+   of whether the code we deploy can reach it), and **BASE-IMPROVEMENTS.md**
+   (what each audit round changed). For what is true today: this file →
+   BASE-MANUAL.md.
 7. **[SEARCH.md](SEARCH.md)**, the search + in-app-filter ruleset (the layered
    client-side → server `?q=` → per-team FTS5 model; recipe-declared).
 8. **[DATA-MODEL.md](DATA-MODEL.md)**, every table (global core + per-team), what's
