@@ -1941,7 +1941,7 @@ export async function retrieve(
     url: row.source_url,
     // The read above already carries `origin_table` and `origin_row_id` for the
     // live cross-check, so the link to the record costs nothing extra.
-    recordPath: recordPath(row.origin_table, row.origin_row_id),
+    recordPath: recordPath(row.origin_table, row.origin_row_id, row.compartment),
     compartment: row.compartment,
     seq: row.seq,
     text: plainText(row.text),
@@ -2114,9 +2114,37 @@ const RECORD_PATH: Record<string, string> = {
   tasks: "tasks",
 }
 
-export function recordPath(originTable: string | null, originRowId: string | null): string | null {
+/** RECORDS THAT LIVE INSIDE ANOTHER RECORD'S PAGE.
+ *
+ * A contact is not a screen — it is a row on its account's Contacts tab. Same
+ * for a to-do, which lives on the account or app it was asked of. So "open the
+ * record" for one of these means opening the page it is ON, which is where a
+ * person would go to look at it anyway.
+ *
+ * Before this they resolved to null and rendered no link at all. The owner's
+ * sentence was "we should always be able to just link back to the resource", and
+ * a citation reading "Roland Golger at HOGO" with nothing to click was the one
+ * shape of answer that could not be checked. Measured in the test run: four
+ * citations out of six on a question about HOGO's people had no way back. */
+const LIVES_ON_ITS_ACCOUNT = new Set(["account_links", "todos"])
+
+export function recordPath(
+  originTable: string | null,
+  originRowId: string | null,
+  /** the source's compartment — `account:<id>` or `agency`. The account id is
+   * already on the row the ranker read, so this costs nothing extra. */
+  compartment?: string | null
+): string | null {
   const segment = originTable ? RECORD_PATH[originTable] : undefined
-  return segment && originRowId ? `${segment}/${originRowId}` : null
+  if (segment && originRowId) return `${segment}/${originRowId}`
+  // The nested kinds, one hop out to the page they sit on. Only ever the
+  // account's OWN compartment: `agency` names no record, so a contact filed
+  // there still renders no link rather than a broken one.
+  if (originTable && LIVES_ON_ITS_ACCOUNT.has(originTable)) {
+    const account = /^account:(.+)$/.exec(compartment ?? "")
+    if (account) return `accounts/${account[1]}`
+  }
+  return null
 }
 
 async function crossCheck(
