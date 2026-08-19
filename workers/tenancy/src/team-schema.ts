@@ -3005,6 +3005,35 @@ UPDATE knowledge_sources
                   AND origin_row_id LIKE '%:' || m.google_event_id);
 `,
   },
+  {
+    // A TABLE THAT WAS RECORDED AS CREATED AND WAS NOT THERE.
+    //
+    // Found on 20 Aug 2026 in the error log, not by anybody using the app:
+    // `GET /api/tenancy/config/screens` failing 25 times in six hours with "no
+    // such table: screens". The owner's team database was missing it. Every
+    // OTHER team database has it, `0002_screens` is recorded as applied on his,
+    // and nothing in this file ever drops it — so it was lost by hand, in a
+    // project where migrations are applied by hand because the maintenance key
+    // has never been set.
+    //
+    // WHY A NEW MIGRATION RATHER THAN EDITING 0002. A migration already recorded
+    // as applied will never run again, so correcting 0002 would fix nothing on
+    // the database that needs it. This one is written to be harmless where the
+    // table exists (which is everywhere else) and curative where it does not.
+    //
+    // IT IS AN OVERRIDES TABLE, so empty is not a loss — it is the default. A
+    // row here replaces one screen's recipe for one team; no rows means every
+    // team screen comes from app code, which is what all of them do today.
+    version: "0047_screens_exists",
+    sql: `
+CREATE TABLE IF NOT EXISTS screens (
+  module TEXT PRIMARY KEY,
+  recipe TEXT NOT NULL,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
