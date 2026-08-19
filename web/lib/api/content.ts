@@ -413,6 +413,24 @@ export const content = {
     fileDataUrl?: string
     fileName?: string
   }) => api<TaskListResponse>("/api/content/tasks", post(input)),
+  /** CORRECT A TASK. Every field is REPLACED by what is sent, so the form sends
+   * the whole task — an omitted field is cleared, which is the same contract the
+   * account door settled on and for the same reason (an absent field meaning
+   * "leave it" is how an agent turn wiped three columns nobody mentioned).
+   * `important` and `urgent` are the two ticks the 1-to-4 priority is derived
+   * from, so this is also how a task is re-prioritised. */
+  updateTask: (input: {
+    id: string
+    title: string
+    detail?: string
+    dueOn?: string
+    assigneeId?: string
+    accountId?: string
+    appId?: string
+    department?: string
+    important: boolean
+    urgent: boolean
+  }) => api<TaskListResponse>("/api/content/tasks/update", post(input)),
   setTaskDone: (id: string, done: boolean) =>
     api<TaskListResponse>("/api/content/tasks/done", post({ id, done })),
 

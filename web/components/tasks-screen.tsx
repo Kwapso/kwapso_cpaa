@@ -41,20 +41,19 @@ import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar
 import { RecordTable, visibleActions } from "@/components/record-table"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
+import { useTaskFormOptions } from "@/lib/use-task-form-options"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { TodosPanel } from "@/components/work-panels"
-import { content as contentApi, tenancy } from "@/lib/api"
+import { content as contentApi } from "@/lib/api"
 import { usePermissions } from "@/lib/perms"
-import { appsKey, listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
-import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
-import type { AppRow, Account, SelectableValue, Task, TeamMember } from "@shared/types"
+import type { Task } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatDateSortable } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { assignableMembers } from "@/lib/members"
 
 /** One task, as a row. Every column the six views need is on it, so the two
  * column sets below are a CHOICE of what to show rather than two shapings that
@@ -136,32 +135,6 @@ const TASK_TABS: { value: TaskView; label: string; icon: string }[] = [
   { value: "upcoming", label: "Upcoming", icon: "clock" },
   { value: "all", label: "All tasks", icon: "list" },
 ]
-
-/** WHAT A TASK NEEDS TO BE WRITTEN AT ALL — the people it can be given to, the
- * apps a Production one must name, the clients a Sales one must name, and the
- * agency's own five departments. Every one is a cache another screen already
- * holds, so opening this form costs a team that has been anywhere else nothing. */
-function useTaskFormOptions(teamId: string) {
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
-    tenancy.members().then((r) => r.members)
-  )
-  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
-  const accountsQ = useCached<Account[]>(`accounts:${teamId}`, () => listFetch.accounts(teamId))
-  const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () => listFetch.selectable(teamId))
-  return {
-    // Who's doing it: OUR people. A client login is an ordinary member and
-    // was in this dropdown until the one seam started deciding (lib/members).
-    members: assignableMembers(membersQ.data),
-    apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
-    accounts: (accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
-    // A retired department never appears as a pickable option, exactly as a
-    // retired ticket type does not — but a task already filed under one still
-    // reads truthfully.
-    departments: (valuesQ.data ?? [])
-      .filter((v) => v.active && v.type === SELECTABLE_GROUPS.department)
-      .map((v) => v.value),
-  }
-}
 
 export function TasksScreen({
   teamId,

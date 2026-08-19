@@ -14,13 +14,13 @@
 // record and not a checklist somewhere: forty minutes on our own VAT return is
 // real time, it is ours, and it costs us the same as forty minutes of delivery.
 
-import { logActivity, type Actor } from "@shared/workers/activity"
+import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { departmentAsks, priorityScore } from "@shared/departments"
+import { PRIORITY_LABEL, departmentAsks, priorityScore } from "@shared/departments"
 import type { Task, TaskViewName } from "@shared/types"
 
 import { nextRef, REF_KINDS } from "./refs"
@@ -326,6 +326,108 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
     relatedRowId: id,
   })
   return { id, accountId }
+}
+
+/** CORRECT A TASK — everything about it except whether it is done.
+ *
+ * THERE WAS NO DOOR AT ALL until 19 Aug 2026. A task could be written and ticked
+ * and nothing else: not retitled, not reassigned, not given a deadline it had
+ * been missing, and — the one that actually bit — not RE-PRIORITISED. The
+ * Eisenhower score is `important` and `urgent`, so with no edit path a task's
+ * priority was fixed at the moment somebody typed it, for ever. The owner asked
+ * why the metric was not being recalculated; the answer is that it is derived on
+ * every read and never stale, and that the two ticks it reads from could not be
+ * changed. This is that half.
+ *
+ * DONE IS NOT EDITABLE. A ticked task is a record of something that happened, and
+ * the way back is the door next to this one — the refusal says so rather than
+ * leaving somebody guessing which button they are missing.
+ *
+ * The two ownership proofs and the department's own rule are the SAME ones
+ * `createTask` applies, deliberately: a task edited into naming a client who is
+ * off the books, or a Production task edited to name no app, is the state the
+ * create door refuses to produce. A door that can only be reached second is
+ * still a door. */
+export async function updateTask(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  id: string,
+  input: TaskInput
+): Promise<{ accountId: string | null }> {
+  const rows = await d1Query<{ status: string; title: string; important: number; urgent: number }>(
+    cfg,
+    guard.databaseId,
+    "SELECT status, title, important, urgent FROM tasks WHERE id = ? LIMIT 1",
+    [id]
+  )
+  const before = rows[0]
+  if (!before) throw new GuardError(404, "not_found", "That task doesn't exist.")
+  if (before.status === "done")
+    throw new GuardError(409, "already_done", "That task is ticked off. Put it back first, then edit it.")
+
+  let accountId: string | null = null
+  if (input.accountId) {
+    const hit = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id FROM accounts WHERE id = ? AND deactivated_at IS NULL LIMIT 1`,
+      [input.accountId]
+    )
+    if (!hit[0]) throw new GuardError(400, "invalid_input", "That client isn't on your books any more.")
+    accountId = hit[0].id
+  }
+  let appId: string | null = null
+  if (input.appId) {
+    const hit = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id FROM apps WHERE id = ? AND deactivated_at IS NULL LIMIT 1`,
+      [input.appId]
+    )
+    if (!hit[0]) throw new GuardError(400, "invalid_input", "That app isn't one of ours any more.")
+    appId = hit[0].id
+  }
+
+  const asks = departmentAsks(input.department ?? null)
+  if (asks.required && asks.field === "app" && !appId)
+    throw new GuardError(400, "invalid_input", `A ${input.department} task has to name the app it is on.`)
+  if (asks.required && asks.field === "account" && !accountId)
+    throw new GuardError(400, "invalid_input", `A ${input.department} task has to name the client it is for.`)
+
+  const now = new Date().toISOString()
+  await d1ExecScript(
+    cfg,
+    guard.databaseId,
+    `UPDATE tasks SET account_id = ${sqlString(accountId)}, app_id = ${sqlString(appId)},
+  title = ${sqlString(input.title)}, detail = ${sqlString(input.detail ?? null)},
+  assignee_id = ${sqlString(input.assigneeId ?? null)},
+  assignee_name = ${sqlString(input.assigneeId ? requireText(input.assigneeName, "Assignee", TEXT_LIMITS.short) : null)},
+  due_on = ${sqlString(input.dueOn ?? null)},
+  important = ${input.important ? 1 : 0}, urgent = ${input.urgent ? 1 : 0},
+  department = ${sqlString(input.department ?? null)},
+  updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)}
+ WHERE id = ${sqlString(id)};`
+  )
+  // THE PRIORITY MOVE IS NAMED, because it is the one edit whose effect is
+  // invisible on the row itself: the score is derived from these two ticks, so a
+  // history that recorded "edited" and not "moved from Whenever to Do it now"
+  // would be a history of the wrong fact.
+  const wasScore = priorityScore(before.important === 1, before.urgent === 1)
+  const nowScore = priorityScore(!!input.important, !!input.urgent)
+  const changes = describeChanges([
+    { label: "Title", from: before.title, to: input.title },
+    ...(wasScore === nowScore
+      ? []
+      : [{ label: "Priority", from: PRIORITY_LABEL[wasScore], to: PRIORITY_LABEL[nowScore] }]),
+  ])
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Task edited",
+    description: `${actor.name} edited the task ${input.title}${changes ? `, ${changes}` : ""}`,
+    relatedTable: "tasks",
+    relatedRowId: id,
+  })
+  return { accountId }
 }
 
 /** Mark a task done, or put it back.

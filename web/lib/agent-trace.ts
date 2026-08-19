@@ -245,6 +245,9 @@ export function traceFor(
     case "cancel_todo":
     case "create_task":
       return { path: seg(teamId, "tasks"), highlight: "main" }
+    // An EDIT lands on the task itself, where the change is visible; a tick lands
+    // there too, because the record is where its status is read.
+    case "update_task":
     case "set_task_done":
       return { path: `${seg(teamId, "tasks")}/${str(input, "id")}`, highlight: "main" }
     // MEETINGS. A create lands on the diary, an edit on the meeting itself.

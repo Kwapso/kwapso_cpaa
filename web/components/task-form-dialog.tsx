@@ -88,6 +88,7 @@ export function TaskFormDialog({
   accounts,
   departments,
   defaultAssigneeId,
+  initial,
   onSubmit,
 }: {
   open: boolean
@@ -101,12 +102,18 @@ export function TaskFormDialog({
   departments: string[]
   /** whoever is opening the form — a new task is theirs until they say otherwise */
   defaultAssigneeId: string
+  /** THE TASK AS IT STANDS, when this form is CORRECTING one rather than writing
+   * one. Absent = a new task. It arrived with the update door on 19 Aug 2026:
+   * until then a task could be written and ticked and nothing else, so a typo was
+   * permanent and — the one that mattered — the two ticks the priority score is
+   * derived from were fixed at the moment somebody typed it. */
+  initial?: TaskFormValues | null
   onSubmit: (values: TaskFormValues) => Promise<void>
 }) {
   const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    {
+    initial ?? {
       title: "",
       detail: "",
       dueOn: "",

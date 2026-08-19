@@ -1312,6 +1312,32 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Add a task: "${str(i, "title").slice(0, 50)}"` },
   },
   {
+    name: "update_task",
+    summary:
+      "Correct a task by `id` — its `title`, `detail`, `dueOn` deadline, `assigneeId`, `accountId`, `appId`, `department`, and the two priority ticks `important` and `urgent`. Every field is REPLACED by what you send, so send the whole task, not just the part you are changing: an omitted field is cleared. The two ticks are what the 1-to-4 priority score is derived from, so this is how a task is re-prioritised. A task that is already ticked off is refused — put it back with `set_task_done` first. The same rules the create door applies still hold: a Production task must name `appId` and a Sales task must name `accountId`.",
+    binding: "CONTENT", method: "POST", path: "/api/content/tasks/update",
+    schema: obj(
+      {
+        id: S, title: S, detail: S, dueOn: S, assigneeId: S, accountId: S,
+        appId: S, department: S, important: B, urgent: B,
+      },
+      ["id", "title"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      dueOn: opt(i, "dueOn"),
+      assigneeId: opt(i, "assigneeId"),
+      accountId: opt(i, "accountId"),
+      appId: opt(i, "appId"),
+      department: opt(i, "department"),
+      important: i.important === true,
+      urgent: i.urgent === true,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit task ${str(i, "id")}` },
+  },
+  {
     name: "set_task_done",
     summary: "Tick a task off, or put it back (`done`: true / false), by id. Ticking a done task changes nothing.",
     binding: "CONTENT", method: "POST", path: "/api/content/tasks/done",

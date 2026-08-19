@@ -23,14 +23,18 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { Check, Undo2 } from "lucide-react"
+import { Check, Pencil, Undo2 } from "lucide-react"
 
 import { ActivityPanel } from "@/components/activity-panel"
+import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chrome"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { CONCEPT_ICON } from "@/lib/pages"
+import { content } from "@/lib/api"
+import { tasksKey } from "@/lib/live-resources"
+import { useTaskFormOptions } from "@/lib/use-task-form-options"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -39,7 +43,8 @@ import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
-import { invalidate, useCachedValue } from "@shared/web/store"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
 export function TaskDetailScreen({
@@ -75,6 +80,12 @@ export function TaskDetailScreen({
   useRecordCounts("tasks", taskId)
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("tasks", taskId))
   const [tab, setTab] = React.useState("overview")
+  // CORRECTING THE TASK. The pickers come from the same hook the create form
+  // uses, so the two forms cannot offer different clients or a different
+  // department list; they are read only when this person could open the form at
+  // all, the rule every other detail's pickers follow.
+  const [editing, setEditing] = React.useState(false)
+  const options = useTaskFormOptions(canEdit ? teamId : null)
 
   if (loading) return <Skeleton variant="list" lines={4} />
   if (!task) return <p className="text-muted-foreground text-sm">{t("That record no longer exists.")}</p>
@@ -143,6 +154,19 @@ export function TaskDetailScreen({
               finished task must not offer to be finished again. No confirm:
               nothing is lost either way, and a confirm on a tick is the kind of
               ceremony that teaches people to click through dialogs. */}
+          {/* CORRECT IT. There was no edit door at all until 19 Aug 2026, so this
+              button had nothing to open: a task could be written and ticked and
+              nothing else, and the two ticks the priority score is derived from
+              were fixed at the moment somebody typed it. A ticked task is a
+              record of something that happened — the door refuses one, and the
+              button stands down rather than opening a form that will be
+              rejected. */}
+          {canEdit && !done && (
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="gap-1">
+              <Pencil className="size-3.5" />
+              {t("Edit")}
+            </Button>
+          )}
           {canEdit && (
             <Button size="sm" variant="outline" onClick={onToggleDone} className="gap-1">
               {done ? <Undo2 className="size-3.5" /> : <Check className="size-3.5" />}
@@ -179,6 +203,51 @@ export function TaskDetailScreen({
             )
           if (panel.value === "activity") return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
+        }}
+      />
+
+      <TaskFormDialog
+        open={editing}
+        onOpenChange={setEditing}
+        draftKey={`task:edit:${taskId}`}
+        teamId={teamId}
+        members={options.members}
+        apps={options.apps}
+        accounts={options.accounts}
+        departments={options.departments}
+        defaultAssigneeId={task.assigneeId ?? ""}
+        // THE TASK AS IT STANDS. The door replaces every field with what arrives,
+        // so the form has to open holding the whole task — a blank form would
+        // clear the four fields nobody touched.
+        initial={{
+          title: task.title,
+          detail: task.detail ?? "",
+          dueOn: task.dueOn ?? "",
+          assigneeId: task.assigneeId ?? "",
+          department: task.department ?? "",
+          appId: task.appId ?? "",
+          accountId: task.accountId ?? "",
+          important: task.important,
+          urgent: task.urgent,
+          fileDataUrl: "",
+          fileName: "",
+        }}
+        onSubmit={async (values: TaskFormValues) => {
+          const { tasks } = await content.updateTask({
+            id: taskId,
+            title: values.title,
+            detail: values.detail || undefined,
+            dueOn: values.dueOn || undefined,
+            assigneeId: values.assigneeId || undefined,
+            accountId: values.accountId || undefined,
+            appId: values.appId || undefined,
+            department: values.department || undefined,
+            important: values.important,
+            urgent: values.urgent,
+          })
+          primeCache(tasksKey(teamId), tasks)
+          invalidate(`activity:record:tasks:${taskId}`)
+          toast.success(t("Task updated."))
         }}
       />
 

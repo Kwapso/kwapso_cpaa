@@ -184,7 +184,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **226 doors, 179 with a tool, 47 with a written reason**, the
+  red build. Today: **227 doors, 180 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -203,7 +203,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 179, **155 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 180, **156 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 
@@ -359,8 +359,9 @@ Today it covers:
     contact reaches this?" has a one-word answer.
   - to-dos and tasks, `raise_todo`, `complete_todo`, `cancel_todo`
     (`todos:create` / `:edit` / `:delete` — what we need FROM a client), and
-    `create_task`, `set_task_done` (`work:create` / `work:edit` — what we owe
-    ourselves).
+    `create_task`, `update_task`, `set_task_done` (`work:create` / `work:edit` —
+    what we owe ourselves; `update_task` is also how a task is RE-PRIORITISED, since
+    the 1-to-4 score is derived from its `important` and `urgent` ticks).
   - time, `start_timer`, `stop_timer`, `log_time`, `resolve_runaway_timer`,
     `set_timer_auto_stop`, all on `work:create`. Logging your OWN hours is a create,
     not an edit: a person who may do the work may say how long it took them.

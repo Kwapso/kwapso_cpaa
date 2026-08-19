@@ -127,6 +127,7 @@ export const TOOL_GATES: Record<string, string> = {
   complete_todo: "todos:edit",
   cancel_todo: "todos:delete",
   create_task: "work:create",
+  update_task: "work:edit",
   set_task_done: "work:edit",
   // MEETINGS gate on their own module. `set_meeting_active` is a `delete`
   // because cancelling IS this module's delete; the row survives it.

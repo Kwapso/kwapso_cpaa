@@ -19,7 +19,7 @@ import { accountScope, refusePortalCaller, type AccountScope } from "@shared/wor
 import { gated, gatedBody } from "@shared/workers/route"
 import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
 import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos } from "../lib/todos"
-import { countTasks, createTask, listTasks, setTaskDone, type TaskFilter } from "../lib/tasks"
+import { countTasks, createTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
 import { TASK_VIEWS, type TaskViewName } from "@shared/types"
 import type { Env } from "../env"
@@ -318,6 +318,59 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
     fileName: file?.name,
   })
   await publishChange(env, guard.teamId, "tasks", id, "add", accountId ?? undefined)
+  return taskPage(cfg, guard, { view: "open" })
+}
+
+/** POST /api/content/tasks/update — correct a task (work:edit).
+ *
+ * The door that did not exist. Tasks could be written and ticked and nothing
+ * else, so a typo was permanent, a task written for the wrong person stayed
+ * theirs, and — the one that mattered — the two ticks the Eisenhower score is
+ * derived from were fixed at the moment somebody typed the task.
+ *
+ * Same body as create, minus the file: an attachment is evidence somebody
+ * uploaded, and replacing it silently is a different act from correcting a
+ * sentence. Every field goes through the same validators for the same reason
+ * (R20 is positional — `important` sits inside a `typeof`, never a cast, or
+ * the string "false" marks a task important). */
+export async function postUpdateTask(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    title?: unknown
+    detail?: unknown
+    dueOn?: unknown
+    assigneeId?: unknown
+    accountId?: unknown
+    appId?: unknown
+    department?: unknown
+    important?: unknown
+    urgent?: unknown
+  }>(request, env, "work", "edit")
+  await refusePortalCaller(cfg, guard)
+
+  const id = requireText(body.id, "Task", TEXT_LIMITS.short)
+  const assigneeId = optionalText(body.assigneeId, "Assignee", TEXT_LIMITS.short)
+  // The same members read the create door makes, and for the same reason: the
+  // name on the row has to be the assignee's, not whoever is editing.
+  const assigneeName = assigneeId
+    ? ((await teamMemberNames(env, guard.teamId)).find((m) => m.userId === assigneeId)?.name ?? null)
+    : null
+  if (assigneeId && !assigneeName)
+    return fail(400, "invalid_input", "That person isn't on the team any more.")
+
+  const { accountId } = await updateTask(cfg, guard, actor, id, {
+    title: requireText(body.title, "What needs doing", TEXT_LIMITS.short),
+    detail: optionalText(body.detail, "Detail", TEXT_LIMITS.long),
+    dueOn: optionalMoment(body.dueOn, "Deadline"),
+    assigneeId,
+    assigneeName: assigneeName ?? undefined,
+    accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short),
+    appId: optionalText(body.appId, "App", TEXT_LIMITS.short),
+    department: optionalText(body.department, "Department", TEXT_LIMITS.short),
+    important: typeof body.important === "boolean" ? body.important : false,
+    urgent: typeof body.urgent === "boolean" ? body.urgent : false,
+  })
+  await publishChange(env, guard.teamId, "tasks", id, "edit", accountId ?? undefined)
   return taskPage(cfg, guard, { view: "open" })
 }
 
