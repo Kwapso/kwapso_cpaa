@@ -47,7 +47,7 @@ import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar
 import { RecordTable, visibleActions } from "@/components/record-table"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
-import { appsKey, cursorKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
+import { appsKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
@@ -57,39 +57,19 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
-/** WHAT THE MONTH IN FRONT OF YOU DOES NOT SAY (R14).
+/* THE "EARLIER NOT LOADED" NOTICE IS GONE, and its absence is the fix.
  *
- * The diary PAGES, newest first, so the rows in hand run from the furthest-out
- * meeting back to wherever the cursor stopped. A month grid drawn over that is
- * honest about the months it has read and silently wrong about every month
- * before them: an empty square in March reads as "we did not meet", when what it
- * means is "nobody has read March yet". A calendar that quietly answers a
- * question it has not asked is worse than one that refuses.
+ * It said: "Earlier meetings haven't been loaded yet, so this month may not be
+ * the whole of it", under a calendar drawing whatever the paged prefix happened
+ * to hold. That was an honest apology for a real limitation — and the limitation
+ * has been removed rather than explained. The calendar asks the DOOR for the
+ * month it is showing (`meetingsMonthKey` / `listFetch.meetingsMonth`), so the
+ * month on screen IS the whole of it and the sentence would now be false.
  *
- * So the calendar renders this under the grid exactly on the months that start
- * before the oldest row loaded — and this renders NOTHING when the cursor says
- * the whole diary is already in hand, because then an empty March really is an
- * empty March. Its own component so the cursor can be read with a hook: the
- * calendar sits inside PagedFind's render prop, where a hook cannot go. */
-function EarlierNotLoaded({
-  listKey,
-  fetchPage,
-}: {
-  listKey: string
-  fetchPage: (cursor: string) => Promise<{ rows: Meeting[]; nextCursor: string | null }>
-}) {
-  const t = useT()
-  const cursor = useCachedValue<string | null>(cursorKey(listKey))
-  if (!cursor) return null
-  return (
-    <>
-      <p className="text-muted-foreground text-sm">
-        {t("Earlier meetings haven't been loaded yet, so this month may not be the whole of it.")}
-      </p>
-      <LoadMore listKey={listKey} fetchPage={fetchPage} label={t("Load more meetings")} />
-    </>
-  )
-}
+ * A caveat left standing over a screen that no longer needs one teaches a person
+ * to distrust a correct answer, which costs more than the sentence ever bought.
+ */
+
 
 /** WHAT "ALL" SHOWS (CHECKLIST 9.1: "all, with far more columns"). The two-field
  * list is for scanning; this is the one somebody reads across.
@@ -214,6 +194,22 @@ export function MeetingsScreen({
   // reader and nothing
   // else; the four censuses went red on it within one run.
   const weekView = view === "week" ? ("week" as const) : undefined
+  // THE MONTH THE CALENDAR IS DRAWING, and its own read.
+  //
+  // The grid told nobody which month it was on, so it drew whatever the paged
+  // list happened to hold — and the diary pages newest-first, which on 19 Aug
+  // 2026 meant June-to-August 2027 while the month on screen was August 2026
+  // with 61 meetings in it. Grid and agenda both said "nothing in the diary this
+  // month" over a badge reading 436. The week view had the identical fault, was
+  // fixed on its own, and this one reads the same page it was fixed away from.
+  //
+  // `null` until the calendar reports (it does so on mount), so the first render
+  // asks for nothing rather than guessing at a month.
+  const [calendarMonth, setCalendarMonth] = React.useState<string | null>(null)
+  const monthQ = useCached<Meeting[]>(
+    view === "calendar" && calendarMonth ? meetingsMonthKey(teamId, calendarMonth) : null,
+    () => listFetch.meetingsMonth(teamId, calendarMonth as string)
+  )
   const weekQ = useCached<Meeting[]>(weekView ? meetingsKey(teamId, weekView) : null, () =>
     listFetch.meetings(teamId, "week")
   )
@@ -400,8 +396,12 @@ export function MeetingsScreen({
           // says so). The one thing the shaper has no column for is the CLOCK
           // TIME, which is the whole point of an agenda row, so it is looked up
           // beside it rather than shaped a second way.
-          const startsAtById = new Map(shown.map((m) => [m.id, m.startsAt]))
-          const calendarEntries: CalendarEntry[] = (data.rows ?? []).map((r) => ({
+          // THE CALENDAR'S OWN ROWS — the month the door answered for, shaped the
+          // same way the list is so a meeting reads identically in both.
+          const monthRows = monthQ.data ?? []
+          const monthShaped = shapeMeetingsList(monthRows)
+          const startsAtById = new Map(monthRows.map((m) => [m.id, m.startsAt]))
+          const calendarEntries: CalendarEntry[] = (monthShaped.rows ?? []).map((r) => ({
             id: String(r.id),
             day: String(r.startsOn ?? ""),
             title: String(r.name ?? ""),
@@ -431,16 +431,22 @@ export function MeetingsScreen({
             <>
               <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
                 {view === "calendar" ? (
+                  // NO `unloaded` SENTENCE ANY MORE. It said "earlier meetings
+                  // haven't been loaded yet, so this month may not be the whole
+                  // of it", which was true of a grid reading the paged prefix and
+                  // is now false: the month on screen IS the whole of it, asked
+                  // of the door. Leaving it would be an apology for a fault that
+                  // no longer exists, which teaches a person to distrust a
+                  // correct screen.
                   <RecordCalendar
                     entries={calendarEntries}
                     onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
-                    emptyText={t("Nothing in the diary this month.")}
-                    unloaded={
-                      <EarlierNotLoaded
-                        listKey={found.listKey ?? meetingsKey(teamId, weekView)}
-                        fetchPage={found.fetchPage}
-                      />
+                    emptyText={
+                      monthQ.data === undefined
+                        ? t("Reading this month…")
+                        : t("Nothing in the diary this month.")
                     }
+                    onMonthChange={setCalendarMonth}
                   />
                 ) : view === "all" ? (
                   // THE DIARY PAGES, so its headers ask the DOOR — `found.order`

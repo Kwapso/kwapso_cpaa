@@ -47,8 +47,22 @@ function filterFrom(url: URL): MeetingFilter {
     appId: queryText(url.searchParams.get("appId"), "App") ?? undefined,
     purposeId: queryText(url.searchParams.get("purposeId"), "Purpose") ?? undefined,
     view: queryText(url.searchParams.get("view"), "View") ?? undefined,
+    // R20 on the query half: through the seam FIRST, then shape-checked. A month
+    // reaches a date comparison, so anything that is not exactly four digits, a
+    // hyphen and two digits is dropped rather than passed on — a malformed month
+    // narrowing to nothing would be a calendar that looks empty for a reason
+    // nobody can see.
+    month: monthOrNone(queryText(url.searchParams.get("month"), "Month") ?? null),
     q: queryText(url.searchParams.get("q"), "Search") ?? undefined,
   }
+}
+
+/** `YYYY-MM` or nothing. The month number is checked as well as the shape:
+ * `2026-13` is the right shape and not a month. */
+function monthOrNone(raw: string | null): string | undefined {
+  if (!raw || !/^\d{4}-\d{2}$/.test(raw)) return undefined
+  const mo = Number(raw.slice(5))
+  return mo >= 1 && mo <= 12 ? raw : undefined
 }
 
 /** GET /api/content/meetings — the diary, newest first (?id → just that one).

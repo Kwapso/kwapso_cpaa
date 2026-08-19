@@ -70,9 +70,23 @@ near-invisible step is the signature of the brand.
 
 What makes it read pink is two files fighting:
 
-1. The library defines the card surface as fully opaque paper:
-   `styles.css` `.glass { background-color: var(--card); box-shadow: inset 0 0 0 1px var(--border); }`,
-   with a comment quoting the brand: *"No frosted-glass cards, no translucent panels."*
+1. ~~The library defines the card surface as fully opaque paper.~~ **CORRECTED
+   2026-08-19: it never did, and this line is why a dialog shipped unreadable.**
+   `.glass` in the installed library is
+   `background-color: color-mix(in oklch, var(--card) 72%, transparent)` with a
+   `backdrop-filter`, and the comment above it reads *"Frosted glass: a
+   translucent pane that blurs (refracts) what's behind it."* The quoted brand
+   line does not appear in `styles.css` at all. Two further claims in this
+   section are also untrue of the installed library: `--card` is `oklch(1 0 0)`,
+   not `#f7f2ea`, which appears nowhere in the file. A paragraph of confident
+   detail about a dependency, written once and never re-read against it, is how
+   `shared/web/library-overrides.css` came to delete the one rule holding a
+   dialog together.
+   **What is true now:** `.glass` is still translucent and is still what a CARD
+   uses, deliberately. Every FLOATING surface — dialog, sheet, alert-dialog,
+   popover, dropdown, hover-card, select, command — is opaque `bg-card` /
+   `bg-popover` as of library v0.13.0, and a census in the library fails the
+   build if a ninth one appears without it.
 2. `shared/web/library-overrides.css:12-14` then makes it translucent again:
    `.glass { background-color: color-mix(in oklch, var(--card) 94%, transparent); }`
 3. `web/app/globals.css:32-56` paints three blurred mango pools (`#fecc6d`) behind
@@ -1765,7 +1779,7 @@ ruling before they are implemented. The last two are settled, and the row says h
 | Rule | What it crosses | Proposed resolution |
 |---|---|---|
 | [G1](#g1-a-record-type-carries-a-glyph), [G2](#g2-the-mapping-if-option-1-is-taken) | UI-CONVENTIONS.md §5, "**No emoji.** Anywhere." | Amend §5 to "no emoji in copy" and add the type mark to §4, or fall back to lucide glyphs. Law changes first, code second. |
-| [C3](#c3-the-ambient-field-never-sits-behind-a-content-surface) | UI-CONVENTIONS.md §7, "Surfaces that float over it … use the frosted `.glass`" | Narrow the override to overlays. The library's own comment already says kwapso has no translucent panels, so this restores the library's intent rather than departing from it. |
+| [C3](#c3-the-ambient-field-never-sits-behind-a-content-surface) | UI-CONVENTIONS.md §7, "Surfaces that float over it … use the frosted `.glass`" | **SETTLED 2026-08-19 IN THE LIBRARY, not by an override.** The premise here was wrong twice: the library's comment said the opposite, and the proposed `[data-slot="dialog-content"]` selector matches nothing — `data-slot` appears zero times in the installed registry. Every floating surface is opaque at v0.13.0 and a census enforces it; a card keeps `.glass` on purpose. |
 | [F3](#f3-the-separator-becomes-the-action-bars-top-edge) | `shared/web/form-shell.tsx:43-53`, an 11-line comment defending `pt-6` as "the ONE value that governs it everywhere" | The comment documents the exact bug being fixed. Replace the value with a structure that cannot have the bug, and replace the comment with one sentence saying so. |
 | [N5](#n5-the-surface-step-is-measured-not-assumed) | [C2](#c2-cards-have-no-border-no-shadow-and-no-hover-animation) and "Do not do" #5, both of which said a card has no border | **SETTLED 18 Aug 2026 by measurement, not by preference.** The light theme's page-to-card step is ΔL\* 3.22, below the threshold at which two flat surfaces read as separate; the dark theme's is 10.32. A borderless card is therefore invisible in light mode, which is exactly the difference the owner reported between the two themes. The card keeps its hairline; the no-shadow rule is untouched. Delete this row and restore C2 the day a theme change raises the light step past ΔL\* 8. |
 | [N10](#n10-the-control-follows-the-option-count) | `shared/web/language-section.tsx:5-11`, whose header comment argues AGAINST a dropdown | The comment's objection is about a dropdown showing a language CODE, and it is right about that. N10 answers it with a named exception rather than by overruling it: the trigger shows the flag and the language's own name for itself, and the menu is searchable. The portal already ships that control. |
