@@ -408,14 +408,13 @@ export async function readGoogleMaterial(
             // one Google kind the assistant could quote and nobody could go and
             // read in context.
             url: message.url,
-            // WHO SAID IT, IN THE PASSAGE ITSELF, and this is the half that
-            // actually answers the owner's complaint. Retrieval hands the
-            // assistant PASSAGES; a passage holding only the words has thrown
-            // the speaker away by the time anybody reads it, however good the
-            // title is. Putting the name in front of the text means "who said
-            // that?" is answerable from the quoted material rather than from
-            // metadata the model may or may not have been given.
-            text: message.sender ? `${message.sender}: ${message.text}` : message.text,
+            // ALREADY ATTRIBUTED LINE BY LINE by `chatThreads` above, which is
+            // the half that actually answers the owner's complaint: retrieval
+            // hands the assistant PASSAGES, and a passage holding only the words
+            // has thrown the speaker away by the time anybody reads it. Adding a
+            // sender here as well is what produced "Somebody in this space:
+            // Somebody in this space:" on every line.
+            text: message.text,
             updatedAt: message.createdAt,
             shelf: space.shelf,
             ownerUserId: guard.userId,

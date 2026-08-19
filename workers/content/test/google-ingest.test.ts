@@ -139,16 +139,22 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
     }),
     chatMessages: async () => [
       {
-        id: "MSG_2",
+        id: "spaces/AAA/messages/MSG_2",
         space: "spaces/AAA",
         sender: "Aurora",
+        senderNamed: true,
+        thread: "spaces/AAA/threads/T1",
+        url: "https://chat.google.com/room/AAA/MSG_2",
         text: "second thing said",
         createdAt: "2026-08-03T11:00:00.000Z",
       },
       {
-        id: "MSG_1",
+        id: "spaces/AAA/messages/MSG_1",
         space: "spaces/AAA",
         sender: "Ana",
+        senderNamed: true,
+        thread: "spaces/AAA/threads/T1",
+        url: "https://chat.google.com/room/AAA/MSG_1",
         text: "first thing said",
         createdAt: "2026-08-03T10:00:00.000Z",
       },
@@ -218,12 +224,13 @@ type SourceRow = {
   owner_user_id: string | null
   title: string
   body: string
+  source_url: string | null
 }
 
 const sources = (): SourceRow[] =>
   db()
     .prepare(
-      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body
+      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body, source_url
          FROM knowledge_sources WHERE origin_table LIKE 'google_%' ORDER BY origin_table, origin_row_id`
     )
     .all() as SourceRow[]
@@ -393,12 +400,32 @@ describe("what actually gets read", () => {
     expect(mail.body, "the hundred-character snippet is not what answers a question").not.toBe("a snippet")
   })
 
-  it("a Chat SPACE is one source holding its conversation, not one source per message", async () => {
+  it("a Chat CONVERSATION is one source, attributed line by line, with a link back", async () => {
+    // THE UNIT CHANGED ON 20 AUG 2026, twice over, and this test carries both
+    // corrections. Per MESSAGE was wrong — four words with no subject. Per SPACE
+    // replaced it and was wrong the other way: a space is a room that has held
+    // every subject for a year, so its chunks were cut across unrelated
+    // conversations, a citation could only say "the FluClinic space", and there
+    // was nothing for a link to point at. A THREAD is what a person means by
+    // "that conversation about the voucher quantity".
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
-    const spaces = sources().filter((s) => s.origin_table === "google_chat")
-    expect(spaces.length, "two messages in one space are one source").toBe(1)
+    const threads = sources().filter((s) => s.origin_table === "google_chat")
+    expect(threads.length, "two messages in one thread are one source").toBe(1)
     // Google hands the newest first; a conversation reads forwards.
-    expect(spaces[0].body.indexOf("first thing said")).toBeLessThan(spaces[0].body.indexOf("second thing said"))
+    expect(threads[0].body.indexOf("first thing said")).toBeLessThan(
+      threads[0].body.indexOf("second thing said")
+    )
+    // WHO SAID WHAT, in the body — because retrieval hands the assistant
+    // PASSAGES, and a passage holding only the words has thrown the speaker away
+    // by the time anybody reads it. This is the owner's actual complaint.
+    expect(threads[0].body).toContain("Ana: first thing said")
+    expect(threads[0].body).toContain("Aurora: second thing said")
+    // ONCE each, not twice. The reader attributes and the ingest lane used to
+    // attribute again, which is how every line came to read "Somebody in this
+    // space: Somebody in this space:".
+    expect(threads[0].body.match(/Ana:/g)?.length, "attributed once, not twice").toBe(1)
+    // AND IT LINKS BACK, which was null from the day Chat was written.
+    expect(threads[0].source_url).toBe("https://chat.google.com/room/AAA/MSG_1")
   })
 
   it("two colleagues who named the same folder get a row each, so neither decides the other's shelf", async () => {
@@ -683,7 +710,11 @@ describe("Google material that has GONE stops being quoted", () => {
 
   it("a Chat space he has switched off is retired without asking Google anything", async () => {
     await sweep()
-    const SPACE = `${IDS.staffUser}:S_SPACE_${IDS.staffUser}`
+    // KEYED ON THE THREAD since 20 Aug 2026, not on the space — a space is a
+    // room, a thread is a conversation, and the conversation is what a citation
+    // points at. The rule under test is unchanged: unsharing the SPACE must take
+    // everything that came out of it with it.
+    const SPACE = `${IDS.staffUser}:spaces/AAA/threads/T1`
     expect(live(SPACE)).toBe(true)
 
     // A Chat source IS a space somebody named here, so the positive signal is a

@@ -282,41 +282,48 @@ export function googleIngestKinds(
       label: "Chat spaces",
       windowed: true,
       textVersion: 1,
-      // ONE SOURCE PER SPACE, NOT PER MESSAGE. A chat message on its own is four
-      // words with no subject; the thing worth answering from is the
-      // CONVERSATION, which is the same reason a ticket's replies are folded into
-      // the ticket rather than indexed one by one. Fifty messages also means
-      // fifty sources, fifty upserts and fifty embedding calls for a morning's
-      // chatter.
+      // ONE SOURCE PER CONVERSATION — not per message, and no longer per space.
+      //
+      // PER MESSAGE was wrong for the reason this comment has always given: a
+      // chat message on its own is four words with no subject, and fifty of them
+      // is fifty sources, fifty upserts and fifty embedding calls for a
+      // morning's chatter.
+      //
+      // PER SPACE, which is what replaced it, was wrong in the other direction
+      // and less obviously. A space is not a subject either — it is a room that
+      // has held every subject for a year. Folding one into a single source
+      // meant its ten chunks were cut across unrelated conversations, a citation
+      // could only ever say "the FluClinic space", and there was nothing for a
+      // link to point AT.
+      //
+      // A THREAD is the unit a person actually means by "that conversation about
+      // the voucher quantity". Google hands us the grouping for free on every
+      // message (`thread.name`) and nothing read it until 20 Aug 2026. The
+      // folding itself lives in google-read's `chatThreads`, beside the reader
+      // that knows what a message is — so by the time an item reaches here it IS
+      // a conversation, and this lane has nothing left to group.
       read: (_cfg, _guard, cursor, limit) =>
-        slice("chat", cursor, limit, (items) => {
-          const bySpace = new Map<string, GoogleItem[]>()
-          for (const item of items) {
-            const key = item.sourceId ?? item.externalId
-            bySpace.set(key, [...(bySpace.get(key) ?? []), item])
-          }
-          return [...bySpace.values()]
-            .filter((group) => group.length > 0)
-            .map((group) => {
-              // Google hands the newest first; a conversation reads forwards.
-              const ordered = [...group].reverse()
-              const newest = group.reduce((a, b) => (moment(a.updatedAt) > moment(b.updatedAt) ? a : b))
-              const first = ordered[0] as GoogleItem
-              return {
-                // The SPACE is the row, so its id is what the source is keyed on.
-                originRowId: `${first.ownerUserId}:${first.sourceId ?? first.externalId}`,
-                // The newest message decides where the space sits in the window:
-                // a space somebody spoke in this morning is the one that changed.
-                sortAt: moment(newest.updatedAt),
-                // "Space — sender" is the item title; the space's own name is
-                // everything before the dash, and it is what a person recognises.
-                title: first.title.split(" — ")[0] || first.title,
-                body: ordered.map((m) => `${m.title.split(" — ")[1] ?? "Someone"}: ${m.text}`).join("\n"),
-                sourceUrl: null,
-                ...fencing(first),
-              }
-            })
-        }),
+        slice("chat", cursor, limit, (items) =>
+          items.map((item) => ({
+            // The THREAD is the row, so the thread's own id is the key. A new
+            // reply updates the conversation in place rather than filing a
+            // second copy of it.
+            originRowId: rowId(item),
+            // As recent as its last reply — `chatThreads` stamps the fold with
+            // the newest message for exactly this.
+            sortAt: moment(item.updatedAt),
+            title: item.title,
+            // ALREADY ATTRIBUTED, line by line, by `chatThreads`. It used to be
+            // re-attributed here from the title, which is why every line read
+            // "Somebody in this space: Somebody in this space:" the moment the
+            // reader started doing it properly.
+            body: item.text,
+            // AND IT LINKS BACK. This was `null` — so Chat was the one Google
+            // kind the assistant could quote and nobody could go and read.
+            sourceUrl: item.url,
+            ...fencing(item),
+          }))
+        ),
     },
   ]
 }
@@ -564,22 +571,44 @@ async function retire(env: Env, cfg: D1Rest, guard: MemberGuard, sourceId: strin
  * retire nothing, because "we did not ask" and "it is not there" are the two
  * sentences this whole pass exists to keep apart.
  */
+/** THE SPACE A THREAD BELONGS TO, off the thread's own name.
+ *
+ * Google's thread names are `spaces/AAA/threads/BBB`, so the space is the first
+ * two segments and needs no lookup. Anything else returns the input unchanged,
+ * which is the safe direction: an id this does not recognise will not match a
+ * live space, and the caller's own comment explains why that is a retirement
+ * rather than a silent keep. */
+function spaceOfThread(threadName: string): string {
+  const m = /^(spaces\/[^/]+)\//.exec(threadName)
+  return m ? m[1] : threadName
+}
+
 async function retireVanished(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   seen: Map<GoogleService, Set<string>>
 ): Promise<void> {
-  // CHAT FIRST, because it asks Google nothing. A Chat source is keyed on the
-  // named source ROW, so it has gone exactly when that row is no longer an
-  // active share — the owner switching a space off IS the positive signal, and
-  // it is one this app wrote down itself.
+  // CHAT FIRST, because it asks Google nothing.
+  //
+  // A chat source is keyed on a THREAD since 20 Aug 2026, and the thread name
+  // CONTAINS its space (`spaces/AAA/threads/T1`), so the question "has this
+  // gone?" is still answerable from a fact this app wrote down itself: is the
+  // space it came out of still an active share?
+  //
+  // IT IS DELIBERATELY NOT "was this thread seen this tick". That reads as the
+  // obvious rule and is a data-loss bug: a space is read fifty messages at a
+  // time, so every conversation older than the last fifty is absent from a
+  // normal tick — and absent is not gone. Keying the question on the SPACE is
+  // what makes the answer conservative in the right direction, which is the same
+  // property the previous space-keyed version had and the reason to keep it.
   if (seen.has("chat")) {
-    const live = new Set(
-      (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active).map((s) => s.id)
+    const liveSpaces = new Set(
+      (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active).map((s) => s.externalId)
     )
     for (const held of await heldSources(cfg, guard, "google_chat"))
-      if (!live.has(held.externalId)) await retire(env, cfg, guard, held.id)
+      if (!liveSpaces.has(spaceOfThread(held.externalId)))
+        await retire(env, cfg, guard, held.id)
   }
 
   for (const service of ["drive", "gmail", "calendar"] as ProbableService[]) {
