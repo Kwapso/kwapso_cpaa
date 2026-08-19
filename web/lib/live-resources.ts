@@ -806,8 +806,20 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.storyOne(id),
     fetchList: (t) => listFetch.stories(t),
     // …and the Stories badge on whichever app, sprint or ticket is open (R15).
+    //
+    // AND THE STORY'S OWN SCREEN. `story-detail.tsx` does not read its row out of
+    // the list — it fetches the one story into `story:one:<id>`, which the row
+    // patch above cannot reach. So starting a timer moved the story to In
+    // progress on the server, published the ping, patched the list, refreshed the
+    // activity feed — and left the open record showing "Open" until somebody
+    // reloaded. Reported 19 Aug 2026 by the owner, who watched exactly that.
+    //
+    // `knowledge` had this right (`knowledge:one:<id>` is in its own deps) and
+    // this did not, which is why the census beside R15 now reads every
+    // `<module>:one:` key a component holds and demands it appear here.
     deps: (t, id) => [
       `activity:record:stories:${id}`,
+      `story:one:${id}`,
       sprintsKey(t),
       insightsKey(t),
       ...recordCountDeps("stories"),
@@ -903,9 +915,16 @@ export const TEAM_RESOURCES: Record<
     // …and the Meetings badge on whichever app or contact record is open, for
     // the same reason one line up: the badge is answered when the record opens,
     // so nothing else would ever re-read it (R15).
+    // …AND THE MEETING'S OWN SCREEN, when it is reading one. `meeting-detail.tsx`
+    // takes its row from the diary's page when the meeting is on it and falls
+    // back to `meeting:one:<id>` when it is not — so the row patch above covered
+    // the meetings somebody browses to and missed every one they deep-link into.
+    // The same fault as the story timer, in a branch, which is why the census
+    // beside R15 reads the KEY rather than the screen.
     deps: (t, id) => [
       ...recordCountDeps("meetings"),
       `activity:record:meetings:${id}`,
+      `meeting:one:${id}`,
       meetingPeopleKey(id),
       meetingTranscriptKey(id),
       insightsKey(t),
