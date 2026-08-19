@@ -83,10 +83,32 @@ describe("the answer is written from the material, and told so", () => {
     )
   })
 
-  it("tells it to say so when the material does not answer the question", () => {
+  it("tells it to say so when the material genuinely does not answer the question", () => {
     // The honest-refusal sentence is the reason a number on any other screen can
     // be trusted. A writer that fills gaps quietly makes every screen suspect.
-    expect(system).toMatch(/does not answer the question, say so/i)
+    expect(system).toMatch(/genuinely says nothing about the question does the first sentence say so/i)
+  })
+
+  it("tells it to LEAD with the answer rather than with a caveat", () => {
+    // The other half, added 20 Aug 2026 after reading a real answer to a real
+    // question off the owner's own base. Asked about the FluClinic voucher
+    // quantity, it opened "The material does not directly answer the question…"
+    // and then answered it across three paragraphs, citing six sources.
+    //
+    // The refusal rule above is what produced that, and it is not the rule that
+    // is wrong — it is the calibration. So both cases are now named explicitly,
+    // and the failure mode is spelled out as a thing NOT to do, because a rule
+    // that only describes the good case leaves the model to infer the bad one.
+    expect(system).toMatch(/LEAD WITH THE ANSWER/)
+    expect(system).toMatch(/answering it anyway/i)
+  })
+
+  it("tells it to name the KIND of source it is quoting, in the sentence", () => {
+    // "A very good understanding of what is coming from where" (owner, 20 Aug
+    // 2026). A title alone reads the same whether it came from a call, a
+    // contract or a chat; naming the kind as it goes is what makes an answer
+    // traceable while you read it rather than afterwards.
+    expect(system).toMatch(/what kind of thing it is/i)
   })
 
   it("carries the visual-block brief, so the drawing rules are the SAME on both surfaces", () => {
