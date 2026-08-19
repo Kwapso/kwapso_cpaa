@@ -57,19 +57,6 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
-/** THE WEEK WE ARE IN, Monday to Sunday, in UTC — the same boundary
- * workers/content/src/lib/meetings.ts computes for the badge above the list, so
- * the number and the rows mean one week. */
-function inThisWeek(startsAt: string): boolean {
-  const now = new Date()
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7))
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 7)
-  const at = Date.parse(startsAt)
-  return at >= start.getTime() && at < end.getTime()
-}
-
 /** WHAT THE MONTH IN FRONT OF YOU DOES NOT SAY (R14).
  *
  * The diary PAGES, newest first, so the rows in hand run from the furthest-out
@@ -205,6 +192,31 @@ export function MeetingsScreen({
   // more columns, which is what makes it worth being a separate view at all.
   const [view, setView] = React.useState<"week" | "calendar" | "all">("week")
   const weekTotal = useCachedValue<number>(totalKey("meetings-week", teamId))
+  // THIS WEEK IS ITS OWN READ (19 Aug 2026) — the door's week, not a browser
+  // filter over the diary's newest page. The comment that used to sit on that
+  // filter argued the week was inside page one for any agency that had not held
+  // fifty meetings since Monday; the diary is ordered by start time DESCENDING,
+  // so page one is the furthest-out FUTURE, and once repeating calendar entries
+  // were swept in it ran from June 2027 to August 2027 with nothing of this week
+  // in it. Badge 11, list empty. A client-side filter underneath a server
+  // COUNT(*) is the arrangement R16 exists to forbid, and the search box on this
+  // very screen had already been moved to the door for that reason.
+  //
+  // It costs one extra read while this tab is showing, and there is no way round
+  // it: the week's rows are genuinely not in the page the diary hands back.
+  // Only while it is showing — the other two views read the diary itself.
+  //
+  // WHICH LIST THE RESTING SCREEN IS STANDING ON, as an argument rather than as
+  // a second name for the key: `meetingsKey(teamId, weekView)` is written out at
+  // the cursor sidecar, the find bar and both Load more buttons, because R14's
+  // and R15's checks read the control's OWN props for this collection's key —
+  // and they are right to. A const holding the resolved key satisfies a
+  // reader and nothing
+  // else; the four censuses went red on it within one run.
+  const weekView = view === "week" ? ("week" as const) : undefined
+  const weekQ = useCached<Meeting[]>(weekView ? meetingsKey(teamId, weekView) : null, () =>
+    listFetch.meetings(teamId, "week")
+  )
   // 9.7 — the repeating entries. `ahead` is the instances beyond the four-week
   // horizon: shown, never stored, because one that far out can still be moved or
   // called off in Google before it happens.
@@ -231,6 +243,7 @@ export function MeetingsScreen({
       setAhead(r.ahead)
       setCaughtUp(r.caughtUp)
       invalidate(meetingsKey(teamId))
+      invalidate(meetingsKey(teamId, "week"))
       const moved = r.created + r.updated + r.cancelled
       // AND WHETHER THERE IS MORE OF THE PAST TO COME. The sweep walks the whole
       // calendar a slice at a time, so "nothing new" on the first press is an
@@ -272,12 +285,17 @@ export function MeetingsScreen({
       notes: values.notes || undefined,
     })
     invalidate(meetingsKey(teamId))
+    invalidate(meetingsKey(teamId, "week"))
     toast.success(t("It's in the diary."))
   }
 
-  if (meetingsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
+  // EITHER READ FAILING IS THE SAME SENTENCE — whichever list this tab is
+  // standing on, what the reader could not get is the meetings.
+  if (meetingsQ.error || weekQ.error)
+    return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
   if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const loaded = meetingsQ.data
+  const weekRows = weekQ.data
 
   return (
     <CountedAbove active>
@@ -323,7 +341,7 @@ export function MeetingsScreen({
           the OLD one — so the search box is answered by the door, over the whole
           diary rather than the page in the browser. */}
       <PagedFind<Meeting>
-        listKey={meetingsKey(teamId)}
+        listKey={meetingsKey(teamId, weekView)}
         placeholder={t("Search meetings…")}
         matches={{
           none: t("No meetings match"),
@@ -365,24 +383,17 @@ export function MeetingsScreen({
         }
       >
         {(found) => {
-          const rows = found.active ? found.rows : loaded
+          // WHICH ROWS THIS TAB IS SHOWING. A find answers over the whole diary
+          // and outranks the tab; otherwise the week reads the week's own list
+          // and the other two read the diary. `undefined` is "not back yet",
+          // which the line below draws as the skeleton rather than as "none".
+          const rows = found.active ? found.rows : view === "week" ? (weekRows ?? null) : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
-          // THIS WEEK is narrowed HERE and not by a second read, deliberately:
-          // the door has already told us how many there are (the badge above is
-          // its exact count), and the week sits inside the newest page for any
-          // agency that has not held fifty meetings since Monday. The date
-          // boundary is the same one the door computes — Monday, in UTC.
-          //
-          // …AND IT STANDS DOWN THE MOMENT SOMEBODY ASKS A QUESTION. The find
-          // above asks the DOOR, over the whole diary (`view: "all"`, and the
-          // comment on it says why), so the door counts every meeting that
-          // matches and this filter then hid most of them: the screen read
-          // "1 meetings match" over "Nothing matched." A client-side filter
-          // underneath a server COUNT(*) is two answers to one question, which
-          // is the arrangement R16 exists to forbid — and the count is the half
-          // that is right. Searching the whole diary is also what the fetch above
-          // already promised: "the week and the calendar are views on top of it".
-          const shown = view === "week" && !found.active ? rows.filter((m) => inThisWeek(m.startsAt)) : rows
+          // NOTHING IS NARROWED HERE. The week used to be, and the badge above
+          // it disagreed for as long as it was: see the note on `weekQ`. Every
+          // row on screen now came back from the door answering the question
+          // this tab asks, which is the same door the count came from (R16).
+          const shown = rows
           const data = shapeMeetingsList(shown)
           // THE CALENDAR'S ROWS — the shaper's, so a meeting reads the same in
           // the grid as it does in the list underneath (a cancelled one still
@@ -426,7 +437,7 @@ export function MeetingsScreen({
                     emptyText={t("Nothing in the diary this month.")}
                     unloaded={
                       <EarlierNotLoaded
-                        listKey={found.listKey ?? meetingsKey(teamId)}
+                        listKey={found.listKey ?? meetingsKey(teamId, weekView)}
                         fetchPage={found.fetchPage}
                       />
                     }
@@ -467,7 +478,7 @@ export function MeetingsScreen({
                   why. Two of the same button on one screen is one too many. */}
               {view !== "calendar" && (
                 <LoadMore
-                  listKey={found.listKey ?? meetingsKey(teamId)}
+                  listKey={found.listKey ?? meetingsKey(teamId, weekView)}
                   fetchPage={found.fetchPage}
                   label={t("Load more meetings")}
                 />
