@@ -585,6 +585,10 @@ type Secrets = {
   refresh_token: string
   access_token: string | null
   access_expires_at: string | null
+  /** NOT a secret either, and read here for the same reason as `scopes` below:
+   * this is the one query on the way to using a connection, so the freshness of
+   * the "last used" stamp can be decided without a second read. */
+  last_used_at: string | null
   /** NOT a secret, and here because this is the one read that happens on the way
    * to using a connection. A door that needs a particular permission can then
    * check for it BEFORE spending a call on Google (`grantedScopeOrThrow`), which
@@ -602,7 +606,8 @@ async function liveSecrets(
     cfg,
     guard.databaseId,
     // R14: one row by a unique index.
-    `SELECT id, refresh_token, access_token, access_expires_at, scopes FROM google_connections
+    `SELECT id, refresh_token, access_token, access_expires_at, scopes, last_used_at
+       FROM google_connections
       WHERE user_id = ? AND service = ? AND deactivated_at IS NULL LIMIT 1`,
     [guard.userId, service]
   )
@@ -628,6 +633,29 @@ const EXPIRY_SKEW_MS = 60_000
  * just starts answering "nothing found". Writing it down is what turns that into
  * a red line on their own settings card.
  */
+/** How out of date the "last used" stamp may get before a read moves it. Five
+ * minutes is finer than any question a person asks of that field ("is this
+ * working?", "did last night's sweep run?") and coarse enough that a sweep
+ * making hundreds of reads writes once. */
+const USED_STAMP_STALE_MS = 5 * 60 * 1000
+
+function stale(lastUsedAt: string | null | undefined): boolean {
+  if (!lastUsedAt) return true
+  const at = Date.parse(lastUsedAt)
+  return !Number.isFinite(at) || Date.now() - at > USED_STAMP_STALE_MS
+}
+
+/** Best-effort: a stamp that failed to move must never cost somebody the read it
+ * was describing. */
+async function touchUsed(cfg: D1Rest, guard: MemberGuard, id: string): Promise<void> {
+  await d1ExecScript(
+    cfg,
+    guard.databaseId,
+    `UPDATE google_connections SET last_used_at = ${sqlString(new Date().toISOString())}
+      WHERE id = ${sqlString(id)};`
+  ).catch(() => undefined)
+}
+
 export async function accessTokenFor(
   env: GoogleEnv,
   cfg: D1Rest,
@@ -645,12 +673,23 @@ export async function accessTokenFor(
     row.access_token &&
     row.access_expires_at &&
     Date.parse(row.access_expires_at) - EXPIRY_SKEW_MS > Date.now()
-  if (fresh)
+  if (fresh) {
+    // AND THE FRESH PATH SAYS SO TOO, at most once every few minutes.
+    //
+    // Stamping only on the refresh left a working connection reading "Never used
+    // yet" for up to an hour at a time — which is the exact sentence a dead one
+    // shows, on the exact screen somebody checks when they suspect a dead one.
+    // Stamping on EVERY read would put a database write on the hot path of a
+    // sweep that makes hundreds, so it is conditional: the row was already read
+    // a line above, so the comparison is free and the write only happens when
+    // the answer would actually change.
+    if (stale(row.last_used_at)) await touchUsed(cfg, guard, row.id)
     return {
       token: await openToken(env, row.access_token as string),
       connectionId: row.id,
       grantedScopes: row.scopes,
     }
+  }
 
   const creds = connectCredentials(env)
   if (!creds)
