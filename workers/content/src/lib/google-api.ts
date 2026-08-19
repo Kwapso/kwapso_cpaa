@@ -32,6 +32,12 @@
 // it stops early — a bounded read that drops rows without saying so is exactly
 // the fault R14 is about.
 
+import {
+  DRIVE_PAGES_PER_FOLDER,
+  DRIVE_WALK_CALL_BUDGET,
+  DRIVE_WALK_MAX_DEPTH,
+  DRIVE_WALK_MAX_FILES,
+} from "@shared/workers/limits"
 import { GuardError } from "@shared/workers/gating"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
@@ -256,13 +262,52 @@ function toDriveFile(raw: unknown, folderId: string): DriveFile {
 const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
 /**
- * Files inside the folders the caller NAMED, and nowhere else.
+ * Files inside the folders the caller NAMED, AND EVERYTHING FILED UNDER THEM.
  *
  * `folderIds` is the whole of the restriction, and the empty case is answered
  * first and explicitly: no named folders means no files. Writing it as an early
  * return rather than letting an empty `IN ()` fall through is deliberate — the
  * version of this that builds a query from an empty list is the version that
  * lists somebody's entire Drive.
+ *
+ * ── IT DESCENDS NOW, AND THAT IS THE FIX ────────────────────────────────────
+ *
+ * This used to read the DIRECT CHILDREN of each named folder, one page of fifty.
+ * The owner reported that his call transcripts were not in the knowledge base,
+ * and this was why: Google Meet does not file a recording as a file in a folder,
+ * it files it as A FOLDER PER MEETING holding the transcript, the recording and
+ * the Gemini notes. His shared `Google Meet` folder therefore contained nothing
+ * but subfolders — every one of them excluded by the `mimeType != folder` clause
+ * — so a folder that looked shared contributed exactly nothing, silently, and
+ * had done since the day he shared it. Measured on his account: 15 shared
+ * folders, 54 files.
+ *
+ * A person who shares a folder means that folder and what is filed under it.
+ * This now reads it that way.
+ *
+ * ── WHAT KEEPS IT BOUNDED ───────────────────────────────────────────────────
+ *
+ * BREADTH-FIRST, NEWEST-FIRST, ON A CALL BUDGET. The budget is in listing calls
+ * because a call is what costs time and quota — a folder of ten files and one of
+ * five hundred are both one call per page, and the thing that actually runs away
+ * is the number of FOLDERS, which nobody controls. Breadth-first means the named
+ * folder's own contents are always read before anything below them; newest-first
+ * means that when the budget runs out it has been spent on what somebody is most
+ * likely to ask about. A walk that ran out of budget is not an error and does not
+ * say so here: the sweep is incremental and the cursor comes back.
+ *
+ * THE ROOT TRAVELS WITH THE FILE, and this is the load-bearing detail. A file's
+ * `folderId` is the NAMED folder it descends from, never its immediate parent —
+ * because the caller looks the shelf and the client up by that id
+ * (`shelfOf.get(file.folderId)` in google-read.ts). Tagging a file with the
+ * subfolder it happens to sit in would have made every descended file
+ * shelf-less, which is to say private and unfiled: the recursion would have
+ * "worked" and quietly hidden everything it found.
+ *
+ * NO CYCLES, NO DOUBLE READS. Drive lets a file sit in two parents, so a folder
+ * can genuinely be reached twice; `seenFolders` makes the walk a tree rather
+ * than a graph, and the first named root to reach a folder is the one that owns
+ * what is in it.
  */
 export async function driveList(
   token: string,
@@ -271,35 +316,110 @@ export async function driveList(
 ): Promise<DriveFile[]> {
   if (folderIds.length === 0) return []
   const out: DriveFile[] = []
-  for (const folderId of folderIds) {
-    const clauses = [`'${escapeDriveLiteral(folderId)}' in parents`, "trashed = false"]
-    // The caller's own words are a NARROWING inside the folder, never a widening
-    // of which folders are searched.
-    if (search) clauses.push(`name contains '${escapeDriveLiteral(search)}'`)
-    const url = new URL("https://www.googleapis.com/drive/v3/files")
-    url.searchParams.set("q", clauses.join(" and "))
-    url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
-    url.searchParams.set("fields", `files(${DRIVE_FILE_FIELDS})`)
-    // ONE PAGE, so WHICH page matters. Newest-changed first is what a person
-    // scanning a folder wants, and it is what makes the knowledge sweep's window
-    // the RIGHT fifty files rather than an arbitrary fifty: a document edited
-    // this morning must not be invisible because the folder also holds two
-    // hundred that have not moved since 2023.
-    url.searchParams.set("orderBy", "modifiedTime desc")
-    // Shared drives are ordinary folders to a person, so a folder somebody named
-    // out of one must behave like any other.
-    url.searchParams.set("supportsAllDrives", "true")
-    url.searchParams.set("includeItemsFromAllDrives", "true")
-    // And `corpora`, the half that was missing. Google defaults it to `user`,
-    // and a shared drive belongs to the ORGANISATION, not the user — so both
-    // flags above can be true and a folder in the agency’s own Build drive
-    // still comes back empty, which is exactly what it did. `allDrives` is the
-    // body the two flags were always describing.
-    url.searchParams.set("corpora", "allDrives")
-    const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
-    for (const raw of Array.isArray(data.files) ? data.files : [])
-      out.push(toDriveFile(raw, folderId))
+  const seenFiles = new Set<string>()
+  const seenFolders = new Set<string>(folderIds)
+  let calls = 0
+
+  /** One page-walk of one folder, for files or for subfolders. `wantFolders`
+   * flips the single clause that separates the two — the rest of the query,
+   * including the shared-drive flags, is identical and must stay identical. */
+  const listing = async (
+    folderId: string,
+    wantFolders: boolean
+  ): Promise<Record<string, unknown>[]> => {
+    const rows: Record<string, unknown>[] = []
+    let pageToken = ""
+    for (let page = 0; page < DRIVE_PAGES_PER_FOLDER; page++) {
+      if (calls >= DRIVE_WALK_CALL_BUDGET) break
+      const clauses = [
+        `'${escapeDriveLiteral(folderId)}' in parents`,
+        "trashed = false",
+        wantFolders ? `mimeType = '${DRIVE_FOLDER_MIME}'` : `mimeType != '${DRIVE_FOLDER_MIME}'`,
+      ]
+      // The caller's own words are a NARROWING inside the folder, never a
+      // widening of which folders are searched. It applies to FILES only: a
+      // subfolder whose name does not match may still hold matching files, and
+      // refusing to open it would make the search shallower than the share.
+      if (search && !wantFolders) clauses.push(`name contains '${escapeDriveLiteral(search)}'`)
+      const url = new URL("https://www.googleapis.com/drive/v3/files")
+      url.searchParams.set("q", clauses.join(" and "))
+      url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
+      url.searchParams.set("fields", `nextPageToken,files(${DRIVE_FILE_FIELDS})`)
+      // Newest-changed first, at every level: it is what a person scanning a
+      // folder wants, and it is what makes a budget that runs out spend itself
+      // on the right material.
+      url.searchParams.set("orderBy", "modifiedTime desc")
+      // Shared drives are ordinary folders to a person, so a folder somebody
+      // named out of one must behave like any other.
+      url.searchParams.set("supportsAllDrives", "true")
+      url.searchParams.set("includeItemsFromAllDrives", "true")
+      // And `corpora`, the half that was missing. Google defaults it to `user`,
+      // and a shared drive belongs to the ORGANISATION, not the user — so both
+      // flags above can be true and a folder in the agency's own Build drive
+      // still comes back empty, which is exactly what it did. `allDrives` is the
+      // body the two flags were always describing.
+      url.searchParams.set("corpora", "allDrives")
+      if (pageToken) url.searchParams.set("pageToken", pageToken)
+      calls += 1
+      // ONE FOLDER'S REFUSAL IS ONE FOLDER'S. The walk now opens folders nobody
+      // named — every descendant of a share — and among a few hundred of those
+      // there is reliably one Google answers 403 or 404 for: a shortcut whose
+      // target moved, a subfolder shared with the parent but not with this
+      // person, an item in a shared drive whose membership changed. Before this
+      // catch, the FIRST such folder threw and the whole listing came back as
+      // `google_access_lost` — a message telling the owner to reconnect a
+      // connection that was working perfectly. Caught here rather than around
+      // the walk, so the loss is one folder rather than everything after it.
+      let data: { files?: unknown; nextPageToken?: unknown }
+      try {
+        data = (await googleFetch(url.toString(), token)) as {
+          files?: unknown
+          nextPageToken?: unknown
+        }
+      } catch {
+        break
+      }
+      for (const raw of Array.isArray(data.files) ? data.files : [])
+        rows.push(raw as Record<string, unknown>)
+      pageToken = str(data.nextPageToken)
+      if (!pageToken) break
+    }
+    return rows
   }
+
+  // The queue carries the NAMED root each folder descends from, so a file found
+  // six levels down is still filed under the share somebody actually made.
+  const queue: { folderId: string; root: string; depth: number }[] = folderIds.map((id) => ({
+    folderId: id,
+    root: id,
+    depth: 0,
+  }))
+
+  while (queue.length > 0) {
+    if (calls >= DRIVE_WALK_CALL_BUDGET || out.length >= DRIVE_WALK_MAX_FILES) break
+    const { folderId, root, depth } = queue.shift() as { folderId: string; root: string; depth: number }
+
+    for (const raw of await listing(folderId, false)) {
+      const file = toDriveFile(raw, root)
+      // A file in two folders is one file. Without this a document filed under
+      // both `FluClinic` and `Meet Recordings` would be indexed twice and would
+      // then compete with itself for room in an answer.
+      if (file.id && !seenFiles.has(file.id)) {
+        seenFiles.add(file.id)
+        out.push(file)
+        if (out.length >= DRIVE_WALK_MAX_FILES) break
+      }
+    }
+
+    if (depth + 1 > DRIVE_WALK_MAX_DEPTH) continue
+    for (const raw of await listing(folderId, true)) {
+      const id = str((raw as Record<string, unknown>).id)
+      if (!id || seenFolders.has(id)) continue
+      seenFolders.add(id)
+      queue.push({ folderId: id, root, depth: depth + 1 })
+    }
+  }
+
   return out
 }
 

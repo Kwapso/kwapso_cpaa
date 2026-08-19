@@ -132,6 +132,26 @@ const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
     "email",
     "https://www.googleapis.com/auth/chat.messages",
     "https://www.googleapis.com/auth/chat.spaces.readonly",
+    // WHO SAID IT. Added 20 Aug 2026, on the owner's "add it, I'll re-approve".
+    //
+    // Google's `messages.list` populates a sender's `displayName` for an APP and
+    // leaves it EMPTY for a person, so without this every human in every space
+    // read as `users/112978…` or, after the honest fix, "Somebody in this
+    // space". Neither is an answer to "who said that?", and the owner's report
+    // was exactly that: "they don't know who sent what message".
+    //
+    // This is the ONLY scope that can close it — a membership is a separate
+    // resource from a message, and no amount of care on our side invents a name
+    // Google did not send. It is readonly and it is the narrowest thing that
+    // works: it lists who is in a space this person can already read, and grants
+    // nothing else.
+    //
+    // IT COSTS A RE-CONSENT, which is why it was asked rather than assumed:
+    // anybody holding an older Chat grant keeps reading "Somebody in this space"
+    // until they disconnect and reconnect Chat. `unrequestedScopes` compares
+    // what Google actually gave against this list, so a stale grant is visible
+    // on the connections screen rather than silent.
+    "https://www.googleapis.com/auth/chat.memberships.readonly",
   ],
 }
 
@@ -140,6 +160,49 @@ const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
  * somewhere else. */
 export function requestedScopes(service: GoogleService): string[] {
   return [...GOOGLE_SCOPES[service]]
+}
+
+/**
+ * THE SCOPES ONE CONSENT ASKS FOR — one service's, or every service's at once.
+ *
+ * ── WHY "ALL AT ONCE" HAD TO EXIST, and it is a bug fix before it is a feature ──
+ *
+ * The four services share ONE Google OAuth client, and Google keeps ONE grant per
+ * (person, client). A consent therefore REPLACES the grant rather than adding to
+ * it — so connecting Gmail silently invalidated the Drive refresh token minted
+ * ten minutes earlier, connecting Calendar killed Gmail, and so on round the
+ * four. Only the service connected LAST ever worked.
+ *
+ * Nothing said so. Our four rows each stayed `active` holding a refresh token
+ * Google had already thrown away, the settings screen showed four green
+ * connections, and every sweep but one failed with `google_access_lost` inside a
+ * catch. Measured on the owner's own account on 20 Aug 2026: twelve connection
+ * rows accumulated over three days, four marked active, and exactly one — Chat,
+ * connected eleven minutes earlier — able to answer a request. That is the whole
+ * of "the run scripts are not syncing".
+ *
+ * ── WHY THE FIX IS THIS AND NOT `include_granted_scopes` ────────────────────
+ *
+ * Google's own answer to a replaced grant is incremental authorisation:
+ * `include_granted_scopes=true` mints the new token over everything this person
+ * has ever approved. That would work, and it would cost the property the comment
+ * above this table exists to defend — a token minted over "everything ever
+ * approved" hands a narrowed connection its old write scope back, and the
+ * granted-scope readback stops being an answer and becomes an echo of history.
+ *
+ * Asking for all four at once needs no incrementality at all. One consent, one
+ * grant, nothing to replace — so `include_granted_scopes` stays `false` and the
+ * narrowing stays real. The union is spelled from the same table the four lists
+ * come from, so a scope added to a service is in the "all" consent by
+ * construction and cannot be forgotten here.
+ *
+ * A person may still connect one service alone; it is the same door with a
+ * narrower ask. What they may not do any more is connect two, one after the
+ * other, and be told both are live.
+ */
+export function connectScopes(service: GoogleService | "all"): string[] {
+  if (service !== "all") return [...GOOGLE_SCOPES[service]]
+  return [...everyRequestedScope()]
 }
 
 /** EVERYTHING THIS APP EVER ASKS THIS OAUTH CLIENT FOR — the four lists, as one
@@ -287,7 +350,7 @@ function connectRedirectUri(env: ConnectEnv): string {
 export async function buildConnectStart(
   env: ConnectEnv,
   creds: ConnectCredentials,
-  service: GoogleService
+  service: GoogleService | "all"
 ): Promise<{ url: string; setCookie: string }> {
   const state = randomToken()
   const verifier = randomToken()
@@ -297,7 +360,7 @@ export async function buildConnectStart(
   url.searchParams.set("client_id", creds.clientId)
   url.searchParams.set("redirect_uri", connectRedirectUri(env))
   url.searchParams.set("response_type", "code")
-  url.searchParams.set("scope", GOOGLE_SCOPES[service].join(" "))
+  url.searchParams.set("scope", connectScopes(service).join(" "))
   url.searchParams.set("state", state)
   url.searchParams.set("code_challenge", challenge)
   url.searchParams.set("code_challenge_method", "S256")

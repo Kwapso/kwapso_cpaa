@@ -113,6 +113,19 @@ export function asService(value: unknown): GoogleService {
   return value as GoogleService
 }
 
+/** ONE SERVICE, OR ALL OF THEM. The connect and disconnect doors take this wider
+ * word; every other door still takes `asService`, because reading Drive is a
+ * question about Drive and "all" is not an answer to it.
+ *
+ * `all` exists because Google keeps one grant per person per OAuth client, so
+ * connecting the four services one at a time made each one evict the last (see
+ * `connectScopes`). It is the ONLY shape that leaves four working connections
+ * behind, which is why the screen leads with it. */
+export function asServiceOrAll(value: unknown): GoogleService | "all" {
+  if (value === "all") return "all"
+  return asService(value)
+}
+
 /** The two services that are reached through NAMED sources. */
 export function asNamedService(value: unknown): GoogleNamedService {
   if (typeof value !== "string" || !(GOOGLE_NAMED_SERVICES as readonly string[]).includes(value))
@@ -345,6 +358,43 @@ export async function saveConnection(
  * disconnect somebody asked for (google-oauth.ts says why that direction).
  * R17: the current-status predicate rides the UPDATE, so a double-click moves
  * zero rows and writes no second history row. */
+/**
+ * DISCONNECT EVERY SERVICE, because Google does anyway.
+ *
+ * The four services share one OAuth client, and Google keeps ONE grant per
+ * person per client — so `revokeAtGoogle` on any single service takes the grant
+ * behind all four with it. Before this, the other three rows stayed `active`
+ * holding refresh tokens Google had already thrown away, and the settings screen
+ * showed three working connections that could not answer a request. The person
+ * found out when a sweep failed, if they ever found out at all.
+ *
+ * So the door tells the truth: disconnecting is an act on the Google ACCOUNT,
+ * not on one service. It loops the four rather than doing one wide UPDATE
+ * because each service has its own named sources to retire and its own line in
+ * the history — and because a service that was already disconnected must move
+ * zero rows and write nothing (R17), which the per-service function already
+ * gets right.
+ */
+export async function disconnectAll(
+  env: GoogleEnv,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor
+): Promise<{ changed: boolean; revokedAtGoogle: boolean }> {
+  let changed = false
+  let revoked = false
+  for (const service of GOOGLE_SERVICES) {
+    const one = await disconnect(env, cfg, guard, actor, service)
+    changed = changed || one.changed
+    // ONE SUCCESSFUL REVOKE IS THE ANSWER FOR ALL FOUR. After the first, Google
+    // answers the rest with `invalid_token` — which `revokeAtGoogle` correctly
+    // reads as "already gone" and reports as success — so this is an OR over
+    // four attempts at one grant, not four independent results.
+    revoked = revoked || one.revokedAtGoogle
+  }
+  return { changed, revokedAtGoogle: revoked }
+}
+
 export async function disconnect(
   env: GoogleEnv,
   cfg: D1Rest,

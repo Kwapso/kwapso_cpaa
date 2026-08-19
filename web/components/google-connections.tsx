@@ -161,8 +161,39 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     <section className="animate-rise flex flex-col gap-4">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
-        {t("Connect your own Google account, one service at a time. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
+        {t("Connect your own Google account. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
       </p>
+
+      {/* ONE BUTTON, ALL FOUR, AND IT IS THE LEAD ACTION FOR A REASON.
+        *
+        * Connecting the services one at a time did not work — not "was tedious",
+        * did not work. Google keeps ONE approval per person per app, so each
+        * consent replaced the last: connecting Gmail silently killed the Drive
+        * connection made ten minutes before, and only the service connected most
+        * recently could answer anything. Four green rows, one working token, no
+        * message anywhere.
+        *
+        * So this asks once, for everything, and writes all four. The per-service
+        * buttons below still exist for somebody who genuinely wants Drive alone,
+        * but they are no longer the path anybody is led down. Reported by the
+        * owner as "this whole mechanism of scoping also should be optional, with
+        * one button to just sync everything instead of selecting one thing" —
+        * which turned out to describe the fix as well as the feature. */}
+      {q.data?.ready && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border p-3">
+          <Button
+            onClick={() => {
+              window.location.href = "/api/content/google/start?service=all"
+            }}
+            className="gap-1"
+          >
+            <Plus className="size-3.5" aria-hidden /> {t("Connect everything")}
+          </Button>
+          <span className="text-muted-foreground min-w-0 flex-1 text-xs">
+            {t("Drive, Gmail, Calendar and Chat in one approval. Google keeps one approval per app, so connecting them one at a time switches the others off.")}
+          </span>
+        </div>
+      )}
 
       {q.error ? (
         <p className="text-destructive text-sm">{t("Couldn't load your Google connections.")}</p>
@@ -427,9 +458,10 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("Disconnect {service}?", {
-                service: disconnecting ? t(SERVICE_COPY[disconnecting].label) : "",
-              })}
+              {/* NOT "{service}?" ANY MORE. It always was every service — Google
+                * keeps one approval per app — and the door now says so rather
+                * than deactivating one row and leaving three claiming to work. */}
+              {t("Disconnect your Google account?")}
             </AlertDialogTitle>
             {/* ONE description holding two sentences, and the second is not an
               * afterthought.

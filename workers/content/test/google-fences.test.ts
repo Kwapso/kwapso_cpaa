@@ -45,19 +45,126 @@ describe("Drive is the folders you named, and nothing else", () => {
     expect(spy, "an empty folder list must not become an unfiltered Drive query").not.toHaveBeenCalled()
   })
 
-  it("every named folder is asked for BY PARENT, one query each", async () => {
+  it("EVERY query is anchored to a parent — named, or reached from a named one", async () => {
     const urls: string[] = []
     globalThis.fetch = vi.fn(async (url: unknown) => {
       urls.push(String(url))
       return new Response(JSON.stringify({ files: [] }), { status: 200 })
     }) as unknown as typeof fetch
     await driveList("token", ["FOLDER_A", "FOLDER_B"])
-    expect(urls).toHaveLength(2)
-    for (const [i, folder] of ["FOLDER_A", "FOLDER_B"].entries()) {
-      const q = new URL(urls[i]).searchParams.get("q") ?? ""
-      expect(q, "every query must be anchored to one named folder").toContain(`'${folder}' in parents`)
+    // The count is no longer one-per-folder — the walk asks each folder for its
+    // files and then for its subfolders — so the assertion is the one that
+    // actually matters: NOTHING is ever asked without a parent to anchor it.
+    // An unanchored query is a listing of somebody's whole Drive.
+    expect(urls.length).toBeGreaterThan(0)
+    for (const url of urls) {
+      const q = new URL(url).searchParams.get("q") ?? ""
+      expect(q, "every query must be anchored to a folder").toMatch(/'(FOLDER_A|FOLDER_B)' in parents/)
       expect(q).toContain("trashed = false")
     }
+  })
+
+  it("DESCENDS into a subfolder, and files what it finds under the NAMED folder", async () => {
+    // THE REGRESSION TEST FOR THE OWNER'S MISSING TRANSCRIPTS (20 Aug 2026).
+    //
+    // Google Meet does not file a recording as a file in a folder — it makes A
+    // FOLDER PER MEETING holding the transcript, the recording and the Gemini
+    // notes. So his shared `Google Meet` folder contained nothing but
+    // subfolders, every one of them excluded by the `mimeType != folder` clause,
+    // and a folder that looked shared contributed exactly zero documents for as
+    // long as it had been shared. Measured on his account: 15 shared folders,
+    // 54 files.
+    const seen: string[] = []
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      const u = new URL(String(url))
+      const q = u.searchParams.get("q") ?? ""
+      seen.push(q)
+      const wantsFolders = q.includes("mimeType = 'application/vnd.google-apps.folder'")
+      // ROOT holds one subfolder and no files; the subfolder holds the document.
+      if (q.includes("'ROOT' in parents"))
+        return new Response(
+          JSON.stringify({
+            files: wantsFolders
+              ? [{ id: "SUB", name: "FluClinic 12 Aug", mimeType: "application/vnd.google-apps.folder" }]
+              : [],
+          }),
+          { status: 200 }
+        )
+      if (q.includes("'SUB' in parents"))
+        return new Response(
+          JSON.stringify({
+            files: wantsFolders
+              ? []
+              : [{ id: "DOC", name: "Notes by Gemini", mimeType: "application/vnd.google-apps.document" }],
+          }),
+          { status: 200 }
+        )
+      return new Response(JSON.stringify({ files: [] }), { status: 200 })
+    }) as unknown as typeof fetch
+
+    const files = await driveList("token", ["ROOT"])
+    expect(files.map((f) => f.id), "the document one level down must be found").toEqual(["DOC"])
+    // THE LOAD-BEARING HALF. A file's `folderId` is what the caller looks the
+    // shelf and the client up by (google-read.ts `shelfOf.get(file.folderId)`).
+    // Tagging it with `SUB` — the folder it literally sits in — would make every
+    // descended file shelf-less, which is to say private and unfiled: the
+    // recursion would "work" and quietly hide everything it found.
+    expect(files[0]?.folderId, "it belongs to the folder somebody NAMED").toBe("ROOT")
+    expect(seen.some((q) => q.includes("'SUB' in parents")), "it must have opened the subfolder").toBe(true)
+  })
+
+  it("a folder reached twice is read once, and a cycle cannot hang the walk", async () => {
+    // Drive lets one folder sit in two parents, so a walk that does not remember
+    // where it has been is a walk that can loop — and a document filed under two
+    // shared folders would otherwise be indexed twice and compete with itself
+    // for room in an answer.
+    let calls = 0
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      calls += 1
+      const q = new URL(String(url)).searchParams.get("q") ?? ""
+      const wantsFolders = q.includes("mimeType = 'application/vnd.google-apps.folder'")
+      // A points at B, B points back at A.
+      if (wantsFolders && q.includes("'A' in parents"))
+        return new Response(
+          JSON.stringify({ files: [{ id: "B", mimeType: "application/vnd.google-apps.folder" }] }),
+          { status: 200 }
+        )
+      if (wantsFolders && q.includes("'B' in parents"))
+        return new Response(
+          JSON.stringify({ files: [{ id: "A", mimeType: "application/vnd.google-apps.folder" }] }),
+          { status: 200 }
+        )
+      return new Response(
+        JSON.stringify({ files: [{ id: "SHARED", name: "one file", mimeType: "text/plain" }] }),
+        { status: 200 }
+      )
+    }) as unknown as typeof fetch
+
+    const files = await driveList("token", ["A"])
+    expect(files.map((f) => f.id), "the same file reached twice is one file").toEqual(["SHARED"])
+    expect(calls, "the cycle must not spend the whole call budget").toBeLessThan(10)
+  })
+
+  it("ONE folder's refusal is one folder's — the rest of the walk survives", async () => {
+    // The walk now opens folders nobody named, and among a few hundred of those
+    // there is reliably one Google answers 403 for: a shortcut whose target
+    // moved, a subfolder shared with its parent but not with this person. Before
+    // this was caught per folder, the FIRST such folder threw and the whole
+    // listing came back as `google_access_lost` — telling the owner to reconnect
+    // a connection that was working perfectly. Which is exactly what it did.
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      const q = new URL(String(url)).searchParams.get("q") ?? ""
+      if (q.includes("'DENIED' in parents")) return new Response("{}", { status: 403 })
+      if (q.includes("mimeType = 'application/vnd.google-apps.folder'"))
+        return new Response(JSON.stringify({ files: [] }), { status: 200 })
+      return new Response(
+        JSON.stringify({ files: [{ id: "OK_FILE", name: "readable", mimeType: "text/plain" }] }),
+        { status: 200 }
+      )
+    }) as unknown as typeof fetch
+
+    const files = await driveList("token", ["DENIED", "FINE"])
+    expect(files.map((f) => f.id), "the readable folder still answers").toEqual(["OK_FILE"])
   })
 
   it("a folder name carrying a quote cannot break out of the query", async () => {

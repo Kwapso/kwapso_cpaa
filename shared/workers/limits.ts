@@ -125,6 +125,39 @@ export const CRON_GROWTH_CAP = 200
  * The rest stay pending and are accepted from the invites inbox. */
 export const INVITE_SWEEP_CAP = 25
 
+/* ---- How far into somebody's Drive a share actually reaches ---------------- */
+
+/** HOW MANY LISTING CALLS ONE DRIVE WALK MAY SPEND.
+ *
+ * Until 20 Aug 2026 a named folder meant its DIRECT CHILDREN and one page of
+ * fifty, and that is the whole reason the owner's transcripts were not in the
+ * knowledge base. Google Meet files a recording as a FOLDER PER MEETING — so his
+ * shared `Google Meet` folder contained nothing but subfolders, every one of them
+ * excluded by the query, and the folder that looked shared contributed zero
+ * documents. Measured: 15 shared folders yielded 54 files.
+ *
+ * So the walk descends. The budget is in CALLS rather than files because a call
+ * is what costs time and quota: a folder of ten files and a folder of five
+ * hundred are both one call per page, and the thing that runs away is the number
+ * of FOLDERS, which nobody controls. Breadth-first and newest-first, so when the
+ * budget does run out it has spent it on the material somebody is most likely to
+ * ask about. */
+export const DRIVE_WALK_CALL_BUDGET = 120
+
+/** HOW DEEP. A share is a statement about a folder and everything filed under it,
+ * which is how a person means it — but a cycle-free tree can still be pathological,
+ * and six levels is deeper than any filing anybody defends. */
+export const DRIVE_WALK_MAX_DEPTH = 6
+
+/** PAGES PER FOLDER, so a big folder is read rather than sampled. Five pages of
+ * fifty is 250 files from one folder; past that the walk moves on rather than
+ * spending the whole budget in one place. */
+export const DRIVE_PAGES_PER_FOLDER = 5
+
+/** THE CEILING ON ONE LISTING, whatever the shape of the tree. R14's hard cap for
+ * this read: a number the worker can hold and the sweep can page through. */
+export const DRIVE_WALK_MAX_FILES = 3000
+
 /* ---- Google brings itself in, on a schedule (owner, 19 Aug 2026) ----------- */
 
 /** HOW MANY CONNECTED PEOPLE one team's tick acts as. Every Google read in this

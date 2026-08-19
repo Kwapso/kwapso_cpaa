@@ -34,6 +34,7 @@
 import { fail, json } from "@shared/workers/http"
 import { queryText, requireText, optionalText, TEXT_LIMITS } from "@shared/workers/validate"
 import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
+import { GOOGLE_SERVICES } from "@shared/types"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -42,9 +43,9 @@ import {
   addNamedSource,
   asMailBinKind,
   asNamedService,
-  asService,
+  asServiceOrAll,
   asShelf,
-  disconnect,
+  disconnectAll,
   grantedScopeOrThrow,
   listConnections,
   listNamedSources,
@@ -121,7 +122,11 @@ export async function getGoogleConnections(request: Request, env: Env): Promise<
 export async function getGoogleStart(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "create")
   await refusePortalCaller(cfg, guard)
-  const service = asService(queryText(new URL(request.url).searchParams.get("service"), "Service"))
+  // "all" is the one the screen leads with: one consent covering every service,
+  // which is the ONLY shape that leaves four working connections behind (see
+  // `connectScopes`). A single service is still spellable — it is the same door
+  // with a narrower ask.
+  const service = asServiceOrAll(queryText(new URL(request.url).searchParams.get("service"), "Service"))
   // BOTH halves checked here, before anybody leaves: the OAuth app AND the key
   // that will hold what they grant. Sending somebody to a consent screen we
   // cannot store the result of is the one failure that costs them a decision
@@ -201,15 +206,24 @@ export async function postGoogleConnect(request: Request, env: Env): Promise<Res
   const [marker, code, verifier, rawService] = (cookie ?? "").split(".")
   if (marker !== "code" || !code || !verifier || !rawService)
     return fail(409, "google_no_handshake", "That connection didn't finish. Start again from Settings.")
-  const service = asService(rawService)
+  const service = asServiceOrAll(rawService)
 
   const tokens = await exchangeConnectCode(env, creds, code, verifier)
-  const id = await saveConnection(env, cfg, guard, actor, {
-    service,
-    googleEmail: await connectedEmail(tokens.accessToken),
-    tokens,
-  })
-  await publishChange(env, guard.teamId, "google", id)
+  const googleEmail = await connectedEmail(tokens.accessToken)
+  // ONE GRANT, FOUR ROWS. The token Google just minted covers every service the
+  // consent asked for, so every service gets a row carrying it. Writing one row
+  // and leaving the other three absent would reproduce the bug this whole change
+  // exists to kill — a live grant the app cannot use because no row points at it.
+  //
+  // The rows stay per-service because everything else about a connection is:
+  // its named folders, its last-used stamp, its own last error, and the sentence
+  // a person reads on the settings card. What is shared is the GRANT, and that
+  // is exactly what is being written four times here.
+  const services = service === "all" ? [...GOOGLE_SERVICES] : [service]
+  let lastId = ""
+  for (const one of services)
+    lastId = await saveConnection(env, cfg, guard, actor, { service: one, googleEmail, tokens })
+  await publishChange(env, guard.teamId, "google", lastId)
   // The one-shot cookie is spent whatever happened next.
   return json(
     { connections: await listConnections(cfg, guard), sources: await listNamedSources(cfg, guard) },
@@ -232,8 +246,15 @@ export async function postGoogleDisconnect(request: Request, env: Env): Promise<
   // field has to sit where something is checking it, and `asService` is this
   // module's word, not the seam's). requireText decides it is a string of sane
   // length; asService decides it is one of the four.
-  const service = asService(requireText(body.service, "Service", TEXT_LIMITS.short))
-  const result = await disconnect(env, cfg, guard, actor, service)
+  // READ AND CHECKED (R20) even though the answer no longer branches on it: the
+  // field is still part of this door's contract, and a body field that stops
+  // being checked is how the next one stops being checked too.
+  asServiceOrAll(requireText(body.service, "Service", TEXT_LIMITS.short))
+  // AND IT DISCONNECTS EVERYTHING, whichever service was named. Google keeps one
+  // grant per person per OAuth client, so revoking on behalf of one service
+  // revokes the other three at Google's end whatever we do — the only choice is
+  // whether our rows say so. They do now. See `disconnectAll`.
+  const result = await disconnectAll(env, cfg, guard, actor)
   if (result.changed) await publishChange(env, guard.teamId, "google")
   return json({
     ...result,
