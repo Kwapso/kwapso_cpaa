@@ -33,7 +33,10 @@ export type TodoFormValues = { accountId: string; title: string; detail: string;
 const accountField = { ...defaultFieldConfig, label: "Which client", required: true }
 const titleField = { ...defaultFieldConfig, label: "What we need from them", required: true }
 const detailField = { ...defaultFieldConfig, label: "Anything else they should know", required: false }
-const dueField = { ...defaultFieldConfig, label: "By when", required: false }
+/** WHEN THE CLIENT HAS TO COME BACK TO US. Called Deadline, which is the word
+ * every other screen in the app uses for the same fact (CHECKLIST 2.5) — this
+ * form said "By when" and was the last place a second word for it survived. */
+const dueField = { ...defaultFieldConfig, label: "Deadline", required: false }
 
 export function TodoFormDialog({
   open,

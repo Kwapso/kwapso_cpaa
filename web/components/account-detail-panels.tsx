@@ -25,7 +25,7 @@ import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
 import { formatDate } from "@shared/web/format"
 import { useT } from "@shared/web/language"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 
 /** A destructive action waiting for a yes. One dialog in the host serves all of
  * them — they differ only in their words and what they run. `run` answers
@@ -114,7 +114,7 @@ export function ContactsPanel({
         </div>
       )}
       {links.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("No contacts yet.")}</p>
+        <EmptyLine concept="contacts">{t("No contacts yet.")}</EmptyLine>
       ) : (
         <ul className="divide-border divide-y rounded-xl border">
           {links.map((l) => (

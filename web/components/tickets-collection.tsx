@@ -45,7 +45,7 @@ import { CountedAbove } from "@/components/counted-tabs"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { EmptyLine, SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
 import { TicketStagesCard } from "@/components/pulse"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -173,7 +173,7 @@ export function TicketsCollection({
       // four KIND tabs beside it carry the team's own type MARKS on every other
       // surface (a ticket's header band, its detail) and cannot carry one here:
       // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
-      // renders nothing at all. Logged as UI-GAPS #17 rather than worked around
+      // renders nothing at all. Logged as UI-GAPS #18 rather than worked around
       // by writing a glyph into the LABEL, which is the one shape
       // UI-CONVENTIONS §5 refuses (a pictograph inside a sentence).
       { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
@@ -339,7 +339,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
       </p>
     )
   if (view.waiting.length === 0)
-    return <p className="text-muted-foreground text-sm">{t("Nothing has been sitting unread. ")}</p>
+    return <EmptyLine concept="triage">{t("Nothing has been sitting unread. ")}</EmptyLine>
 
   return (
     <ul className="divide-border divide-y">

@@ -44,7 +44,7 @@ import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 
 /** THE META LINE OF A ROW OF TIME: who, and when. Two facts, and it used to be
  * five.
@@ -274,7 +274,7 @@ export function TimePanel({
       <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
 
       {logs.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("No time logged yet.")}</p>
+        <EmptyLine concept="time">{t("No time logged yet.")}</EmptyLine>
       ) : (
         <ul className="divide-border divide-y rounded-xl border">
           {logs.map((l) => (

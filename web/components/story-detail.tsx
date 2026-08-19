@@ -170,7 +170,7 @@ export function StoryDetailScreen({
     // due, so this is the SPRINT's end date — the story's own date field went on
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story
     // with no sprint has no deadline to show, which is the honest answer.
-    { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
+    { label: t("Deadline"), value: formatDate(story.sprintEndsOn) || "—" },
     // The three fields somebody TYPED — the detail, what was done, and what the
     // client will be told — read through `of`, so the reader who pressed
     // Translate sees them in their own language and nobody else's row changed.
