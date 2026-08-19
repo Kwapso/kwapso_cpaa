@@ -215,6 +215,11 @@ const membersListRecipe: ScreenRecipe = {
   binding: { module: "members" },
   gate: { module: "team_members", right: "read" },
   fields: [field("name", "Member"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("No members yet.", "Search members…", [
     { field: "role", label: "Role", control: "select" },
@@ -280,6 +285,11 @@ const rolesListRecipe: ScreenRecipe = {
   binding: { module: "roles" },
   gate: { module: "member_roles", right: "read" },
   fields: [field("name", "Role"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("No roles yet.", "Search roles…", [
     { field: "state", label: "Status", control: "select" },
@@ -297,6 +307,11 @@ const invitesListRecipe: ScreenRecipe = {
   binding: { module: "invites" },
   gate: { module: "team_members", right: "read" },
   fields: [field("email", "Email"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("No invites yet.", "Search invites…", [
     { field: "status", label: "Status", control: "select" },
@@ -424,6 +439,11 @@ const knowledgeListRecipe: ScreenRecipe = {
   binding: { module: "knowledge" },
   gate: { module: "knowledge", right: "read" },
   fields: [field("name", "Source"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
@@ -451,6 +471,11 @@ const meetingsListRecipe: ScreenRecipe = {
   binding: { module: "meetings" },
   gate: { module: "meetings", right: "read" },
   fields: [field("name", "Meeting"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
@@ -473,6 +498,11 @@ const processesListRecipe: ScreenRecipe = {
   binding: { module: "processes" },
   gate: { module: "processes", right: "read" },
   fields: [field("name", "Process"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
@@ -538,6 +568,11 @@ const appsListRecipe: ScreenRecipe = {
   binding: { module: "apps" },
   gate: { module: "processes", right: "read" },
   fields: [field("name", "App"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("No apps recorded yet.", "Search apps…", [
     { field: "account", label: "Client", control: "select" },
@@ -556,6 +591,11 @@ const tasksListRecipe: ScreenRecipe = {
   binding: { module: "tasks" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Task"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("Nothing on our own list.", "Search tasks…", [
     { field: "status", label: "Status", control: "select" },
@@ -619,6 +659,11 @@ const brandListRecipe: ScreenRecipe = {
   binding: { module: "brand" },
   gate: { module: "brand_assets", right: "read" },
   fields: [field("name", "Asset"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("Nothing in the brand library yet.", "Search the brand library…", [
     { field: "category", label: "Type", control: "select" },
@@ -651,6 +696,11 @@ const purposesListRecipe: ScreenRecipe = {
   binding: { module: "purposes" },
   gate: { module: "delivery", right: "read" },
   fields: [field("name", "Purpose"), field("detail", "Details")],
+  // The record's own face in the leading slot (R35). Every shaper builds a
+  // `mark` node — a picture where the record has one, its type's glyph
+  // where the type has one, and its initial where it has neither, which
+  // is what keeps every list in the app the same shape.
+  leading: "mark",
   actions: [],
   collection: listCollection("No meeting purposes yet.", "Search meeting purposes…", [
     { field: "department", label: "Department", control: "select" },

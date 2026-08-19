@@ -35,7 +35,7 @@ import {
   STICKY_TABS,
   type RecordAction,
 } from "@/components/record-chrome"
-import { MARK_GROUP, typeMark } from "@/lib/type-marks"
+import { MARK_GROUP, markMap, typeMark } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { assignableMembers } from "@/lib/members"
@@ -104,6 +104,7 @@ export function HelpDetailScreen({
   basePath: string
 }) {
   const t = useT()
+
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
     content.help().then((r) => r.tickets)
   )
@@ -621,6 +622,7 @@ export function HelpDetailScreen({
           if (panel.value === "stories")
             return (
               <StoriesPanel
+                marks={markMap(selectableQ.data, MARK_GROUP.story)}
                 ownerKind="ticket"
                 ownerId={helpId}
                 filter={{ ticketId: helpId }}

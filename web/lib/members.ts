@@ -34,8 +34,16 @@ import { personName } from "@/lib/identity"
 import { tenancy } from "@/lib/api"
 import { TEAM_RESOURCES } from "@/lib/live-resources"
 
-/** One pickable person: the id a door stores, and the words a person reads. */
-export type PickablePerson = { id: string; name: string }
+/** One pickable person: the id a door stores, the words a person reads, and
+ * THEIR FACE (R35).
+ *
+ * `photo` was dropped here for a year. `TeamMember` carries `imageUrl`, the
+ * member list draws it, the profile menu draws it, the ticket's stakeholder list
+ * draws it — and every picker that chose a person from this same array showed a
+ * column of names, because the mapping one line down took `id` and `name` and
+ * left the picture behind. A field that is not carried cannot be forgotten
+ * later; it is already gone. */
+export type PickablePerson = { id: string; name: string; photo?: string | null }
 
 /**
  * The people this team can hand work to — our own staff, never a client login,
@@ -66,6 +74,7 @@ export function assignableMembers(members: TeamMember[] | undefined): PickablePe
       // construction (the users table says so) and the thing a colleague already
       // knows. A role title would not be: two people can share one.
       name: (seen.get(name) ?? 0) > 1 && m.email ? `${name} (${m.email})` : name,
+      photo: m.imageUrl,
     }
   })
 }

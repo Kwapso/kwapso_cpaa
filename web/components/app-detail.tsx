@@ -74,6 +74,7 @@ import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/t
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
 
 export function AppDetailScreen({
   teamId,
@@ -88,6 +89,13 @@ export function AppDetailScreen({
   const t = useT()
   // The apps set is bounded and read whole, so the record comes out of the same
   // cache the list holds — opening one costs no round-trip.
+  // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
+  // nested panel on it. The same key the Dropdown values manager writes, so
+  // an emoji changed there reaches these rows with no deploy.
+  const teamVocabulary = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
@@ -463,6 +471,7 @@ export function AppDetailScreen({
           if (panel.value === "sprints")
             return (
               <SprintsPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.sprint)}
                 ownerKind="app"
                 ownerId={appId}
                 filter={{ appId }}
@@ -474,6 +483,7 @@ export function AppDetailScreen({
           if (panel.value === "stories")
             return (
               <StoriesPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
                 ownerKind="app"
                 ownerId={appId}
                 filter={{ appId }}
@@ -501,6 +511,7 @@ export function AppDetailScreen({
           if (panel.value === "tickets")
             return (
               <AppTicketsPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.ticket)}
                 appId={appId}
                 host={host}
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}

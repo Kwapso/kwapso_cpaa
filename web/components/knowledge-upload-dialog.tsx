@@ -29,6 +29,7 @@ import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/d
 import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import {
@@ -86,10 +87,10 @@ export function KnowledgeUploadDialog({
   /** the accounts this caller may file under — already fenced by their own read */
   /** the team whose clients the compartment picker searches (accounts PAGE, R14) */
   teamId: string | null
-  accountOptions: { id: string; name: string }[]
+  accountOptions: PickableRecord[]
   /** the apps this caller may OPEN (8.11) — the only ones the door will accept
    * as a visibility limit, so the only ones worth offering (12.3) */
-  appOptions: { id: string; name: string }[]
+  appOptions: PickableRecord[]
   /** stable id for per-session draft persistence (CACHING.md §11) */
   draftKey?: string
 }) {
@@ -251,7 +252,7 @@ export function KnowledgeUploadDialog({
           onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
           emptyOption={{ value: AGENCY, label: t("The agency's own") }}
           placeholder={t("The agency's own")}
           searchPlaceholder={t("Search accounts…")}
@@ -292,7 +293,7 @@ export function KnowledgeUploadDialog({
             id="knowledge-file-app"
             value={values.visibleToAppId}
             onChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
-            options={appOptions.map((a) => ({ value: a.id, label: a.name }))}
+            options={appOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             placeholder={t("Pick the app")}
             searchPlaceholder={t("Search apps…")}
             emptyText={t("No app matched.")}

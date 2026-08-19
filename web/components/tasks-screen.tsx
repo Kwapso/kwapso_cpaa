@@ -52,6 +52,7 @@ import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
 import type { Task } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatDateSortable } from "@shared/web/format"
+import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
@@ -64,6 +65,11 @@ function shapeTasks(tasks: Task[]) {
       const mark = departmentGlyph(t.department)
       return {
         id: t.id,
+        // THE DEPARTMENT'S GLYPH IN THE SLOT (R35). It was already computed one
+        // line up and spent entirely on the `department` COLUMN — concatenated
+        // into that word, which is a pictograph inside a sentence, and invisible
+        // on the list view where the column is not shown at all.
+        mark: <RecordMark mark={mark || null} name={t.title} />,
         name: t.ref ? `${t.ref} · ${t.title}` : t.title,
         detail:
           [

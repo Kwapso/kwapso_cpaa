@@ -46,6 +46,11 @@ export async function searchAccounts(
     // they are two of the three fields the door itself searched — so a row that
     // matched on an email nobody could see used to look like a wrong answer.
     hint: [a.code, a.email].filter(Boolean).join(" · ") || undefined,
+    // AND THE LOGO (R35). It arrived on every one of these rows and was dropped
+    // here, one line before the picker, so the accounts LIST drew a company's
+    // mark and the picker that chooses the same company drew a word.
+    picture: a.logoUrl,
+    shape: "square" as const,
   }))
 }
 
@@ -55,7 +60,7 @@ export async function searchAccounts(
  * is filed against. */
 export async function searchTickets(
   term: string,
-  opts: { appId?: string } = {}
+  opts: { appId?: string; marks?: Map<string, string> } = {}
 ): Promise<PickerOption[]> {
   const r = await content.help({ q: term || undefined, appId: opts.appId })
   return r.tickets
@@ -63,6 +68,10 @@ export async function searchTickets(
     .map((t) => ({
       value: t.id,
       label: t.ref ? `${t.ref} · ${t.description.slice(0, 80)}` : t.description.slice(0, 80),
+      // THE TYPE'S GLYPH (R35), handed IN rather than read here: the vocabulary
+      // is the team's own and lives in a screen's cache, and a lib that fetched
+      // it would make one picker cost two round trips.
+      mark: opts.marks?.get(t.helpType ?? "") ?? null,
     }))
 }
 
@@ -70,12 +79,16 @@ export async function searchTickets(
  * resolved tickets are. */
 export async function searchStories(
   term: string,
-  opts: { appId?: string } = {}
+  opts: { appId?: string; marks?: Map<string, string> } = {}
 ): Promise<PickerOption[]> {
   const r = await content.stories({ q: term || undefined, appId: opts.appId })
   return r.stories
     .filter((s) => s.status !== "done")
-    .map((s) => ({ value: s.id, label: s.ref ? `${s.ref} · ${s.title}` : s.title }))
+    .map((s) => ({
+      value: s.id,
+      label: s.ref ? `${s.ref} · ${s.title}` : s.title,
+      mark: opts.marks?.get(s.storyType ?? "") ?? null,
+    }))
 }
 
 /** WHAT TIME CAN BE LOGGED AGAINST — a story OR a ticket, in one list, because
@@ -92,9 +105,13 @@ export async function searchStories(
  * finished. */
 export async function searchWorkTargets(
   term: string,
-  words: { story: string; ticket: string }
+  words: { story: string; ticket: string },
+  marks: { story?: Map<string, string>; ticket?: Map<string, string> } = {}
 ): Promise<PickerOption[]> {
-  const [stories, tickets] = await Promise.all([searchStories(term), searchTickets(term)])
+  const [stories, tickets] = await Promise.all([
+    searchStories(term, { marks: marks.story }),
+    searchTickets(term, { marks: marks.ticket }),
+  ])
   return [
     ...stories.map((s) => ({ ...s, value: `stories:${s.value}`, hint: words.story })),
     ...tickets.map((t) => ({ ...t, value: `help:${t.value}`, hint: words.ticket })),

@@ -66,6 +66,10 @@ export function shapeMembersList(members: TeamMember[]): ScreenData {
   return {
     rows: members.map((m) => ({
       id: m.userId,
+      // A PERSON'S FACE (R35). `imageUrl` arrived on every one of these rows and
+      // was drawn on the profile menu, the staff panel and a ticket's
+      // stakeholders — and not on the list of the team itself.
+      mark: <RecordMark picture={m.imageUrl} name={personName(m)} shape="round" />,
       name: personName(m),
       detail: `${m.roleTitle} · joined ${formatDate(m.joinedAt)}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -78,6 +82,10 @@ export function shapeRolesList(roles: TeamRole[]): ScreenData {
   return {
     rows: roles.map((r) => ({
       id: r.id,
+      // No picture exists for a role, and that is not a reason to draw nothing:
+      // the initial in the same box every other row uses is what keeps a list of
+      // roles the same shape as a list of anything else (R35).
+      mark: <RecordMark name={r.title} />,
       name: r.active ? r.title : `${r.title} (inactive)`,
       detail: r.description || `${r.memberCount} member${r.memberCount === 1 ? "" : "s"}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -90,6 +98,7 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
   return {
     rows: invites.map((i) => ({
       id: i.id,
+      mark: <RecordMark name={i.email} shape="round" />,
       email: i.email,
       detail: `${i.roleTitle} · ${INVITE_STATUS[i.status]}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -203,6 +212,7 @@ export function shapeKnowledgeList(
   return {
     rows: sources.map((s) => ({
       id: s.id,
+      mark: <RecordMark name={s.title} />,
       // A source taken AWAY from the assistant stays in the list (deactivate-not-
       // delete) and says so, the same way a retired article does — seeing what
       // you excluded is half of trusting what you did not.
@@ -223,6 +233,9 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
   return {
     rows: meetings.map((m) => ({
       id: m.id,
+      // WHO IT WAS WITH, as a picture. A diary scanned by date still wants to
+      // say at a glance whose call it was (R35).
+      mark: <RecordMark name={m.accountName ?? m.title} />,
       // A CANCELLED meeting stays in the list (deactivate-not-delete) and says
       // so — "didn't we have a call in March?" is answered either way, and the
       // answer "yes, and we called it off" is a different one from silence.
@@ -380,12 +393,17 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
   return {
     rows: items.map((a) => ({
       id: a.id,
+      mark: <RecordMark picture={a.fileUrl} name={a.name} />,
       name: a.active ? a.name : `${a.name} (archived)`,
       // A COLOUR SAYS ITS VALUE. Twelve rows named "1".."12" read as twelve
       // identical lines saying "Color" until 0043 gave them the hex they had
-      // always carried inside a URL. The swatch itself needs the library's
-      // leading slot (UI-GAPS #16); the WORD does not, and a hex is a thing a
-      // person copies far more often than they look at.
+      // always carried inside a URL. The WORD is still worth having — a hex is a
+      // thing a person copies far more often than they look at.
+      //
+      // AND THE SWATCH, at last. This comment promised it "needs the library's
+      // leading slot (UI-GAPS #16)"; #16 shipped, and the sentence outlived the
+      // fact — which is precisely the rot that gap's own check exists to catch,
+      // one level below where it was looking.
       detail: a.colorHex || a.category || a.description || "—",
       category: a.category || "—",
       state: a.active ? "Live" : "Archived",
@@ -416,6 +434,7 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
   return {
     rows: items.map((p) => ({
       id: p.id,
+      mark: <RecordMark name={p.name} />,
       name: p.active ? p.name : `${p.name} (archived)`,
       detail: p.department || p.description || "—",
       department: p.department || "—",

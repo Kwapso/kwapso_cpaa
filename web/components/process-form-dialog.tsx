@@ -21,6 +21,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { RecordPicker } from "@/components/record-picker"
+import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -65,7 +66,7 @@ export function ProcessFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   /** The systems we've built — a process lives inside one. */
-  apps: { id: string; name: string }[]
+  apps: PickableRecord[]
   /** Opened FROM an app, so which app is a fact rather than a question
    * (CHECKLIST 8.12). The picker disappears and a sentence takes its place —
    * the same shape the sprint and story forms already use. */
@@ -144,7 +145,7 @@ export function ProcessFormDialog({
             id="process-app"
             value={values.appId}
             onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-            options={apps.map((a) => ({ value: a.id, label: a.name }))}
+            options={apps.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             placeholder={t("Pick the app")}
             searchPlaceholder={t("Search apps…")}
             emptyText={t("No app matched.")}

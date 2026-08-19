@@ -87,7 +87,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
             ariaLabel={t("Who is on triage duty")}
             value=""
             onChange={assign}
-            options={onDutyCandidates.map((m) => ({ value: m.id, label: m.name }))}
+            options={onDutyCandidates.map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
             placeholder={t("Pick who's on duty")}
             searchPlaceholder={t("Search people…")}
             emptyText={t("Nobody here matched.")}

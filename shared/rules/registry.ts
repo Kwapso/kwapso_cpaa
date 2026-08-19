@@ -272,6 +272,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "glossary-in-copy",
     status: "enforced",
   },
+  {
+    id: "R35",
+    dimension: "ui",
+    law: "A RECORD NEVER APPEARS WITHOUT ITS FACE. Wherever a record or a dropdown value is shown to be chosen or scanned — a picker option, a row in a collection, a row in a nested panel inside another record's screen — it is drawn with its visual beside its name: its own picture where it has one, its type's glyph where the type has one, and its initial where it has neither. Never nothing, and never the glyph written INTO the words (a pictograph inside a sentence is the one shape UI-CONVENTIONS §5 refuses). Enforced at the three places it can be lost rather than by inspecting markup: `PickerOption` and `PickableRecord` must DECLARE the visual fields, so a type cannot drop a picture before a component sees it; every list recipe must name its `leading` column; and the one shared nested row (`Row` in work-panels.tsx) takes its mark as a REQUIRED prop, with `null` a real and visible answer.",
+    why: "A visual is a key identifier, not decoration on the main page — the owner said so three times across two rounds, and each time the fix was applied where he pointed and nowhere else. The census on 19 Aug 2026 found the true size: THIRTY-THREE pickers, not one of which could show a visual at all, because `PickerOption` had no field for one; ten of fourteen list recipes naming no leading column; around twenty nested panels drawing bare words for records that lead with a glyph on their own screen; and `PickablePerson` dropping `imageUrl` one line before every picker that offers a person. WHY THE CHECK IS POSITIONAL RATHER THAN VISUAL: there is no honest regex for 'this JSX is a record row' — `.map(x => <li>` matches attachments, replies, comments and steps, none of which are records. So the rule stands on the three CHOKEPOINTS instead, which is the same move `record-picker.tsx` being the only composer of `command` already makes: a field that is not carried cannot be forgotten later, it is already gone, and a required prop cannot be skipped by a twenty-first panel. TWO PICKERS HAD WORKED AROUND THE MISSING SLOT by concatenating the emoji into the label, which put a pictograph in the search index and on the trigger; both now pass it as a mark.",
+    checkId: "records-carry-their-face",
+    status: "enforced",
+  },
 ]
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back

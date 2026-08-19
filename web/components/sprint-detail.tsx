@@ -53,6 +53,9 @@ import { moneyText } from "@shared/web/money"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
+import type { SelectableValue } from "@shared/types"
+import { tenancy } from "@/lib/api"
 
 /** Whole cents → what a person would say. The FORMATTING is the shared seam
  * (shared/web/money.ts) now that the two rate cards render prices of their own;
@@ -77,6 +80,13 @@ export function SprintDetailScreen({
   const { t, lang } = useLanguage()
   // Sprints are bounded and read whole, so the record comes out of the same cache
   // the list holds — opening one costs no round-trip.
+  // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
+  // nested panel on it. The same key the Dropdown values manager writes, so
+  // an emoji changed there reaches these rows with no deploy.
+  const teamVocabulary = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
   const activity = useRecordActivity("sprints", sprintId)
   // THE BADGE, BEFORE THE CLICK — the work inside this block, counted when the
@@ -276,6 +286,7 @@ export function SprintDetailScreen({
           if (panel.value === "stories")
             return (
               <StoriesPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
                 ownerKind="sprint"
                 ownerId={sprintId}
                 filter={{ sprintId }}
