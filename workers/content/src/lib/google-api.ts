@@ -34,6 +34,7 @@
 
 import {
   DRIVE_PAGES_PER_FOLDER,
+  GMAIL_SWEEP_PAGES,
   DRIVE_WALK_CALL_BUDGET,
   DRIVE_WALK_MAX_DEPTH,
   DRIVE_WALK_MAX_FILES,
@@ -855,17 +856,46 @@ export async function gmailSearch(
   contactQuery: string,
   search?: string
 ): Promise<MailMessage[]> {
-  const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages")
-  url.searchParams.set("q", search ? `${contactQuery} (${search})` : contactQuery)
-  url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
-  const data = (await googleFetch(url.toString(), token)) as { messages?: unknown }
-  const ids = (Array.isArray(data.messages) ? data.messages : [])
-    .map((m) => str((m as Record<string, unknown>).id))
-    .filter(Boolean)
+  const terms = [contactQuery, search ? `(${search})` : ""].filter(Boolean).join(" ")
+  const ids: string[] = []
+  let pageToken = ""
+  // PAGED, newest first, up to the sweep's budget. One page was fifty messages
+  // and no way to reach the fifty-first — which, once the contact fence came off
+  // and the query became the whole mailbox, would have been a far smaller answer
+  // than the fenced one it replaced.
+  for (let page = 0; page < GMAIL_SWEEP_PAGES; page++) {
+    const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages")
+    // AN EMPTY `q` IS THE WHOLE MAILBOX, deliberately, and only reachable when
+    // the caller passed no fence. Gmail treats a missing `q` as "everything",
+    // which is exactly what an unfenced read means — so it is spelled by
+    // omitting the parameter rather than by sending an empty filter that could
+    // be mistaken for a narrowing.
+    if (terms) url.searchParams.set("q", terms)
+    url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
+    if (pageToken) url.searchParams.set("pageToken", pageToken)
+    const data = (await googleFetch(url.toString(), token)) as {
+      messages?: unknown
+      nextPageToken?: unknown
+    }
+    for (const m of Array.isArray(data.messages) ? data.messages : []) {
+      const id = str((m as Record<string, unknown>).id)
+      if (id) ids.push(id)
+    }
+    pageToken = str(data.nextPageToken)
+    if (!pageToken) break
+  }
   // Gmail's search answers with ids only, so the headers are a second call each.
-  // Bounded by the page size above, and run together rather than in sequence —
-  // fifty round-trips one after another is a request nobody waits for.
-  return Promise.all(ids.map((id) => gmailMessage(token, id, false)))
+  // Run a PAGE at a time rather than all five hundred at once: `Promise.all` over
+  // five hundred fetches is five hundred concurrent sockets, which Gmail answers
+  // with rate limits and the runtime answers with a stall.
+  const out: MailMessage[] = []
+  for (let i = 0; i < ids.length; i += GOOGLE_PAGE_SIZE)
+    out.push(
+      ...(await Promise.all(
+        ids.slice(i, i + GOOGLE_PAGE_SIZE).map((id) => gmailMessage(token, id, false))
+      ))
+    )
+  return out
 }
 
 /** One message. `withBody` decides whether the text is read too — a list wants
@@ -1643,6 +1673,13 @@ export type ChatMessage = {
   senderNamed: boolean
   text: string
   createdAt: string | null
+  /** BACK TO THE MESSAGE ITSELF, in Google Chat. Every other Google kind carried
+   * one of these from the day it was written — Drive its `webViewLink`, Gmail
+   * and Calendar their own — and Chat carried `null`, so a message the assistant
+   * quoted was the one thing in the knowledge base a person could not go and
+   * read in context. Built from the ids rather than asked for, because Chat's
+   * API does not return a link. */
+  url: string | null
 }
 
 /**
@@ -1695,20 +1732,81 @@ export async function chatSpaces(token: string): Promise<ChatSpace[]> {
  * always comes from a row the caller created — never from a request parameter,
  * which is what keeps "named spaces only" true on this side of the boundary too. */
 export async function chatMessages(token: string, spaceName: string): Promise<ChatMessage[]> {
+  // WHO IS IN THIS SPACE, asked once for the whole page of messages rather than
+  // once per message. See `chatMembers` for why this call has to exist at all.
+  const members = await chatMembers(token, spaceName)
   const url = new URL(`https://chat.googleapis.com/v1/${encodeURI(spaceName)}/messages`)
   url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
   url.searchParams.set("orderBy", "createTime desc")
   const data = (await googleFetch(url.toString(), token)) as { messages?: unknown }
   return (Array.isArray(data.messages) ? data.messages : []).map((raw) => {
     const m = raw as Record<string, unknown>
+    const id = str(m.name)
     return {
-      id: str(m.name),
+      id,
       space: spaceName,
-      ...toChatSender(m.sender),
+      ...toChatSender(m.sender, members),
       text: str(m.text),
       createdAt: str(m.createTime) || null,
+      url: chatMessageUrl(id),
     }
   })
+}
+
+/**
+ * WHO IS IN A SPACE, as `users/112978…` → "Ishita Goyal".
+ *
+ * THE REASON THIS CALL EXISTS. Google's `messages.list` populates a sender's
+ * `displayName` for an APP and leaves it EMPTY for a person — so before this,
+ * every human in every space read as a resource id, or (after the honest fix
+ * that preceded this one) as "Somebody in this space". The owner's report was
+ * exactly that: the assistant "doesn't know who sent what message".
+ *
+ * A membership is a different resource from a message and needs its own scope,
+ * `chat.memberships.readonly`, which the app now asks for. Anybody holding an
+ * older grant simply gets an empty map here and the honest description again —
+ * never a wrong name, and never a thrown error for a permission they have not
+ * granted yet. That is the whole of the failure handling: this call is an
+ * IMPROVEMENT to a message, so it may not be allowed to cost one.
+ */
+async function chatMembers(token: string, spaceName: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const url = new URL(`https://chat.googleapis.com/v1/${encodeURI(spaceName)}/members`)
+  url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
+  // Google returns a membership's member as an embedded user; asking for the
+  // name and the display name keeps the response small.
+  try {
+    const data = (await googleFetch(url.toString(), token)) as { memberships?: unknown }
+    for (const raw of Array.isArray(data.memberships) ? data.memberships : []) {
+      const member = ((raw as Record<string, unknown>).member ?? {}) as Record<string, unknown>
+      const id = str(member.name)
+      const shown = str(member.displayName)
+      if (id && shown) out.set(id, shown)
+    }
+  } catch {
+    // An older grant, or a space whose membership this person may not list. The
+    // messages are still worth having with a described speaker on them.
+  }
+  return out
+}
+
+/**
+ * A LINK BACK TO THE MESSAGE, built from its own name.
+ *
+ * Chat's API returns no link, so this is the one Google kind whose URL is
+ * constructed rather than read — and it is constructed from ids Google itself
+ * gave us, never from anything a person typed. `spaces/AAQAVQq3-Vc/messages/
+ * abc.def` becomes `https://chat.google.com/room/AAQAVQq3-Vc/abc.def`, which is
+ * the address Chat's own web app uses.
+ *
+ * Returns null rather than a half-built address when the name is not the shape
+ * we expect: a link that goes nowhere is worse than no link, because a person
+ * clicks it.
+ */
+export function chatMessageUrl(messageName: string): string | null {
+  const m = /^spaces\/([^/]+)\/messages\/(.+)$/.exec(messageName)
+  if (!m) return null
+  return `https://chat.google.com/room/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}`
 }
 
 /**
@@ -1737,10 +1835,18 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
  * sender Google described in no way at all — but it now arrives labelled as one
  * rather than dressed as a name.
  */
-function toChatSender(raw: unknown): { sender: string; senderNamed: boolean } {
+function toChatSender(
+  raw: unknown,
+  members?: Map<string, string>
+): { sender: string; senderNamed: boolean } {
   const s = (raw ?? {}) as Record<string, unknown>
   const given = str(s.displayName)
   if (given) return { sender: given, senderNamed: true }
+  // THE MEMBERSHIP, which is the half Google leaves off a message. Looked up by
+  // the sender's own resource name, so a hit is Google's word for who this is
+  // and carries `senderNamed: true` exactly as a `displayName` would.
+  const fromMembers = members?.get(str(s.name))
+  if (fromMembers) return { sender: fromMembers, senderNamed: true }
   const type = str(s.type)
   const described = type === "BOT" ? "An app" : type === "HUMAN" ? "Somebody in this space" : ""
   return { sender: described || str(s.name), senderNamed: false }
@@ -1780,6 +1886,7 @@ export async function chatPost(token: string, spaceName: string, text: string): 
     senderNamed: true,
     text: str(data.text) || text,
     createdAt: str(data.createTime) || null,
+    url: chatMessageUrl(str(data.name)),
   }
 }
 

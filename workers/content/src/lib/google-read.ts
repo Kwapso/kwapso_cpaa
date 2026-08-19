@@ -35,6 +35,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
 import {
@@ -45,7 +46,6 @@ import {
   calendarList,
   gmailMessage,
   gmailSearch,
-  knownContactQuery,
   GMAIL_CONTACT_CAP,
 } from "./google-api"
 import { accessTokenFor, listNamedSources, type GoogleEnv } from "./google"
@@ -147,6 +147,49 @@ export type GoogleReadRequest = {
  * declares their inbox to be team material, and inventing a way to would be
  * inventing a decision nobody made.
  */
+/**
+ * THE GOOGLE EVENTS THIS APP ALREADY HOLDS AS MEETINGS.
+ *
+ * ── THE MEASUREMENT ─────────────────────────────────────────────────────────
+ *
+ * On the owner's own staging data, 20 Aug 2026: 251 calendar entries in the
+ * knowledge base, and 250 of them were the SAME EVENT as a meeting row, matched
+ * on Google's own event id. "Week Planning" was in there 108 times. "Pickleball"
+ * 99 times.
+ *
+ * The two arrive by different lanes and neither knew about the other. The
+ * meetings sweep files a meeting — title, purpose, who was there, the
+ * transcript when there is one, averaging 431 characters. The calendar sweep
+ * files the same event straight off Google — a title and a date, averaging
+ * THIRTY-FOUR characters.
+ *
+ * ── WHY IT IS WORTH A QUERY ─────────────────────────────────────────────────
+ *
+ * An eighth of the whole knowledge base was a second, thinner copy of something
+ * already in it. That is not merely waste: retrieval hands back the passages
+ * that match, so a hundred near-identical thirty-four-character titles compete
+ * for room with the passages that could actually answer the question. The
+ * owner's report was that the assistant's answers were unsatisfactory, and this
+ * is the largest single reason found.
+ *
+ * THE MEETING WINS, always, and it is not close — it is the same event with the
+ * work written on it. An event NOT in this set is a diary entry nobody made a
+ * meeting for, which is exactly the case the calendar lane is for, and it still
+ * files normally.
+ */
+async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
+  const rows = await d1Query<{ google_event_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — a diary is bounded by how many conversations a team has had,
+    // and this reads one column of it.
+    `SELECT google_event_id FROM meetings
+      WHERE google_event_id IS NOT NULL AND google_event_id <> '' AND deactivated_at IS NULL
+      LIMIT ${LIST_HARD_CAP}`
+  )
+  return new Set(rows.map((r) => r.google_event_id))
+}
+
 export async function readGoogleMaterial(
   env: GoogleEnv,
   cfg: D1Rest,
@@ -208,11 +251,29 @@ export async function readGoogleMaterial(
   if (wanted.includes("gmail")) {
     const token = await tokenOrNull(env, cfg, guard, "gmail")
     if (token) {
+      // WHAT THE CONTACTS ARE STILL FOR. They no longer FENCE the search — the
+      // owner opened the mailbox on 20 Aug 2026 — but they still decide which
+      // client a message belongs to a few lines below. So this reports how many
+      // addresses were available to attribute with, and `capped` says whether
+      // that attribution had to work from a subset.
       contactsUsed = Math.min(contacts.length, GMAIL_CONTACT_CAP)
       contactsCapped = contacts.length > GMAIL_CONTACT_CAP
-      const fence = knownContactQuery(contacts.map((c) => c.email))
-      // No known contacts → no search. Not an empty filter — nothing at all.
-      for (const mail of fence ? await gmailSearch(token, fence, request.search) : [])
+      // THE CONTACT FENCE IS OFF (owner, 20 Aug 2026: "I'd read all my emails").
+      //
+      // It used to build a query from up to forty known contact addresses, so an
+      // inbox of tens of thousands contributed THIRTY sources and every internal
+      // thread, every supplier and every conversation with somebody not yet filed
+      // as a contact was invisible to the assistant. Measured before the change:
+      // 30 email sources against 436 meetings and 1,218 document passages.
+      //
+      // WHAT MAKES THAT HIS DECISION ALONE TO TAKE: mail is filed on the
+      // `private` shelf a few lines below, and the knowledge base enforces that
+      // on every read (`ownerClause`). Opening the net widens what can answer HIS
+      // questions and nobody else's — no colleague, and no client.
+      //
+      // The contacts are still read, and still do the OTHER job below: deciding
+      // which client a message belongs to. Losing the fence does not lose that.
+      for (const mail of await gmailSearch(token, "", request.search))
         items.push({
           service: "gmail",
           sourceId: null,
@@ -236,8 +297,12 @@ export async function readGoogleMaterial(
 
   if (wanted.includes("calendar")) {
     const token = await tokenOrNull(env, cfg, guard, "calendar")
+    // EVENTS THIS APP ALREADY HOLDS AS MEETINGS, so they are not filed twice.
+    // See `meetingEventIds` for the measurement that made this necessary.
+    const alreadyMeetings = token ? await meetingEventIds(cfg, guard) : new Set<string>()
     if (token)
-      for (const event of (await calendarList(token, { from: request.from, to: request.to })).events)
+      for (const event of (await calendarList(token, { from: request.from, to: request.to })).events) {
+        if (alreadyMeetings.has(event.id)) continue
         items.push({
           service: "calendar",
           sourceId: null,
@@ -253,6 +318,7 @@ export async function readGoogleMaterial(
           // only place on an event where that is written down.
           accountId: accountForAddresses(contacts, event.attendees.map((a) => a.email).join(" ")),
         })
+      }
   }
 
   if (wanted.includes("chat")) {
@@ -265,8 +331,19 @@ export async function readGoogleMaterial(
             sourceId: space.id,
             externalId: message.id,
             title: `${space.name} — ${message.sender}`,
-            url: null,
-            text: message.text,
+            // THE LINK BACK, built from the message's own ids (`chatMessageUrl`).
+            // This was `null` from the day it was written, which made Chat the
+            // one Google kind the assistant could quote and nobody could go and
+            // read in context.
+            url: message.url,
+            // WHO SAID IT, IN THE PASSAGE ITSELF, and this is the half that
+            // actually answers the owner's complaint. Retrieval hands the
+            // assistant PASSAGES; a passage holding only the words has thrown
+            // the speaker away by the time anybody reads it, however good the
+            // title is. Putting the name in front of the text means "who said
+            // that?" is answerable from the quoted material rather than from
+            // metadata the model may or may not have been given.
+            text: message.sender ? `${message.sender}: ${message.text}` : message.text,
             updatedAt: message.createdAt,
             shelf: space.shelf,
             ownerUserId: guard.userId,

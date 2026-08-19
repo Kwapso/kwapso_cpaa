@@ -125,6 +125,27 @@ export const CRON_GROWTH_CAP = 200
  * The rest stay pending and are accepted from the invites inbox. */
 export const INVITE_SWEEP_CAP = 25
 
+/* ---- How much of a mailbox the knowledge base may read --------------------- */
+
+/** PAGES OF MAIL ONE SWEEP LISTS, fifty to a page.
+ *
+ * Mail used to be fenced to KNOWN CONTACTS — a query built from up to forty
+ * addresses already in the team's contact list — which meant an inbox of tens of
+ * thousands contributed thirty sources, and every internal thread, every supplier
+ * and every conversation with somebody not yet filed as a contact was invisible.
+ * The owner's ruling on 20 Aug 2026 was to open it: "I'd read all my emails…
+ * full access to all information."
+ *
+ * IT IS STILL HIS ALONE. Mail is filed on the `private` shelf, which the
+ * knowledge base enforces on every read — so opening the net widens what can
+ * answer HIS questions and nothing else. That is the property that made this a
+ * decision he could take on his own behalf rather than for his team.
+ *
+ * Ten pages because the cost is a metadata call PER MESSAGE, not per page:
+ * five hundred messages is five hundred round trips, batched fifty at a time.
+ * Past that a sweep stops being a sweep and becomes a migration. */
+export const GMAIL_SWEEP_PAGES = 10
+
 /* ---- How far into somebody's Drive a share actually reaches ---------------- */
 
 /** HOW MANY LISTING CALLS ONE DRIVE WALK MAY SPEND.
