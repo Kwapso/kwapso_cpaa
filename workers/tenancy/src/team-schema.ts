@@ -2958,6 +2958,53 @@ SELECT lower(hex(randomblob(16))), s.id, 'link',
    );
 `,
   },
+  {
+    // THE SAME MEETING, FILED TWICE, 250 TIMES OVER.
+    //
+    // Two lanes write knowledge sources about the same conversation and neither
+    // knew about the other. The meetings sweep files a meeting — title, purpose,
+    // who was there, the transcript when there is one, averaging 431 characters.
+    // The calendar sweep files the same Google event straight off the diary: a
+    // title and a date, averaging THIRTY-FOUR.
+    //
+    // Measured on the owner's staging base on 20 Aug 2026: 251 calendar entries
+    // in the knowledge base and 250 of them the same event as a meeting row,
+    // matched on Google's own event id. "Week Planning" 108 times. "Pickleball"
+    // 99. An eighth of the whole base was a thinner copy of something already in
+    // it — and not merely wasted: retrieval hands back the passages that match,
+    // so a hundred near-identical thirty-four-character titles compete for room
+    // with the passages that could answer the question. Asked to summarise the
+    // Team Assembly meeting, the assistant returned SIX citations and all six
+    // were the same calendar entry.
+    //
+    // WHY A MIGRATION AND NOT THE SWEEP. `readGoogleMaterial` stopped PRODUCING
+    // these the same day, so nothing new is filed. But retirement asks Google
+    // "is this event still there?" — and it is, so the existing 250 would have
+    // stayed for ever. They are not gone from Google; they are no longer
+    // something this app should hold a second copy of, which is a decision, not
+    // a discovery, and a decision belongs here.
+    //
+    // DEACTIVATED, NEVER DELETED, like everything else. The chunks DO go, because
+    // a chunk is what an answer is built from and leaving them would leave the
+    // duplicates quotable while claiming they were retired.
+    version: "0046_one_meeting_one_source",
+    sql: `
+DELETE FROM knowledge_chunks WHERE source_id IN (
+  SELECT s.id FROM knowledge_sources s
+   WHERE s.kind = 'event' AND s.deactivated_at IS NULL
+     AND EXISTS (SELECT 1 FROM meetings m
+                  WHERE m.google_event_id IS NOT NULL AND m.google_event_id <> ''
+                    AND s.origin_row_id LIKE '%:' || m.google_event_id)
+);
+UPDATE knowledge_sources
+   SET deactivated_at = datetime('now'),
+       deactivator_name = 'Automatic clean-up'
+ WHERE kind = 'event' AND deactivated_at IS NULL
+   AND EXISTS (SELECT 1 FROM meetings m
+                WHERE m.google_event_id IS NOT NULL AND m.google_event_id <> ''
+                  AND origin_row_id LIKE '%:' || m.google_event_id);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
