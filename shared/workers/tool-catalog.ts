@@ -655,9 +655,27 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Rename dropdown value ${str(i, "id")} to "${str(i, "value")}"` },
   },
   {
+    name: "set_dropdown_default",
+    mcpName: "set_dropdown_value_default",
+    summary:
+      "Mark a dropdown value (by `id`) as one of the team's defaults, or take that mark off, with `isDefault`. A default value cannot be switched off by `set_dropdown_value_active` until the mark is taken off — that is what the mark is for. Renaming a default is always allowed.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable/default",
+    schema: obj({ id: S, isDefault: B }, ["id", "isDefault"]),
+    buildBody: (i) => ({ id: str(i, "id"), isDefault: i.isDefault === true }),
+    agent: {
+      write: true,
+      // Taking the mark OFF is the destructive half: it is the step that makes a
+      // built-in value removable, so it is the one worth asking about.
+      confirm: (i) => i.isDefault !== true,
+      summarize: (i) =>
+        `${i.isDefault === true ? "Make" : "Stop treating"} dropdown value ${str(i, "id")} ${i.isDefault === true ? "one of the defaults" : "as one of the defaults"}`,
+    },
+  },
+  {
     name: "set_dropdown_active",
     mcpName: "set_dropdown_value_active",
-    summary: "Switch a dropdown value off (deactivate) or back on (reactivate), never deleted.",
+    summary:
+      "Switch a dropdown value off (deactivate) or back on (reactivate), never deleted. A value marked as one of the team's defaults refuses to switch off — take the mark off with `set_dropdown_default` first.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable/active",
     schema: obj({ id: S, active: B }, ["id", "active"]),
     buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),

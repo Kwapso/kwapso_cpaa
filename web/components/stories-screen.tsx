@@ -43,14 +43,25 @@ import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { assignableMembers } from "@/lib/members"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
+import { RecordMark } from "@shared/web/record-mark"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
- * who has it, when it is due, and which request it answers. */
-function shapeStories(stories: Story[]) {
+ * who has it, when it is due, and which request it answers.
+ *
+ * `marks` is the STORY TYPE's glyph, keyed by the word the row stores (the same
+ * lookup the tickets collection makes, `web/lib/type-marks.ts`). Tickets got
+ * this and stories did not, which is why one collection led with a mark and the
+ * one beside it led with nothing. */
+function shapeStories(stories: Story[], marks?: Map<string, string>) {
   return {
     rows: stories.map((s) => ({
       id: s.id,
+      // THE GLYPH THE ROW IS KNOWN BY (recipe `leading`). A NODE, not a string —
+      // the slot renders whatever the column holds. A story whose type has no
+      // mark falls back to the type's first letter rather than an empty box.
+      mark: <RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? "?"} />,
       // The title alone (K1 / CHECKLIST 11.9). The reference leads the eyebrow on
       // the story's own screen, where it belongs (D4).
       name: s.title,
@@ -199,6 +210,11 @@ export function StoriesScreen({
   // reads (R14). The same fetcher primes the exact `total:` sidecar (R16).
   const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
   const options = useStoryFormOptions(teamId)
+  // THE STORY TYPE'S GLYPH, keyed by the word the row stores. The vocabulary is
+  // already in hand — `useStoryFormOptions` reads the same `selectable:` cache
+  // the Dropdown values screen writes — so this costs no extra request, and an
+  // emoji changed on that screen reaches these rows the moment it lands.
+  const storyMarks = markMap(options.selectableValues, MARK_GROUP.story)
   const [storyOpen, setStoryOpen] = React.useState(false)
 
   if (storiesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the work.")}</p>
@@ -260,7 +276,7 @@ export function StoriesScreen({
         {(found) => {
           const rows = found.active ? found.rows : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
-          const data = shapeStories(rows)
+          const data = shapeStories(rows, storyMarks)
           const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
           return (
             <>

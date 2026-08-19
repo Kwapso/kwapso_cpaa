@@ -295,15 +295,20 @@ export function shapeAccountsList(
         id: a.id,
         // THE SQUARE THE ROW IS KNOWN BY (recipe `leading`, library v0.11.0). A
         // NODE, not a URL — the slot renders whatever the column holds, so a bare
-        // `logoUrl` here would print the path as text. A person is a circle and a
-        // company a rounded square, which is the one rule `RecordMark` exists to
-        // keep (shared/web/record-mark.tsx); a row with no picture gets the
-        // initial rather than an empty box.
+        // `logoUrl` here would print the path as text. A row with no picture gets
+        // the initial rather than an empty box.
+        //
+        // EVERY CLIENT IS A SQUARE, the sole traders included. They were drawn
+        // circles, which is the honest shape for a person and the wrong one HERE:
+        // one list, one column, and two shapes in it reading as two kinds of
+        // record when a client is a client. The crop stays with them — 31 of
+        // these hold a real face, and `fit` is what keeps squaring the box from
+        // letterboxing every one (shared/web/record-mark.tsx).
         mark: (
           <RecordMark
             picture={a.logoUrl}
             name={a.name}
-            shape={a.accountType === "individual" ? "round" : "square"}
+            fit={a.accountType === "individual" ? "cover" : "contain"}
           />
         ),
         // Archived rows stay visible (archive-never-delete), flagged like retired

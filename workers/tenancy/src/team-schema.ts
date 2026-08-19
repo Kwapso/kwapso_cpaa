@@ -2877,6 +2877,37 @@ UPDATE brand_assets
    AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -6, 1) GLOB '[0-9A-Fa-f]';
 `,
   },
+  {
+    // A SPRINT'S STATE HAD NO GLYPH, because it had no vocabulary row to hang
+    // one on. Ticket status and Story status have been `"labels"` groups since
+    // they shipped — the code owns the state, the dropdown row owns the word a
+    // person reads and the mark beside it — and a sprint's three states were the
+    // one set that skipped the pattern and stayed bare words on screen.
+    //
+    // They are DERIVED, not stored: `sprintState()` reads the dates. So these
+    // rows can never move a sprint, and the words are exactly the three
+    // `STATE_HEADING` already renders, which is what lets the screen look the
+    // mark up by the word it is already showing.
+    //
+    // Also the two ticket types that shipped without a glyph. Only where the
+    // mark is still NULL, so a team that has already chosen its own keeps it.
+    //
+    // Re-runnable: every statement is guarded on the row being absent or unset.
+    version: "0044_a_sprint_state_has_a_face",
+    sql: `
+INSERT INTO selectable_data (id, type, value, is_default, mark, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), 'Sprint status', v.value, 1, v.mark, datetime('now'), 'kwapso'
+  FROM (SELECT 'Running now' AS value, '🏃' AS mark
+        UNION ALL SELECT 'Coming up', '📅'
+        UNION ALL SELECT 'Wrapped', '✅') v
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s WHERE s.type = 'Sprint status' AND s.value = v.value
+ );
+
+UPDATE selectable_data SET mark = '➕' WHERE type = 'Ticket type' AND value = 'Extra' AND mark IS NULL;
+UPDATE selectable_data SET mark = '📘' WHERE type = 'Ticket type' AND value = 'Requirements' AND mark IS NULL;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -2925,6 +2956,16 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // Display-only labels for the five built-in states. The status the code trusts
   // is HELP_STATUSES in shared/types.ts — these rows are what a team may reword
   // on screen, and renaming one can never move a ticket.
+  // THE THREE STATES A SPRINT IS IN, as words with a glyph each. Aurora asked
+  // for a mark on upcoming and running sprints rather than the bare word, and
+  // this is the shape the app already had for a state the CODE owns: a sprint's
+  // state is DERIVED from its dates (`sprintState` in sprints-screen.tsx) and
+  // can never be set from here, so these rows carry only what a person reads —
+  // the word and the mark beside it. Renaming one can never move a sprint, and
+  // changing a glyph on the Dropdown values screen reaches every sprint at once.
+  { type: "Sprint status", value: "Running now", mark: "🏃" },
+  { type: "Sprint status", value: "Coming up", mark: "📅" },
+  { type: "Sprint status", value: "Wrapped", mark: "✅" },
   { type: "Ticket status", value: "New" },
   { type: "Ticket status", value: "Triaged" },
   { type: "Ticket status", value: "In progress" },

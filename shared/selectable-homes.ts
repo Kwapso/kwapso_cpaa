@@ -70,6 +70,10 @@ export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
   // Renaming one is already felt everywhere, because nothing stored it.
   "Ticket status": "labels",
   "Story status": "labels",
+  // A sprint's state is DERIVED from its dates (`sprintState`), so there is even
+  // less to rewrite here than for the two above — nothing stores it at all. The
+  // rows carry the word the groups are headed with and the glyph beside it.
+  "Sprint status": "labels",
 
   /* ---- groups that back nothing ------------------------------------------ */
   // Retired with the column it filled (team migration 0042). The migration

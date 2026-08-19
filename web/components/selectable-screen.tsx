@@ -20,7 +20,7 @@ import {
 } from "@kwapso/ui/registry/primitives/select/select"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, X, Check, Upload, Download, Power, Search } from "lucide-react"
+import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "lucide-react"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -53,6 +53,7 @@ export function SelectableScreen({
   const [addOpen, setAddOpen] = React.useState(false)
   // Inline rename state (one row at a time).
   const [editingId, setEditingId] = React.useState<string | null>(null)
+  const [savingId, setSavingId] = React.useState<string | null>(null)
   const [editValue, setEditValue] = React.useState("")
   // The emoji, editable at last. The door has parsed and written it since the
   // day it shipped and this screen never sent one, so a value's emoji could be
@@ -88,7 +89,14 @@ export function SelectableScreen({
   }
 
   async function saveRename(id: string) {
-    if (!editValue.trim()) return
+    if (!editValue.trim() || savingId) return
+    // THE ROW SAYS IT IS SAVING. A rename crosses the gateway, the worker, six
+    // reads and writes over the D1 REST door and a realtime ping before the list
+    // comes back, and the checkmark used to sit there looking unpressed for all
+    // of it — so the first thing a person did was press it again. The wait got
+    // shorter this round; this is the half that makes it FEEL shorter, and the
+    // half that stops the second click.
+    setSavingId(id)
     try {
       const { values: next } = await tenancy.updateSelectable(id, editValue, editMark)
       primeCache(`selectable:${teamId}`, next)
@@ -96,6 +104,20 @@ export function SelectableScreen({
       toast.success(t("Renamed."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't rename that value."))
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  /** Mark a value as one of the team's defaults, or take the mark off. The mark
+   * is what stops `setActive` retiring a word the app shipped with. */
+  async function setDefault(v: SelectableValue, next: boolean) {
+    try {
+      const { values: rows } = await tenancy.setSelectableDefault(v.id, next)
+      primeCache(`selectable:${teamId}`, rows)
+      toast.success(next ? t("Marked as a default.") : t("No longer a default."))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
     }
   }
 
@@ -251,9 +273,14 @@ export function SelectableScreen({
                           size="sm"
                           variant="ghost"
                           onClick={() => void saveRename(v.id)}
+                          disabled={savingId === v.id}
                           aria-label={t("Save")}
                         >
-                          <Check className="size-4" />
+                          {savingId === v.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
                         </Button>
                         <Button
                           size="sm"
@@ -282,6 +309,15 @@ export function SelectableScreen({
                             {t("Inactive")}
                           </Badge>
                         )}
+                        {/* ONE OF THE DEFAULTS — a word the app shipped with, and
+                            the reason the Deactivate action is not on this row.
+                            `is_default` has been on every seeded value since the
+                            table was written and was read by nothing at all. */}
+                        {v.isDefault && (
+                          <Badge variant="secondary" className="shrink-0">
+                            {t("Default")}
+                          </Badge>
+                        )}
                         {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2). The row
                             was `mark · value · "Inactive" · Edit · Power`:
                             two facts, a state and two actions in one sweep,
@@ -306,7 +342,30 @@ export function SelectableScreen({
                                   },
                                 ]
                               : []),
-                            ...(canDelete
+                            ...(canEdit
+                              ? [
+                                  v.isDefault
+                                    ? {
+                                        key: "undefault",
+                                        label: t("Stop treating as a default"),
+                                        icon: <ShieldOff className="size-3.5" />,
+                                        onSelect: () => void setDefault(v, false),
+                                      }
+                                    : {
+                                        key: "default",
+                                        label: t("Make it a default"),
+                                        icon: <Shield className="size-3.5" />,
+                                        onSelect: () => void setDefault(v, true),
+                                      },
+                                ]
+                              : []),
+                            // DEACTIVATE STANDS DOWN ON A DEFAULT rather than
+                            // offering itself and failing at the door. The door
+                            // refuses it either way (that is the real defence,
+                            // and it holds for the agent and MCP too); this is
+                            // so a person is never offered a button that cannot
+                            // work. Take the default mark off and it comes back.
+                            ...(canDelete && !v.isDefault
                               ? [
                                   v.active
                                     ? {

@@ -57,7 +57,7 @@ function listCollection(
   emptyText: string,
   searchPlaceholder: string,
   filterFacets: FilterFacet[] = [],
-  opts: { paged?: boolean } = {}
+  opts: { paged?: boolean; icon?: keyof typeof CONCEPT_ICON } = {}
 ): CollectionConfig {
   return {
     ...defaultCollectionConfig,
@@ -66,6 +66,14 @@ function listCollection(
     userFilter: filterFacets.length > 0,
     filterFacets,
     emptyText,
+    // THE SECTION'S OWN CONCEPT GLYPH, above the empty sentence (library
+    // v0.12.0 `emptyIcon`). A lone line of grey text in a dashed box reads as a
+    // screen that FAILED rather than one with nothing on it yet — and that is
+    // the screen every brand-new team sees on every page. The host's
+    // hand-composed empty states have led with a glyph for this reason all
+    // along; a recipe had no way to say it until now. Same key as the nav, so
+    // the empty state and the rail entry can never drift apart.
+    emptyIcon: opts.icon ? CONCEPT_ICON[opts.icon] : null,
     // R14 meets R16: on a PAGED collection the frame's own "Showing X of Y" is
     // wrong in both numbers — it counts the loaded PREFIX, so it reads
     // "Showing 50 of 50" beside a badge that correctly says 55. The count is
@@ -210,7 +218,7 @@ const membersListRecipe: ScreenRecipe = {
   actions: [],
   collection: listCollection("No members yet.", "Search members…", [
     { field: "role", label: "Role", control: "select" },
-  ]),
+  ], { icon: "members" }),
 }
 
 /** Member detail (Overview + Activity). Actions change-role + remove are gated by
@@ -275,7 +283,7 @@ const rolesListRecipe: ScreenRecipe = {
   actions: [],
   collection: listCollection("No roles yet.", "Search roles…", [
     { field: "state", label: "Status", control: "select" },
-  ]),
+  ], { icon: "roles" }),
 }
 
 /* -------------------------------- invites -------------------------------- */
@@ -292,7 +300,7 @@ const invitesListRecipe: ScreenRecipe = {
   actions: [],
   collection: listCollection("No invites yet.", "Search invites…", [
     { field: "status", label: "Status", control: "select" },
-  ]),
+  ], { icon: "invites" }),
 }
 
 /** Invite detail — who/what/when, plus Revoke (gated team_members:delete; the
@@ -364,7 +372,7 @@ const ticketsListRecipe: ScreenRecipe = {
   // the clutter the accounts screen took away ("two controls for one field").
   // The one in the frame narrowed the loaded fifty and was the same defect the
   // strip was built to avoid.
-  collection: listCollection("No tickets yet.", "Search tickets…", [], { paged: true }),
+  collection: listCollection("No tickets yet.", "Search tickets…", [], { paged: true, icon: "tickets" }),
 }
 
 /* -------------------------------- accounts -------------------------------- */
@@ -398,7 +406,7 @@ const accountsListRecipe: ScreenRecipe = {
   // "companies among the newest fifty" — while the exact count above them never
   // moved, which is what a manager reported as "filter by type, the count
   // doesn't change". A filter a person can pick has to be one the server applies.
-  collection: listCollection("No accounts yet.", "Search accounts…", [], { paged: true }),
+  collection: listCollection("No accounts yet.", "Search accounts…", [], { paged: true, icon: "accounts" }),
 }
 
 /* -------------------------------- knowledge ------------------------------- */
@@ -448,7 +456,7 @@ const meetingsListRecipe: ScreenRecipe = {
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
   // fifty rows the browser is holding. This screen's filters are the DOOR's now,
   // declared in web/lib/collection-filters.ts and asked from the host's find bar.
-  collection: listCollection("Nothing in the diary yet.", "Search meetings…", [], { paged: true }),
+  collection: listCollection("Nothing in the diary yet.", "Search meetings…", [], { paged: true, icon: "meetings" }),
 }
 
 /* ------------------------------ process maps ------------------------------ */
@@ -470,7 +478,7 @@ const processesListRecipe: ScreenRecipe = {
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
   // fifty rows the browser is holding. This screen's filters are the DOOR's now,
   // declared in web/lib/collection-filters.ts and asked from the host's find bar.
-  collection: listCollection("No processes yet.", "Search processes…", [], { paged: true }),
+  collection: listCollection("No processes yet.", "Search processes…", [], { paged: true, icon: "processes" }),
 }
 
 /* ------------------------------- the work ------------------------------- */
@@ -487,12 +495,15 @@ const storiesListRecipe: ScreenRecipe = {
   binding: { module: "stories" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Story"), field("detail", "Details")],
+  // The story TYPE's glyph in the leading slot, the same slot tickets and
+  // accounts fill (library v0.11.0 `leading`). `shapeStories` builds the node.
+  leading: "mark",
   actions: [],
   // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
   // fifty rows the browser is holding. This screen's filters are the DOOR's now,
   // declared in web/lib/collection-filters.ts and asked from the host's find bar.
-  collection: listCollection("No work in hand.", "Search work…", [], { paged: true }),
+  collection: listCollection("No work in hand.", "Search work…", [], { paged: true, icon: "stories" }),
 }
 
 /** THE SPRINTS — the blocks the work was sold inside. A row's summary line is
@@ -506,12 +517,14 @@ const sprintsListRecipe: ScreenRecipe = {
   binding: { module: "sprints" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Sprint"), field("detail", "Details")],
+  // The sprint TYPE's glyph, the same one the Overview groups lead with.
+  leading: "mark",
   actions: [],
   collection: listCollection("No sprints yet.", "Search sprints…", [
     { field: "account", label: "Client", control: "select" },
     { field: "app", label: "App", control: "select" },
     { field: "state", label: "Status", control: "select" },
-  ]),
+  ], { icon: "sprints" }),
 }
 
 /** THE APPS — the systems we have built, one per row, each belonging to exactly
@@ -530,7 +543,7 @@ const appsListRecipe: ScreenRecipe = {
     { field: "account", label: "Client", control: "select" },
     { field: "stage", label: "Stage", control: "select" },
     { field: "state", label: "Archived", control: "select" },
-  ]),
+  ], { icon: "apps" }),
 }
 
 /** OUR OWN ADMIN. A task is never a client's — the summary line says who has it
@@ -547,7 +560,7 @@ const tasksListRecipe: ScreenRecipe = {
   collection: listCollection("Nothing on our own list.", "Search tasks…", [
     { field: "status", label: "Status", control: "select" },
     { field: "assignee", label: "Who has it", control: "select" },
-  ]),
+  ], { icon: "tasks" }),
 }
 
 /* -------------------- the agency's own housekeeping ----------------------- */
@@ -610,7 +623,7 @@ const brandListRecipe: ScreenRecipe = {
   collection: listCollection("Nothing in the brand library yet.", "Search the brand library…", [
     { field: "category", label: "Type", control: "select" },
     { field: "state", label: "Archived", control: "select" },
-  ]),
+  ], { icon: "brand" }),
 }
 
 const brandDetailRecipe: ScreenRecipe = {
@@ -642,7 +655,7 @@ const purposesListRecipe: ScreenRecipe = {
   collection: listCollection("No meeting purposes yet.", "Search meeting purposes…", [
     { field: "department", label: "Department", control: "select" },
     { field: "state", label: "Archived", control: "select" },
-  ]),
+  ], { icon: "purposes" }),
 }
 
 const purposesDetailRecipe: ScreenRecipe = {
