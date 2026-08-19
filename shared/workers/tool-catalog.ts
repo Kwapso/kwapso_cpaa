@@ -137,6 +137,7 @@ const brandAssetBody = (i: Record<string, unknown>): Record<string, unknown> => 
   category: opt(i, "category"),
   description: opt(i, "description"),
   fileUrl: opt(i, "fileUrl"),
+  colorHex: opt(i, "colorHex"),
 })
 
 /** WHAT WE HANDED OVER, as a body. The APP rides on both writes — the create
@@ -2071,9 +2072,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_brand_asset",
     summary:
-      "Add something to the brand library (name required). `category` is picked-or-created as a dropdown value. `fileUrl` may be a link anywhere; uploading the bytes themselves is a screen action, not a tool.",
+      "Add something to the brand library (name required). `category` is picked-or-created as a dropdown value. `fileUrl` may be a link anywhere; uploading the bytes themselves is a screen action, not a tool. An asset that IS a colour carries `colorHex` (`#RRGGBB`) instead of a file — a swatch is drawn from the value, never fetched from a website.",
     binding: "CONTENT", method: "POST", path: "/api/content/brand-assets",
-    schema: obj({ name: S, category: S, description: S, fileUrl: S }, ["name"]),
+    schema: obj({ name: S, category: S, description: S, fileUrl: S, colorHex: S }, ["name"]),
     buildBody: (i) => brandAssetBody(i),
     agent: { write: true, confirm: false, summarize: (i) => `Add "${str(i, "name")}" to the brand library` },
   },
@@ -2081,7 +2082,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "update_brand_asset",
     summary: "Edit a brand asset (by id). Same fields as creating one.",
     binding: "CONTENT", method: "POST", path: "/api/content/brand-assets/update",
-    schema: obj({ id: S, name: S, category: S, description: S, fileUrl: S }, ["id", "name"]),
+    schema: obj({ id: S, name: S, category: S, description: S, fileUrl: S, colorHex: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), ...brandAssetBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit brand asset ${str(i, "id")}` },
   },

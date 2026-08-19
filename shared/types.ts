@@ -1660,6 +1660,11 @@ export type BrandAsset = {
   description: string | null
   /** an object we host (/media/internal/…) or a link somewhere else. */
   fileUrl: string | null
+  /** `#RRGGBB`, for an asset that IS a colour rather than a file of one. A brand
+   * colour was 24 links to flat rectangles drawn by someone else's website until
+   * 0043 — nine of them at a domain one letter off the one we meant. The value
+   * was in the URL the whole time. */
+  colorHex: string | null
   active: boolean
   createdAt: string
   creatorName: string | null

@@ -220,6 +220,20 @@ export const brandAssetFields = (categories: string[]): InternalField[] => [
     kind: "file",
     upload: (dataUrl) => content.uploadBrandAssetFile(dataUrl).then((r) => r.url),
   },
+  // …OR A COLOUR, WHICH IS NOT A FILE (0043). A brand colour was 24 links to a
+  // flat rectangle rendered by somebody else's website — nine of them at a
+  // typosquat of the domain we meant — while the hex sat in the URL the whole
+  // time. It is plain text rather than a new field kind: the door normalises
+  // whatever arrives (`safeColorHex`), accepting `#0F8`, `0F8`, `#00FF88` or
+  // `00ff88` and dropping anything that is not a colour, so a native picker
+  // would buy a swatch in the form and nothing else. The same door answers the
+  // importer and two MCP tools, neither of which has a picker at all.
+  //
+  // The placeholder is the SHAPE, not an example colour: a real hex here is a
+  // hex literal in `web/`, which R32 forbids and caught within one run of
+  // writing this line. It was right to — the exemption list is for the six files
+  // that genuinely need one, and a form's placeholder is not a seventh.
+  { key: "colorHex", label: "Colour", kind: "text", placeholder: "#RRGGBB" },
   { key: "description", label: "Description", kind: "prose", placeholder: "When to use it, and when not to." },
 ]
 

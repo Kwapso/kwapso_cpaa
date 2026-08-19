@@ -1,4 +1,5 @@
 [
+  "#RRGGBB",
   "+{n} more",
   "1 account matches",
   "1 meeting matches",
@@ -163,6 +164,7 @@
   "Closed",
   "Collapse",
   "Collapse sidebar",
+  "Colour",
   "Comfortable",
   "Compact",
   "Companies",

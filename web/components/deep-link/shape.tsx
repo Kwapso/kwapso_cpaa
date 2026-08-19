@@ -351,7 +351,12 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
     rows: items.map((a) => ({
       id: a.id,
       name: a.active ? a.name : `${a.name} (archived)`,
-      detail: a.category || a.description || "—",
+      // A COLOUR SAYS ITS VALUE. Twelve rows named "1".."12" read as twelve
+      // identical lines saying "Color" until 0043 gave them the hex they had
+      // always carried inside a URL. The swatch itself needs the library's
+      // leading slot (UI-GAPS #16); the WORD does not, and a hex is a thing a
+      // person copies far more often than they look at.
+      detail: a.colorHex || a.category || a.description || "—",
       category: a.category || "—",
       state: a.active ? "Live" : "Archived",
     })),
@@ -366,7 +371,9 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): S
       detail: asset.category || "No type said",
       category: asset.category || "—",
       description: asset.description || "—",
-      file: asset.fileUrl || "No file yet",
+      // A COLOUR IS THE ASSET, not a file of it (0043). The two are exclusive by
+      // construction: the migration cleared `file_url` on every row it converted.
+      file: asset.colorHex || asset.fileUrl || "No file yet",
       created: formatDateTime(asset.createdAt),
       createdBy: asset.creatorName || "—",
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt) : "—",

@@ -2822,6 +2822,61 @@ UPDATE selectable_data
    AND deactivated_at IS NULL;
 `,
   },
+  {
+    // A COLOUR IS NOT A PICTURE OF A COLOUR.
+    //
+    // Twenty-four of the twenty-five `Color` rows in the brand library held a
+    // LINK to a flat rectangle rendered by somebody else's website. Every other
+    // category — Avatar, Graphic, Icon, Isotype, Kit, Logo, Presentation, 46
+    // rows — is hosted here. Colour was the whole of the library's external
+    // surface, and the hex was sitting in the URL the entire time.
+    //
+    // NINE OF THE TWENTY-FOUR WERE ON A TYPOSQUAT: `corhexa.com`, which is not
+    // `colorhexa.com` and is not ours. A domain we do not control, named one
+    // letter away from one we meant, returning bytes into the agency's own brand
+    // library. Nothing rendered them as an image — a brand asset's `file_url` is
+    // shown as TEXT today — so this was dormant rather than live. It would not
+    // have stayed dormant: the collection row is getting a picture slot (the
+    // library's `leading`, UI-GAPS #16), and `brand.list` carrying "the asset's
+    // own file" is named in that entry as one of the four lists that gain one.
+    // The fix lands before the thing that would have made it matter.
+    //
+    // The two hosts wrote two shapes — `…/FDE0F8.png` and `…/png/600x300/f4c600`
+    // — and both end in the six hex digits, before an optional `.png`. So: strip
+    // the extension, take six, and guard each character one at a time. SIX
+    // SEPARATE SINGLE-CHARACTER GLOBS rather than one six-class pattern, because
+    // D1 refuses that as "LIKE or GLOB pattern too complex" — the whole
+    // statement fails and the migration dies, which is a worse outcome than any
+    // colour. A row that does not match keeps its URL and is converted by
+    // nobody: losing a link is cheap, inventing a colour is not.
+    //
+    // `file_url` is CLEARED on the rows that convert. The link is what the fix is
+    // about; leaving it would leave the typosquat in the database, one query away
+    // from whatever reads `file_url` next.
+    //
+    // Re-runnable: `color_hex IS NULL` excludes everything a previous pass did.
+    version: "0043_a_colour_is_not_a_picture",
+    sql: `
+ALTER TABLE brand_assets ADD COLUMN color_hex TEXT;
+
+UPDATE brand_assets
+   SET color_hex = '#' || upper(substr(
+         CASE WHEN lower(file_url) LIKE '%.png'
+              THEN substr(file_url, 1, length(file_url) - 4)
+              ELSE file_url END, -6)),
+       file_url = NULL
+ WHERE category = 'Color'
+   AND color_hex IS NULL
+   AND file_url IS NOT NULL
+   AND (file_url LIKE '%colorhexa.com/%' OR file_url LIKE '%corhexa.com/%')
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -1, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -2, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -3, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -4, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -5, 1) GLOB '[0-9A-Fa-f]'
+   AND substr(CASE WHEN lower(file_url) LIKE '%.png' THEN substr(file_url, 1, length(file_url) - 4) ELSE file_url END, -6, 1) GLOB '[0-9A-Fa-f]';
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

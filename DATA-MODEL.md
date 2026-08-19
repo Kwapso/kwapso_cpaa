@@ -1043,6 +1043,29 @@ row would mean granting the right to read every note ever taken in order to let
 somebody see the list of purposes.
 ### brand_assets + meeting_purposes + staff_profiles + staff_certificates. KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`). THE AGENCY'S OWN HOUSEKEEPING
 
+**A colour is not a picture of a colour (`0043`, 19 Aug 2026).** Twenty-four of
+the twenty-five `Color` rows held a LINK to a flat rectangle rendered by another
+website, and **nine were on `corhexa.com` — a typosquat of `colorhexa.com`**, a
+domain we do not control, one letter from the one we meant, serving bytes into
+the agency's own brand library. Every other category (46 rows across seven types)
+was already hosted here, so colour was the whole of the library's external
+surface — and the hex sat in the URL the entire time.
+
+Nothing rendered those URLs as an image: a brand asset's file shows as TEXT, so
+this was **dormant rather than live**. It would not have stayed dormant. The
+collection row is getting a picture slot (UI-GAPS #16), and that entry names
+`brand.list` carrying "the asset's own file" as one of the four lists that gain
+one. The fix landed before the thing that would have made it matter.
+
+`color_hex` is `#RRGGBB`, normalised on the way in by `safeColorHex` (three-digit
+shorthand expanded, anything else dropped rather than refused — the same choice
+`safeExternalLink` makes beside it, and for the same reason: the field is
+optional and losing a bad value costs nothing). The migration converted both URL
+shapes the two hosts wrote, cleared `file_url` on every row it touched, and left
+the one colour we host and every non-colour row alone. Proved row by row in
+`workers/tenancy/test/colour-is-not-a-picture.test.ts`, including the trap: a
+logo whose URL happens to end in six valid hex digits.
+
 Four tables, three permission modules, and the agency-internal side of the legacy
 Glide app finally landed. What they have in common is the whole of their security
 story: **none of them carries an `account_id`**, because none of these rows
@@ -1056,7 +1079,7 @@ structural shape R24 uses for margin, applied to a different secret.
 
 | Table | Module | From (Glide) | Rows | What it is |
 |---|---|---|---|---|
-| `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere. |
+| `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere; `color_hex` (`0043`) holds a colour that IS the asset, and the two are exclusive — the migration cleared the URL on every row it converted. |
 | `meeting_purposes` | `delivery` | `purposes` | 27 | Why the agency meets, and the department it belongs to. |
 | `staff_profiles` | `staff_profiles` | `users` (six profile columns) | 6 | The person behind the member row: personality type, what they are best at, what they find hard, who they look up to, a photo. |
 | `staff_certificates` | `staff_profiles` | `certificates` | 5 | A qualification somebody holds, issuer, granted, lapses, the paper itself. |

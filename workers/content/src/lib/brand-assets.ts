@@ -26,6 +26,7 @@ type AssetRow = {
   category: string | null
   description: string | null
   file_url: string | null
+  color_hex: string | null
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -40,6 +41,7 @@ function toAsset(r: AssetRow): BrandAsset {
     category: r.category,
     description: r.description,
     fileUrl: r.file_url,
+    colorHex: r.color_hex,
     active: r.deactivated_at === null,
     createdAt: r.created_at,
     creatorName: r.creator_name,
@@ -48,7 +50,7 @@ function toAsset(r: AssetRow): BrandAsset {
   }
 }
 
-const COLUMNS = `id, name, category, description, file_url,
+const COLUMNS = `id, name, category, description, file_url, color_hex,
                  deactivated_at, created_at, creator_name, updated_at, editor_name`
 
 /** Every asset (active + retired), by category then name. */
@@ -79,6 +81,26 @@ export type BrandAssetInput = {
   category?: string
   description?: string
   fileUrl?: string
+  colorHex?: string
+}
+
+/** A COLOUR, NOT A LINK TO A PICTURE OF ONE (0043). `#RRGGBB`, upper-cased, or
+ * null — nothing else is stored, so nothing else can be rendered.
+ *
+ * Checked POSITIONALLY, as R20 asks: the value sits inside the test rather than
+ * being trusted because a form happened to send it. A brand asset is written by
+ * the screen, by the importer and by two MCP tools, and the last two are typed
+ * by a machine that has never seen the form's colour picker.
+ *
+ * A three-digit shorthand is expanded rather than refused — `#0F8` is a colour a
+ * person can legitimately type, and doubling each digit is what every browser
+ * does with it. Anything else is DROPPED rather than refused, the same choice
+ * `safeExternalLink` makes one file over and for the same reason: the field is
+ * optional, and losing a bad colour costs nothing. */
+export function safeColorHex(value: unknown): string | null {
+  const v = typeof value === "string" ? value.trim().replace(/^#/, "").toUpperCase() : ""
+  if (/^[0-9A-F]{3}$/.test(v)) return `#${v[0]}${v[0]}${v[1]}${v[1]}${v[2]}${v[2]}`
+  return /^[0-9A-F]{6}$/.test(v) ? `#${v}` : null
 }
 
 /** One validation path for both writes — see the note on marketing's `clean`. */
@@ -91,6 +113,7 @@ async function clean(cfg: D1Rest, guard: MemberGuard, actor: Actor, input: Brand
     category,
     description: optionalText(input.description, "Description", TEXT_LIMITS.long) ?? null,
     fileUrl: safeExternalLink(optionalText(input.fileUrl, "File", TEXT_LIMITS.link)),
+    colorHex: safeColorHex(optionalText(input.colorHex, "Colour", TEXT_LIMITS.short)),
   }
 }
 
@@ -106,8 +129,8 @@ export async function createBrandAsset(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO brand_assets (id, name, category, description, file_url, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(v.name)}, ${sqlString(v.category)}, ${sqlString(v.description)}, ${sqlString(v.fileUrl)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO brand_assets (id, name, category, description, file_url, color_hex, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(v.name)}, ${sqlString(v.category)}, ${sqlString(v.description)}, ${sqlString(v.fileUrl)}, ${sqlString(v.colorHex)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Brand asset created",
@@ -131,13 +154,14 @@ export async function updateBrandAsset(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE brand_assets SET name = ${sqlString(v.name)}, category = ${sqlString(v.category)}, description = ${sqlString(v.description)}, file_url = ${sqlString(v.fileUrl)}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE brand_assets SET name = ${sqlString(v.name)}, category = ${sqlString(v.category)}, description = ${sqlString(v.description)}, file_url = ${sqlString(v.fileUrl)}, color_hex = ${sqlString(v.colorHex)}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
   )
   const changes = describeChanges([
     { label: "Name", from: before.name, to: v.name },
     { label: "Type", from: before.category, to: v.category },
     { label: "Description", from: before.description, to: v.description },
     { label: "File", from: before.file_url, to: v.fileUrl },
+    { label: "Colour", from: before.color_hex, to: v.colorHex },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Brand asset edited",
