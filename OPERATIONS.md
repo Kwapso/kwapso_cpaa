@@ -23,9 +23,12 @@ BOOTSTRAP.md stands the whole thing up from zero.
   (the TWO STAGING domains are attached and serving. The two PRODUCTION domains
   are not attached yet. See "Custom domains" below for what is true and why.
   Staging also answers on its `*.workers.dev` names; production answers on none,
-  by config. Two scripts still DEFAULT to the staging workers.dev name:
-  `scripts/smoke-staging.mjs` and `scripts/smoke-mcp.mjs` read `SMOKE_BASE`, so
-  export it to run either against a custom domain.)
+  by config. Three scripts still DEFAULT to the staging workers.dev names:
+  `scripts/smoke-staging.mjs` and `scripts/smoke-mcp.mjs` read `SMOKE_BASE`, and
+  `scripts/smoke-portal.mjs` reads BOTH `SMOKE_BASE` (the agency door, where its
+  staff fixtures are built) and `SMOKE_PORTAL_BASE` (the client door, which is
+  the surface it is actually proving). Export them to run against a custom
+  domain.)
 - build_command: npm run build (root; builds BOTH static exports, web/ → web/out and web-portal/ → web-portal/out). `npm run build:portal` builds the portal alone.
 - deploy_staging_command: npm run deploy:staging (root; runs `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
 - deploy_production_command: npm run deploy:production (root; same eight-worker realtime-first order, production names)
@@ -345,7 +348,11 @@ both owner-only:
 - `npm run check` — lint, then TypeScript across every workspace, then every suite. Fast (no build), and it is what CI runs.
 - `npm run check:built` — **builds both static exports, then re-runs both front-door suites against them.** Not the same check twice: a handful of assertions can only be true of a BUILT app, and until 18 Aug 2026 they quietly skipped whenever `web/out/` was absent, which on a fresh clone is always. The one they exist for is a minifier mangling — SWC constant-folds a template literal whose substitutions are compile-time constants, and folding the boot loader's mark once DROPPED text, so an SVG attribute reached the browser unterminated under a green build (`web/test/splash.test.ts`). Vitest compiles with a different toolchain and folds nothing, so no source-level test can see it. `REQUIRE_EXPORT=1` makes a missing export a failure rather than a skip. It costs one build plus about ten seconds, and `deploy:staging` / `deploy:production` call it in place of `npm run build` so the export these bytes are read out of is the one about to be uploaded.
 - CI runs the same on every push (.github/workflows/ci.yml)
-- deploy:staging ends with scripts/smoke-staging.mjs, the LIVE login→team journey must pass or the deploy is considered failed
+- deploy:staging ends with **two** live smokes, both must pass or the deploy is considered failed:
+  - `scripts/smoke-staging.mjs` (`npm run smoke:staging`) — the AGENCY front door: the LIVE login → onboarding → team journey, plus the MCP front desk end to end.
+  - `scripts/smoke-portal.mjs` (`npm run smoke:portal`) — the CLIENT front door, added 19 Aug 2026 because until then **half the product deployed unverified on every push**: the agency smoke never touched `kwapso-portal-staging`. It signs a client in at the portal's own hostname, knocks on **every** door in the gateway's `PORTAL_DOORS` allow-list (the census is derived from the table and from what the run actually called, so a door opened tomorrow is an untested door today and the run goes red), then attacks each of them with a second company's ids — list, search, by-id and by-write — with every negative's BAIT proved to exist first from the account that should see it. It also proves the two bugs of that week stay fixed: a deliverable whose visibility is revoked stops returning its file URL (grepped out of the whole response body, not read off one field), and no door reading the agency's own cost is reachable at the client's hostname (R24 — the doors are derived from `internal-money.ts`'s own exports, and each is asked twice: 404 at the client's hostname, 403 `client_login` at ours, to the same person).
+  - It needs **both** base URLs: `SMOKE_BASE` (agency, staff build the fixtures there) and `SMOKE_PORTAL_BASE` (client), plus `TEST_LOGIN_KEY`. Both default to the staging `*.workers.dev` names. Its fixtures are fixed and found-or-created — the second run creates nothing.
+  - `web-portal/test/portal-smoke.test.ts` guards the smoke itself at `npm run check`: that it is still wired into `deploy:staging`, that every door path it names is a real allow-list entry (a typo would 404, and a 404 is what half its checks are *looking* for), and that every resource in `PORTAL_LISTENERS` still has a door named for it, in both directions.
 
 ## Growth watch, the alarms, and what to do when one fires (scaling review 2026-08-14)
 
