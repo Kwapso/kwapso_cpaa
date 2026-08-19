@@ -142,6 +142,7 @@ Today it covers:
   - meetings, `list_meetings`
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_impact`, `list_account_rates`,
+    `list_story_attachments`, `add_story_link`, `remove_story_attachment`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
   - what we hand over on a system, `list_deliverables` (`appId` names the app
     whose handover shelf you want; `id` narrows to one row). The CLIENT's own
@@ -184,7 +185,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **228 doors, 181 with a tool, 47 with a written reason**, the
+  red build. Today: **231 doors, 184 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -203,7 +204,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 181, **157 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 184, **160 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 

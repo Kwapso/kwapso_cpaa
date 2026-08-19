@@ -785,6 +785,35 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Take an attachment off ticket ${str(i, "id")}` },
   },
   {
+    name: "list_story_attachments",
+    summary:
+      "The files and links on one story, by `id` — what somebody put up to show what the work did. `attachments` carries each one's `kind` ('file' or 'link'), its `label`, and the `url` to open it; `total` is how many there are. A story needs at least one of these before it can go for review.",
+    binding: "CONTENT", method: "GET", path: "/api/content/stories/attachments",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `List what's attached to story ${str(i, "id")}` },
+  },
+  {
+    name: "add_story_link",
+    summary:
+      "Attach a LINK to a story: `id` is the story, `label` what a person reads, `url` where it goes. A story holds several, and needs at least one before `set_story_status` will move it to in_review. Files are attached from the app rather than here — this tool sends `kind` as 'link' and never uploads bytes.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments",
+    schema: obj({ id: S, label: S, url: S }, ["id", "label", "url"]),
+    // `kind` fixed and `fileDataUrl` withheld, for the ticket door's reasons —
+    // both named in NARROWED_BODY_FIELDS.
+    buildBody: (i) => ({ id: str(i, "id"), kind: "link", label: str(i, "label"), url: str(i, "url") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Attach "${str(i, "label")}" to story ${str(i, "id")}` },
+  },
+  {
+    name: "remove_story_attachment",
+    summary:
+      "Take a file or a link off a story: `id` is the story, `attachmentId` the one to remove (from list_story_attachments). Nothing is deleted, the row keeps its history and the file stays where it was stored; it simply stops being listed.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments/remove",
+    schema: obj({ id: S, attachmentId: S }, ["id", "attachmentId"]),
+    buildBody: (i) => ({ id: str(i, "id"), attachmentId: str(i, "attachmentId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Take an attachment off story ${str(i, "id")}` },
+  },
+  {
     // Drag-rank is the ONLY priority signal the product has (SCOPE ch.07), so
     // "make this one more urgent" has exactly one honest answer on this surface,
     // and this is it. Neighbours rather than a position, for the same reason the

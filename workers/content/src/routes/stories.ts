@@ -18,6 +18,15 @@
 // one: a fence implies a client can reach these rows through it.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { safeExternalLink } from "../lib/internal-fields"
+import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
+import {
+  addStoryAttachment,
+  countStoryAttachments,
+  listStoryAttachments,
+  removeStoryAttachment,
+} from "../lib/story-attachments"
 import { resolveOrdering } from "@shared/workers/sorting"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
@@ -337,4 +346,91 @@ export async function postSprintComplete(request: Request, env: Env): Promise<Re
     sprints: await listSprints(cfg, guard, {}),
     total: await countSprints(cfg, guard, {}),
   })
+}
+
+/* ------------------------- what a story shows for itself ------------------- */
+
+/** GET /api/content/stories/attachments?id= — the files and links on a story.
+ * `work:read`, agency-only (a story is our own work; the portal has no stories
+ * screen and its gateway forwards no stories door). */
+export async function getStoryAttachments(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Story")
+  if (!id) return fail(400, "invalid_input", "id is required.")
+  const attachments = await listStoryAttachments(cfg, guard, id)
+  return json({ attachments, total: await countStoryAttachments(cfg, guard, id) })
+}
+
+/** POST /api/content/stories/attachments — attach a file or a link to a story.
+ *
+ * `work:edit`, because unlike a ticket (where the person who raised it may add
+ * their own screenshot) a story is ours and showing what it did is part of doing
+ * it. The two branches are the ticket door's, for the ticket door's reasons: a
+ * LINK has its scheme checked here rather than filtered at each front end, since
+ * what lands here goes into an `href`; a FILE goes through the one binary
+ * validator, which caps BEFORE it decodes. */
+export async function postStoryAttachment(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    kind?: unknown
+    label?: unknown
+    url?: unknown
+    fileDataUrl?: unknown
+  }>(request, env, "work", "edit")
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Story", TEXT_LIMITS.short)
+  if (body.kind !== "file" && body.kind !== "link")
+    return fail(400, "invalid_input", "kind must be file or link.")
+  const label = requireText(body.label, "Name", TEXT_LIMITS.short)
+
+  let url: string
+  let contentType: string | null = null
+  let sizeBytes: number | null = null
+  if (body.kind === "link") {
+    const raw = requireText(body.url, "Link", TEXT_LIMITS.link)
+    const safe = safeExternalLink(raw)
+    if (!safe || !/^https?:\/\//i.test(safe))
+      return fail(400, "invalid_input", "A link has to start with http:// or https://.")
+    url = safe
+  } else {
+    const parsed = parseUploadDataUrl(body.fileDataUrl, TICKET_FILE_MAX_BYTES)
+    if (!parsed)
+      return fail(400, "invalid_input", "That file didn't come through. Try again, up to 10MB.")
+    // The key carries a ULID, which is what makes the capability URL
+    // unguessable; the team id keeps one team's objects out of another's prefix.
+    const key = mediaKey("story", guard.teamId)
+    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+    url = `/media/${key}`
+    contentType = parsed.contentType
+    sizeBytes = parsed.bytes.byteLength
+  }
+
+  const attachments = await addStoryAttachment(cfg, guard, actor, id, {
+    kind: body.kind,
+    label,
+    url,
+    contentType,
+    sizeBytes,
+  })
+  await publishChange(env, guard.teamId, "stories", id, "edit")
+  return json({ attachments, total: attachments.length })
+}
+
+/** POST /api/content/stories/attachments/remove — take one off (deactivate,
+ * never delete: the object stays in the bucket and the audit block says who). */
+export async function postStoryAttachmentRemove(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; attachmentId?: unknown }>(
+    request,
+    env,
+    "work",
+    "edit"
+  )
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Story", TEXT_LIMITS.short)
+  const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)
+  // R17: a second press moves zero rows → no ping, no duplicate history.
+  const { moved, attachments } = await removeStoryAttachment(cfg, guard, actor, id, attachmentId)
+  if (moved) await publishChange(env, guard.teamId, "stories", id, "edit")
+  return json({ attachments, total: attachments.length })
 }

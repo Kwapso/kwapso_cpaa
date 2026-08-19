@@ -2908,6 +2908,56 @@ UPDATE selectable_data SET mark = '➕' WHERE type = 'Ticket type' AND value = '
 UPDATE selectable_data SET mark = '📘' WHERE type = 'Ticket type' AND value = 'Requirements' AND mark IS NULL;
 `,
   },
+  {
+    // A STORY GOES FOR REVIEW WITH SOMETHING TO LOOK AT.
+    //
+    // The owner's ruling, 19 Aug 2026: "An explanation text plus one or more
+    // files or images are required to send a story for review." That REVERSES a
+    // recorded decision of Aurora's — the file was deliberately optional,
+    // because "a required upload on work with nothing to show is a rule people
+    // satisfy with a blank image", and that reasoning is still worth knowing.
+    // The owner overruled it knowing so; the docstrings that argued the other
+    // way have been rewritten rather than left contradicting the code.
+    //
+    // The story carried ONE typed-in link (`review_file_url`, `review_file_name`
+    // from 0028) and no way to attach anything. This is `help_attachments` one
+    // table along, same shape and same reasons: one table for files AND links
+    // because "here is the thing I mean" is one act; `kind` decides only how
+    // `url` is read; the shared MEDIA bucket because both gateways serve it;
+    // deactivate, never delete.
+    //
+    // The old two columns stay. They hold real links on real stories, and a
+    // migration that dropped them would lose the proof somebody already gave.
+    version: "0045_a_story_shows_its_work",
+    sql: `
+CREATE TABLE IF NOT EXISTS story_attachments (
+  id TEXT PRIMARY KEY,
+  story_id TEXT NOT NULL REFERENCES stories (id),
+  kind TEXT NOT NULL CHECK (kind IN ('file', 'link')),
+  label TEXT NOT NULL,
+  url TEXT NOT NULL,
+  content_type TEXT,
+  size_bytes INTEGER,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_story_attachments_story ON story_attachments (story_id);
+
+-- THE LINK ALREADY GIVEN BECOMES AN ATTACHMENT, so a story that satisfied the
+-- old rule still satisfies the new one and nobody is asked to re-upload proof
+-- they already provided. Re-runnable: the NOT EXISTS excludes anything a
+-- previous pass carried over.
+INSERT INTO story_attachments (id, story_id, kind, label, url, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), s.id, 'link',
+       COALESCE(NULLIF(TRIM(s.review_file_name), ''), 'What was shown'),
+       s.review_file_url, COALESCE(s.updated_at, s.created_at), 'kwapso'
+  FROM stories s
+ WHERE s.review_file_url IS NOT NULL AND TRIM(s.review_file_url) <> ''
+   AND NOT EXISTS (
+     SELECT 1 FROM story_attachments a WHERE a.story_id = s.id AND a.url = s.review_file_url
+   );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

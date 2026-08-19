@@ -41,6 +41,7 @@ import type {
   MeetingPurpose,
   StaffCertificate,
   StaffProfile,
+  StoryAttachment,
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
 import { api, enc, listQuery, post } from "@shared/web/api"
@@ -351,6 +352,28 @@ export const content = {
   }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/update", post(input)),
   setSprintComplete: (id: string, complete: boolean) =>
     api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
+
+  /* -------------------- what a story shows for itself ----------------------- */
+  /** The files and links on a story. A story needs at least one before it can go
+   * for review (owner, 19 Aug 2026) — the door counts what the story CARRIES,
+   * not what the review request sends, so uploading on Tuesday still counts on
+   * Thursday. */
+  storyAttachments: (id: string) =>
+    api<{ attachments: StoryAttachment[]; total: number }>(
+      `/api/content/stories/attachments?id=${enc(id)}`
+    ),
+  addStoryAttachment: (input: {
+    id: string
+    kind: "file" | "link"
+    label: string
+    url?: string
+    fileDataUrl?: string
+  }) => api<{ attachments: StoryAttachment[]; total: number }>("/api/content/stories/attachments", post(input)),
+  removeStoryAttachment: (id: string, attachmentId: string) =>
+    api<{ attachments: StoryAttachment[]; total: number }>(
+      "/api/content/stories/attachments/remove",
+      post({ id, attachmentId })
+    ),
 
   /* --------------------------------- triage --------------------------------- */
   /** Whose week it is, and the requests nobody has read past three days. One

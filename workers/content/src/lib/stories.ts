@@ -34,6 +34,7 @@
 // it. What a client sees of a story is a COUNT on their own ticket, and that
 // count is served by the ticket door (BUILD-1 §7).
 
+import { countStoryAttachments } from "./story-attachments"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -788,6 +789,26 @@ async function refuseUnreviewable(
       400,
       "review_note_required",
       "Before this goes for review, say what you did, a line or two is plenty."
+    )
+  // AND SOMETHING TO LOOK AT (owner, 19 Aug 2026): "An explanation text plus one
+  // or more files or images are required to send a story for review."
+  //
+  // This REVERSES Aurora's ruling, which made the file optional because "a
+  // required upload on work with nothing to show is a rule people satisfy with a
+  // blank image". That risk is real and the owner overruled it knowing so; the
+  // note is kept here rather than deleted, because the day somebody finds a
+  // folder of blank screenshots this is the sentence that explains them.
+  //
+  // COUNTED, NOT PASSED IN — the same shape as `existingNote` above. A person who
+  // uploaded three images on Tuesday and pressed the button on Thursday sends no
+  // files with the request, and refusing them would be the rule punishing the
+  // orderly. What the story CARRIES is what counts.
+  const shown = await countStoryAttachments(cfg, guard, id)
+  if (shown === 0)
+    throw new GuardError(
+      400,
+      "review_file_required",
+      "Attach at least one file or link showing what you did, then send it for review."
     )
   const running = await d1Query<{ n: number }>(
     cfg,

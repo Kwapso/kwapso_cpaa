@@ -142,6 +142,12 @@ export const TICKET_FACET_CAP = 500
  * read to the end of and a count can be trusted. */
 export const TICKET_ATTACHMENT_CAP = 50
 
+/** WHAT A STORY MAY SHOW FOR ITSELF. Smaller than a ticket's fifty on purpose:
+ * a ticket accumulates evidence over a conversation that can run for weeks, and
+ * a story's attachments are what one person put up to say "come and look". Past
+ * this the door refuses in words rather than truncating a list. */
+export const STORY_ATTACHMENT_CAP = 20
+
 /** Rows the work-log summary's two grouped reads may return (R14) — time BY
  * PERSON and time BY KIND OF WORK, on one record. Both group over sets that
  * cannot run away: the people are the team's members and the kinds are the

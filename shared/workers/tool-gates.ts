@@ -109,6 +109,9 @@ export const TOOL_GATES: Record<string, string> = {
   // Showing somebody what you mean is the same bar as saying it — a person who
   // can see a ticket can attach to it, exactly as they can reply to it.
   add_help_link: "help:read",
+  list_story_attachments: "work:read",
+  add_story_link: "work:edit",
+  remove_story_attachment: "work:edit",
   remove_help_attachment: "help:read",
   reply_help_ticket: "help:read",
   // Answering is a status move, so it sits on the same right every other move

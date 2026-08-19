@@ -407,6 +407,24 @@ export type HelpAttachment = {
   addedByName: string | null
 }
 
+/** ONE THING A STORY SHOWS FOR ITSELF — a file in the shared media bucket, or a
+ * link somebody pasted. The same shape `HelpAttachment` has one table along, and
+ * for the same reasons: "here is the thing I mean" is one act, and `kind` decides
+ * only how `url` is read. */
+export type StoryAttachment = {
+  id: string
+  storyId: string
+  kind: "file" | "link"
+  /** what a person reads in the list — the file's name, or the link's label */
+  label: string
+  /** the file's key inside the shared media bucket, or the link's URL */
+  url: string
+  contentType: string | null
+  sizeBytes: number | null
+  createdAt: string
+  addedByName: string | null
+}
+
 /** One reply on a ticket. `isAgent` marks the AI-drafted first reply; a mention
  * is notification-only (every member can see every ticket via the All tab).
  *

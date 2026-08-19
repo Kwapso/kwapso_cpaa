@@ -405,6 +405,7 @@ export function StoryDetailScreen({
         onSubmit={save}
       />
       <ReviewDialog
+        storyId={storyId}
         open={reviewOpen}
         onOpenChange={setReviewOpen}
         draftKey={`story:review:${storyId}`}

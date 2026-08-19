@@ -220,6 +220,10 @@ export function traceFor(
       return { path: seg(teamId, "stories"), highlight: "main" }
     case "update_story":
     case "set_story_status":
+    // Attaching or taking off what a story shows for itself lands on the story,
+    // the same way a ticket's files land on the ticket.
+    case "add_story_link":
+    case "remove_story_attachment":
       return { path: `${seg(teamId, "stories")}/${str(input, "id")}`, highlight: "main" }
     case "create_sprint":
       return { path: seg(teamId, "sprints"), highlight: "main" }

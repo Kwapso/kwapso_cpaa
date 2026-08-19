@@ -108,6 +108,19 @@ describe("a story is what WE do", () => {
   it("opens in `open`, and moves through in progress and in review", async () => {
     const id = await addStory({ title: "Walk the lifecycle" })
     expect(storyRow(id).status).toBe("open")
+    // SOMETHING TO LOOK AT, because review now needs one as well as an
+    // explanation (owner, 19 Aug 2026). Attached through the shipped door so
+    // this walk exercises the same path a person takes.
+    expect(
+      (
+        await call(IDS.staffUser, "POST /api/content/stories/attachments", {
+          id,
+          kind: "link",
+          label: "The screen it changed",
+          url: "https://example.test/before-and-after",
+        })
+      ).status
+    ).toBe(200)
     for (const status of ["in_progress", "in_review"]) {
       // `reviewNote` rides both moves and only one of them reads it: a story
       // cannot go to review without saying what was done (CHECKLIST 6.9). It is

@@ -105,6 +105,19 @@ async function story(title: string, extra: Record<string, unknown> = {}): Promis
 // CHECKLIST 5.3 — "a new state Scheduled, between Triage and In progress: stories
 // exist AND are in a sprint". BOTH halves, because either alone is a different
 // and wrong sentence.
+/** Something to look at, through the shipped door — so these fixtures exercise
+ * the same path a person does rather than writing the row by hand. */
+async function attach(storyId: string) {
+  const res = await call(IDS.staffUser, "POST /api/content/stories/attachments", {
+    id: storyId,
+    kind: "link",
+    label: "The screen it changed",
+    url: "https://example.test/before-and-after",
+  })
+  expect(res.status, "attaching must work, or every test under it is measuring the wrong thing").toBe(200)
+}
+
+
 describe("scheduled happens by itself", () => {
   it("does not move a ticket whose work exists but is booked into nothing", async () => {
     const id = await ticket("Work written down, nothing booked")
@@ -194,6 +207,7 @@ describe("a timer is what moves the work", () => {
   it("never pulls reviewed work back out of review", async () => {
     const id = await ticket("Reviewed, then re-clocked")
     const s = await story("Finished work", { ticketId: id })
+    await attach(s)
     await call(IDS.staffUser, "POST /api/content/stories/status", {
       id: s,
       status: "in_review",
@@ -214,6 +228,11 @@ describe("a timer is what moves the work", () => {
 describe("review is refused until the work has stopped and said what it did", () => {
   it("refuses while a timer on it is still running", async () => {
     const s = await story("Still being clocked")
+    // Something to look at, so this test measures the TIMER refusal rather
+    // than tripping over the attachment one first. The two are checked in the
+    // order a person fills the form in — say what you did, show it, then the
+    // state of the work itself.
+    await attach(s)
     await call(IDS.staffUser, "POST /api/content/work-logs/start", {
       targetTable: "stories",
       targetId: s,
@@ -228,7 +247,12 @@ describe("review is refused until the work has stopped and said what it did", ()
     expect(storyRow(s).status).toBe("in_progress")
   })
 
-  it("refuses with no explanation, and accepts with one and no file", async () => {
+  // THE RULING CHANGED, AND SO DID THIS TEST (owner, 19 Aug 2026): "An
+  // explanation text plus one or more files or images are required to send a
+  // story for review." It used to assert the opposite — Aurora's "a file is only
+  // required when there IS one" — and a test left asserting a superseded ruling
+  // is worse than no test, because it goes green while the product has moved.
+  it("refuses with no explanation, refuses with no file, and takes both together", async () => {
     const s = await story("Nothing to show for it")
     const bare = await call(IDS.staffUser, "POST /api/content/stories/status", {
       id: s,
@@ -237,17 +261,46 @@ describe("review is refused until the work has stopped and said what it did", ()
     expect(bare.status).toBe(400)
     expect((await bare.json()) as { error: string }).toMatchObject({ error: "review_note_required" })
 
+    // THE WORDS ALONE ARE NO LONGER ENOUGH. This is the exact request that used
+    // to pass, kept verbatim so the reversal is legible in the diff.
     const said = await call(IDS.staffUser, "POST /api/content/stories/status", {
       id: s,
       status: "in_review",
       reviewNote: "Renamed the column and checked the two screens that read it.",
     })
-    expect(said.status, "a file is only required when there IS one").toBe(200)
+    expect(said.status, "an explanation with nothing to look at is refused now").toBe(400)
+    expect((await said.json()) as { error: string }).toMatchObject({ error: "review_file_required" })
+    expect(storyRow(s).status, "a refused story does not move").toBe("open")
+
+    await attach(s)
+    const both = await call(IDS.staffUser, "POST /api/content/stories/status", {
+      id: s,
+      status: "in_review",
+      reviewNote: "Renamed the column and checked the two screens that read it.",
+    })
+    expect(both.status).toBe(200)
+    expect(storyRow(s).status).toBe("in_review")
+  })
+
+  // WHAT THE STORY CARRIES IS WHAT COUNTS, not what this request sends. Somebody
+  // who uploaded on Tuesday and pressed the button on Thursday sends no files
+  // with the move, and refusing them would be the rule punishing the orderly —
+  // the same shape as the explanation's own `existingNote` fallback.
+  it("counts files the story already had, not files sent with the move", async () => {
+    const s = await story("Uploaded on Tuesday")
+    await attach(s)
+    const later = await call(IDS.staffUser, "POST /api/content/stories/status", {
+      id: s,
+      status: "in_review",
+      reviewNote: "Explained on Thursday.",
+    })
+    expect(later.status).toBe(200)
     expect(storyRow(s).status).toBe("in_review")
   })
 
   it("keeps an explanation typed days ago rather than blanking it on a later move", async () => {
     const s = await story("Explained on Tuesday")
+    await attach(s)
     await call(IDS.staffUser, "POST /api/content/stories/status", {
       id: s,
       status: "in_review",
