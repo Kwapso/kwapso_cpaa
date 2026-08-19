@@ -290,6 +290,12 @@ export async function driveList(
     // out of one must behave like any other.
     url.searchParams.set("supportsAllDrives", "true")
     url.searchParams.set("includeItemsFromAllDrives", "true")
+    // And `corpora`, the half that was missing. Google defaults it to `user`,
+    // and a shared drive belongs to the ORGANISATION, not the user — so both
+    // flags above can be true and a folder in the agency’s own Build drive
+    // still comes back empty, which is exactly what it did. `allDrives` is the
+    // body the two flags were always describing.
+    url.searchParams.set("corpora", "allDrives")
     const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
     for (const raw of Array.isArray(data.files) ? data.files : [])
       out.push(toDriveFile(raw, folderId))
@@ -349,6 +355,12 @@ export async function driveFilesPick(token: string, search?: string): Promise<Dr
   url.searchParams.set("orderBy", "modifiedTime desc")
   url.searchParams.set("supportsAllDrives", "true")
   url.searchParams.set("includeItemsFromAllDrives", "true")
+  // And `corpora`, the half that was missing. Google defaults it to `user`,
+  // and a shared drive belongs to the ORGANISATION, not the user — so both
+  // flags above can be true and a folder in the agency’s own Build drive
+  // still comes back empty, which is exactly what it did. `allDrives` is the
+  // body the two flags were always describing.
+  url.searchParams.set("corpora", "allDrives")
   const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
   return (Array.isArray(data.files) ? data.files : []).map((raw) => toDriveFile(raw, ""))
 }
@@ -415,6 +427,12 @@ export async function driveFolders(token: string, search?: string): Promise<Driv
   url.searchParams.set("fields", `files(${DRIVE_FILE_FIELDS})`)
   url.searchParams.set("supportsAllDrives", "true")
   url.searchParams.set("includeItemsFromAllDrives", "true")
+  // And `corpora`, the half that was missing. Google defaults it to `user`,
+  // and a shared drive belongs to the ORGANISATION, not the user — so both
+  // flags above can be true and a folder in the agency’s own Build drive
+  // still comes back empty, which is exactly what it did. `allDrives` is the
+  // body the two flags were always describing.
+  url.searchParams.set("corpora", "allDrives")
   const data = (await googleFetch(url.toString(), token)) as { files?: unknown }
   return (Array.isArray(data.files) ? data.files : []).map((raw) => toDriveFile(raw, ""))
 }
