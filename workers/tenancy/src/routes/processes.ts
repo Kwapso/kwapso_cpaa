@@ -537,7 +537,7 @@ export async function postProcessComment(request: Request, env: Env): Promise<Re
 
 // ── the savings drill-down ───────────────────────────────────────────────────
 
-/** GET /api/tenancy/value[?accountId=&appId=] — the savings, drilled App →
+/** GET /api/tenancy/impact[?accountId=&appId=] — the savings, drilled App →
  * Process → Step, with the caption that makes the number honest. And, for the
  * accounts the owner has switched on, what they bought.
  *
@@ -558,7 +558,7 @@ export async function postProcessComment(request: Request, env: Env): Promise<Re
  *
  * `accountId` narrows for staff; for a client login the fence has already
  * decided, and naming somebody else's account is a 404. */
-export async function getValue(request: Request, env: Env): Promise<Response> {
+export async function getImpact(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "processes", "read")
   const scope = await accountScope(cfg, guard)
   const url = new URL(request.url)

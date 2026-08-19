@@ -432,7 +432,7 @@ step("Process maps")
 
 step("Checking the savings add up")
 {
-  const view = must(await api("/api/tenancy/value", {}, cookie), "reading the value")
+  const view = must(await api("/api/tenancy/impact", {}, cookie), "reading the value")
   const hours = Math.round((view.savedSecondsPerMonth ?? 0) / 3600)
   const check = (label, ok, detail = "") => {
     console.log(`  ${ok ? "PASS" : "FAIL"}  ${label}${ok ? "" : ` — ${detail}`}`)

@@ -73,7 +73,7 @@ import type { ProcessComment, ProcessDetail, ProcessStep, ProcessVersion } from 
 import { SAVINGS_CAPTION, hoursText, minutesText } from "@shared/workers/savings"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { StepFormDialog, type StepFormValues } from "@/components/step-form-dialog"
-import { SavingStepLine } from "@/components/value-panel"
+import { SavingStepLine } from "@/components/impact-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { RecordPicker } from "@/components/record-picker"
@@ -93,7 +93,7 @@ import {
   processKey,
   processVersionKey,
   processesKey,
-  valueKey,
+  impactKey,
 } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -177,7 +177,7 @@ export function ProcessDetailScreen({
     invalidate(`activity:record:processes:${processId}`)
     invalidate(processesKey(teamId))
     // A duration changing is exactly when a value figure stops being true.
-    invalidate(valueKey(teamId))
+    invalidate(impactKey(teamId))
     // …and every older version we have loaded. Cutting a version is the write
     // that turns today's steps into an old version's, so the slices have to go
     // with it — the same family drop the live listener does for everyone else.

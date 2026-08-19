@@ -50,7 +50,7 @@
 //   POST /api/tenancy/processes/versions   -> cut a version (button, or a sprint's id)
 //   GET  /api/tenancy/processes/comments   -> the conversation on a map (?processId)
 //   POST /api/tenancy/processes/comments   -> comment on a map (clients too)
-//   GET  /api/tenancy/value                -> savings, App -> Process -> Step
+//   GET  /api/tenancy/impact               -> savings, App -> Process -> Step
 //   GET  /api/tenancy/record-counts        -> one record's child totals, before a tab is clicked
 //   GET  /api/tenancy/rates                -> an account's rate card (?accountId)
 //   POST /api/tenancy/rates                -> add a rate
@@ -153,7 +153,7 @@ import {
   getProcessComments,
   getProcessDetail,
   getProcesses,
-  getValue,
+  getImpact,
   postAddStep,
   postAppActive,
   postCreateApp,
@@ -276,7 +276,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/processes/versions": { handler: postCutVersion, kind: "mutation" },
   "GET /api/tenancy/processes/comments": { handler: getProcessComments, kind: "read" },
   "POST /api/tenancy/processes/comments": { handler: postProcessComment, kind: "mutation" },
-  "GET /api/tenancy/value": { handler: getValue, kind: "read" },
+  "GET /api/tenancy/impact": { handler: getImpact, kind: "read" },
   // THE BADGES ON A RECORD'S TABS, answered when the record OPENS rather than
   // when the tab is clicked — the counts are eager, the rows stay lazy. It
   // crosses three modules, so it is gated per COLLECTION rather than at the door

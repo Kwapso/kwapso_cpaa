@@ -260,7 +260,7 @@ const FED_BY = {
   todos: "GET /api/content/todos",
   stories: "GET /api/content/portal/delivery",
   sprints: "GET /api/content/portal/delivery",
-  process_comments: "GET /api/tenancy/value",
+  process_comments: "GET /api/tenancy/impact",
   deliverables: "GET /api/content/portal/deliverables",
 }
 
@@ -646,7 +646,7 @@ section("their own world")
   const delivery = await portal("/api/content/portal/delivery", {}, client)
   ok("their delivery blocks answer", delivery.ok && Array.isArray(delivery.body?.sprints), `status ${delivery.status}`)
 
-  const value = await portal("/api/tenancy/value", {}, client)
+  const value = await portal("/api/tenancy/impact", {}, client)
   ok("their value screen answers", value.ok, `status ${value.status} ${JSON.stringify(value.body).slice(0, 120)}`)
 
   const todos = await portal("/api/content/todos", {}, client)
@@ -867,7 +867,7 @@ section("the account fence")
   )
   ok("they cannot comment on the other company's map", said.status === 404, `got ${said.status}`)
 
-  const value = await portal(`/api/tenancy/value?accountId=${THEIRS}`, {}, client)
+  const value = await portal(`/api/tenancy/impact?accountId=${THEIRS}`, {}, client)
   const dump = JSON.stringify(value.body ?? {})
   ok(
     "asking for the other company's value answers about nobody",

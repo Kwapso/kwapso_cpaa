@@ -43,7 +43,7 @@ export const cacheKeys = {
    * doing the attaching never waits. */
   attachments: (ticketId: string) => `portal:attachments:${ticketId}`,
   attachmentsTotal: (ticketId: string) => `portal:attachments:${ticketId}:total`,
-  value: "portal:value",
+  impact: "portal:impact",
   /** What we are waiting on them for, and what they bought. */
   todos: "portal:todos",
   delivery: "portal:delivery",
@@ -74,11 +74,11 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   // inside of, and both of which they watch.
   stories: () => [cacheKeys.tickets, cacheKeys.delivery],
   sprints: () => [cacheKeys.delivery],
-  // A comment on one of their process maps — theirs or ours. The whole value
+  // A comment on one of their process maps — theirs or ours. The whole impact
   // read is dropped rather than the one conversation, because the comment that
   // just landed may be the explanation for a step that got slower, and that
-  // changes what the value screen says beside it.
-  process_comments: () => [cacheKeys.value],
+  // changes what the impact screen says beside it.
+  process_comments: () => [cacheKeys.impact],
   /** THE MOMENT SOMETHING IS SHARED WITH THEM, their screen says so — which is
    * the whole reason this resource is worth hearing. The agency presses "Show to
    * the client" and the card appears where the client is already looking, rather

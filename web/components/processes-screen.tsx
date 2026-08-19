@@ -33,9 +33,9 @@ import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
-import { ValuePanel } from "@/components/value-panel"
+import { ImpactPanel } from "@/components/impact-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { accountsKey, appsKey, listFetch, processesKey, valueKey } from "@/lib/live-resources"
+import { accountsKey, appsKey, listFetch, processesKey, impactKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { Account, AppRow, ProcessSummary } from "@shared/types"
 import type { SavingsView } from "@shared/workers/savings"
@@ -90,7 +90,7 @@ export function ProcessesScreen({
   const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
     listFetch.processes(teamId)
   )
-  const valueQ = useCached<SavingsView>(valueKey(teamId), () => tenancy.value())
+  const valueQ = useCached<SavingsView>(impactKey(teamId), () => tenancy.impact())
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => tenancy.apps().then((r) => r.apps))
 
   // The accounts an app can belong to. Page one is plenty for a picker, and it
@@ -113,7 +113,7 @@ export function ProcessesScreen({
         roleName: values.roleName || undefined,
       })
       invalidate(processesKey(teamId))
-      invalidate(valueKey(teamId))
+      invalidate(impactKey(teamId))
       toast.success(t("Process mapped."))
     } catch (err) {
       throw err instanceof ApiFailure ? err : new Error("Couldn't map that process.")
@@ -130,7 +130,7 @@ export function ProcessesScreen({
       toolCostCentsPerMonth: values.toolCostCentsPerMonth,
     })
     invalidate(appsKey(teamId))
-    invalidate(valueKey(teamId))
+    invalidate(impactKey(teamId))
     toast.success(t("App recorded."))
   }
 
@@ -213,14 +213,14 @@ export function ProcessesScreen({
         }}
       </PagedFind>
 
-      {/* WHAT THE MAPS ADD UP TO — under them, not over them. `ValuePanel` is a
+      {/* WHAT THE MAPS ADD UP TO — under them, not over them. `ImpactPanel` is a
           headline, R25's caption and a three-level accordion, and it sat between
           the heading and the search box: four blocks before the first process on
           a screen called Processes (N2). The person came for the list. It is the
           SUM of the rows above it, so it reads better after them anyway, and it
           is one scroll away rather than a click — which is the trade the owner
           asked for when he said people should be happy to scroll. */}
-      <ValuePanel view={valueQ.data} />
+      <ImpactPanel view={valueQ.data} />
 
       <AppFormDialog
         members={members}

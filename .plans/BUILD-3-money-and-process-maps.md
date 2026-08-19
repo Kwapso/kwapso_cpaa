@@ -78,7 +78,7 @@ them.
 
 The owner's ruling: **value for everyone; what they bought only for the accounts
 where he switches it on.** So a per-account flag governs price visibility, and
-the savings/value view is on by default.
+the savings/impact view is on by default.
 
 **Internal rates and margin NEVER render in the portal, under any flag, ever.**
 Not behind a permission, not behind a feature toggle, not for an admin viewing

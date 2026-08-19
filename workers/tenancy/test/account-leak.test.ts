@@ -449,10 +449,10 @@ const BURGLARIES: Burglary[] = [
     // value read walks every app and every process the CALLER may see, so a fence
     // that had been left off this one statement would hand a burglar the whole
     // estate's maps in a single unauthenticated-looking GET.
-    route: "GET /api/tenancy/value",
+    route: "GET /api/tenancy/impact",
     why: "read the savings drill-down, which names every app, map and step in the team",
-    attack: () => req("GET /api/tenancy/value"),
-    honest: () => req("GET /api/tenancy/value"),
+    attack: () => req("GET /api/tenancy/impact"),
+    honest: () => req("GET /api/tenancy/impact"),
     expect: "nothing",
   },
 ]

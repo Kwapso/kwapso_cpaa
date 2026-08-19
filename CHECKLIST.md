@@ -341,7 +341,7 @@ stays there as the record. **BUILDING** means a lane is on it in this session ri
 | 22.1 | What actually was the deep link issue, and is it the mechanism Glide used? | Answered in full. It was the gateway's own list of which addresses it handles, not permissions and not the row id. Yes, the shape is the same as Glide's: the URL names the record, the page resolves it in the browser, and the server decides whether you may see it |
 | 22.2 | Is sync-on-open in place? | Yes, and proved live. Per-screen freshness is not, and is being built |
 | 22.3 | Why is Drive folder-wise only? | It was a scoping decision, not a limitation. File-level sharing is being added |
-| 22.4 | Why did the Value tab show hours but no money? | The money half needs a role on the process and a rate on that role. The hours half needs neither. Being diagnosed and made speakable |
+| 22.4 | Why did the Impact tab show hours but no money? | The money half needs a role on the process and a rate on that role. The hours half needs neither. Being diagnosed and made speakable |
 
 ## 23 · Still blocked on you
 
@@ -364,7 +364,7 @@ Nobody asked for these. They are the faults the work walked into.
 | 24.4 | Every process map in the app was born with no role | **DONE**, the form has asked "who does it" since the rate card shipped and nothing behind it read the answer. No role, no rate, no price — which is why you saw hours and no money |
 | 24.5 | A story could store the literal word "Assignee" as the person doing it | **DONE**, it resolved the name from the activity feed and fell back to the label |
 | 24.6 | The calendar sweep would have reported success while never reaching tomorrow | **DONE**, caught in the lane's own review: one straddling window spent its whole page on the past |
-| 24.7 | The charting library put 114 KB on every route | **DONE**, the whole app is one shell, and lazy-loading the component alone does nothing because its config lives in the same module. Isolated behind one dynamic import per app: the agency shell is 4 KB over baseline and the client's value screen is 100 KB lighter than before |
+| 24.7 | The charting library put 114 KB on every route | **DONE**, the whole app is one shell, and lazy-loading the component alone does nothing because its config lives in the same module. Isolated behind one dynamic import per app: the agency shell is 4 KB over baseline and the client's impact screen is 100 KB lighter than before |
 | 24.8 | Three real defects in the translation generator | **DONE**, no checkpoint inside a language, curly quotes read as invented keys, and one bad value binning its whole batch of seven good ones |
 
 ## 25 · Asked for after the first round-two build

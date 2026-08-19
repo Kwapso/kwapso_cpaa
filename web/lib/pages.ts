@@ -317,11 +317,11 @@ export const CONCEPT_ICON = {
   tickets: "life-buoy",
   // The map and the numbers drilled through it: a process is a route someone
   // follows, a step is one stop on it, a version is a point in its history, and
-  // value is the time it gives back.
+  // impact is the time it gives back.
   processes: "route",
   steps: "list-checks",
   versions: "git-branch",
-  value: "piggy-bank",
+  impact: "piggy-bank",
   comments: "message-square",
   // The work engine: a story is a piece of work in hand, a sprint is the block
   // it was sold inside, an app is the system it runs on, a task is our own

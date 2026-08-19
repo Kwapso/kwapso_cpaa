@@ -512,14 +512,14 @@ export function processVersionKey(processId: string, versionId: string): string 
 export const PROCESS_VERSION_SLICES = "process-version:"
 /** The savings drill-down, per team — the one number a client is most likely to
  * ask about, so it re-reads whenever any step under it moves. */
-export function valueKey(teamId: string): string {
-  return `value:${teamId}`
+export function impactKey(teamId: string): string {
+  return `impact:${teamId}`
 }
 /** The same drill-down NARROWED to one client — what their work has given them
  * back, summed across their apps. Its own key beside the team-wide one, because
  * they are two different questions and one cache cannot hold both answers. */
-export function accountValueKey(accountId: string): string {
-  return `value:account:${accountId}`
+export function accountImpactKey(accountId: string): string {
+  return `impact:account:${accountId}`
 }
 /** The systems we've built (bounded, team-wide) — a filter and a heading on the
  * maps screen, and the names inside the value drill-down. */
@@ -774,7 +774,7 @@ export const TEAM_RESOURCES: Record<
       processKey(id),
       processCommentsKey(id),
       `activity:record:processes:${id}`,
-      valueKey(t),
+      impactKey(t),
       // …and the Process maps badge on whichever app screen is open (R15).
       ...recordCountDeps("processes"),
     ],
@@ -794,7 +794,7 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.processRow(id),
     fetchList: (t) => listFetch.processes(t),
-    deps: (t, id) => [processKey(id), processCommentsKey(id), valueKey(t)],
+    deps: (t, id) => [processKey(id), processCommentsKey(id), impactKey(t)],
   },
   // THE WORK ENGINE — row-level live. Somebody else moving a story to in review
   // patches just that row in the cached backlog; the deps carry the parts of the
@@ -1018,7 +1018,7 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.apps(t),
     // …and the Apps badge on whichever client's record is open (R15).
     deps: (t, id) => [
-      valueKey(t),
+      impactKey(t),
       sprintsKey(t),
       storiesKey(t),
       `activity:record:apps:${id}`,

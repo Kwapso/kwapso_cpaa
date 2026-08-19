@@ -61,7 +61,7 @@ import {
   listFetch,
   meetingsKey,
   totalKey,
-  valueKey,
+  impactKey,
 } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { appStageMark } from "@shared/app-stages"
@@ -170,7 +170,7 @@ export function AppDetailScreen({
 
   const refresh = React.useCallback(() => {
     invalidate(appsKey(teamId))
-    invalidate(valueKey(teamId))
+    invalidate(impactKey(teamId))
     invalidate(`activity:record:apps:${appId}`)
   }, [appId, teamId])
 
@@ -354,8 +354,8 @@ export function AppDetailScreen({
       ...(canSeeMoney
         ? [
             {
-              value: "value",
-              label: t("Value"),
+              value: "impact",
+              label: t("Impact"),
               icon: CONCEPT_ICON["internal-rates"],
               badge: "",
               badgeVariant: "" as const,
@@ -507,7 +507,7 @@ export function AppDetailScreen({
               />
             )
           if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
-          if (panel.value === "value") return <AppMoneyPanel appId={appId} host={host} />
+          if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />
           if (panel.value === "knowledge")
             return (
               <KnowledgeAsk
@@ -641,7 +641,7 @@ export function AppDetailScreen({
             roleName: v.roleName || undefined,
           })
           invalidate(sliceKey("processes-app", appId))
-          invalidate(valueKey(teamId))
+          invalidate(impactKey(teamId))
           // The money is computed from this map's role, so the panel that shows
           // it has to be told a priced map just appeared.
           invalidate(appMoneyKey(appId))

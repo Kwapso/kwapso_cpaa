@@ -141,8 +141,8 @@ Today it covers:
     `get_triage`, `list_work_logs`, `list_running_timers`, `get_team_pulse`
   - meetings, `list_meetings`
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
-    `list_process_comments`, `read_value`, `list_account_rates`,
-    `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_value`
+    `list_process_comments`, `read_impact`, `list_account_rates`,
+    `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
   - what we hand over on a system, `list_deliverables` (`appId` names the app
     whose handover shelf you want; `id` narrows to one row). The CLIENT's own
     view of the same shelf is a separate door on the portal and is deliberately
@@ -299,7 +299,7 @@ Today it covers:
   - process maps, `create_app`, `update_app`, `set_app_active`, `create_process`,
     `update_process`, `set_process_active`, `add_process_step`, `update_process_step`,
     `remove_process_step`, `cut_process_version`, `comment_on_process` (all need
-    `processes:*`). `read_value` beside them is the savings drilled App → Process →
+    `processes:*`). `read_impact` beside them is the savings drilled App → Process →
     Step, with the caption that says what the numbers are made of — the times are
     estimates the agency and the client agreed, the subtraction is arithmetic. A step
     that got SLOWER is included and counted; nothing filters one out.
@@ -308,7 +308,7 @@ Today it covers:
     `update_internal_rate`, `set_internal_rate_active` (what our own hour costs us) and
     `set_role_rate` (what an hour of a ROLE is worth — one tool for add, re-price and
     retire, because the role name is the key), all needing `commercials:*`.
-    **`read_margin`, `list_internal_rates`, `list_role_rates` and `get_app_value` answer with
+    **`read_margin`, `list_internal_rates`, `list_role_rates` and `get_app_impact` answer with
     the agency's own figures**: a token acts as its owner, and no client login can hold
     a token or be acted for at all, but if you are building a client-facing integration
     on somebody's staff token, these two are the calls not to relay. Law **R24** makes

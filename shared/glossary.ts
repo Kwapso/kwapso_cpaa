@@ -111,10 +111,16 @@ export const GLOSSARY = {
   regression: { term: "Regression", def: "A step that now takes longer than the baseline. We show it, and we say why." },
   agreedEstimate: { term: "Agreed estimate", def: "A time we agreed with you rather than measured. The estimates are agreed; the subtraction is arithmetic." },
   rateCard: { term: "Rate card", def: "What an account is charged per hour, by kind of work." },
+  // THE HEADLINE NUMBER OF THE WHOLE PRODUCT, and until 19 Aug 2026 it had no
+  // entry — a tab on two screens, a section of the client portal and two machine
+  // tools, all naming a concept the dictionary had never defined. It is the same
+  // arithmetic `saving` describes, summed and shown: a saving is one step getting
+  // faster, impact is what all of them come to.
+  impact: { term: "Impact", def: "What the work has given back, summed: the hours a client no longer spends, and what those hours are worth." },
   internalRate: { term: "Internal rate", def: "What an hour of our own work costs us. Ours alone, it never leaves the agency." },
   margin: { term: "Margin", def: "What is left of revenue after our own time and tool costs. Ours alone, never shown to a client." },
   toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month, hosting and the services behind it." },
-  priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Value is shown either way." },
+  priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Impact is shown either way." },
   // WHAT WE HAND OVER on an app. ONE word now, not two: the KIND entry that used
   // to sit here was the very fault it was written to prevent — it worried that
   // "somebody writes 'category' on one screen and 'type' on the next", and by

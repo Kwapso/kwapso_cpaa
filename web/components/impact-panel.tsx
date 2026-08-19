@@ -89,7 +89,7 @@ export function SavingStepLine({ step }: { step: StepSaving }) {
   )
 }
 
-export function ValuePanel({ view }: { view: SavingsView | undefined }) {
+export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
   const t = useT()
   if (view === undefined) return <Skeleton variant="list" lines={4} />
 

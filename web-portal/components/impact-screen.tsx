@@ -47,7 +47,7 @@ import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } 
 import type { ProcessComment } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, useCached } from "@shared/web/store"
-import { ApiFailure, value as valueApi, type PortalValue } from "@/lib/api"
+import { ApiFailure, impact as impactApi, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { PortalReady } from "@/components/portal-shell"
 import { useT } from "@shared/web/language"
@@ -74,7 +74,7 @@ import { useT } from "@shared/web/language"
  * to render it on; the placeholder holds the chart's own height so the accordion
  * below it does not jump when the chunk lands. */
 const AppSavingsChart = dynamic(
-  () => import("@/components/value-chart").then((m) => m.AppSavingsChart),
+  () => import("@/components/impact-chart").then((m) => m.AppSavingsChart),
   { ssr: false, loading: () => <Skeleton className="h-[190px] w-full rounded-xl" /> }
 )
 
@@ -138,10 +138,10 @@ function StepLine({ step }: { step: StepSaving }) {
   )
 }
 
-export function ValueScreen({ ready }: { ready: PortalReady }) {
+export function ImpactScreen({ ready }: { ready: PortalReady }) {
   const t = useT()
   void ready // the account is decided by the server from the caller's own stamp
-  const { data, loading } = useCached<PortalValue>(cacheKeys.value, () => valueApi.read())
+  const { data, loading } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   const [openProcessId, setOpenProcessId] = React.useState<string | null>(null)
   // The chart's rows, built above the early returns so the hook order is fixed
   // whatever the read is doing. Hours to one decimal, from the SAME rounding the
@@ -310,7 +310,7 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
   const t = useT()
   const { data } = useCached<{ comments: ProcessComment[]; total: number }>(
     open ? cacheKeys.processComments(processId) : null,
-    () => valueApi.comments(processId)
+    () => impactApi.comments(processId)
   )
   const [busy, setBusy] = React.useState(false)
   if (!open) return null
@@ -318,7 +318,7 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
   async function add(body: string) {
     setBusy(true)
     try {
-      await valueApi.comment(processId, body)
+      await impactApi.comment(processId, body)
       invalidate(cacheKeys.processComments(processId))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't send that. Try again."))

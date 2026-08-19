@@ -38,7 +38,7 @@ import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
 import { AppTiles } from "@/components/app-tiles"
 import { tenancy } from "@/lib/api"
-import { accountsKey, appsKey, listFetch, valueKey } from "@/lib/live-resources"
+import { accountsKey, appsKey, listFetch, impactKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { NO_STAGE, appStageIsActive, appStageOrder } from "@shared/app-stages"
 import type { Account, AppRow } from "@shared/types"
@@ -74,7 +74,7 @@ export async function createAppFrom(
     mainStakeholderContactId: values.mainStakeholderContactId || undefined,
   })
   invalidate(appsKey(teamId))
-  invalidate(valueKey(teamId))
+  invalidate(impactKey(teamId))
   toast.success(t("App recorded."))
 }
 

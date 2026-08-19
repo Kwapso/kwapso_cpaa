@@ -469,12 +469,12 @@ export const tenancy = {
 
   /** THE VALUE: savings drilled App → Process → Step, with the caption that says
    * what the numbers are made of (R25). */
-  value: (opts: { accountId?: string; appId?: string } = {}) => {
+  impact: (opts: { accountId?: string; appId?: string } = {}) => {
     const p = new URLSearchParams()
     if (opts.accountId) p.set("accountId", opts.accountId)
     if (opts.appId) p.set("appId", opts.appId)
     const qs = p.toString()
-    return api<SavingsView>(`/api/tenancy/value${qs ? `?${qs}` : ""}`)
+    return api<SavingsView>(`/api/tenancy/impact${qs ? `?${qs}` : ""}`)
   },
 
   /** HOW MANY OF EACH THING HANG OFF ONE RECORD — this worker's half (apps,

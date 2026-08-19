@@ -182,7 +182,7 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // `/api/tenancy/internal-rates` most of all: those are the agency's own books,
   // refused at the door as well as unnamed here, and R24 fails the build if a
   // line for one of them ever appears in this table.
-  "GET /api/tenancy/value": "TENANCY",
+  "GET /api/tenancy/impact": "TENANCY",
   "GET /api/tenancy/processes/comments": "TENANCY",
   "POST /api/tenancy/processes/comments": "TENANCY",
 

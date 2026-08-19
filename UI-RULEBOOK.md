@@ -995,7 +995,7 @@ Evidence: `brand.css` `--margin--s: 10px`, `--base: 20px`, `--m: 40px`, `--l: 60
 `--xl: 80px`, `--xxl: 100px`, a doubling scale; its gap census is 10px (44 rules), 20px
 (38), 16px (18), 40px (12). Card padding on the brand site is 40px, and section vertical
 rhythm is 100px top. The portal already uses `gap-10` between sections
-(`web-portal/components/home-screen.tsx:58`, `company-screen.tsx:60`, `value-screen.tsx:132`).
+(`web-portal/components/home-screen.tsx:58`, `company-screen.tsx:60`, `impact-screen.tsx:132`).
 
 ### S2: horizontal gutters are `px-4 sm:px-6 lg:px-10`
 
@@ -1328,7 +1328,7 @@ The worst bands in the app today, all counted off the source:
 | A sprint overview row | `web/components/sprints-screen.tsx` | 7 |
 | A story's work-log row | `web/components/story-detail.tsx:214` | 7 |
 | A process version row | `web/components/process-detail.tsx:287` | 7 |
-| The portal's `StepLine` | `web-portal/components/value-screen.tsx:72` | 7 |
+| The portal's `StepLine` | `web-portal/components/impact-screen.tsx:72` | 7 |
 
 The fix is never a smaller font. It is
 [K1](#k1-a-collection-row-is-a-title-plus-one-meta-line-and-nothing-else): a title and one
@@ -1349,7 +1349,7 @@ something between the heading and the rows:
   (`web/components/tickets-collection.tsx:148-193`). V=6.
 - **Sprints** adds a state heading and a kind label above the first row
   (`web/components/sprints-screen.tsx:212`). V=5.
-- **Processes** puts the whole ValuePanel, an accordion three levels deep, above the list
+- **Processes** puts the whole ImpactPanel, an accordion three levels deep, above the list
   (`web/components/processes-screen.tsx:67`). V=4.
 - **Knowledge base** puts the ask box above the list
   (`web/components/deep-link/collection-content.tsx:461`). V=4.
@@ -1462,7 +1462,7 @@ and it is countable:
 A heading, a paragraph, a single stat, a single action, a callout, an audit footer: bare on
 the page, separated by `gap-6`. Today the app draws **130 border classes across 58 files**,
 plus 6 `divide-y`. The heaviest are `web/components/import-screen.tsx` (9),
-`web/components/process-detail.tsx` (8), `web-portal/components/value-screen.tsx` (7),
+`web/components/process-detail.tsx` (8), `web-portal/components/impact-screen.tsx` (7),
 `web/components/app-shell.tsx` (6) and `web/components/internal-rate-card.tsx` (5).
 Import's review phase draws a bordered card per step inside a bordered plan inside a
 bordered screen, and that is the twisted feeling arriving as geometry.

@@ -1812,7 +1812,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_process",
     summary:
-      "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way. `roleName` is WHOSE hours this takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_value) — a map created without one counts its hours and reports no money at all, so name it here rather than leaving it for update_process.",
+      "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way. `roleName` is WHOSE hours this takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_impact) — a map created without one counts its hours and reports no money at all, so name it here rather than leaving it for update_process.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes",
     schema: obj({ appId: S, name: S, description: S, baselineLabel: S, roleName: S }, ["appId", "name"]),
     buildBody: (i) => ({
@@ -1827,7 +1827,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_process",
     summary:
-      "Rename or re-describe a process map (by id), or say who does the work. Send ONLY what you are changing; to empty a field, send it as an empty string. `roleName` is WHOSE hours this process takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_value). It is free text in the team's own words, and naming a role nobody has priced is fine: the hours still count and the money is reported as unpriced rather than invented.",
+      "Rename or re-describe a process map (by id), or say who does the work. Send ONLY what you are changing; to empty a field, send it as an empty string. `roleName` is WHOSE hours this process takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_impact). It is free text in the team's own words, and naming a role nobody has priced is fine: the hours still count and the money is reported as unpriced rather than invented.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/update",
     schema: obj({ id: S, name: S, description: S, roleName: S }, ["id", "name"]),
     buildBody: (i) => ({
@@ -1934,10 +1934,10 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Comment on map ${str(i, "processId")}` },
   },
   {
-    name: "read_value",
+    name: "read_impact",
     summary:
       "THE SAVINGS, drilled App → Process → Step: for each step, what it took before, what it takes now, how often it happens, and the subtraction between them. `accountId` / `appId` narrow it. Every answer carries the caption that makes it honest, the times are agreed estimates, the subtraction is arithmetic, and a `prices` block appears ONLY for an account whose price visibility is switched on. A step that got slower is included and counted, never filtered out.",
-    binding: "TENANCY", method: "GET", path: "/api/tenancy/value",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/impact",
     schema: obj({ accountId: S, appId: S }),
     buildQuery: (i) => {
       const q: string[] = []
@@ -2087,7 +2087,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
-    name: "get_app_value",
+    name: "get_app_impact",
     summary:
       "What ONE app has given back every month: `savedSecondsPerMonth` (the hours), `moneyCentsPerMonth` (those hours at the rate of the role that used to spend them) and one line per process in `lines`, each naming its `roleName` and `centsPerHour`. `unpricedProcesses` counts the processes that could not be priced because they name no role or the role has no live rate, their HOURS are still in the total and their money is not, and saying so is the point. Always quote `caption` with the figure. INTERNAL: the money half comes from the role rate card, so never repeat it to a client, the hours half on its own is what the client's own value screen shows.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/app-money",

@@ -81,7 +81,7 @@ import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dial
 import { useAssignableMembers } from "@/lib/members"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { RichText } from "@shared/web/rich-text-view"
-import { ValuePanel } from "@/components/value-panel"
+import { ImpactPanel } from "@/components/impact-panel"
 import { createAppFrom } from "@/components/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
 import { OverviewList } from "@/components/overview-list"
@@ -97,7 +97,7 @@ import {
 import { formatCount } from "@shared/web/format-count"
 import {
   accountKey,
-  accountValueKey,
+  accountImpactKey,
   accountsKey,
   appsKey,
   listFetch,
@@ -140,8 +140,8 @@ export function AccountDetailScreen({
   // that is worth, from the ONE savings door (it narrows by account, so the
   // arithmetic here is the same arithmetic the maps screen shows for everybody).
   // R25: the panel renders SAVINGS_CAPTION with it, word for word.
-  const valueQ = useCached<SavingsView>(accountValueKey(accountId), () =>
-    tenancy.value({ accountId })
+  const valueQ = useCached<SavingsView>(accountImpactKey(accountId), () =>
+    tenancy.impact({ accountId })
   )
 
   const { can } = usePermissions(teamId)
@@ -459,9 +459,14 @@ export function AccountDetailScreen({
             // and a free-text About — which is where the headline number of the
             // whole product had been sitting. The owner asked where it was.
             //
-            // "Value" is the word, not "Impact" or "Savings": the CLIENT PORTAL
-            // already calls this exact screen Value with this exact piggy-bank
-            // mark, and one thing gets one word on both front doors (R34).
+            // "Impact" is the word (owner, 19 Aug 2026). It was "Value", and the
+            // note here argued FOR that on R34 grounds: the client portal called
+            // the same screen Value with the same piggy-bank mark, and one thing
+            // gets one word on both front doors. The rule was right and the word
+            // was the owner's to pick — so the portal moved too, in the same
+            // commit, along with the app tab, the route, both machine tools and
+            // the glossary. R34 is satisfied by both doors saying Impact, not by
+            // either of them keeping the old one.
             //
             // Behind `canSeeApps` because the arithmetic IS the apps' — every
             // saving is a step on a process map on one of their systems, so a
@@ -469,9 +474,9 @@ export function AccountDetailScreen({
             // tab badge is an exact server COUNT of rows (R16), and this tab
             // holds one derivation rather than a collection.
             {
-              value: "value",
-              label: t("Value"),
-              icon: CONCEPT_ICON.value,
+              value: "impact",
+              label: t("Impact"),
+              icon: CONCEPT_ICON.impact,
               badge: "",
               badgeVariant: "" as const,
             },
@@ -658,10 +663,10 @@ export function AccountDetailScreen({
           // question a client asks first and the one the whole product is for.
           // The panel carries the caption that makes the number honest (R25); it
           // is never assembled here.
-          if (tabItem.value === "value")
+          if (tabItem.value === "impact")
             return (
               <div className="flex flex-col gap-4">
-                <ValuePanel view={valueQ.data} />
+                <ImpactPanel view={valueQ.data} />
                 {/* THE SAME HOURS, IN MONEY. Not a second calculation — it is the
                     drill-down's own total multiplied by what this client agreed
                     to pay for an hour of the work, which is why it is only shown

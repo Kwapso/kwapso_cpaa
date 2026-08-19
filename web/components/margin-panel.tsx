@@ -13,7 +13,7 @@
 //
 // EVERY LINE IS SHOWN, NOT JUST THE ANSWER. A margin somebody cannot check is a
 // margin they stop believing the first time it looks wrong — the same argument
-// value-panel.tsx makes about a saving, and the reason `lines` comes back off
+// impact-panel.tsx makes about a saving, and the reason `lines` comes back off
 // the door already computed rather than being assembled here.
 //
 // It lives on the Rates tab, under the rate card, because "what do we charge

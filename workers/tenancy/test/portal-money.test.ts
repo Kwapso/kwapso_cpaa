@@ -127,7 +127,7 @@ describe("the money doors refuse a client login — with every right, with the f
 describe("the value read: what a client sees, and what they never do", () => {
   it("with price visibility OFF, the prices key is ABSENT — not empty, not hidden", async () => {
     setPriceVisibility(false)
-    const { status, text } = await call(req("GET /api/tenancy/value"), IDS.victimUser)
+    const { status, text } = await call(req("GET /api/tenancy/impact"), IDS.victimUser)
     expect(status).toBe(200)
     const body = JSON.parse(text) as Record<string, unknown>
     // Absent, so no screen can render it and no flag on the client side decides.
@@ -137,7 +137,7 @@ describe("the value read: what a client sees, and what they never do", () => {
 
   it("with price visibility ON, they see what they bought — and still no margin", async () => {
     setPriceVisibility(true)
-    const { status, text } = await call(req("GET /api/tenancy/value"), IDS.victimUser)
+    const { status, text } = await call(req("GET /api/tenancy/impact"), IDS.victimUser)
     expect(status).toBe(200)
     const body = JSON.parse(text) as { prices?: { rates: { label: string; centsPerHour: number }[] } }
     expect(body.prices?.rates).toEqual([{ label: "Development", centsPerHour: 12000, currency: "EUR" }])
@@ -148,7 +148,7 @@ describe("the value read: what a client sees, and what they never do", () => {
   it("even with commercials:read AND the flag on, the value read carries no internal figure", async () => {
     grantCommercialsToClients()
     setPriceVisibility(true)
-    const { text } = await call(req("GET /api/tenancy/value"), IDS.victimUser)
+    const { text } = await call(req("GET /api/tenancy/impact"), IDS.victimUser)
     for (const figure of INTERNAL_FIGURES) expect(text).not.toContain(figure)
   })
 

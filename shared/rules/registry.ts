@@ -1184,7 +1184,7 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, and the paragraph about it. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
-  "account-detail.value":
+  "account-detail.impact":
     "what this client's apps have given back: the hours, their step-by-step derivation, and the same hours in money. It is one ARITHMETIC, not a set of rows — the steps under it are the workings of a single figure, so a count on the tab would number the sum's terms rather than anything a person asked for. It sat at the bottom of Overview until 19 Aug 2026, under the cover, eight fields and the About, which is where the headline number of the whole product had been living.",
   "account-detail.knowledge":
     "the knowledge base asked IN CONTEXT (12.1): a question box that already knows which client it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count.",
@@ -1217,7 +1217,7 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
   "app-detail.overview":
     "one system's own fields — whose it is, its stage, the four paragraphs of context, who is on it from both sides, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
-  "app-detail.value":
+  "app-detail.impact":
     "the hours this app gives back every month and what they are worth at the rate of the role that used to spend them (8.13). An arithmetic over the app's process maps, drilled process by process — the lines are the sum's own working, not a collection of records, and a badge over them would be counting the number of terms in an addition.",
   "app-detail.knowledge":
     "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",

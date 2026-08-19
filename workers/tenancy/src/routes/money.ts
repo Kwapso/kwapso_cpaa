@@ -215,7 +215,7 @@ export async function postSetRoleRate(request: Request, env: Env): Promise<Respo
 /** GET /api/tenancy/app-money?appId= — the hours one app gives back and what
  * they are worth (8.13). INTERNAL: the money half is computed from the role rate
  * card, so this door is agency-only and the portal gateway does not open it. The
- * HOURS half a client may see — that is `GET /api/tenancy/value`, which is a
+ * HOURS half a client may see — that is `GET /api/tenancy/impact`, which is a
  * different door answering a different question with no price in it. */
 export async function getAppMoney(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "commercials", "read")

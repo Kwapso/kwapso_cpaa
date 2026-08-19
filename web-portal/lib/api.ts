@@ -92,18 +92,18 @@ export const portal = {
  * off: the door does not send it, so no screen can render it, and there is no
  * flag on this side to get wrong. The one figure that is never here under any
  * setting is the agency's own margin (R24). */
-export type PortalValue = SavingsView & {
+export type PortalImpact = SavingsView & {
   prices?: {
     rates: { label: string; centsPerHour: number; currency: string | null }[]
     soldCents: number | null
   }
 }
 
-export const value = {
+export const impact = {
   /** The savings, drilled App → Process → Step, for the company this person is
    * standing in. The account is decided by the SERVER from their own stamp — the
    * portal never composes an account id. */
-  read: () => api<PortalValue>("/api/tenancy/value"),
+  read: () => api<PortalImpact>("/api/tenancy/impact"),
   /** The conversation on one process map. */
   comments: (processId: string) =>
     api<{ comments: ProcessComment[]; total: number }>(
@@ -216,7 +216,7 @@ export const delivery = {
       post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
     ),
   /** The blocks of work they bought — named, dated, and counted. No price here
-   * under any setting: what they were CHARGED comes from `value.read()` behind
+   * under any setting: what they were CHARGED comes from `impact.read()` behind
    * their own account's price-visibility switch, and there is one door for it. */
   sprints: () =>
     api<{

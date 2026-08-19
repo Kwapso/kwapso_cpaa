@@ -32,7 +32,7 @@ import { ArrowRight, Plus } from "lucide-react"
 
 import { SAVINGS_CAPTION, hoursText } from "@shared/workers/savings"
 import { invalidate, useCached } from "@shared/web/store"
-import { support, value as valueApi, type PortalValue } from "@/lib/api"
+import { support, impact as impactApi, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { CollectionHeading } from "@/components/collection-heading"
@@ -49,7 +49,7 @@ const PREVIEW = 3
 
 /** THE ONE NUMBER, on the way past.
  *
- * It reads the SAME cache key the Value screen reads (`cacheKeys.value`), so
+ * It reads the SAME cache key the Value screen reads (`cacheKeys.impact`), so
  * Home warms it and the drill-down opens instantly — one door, one answer, and
  * no chance of two screens quoting a client two different figures.
  *
@@ -61,10 +61,10 @@ const PREVIEW = 3
  * is written. The whole point of the number is being believable. */
 function TimeGivenBack() {
   const t = useT()
-  const { data } = useCached<PortalValue>(cacheKeys.value, () => valueApi.read())
+  const { data } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   if (!data || data.apps.length === 0 || data.savedSecondsPerMonth <= 0) return null
   return (
-    <Link href="/value" className="hover:bg-muted/40 rounded-xl border p-6 transition-colors">
+    <Link href="/impact" className="hover:bg-muted/40 rounded-xl border p-6 transition-colors">
       <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
       <p className="text-3xl font-semibold tracking-tight">{hoursText(data.savedSecondsPerMonth)}</p>
       <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
