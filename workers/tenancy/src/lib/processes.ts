@@ -25,11 +25,11 @@ import { accountScopeClause, appScopeClause, requireAccountInScope, type Account
 import { countCollection } from "@shared/workers/count"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
+import { APP_MODULE_CAP, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { savingsView, type SavingsView, type StepFigures } from "@shared/workers/savings"
-import type { AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
+import type { AppModule, AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
 /** Glue optional clauses into a WHERE, dropping the empty ones, so a scope clause
@@ -57,6 +57,7 @@ async function insertRow(
   guard: MemberGuard,
   table:
     | "apps"
+    | "app_modules"
     | "app_staff"
     | "app_stakeholders"
     | "processes"
@@ -721,6 +722,297 @@ export async function setAppActive(
 /** WHAT A CALLER MAY NARROW a processes read to — the fence plus the two filters,
  * built ONCE so the paged list and any other reader can never disagree about what
  * a filter means. */
+// ── modules ──────────────────────────────────────────────────────────────────
+//
+// A MODULE IS A SECTION OF AN APP, and this is every statement written against
+// `app_modules`. The fence is the app's: a module has no account of its own to
+// be reasoned about separately, so `account_id` is denormalised off the app at
+// creation exactly as `processes` does it, and every read below ANDs the same
+// one clause. See the migration (0048_app_modules) for why it is a table rather
+// than a dropdown group.
+
+/** The one WHERE every module read shares — the account fence, the app, and
+ * whether archived rows are in. Written once so the rows and the count over them
+ * cannot answer differently. */
+function appModulesWhere(
+  scope: AccountScope,
+  opts: { id?: string; appId?: string; archived?: string }
+): { sql: string; params: (string | number)[] } {
+  const fence = accountScopeClause(scope, "m.account_id")
+  const parts: (string | undefined)[] = [fence.sql]
+  const params: (string | number)[] = [...fence.params]
+  // ONE ROW BY ID — the live layer's re-pull after a ping, through the same door
+  // and therefore the same fence (the shape /api/tenancy/selectable uses).
+  if (opts.id) {
+    parts.push("m.id = ?")
+    params.push(opts.id)
+  }
+  if (opts.appId) {
+    parts.push("m.app_id = ?")
+    params.push(opts.appId)
+  }
+  // ARCHIVED IS OUT UNLESS ASKED FOR. A picker must never offer a section that
+  // was switched off, and the tickets already filed against it keep pointing at
+  // it — which is the whole reason a module is deactivated and never deleted.
+  if (opts.archived !== "all") parts.push("m.deactivated_at IS NULL")
+  return { sql: where(parts), params }
+}
+
+export async function countAppModules(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: { id?: string; appId?: string; archived?: string } = {}
+): Promise<number> {
+  const { sql, params } = appModulesWhere(scope, opts)
+  return countCollection(
+    cfg,
+    guard.databaseId,
+    `SELECT 1 FROM app_modules m JOIN apps a ON a.id = m.app_id${sql}`,
+    params
+  )
+}
+
+/** THE SECTIONS OF AN APP — or of every app, when no `appId` narrows it.
+ * Alphabetical, capped at APP_MODULE_CAP (R14 — a bounded read, and the cap is
+ * said in limits.ts beside the number: 1,000, four times the agency's whole
+ * history). Not paged, because this collection does not grow with USE — it is
+ * the shape of the software we have built, and it moves only when we build more.
+ *
+ * THE WHOLE TEAM'S IS THE ORDINARY READ, and the narrowing is the exception. A
+ * ticket form needs whichever app was just chosen, and asking the server again
+ * on every change of a dropdown is a spinner where a list should be — so the
+ * screens hold all of them and narrow locally.
+ *
+ * ALPHABETICAL AND NOT NEWEST-FIRST, which is the opposite of every other list
+ * in this file. The difference is what the list is FOR: a person reads a process
+ * list to see what has been happening, and reads a module list to FIND ONE in a
+ * picker. Newest-first is a stream; a picker is an index. */
+export async function listAppModules(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: { id?: string; appId?: string; archived?: string } = {}
+): Promise<AppModule[]> {
+  const { sql, params } = appModulesWhere(scope, opts)
+  const rows = await d1Query<{
+    id: string
+    app_id: string
+    app_name: string
+    account_id: string | null
+    name: string
+    mark: string | null
+    name_de: string | null
+    description: string | null
+    benefit: string | null
+    deactivated_at: string | null
+    created_at: string
+    ticket_count: number
+  }>(
+    cfg,
+    guard.databaseId,
+    `SELECT m.id, m.app_id, a.name AS app_name, m.account_id, m.name, m.mark, m.name_de,
+            m.description, m.benefit, m.deactivated_at, m.created_at,
+            (SELECT COUNT(*) FROM help h WHERE h.module_id = m.id AND h.resolved = 0) AS ticket_count
+       FROM app_modules m JOIN apps a ON a.id = m.app_id${sql}
+      ORDER BY m.name COLLATE NOCASE ASC LIMIT ${APP_MODULE_CAP}`,
+    params
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    appId: r.app_id,
+    appName: r.app_name,
+    accountId: r.account_id,
+    name: r.name,
+    mark: r.mark,
+    nameDe: r.name_de,
+    description: r.description,
+    benefit: r.benefit,
+    ticketCount: r.ticket_count,
+    active: r.deactivated_at == null,
+    createdAt: r.created_at,
+  }))
+}
+
+/** One module inside the caller's fence, or a 404 identical to a made-up id. */
+async function moduleOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string
+): Promise<{ id: string; appId: string; name: string; mark: string | null; nameDe: string | null; description: string | null; benefit: string | null }> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{
+    id: string
+    app_id: string
+    name: string
+    mark: string | null
+    name_de: string | null
+    description: string | null
+    benefit: string | null
+  }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, app_id, name, mark, name_de, description, benefit FROM app_modules${where([fence.sql, "id = ?"])}`,
+    [...fence.params, id]
+  )
+  const row = rows[0]
+  if (!row) throw new GuardError(404, "not_found", "That module doesn't exist.")
+  return {
+    id: row.id,
+    appId: row.app_id,
+    name: row.name,
+    mark: row.mark,
+    nameDe: row.name_de,
+    description: row.description,
+    benefit: row.benefit,
+  }
+}
+
+/** Add a section to an app.
+ *
+ * THE DUPLICATE IS REFUSED BY THE INDEX, not by a read-then-write: two people
+ * naming a module "Settings" at the same moment is exactly the race a SELECT
+ * first loses, and `idx_app_modules_name` is unique over ACTIVE rows of one app.
+ * A clash comes back as the sentence a person can act on rather than a 500. */
+export async function createAppModule(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  input: { appId: string; name: string; mark?: string | null; nameDe?: string | null; description?: string | null; benefit?: string | null }
+): Promise<string> {
+  const app = await appOrThrow(cfg, guard, scope, input.appId)
+  const id = ulid()
+  const now = new Date().toISOString()
+  try {
+    await insertRow(cfg, guard, "app_modules", {
+      id,
+      app_id: input.appId,
+      account_id: app.accountId,
+      name: input.name,
+      mark: input.mark ?? null,
+      name_de: input.nameDe ?? null,
+      description: input.description ?? null,
+      benefit: input.benefit ?? null,
+      created_at: now,
+      creator_id: actor.id,
+      creator_email: actor.email,
+      creator_name: actor.name,
+    })
+  } catch (err) {
+    if (String(err).includes("UNIQUE"))
+      throw new GuardError(409, "duplicate", `${app.name} already has a module called "${input.name}".`)
+    throw err
+  }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Module created",
+    description: `${actor.name} added the module "${input.name}" to ${app.name}`,
+    relatedTable: "app_modules",
+    relatedRowId: id,
+  })
+  return id
+}
+
+/** Rename or re-describe a module.
+ *
+ * A RENAME REACHES EVERY TICKET FOR FREE, and that is the whole reason a ticket
+ * stores `module_id` rather than the word. Every other vocabulary in this app
+ * stores the WORD on the record and needs `VOCABULARY_HOMES` to rewrite them on
+ * rename (shared/selectable-homes.ts argues why, and 107 tickets are the reason
+ * it exists). A module had no CSV column, no filter contract and no MCP argument
+ * to break, so it could afford the join the note there calls out of reach. */
+export async function updateAppModule(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  input: { name: string; mark?: string | null; nameDe?: string | null; description?: string | null; benefit?: string | null }
+): Promise<void> {
+  const before = await moduleOrThrow(cfg, guard, scope, id)
+  const fence = accountScopeClause(scope, "account_id")
+  const audit = editedBy(actor, new Date().toISOString())
+  // ABSENT MEANS "SAY NOTHING", the patch rule every other door in this file
+  // keeps — so a picker that sends only a name cannot silently erase an emoji.
+  const mark = input.mark === undefined ? before.mark : input.mark
+  const nameDe = input.nameDe === undefined ? before.nameDe : input.nameDe
+  const description = input.description === undefined ? before.description : input.description
+  const benefit = input.benefit === undefined ? before.benefit : input.benefit
+  let changed: { id: string }[]
+  try {
+    changed = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `UPDATE app_modules SET name = ?, mark = ?, name_de = ?, description = ?, benefit = ?, ${audit.sql}
+       ${where([fence.sql, "id = ?"])} RETURNING id`,
+      [input.name, mark, nameDe, description, benefit, ...audit.params, ...fence.params, id]
+    )
+  } catch (err) {
+    if (String(err).includes("UNIQUE"))
+      throw new GuardError(409, "duplicate", `That app already has a module called "${input.name}".`)
+    throw err
+  }
+  if (!changed[0]) throw new GuardError(404, "not_found", "That module doesn't exist.")
+  const changes = describeChanges([
+    { label: "Name", from: before.name, to: input.name },
+    { label: "Emoji", from: before.mark, to: mark },
+    { label: "German name", from: before.nameDe, to: nameDe },
+    { label: "Description", from: before.description, to: description, hideValues: true },
+    { label: "Benefit", from: before.benefit, to: benefit, hideValues: true },
+  ])
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Module edited",
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
+    relatedTable: "app_modules",
+    relatedRowId: id,
+  })
+}
+
+/** Switch a module off, or back on. R17: the current-status predicate rides the
+ * UPDATE, so a second press moves zero rows and writes no activity and pings
+ * nobody.
+ *
+ * THE TICKETS KEEP POINTING AT IT. Deactivating a section does not orphan two
+ * years of tickets — they still name it, it still reads correctly on every one
+ * of them, and it simply stops being offered on the form. That is the whole
+ * difference between deactivate and delete, and the reason the unique index is
+ * over ACTIVE rows only: the name is free to be used again. */
+export async function setAppModuleActive(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  active: boolean
+): Promise<boolean> {
+  const mod = await moduleOrThrow(cfg, guard, scope, id)
+  const fence = accountScopeClause(scope, "account_id")
+  const now = new Date().toISOString()
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    active
+      ? `UPDATE app_modules SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL,
+           deactivator_name = NULL, updated_at = ?
+         ${where([fence.sql, "id = ?", "deactivated_at IS NOT NULL"])} RETURNING id`
+      : `UPDATE app_modules SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
+           deactivator_name = ?, updated_at = ?
+         ${where([fence.sql, "id = ?", "deactivated_at IS NULL"])} RETURNING id`,
+    active ? [now, ...fence.params, id] : [now, actor.id, actor.email, actor.name, now, ...fence.params, id]
+  )
+  if (!changed[0]) return false
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: active ? "Module restored" : "Module switched off",
+    description: `${actor.name} ${active ? "switched on" : "switched off"} the module ${mod.name}`,
+    relatedTable: "app_modules",
+    relatedRowId: id,
+  })
+  return true
+}
+
+// ── processes ────────────────────────────────────────────────────────────────
+
 export type ProcessFilters = { q?: string; appId?: string; archived?: string }
 
 function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: string; params: string[] } {

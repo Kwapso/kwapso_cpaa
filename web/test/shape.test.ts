@@ -78,6 +78,9 @@ const ticket: HelpTicket = {
   status: "in_progress",
   resolved: false,
   resolvedAt: null,
+  moduleId: "m1",
+  moduleName: "Settings",
+  moduleMark: "⚙️",
   // Our unsent working text. Present on a STAFF read (this one) and always null
   // to a client login — lib/help.ts toTicket.
   draftResolution: null,

@@ -104,6 +104,20 @@ export const GLOSSARY = {
   // lane (.plans/BUILD-1 §9 ports it too); the definition below is that lane's,
   // word for word, so a merge keeps one line rather than choosing between two.
   process: { term: "Process", def: "A way of working inside an app, the steps someone takes to get one job done." },
+  // A MODULE IS THE APP'S OWN DIVISION, AND IT IS NOT A PROCESS. The two sit on
+  // different trees and the difference is the whole reason both exist: an
+  // ACCOUNT has processes (how the client's business works, versioned, the thing
+  // every saving is drilled through), while an APP has modules (how the software
+  // we built is divided — Settings, Documents, Tasks). A ticket is filed against
+  // a module because a ticket is about a screen; a saving is measured on a
+  // process because a saving is about a job of work.
+  //
+  // THE WORD WAS FREE, which is why we could take the one the team already says.
+  // `module` has meant "a permission module" in this codebase since the base was
+  // built — but only ever in CODE. It appeared zero times in the app's
+  // user-visible sentences (the Roles screen settled on "access right" on 19 Aug
+  // 2026), so no screen has to change and no reader meets the word twice.
+  module: { term: "Module", def: "A section of an app, like Settings or Documents. A ticket says which one it is about." },
   step: { term: "Step", def: "One part of a process. It carries how long it takes and how often it runs." },
   processVersion: { term: "Version", def: "A process as it was at one moment. Version 1 is how they worked before us; each later one is what we changed it to." },
   baseline: { term: "Baseline", def: "Version 1 of a process, how the work was done before we touched anything. Every saving is measured from it." },

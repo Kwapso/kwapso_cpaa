@@ -132,6 +132,10 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
   apps: [
     { key: "sprints-app", module: "work", resource: "sprints", door: "content" },
     { key: "stories-app", module: "work", resource: "stories", door: "content" },
+    // THE SECTIONS OF THE APP. Same module as `processes-app` because the app
+    // record is one right: whoever may read the system may read how it is
+    // divided.
+    { key: "modules-app", module: "processes", resource: "app_modules", door: "tenancy" },
     { key: "processes-app", module: "processes", resource: "processes", door: "tenancy" },
     { key: "meetings-app", module: "meetings", resource: "meetings", door: "content" },
     { key: "tickets-app", module: "help", resource: "help", door: "content" },

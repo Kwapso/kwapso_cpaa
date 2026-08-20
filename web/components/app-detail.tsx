@@ -20,6 +20,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { ModulesPanel } from "@/components/modules-panel"
 import { Pencil, Power } from "lucide-react"
 
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
@@ -114,6 +115,7 @@ export function AppDetailScreen({
   const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-app", appId))
   const storiesTotal = useCachedValue<number | null>(totalKey("stories-app", appId))
   const mapsTotal = useCachedValue<number | null>(totalKey("processes-app", appId))
+  const modulesTotal = useCachedValue<number | null>(totalKey("modules-app", appId))
   const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-app", appId))
   const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-app", appId))
   const deliverablesTotal = useCachedValue<number | null>(totalKey("deliverables-app", appId))
@@ -327,6 +329,17 @@ export function AppDetailScreen({
         badgeVariant: "" as const,
       },
       {
+        // THE APP'S OWN DIVISION, and it sits before Processes deliberately: a
+        // module is what this system IS made of, a process is how the client
+        // works inside it. Reading the structure first is the order somebody
+        // learns an app in.
+        value: "modules",
+        label: t("Modules"),
+        icon: CONCEPT_ICON.processes,
+        badge: formatCount(modulesTotal),
+        badgeVariant: "" as const,
+      },
+      {
         value: "maps",
         label: t("Processes"),
         icon: CONCEPT_ICON.processes,
@@ -503,6 +516,7 @@ export function AppDetailScreen({
                 emptyText={t("Nothing has been done on this app yet.")}
               />
             )
+          if (panel.value === "modules") return <ModulesPanel teamId={teamId} appId={appId} />
           if (panel.value === "maps")
             return (
               <ProcessesPanel

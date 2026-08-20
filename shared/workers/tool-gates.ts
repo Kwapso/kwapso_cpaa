@@ -172,6 +172,13 @@ export const TOOL_GATES: Record<string, string> = {
   create_app: "processes:create",
   update_app: "processes:edit",
   set_app_active: "processes:delete",
+  // A MODULE IS PART OF THE APP RECORD, so it gates on `processes` like the app
+  // itself does — the same right that lets somebody record a system lets them
+  // say what sections it has. Switching one off takes `delete`, because it
+  // removes a choice every future ticket could have made.
+  create_app_module: "processes:create",
+  update_app_module: "processes:edit",
+  set_app_module_active: "processes:delete",
   create_process: "processes:create",
   update_process: "processes:edit",
   set_process_active: "processes:delete",

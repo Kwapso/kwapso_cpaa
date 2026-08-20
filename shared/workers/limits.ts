@@ -227,6 +227,25 @@ export const TRANSCRIPT_HORIZON_DAYS = 14
  * unbounded send from a trusted sender. */
 export const MENTIONS_LIMIT = 50
 
+/** EVERY MODULE THE TEAM HAS — the sections of every app, read as ONE list.
+ *
+ * A CAP RATHER THAN A CURSOR. This collection is apps × their sections: 246
+ * across 24 apps in the legacy data, median 11 each and 20 at the widest. It
+ * does not GROW with use the way tickets or processes do — it is the shape of
+ * the software we have built, and it only moves when we build more. (R14: a
+ * bounded read says its cap; `app_modules` is deliberately NOT a
+ * GROWING_COLLECTIONS row.)
+ *
+ * READ WHOLE AND FILTERED ON SCREEN, which is why the cap is the team's and not
+ * one app's. A ticket form needs the modules of whichever app was just chosen,
+ * and re-fetching on every change of a dropdown is a spinner where there should
+ * be a list — so the picker holds all of them and narrows locally. That also
+ * gives the collection ONE cache key, which is what lets a rename reach every
+ * screen showing it through the ordinary row-level live path (R15).
+ *
+ * 1,000 is four times the agency's whole history at ~90 apps' worth. */
+export const APP_MODULE_CAP = 1000
+
 /** Rows the ticket sub-tab tally may return (R14). It is a GROUP BY over
  * (`help_type`, `status`) — two collections that cannot run away, since one is a
  * team's own dropdown vocabulary and the other is the seven-value fixed

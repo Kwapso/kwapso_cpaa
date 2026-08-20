@@ -56,6 +56,10 @@ import {
   updateApp,
   updateProcess,
   updateStep,
+  createAppModule,
+  listAppModules,
+  setAppModuleActive,
+  updateAppModule,
 } from "../lib/processes"
 import type { Env } from "../env"
 
@@ -284,6 +288,78 @@ export async function postAppActive(request: Request, env: Env): Promise<Respons
   const changed = await setAppActive(cfg, guard, scope, actor, id, body.active)
   if (changed) await publishChange(env, guard.teamId, "apps", id)
   return json({ ok: true })
+}
+
+// ── modules ──────────────────────────────────────────────────────────────────
+
+/** GET /api/tenancy/app-modules[?id=][?appId=][&archived=all] — the sections of
+ * an app, or of every app when nothing narrows it.
+ *
+ * R21: FENCED, NOT REFUSED, and this one has to be. A client files a ticket from
+ * the portal and the form asks which section it is about — so the portal opens
+ * this door too, and the account fence is what keeps one client from reading
+ * another's app structure. The narrowing to one app is a filter on top of that
+ * fence, never a substitute for it: an `appId` belonging to somebody else
+ * returns nothing rather than something.
+ *
+ * R14: bounded at APP_MODULE_CAP, said in the lib beside the statement. */
+export async function getAppModules(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "processes", "read")
+  const scope = await accountScope(cfg, guard)
+  const params = new URL(request.url).searchParams
+  const modules = await listAppModules(cfg, guard, scope, {
+    id: queryText(params.get("id"), "Module"),
+    appId: queryText(params.get("appId"), "App"),
+    archived: queryText(params.get("archived"), "Archived"),
+  })
+  return json({ modules, total: modules.length })
+}
+
+/** POST /api/tenancy/app-modules — add a section to an app. AGENCY ONLY: a
+ * client files tickets AGAINST the sections, they do not author the structure of
+ * the software we built, exactly as they do not author the app itself. */
+export async function postCreateAppModule(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = await createAppModule(cfg, guard, scope, actor, {
+    appId: requireText(body.appId, "App", TEXT_LIMITS.short),
+    name: requireText(body.name, "Name", TEXT_LIMITS.short),
+    mark: optionalText(body.mark, "Emoji", TEXT_LIMITS.short),
+    nameDe: optionalText(body.nameDe, "German name", TEXT_LIMITS.short),
+    description: optionalText(body.description, "Description", TEXT_LIMITS.long),
+    benefit: optionalText(body.benefit, "Benefit", TEXT_LIMITS.long),
+  })
+  await publishChange(env, guard.teamId, "app_modules", id, "add")
+  return json({ id })
+}
+
+/** POST /api/tenancy/app-modules/update — rename or re-describe a section.
+ * Every ticket holding it follows, because a ticket stores the id. */
+export async function postUpdateAppModule(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Module", TEXT_LIMITS.short)
+  await updateAppModule(cfg, guard, scope, actor, id, {
+    name: requireText(body.name, "Name", TEXT_LIMITS.short),
+    mark: optionalText(body.mark, "Emoji", TEXT_LIMITS.short),
+    nameDe: optionalText(body.nameDe, "German name", TEXT_LIMITS.short),
+    description: optionalText(body.description, "Description", TEXT_LIMITS.long),
+    benefit: optionalText(body.benefit, "Benefit", TEXT_LIMITS.long),
+  })
+  await publishChange(env, guard.teamId, "app_modules", id, "edit")
+  return json({ ok: true })
+}
+
+/** POST /api/tenancy/app-modules/active — switch a section off, or back on.
+ * R17: zero rows moved is silence — no activity row, and no ping. */
+export async function postAppModuleActive(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "delete")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Module", TEXT_LIMITS.short)
+  const active = body.active === true
+  const moved = await setAppModuleActive(cfg, guard, scope, actor, id, active)
+  if (moved) await publishChange(env, guard.teamId, "app_modules", id, "edit")
+  return json({ ok: true, changed: moved })
 }
 
 // ── processes ────────────────────────────────────────────────────────────────

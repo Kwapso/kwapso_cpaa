@@ -64,6 +64,10 @@ export const IDS = {
   // burglar can only be caught stealing something that exists, and a map is worth
   // stealing — it names how a client's own people work, and what we changed.
   victimApp: "AP_VICTIM",
+  /** A SECTION of the victim's system. Worth stealing on its own: the module
+   * list of a client's app is the shape of the software we built them, and a
+   * burglar who can read it knows what that business runs on. */
+  victimModule: "AM_VICTIM",
   victimProcess: "PR_VICTIM",
   victimVersion: "PV_VICTIM",
   victimStep: "PS_VICTIM",
@@ -89,6 +93,7 @@ export const VICTIM_IDS = [
   IDS.clientPerson,
   IDS.victimTicket,
   IDS.victimApp,
+  IDS.victimModule,
   IDS.victimProcess,
   IDS.victimVersion,
   IDS.victimStep,
@@ -226,6 +231,8 @@ export function buildSpineDb(): DatabaseSync {
   db.exec(`
     INSERT INTO apps (id, account_id, name, url, stage, tool_cost_cents_per_month, created_at, creator_id)
       VALUES ('${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch', 'https://dispatch.example', 'live', 42000, '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO app_modules (id, app_id, account_id, name, mark, description, created_at, creator_id)
+      VALUES ('${IDS.victimModule}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch board', '🚚', 'Where their drivers are assigned', '2026-02-01', '${IDS.staffUser}');
     INSERT INTO processes (id, app_id, account_id, name, description, created_at, creator_id)
       VALUES ('${IDS.victimProcess}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman invoice approval', 'How Bergman approves a supplier invoice', '2026-02-01', '${IDS.staffUser}');
     INSERT INTO process_versions (id, process_id, account_id, version_no, label, created_at, creator_id)

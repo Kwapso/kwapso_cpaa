@@ -38,7 +38,7 @@ import { GuardError, teamContext } from "@shared/workers/gating"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { queryText } from "@shared/workers/validate"
 import { answerRecordCounts, type RecordCounter } from "@shared/workers/record-counts"
-import { countApps, countProcesses } from "../lib/processes"
+import { countApps, countAppModules, countProcesses } from "../lib/processes"
 import { countAccountRates } from "../lib/rates"
 import type { Env } from "../env"
 
@@ -50,6 +50,7 @@ const COUNTERS: Record<string, RecordCounter> = {
   "apps-account": (cfg, guard, scope, id) => countApps(cfg, guard, scope, { accountId: id }),
   "account-rates": (cfg, guard, scope, id) => countAccountRates(cfg, guard, scope, id),
   "processes-app": (cfg, guard, scope, id) => countProcesses(cfg, guard, scope, { appId: id }),
+  "modules-app": (cfg, guard, scope, id) => countAppModules(cfg, guard, scope, { appId: id }),
 }
 
 /** GET /api/tenancy/record-counts?table=&id= — the child totals this worker owes
