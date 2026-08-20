@@ -37,6 +37,28 @@ export const brand = {
       light: "oklch(0.93 0.055 88)",
       dark: "oklch(0.35 0.05 86)",
     } as AccentPair,
+    /** THE TEXT THAT SITS ON THOSE TWO, and it is charcoal on both — which is
+     * what the `primary` note three lines up has always said and what nothing
+     * ever implemented.
+     *
+     * `BrandTheme` overrode `--primary` and left `--primary-foreground` at the
+     * LIBRARY's value, which is pure white in light mode. Mango is a LIGHT
+     * colour (lightness 0.87), so every primary button in the app was white
+     * text on pale mango: about 1.4:1, far under the 4.5:1 a person needs, and
+     * the specific way a control reads as switched off. The owner's words on
+     * 20 Aug 2026 were "the buttons are seeming so dull… it feels like I should
+     * not be pressing them", which is exactly what an unreadable label does.
+     *
+     * Dark mode was fine by accident: the library's dark `--primary-foreground`
+     * is near-black, which is the right answer for mango. So this was a
+     * light-mode-only fault, invisible to anyone testing in dark.
+     *
+     * ONE VALUE FOR BOTH MODES, because the surface it sits on is mango in both
+     * — the point of a brand colour is that it does not invert. */
+    ink: {
+      light: "oklch(0.22 0.01 80)",
+      dark: "oklch(0.22 0.01 80)",
+    } as AccentPair,
   },
 
   /** Email-safe HEX mirror of the accent. Email clients don't support oklch, so
