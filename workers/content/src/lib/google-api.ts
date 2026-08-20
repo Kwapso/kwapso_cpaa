@@ -39,6 +39,7 @@ import {
   DRIVE_WALK_MAX_DEPTH,
   DRIVE_WALK_MAX_FILES,
 } from "@shared/workers/limits"
+import { extractFileText, fileShape } from "./file-text"
 import { GuardError } from "@shared/workers/gating"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
@@ -651,6 +652,19 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   // and Chat indexed 25, 25 and 2 the same minute. A dead token still stops the
   // loop, which is right; one awkward file no longer does.
   if (!res.ok || !res.body) return ""
+  // WHAT KIND OF FILE THIS IS decides how its words come out. A Google Doc was
+  // exported as text above and needs nothing; everything else is bytes, and
+  // bytes are not words. See lib/file-text.ts — 46% of this team's indexed
+  // documents held under 50 characters before it existed, because a .docx is a
+  // ZIP and the decoder stopped at the first byte that was not text.
+  if (!isGoogleDoc) {
+    const meta = await driveFileMeta(token, id)
+    const shape = fileShape(meta.name, meta.mime)
+    if (shape !== "text") {
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      return extractFileText(bytes, meta.name, meta.mime)
+    }
+  }
   // A BOUNDED READ, NOT A BOUNDED SLICE, and the difference is a dead worker.
   //
   // This was `(await res.text()).slice(0, DRIVE_TEXT_CAP)` — which pulls the
@@ -699,6 +713,24 @@ const DRIVE_SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
  * is the second call that makes the difference between a document and an empty
  * string; a shortcut whose target we cannot read is returned as itself, so the
  * read below fails the ordinary honest way rather than throwing here. */
+/** NAME AND MIME for one file, the two things `fileShape` needs to decide how
+ * the bytes should be read. Separate from `driveReadable` because that one is
+ * about following a shortcut and this one is about what to do at the end of it. */
+async function driveFileMeta(token: string, fileId: string): Promise<{ name: string; mime: string }> {
+  try {
+    const meta = (await googleFetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name,mimeType&supportsAllDrives=true`,
+      token
+    )) as { name?: unknown; mimeType?: unknown }
+    return { name: str(meta.name), mime: str(meta.mimeType) }
+  } catch {
+    // An unreadable header is not a reason to refuse the body — the extension in
+    // the name is the fallback, and with no name at all the caller reads it as
+    // plain text exactly as it always did.
+    return { name: "", mime: "" }
+  }
+}
+
 async function driveReadable(token: string, fileId: string): Promise<{ mime: string; id: string }> {
   const ask = async (id: string) =>
     (await googleFetch(
