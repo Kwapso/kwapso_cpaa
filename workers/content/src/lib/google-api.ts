@@ -650,8 +650,41 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   // in Settings" against a grant that was never broken, while Gmail, Calendar
   // and Chat indexed 25, 25 and 2 the same minute. A dead token still stops the
   // loop, which is right; one awkward file no longer does.
-  if (!res.ok) return ""
-  return (await res.text()).slice(0, DRIVE_TEXT_CAP)
+  if (!res.ok || !res.body) return ""
+  // A BOUNDED READ, NOT A BOUNDED SLICE, and the difference is a dead worker.
+  //
+  // This was `(await res.text()).slice(0, DRIVE_TEXT_CAP)` — which pulls the
+  // WHOLE export into memory and only then throws away everything past a
+  // hundred thousand characters. The comment above the cap has always claimed
+  // this "keeps one file from being a worker's whole memory budget"; it did the
+  // opposite, and nothing noticed while a share meant one page of fifty files.
+  //
+  // The recursive walk found 339 of the owner's files on 20 Aug 2026, including
+  // exports measured in megabytes, and the sweep started failing with
+  // "Memory limit would be exceeded before EOF" — Cloudflare killing the read
+  // before it finished. Every document in that pass was lost with it.
+  //
+  // So it reads in chunks and STOPS, then cancels the rest of the download: a
+  // file we are only ever going to keep the first hundred thousand characters of
+  // should not be transferred in full to prove it.
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let text = ""
+  try {
+    while (text.length < DRIVE_TEXT_CAP) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += decoder.decode(value, { stream: true })
+    }
+  } catch {
+    // A read that broke half way is still worth what it had — a partial document
+    // answers more questions than an empty one.
+  } finally {
+    // Tell Google to stop sending. Without this the rest of a 40MB export still
+    // crosses the wire while nothing reads it.
+    await reader.cancel().catch(() => undefined)
+  }
+  return text.slice(0, DRIVE_TEXT_CAP)
 }
 
 /** Google's own mime type for a POINTER to a file. Named beside the folder one
@@ -922,13 +955,14 @@ export async function gmailSearch(
   // Run a PAGE at a time rather than all five hundred at once: `Promise.all` over
   // five hundred fetches is five hundred concurrent sockets, which Gmail answers
   // with rate limits and the runtime answers with a stall.
+  // TEN AT A TIME, not fifty. Fifty concurrent fetches per page over four pages
+  // is two hundred sockets at Gmail in a few seconds, and Gmail answers that
+  // with a refusal — which arrived as "Google couldn't answer that just now" and
+  // cost the whole mail lane a pass. The work is the same; only the rate changes.
   const out: MailMessage[] = []
-  for (let i = 0; i < ids.length; i += GOOGLE_PAGE_SIZE)
-    out.push(
-      ...(await Promise.all(
-        ids.slice(i, i + GOOGLE_PAGE_SIZE).map((id) => gmailMessage(token, id, false))
-      ))
-    )
+  const BATCH = 10
+  for (let i = 0; i < ids.length; i += BATCH)
+    out.push(...(await Promise.all(ids.slice(i, i + BATCH).map((id) => gmailMessage(token, id, false)))))
   return out
 }
 

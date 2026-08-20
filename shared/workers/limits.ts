@@ -160,7 +160,7 @@ export const INGEST_SOURCES_PER_PRESS = 40
  * Ten pages because the cost is a metadata call PER MESSAGE, not per page:
  * five hundred messages is five hundred round trips, batched fifty at a time.
  * Past that a sweep stops being a sweep and becomes a migration. */
-export const GMAIL_SWEEP_PAGES = 10
+export const GMAIL_SWEEP_PAGES = 4
 
 /* ---- How far into somebody's Drive a share actually reaches ---------------- */
 
