@@ -596,10 +596,22 @@ describe("changing what a kind SAYS really does re-index what is already there",
     expect(starts.length, "the kind scan found nothing — it has gone blind").toBe(declared.size)
 
     const PINNED: Record<string, { version: number; digest: string }> = READER_DIGESTS
+    // WHERE THE TABLE ENDS, so the LAST kind's digest is its own reader and not
+    // every helper that happens to be declared below it.
+    //
+    // `to` used to fall back to the end of the FILE, which meant editing
+    // anything after the kinds array — a shared helper, a comment, `sweepKinds`
+    // — read as a change to whichever kind was declared last. It fired on 20 Aug
+    // 2026 naming "task" for an edit to the sweep loop forty lines below it, and
+    // the instruction it printed was to bump task's textVersion: a full,
+    // pointless re-index of every task in the base to silence a false alarm.
+    // A check that asks for the wrong repair is worse than one that stays quiet.
+    const tableEnd = sweep.indexOf("\n]", starts[starts.length - 1]?.index ?? 0)
+    const lastEnd = tableEnd === -1 ? sweep.length : tableEnd
     const slices: [number, number][] = []
     for (const [i, match] of starts.entries()) {
       const from = match.index as number
-      const to = (starts[i + 1]?.index as number) ?? sweep.length
+      const to = (starts[i + 1]?.index as number) ?? lastEnd
       slices.push([from, to])
       const name = match[1]
       const pin = PINNED[name]
@@ -665,9 +677,20 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // time, where it used to quote the retired status column.
   meeting: { version: 2, digest: "65d8cfae5e392220" },
   todo: { version: 1, digest: "a9dcdb8d5676cf63" },
-  task: { version: 1, digest: "aabda570655bf27a" },
+  // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
+  // the point. `task` is declared last, so its slice used to run to the end of
+  // the file and its digest covered every helper below the table. Bounding the
+  // slice at the table's own closing bracket changed the MEASUREMENT, not the
+  // reader — the task builder is byte for byte what it was — so nothing needs
+  // re-indexing and the version must not move.
+  task: { version: 1, digest: "53b2e7fbb8e5c384" },
 }
 
 /** Everything in the sweep that is NOT inside a kind: the shared helpers each
  * reader leans on. Pinned once, for the reason the check above states. */
-const SHARED_DIGEST = "4a950e388f54a75b"
+// UPDATED 20 Aug 2026 for the sweep ORDER, which changes no kind's text.
+// `sweepKinds` now walks the lanes oldest-swept first instead of in declaration
+// order, because the Drive lane grew long enough to starve the ones behind it
+// (document had run 194 times to message's 180, and the gap widened every tick).
+// Which lane goes first is not something any kind SAYS, so no textVersion moves.
+const SHARED_DIGEST = "4c4971b3d67c16d3"

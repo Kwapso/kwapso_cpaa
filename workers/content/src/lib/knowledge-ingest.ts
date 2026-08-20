@@ -1534,7 +1534,36 @@ export async function sweepKinds(
   limit = INGEST_SOURCES_PER_TICK
 ): Promise<SweepResult[]> {
   const results: SweepResult[] = []
-  for (const kind of kinds) {
+  // OLDEST-SWEPT FIRST, so no kind is permanently starved by the one in front.
+  //
+  // The list was walked in DECLARATION order, which is fine only while a tick
+  // can finish it. It cannot any more: since the Drive walk started descending
+  // into subfolders it reads several hundred files before filing a row, and a
+  // tick that runs out of room stops wherever it got to — always in the same
+  // place, because the order never changed.
+  //
+  // Measured on the owner's staging base, 20 Aug 2026: `document` had run 194
+  // times, `email` 186, `event` 183 and `message` 180. The lane declared first
+  // had swept fourteen more times than the lane declared last, and the gap grows
+  // every tick. `message` was two ticks from being re-indexed with the new chat
+  // names and would have kept slipping.
+  //
+  // Same rotation, and the same reasoning, as the PEOPLE loop in
+  // google-autopilot.ts: with more work than a tick can hold, the one waiting
+  // longest goes first and everybody comes round. A kind that has never run
+  // sorts first of all, which is the right answer for a lane just added.
+  const keys = kinds.map((k) => k.stateKey ?? k.kind)
+  const lastRun = new Map<string, string>()
+  try {
+    for (const st of await listIngestState(cfg, guard, keys)) lastRun.set(st.kind, st.lastRunAt ?? "")
+  } catch {
+    // The order is an optimisation, never a precondition. If the state cannot be
+    // read, sweep in declaration order exactly as before.
+  }
+  const ordered = [...kinds].sort((a, b) =>
+    (lastRun.get(a.stateKey ?? a.kind) ?? "").localeCompare(lastRun.get(b.stateKey ?? b.kind) ?? "")
+  )
+  for (const kind of ordered) {
     const stateKey = kind.stateKey ?? kind.kind
     try {
       results.push(await sweepKind(env, cfg, guard, kind, limit))
