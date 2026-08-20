@@ -30,8 +30,14 @@ BOOTSTRAP.md stands the whole thing up from zero.
   the surface it is actually proving). Export them to run against a custom
   domain.)
 - build_command: npm run build (root; builds BOTH static exports, web/ → web/out and web-portal/ → web-portal/out). `npm run build:portal` builds the portal alone.
-- deploy_staging_command: npm run deploy:staging (root; runs `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
-- deploy_production_command: npm run deploy:production (root; same eight-worker realtime-first order, production names)
+- language_sweep: `npm run lang` (extract every user-visible English string, then prune
+  the catalogue and the seed to the languages `shared/i18n.ts` declares — English,
+  German, Spanish and Catalan since 2026-08-20). Run it before you commit. BOTH deploy
+  commands now open with `npm run lang:check` and REFUSE on a stale catalogue, so a
+  ship can no longer carry a sentence nobody translated or a language nobody speaks.
+  The check is a second apart and fails before the two-minute build rather than after it.
+- deploy_staging_command: npm run deploy:staging (root; runs `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
+- deploy_production_command: npm run deploy:production (root; `lang:check` first, then the same eight-worker realtime-first order, production names)
 - github_remote: origin (https://github.com/Kwapso/kwapso_cpaa.git)
 
 ## Reset config

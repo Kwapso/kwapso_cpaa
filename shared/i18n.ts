@@ -53,60 +53,44 @@ export { CATALOGUE, SEED }
  * build-time translator fills in (`scripts/i18n-translate.mjs` reads this very
  * file rather than keeping its own list — a second list is a second truth).
  *
- * THE FIRST FOUR ARE NOT INVENTED. They are the LANGUAGES rows in the agency's
- * own legacy data, which is also where their flags come from, and their German
- * is lifted from the words the agency has been using with German clients for
- * years (shared/i18n-seed.ts). They stay first because they are the ones a
- * kwapso user actually picks.
+ * THESE FOUR ARE NOT INVENTED. They are the LANGUAGES rows in the agency's own
+ * legacy data, which is also where their flags come from, and their German is
+ * lifted from the words the agency has been using with German clients for years
+ * (shared/i18n-seed.ts). They are the ones a kwapso user actually picks.
  *
- * THE REST ARE THE WORLD'S TOP 25 BY TOTAL SPEAKERS — native plus second
- * language — in that order, so the list answers "can this app speak to the
- * person in front of me" for most of the planet. Two judgement calls, stated
- * rather than hidden: regional varieties that share a written form with one
- * already here (Wu and Yue against Mandarin, Egyptian against Modern Standard
- * Arabic) are not repeated, because a language switcher offers a person a
- * SCREEN, and those screens would be the same one; and each entry has to be a
- * language somebody can be shown a whole interface in.
+ * ── WHY THERE ARE FOUR AND NOT TWENTY-NINE ─────────────────────────────────
+ *
+ * There were twenty-nine: these four, then the world's top twenty-five by total
+ * speakers. The reasoning was that a switcher should answer "can this app speak
+ * to the person in front of me" for most of the planet. It was a good sentence
+ * and it cost more than it was worth.
+ *
+ * What it actually bought: 1,027 strings × 25 languages nobody has selected
+ * once, regenerated on every catalogue run, reviewed by nobody who reads any of
+ * them. A wrong Javanese sentence and a right one are indistinguishable to
+ * everyone who works here, so the twenty-five were never quality-checked — they
+ * were only ever LARGE. And R28 goes red when the catalogue drifts from the
+ * code, so every new sentence dragged twenty-five unverifiable translations
+ * behind it before the build would pass.
+ *
+ * The four that remain are the four somebody can check. German is the agency's
+ * working language with its German clients; Spanish and Catalan are Aurora's
+ * and Alex's own. Every string in every one of them can be read by a person who
+ * would notice if it were wrong — which is the only definition of "translated"
+ * that means anything.
+ *
+ * ADDING ONE BACK is deliberately still one line, plus a run of
+ * `node scripts/i18n-prune.mjs` to widen the catalogue and the seed to match.
+ * The bar is not technical: it is somebody who can read the result.
  *
  * `native` is what the switcher shows — somebody looking for their own language
  * scans for the word they call it, not for the English name of it. `english` is
- * what the machine translator and the assistant are told to write in.
- *
- * KNOWN GAP: Arabic, Urdu and Persian are read right to left, and nothing here
- * sets the document's direction yet. Their words are correct; their layout is
- * not. That is a screen-level change, not a catalogue one. */
+ * what the machine translator and the assistant are told to write in. */
 export const LANGUAGES = [
-  // The agency's own four.
   { code: "en", english: "English", native: "English", flag: "🇬🇧" },
   { code: "de", english: "German", native: "Deutsch", flag: "🇩🇪" },
   { code: "es", english: "Spanish", native: "Español", flag: "🇪🇸" },
   { code: "ca", english: "Catalan", native: "Català", flag: "🇦🇩" },
-  // Then the world's, by how many people speak them.
-  { code: "zh", english: "Mandarin Chinese", native: "中文", flag: "🇨🇳" },
-  { code: "hi", english: "Hindi", native: "हिन्दी", flag: "🇮🇳" },
-  { code: "ar", english: "Modern Standard Arabic", native: "العربية", flag: "🇸🇦" },
-  { code: "fr", english: "French", native: "Français", flag: "🇫🇷" },
-  { code: "bn", english: "Bengali", native: "বাংলা", flag: "🇧🇩" },
-  { code: "pt", english: "Portuguese", native: "Português", flag: "🇵🇹" },
-  { code: "ru", english: "Russian", native: "Русский", flag: "🇷🇺" },
-  { code: "ur", english: "Urdu", native: "اردو", flag: "🇵🇰" },
-  { code: "id", english: "Indonesian", native: "Bahasa Indonesia", flag: "🇮🇩" },
-  { code: "ja", english: "Japanese", native: "日本語", flag: "🇯🇵" },
-  { code: "pa", english: "Punjabi", native: "ਪੰਜਾਬੀ", flag: "🇮🇳" },
-  { code: "mr", english: "Marathi", native: "मराठी", flag: "🇮🇳" },
-  { code: "te", english: "Telugu", native: "తెలుగు", flag: "🇮🇳" },
-  { code: "tr", english: "Turkish", native: "Türkçe", flag: "🇹🇷" },
-  { code: "ta", english: "Tamil", native: "தமிழ்", flag: "🇮🇳" },
-  { code: "vi", english: "Vietnamese", native: "Tiếng Việt", flag: "🇻🇳" },
-  { code: "ha", english: "Hausa", native: "Hausa", flag: "🇳🇬" },
-  { code: "sw", english: "Swahili", native: "Kiswahili", flag: "🇰🇪" },
-  { code: "tl", english: "Filipino", native: "Filipino", flag: "🇵🇭" },
-  { code: "ko", english: "Korean", native: "한국어", flag: "🇰🇷" },
-  { code: "fa", english: "Persian", native: "فارسی", flag: "🇮🇷" },
-  { code: "jv", english: "Javanese", native: "Basa Jawa", flag: "🇮🇩" },
-  { code: "it", english: "Italian", native: "Italiano", flag: "🇮🇹" },
-  { code: "gu", english: "Gujarati", native: "ગુજરાતી", flag: "🇮🇳" },
-  { code: "th", english: "Thai", native: "ไทย", flag: "🇹🇭" },
 ] as const
 
 export type Language = (typeof LANGUAGES)[number]["code"]
@@ -158,7 +142,7 @@ export type Vars = Record<string, string | number>
  *
  * Deliberately not a template engine. No conditionals, no plurals, no nesting —
  * a translator gets a sentence with holes in it, which is the most they can be
- * asked to preserve faithfully across twenty-nine languages. */
+ * asked to preserve faithfully across every language this app speaks. */
 export function fill(text: string, vars?: Vars): string {
   if (!vars) return text
   return text.replace(/\{(\w+)\}/g, (whole, key: string) =>
@@ -168,9 +152,9 @@ export function fill(text: string, vars?: Vars): string {
 
 /** SEED OVER CATALOGUE, PER LANGUAGE — not per key.
  *
- * The seed is PARTIAL on purpose: it holds the agency's own German, Spanish and
- * Catalan for a string the machine answered in twenty-eight languages. Replacing
- * the whole entry would throw the other twenty-five away, so each language is
+ * The seed is PARTIAL on purpose: it holds the agency's own word for a string in
+ * the language somebody here actually checked it in, and the machine answered the
+ * rest. Replacing the whole entry would throw those away, so each language is
  * decided on its own — the same merge `scripts/i18n-translate.mjs` already does
  * at build time, which is the point: the runtime now agrees with it. */
 export function overlay(base: Catalogue, over: Catalogue): Catalogue {

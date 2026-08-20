@@ -62,7 +62,7 @@ export const VISIBLE_PROPS = new Set([
  * only string-literal `scope` props in either front door are those four". That
  * stopped being true the day `GoogleSyncButton` shipped: `scope="knowledge"` /
  * `scope="both"` is a UNION MEMBER the component switches on, and three of them
- * went into the catalogue and were machine-translated in twenty-eight languages.
+ * went into the catalogue and were machine-translated into every language the app speaks.
  * A wrapped one would not merely be silly, it would not compile — the codemod
  * that wrapped them is what surfaced this — and a rule that says "wrap every
  * extracted position" cannot stand while a position is a type.

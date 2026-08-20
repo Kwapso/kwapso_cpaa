@@ -151,25 +151,26 @@ describe("the seed wins on SCREEN, not only inside the generator", () => {
     expect(translate("Issue", "de", undefined, overlay(machine, hand))).toBe("Problem")
   })
 
-  it("decides PER LANGUAGE, so the seed's German keeps the machine's Japanese", () => {
-    // The seed is partial on purpose — three languages where the catalogue has
-    // twenty-eight — so overwriting the whole ENTRY would throw twenty-five
-    // translations away every time somebody corrected one word.
-    const machine: Catalogue = { Issue: { de: "Ausgabe", ja: "問題" } }
+  it("decides PER LANGUAGE, so the seed's German keeps the machine's Catalan", () => {
+    // The seed is partial PER ENTRY on purpose: a word is hand-written in the
+    // language somebody actually checked it in, and the machine answered the
+    // rest. Overwriting the whole ENTRY would throw those away every time
+    // somebody corrected one word.
+    const machine: Catalogue = { Issue: { de: "Ausgabe", ca: "Sortida" } }
     const hand: Catalogue = { Issue: { de: "Problem" } }
     const spoken = overlay(machine, hand)
     expect(translate("Issue", "de", undefined, spoken)).toBe("Problem")
-    expect(translate("Issue", "ja", undefined, spoken)).toBe("問題")
+    expect(translate("Issue", "ca", undefined, spoken)).toBe("Sortida")
   })
 
   it("copies rather than mutates, so neither file is corrupted at import", () => {
     // The seam runs once, at module load, over the two real exports. An overlay
     // that wrote INTO its argument would edit CATALOGUE in memory, and every
     // later reader would see a file that does not exist on disk.
-    const machine: Catalogue = { Issue: { de: "Ausgabe", ja: "問題" } }
+    const machine: Catalogue = { Issue: { de: "Ausgabe", ca: "Sortida" } }
     const hand: Catalogue = { Issue: { de: "Problem" } }
     overlay(machine, hand)
-    expect(machine.Issue).toEqual({ de: "Ausgabe", ja: "問題" })
+    expect(machine.Issue).toEqual({ de: "Ausgabe", ca: "Sortida" })
     expect(hand.Issue).toEqual({ de: "Problem" })
   })
 

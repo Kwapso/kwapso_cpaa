@@ -251,7 +251,7 @@ export function ContactCreateDialog({
         <DialogDescription>
           {/* ONE entry with a hole in it, not a fragment plus a name. The sentence
               used to end on "of" and have the company appended after it, which
-              nine of the twenty-eight languages cannot do — Hindi, Japanese,
+              some languages cannot do — Hindi, Japanese,
               Korean, Chinese and five others put the possessed noun before the
               possessor, so there is nothing for a translator to end on. A
               placeholder can be moved; a dangling preposition cannot. */}

@@ -1,7 +1,8 @@
 // R28 — EVERY STRING THE APP SAYS IS IN THE CATALOGUE, AND THE CATALOGUE SAYS
 // NOTHING THE APP DOESN'T.
 //
-// The pipeline that translates this product into 29 languages is keyed by the
+// The pipeline that translates this product into the languages it speaks is keyed
+// by the
 // ENGLISH sentence (shared/i18n.ts): what a developer types at the call site is
 // what the catalogue is keyed by and what the translator translates. That makes
 // the whole thing depend on one fact staying true — that `shared/i18n-strings.json`
@@ -17,6 +18,14 @@
 //     in the file, get translated on every build, and make the catalogue a
 //     record of what the app USED to say. The same ratchet reasoning as R20's
 //     exemption list and R27's vocabulary.
+//   • A LANGUAGE THE APP NO LONGER SPEAKS — a translation on disk for a code
+//     that is not in `LANGUAGES`. `shared/i18n.ts` calls that array the one
+//     place a language is decided, and it was true of everything DERIVED from
+//     it and false of the two files that accumulate. Dropping a language left
+//     its 1,027 translations in the bundle, in every catalogue diff, and in the
+//     header sentence claiming how many languages this app speaks. The fix is
+//     `node scripts/i18n-prune.mjs`, which only ever REMOVES — filling a
+//     language in costs money and is `i18n-translate`'s job, not this one's.
 //
 // IT RE-RUNS THE REAL EXTRACTOR rather than re-implementing it. `scripts/lib/
 // i18n-source.mjs` is the ONE definition of "a string a person reads" — it is
@@ -40,7 +49,7 @@ import {
   sourceFiles,
   visitStrings,
 } from "../../scripts/lib/i18n-source.mjs"
-import { translate } from "@shared/i18n"
+import { CATALOGUE, LANGUAGES, SEED, translate } from "@shared/i18n"
 import { formatRelative } from "@shared/web/format"
 
 /** What a whole-repo source scan is allowed to take. Stated once. */
@@ -174,7 +183,7 @@ describe("R28 · what the one definition can see", () => {
 //     record footer and rendered *Erstellt von Aurora · 5d ago*.
 //   • The whole language settings screen and the whole text-size section live
 //     in shared/web/, already wrapped in `t(...)`, in no catalogue. They only
-//     looked finished because the SEED carried three of the twenty-nine
+//     looked finished because the SEED carried three of the twenty-nine of the time
 //     languages by hand.
 //   • shared/scale.ts holds "Compact", "Comfortable" and "Large", rendered
 //     through `t(step.label)` with the English one directory outside the walk.
@@ -300,5 +309,51 @@ describe("R28 · what the walk can REACH", () => {
     // reader's own locale — deliberately not a second time vocabulary.
     const lastYear = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString()
     expect(formatRelative(lastYear, de)).not.toContain("vor")
+  })
+})
+
+// ── the languages, as opposed to the strings ─────────────────────────────────
+//
+// R28's other three clauses ask whether the catalogue's KEYS match the code.
+// This asks whether its VALUES do: `shared/i18n.ts` holds one array of
+// languages and says in its own comment that adding or dropping one is a single
+// line, because everything is derived from it. Everything derived, yes — but the
+// catalogue and the seed are not derived, they are ACCUMULATED, and on
+// 2026-08-20 the app declared four languages while 1.4 MB of Javanese, Hausa
+// and Thai sat in the bundle behind it.
+//
+// Narrow on purpose: it fails only on a language the app does NOT speak. A
+// language it speaks but has not translated yet is a partly-translated app,
+// which is R28's founding position on missing words — a sentence, not a bug.
+describe("R28 · the catalogue speaks the languages the app speaks, and no others", () => {
+  it("catalogued-strings: no translation on disk for a language outside LANGUAGES", () => {
+    const spoken = new Set<string>(LANGUAGES.map((l) => l.code))
+    for (const [file, table] of [
+      ["shared/i18n-catalogue.ts", CATALOGUE],
+      ["shared/i18n-seed.ts", SEED],
+    ] as const) {
+      const found = new Map<string, number>()
+      for (const row of Object.values(table))
+        for (const code of Object.keys(row))
+          if (!spoken.has(code)) found.set(code, (found.get(code) ?? 0) + 1)
+      const extra = [...found.entries()].sort()
+      expect(
+        extra,
+        `${file} carries translations for ${extra.length} language(s) this app does not speak: ` +
+          extra.map(([code, n]) => `${code} (${n})`).join(", ") +
+          `. Run \`node scripts/i18n-prune.mjs\` and commit the result.`
+      ).toEqual([])
+    }
+  })
+
+  it("catalogued-strings: the generated catalogue's header says how many languages it really holds", () => {
+    // The header is the sentence a person reads instead of counting. It went
+    // stale the moment the array was trimmed, and a stale count in a GENERATED
+    // file reads as fact rather than as a leftover.
+    const head = readFileSync(join(ROOT, "shared", "i18n-catalogue.ts"), "utf8").slice(0, 4000)
+    const claim = /^\/\/ (\d+) strings · (\d+) languages/m.exec(head)
+    expect(claim, "shared/i18n-catalogue.ts has no `N strings · N languages` header line").toBeTruthy()
+    expect(Number(claim![2]), "the header's language count").toBe(LANGUAGES.length - 1)
+    expect(Number(claim![1]), "the header's string count").toBe(Object.keys(CATALOGUE).length)
   })
 })

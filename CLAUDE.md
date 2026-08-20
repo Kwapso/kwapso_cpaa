@@ -68,7 +68,8 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   surface. Identifiers, not sentences, an invented NAME can no longer ship.
   (`described-contracts`)
 - **The translation catalogue cannot rot (R28).** `shared/i18n-strings.json` is
-  EXACTLY the set of user-visible English sentences the two front doors say,
+  EXACTLY the set of user-visible English sentences the two front doors say, in
+  EXACTLY the languages `LANGUAGES` declares,
   derived by re-running the one shared definition of what a person reads
   (`scripts/lib/i18n-source.mjs`). That definition answers TWO questions and both
   are derived: which POSITIONS a person reads (the seven), and which FILES —
@@ -88,8 +89,12 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   pipeline is build-time, so "is the catalogue current?" was the assumption it all
   rested on; then "current against WHAT?" — `formatRelative` in `shared/web/` had
   been saying "5d ago" in English to nine call sites on both front doors, beside a
-  German sentence, for a year. Run `node scripts/i18n-extract.mjs` before you
-  commit. (`catalogued-strings`)
+  German sentence, for a year. A translation on disk for a language the app no longer speaks
+  is the fourth failure, added 2026-08-20 when the list was cut to four: the one
+  array in `shared/i18n.ts` was the only place a language was decided for
+  everything DERIVED from it, and never for the two files that ACCUMULATE. Run
+  `npm run lang` before you commit — extract, then prune — and both deploy
+  scripts refuse on a stale catalogue. (`catalogued-strings`)
 - **The page has one width, and a screen does not get its own (R29).** Each front
   door owns exactly ONE page container, `web/components/deep-link-screen.tsx` at
   `max-w-[1600px]` and `web-portal/components/portal-shell.tsx` at `max-w-3xl`
@@ -119,8 +124,8 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   cannot be wrapped where they are declared), held shut by an IMPORT BAN on the
   library `Field`; and a copy TABLE read back through `t` elsewhere is data in
   `TRANSLATED_WHERE_READ` with the call that reads it, rot-checked. Earned by
-  666 of 2,001 extracted positions being translated into 28 languages every
-  build and never asked for — every form field label in the app among them.
+  666 of 2,001 extracted positions being translated into every language the app
+  speaks, every build, and never asked for — every form field label in the app among them.
   (`wrapped-strings`)
 - **Every colour resolves through a token (R32).** No Tailwind colour ramp and no
   hex literal in `web/`, `web-portal/` or `shared/`: what a colour MEANS has a

@@ -216,7 +216,7 @@ longer builds the purged ones.
 | 13.1 | A language switcher in the agency app | **DONE**, live on staging |
 | 13.2 | A language switcher in the client portal | **DONE**. **CHANGED**: it sits in the header, not a settings page. You confirmed no settings page for the portal |
 | 13.3 | The preference saves and survives a reload | **DONE**, proved live, and it refuses eight kinds of bad input |
-| 13.4 | Every string the app says gets translated | **MOSTLY DONE, the last stretch is YOUR CALL.** 1,317 sentences now, 1,011 translated into all 28 languages, so roughly 300 still fall back to English — a sentence rather than a bug, which is why the key IS the English. Two things changed since this line was written. Your account has credit again. And the seed now wins ON SCREEN, not only inside the generator (`SPOKEN = overlay(CATALOGUE, SEED)`), so a translation can be written by hand and reach a reader without spending anything — which it could not before: the only documented way to add one was to run the generator, and the generator spends your key. Finishing the last 300 by machine is one command and your permission; I have not run it |
+| 13.4 | Every string the app says gets translated | **MOSTLY DONE, the last stretch is YOUR CALL.** 1,441 sentences now, translated into German, Spanish and Catalan — a sentence rather than a bug, which is why the key IS the English. Two things changed since this line was written. Your account has credit again. And the seed now wins ON SCREEN, not only inside the generator (`SPOKEN = overlay(CATALOGUE, SEED)`), so a translation can be written by hand and reach a reader without spending anything — which it could not before: the only documented way to add one was to run the generator, and the generator spends your key. Finishing the last 300 by machine is one command and your permission; I have not run it |
 | 13.5 | Translation happens at build time into static files, costing nothing at runtime | **DONE**, the extractor and the translator both exist and run |
 | 13.6 | What people type is translated once and cached, never on reload | **BUILDING** |
 | 13.7 | A re-translate button when the text and the reader's language differ | **BUILDING** |
@@ -224,7 +224,7 @@ longer builds the purged ones.
 | 13.9 | The assistant answers in the reader's language | **DONE** |
 | 13.10 | The assistant never translates data, only prose | **DONE**, and there is a test that fails if the rule leaves the prompt |
 | 13.11 | Everything on the backend stays English: queries, filters, statuses, search | **DONE** by the same rule |
-| 13.12 | Top 25 languages | **DONE**, 29 languages, your four first, one exported list |
+| 13.12 | Top 25 languages | **REVERSED 2026-08-20 on the owner's call.** Four languages — English, German, Spanish, Catalan — because those are the four somebody here can read well enough to notice a wrong sentence. The other 25 were large, not checked. R28 now fails on a translation for a language `LANGUAGES` does not declare |
 | 13.13 | Haiku, one pass, no reviewer | **DONE**. **CHANGED**: Aurora wanted a second checking pass. You overruled |
 | 13.14 | The language is set per account, overridable per contact, and staff switch their own | **BUILDING**. **CHANGED**: Aurora wanted account-only. You overruled |
 | 13.15 | A rule that fails the build when a new string escapes the catalogue | **DONE**. R28 exists: the law, its registry row and its check. It re-runs the real extractor rather than describing it, names missing and orphaned strings separately, and **went red on its first run and caught two real ones** |
@@ -317,7 +317,7 @@ stays there as the record. **BUILDING** means a lane is on it in this session ri
 
 | # | The thing | Status |
 |---|---|---|
-| 20.1 | Every system string translated by us, at build time, in all 29 languages | **DONE** |
+| 20.1 | Every system string translated by us, at build time, in every language we speak | **DONE** |
 | 20.2 | What a person types is translated only when somebody asks for it, on the cheapest Haiku | **DONE** |
 | 20.3 | One translation call routed everywhere it is needed, rather than one per field | **DONE** |
 | 20.4 | The switcher becomes a dropdown, not 25 stretched pills | **DONE** |
@@ -451,7 +451,7 @@ Nobody asked for these. They are the faults the work walked into.
 |---|---|---|
 | 31.1 | Account logos, covers and app logos could not be set **at all** from the app's own picker | **DONE**, the field was checked against the 20,000-character prose cap, 166× below the real limit. It shipped green because the test used a 110-character one-pixel image. Found three more of the same, including a team logo with **no length cap at any size** |
 | 31.2 | Deliverables shipped invisible to the whole agency, Admin included | **DONE**, migration `0036` omitted the permission grant every other module carries |
-| 31.3 | Every form field label was English in all 28 languages | **DONE**. 440 real cases: the words were translated and then never asked for. Now one wrapper and a law (R33) |
+| 31.3 | Every form field label was English in every language | **DONE**. 440 real cases: the words were translated and then never asked for. Now one wrapper and a law (R33) |
 | 31.4 | A colour swatch in your brand library loads from a **typosquatted domain** | **OPEN**, nine of them, on a host that is not the one they meant. It can serve anything it likes into your brand library, and one is already broken. A colour should be a value, not a remote image |
 | 31.5 | The ship gate went red three times with nothing wrong | **DONE**, slow tests against a 5-second budget. Fixed as one decision, not three patches |
 | 31.6 | A stale build accused the minifier of mangling the code | **DONE**, it now says "stale build" and names the command that fixes it |

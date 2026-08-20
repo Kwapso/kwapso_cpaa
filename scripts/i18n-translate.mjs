@@ -281,7 +281,7 @@ function readAnswer(text, batch, language) {
   // A string carrying typographic quotes — `Choose “Add to Home Screen”` — comes
   // back with ORDINARY ones, every time, in every language. That is the model
   // tidying the typography, which is a different act from inventing a key, and
-  // treating it as one cost four strings × twenty-eight languages: they were
+  // treating it as one cost four strings × every language the app speaks: they were
   // dropped silently as "not asked about", reported as missing, and re-sent on
   // every subsequent run to be dropped again.
   //

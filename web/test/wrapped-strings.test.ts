@@ -11,7 +11,7 @@
 //   • and most dialog titles, because they are written as a ternary.
 //
 // All of them were in `shared/i18n-strings.json`. Most of them had German. None
-// of them asked for it, so all of them rendered in English, in twenty-eight
+// of them asked for it, so all of them rendered in English, in every
 // languages, under a green build. R28 was satisfied throughout — a catalogue can
 // be perfect and every screen still English, because "is this string EXTRACTED?"
 // and "does this position CALL t?" are different questions and only the first
