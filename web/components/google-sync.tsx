@@ -184,7 +184,16 @@ export function GoogleSyncButton({
           into something a person can act on, and it takes the place of the
           "last brought in" line rather than sitting beside it: a stamp from
           Tuesday under a red sentence is two facts fighting for one glance. */}
-      {failing ? (
+      {/* NOT WHILE IT IS RUNNING. `failing` is a STORED error from the last
+          time a connection was used, so it survives until something succeeds —
+          which means it sat in red beside the spinner while the sync was
+          working perfectly, and the owner read the pair as "still broken".
+          A sentence about the past must not be shown next to a live attempt to
+          disprove it; the moment the press finishes, the row is re-read and
+          this either comes back or it does not. */}
+      {syncing ? (
+        <span className="text-muted-foreground text-xs">{t("This can take a few minutes.")}</span>
+      ) : failing ? (
         <span className="text-destructive text-xs">{failing}</span>
       ) : lastRun ? (
         <span className="text-muted-foreground text-xs">

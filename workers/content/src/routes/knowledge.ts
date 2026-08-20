@@ -263,49 +263,28 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
   // R20, positionally: a strict comparison against a literal. Anything that is
   // not exactly `true` — absent, a string, a number — means the ordinary sweep,
   // which is the behaviour every caller had before this field existed.
-  // IT KEEPS GOING UNTIL IT IS DONE, and that is what "bring it in" means.
+  // ONE BOUNDED PASS PER CALL, and the loop belongs to the CALLER.
   //
-  // One press used to be one bounded slice — twenty-five rows per kind — so
-  // catching up a mailbox or a Drive that had never been read meant pressing the
-  // button, watching it say it had worked, and pressing it again. Nobody does
-  // that thirty times. The owner's words for the whole area were "this whole
-  // mechanism… is fucking painful", and this is the half of it that lives here.
+  // A server-side loop was added here on 20 Aug 2026 and taken out the same
+  // morning, because the screen has looped since the day it was written
+  // (`MAX_SYNC_PASSES` in web/components/google-sync.tsx). Two loops around the
+  // same work meant one press did twelve passes of up-to-forty passes, and each
+  // HTTP call ran for over five minutes before answering — long enough that the
+  // owner watched a spinner and reasonably concluded the button was broken.
   //
-  // BOUNDED BY THE CLOCK, NOT BY A COUNT, because the two things that vary are
-  // how much there is and how fast Google is, and neither is knowable in
-  // advance. A pass that finds everything caught up stops immediately, so a
-  // press with nothing to do still costs one round. The wall-clock ceiling sits
-  // under the platform's own request limit with room to spare, and the passes
-  // ceiling is the backstop for the case where a kind reports progress forever.
+  // The floor is the LISTING, not the writing: every pass re-reads all four
+  // services in full — a Drive walk of up to a hundred and twenty requests, ten
+  // pages of mail — before it files a single row. So no slice size makes one
+  // call quick, and the answer is not a bigger slice but a call that RETURNS.
   //
-  // WHATEVER IT GOT THROUGH IS KEPT. Each pass commits its own rows before the
-  // next begins, so stopping at the ceiling leaves the base further ahead than
-  // it was — never half a write, and never nothing.
-  const startedAt = Date.now()
-  const SYNC_BUDGET_MS = 50_000
-  const SYNC_MAX_PASSES = 40
-  let sweep = await sweepGoogle(env, cfg, guard, {
+  // A press is therefore a nudge rather than a backfill: it does a real chunk,
+  // reports it honestly, and the fifteen-minute sweep finishes the rest without
+  // anybody watching. That is the shape the cron already had.
+  const sweep = await sweepGoogle(env, cfg, guard, {
     onlyIfStale: body.onlyIfStale === true,
-    // A PRESS IS NOT A TICK. Every pass re-lists the whole of each service
-    // before filing anything, so the listing dominates — a bigger slice is a
-    // quarter of the round trips for the same result.
     limit: INGEST_SOURCES_PER_PRESS,
   })
-  let indexed = sweep.results.reduce((sum, r) => sum + r.indexed, 0)
-  let passes = 1
-  while (
-    !sweep.skipped &&
-    passes < SYNC_MAX_PASSES &&
-    Date.now() - startedAt < SYNC_BUDGET_MS &&
-    sweep.results.some((r) => !r.caughtUp && !r.error)
-  ) {
-    // `onlyIfStale` is deliberately NOT carried into the later passes: it exists
-    // to stop a browser asking twice on one page load, and a pass that has just
-    // finished writing is not stale in the sense that flag is about.
-    sweep = await sweepGoogle(env, cfg, guard, { limit: INGEST_SOURCES_PER_PRESS })
-    indexed += sweep.results.reduce((sum, r) => sum + r.indexed, 0)
-    passes += 1
-  }
+  const indexed = sweep.results.reduce((sum, r) => sum + r.indexed, 0)
   if (indexed > 0) await publishChange(env, guard.teamId, "knowledge")
   // WRITTEN OUT LONGHAND, and that is R27 rather than a style preference: the
   // response-key derivation reads the keys of a `json({…})` literal, and a
@@ -318,11 +297,9 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
     results: sweep.results,
     skipped: sweep.skipped,
     caughtUp: sweep.results.every((r) => r.caughtUp && !r.error),
-    // HOW HARD IT WORKED, so "it says it synced and nothing changed" is a
-    // readable sentence rather than a mystery: `passes` says how many rounds it
-    // ran and `indexed` how many sources it actually wrote. A press that finds
-    // nothing new reports 1 and 0, which is a complete and honest answer.
-    passes,
+    // WHAT IT ACTUALLY WROTE, so "it says it synced and nothing changed" is a
+    // readable sentence rather than a mystery. A pass that finds nothing new
+    // reports 0, which is a complete and honest answer.
     indexed,
     total: await countSources(cfg, guard),
   })

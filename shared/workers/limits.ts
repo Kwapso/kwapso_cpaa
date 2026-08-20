@@ -139,7 +139,7 @@ export const INVITE_SWEEP_CAP = 25
  *
  * Still bounded, and bounded by the same reasoning as the tick: it has to fit
  * inside one request with room for the embedding calls each row costs. */
-export const INGEST_SOURCES_PER_PRESS = 100
+export const INGEST_SOURCES_PER_PRESS = 40
 
 /* ---- How much of a mailbox the knowledge base may read --------------------- */
 
