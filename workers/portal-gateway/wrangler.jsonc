@@ -29,10 +29,11 @@
     // non-listed paths skip the worker entirely (asset-only), so ALL must be
     // listed: /api/* (the allow-list fan-out), /mcp (so it is refused HERE
     // rather than falling through to the asset 404 page — the refusal must be
-    // the worker's, not the asset layer's), /media/* (R2) and /support/* (the
-    // client-resolved ticket shell). Static screens (/, /home, /_next/static/**)
+    // the worker's, not the asset layer's), /media/* (R2) and /tickets/* (the
+    // client-resolved ticket shell — it said /support/* until 20 Aug 2026, a
+    // path that exists nowhere in this app, so every ticket deep link 404'd). Static screens (/, /home, /_next/static/**)
     // are NOT listed, so they keep the fast asset path + immutable caching.
-    "run_worker_first": ["/api/*", "/mcp", "/media/*", "/support/*"]
+    "run_worker_first": ["/api/*", "/mcp", "/media/*", "/tickets/*"]
   },
   // Only the doors the portal actually uses are bound. There is no DATAOPS and
   // no MCP binding here ON PURPOSE: a worker cannot forward to a service it
@@ -56,7 +57,7 @@
         "directory": "../../web-portal/out",
         "binding": "ASSETS",
         "not_found_handling": "404-page",
-        "run_worker_first": ["/api/*", "/mcp", "/media/*", "/support/*"]
+        "run_worker_first": ["/api/*", "/mcp", "/media/*", "/tickets/*"]
       },
       "services": [
         { "binding": "AUTH", "service": "kwapso-auth-staging" },

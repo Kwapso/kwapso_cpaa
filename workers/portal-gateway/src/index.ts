@@ -202,6 +202,31 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/realtime": "REALTIME",
 }
 
+/** The portal paths that are CLIENT-RESOLVED SHELLS: /tickets is a real static
+ * file, but /tickets/<id> is the same shell with the id read off
+ * window.location, so any depth under one of these must be served the shell
+ * instead of the 404 page.
+ *
+ * IT IS EXPORTED BECAUSE IT IS HALF A CONTRACT — the same half the agency
+ * gateway's own SHELL_MODULES is. The other half is `assets.run_worker_first`
+ * in wrangler.jsonc: that field is an ARRAY, and an array means every path NOT
+ * listed skips this Worker entirely and is answered by the asset layer, which
+ * with `not_found_handling: "404-page"` is a 404.
+ *
+ * THIS EXACT FAULT SHIPPED TWICE. The agency door had it on 17 Aug 2026 — the
+ * array named a `/help/*` that was not a URL segment in the app — and it was
+ * fixed and locked with a test the same day. The portal was never given that
+ * test, and its array still read `/support/*`, a path that appears NOWHERE in
+ * this codebase but here. So the handler forwarded /tickets/* and the asset
+ * layer 404'd it first, and the only reason it looked fine is that clicking a
+ * ticket in the app never leaves the page. A RELOAD, a pasted link, and every
+ * ticket-notification email a client has ever received all landed on the 404
+ * page (shared/workers/record-link.ts builds them as `/tickets/<id>`).
+ *
+ * test/shell-routing.test.ts now reads both halves off disk, in every
+ * environment, because wrangler envs do not inherit a parent's assets block. */
+export const SHELL_MODULES = ["tickets"]
+
 type Env = {
   ASSETS: Fetcher
   AUTH: Fetcher
@@ -267,10 +292,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // (the browser keeps the real URL; the page parses it client-side). Without
     // this, a deep link a client was emailed would 404 before the worker saw it
     // — the static-export reload trap, EDGE-CASES.md.
-    if (pathname.startsWith("/tickets/")) {
-      const shell = new URL(request.url)
-      shell.pathname = "/tickets"
-      return env.ASSETS.fetch(new Request(shell, request))
+    for (const mod of SHELL_MODULES) {
+      if (pathname.startsWith(`/${mod}/`)) {
+        const shell = new URL(request.url)
+        shell.pathname = `/${mod}`
+        return env.ASSETS.fetch(new Request(shell, request))
+      }
     }
 
     // Static screens/assets. Long-cache headers for the content-hashed
