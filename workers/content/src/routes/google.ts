@@ -34,7 +34,8 @@
 import { fail, json } from "@shared/workers/http"
 import { queryText, requireText, optionalText, TEXT_LIMITS } from "@shared/workers/validate"
 import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
-import { GOOGLE_SERVICES } from "@shared/types"
+import { GOOGLE_SERVICES, type GoogleService } from "@shared/types"
+import { rewindGoogleLane } from "../lib/knowledge-google"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -375,6 +376,9 @@ export async function postGoogleSource(request: Request, env: Env): Promise<Resp
         accountId,
       })
     )
+  // SHARING IS THE ONE EVENT THAT MEANS "READ THIS AGAIN". Once, for the lane,
+  // not once per folder — the cursor belongs to the service, not to the row.
+  if (ids.length) await rewindGoogleLane(cfg, guard, service)
   // One ping per row, because each is a row a screen is looking at (R1/R15).
   for (const id of ids) await publishChange(env, guard.teamId, "google", id)
   return json({ sources: await listNamedSources(cfg, guard), shared: ids.length })
@@ -413,7 +417,15 @@ export async function postGoogleSourceActive(request: Request, env: Env): Promis
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Folder or space", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "id and active are required.")
+  // WHICH LANE this row belongs to, read BEFORE the flip — the row is the only
+  // thing that knows, and after a successful switch-on its lane has to forget
+  // where it had got to.
+  const source = await ownSourceOrThrow(cfg, guard, id)
   const changed = await setNamedSourceActive(cfg, guard, actor, id, body.active)
+  // SWITCHING ONE BACK ON is the same event as sharing it for the first time:
+  // the lane's cursor points past material that is about to matter again.
+  if (changed && body.active === true)
+    await rewindGoogleLane(cfg, guard, source.service as GoogleService)
   if (changed) await publishChange(env, guard.teamId, "google", id)
   return json({ sources: await listNamedSources(cfg, guard) })
 }

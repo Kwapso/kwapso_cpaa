@@ -80,8 +80,46 @@ export const GOOGLE_SOURCE_KINDS = GOOGLE_SERVICES.map((s) => KIND_OF[s])
 /** The state key one person's sweep of one service keeps its place under. The
  * ONE place the string is built, so the sweeper, the screen and the door can
  * never spell it differently. */
-function googleStateKey(service: GoogleService, userId: string): string {
+export function googleStateKey(service: GoogleService, userId: string): string {
   return `${KIND_OF[service]}:${userId}`
+}
+
+/** FORGET WHERE THIS LANE HAD GOT TO, so the next sweep reads it from the start.
+ *
+ * THE FAULT (owner, 20 Aug 2026). He disconnected Google, pressed "Connect
+ * everything", and re-shared five Chat spaces and four Drive folders. The sweep
+ * ran twice afterwards and brought in ZERO chat messages, while the knowledge
+ * base held 73 chat sources with every one of them deactivated. The material was
+ * gone and re-sharing did not bring it back.
+ *
+ * The cursor is why. A lane keeps its place — `v2|2026-08-20T04:16:39|…` — and
+ * resumes from it, which is exactly right while a share is CONTINUOUS: nobody
+ * wants a re-read of two years of chat every quarter of an hour. But
+ * disconnecting retires the sources (`retireVanished` is correct to do that: the
+ * space is genuinely no longer shared) and re-sharing brings the space back
+ * while the cursor still points past everything in it. So the lane resumes
+ * after the end of material that is no longer there, finds nothing newer, and
+ * reports an honest, useless "caught up".
+ *
+ * SHARING SOMETHING IS THE ONE EVENT THAT MEANS "READ THIS AGAIN". It is rare, a
+ * person does it deliberately, and it is the moment they expect the material to
+ * appear — so it is the right and only place to give the cursor up. The cost is
+ * one re-read of a folder or a space, bounded by the same caps as any other
+ * sweep, and the alternative is what happened here: a share that silently does
+ * nothing. */
+export async function rewindGoogleLane(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  service: GoogleService
+): Promise<void> {
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    // The row may not exist yet — a first share before a first sweep — and a
+    // cursor that was never set is already rewound, so this touches nothing.
+    `UPDATE knowledge_ingest SET cursor = NULL WHERE kind = ?`,
+    [googleStateKey(service, guard.userId)]
+  )
 }
 
 /** Every state key one person could have — what the sync screen asks for. */
