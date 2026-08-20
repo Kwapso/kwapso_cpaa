@@ -545,6 +545,53 @@ export async function addNamedSource(
 
 /** Take a folder or space away again, or put it back. R17: the current-status
  * predicate rides the UPDATE; zero rows moved = no history row and no ping. */
+/* ─────────────────────── who users/1001836… actually is ─────────────────── */
+
+/** EVERY NAME WE HAVE EVER LEARNED, as `users/…` → "Ishita Goyal".
+ *
+ * Read whole because it is small — one row per colleague who has ever been
+ * @-mentioned in a shared space, so it is the size of a team and not of a
+ * conversation. Team migration 0049_chat_people argues why remembering is the
+ * only route left: every endpoint Google offers for "who is this person" was
+ * measured and came back without a name. */
+export async function knownChatPeople(cfg: D1Rest, guard: MemberGuard): Promise<Map<string, string>> {
+  const rows = await d1Query<{ user_id: string; display_name: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: one row per person ever seen in a shared space; the ceiling
+    // is far above any real team.
+    `SELECT user_id, display_name FROM chat_people LIMIT ${LIST_HARD_CAP}`
+  )
+  return new Map(rows.map((r) => [r.user_id, r.display_name]))
+}
+
+/** REMEMBER WHAT A CONVERSATION JUST TAUGHT US.
+ *
+ * Idempotent by construction: the id is the primary key and a repeat is an
+ * UPDATE of the same name, so sweeping the same space twice writes the same row
+ * twice and changes nothing. The name is allowed to CHANGE — somebody who
+ * marries and updates their Google profile should not stay under the old one —
+ * which is why this is an upsert rather than an insert-if-absent. */
+export async function rememberChatPeople(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  learned: Map<string, string>
+): Promise<void> {
+  const rows = [...learned].filter(([id, name]) => id && name)
+  if (!rows.length) return
+  const now = new Date().toISOString()
+  // Bounded per call so one enormous page cannot build a statement past D1's
+  // limits; the next sweep picks up whatever did not fit.
+  for (const [id, name] of rows.slice(0, 100))
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `INSERT INTO chat_people (user_id, display_name, learned_at, learned_from)
+       VALUES (${sqlString(id)}, ${sqlString(name)}, ${sqlString(now)}, 'mention')
+       ON CONFLICT(user_id) DO UPDATE SET display_name = excluded.display_name, learned_at = excluded.learned_at`
+    )
+}
+
 export async function setNamedSourceActive(
   cfg: D1Rest,
   guard: MemberGuard,

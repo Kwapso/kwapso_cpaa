@@ -41,6 +41,8 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   accessTokenFor,
+  knownChatPeople,
+  rememberChatPeople,
   addNamedSource,
   asMailBinKind,
   asNamedService,
@@ -1209,7 +1211,12 @@ export async function getGoogleChat(request: Request, env: Env): Promise<Respons
   const source = await ownSourceOrThrow(cfg, guard, sourceId)
   if (source.service !== "chat") return fail(400, "invalid_input", "That isn't a Chat space.")
   const { token } = await accessTokenFor(env, cfg, guard, "chat")
-  return json({ messages: await chatMessages(token, source.externalId), space: source.name })
+  // NAMES WE ALREADY KNOW GO IN, NAMES THIS PAGE TEACHES COME BACK OUT and are
+  // written down — so the assistant reading one space makes every later read
+  // better, not just this one (0049_chat_people).
+  const page = await chatMessages(token, source.externalId, await knownChatPeople(cfg, guard))
+  await rememberChatPeople(cfg, guard, page.learned)
+  return json({ messages: page.messages, space: source.name })
 }
 
 /** POST /api/content/google/chat/messages — post in a space I named.

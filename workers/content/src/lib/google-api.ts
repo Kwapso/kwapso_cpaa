@@ -1803,7 +1803,15 @@ export async function chatSpaces(token: string): Promise<ChatSpace[]> {
 /** Messages in ONE named space. `spaceName` is Google's `spaces/AAAA…`, and it
  * always comes from a row the caller created — never from a request parameter,
  * which is what keeps "named spaces only" true on this side of the boundary too. */
-export async function chatMessages(token: string, spaceName: string): Promise<ChatMessage[]> {
+export async function chatMessages(
+  token: string,
+  spaceName: string,
+  /** NAMES WE ALREADY LEARNED, from any space, on any earlier sweep. Passed in
+   * rather than looked up here because this file talks to Google and never to
+   * the database — the caller owns the remembering (team migration
+   * 0049_chat_people says why it has to be remembered at all). */
+  known: Map<string, string> = new Map()
+): Promise<{ messages: ChatMessage[]; learned: Map<string, string> }> {
   // WHO IS IN THIS SPACE, asked once for the whole page of messages rather than
   // once per message. See `chatMembers` for why this call has to exist at all.
   const members = await chatMembers(token, spaceName)
@@ -1830,20 +1838,28 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
   // It costs no extra call and no extra permission, which is what makes it the
   // right answer rather than the clever one.
   const learned = mentionedNames(messages)
+  // THREE SOURCES, IN ORDER OF HOW MUCH THEY PROVE, and the last is the new one:
+  // what this page just taught us, then what any EARLIER page in any space
+  // taught us, then whatever the roster managed. The remembered map is why a
+  // name survives the request it was learned in — see 0049_chat_people.
   for (const [id, name] of learned) if (!members.has(id)) members.set(id, name)
-  return messages.map((raw) => {
-    const m = raw as Record<string, unknown>
-    const id = str(m.name)
-    return {
-      id,
-      space: spaceName,
-      ...toChatSender(m.sender, members),
-      text: str(m.text),
-      createdAt: str(m.createTime) || null,
-      thread: str((m.thread as Record<string, unknown> | undefined)?.name),
-      url: chatMessageUrl(id),
-    }
-  })
+  for (const [id, name] of known) if (!members.has(id)) members.set(id, name)
+  return {
+    messages: messages.map((raw) => {
+      const m = raw as Record<string, unknown>
+      const id = str(m.name)
+      return {
+        id,
+        space: spaceName,
+        ...toChatSender(m.sender, members),
+        text: str(m.text),
+        createdAt: str(m.createTime) || null,
+        thread: str((m.thread as Record<string, unknown> | undefined)?.name),
+        url: chatMessageUrl(id),
+      }
+    }),
+    learned,
+  }
 }
 
 /**

@@ -137,7 +137,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
           },
         ],
     }),
-    chatMessages: async () => [
+    chatMessages: async () => ({ learned: new Map<string, string>(), messages: [
       {
         id: "spaces/AAA/messages/MSG_2",
         space: "spaces/AAA",
@@ -158,7 +158,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         text: "first thing said",
         createdAt: "2026-08-03T10:00:00.000Z",
       },
-    ],
+    ] }),
   }
 })
 

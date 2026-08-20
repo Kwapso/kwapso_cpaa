@@ -171,7 +171,7 @@ describe("who said it, in words, or an honest description of who", () => {
 
   it("Google's own name wins, and is marked as Google's", async () => {
     stubGoogle(() => message({ name: "users/1", displayName: "Ana Ruiz", type: "HUMAN" }))
-    const [m] = await chatMessages("tok", "spaces/AAA")
+    const [m] = (await chatMessages("tok", "spaces/AAA")).messages
     expect(m?.sender).toBe("Ana Ruiz")
     expect(m?.senderNamed).toBe(true)
   })
@@ -181,7 +181,7 @@ describe("who said it, in words, or an honest description of who", () => {
     // `chat.spaces.readonly` returns no membership, so a name is not available at
     // any price short of a wider grant and a re-consent from everybody.
     stubGoogle(() => message({ name: "users/112978", type: "HUMAN" }))
-    const [m] = await chatMessages("tok", "spaces/AAA")
+    const [m] = (await chatMessages("tok", "spaces/AAA")).messages
     expect(m?.sender).not.toContain("users/")
     expect(m?.sender).toBe("Somebody in this space")
     // And the reader is TOLD it is our sentence rather than Google's.
@@ -190,12 +190,12 @@ describe("who said it, in words, or an honest description of who", () => {
 
   it("an app is not a person — the two are worth telling apart in a transcript", async () => {
     stubGoogle(() => message({ name: "users/9", type: "BOT" }))
-    expect((await chatMessages("tok", "spaces/AAA"))[0]?.sender).toBe("An app")
+    expect(((await chatMessages("tok", "spaces/AAA")).messages)[0]?.sender).toBe("An app")
   })
 
   it("a sender Google described in NO way falls back to the id, labelled as one", async () => {
     stubGoogle(() => message({ name: "users/7" }))
-    const [m] = await chatMessages("tok", "spaces/AAA")
+    const [m] = (await chatMessages("tok", "spaces/AAA")).messages
     expect(m?.sender).toBe("users/7")
     expect(m?.senderNamed).toBe(false)
   })

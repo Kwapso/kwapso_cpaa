@@ -49,7 +49,13 @@ import {
   gmailSearch,
   GMAIL_CONTACT_CAP,
 } from "./google-api"
-import { accessTokenFor, listNamedSources, type GoogleEnv } from "./google"
+import {
+  accessTokenFor,
+  knownChatPeople,
+  listNamedSources,
+  rememberChatPeople,
+  type GoogleEnv,
+} from "./google"
 
 /** Contact addresses one lookup will read. R14's spirit on the other axis: the
  * accounts table is a GROWING collection, so the read that feeds a Gmail query
@@ -394,10 +400,19 @@ export async function readGoogleMaterial(
 
   if (wanted.includes("chat")) {
     const token = await tokenOrNull(env, cfg, guard, "chat")
+    // WHO WE ALREADY KNOW, read ONCE for the whole sweep rather than per space —
+    // and it is what stops a person reading as "Somebody in this space" in one
+    // conversation while being named in the next (0049_chat_people).
+    const known = token ? await knownChatPeople(cfg, guard) : new Map<string, string>()
+    const fresh = new Map<string, string>()
     if (token)
-      for (const space of (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active))
+      for (const space of (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active)) {
+        const page = await chatMessages(token, space.externalId, known)
+        // WHAT THIS SPACE TAUGHT US IS AVAILABLE TO THE NEXT ONE, in this same
+        // sweep, before anything is written down.
+        for (const [id, name] of page.learned) { known.set(id, name); fresh.set(id, name) }
         // ONE SOURCE PER CONVERSATION, NOT PER MESSAGE. See `chatThreads`.
-        for (const message of chatThreads(await chatMessages(token, space.externalId)))
+        for (const message of chatThreads(page.messages))
           items.push({
             service: "chat",
             sourceId: space.id,
@@ -421,6 +436,12 @@ export async function readGoogleMaterial(
             // The space says whose it is, exactly as a Drive folder does.
             accountId: space.accountId,
           })
+      }
+    // WRITTEN DOWN ONCE, AT THE END. Everything this sweep learned, from every
+    // space, so the next sweep starts knowing it — which is the whole point:
+    // coverage that goes UP over time instead of depending on whether a mention
+    // happens to be in the page in front of us.
+    if (fresh.size) await rememberChatPeople(cfg, guard, fresh)
   }
 
   return { items, contactsUsed, contactsCapped }

@@ -3104,6 +3104,53 @@ ALTER TABLE help ADD COLUMN module_id TEXT REFERENCES app_modules (id);
 CREATE INDEX idx_help_module ON help (module_id);
 `,
   },
+  {
+    // ── WHO users/1001836… IS, REMEMBERED ────────────────────────────────────
+    //
+    // THE OWNER, 20 Aug 2026: "make sure that we always have the sender names
+    // because it keeps saying somebody in this space."
+    //
+    // EVERY ROUTE GOOGLE OFFERS WAS TRIED AND MEASURED, and the results are why
+    // this table exists rather than another API call:
+    //
+    //   • `messages.list` populates `displayName` for an APP and leaves it EMPTY
+    //     for every human.
+    //   • `spaces.members.list`, with `chat.memberships.readonly` granted and
+    //     re-approved, answers {"name":"users/100183…","type":"HUMAN"} — the
+    //     roster, with no names on it. There is no Chat scope that returns one.
+    //   • People API `people:batchGet` answers for the caller and their own
+    //     contacts, and for nobody else.
+    //   • `people.listDirectoryPeople` returns {} unless domain-wide contact
+    //     sharing is switched on for the whole Workspace — an organisation-wide
+    //     privacy setting, which is a far larger thing to change than a
+    //     knowledge base deserves.
+    //
+    // ONE ROUTE WORKS, and it is the conversation itself. When somebody writes
+    // "@Ishita Goyal", Google attaches an annotation carrying that person's
+    // resource id AND the character range of their name in the message text —
+    // the exact pair every endpoint above withheld.
+    //
+    // IT WAS BEING LEARNED AND THROWN AWAY. The join happened per page of
+    // messages and the map died with the request, so a name was known only while
+    // a mention happened to be in the same fifty messages. That is why the
+    // owner kept seeing "Somebody in this space" beside people the app had
+    // already identified minutes earlier.
+    //
+    // So it is remembered. Learned once, from any space, and applied everywhere
+    // afterwards — which is also what makes the coverage go UP over time instead
+    // of depending on what is in the current page. A row is a fact Google gave
+    // us about a person, never a guess: nothing writes here without both halves
+    // arriving together.
+    version: "0049_chat_people",
+    sql: `
+CREATE TABLE chat_people (
+  user_id TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  learned_at TEXT NOT NULL,
+  learned_from TEXT
+);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
