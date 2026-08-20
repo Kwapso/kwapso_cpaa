@@ -274,6 +274,80 @@ describe("a source a person writes is answerable straight away", () => {
 // often enough) rather than this floor.
 const NOTHING_CLOSE_ENOUGH = { minScore: "0.99" }
 
+// THE WORDS AROUND A QUESTION ARE NOT THE QUESTION.
+//
+// Isolated on staging on 20 Aug 2026, against the agency's own material:
+//
+//   "Ishita and Alaap one-to-one"                          → 6 passages
+//   "What was decided in the Ishita and Alaap meeting?"     → 3 passages
+//   "What was decided in the Ishita and Alaap one-to-one?"  → NOTHING
+//
+// The same transcript, indexed and chunked, and the base said it had nothing
+// about a conversation it held in full. An embedding model reads "what was
+// decided in the" as content, and enough of that scaffolding drags the vector
+// under the floor; the word arm then inherits the decision and its own floor —
+// half the question's terms — is defeated by the same padding, because the
+// transcript says "Ishita" and "Alaap" and neither "decided" nor "one-to-one".
+//
+// WHAT THIS SUITE CAN AND CANNOT PROVE, said out loud because the first version
+// of it proved nothing. The stand-in model here is a bag of words in 256 slots
+// (see fakeVector); it has no semantic drift to reproduce, so a test asserting
+// "the padded question is answered" passed with the fix REMOVED — a green test
+// asserting the wrong thing, which is worse than no test. The symptom was
+// verified against the real model on staging, where it was found.
+//
+// So what is locked here is the MECHANISM, which is what can regress silently:
+// on the path where the first look found nothing, the question is asked again
+// with its own terms and none of its scaffolding — and that second look clears
+// the SAME floor, so it can rescue a phrasing without ever inventing an answer.
+describe("a refused question is asked again in its own words", () => {
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Ishita and Alaap catch-up",
+      body:
+        "Ishita and Alaap agreed that the voucher redemption work moves to the August sprint, " +
+        "and that Ishita picks up the outstanding onboarding questions from the pharmacy chains.",
+    })
+  })
+
+  it("asks the model a second time, with the scaffolding stripped", async () => {
+    const question = "What was actually decided in the Ishita and Alaap one-to-one catch-up?"
+    await ask(IDS.staffUser, question, undefined, NOTHING_CLOSE_ENOUGH)
+
+    // The full question, as typed — the first look, unchanged.
+    expect(embedded, "the question itself must still be embedded as asked").toContain(question)
+
+    // …and a second, shorter text that is NOT the question, made of its own
+    // terms. Derived rather than spelled out: retyping the expected string here
+    // would only prove that two files agree about tokenising.
+    const second = embedded.filter((t) => t !== question && t.length < question.length)
+    expect(
+      second.length,
+      `only these texts were embedded: ${embedded.join(" / ")}`
+    ).toBeGreaterThan(0)
+    const focused = second[second.length - 1]
+    expect(focused).toContain("ishita")
+    expect(focused).not.toContain("what")
+    expect(focused).not.toContain("?")
+  })
+
+  // THE SECOND LOOK MAY NOT BECOME A SECOND CHANCE. It clears the same floor as
+  // the first, so a question the base genuinely cannot answer is still refused —
+  // the half that a "just retry it until something comes back" fix would have
+  // quietly given away, and the half R23 actually cares about.
+  it("still refuses when nothing clears the floor either time", async () => {
+    const answer = await ask(
+      IDS.staffUser,
+      "What was decided about the Antarctic shipping tariff review?",
+      undefined,
+      NOTHING_CLOSE_ENOUGH
+    )
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(false)
+    expect(answer.citations).toEqual([])
+    expect(answer.passages).toEqual([])
+  })
+})
+
 describe("R23 — a question the team's material cannot answer is refused, not approximated", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {

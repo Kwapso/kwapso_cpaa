@@ -1874,7 +1874,56 @@ export async function retrieve(
   // below the floor it is merely the least unlike, and letting it through is how
   // a knowledge base answers a question about parental leave out of a note about
   // dispatch outages.
-  const vector = hits.filter((h) => h.score >= numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE))
+  const floor = numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
+  let vector = hits.filter((h) => h.score >= floor)
+
+  // A SECOND LOOK, WITH THE QUESTION'S OWN WORDS AND NONE OF ITS SCAFFOLDING.
+  //
+  // THE FAULT, isolated on staging on 20 Aug 2026 against real material:
+  //
+  //   "Ishita and Alaap one-to-one"                          → 6 passages
+  //   "What was decided in the Ishita and Alaap meeting?"     → 3 passages
+  //   "What was decided in the Ishita and Alaap one-to-one?"  → NOTHING
+  //
+  // Same document, same index, indexed and chunked. The words a person puts
+  // AROUND their question — "what was decided in the", the question mark — are
+  // content to an embedding model, and enough of them pull the vector away from
+  // the material until the closest chunk falls under the floor. Then `sole`
+  // becomes true and the word arm inherits the decision with a floor of its own
+  // that the same padding also defeats: half of six terms is three, and a
+  // transcript of that call contains "Ishita" and "Alaap" and neither "decided"
+  // nor "one-to-one". Both arms refuse, for two unrelated reasons, and the base
+  // says it has nothing about a conversation it holds in full.
+  //
+  // THE FLOOR IS NOT THE BUG and must not be moved. 0.50 was measured against
+  // this model on real documents (see MIN_VECTOR_SCORE) and it is the last floor
+  // that costs nothing; buying these questions by lowering it would buy the
+  // genuine refusals back as confident nonsense, which is the failure R23 exists
+  // to prevent.
+  //
+  // So: ask again with the terms the question is ABOUT. `questionTerms` already
+  // knows how to find them — it is the same list the word arm has always used —
+  // so this is a second reading of a decision already made, not a new one.
+  //
+  // STRICTLY ADDITIVE, and that is the whole safety argument. It runs ONLY where
+  // the first look found nothing, so no question that is answered today can be
+  // answered differently tomorrow; the floor it must clear is the same floor;
+  // and it costs one embedding on the path that was about to refuse, which is
+  // the cheapest moment in the whole function to spend one.
+  if (!vector.length && asked && hasVectorStore(env) && terms.length > 1) {
+    const focused = terms.join(" ")
+    // Nothing to gain when the question was already just its own terms.
+    if (focused.toLowerCase() !== question.trim().toLowerCase()) {
+      const [askedAgain] = await embed(env, [focused])
+      if (askedAgain) {
+        const again = await searchVectors(env, guard, askedAgain, {
+          level: "chunk",
+          ...compartmentFilter(route.compartments),
+        })
+        vector = again.filter((h) => h.score >= floor)
+      }
+    }
+  }
 
   // WHEN THE WORD MATCH RUNS, in two cases and for two different reasons:
   //   • the question contains something EXACT (a reference, an invoice number).
