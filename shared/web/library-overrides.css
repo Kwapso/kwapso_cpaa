@@ -72,3 +72,47 @@
  * one door can be given and the other forgotten — the same reasoning the front
  * door helpers are shared for. Locked by web/test/shared-web-is-styled.test.ts. */
 @source ".";
+
+/* ── THE SCROLL LOCK MUST NOT MOVE THE FURNITURE ───────────────────────────
+ *
+ * THE SYMPTOM (owner, 20 Aug 2026): "when I'm opening some kind of overlay on
+ * my screen or opening the assistant, the sidebar gets weirdly distorted."
+ * Both front doors, and the assistant is the easiest way to see it — it is a
+ * Radix Sheet.
+ *
+ * THE MECHANISM, read out of the dependency rather than guessed. Every Radix
+ * overlay (dialog, alert dialog, sheet) locks the page through
+ * `react-remove-scroll`, which stamps `data-scroll-locked` on <body> and, in its
+ * DEFAULT gap mode, writes:
+ *
+ *     body[data-scroll-locked] { overflow: hidden !important;
+ *                                margin-right: <scrollbar>px !important; }
+ *
+ * The margin is meant to stop the page jumping when the scrollbar disappears.
+ * It does the opposite here, because it makes the BODY BOX NARROWER — and both
+ * shells hang their furniture off that box. The agency sidebar is
+ * `sticky top-0 h-[100svh] overflow-y-auto` and the portal's header and bottom
+ * nav are `sticky` too, so all of them are re-laid-out mid-animation the moment
+ * an overlay opens, and again when it closes.
+ *
+ * THE FIX IS TO REMOVE THE PROBLEM RATHER THAN COMPENSATE FOR IT. Reserving the
+ * scrollbar's space permanently (`scrollbar-gutter: stable`) means the gutter is
+ * there whether or not a scrollbar is drawn — so hiding the scrollbar changes no
+ * width at all, and the margin the library adds to compensate has nothing left
+ * to compensate for. Zeroing it is then correct rather than a fight: with the
+ * gutter stable, that margin is a 15px indent applied for no reason.
+ *
+ * BOTH RULES ARE NEEDED and neither is sufficient alone. Without the gutter,
+ * zeroing the margin brings the jump back. Without zeroing the margin, the
+ * gutter is reserved AND the margin is still added, which indents the page by a
+ * scrollbar's width every time a dialog opens.
+ *
+ * It lives in the OVERRIDES file because both front doors need it and the
+ * library is never edited from this repo. */
+html {
+  scrollbar-gutter: stable;
+}
+
+body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
