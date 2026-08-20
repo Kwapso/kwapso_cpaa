@@ -274,6 +274,16 @@ const RRF_K = 60
  * which is a short list or it is not an answer. */
 const ROUTER_TOP_RECORDS = 3
 
+/** HOW MANY OF THE ROUTER'S RECORDS THE LAST-RESORT READ OPENS.
+ *
+ * Fewer than the router names, deliberately. `ROUTER_TOP_RECORDS` decides what a
+ * READER is told the question looks like it is about — a sentence somebody can
+ * disagree with, so three is generous. This decides what gets READ when nothing
+ * else found anything, and there a third guess is a paragraph from a
+ * conversation that merely resembles the right one. The best two, and the
+ * diversifier still has the final word on how many of each survive. */
+const ROUTER_FALLBACK_RECORDS = 2
+
 /** Terms one question contributes to the lexical arm. A question is short; this
  * is a ceiling on a pathological one (a pasted log file in the question box),
  * and it bounds the `IN (…)` list — and therefore the bound parameters — the
@@ -1875,55 +1885,9 @@ export async function retrieve(
   // a knowledge base answers a question about parental leave out of a note about
   // dispatch outages.
   const floor = numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
-  let vector = hits.filter((h) => h.score >= floor)
+  const vector = hits.filter((h) => h.score >= floor)
 
-  // A SECOND LOOK, WITH THE QUESTION'S OWN WORDS AND NONE OF ITS SCAFFOLDING.
-  //
-  // THE FAULT, isolated on staging on 20 Aug 2026 against real material:
-  //
-  //   "Ishita and Alaap one-to-one"                          → 6 passages
-  //   "What was decided in the Ishita and Alaap meeting?"     → 3 passages
-  //   "What was decided in the Ishita and Alaap one-to-one?"  → NOTHING
-  //
-  // Same document, same index, indexed and chunked. The words a person puts
-  // AROUND their question — "what was decided in the", the question mark — are
-  // content to an embedding model, and enough of them pull the vector away from
-  // the material until the closest chunk falls under the floor. Then `sole`
-  // becomes true and the word arm inherits the decision with a floor of its own
-  // that the same padding also defeats: half of six terms is three, and a
-  // transcript of that call contains "Ishita" and "Alaap" and neither "decided"
-  // nor "one-to-one". Both arms refuse, for two unrelated reasons, and the base
-  // says it has nothing about a conversation it holds in full.
-  //
-  // THE FLOOR IS NOT THE BUG and must not be moved. 0.50 was measured against
-  // this model on real documents (see MIN_VECTOR_SCORE) and it is the last floor
-  // that costs nothing; buying these questions by lowering it would buy the
-  // genuine refusals back as confident nonsense, which is the failure R23 exists
-  // to prevent.
-  //
-  // So: ask again with the terms the question is ABOUT. `questionTerms` already
-  // knows how to find them — it is the same list the word arm has always used —
-  // so this is a second reading of a decision already made, not a new one.
-  //
-  // STRICTLY ADDITIVE, and that is the whole safety argument. It runs ONLY where
-  // the first look found nothing, so no question that is answered today can be
-  // answered differently tomorrow; the floor it must clear is the same floor;
-  // and it costs one embedding on the path that was about to refuse, which is
-  // the cheapest moment in the whole function to spend one.
-  if (!vector.length && asked && hasVectorStore(env) && terms.length > 1) {
-    const focused = terms.join(" ")
-    // Nothing to gain when the question was already just its own terms.
-    if (focused.toLowerCase() !== question.trim().toLowerCase()) {
-      const [askedAgain] = await embed(env, [focused])
-      if (askedAgain) {
-        const again = await searchVectors(env, guard, askedAgain, {
-          level: "chunk",
-          ...compartmentFilter(route.compartments),
-        })
-        vector = again.filter((h) => h.score >= floor)
-      }
-    }
-  }
+
 
   // WHEN THE WORD MATCH RUNS, in two cases and for two different reasons:
   //   • the question contains something EXACT (a reference, an invoice number).
@@ -1946,6 +1910,7 @@ export async function retrieve(
     hasExactTerm(question) || sole ? await lexicalArm(cfg, guard, terms, route.compartments, sole) : []
 
   const fused = fuse(vector, lexical)
+
   if (!fused.length)
     return knowledgeAnswer({
       question,
@@ -1982,7 +1947,67 @@ export async function retrieve(
     reader.params
   )
 
-  const ranked = diversify(rankPassages(fused, rows), want)
+  // ── WHAT SURVIVED THE READ, AND WHAT TO DO WHEN NOTHING DID ──────────────
+  //
+  // THE FAULT, isolated on staging on 20 Aug 2026. Three phrasings of one
+  // question, one transcript, indexed and chunked:
+  //
+  //   "Ishita and Alaap one-to-one"                          -> 6 passages
+  //   "What was decided in the Ishita and Alaap meeting?"     -> 3 passages
+  //   "What was decided in the Ishita and Alaap one-to-one?"  -> NOTHING
+  //
+  // The refusal came back carrying `candidates: 2` and this sentence: "It reads
+  // like a question about \"Ishita x Alaap\"." So the search DID find two
+  // chunks and the router DID name the right record — and the answer was still
+  // "the knowledge base has nothing on this".
+  //
+  // Two ids came out of the vector store and NEITHER was in the database. The
+  // source itself is wide open (`owner_user_id` null, `visible_to_app_id` null,
+  // compartment `agency`, one live chunk), so no fence dropped them: the ids
+  // simply no longer exist. Re-indexing replaces a source's chunks — new rows,
+  // new ids — and the store can still answer with the ids of the ones it
+  // replaced. R26 is what makes that survivable rather than dangerous: the index
+  // NARROWS and the database DECIDES, so a ghost id reads back as no row instead
+  // of as somebody else's paragraph. But "no row" was being reported as "nothing
+  // to say", which is a different and much worse sentence.
+  //
+  // So when nothing survives the read, the covers get the last word. Those
+  // record ids already cleared the SAME floor in `deriveRoute`, and their chunks
+  // are read from D1 by source — rows that exist by construction, because the
+  // database is what just handed them over.
+  //
+  // WHY THIS DOES NOT CONTRADICT THE NOTE ON `records`, which says the router's
+  // guess "rides the ANSWER and never the ranking — a wrong guess here is
+  // something a reader can disagree with, not something that hid the passage".
+  // That rule exists so a wrong guess cannot HIDE a passage. This runs only when
+  // there is no passage left to hide; it cannot reorder anything, because there
+  // is nothing to reorder. And if the covers found no record over the floor —
+  // which is what a question the base has nothing on produces — it does not run,
+  // and the refusal stands exactly as it always did.
+  let ranked = diversify(rankPassages(fused, rows), want)
+  if (!ranked.length && route.records.length) {
+    const named = route.records.slice(0, ROUTER_FALLBACK_RECORDS).map((r) => r.sourceId)
+    const revived = await d1Query<ScoredRow>(
+      cfg,
+      guard.databaseId,
+      // The SAME fence and the SAME columns as the read above — a second way in
+      // may not be a wider one. R14: bounded by RANKING_POOL, said here.
+      `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
+              s.origin_table, s.origin_row_id
+         FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
+        WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
+          AND s.deactivated_at IS NULL AND ${reader.sql}
+        ORDER BY c.seq LIMIT ${RANKING_POOL}`,
+      reader.params
+    )
+    // Scored on the scale `fuse` uses, in the order the router put the records
+    // and the author put the paragraphs, so everything downstream is handed the
+    // shape it already understands.
+    ranked = diversify(
+      revived.map((row, i) => ({ row, score: 1 / (RRF_K + i) })),
+      want
+    )
+  }
   const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => ({
     sourceId: row.source_id,
     title: row.title,
