@@ -20,8 +20,8 @@ BOOTSTRAP.md stands the whole thing up from zero.
 - production_url: https://agency.kwapso.app
 - portal_staging_url: https://staging-client.kwapso.app
 - portal_production_url: https://client.kwapso.app
-  (the TWO STAGING domains are attached and serving. The two PRODUCTION domains
-  are not attached yet. See "Custom domains" below for what is true and why.
+  (ALL FOUR domains are attached and serving, production included since
+  20 Aug 2026. See "Custom domains" below for what is true and why.
   Staging also answers on its `*.workers.dev` names; production answers on none,
   by config. Three scripts still DEFAULT to the staging workers.dev names:
   `scripts/smoke-staging.mjs` and `scripts/smoke-mcp.mjs` read `SMOKE_BASE`, and
@@ -455,18 +455,24 @@ Manager (paid per zone), so staging uses a hyphen instead of a dot.
 below, which is the decision this table follows. The earlier `clients.kwapso.app` /
 `clients-staging.kwapso.app` pair was never attached.)
 
-**The two STAGING names are attached and serving.** The two PRODUCTION names,
-`agency.kwapso.app` and `client.kwapso.app`, are **not attached**: no DNS record for
-either exists, deliberately, until the owner has a real client to point at them
-(decided 11 Aug 2026). This paragraph claimed all four were live until that date; they
-were not, and the claim survived a doc sweep because nothing checked it. If you change
-this, check it with `dig +short agency.kwapso.app` before you write the sentence.
+**All four names are attached and serving**, checked with `dig` on 20 Aug 2026:
+`agency.kwapso.app` and `client.kwapso.app` both resolve to the zone's Cloudflare
+addresses and both answer from the production gateways — the agency door 401s on
+`/api/auth/me` exactly as staging does, and the client door 404s `/api/data-ops/agent/chat`,
+which is the account fence holding at the production hostname.
+
+THIS PARAGRAPH HAS NOW BEEN WRONG IN BOTH DIRECTIONS. It claimed all four were live
+before 11 Aug 2026 when only two were; it then claimed production was deliberately
+unattached, and stayed on that sentence past the day somebody attached them. Neither
+error was catchable by a test, because a DNS record is not in this repository — which
+is why the instruction below is the whole of the defence. **Check it with
+`dig +short agency.kwapso.app` before you write the sentence, in either direction.**
 
 Attach one from the gateway worker: Workers & Pages → the worker → Settings → Domains
 & Routes → Add custom domain. Cloudflare writes the DNS record and issues the cert.
 
-**The addresses production answers on: none, until a custom domain is attached.** Both
-gateways set `"workers_dev": false` at the top level (production) and `true` only under
+**The addresses production answers on: the two custom domains above, and nothing
+else.** Both gateways set `"workers_dev": false` at the top level (production) and `true` only under
 `env.staging`, and `"preview_urls": false` everywhere. Until 11 Aug 2026 neither
 declared either setting, so both defaulted to ON and `kwapso.kwapso.workers.dev`
 answered 200, a live production front door, with a live sign-in behind it, at an
