@@ -3034,6 +3034,76 @@ CREATE TABLE IF NOT EXISTS screens (
 );
 `,
   },
+  {
+    // ── A MODULE: THE SECTION OF AN APP A TICKET IS ABOUT ────────────────────
+    //
+    // WHY IT COMES BACK. It was deferred on 12 Aug 2026 with the note "the base
+    // has no module noun — an app's stories carry the module NAME in their
+    // detail instead, which is where staff already look for it". That reasoning
+    // did not survive contact: `stories` has `process_id` and `step_key` and no
+    // module column, so the name was only ever typed into free prose, and
+    // TICKETS — the thing people actually file all day — got nothing at all.
+    // The designer's report on 19 Aug 2026 was that she could not organise the
+    // tickets she was creating, which is precisely the hole that leaves.
+    //
+    // THE LEGACY DATA SETTLES WHAT IT IS. 246 rows across 24 apps, median 11 per
+    // app: Einstellungen, Team, Dokumente, Aufgaben, Onboarding. They are the
+    // SECTIONS OF THE DELIVERED APP. And 1,727 of 1,820 real tickets — 94% —
+    // carried one over two years, which is why the field is required at creation
+    // rather than hopefully filled in later.
+    //
+    // ── WHY A TABLE AND NOT A DROPDOWN GROUP ────────────────────────────────
+    //
+    // The owner's first instinct was `selectable_data`, to get a rename, an
+    // emoji and a translation without a bespoke admin screen. Those are the
+    // right things to want and this table carries every one of them. What it
+    // does not do is flatten: 160 of the 246 names are DISTINCT and 124 belong
+    // to exactly ONE app, so a team-wide vocabulary offers 160 options on a
+    // ticket where 11 apply. Scoping `selectable_data` instead would have made
+    // one group app-aware in a seam built to be uniform — `VOCABULARY_HOMES`
+    // rewrites records on rename by (table, column) with no notion of a scope,
+    // and `(type, value)` would stop identifying a row.
+    //
+    // ── AND WHY A TICKET STORES THE ID, NOT THE WORD ────────────────────────
+    //
+    // Every existing vocabulary stores the WORD on the record, because the word
+    // is what the door filters by, what the CSV carries and what four MCP tools
+    // take as an argument (selectable-homes.ts argues it at length). A module
+    // has none of those contracts yet, so it can afford the tidier model the
+    // note there calls out of reach: the id is the join, and a rename is then a
+    // lookup that reaches every ticket for free — no rewrite script, and no
+    // app-aware special case in one.
+    //
+    // SHAPED LIKE `processes`, deliberately: same parent, same denormalised
+    // `account_id`, same audit block, same deactivate-never-delete. A reader who
+    // knows one knows this. `mark` and `name_de` mirror `selectable_data`'s own
+    // enrichment columns so the editing affordances are identical.
+    //
+    // The unique index is on ACTIVE rows only: two apps may both have a
+    // "Settings", one app may not, and a deactivated name can be reused.
+    version: "0048_app_modules",
+    sql: `
+CREATE TABLE app_modules (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  account_id TEXT REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  mark TEXT,
+  name_de TEXT,
+  description TEXT,
+  benefit TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_app_modules_app ON app_modules (app_id);
+CREATE INDEX idx_app_modules_account ON app_modules (account_id);
+CREATE UNIQUE INDEX idx_app_modules_name ON app_modules (app_id, name) WHERE deactivated_at IS NULL;
+
+ALTER TABLE help ADD COLUMN module_id TEXT REFERENCES app_modules (id);
+CREATE INDEX idx_help_module ON help (module_id);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

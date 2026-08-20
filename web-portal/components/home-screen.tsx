@@ -90,7 +90,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
   const company = ready.accounts.find((a) => a.id === ready.currentAccountId)?.name ?? ""
   const newest = (tickets ?? []).slice(0, PREVIEW)
 
-  async function raise(input: { description: string }) {
+  async function raise(input: { description: string; appId?: string; moduleId?: string }) {
     await support.raise(input)
     invalidate(cacheKeys.tickets)
     invalidate(cacheKeys.ticketsTotal)

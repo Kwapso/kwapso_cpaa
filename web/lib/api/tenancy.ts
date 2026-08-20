@@ -13,6 +13,7 @@
 
 import { ApiFailure } from "@shared/web/api"
 import type {
+  AppModule,
   Account,
   AccountDetail,
   AccountRate,
@@ -156,6 +157,25 @@ export const tenancy = {
     api<{ roles: TeamRole[] }>("/api/tenancy/roles/active", {
       method: "POST",
       body: JSON.stringify({ roleId, active }),
+    }),
+
+  /** EVERY MODULE THE TEAM HAS — the sections of every app, read whole and
+   * narrowed on screen. One read, one cache key, so a rename reaches the ticket
+   * form, the ticket list and the app's own tab through the ordinary live path. */
+  appModules: () => api<{ modules: AppModule[]; total: number }>("/api/tenancy/app-modules"),
+  /** One module by id (the row-level live re-pull) — same door, ?id= filter. */
+  appModuleOne: (id: string) =>
+    api<{ modules: AppModule[] }>(`/api/tenancy/app-modules?id=${encodeURIComponent(id)}`).then(
+      (r) => r.modules[0] ?? null
+    ),
+  createAppModule: (input: { appId: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
+    api<{ id: string }>("/api/tenancy/app-modules", { method: "POST", body: JSON.stringify(input) }),
+  updateAppModule: (input: { id: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
+    api<{ ok: true }>("/api/tenancy/app-modules/update", { method: "POST", body: JSON.stringify(input) }),
+  setAppModuleActive: (id: string, active: boolean) =>
+    api<{ ok: true; changed: boolean }>("/api/tenancy/app-modules/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
     }),
 
   /** The team's dropdown values ("selectable data"), ordered for grouping by type. */

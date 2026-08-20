@@ -162,6 +162,7 @@ export type TriageWaiting = {
   helpType: string | null
   accountId: string | null
   appId: string | null
+  moduleId: string | null
   raisedByContactId: string | null
 }
 
@@ -234,6 +235,8 @@ export const content = {
     /** WHICH SYSTEM (5.8) and WHO ASKED (5.9). The contact is checked against the
      * account's own live links, so a ticket can never name a stranger. */
     appId?: string
+    /** WHICH SECTION of that system. Refused unless it belongs to `appId`. */
+    moduleId?: string
     raisedByContactId?: string
   }) => api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
   updateHelp: (input: {
@@ -242,6 +245,7 @@ export const content = {
     helpType?: string
     accountId?: string
     appId?: string
+    moduleId?: string
     raisedByContactId?: string
   }) => api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>

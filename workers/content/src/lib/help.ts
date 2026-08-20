@@ -58,6 +58,9 @@ type TicketRow = {
   account_id: string | null
   app_id: string | null
   app_name: string | null
+  module_id: string | null
+  module_name: string | null
+  module_mark: string | null
   raised_by_contact_id: string | null
   raised_by_contact_name: string | null
   validated_at: string | null
@@ -126,6 +129,9 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
       : "new",
     resolved: r.resolved === 1,
     resolvedAt: r.resolved_at,
+    moduleId: r.module_id,
+    moduleName: r.module_name,
+    moduleMark: r.module_mark,
     // The HANDLE dies with the name. Blanking `raiserName` alone would leave a
     // per-staff-member pseudonym on every ticket, and a pseudonym is anonymity
     // only until one thing links it to a name once — which is precisely the
@@ -201,10 +207,15 @@ function toMessage(r: ReplyRow): HelpMessage {
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
-  account_id, app_id, raised_by_contact_id, validated_at,
+  account_id, app_id, module_id, raised_by_contact_id, validated_at,
   ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
   (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
+  -- R35: a module shown on a ticket carries its OWN face — the name AND the
+  -- emoji beside it, on the same read as the row, so a list never renders a bare
+  -- id and never pays a second round trip to find out what it is looking at.
+  (SELECT m.name FROM app_modules m WHERE m.id = help.module_id) AS module_name,
+  (SELECT m.mark FROM app_modules m WHERE m.id = help.module_id) AS module_mark,
   (SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_name,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client,
@@ -411,6 +422,12 @@ function appClause(appId: string | undefined): { sql: string; params: string[] }
  *
  * Both ride the list AND the count, or the badge answers a different question
  * from the rows beneath it (R16). */
+/** ONE SECTION'S TICKETS. `module_id` is a real column on the row, so this is an
+ * indexed equality and not a join — `idx_help_module` exists for exactly this. */
+function moduleClause(moduleId: string | undefined): { sql: string; params: string[] } {
+  return moduleId ? { sql: "module_id = ?", params: [moduleId] } : { sql: "", params: [] }
+}
+
 function typeClause(helpType: string | undefined): { sql: string; params: string[] } {
   return helpType ? { sql: "help_type = ?", params: [helpType] } : { sql: "", params: [] }
 }
@@ -443,6 +460,12 @@ export type TicketFilter = {
   accountId?: string
   /** one system's tickets — the app record's Tickets tab (8.6) */
   appId?: string
+  /** ONE SECTION of one app — what "group all the tickets I am creating in an
+   * organized way" actually asks for. Sits BESIDE `appId` rather than replacing
+   * it: a module id already implies its app, but the two filters are chosen
+   * independently on screen (pick the app, then narrow), and a module filter
+   * with no app named still answers correctly. */
+  moduleId?: string
   /** one kind — the sub-tab strip's four type tabs */
   helpType?: string
   /** one stage — the sub-tab strip's Ready and Closed tabs */
@@ -460,6 +483,7 @@ function ticketWhere(
   const parts = [
     accountClause(filter.accountId),
     appClause(filter.appId),
+    moduleClause(filter.moduleId),
     typeClause(filter.helpType),
     statusClause(filter.status),
     searchClause(filter.q),
@@ -740,6 +764,9 @@ export type TicketInput = {
    * is written, exactly as the client is — an unchecked id here would route a
    * request at a system that does not exist. */
   appId?: string
+  /** WHICH SECTION OF THAT APP. Proved to belong to `appId` before it is
+   * written — see `moduleForTicket` for why the PAIR is the check. */
+  moduleId?: string
   /** WHO ASKED (CHECKLIST 5.9) — a contact, meaning a person's own account row
    * linked to the client this ticket belongs to. Proved to be exactly that, so
    * "raised by" can never name a stranger. */
@@ -760,6 +787,37 @@ async function appForTicket(cfg: D1Rest, guard: MemberGuard, raw: unknown): Prom
     `SELECT id FROM apps WHERE id = ${sqlString(id)} AND deactivated_at IS NULL LIMIT 1`
   )
   if (!rows[0]) throw new GuardError(400, "invalid_input", "That app isn't one of ours any more.")
+  return rows[0].id
+}
+
+/** WHICH SECTION OF THE APP — a module, and it must be a module OF THIS APP.
+ *
+ * THE PAIR IS THE CHECK, not the id on its own. 160 of the legacy module names
+ * are distinct and 124 belong to exactly one app, so ids are plentiful and a
+ * client's form is a place somebody can put any of them. Checking only that the
+ * module exists would let a ticket on the Padelbase app be filed against a
+ * section of somebody else's system — readable to the wrong people, and
+ * countable in the wrong app's badge. The `app_id = ?` in this statement is the
+ * fence, and it is why the app is resolved BEFORE the module in `createTicket`.
+ *
+ * A ticket with no app cannot carry a module either: there is nothing to check
+ * the module against, so naming one is refused rather than trusted. */
+async function moduleForTicket(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  raw: unknown,
+  appId: string | null
+): Promise<string | null> {
+  const id = optionalText(raw, "Module", TEXT_LIMITS.short)
+  if (!id) return null
+  if (!appId) throw new GuardError(400, "invalid_input", "Choose the app before the module.")
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM app_modules WHERE id = ${sqlString(id)} AND app_id = ${sqlString(appId)}
+       AND deactivated_at IS NULL LIMIT 1`
+  )
+  if (!rows[0]) throw new GuardError(400, "invalid_input", "That module isn't part of that app.")
   return rows[0].id
 }
 
@@ -854,6 +912,8 @@ export async function createTicket(
   const accountId =
     scope.kind === "portal" ? scope.currentAccountId : await accountForStaffTicket(cfg, guard, input.accountId)
   const appId = await appForTicket(cfg, guard, input.appId)
+  // AFTER the app, because the app is what it is checked against.
+  const moduleId = await moduleForTicket(cfg, guard, input.moduleId, appId)
   const raisedBy = await contactForTicket(cfg, guard, input.raisedByContactId, accountId)
   const helpType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
   const now = new Date().toISOString()
@@ -884,8 +944,8 @@ export async function createTicket(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, module_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -963,6 +1023,11 @@ export async function updateTicket(
   // the same rule the two titles follow: a portal form that does not offer the
   // field must not blank ours.
   const appId = (await appForTicket(cfg, guard, input.appId)) ?? before.app_id
+  // THE MODULE IS CHECKED AGAINST THE APP THE TICKET WILL HAVE, not the one it
+  // had. Moving a ticket to another app and naming a section of the new one is a
+  // single legitimate edit, and checking against `before.app_id` would refuse it
+  // for the one reason that is not true.
+  const moduleId = (await moduleForTicket(cfg, guard, input.moduleId, appId)) ?? before.module_id
   const raisedBy =
     (await contactForTicket(cfg, guard, input.raisedByContactId, accountAfter)) ??
     before.raised_by_contact_id
@@ -991,7 +1056,7 @@ export async function updateTicket(
     cfg,
     guard.databaseId,
     `UPDATE help SET help_type = ?, description = ?, screen_recording_link = ?, source_screen = ?,
-       title_de = ?, title_en = ?, app_id = ?, raised_by_contact_id = ?,
+       title_de = ?, title_en = ?, app_id = ?, module_id = ?, raised_by_contact_id = ?,
        account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?${lockSet}
      WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}${ownership} RETURNING id`,
     [
@@ -1005,6 +1070,7 @@ export async function updateTicket(
       optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? before.title_de,
       optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? before.title_en,
       appId,
+      moduleId,
       raisedBy,
       accountAfter,
       now,

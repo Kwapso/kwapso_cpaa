@@ -775,6 +775,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   // ships no activity feed at all to put it in (PORTAL_ACTIVITY_EXEMPT).
   apps: { fence: null, why: "an app's history names the staff who recorded it and quotes what it costs US to run — the client sees the system, never our ledger about it" },
   processes: { fence: null, why: "a map's history names the staff who mapped and re-mapped it; the client is shown the map itself, which is the part that is theirs" },
+  app_modules: { fence: null, why: "who renamed a section of their app, and when, is our record of our own work — the client picks the module on a ticket and never needs the history of how it got its name" },
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
@@ -896,6 +897,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // record from a reader's point of view — an app with maps inside it — and two
   // on `commercials`, which is the module a client login never holds.
   apps: "processes",
+  // A MODULE is part of the app record, so it is read by whoever may read the
+  // app — the same right, because "what sections does their system have" and
+  // "what systems do they have" are one question asked at two depths.
+  app_modules: "processes",
   processes: "processes",
   process_versions: "processes",
   process_steps: "processes",

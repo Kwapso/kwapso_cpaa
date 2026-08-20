@@ -133,6 +133,10 @@ function ticketFilterFrom(url: URL): TicketFilter {
     // because the list pages, so "this app's tickets among the newest fifty" is
     // an answer that would look like an answer and not be one.
     appId: queryText(url.searchParams.get("appId"), "App"),
+    // WHICH SECTION of it — the module. The same filter-over-the-fence reasoning
+    // as the two above, and the reason the list can be grouped at all: a module
+    // belonging to an app the caller cannot see narrows to rows already excluded.
+    moduleId: queryText(url.searchParams.get("moduleId"), "Module"),
     // The sub-tab strip's two halves. The type is the team's OWN vocabulary, so
     // it is not checked against a list here — an unknown word narrows to nothing,
     // which is the honest answer for a type nobody uses.
@@ -236,6 +240,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // R20 positional: every field this door reads sits inside a checker, here at
   // the boundary, before lib/help proves the two ids point at live rows.
   optionalText(body.appId, "App", TEXT_LIMITS.short)
+  optionalText(body.moduleId, "Module", TEXT_LIMITS.short)
   optionalText(body.raisedByContactId, "Raised by", TEXT_LIMITS.short)
   const scope = await callerScope(cfg, guard)
   const { id, accountId } = await createTicket(cfg, guard, scope, actor, body)
@@ -254,6 +259,7 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   requireText(body.description, "Description", TEXT_LIMITS.long)
   optionalText(body.appId, "App", TEXT_LIMITS.short)
+  optionalText(body.moduleId, "Module", TEXT_LIMITS.short)
   optionalText(body.raisedByContactId, "Raised by", TEXT_LIMITS.short)
   const scope = await callerScope(cfg, guard)
   const accountId = await updateTicket(cfg, guard, scope, actor, id, body)

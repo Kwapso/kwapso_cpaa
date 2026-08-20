@@ -462,6 +462,14 @@ function recordCountDeps(resource: string): string[] {
   })
 }
 
+/** EVERY MODULE THE TEAM HAS. ONE key, not one per app, and that is what makes
+ * the collection live: a ping names a MODULE, and the app it hangs off is on the
+ * row the listener has not read — so per-app keys could only ever be dropped
+ * blindly, while one key is patched exactly. The screens narrow it themselves. */
+export function appModulesKey(teamId: string): string {
+  return `app-modules:${teamId}`
+}
+
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
@@ -728,6 +736,17 @@ export const TEAM_RESOURCES: Record<
   // Dropdown values — row-level live (was a DEAF publisher before R15: the worker
   // pinged `selectable_data` and nothing listened, so a teammate's edit left the
   // manager stale until a reload).
+  // THE SECTIONS OF AN APP — row-level, so renaming one reaches the ticket form,
+  // the ticket list's filter and the app's own Modules tab without any of them
+  // refetching a list. The tab badge follows through `deps`: adding a section
+  // moves the number on whichever app screen is open.
+  app_modules: {
+    key: (t) => appModulesKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.appModuleOne(id),
+    fetchList: () => tenancy.appModules().then((r) => r.modules),
+    deps: (_t, id) => [`activity:record:app_modules:${id}`, ...recordCountDeps("app_modules")],
+  },
   selectable_data: {
     key: (t) => `selectable:${t}`,
     idField: "id",

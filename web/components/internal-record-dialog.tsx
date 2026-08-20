@@ -263,6 +263,27 @@ export const deliverableFields = (kinds: string[]): InternalField[] => [
   },
 ]
 
+/** A MODULE — a section of an app, and what a ticket says it is about.
+ *
+ * FIVE FIELDS AND THE LAST TWO ARE OPTIONAL, which is the shape the legacy data
+ * turned out to have: every one of the 246 modules carried a name, most carried
+ * a description, and each named the BENEFIT it delivers ("Time savings,
+ * transparency, and automated monitoring") — a sentence nobody writes on a
+ * picker but that a handover document is written from.
+ *
+ * `mark` and `nameDe` are the same two enrichments a dropdown value carries, and
+ * they are here for the same reason: the emoji is how a section is recognised at
+ * a glance in a list, and the German name is what a client who reads in German
+ * sees. R33: these labels are translated on the way to the screen by
+ * shared/web/field.tsx, which is why they are bare here. */
+export const moduleFields = (): InternalField[] => [
+  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Settings" },
+  { key: "mark", label: "Emoji", kind: "text", placeholder: "⚙️" },
+  { key: "nameDe", label: "German name", kind: "text", placeholder: "Einstellungen" },
+  { key: "description", label: "What it does", kind: "prose", placeholder: "Where the team manages their own preferences." },
+  { key: "benefit", label: "What it gives them", kind: "prose", placeholder: "Time saved, and one place to look." },
+]
+
 export const purposeFields = (departments: string[]): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Sprint review" },
   { key: "department", label: "Department", kind: "text", options: departments, placeholder: "Delivery, Sales…" },

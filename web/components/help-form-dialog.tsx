@@ -39,13 +39,13 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
-import { appsKey, listFetch } from "@/lib/live-resources"
+import { appModulesKey, appsKey, listFetch } from "@/lib/live-resources"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 import { RecordPicker } from "@/components/record-picker"
-import type { AppRow } from "@shared/types"
+import type { AppModule, AppRow } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }
@@ -68,6 +68,28 @@ const appField = {
   required: false,
   hint: "Which system this is about. It is what routes the request and who gets told when it is answered.",
 }
+// WHICH SECTION OF IT (Aurora, 19 Aug 2026). It sits directly under the app
+// because it is meaningless without one, and the hint says so rather than
+// leaving somebody to discover it by finding the list empty.
+// REQUIRED, BUT ONLY WHERE IT CAN BE ANSWERED — and the two exceptions are not
+// softenings of the rule, they are the rule staying true.
+//
+// Aurora asked for it required and 94% of the legacy tickets carried one, so the
+// default is required. But a ticket about NO APP has no section to name — the
+// agency's own housekeeping questions are exactly that, and the app field is
+// optional for the same reason ("a hard requirement here would make the internal
+// ticket unraisable"). And an app whose modules nobody has written down yet has
+// nothing to offer, so requiring one would be a door with no handle.
+//
+// So: required once an app with modules is chosen, and silent otherwise. It
+// tightens by itself as the apps get their sections written down, which is the
+// opposite of a rule somebody has to remember to switch on.
+const moduleField = (required: boolean) => ({
+  ...defaultFieldConfig,
+  label: "Module",
+  required,
+  hint: "Which part of the app it is about, like Settings or Documents. Choose the app first.",
+})
 const contactField = {
   ...defaultFieldConfig,
   label: "Raised by",
@@ -96,6 +118,7 @@ export function HelpFormDialog({
     helpType?: string
     accountId?: string
     appId?: string
+    moduleId?: string
     raisedByContactId?: string
   }) => Promise<void>
   /** The team's active "Ticket type" dropdown values. */
@@ -117,6 +140,7 @@ export function HelpFormDialog({
     helpType?: string | null
     accountId?: string | null
     appId?: string | null
+    moduleId?: string | null
     raisedByContactId?: string | null
   }
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
@@ -139,11 +163,18 @@ export function HelpFormDialog({
   const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
     listFetch.apps(teamId as string)
   )
+  // EVERY MODULE THE TEAM HAS, narrowed below to the app in hand. One bounded
+  // read held whole, so changing the app above re-filters instantly instead of
+  // putting a spinner inside a form somebody is halfway through.
+  const modulesQ = useCached<AppModule[]>(teamId ? appModulesKey(teamId) : null, () =>
+    tenancy.appModules().then((r) => r.modules)
+  )
   const initialValues = {
     description: initial?.description ?? "",
     helpType: initial?.helpType || NONE,
     accountId: initial?.accountId || NONE,
     appId: initial?.appId || fixedApp?.id || NONE,
+    moduleId: initial?.moduleId || NONE,
     raisedByContactId: initial?.raisedByContactId || NONE,
   }
   // Per-session draft: restores what you typed if you navigate away and reopen.
@@ -153,6 +184,13 @@ export function HelpFormDialog({
   // the one being picked. Read from the same door the account screen reads, so
   // "who is a contact here" has one answer in the app.
   const chosenAccountId = initial?.accountId ?? (values.accountId === NONE ? null : values.accountId)
+  // WHICH APP THE MODULE LIST BELONGS TO — the one pinned by the screen this
+  // form was opened from, or the one being picked.
+  const chosenAppId = fixedApp?.id ?? (values.appId === NONE ? null : values.appId)
+  const appModules = (modulesQ.data ?? []).filter((m) => m.active && m.appId === chosenAppId)
+  // Only demanded once there is something to demand — see `moduleField`.
+  const moduleRequired = Boolean(chosenAppId) && appModules.length > 0
+  const moduleMissing = moduleRequired && values.moduleId === NONE
   const detailQ = useCached(chosenAccountId ? `account-detail:${chosenAccountId}` : null, () =>
     tenancy.accountDetail(chosenAccountId as string)
   )
@@ -181,6 +219,7 @@ export function HelpFormDialog({
             ? undefined
             : values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId === NONE ? undefined : values.appId,
+        moduleId: values.moduleId === NONE ? undefined : values.moduleId,
         raisedByContactId:
           values.raisedByContactId === NONE ? undefined : values.raisedByContactId,
       })
@@ -216,7 +255,7 @@ export function HelpFormDialog({
       }
       submit={{
         busy: busy,
-        disabled: !richTextValue(values.description),
+        disabled: !richTextValue(values.description) || moduleMissing,
       }}
     >
       <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
@@ -252,7 +291,7 @@ export function HelpFormDialog({
         <RecordPicker
           id="help-app"
           value={values.appId || NONE}
-          onChange={(appId) => setValues((v) => ({ ...v, appId }))}
+          onChange={(appId) => setValues((v) => ({ ...v, appId, moduleId: NONE }))}
           options={(appsQ.data ?? [])
             .filter((a) => a.active)
             .map((a) => ({ value: a.id, label: a.name }))}
@@ -261,6 +300,24 @@ export function HelpFormDialog({
           searchPlaceholder={t("Search apps…")}
           emptyText={t("No app matched.")}
           disabled={busy}
+        />
+      </Field>
+      {/* WHICH SECTION OF IT. Offered only once an app is chosen, because a
+          module belongs to one and the door refuses a pair that does not match —
+          a picker that can only produce a refusal is worse than no picker.
+          Changing the app CLEARS it, which is the one behaviour that keeps the
+          two honest: a section of the old app is not a section of the new one. */}
+      <Field config={moduleField(moduleRequired)} htmlFor="help-module" className={fieldSpacing}>
+        <RecordPicker
+          id="help-module"
+          value={values.moduleId || NONE}
+          onChange={(moduleId) => setValues((v) => ({ ...v, moduleId }))}
+          options={appModules.map((m) => ({ value: m.id, label: m.name, mark: m.mark }))}
+          emptyOption={{ value: NONE, label: t("No module") }}
+          placeholder={chosenAppId ? t("No module") : t("Choose an app first")}
+          searchPlaceholder={t("Search modules…")}
+          emptyText={chosenAppId ? t("This app has no modules yet.") : t("Choose an app first.")}
+          disabled={busy || !chosenAppId}
         />
       </Field>
       {/* The picker reads `values.accountId || NONE` rather than the bare value:

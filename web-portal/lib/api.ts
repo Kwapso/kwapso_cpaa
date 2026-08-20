@@ -17,6 +17,7 @@
 
 import type {
   AccountDetail,
+  AppModule,
   ClientDeliverable,
   HelpAttachment,
   HelpMessage,
@@ -115,6 +116,15 @@ export const impact = {
     api<{ id: string }>("/api/tenancy/processes/comments", post({ processId, body })),
 }
 
+/** THE SECTIONS OF THIS CLIENT'S APPS. One read, fenced by the door to their own
+ * accounts, so the portal never names an app id and never has to: what comes
+ * back is already only their systems. The three module WRITES are not on this
+ * surface at all — a client files tickets against the structure of the software
+ * we built them, they do not author it. */
+export const appModules = {
+  list: () => api<{ modules: AppModule[]; total: number }>("/api/tenancy/app-modules"),
+}
+
 export const support = {
   /** R14: a PAGE of this client's tickets — hand `cursor` back from the previous
    * response for the next one. `total` is the exact server count of what this
@@ -133,7 +143,7 @@ export const support = {
   thread: (id: string) =>
     api<{ replies: HelpMessage[]; total: number }>(`/api/content/help/thread?id=${enc(id)}`),
   /** Raise a ticket. */
-  raise: (input: { description: string; helpType?: string }) =>
+  raise: (input: { description: string; helpType?: string; appId?: string; moduleId?: string }) =>
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>("/api/content/help", post(input)),
   /** Add to the conversation. No @mentions from this surface: a client has no
    * business naming which staff member picks it up (SCOPE ch.06). */

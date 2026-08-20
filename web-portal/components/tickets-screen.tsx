@@ -42,7 +42,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
   const { tickets, total, loading, hasMore, loadingMore, loadMore } = useTickets()
   const [raising, setRaising] = React.useState(false)
 
-  async function raise(input: { description: string }) {
+  async function raise(input: { description: string; appId?: string; moduleId?: string }) {
     await support.raise(input)
     invalidate(cacheKeys.tickets)
     invalidate(cacheKeys.ticketsTotal)

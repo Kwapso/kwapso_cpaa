@@ -272,10 +272,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle, 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'created', 'updated', 'status', 'kind' or 'title'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `moduleId` narrows to one SECTION of that system, the modules an app is divided into (list_app_modules gives their ids). `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle, 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'created', 'updated', 'status', 'kind' or 'title'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
     schema: obj({
-      scope: S, view: S, q: S, accountId: S, appId: S, helpType: S, status: S, id: S,
+      scope: S, view: S, q: S, accountId: S, appId: S, moduleId: S, helpType: S, status: S, id: S,
       sort: S, dir: S, cursor: S,
     }),
     buildQuery: (i) => {
@@ -283,6 +283,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       if (str(i, "q")) q.push(`q=${encodeURIComponent(str(i, "q"))}`)
       if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
       if (str(i, "appId")) q.push(`appId=${encodeURIComponent(str(i, "appId"))}`)
+      if (str(i, "moduleId")) q.push(`moduleId=${encodeURIComponent(str(i, "moduleId"))}`)
       if (str(i, "helpType")) q.push(`helpType=${encodeURIComponent(str(i, "helpType"))}`)
       if (str(i, "status")) q.push(`status=${encodeURIComponent(str(i, "status"))}`)
       // Forwarded only when the caller asked for the archive: the door defaults
@@ -691,14 +692,14 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",
     summary:
-      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about, and `raisedByContactId` the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. A ticket whose kind is an extra, a request or feedback opens `awaiting_validation` and waits for that client's main stakeholder to confirm it; a question or an issue opens `new` and goes straight into the queue.",
+      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. A ticket whose kind is an extra, a request or feedback opens `awaiting_validation` and waits for that client's main stakeholder to confirm it; a question or an issue opens `new` and goes straight into the queue.",
     binding: "CONTENT", method: "POST", path: "/api/content/help",
-    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, raisedByContactId: S }, ["description"]),
+    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S }, ["description"]),
     // accountId is read in lib/help.ts, not in the handler, so R22's source scan
     // cannot derive it (see its own note on fields forwarded wholesale to a lib).
     // Exposed by hand, deliberately: without it a machine can only raise tickets
     // that no client will ever see.
-    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), raisedByContactId: opt(i, "raisedByContactId") }),
+    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId") }),
     // CONFIRM, because `accountId` decides WHO CAN READ THIS TICKET. Naming a
     // client puts the conversation in their portal — the same order of decision
     // as a permission grant, reached by a model that has been reading ticket text
@@ -709,12 +710,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_help_ticket",
     summary:
-      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about) and `raisedByContactId` (the person at that client who asked) can both be corrected freely; leaving either out keeps whatever the ticket already carries.",
+      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/update",
-    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, raisedByContactId: S }, ["id", "description"]),
+    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S }, ["id", "description"]),
     // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
     // derive it. Exposed by hand.
-    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), raisedByContactId: opt(i, "raisedByContactId") }),
+    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId") }),
     // CONFIRM, and this is the one that mattered. The door SETS `account_id` on a
     // ticket that had none, and a ticket carries its whole reply history — so one
     // silent call could hand an internal agency conversation to a client's portal.
@@ -1808,6 +1809,67 @@ export const SHARED_TOOLS: SharedTool[] = [
       confirm: (i) => i.visible === true,
       summarize: (i) =>
         `${i.visible === true ? "Show" : "Hide"} deliverable ${str(i, "id")} ${i.visible === true ? "to" : "from"} the client`,
+    },
+  },
+  {
+    name: "list_app_modules",
+    summary:
+      "List the MODULES of an app — the sections the software is divided into, like Settings, Documents or Tasks. A module is what a ticket says it is about, so this is how tickets are grouped; it is NOT a process (a process is a way of working, and belongs to the account's world, not the app's structure). `appId` narrows to one system and is what you almost always want; `id` fetches just one module; `archived` accepts 'all' to include the sections that have been switched off. Each row carries `name`, `mark` (the emoji beside it), `nameDe` (the German name), `description`, `benefit` and `ticketCount`, the open tickets filed against it. Bounded, not paged: an app has a handful of sections, never a stream of them.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/app-modules",
+    schema: obj({ id: S, appId: S, archived: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["id", "appId", "archived"]) if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "appId") ? `List the modules of app ${str(i, "appId")}` : "List app modules"),
+    },
+  },
+  {
+    name: "create_app_module",
+    summary:
+      "Add a section to an app. `name` is what it is called on screen; `mark` is an emoji shown beside it, `nameDe` the German name for a client who reads in German, `description` what the section does and `benefit` what it gives them. Two live modules of one app cannot share a name.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules",
+    schema: obj({ appId: S, name: S, mark: S, nameDe: S, description: S, benefit: S }, ["appId", "name"]),
+    buildBody: (i) => ({
+      appId: str(i, "appId"),
+      name: str(i, "name"),
+      mark: opt(i, "mark"),
+      nameDe: opt(i, "nameDe"),
+      description: opt(i, "description"),
+      benefit: opt(i, "benefit"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the module "${str(i, "name")}"` },
+  },
+  {
+    name: "update_app_module",
+    summary:
+      "Rename or re-describe a module (by id). Send ONLY what you are changing; to empty a field, send it as an empty string. A rename reaches every ticket filed against it straight away, because a ticket stores the module rather than its spelling.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules/update",
+    schema: obj({ id: S, name: S, mark: S, nameDe: S, description: S, benefit: S }, ["id", "name"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      mark: sent(i, "mark"),
+      nameDe: sent(i, "nameDe"),
+      description: sent(i, "description"),
+      benefit: sent(i, "benefit"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit the module "${str(i, "name")}"` },
+  },
+  {
+    name: "set_app_module_active",
+    summary:
+      "Switch a module off (`active: false`) or back on (`active: true`). Never deleted: every ticket already filed against it keeps naming it and still reads correctly — it simply stops being offered on the ticket form.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Switch on" : "Switch off"} module ${str(i, "id")}`,
     },
   },
   {

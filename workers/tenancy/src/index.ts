@@ -39,6 +39,10 @@
 //   POST /api/tenancy/apps                 -> record an app (agency only)
 //   POST /api/tenancy/apps/update          -> edit an app (agency only)
 //   POST /api/tenancy/apps/active          -> archive / restore an app
+//   GET  /api/tenancy/app-modules          -> the sections of an app (?appId= &archived=)
+//   POST /api/tenancy/app-modules          -> add a section to an app (agency only)
+//   POST /api/tenancy/app-modules/update   -> rename / re-describe a section
+//   POST /api/tenancy/app-modules/active   -> switch a section off / back on
 //   GET  /api/tenancy/processes            -> process maps, paged (?q= &appId= &cursor=)
 //   GET  /api/tenancy/processes/detail     -> one map: versions + current steps (?id)
 //   POST /api/tenancy/processes            -> map a process + its baseline (agency only)
@@ -165,6 +169,10 @@ import {
   postUpdateApp,
   postUpdateProcess,
   postUpdateStep,
+  getAppModules,
+  postCreateAppModule,
+  postUpdateAppModule,
+  postAppModuleActive,
 } from "./routes/processes"
 import {
   getAccountRates,
@@ -265,6 +273,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/apps": { handler: postCreateApp, kind: "mutation" },
   "POST /api/tenancy/apps/update": { handler: postUpdateApp, kind: "mutation" },
   "POST /api/tenancy/apps/active": { handler: postAppActive, kind: "mutation" },
+  "GET /api/tenancy/app-modules": { handler: getAppModules, kind: "read" },
+  "POST /api/tenancy/app-modules": { handler: postCreateAppModule, kind: "mutation" },
+  "POST /api/tenancy/app-modules/update": { handler: postUpdateAppModule, kind: "mutation" },
+  "POST /api/tenancy/app-modules/active": { handler: postAppModuleActive, kind: "mutation" },
   "GET /api/tenancy/processes": { handler: getProcesses, kind: "read" },
   "GET /api/tenancy/processes/detail": { handler: getProcessDetail, kind: "read" },
   "POST /api/tenancy/processes": { handler: postCreateProcess, kind: "mutation" },

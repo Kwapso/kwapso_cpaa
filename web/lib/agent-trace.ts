@@ -174,6 +174,18 @@ export function traceFor(
     // conversation are all on one screen, so a change is visible wherever it
     // landed. A step and a comment carry the PROCESS id rather than their own,
     // which is what lets both land on the map that now reads differently.
+    // A MODULE HAS NO SCREEN OF ITS OWN, and that is the design rather than a
+    // gap: it is a section of an app, so it is managed ON the app, on the
+    // Modules tab. All three writes land there — the create because the new
+    // section appears in that list, the edit and the switch-off because that is
+    // the only place the row is shown. `create_app_module` carries the APP's id
+    // rather than the module's, which is what lets it land on the same screen as
+    // the other two without knowing what it just made.
+    case "create_app_module":
+      return { path: `${seg(teamId, "apps")}/${str(input, "appId")}`, highlight: "main" }
+    case "update_app_module":
+    case "set_app_module_active":
+      return { path: seg(teamId, "apps"), highlight: "main" }
     case "create_process":
       return { path: seg(teamId, "processes"), highlight: "main" }
     case "update_process":

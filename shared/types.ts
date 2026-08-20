@@ -374,6 +374,16 @@ export type HelpTicket = {
    * sprint it could be scheduled into, and who the stakeholder to tell is. */
   appId: string | null
   appName: string | null
+  /** WHICH SECTION OF THAT APP (Aurora, 19 Aug 2026: "please implement MODULES
+   * under apps, so i can group all the tickets I am creating in an organized
+   * way"). 94% of the 1,820 tickets in the legacy data carried one, which is why
+   * the form asks for it rather than hoping triage adds it later.
+   *
+   * The NAME and the MARK ride the row (R35) — a ticket list shows the section
+   * with its emoji, and never a bare id it would have to go and resolve. */
+  moduleId: string | null
+  moduleName: string | null
+  moduleMark: string | null
   /** WHO ASKED (CHECKLIST 5.9) — the CONTACT, a person row on the account, not
    * the login that typed it. Staff raise most of a client's history on their
    * behalf, so "who raised it" and "who typed it" are different people and the
@@ -1068,6 +1078,41 @@ export type ClientDeliverable = {
 }
 
 /** One process in a list: what it is, and how much of it there is. */
+/** A MODULE — one section of an app, and the thing a ticket says it is about.
+ *
+ * The two trees this product keeps apart meet on the app and nowhere else: an
+ * ACCOUNT has processes (how the client's business works, versioned, what every
+ * saving is drilled through), and an APP has modules (how the software we built
+ * is divided — Settings, Documents, Tasks). A ticket carries a module because a
+ * ticket is about a screen. A saving carries a process because a saving is about
+ * a job of work. Nothing joins them, on purpose.
+ *
+ * `mark` and `nameDe` mirror `selectable_data`'s enrichment columns so a module
+ * is edited with the same affordances as any other vocabulary — an emoji and a
+ * German name — without being a team-wide vocabulary, which it cannot be: 124 of
+ * the 160 distinct names in the legacy data belong to exactly one app. */
+export type AppModule = {
+  id: string
+  appId: string
+  appName: string
+  accountId: string | null
+  name: string
+  /** the emoji shown beside the name, as on a dropdown value */
+  mark: string | null
+  /** the German name, for a client whose account reads in German */
+  nameDe: string | null
+  description: string | null
+  /** WHAT THIS SECTION GIVES THE CLIENT — carried over from the legacy data,
+   * where every module named its own benefit ("Time savings, transparency, and
+   * automated monitoring"). Not shown on a picker; it is what a handover
+   * document is written from. */
+  benefit: string | null
+  /** open tickets filed against this module */
+  ticketCount: number
+  active: boolean
+  createdAt: string
+}
+
 export type ProcessSummary = {
   id: string
   appId: string
