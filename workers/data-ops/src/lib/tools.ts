@@ -190,7 +190,11 @@ const AGENT_ONLY: AgentTool[] = [
       "Which Google services the signed-in person has connected (Drive, Gmail, Calendar, Google Chat), " +
       "which Google account each is, and which folders and spaces they have shared. Call this FIRST if " +
       "you are unsure whether you can read something, an unconnected service is not an error, it is a " +
-      "thing to tell them about.",
+      "thing to tell them about. READ `connected`: it is the list of services that are live right now. " +
+      "`connections` is the whole HISTORY of connecting and disconnecting, so most rows in it are " +
+      "switched off even when everything is working — never conclude from that list that nothing is " +
+      "connected. `sources` are the folders and spaces shared; a service can be connected with none " +
+      "shared, which means 'nothing handed over yet', not 'not connected'.",
     schema: obj({}),
     binding: "CONTENT",
     method: "GET",

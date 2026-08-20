@@ -110,8 +110,27 @@ import type { Env } from "../env"
 export async function getGoogleConnections(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "read")
   await refusePortalCaller(cfg, guard)
+  const connections = await listConnections(cfg, guard)
   return json({
-    connections: await listConnections(cfg, guard),
+    connections,
+    // WHICH SERVICES ARE LIVE, AS A LIST, and it is here because a reader got it
+    // wrong (owner, 20 Aug 2026). He pressed "Connect everything", all four
+    // services connected, and the assistant told him "you don't actually have an
+    // active Google connection" — then sent him to reconnect something he had
+    // reconnected two minutes earlier.
+    //
+    // The rows were right. `connections` is the whole HISTORY of connecting and
+    // disconnecting — seventeen rows that day, thirteen of them switched off —
+    // because the Settings screen shows that history on purpose. A model handed
+    // that pile has to notice `active` on each row and take the union, and this
+    // one did not.
+    //
+    // So the door states the conclusion rather than leaving it to be derived.
+    // The screen ignores this and reads the rows, exactly as it did; the machine
+    // surface reads one unambiguous list. Derived from the same rows in the same
+    // breath, so the two can never disagree — which is the only reason it is
+    // safe to add a second way of saying the same thing.
+    connected: connections.filter((c) => c.active).map((c) => c.service),
     sources: await listNamedSources(cfg, guard),
     ready: Boolean(connectCredentials(env)) && tokenStorageReady(env),
   })
