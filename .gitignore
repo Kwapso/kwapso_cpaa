@@ -26,6 +26,8 @@ out/
 # lean-mean and interface-lessness reports were deleted by hand once for that
 # reason; ignoring them is what stops the next run putting them back.
 /architecture-blueprint.html
+/architecture-review.html
+/architecture-review.md
 /lean-mean-report.html
 /lean-mean-report.md
 /interface-lessness-report.html
@@ -34,10 +36,10 @@ out/
 /story-review.md
 /ocean-review.html
 /ocean-review.md
-/architecture-review.html
-/architecture-review.md
-/scaling-review.html
-/scaling-review.md
+# NOT scaling-review.md/.html. README's doc map lists it as item 27 and
+# DATA-MODEL.md cites it for a claim, so it is a DOCUMENT that two other
+# documents depend on — ignoring it left the map pointing at a file a fresh
+# clone does not have.
 
 # WHERE scripts/backup.mjs PUTS THE BACKUPS, and the one line standing between a
 # routine `git add -A` and every client's database in the repository. The script

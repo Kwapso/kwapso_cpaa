@@ -42,7 +42,7 @@ because an exception nobody can find is a bypass with better manners:
   already gated (R10) and already publishes (R1) in the worker that owns it. There is
   nothing there for either seam test to read. What it *does* own is which doors exist
   at all, and that is checked instead by `workers/portal-gateway/test/portal-door.test.ts`,
-  which derives the agency's whole `/api` surface off `web/lib/api.ts` and asserts every
+  which derives the agency's whole `/api` surface off `web/lib/api/` and asserts every
   door the portal does not name returns a 404. A door-list worker is held to a
   door-list check.
 

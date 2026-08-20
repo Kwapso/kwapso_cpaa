@@ -555,7 +555,7 @@ config shape.
 Two lines. The title, and one dot-separated subtitle carrying **at most three** facts.
 Cut the rest.
 
-Today `web/components/deep-link/shape.ts` and `stories-screen.tsx:48-59` build subtitles
+Today `web/components/deep-link/shape.tsx` and `stories-screen.tsx:48-59` build subtitles
 of four and five parts, and prefix the reference into the title as well. The reductions:
 
 | Row | Today | Rule |
@@ -1144,7 +1144,7 @@ attach screenshots, a picture is worth a thousand words."
 
 ### W2: the empty-value placeholder is an en dash, and it is the one exception
 
-The 73 standalone `"—"` placeholders in `web/components/deep-link/shape.ts` and elsewhere
+The 73 standalone `"—"` placeholders in `web/components/deep-link/shape.tsx` and elsewhere
 are a different construct from prose punctuation. Standardise them on `"–"` (en dash) or,
 better, on nothing at all where `hideEmpty` on `DescriptionList` can drop the row instead.
 `defaultDescriptionListConfig` already sets `hideEmpty: true`.
@@ -1823,7 +1823,7 @@ implemented. Kept as the record of what landed and where:
 | `web/components/app-shell.tsx` | L1, S2, T2 | Gutters and the 11px tab labels. **Done.** |
 | `shared/web/form-shell.tsx` | F1, F2, F3 | The three-row grid, the pinned action bar, "Submit". **Done.** |
 | `web/components/help-detail.tsx` | B1, B2, L7, T5 | Six buttons became one plus a menu; the title became an `<h1>`. **Done**, via the new `web/components/record-chrome.tsx`. |
-| `web/components/deep-link/shape.ts` | K1, W1, W2 | Subtitles dropped to three facts. **Done.** |
+| `web/components/deep-link/shape.tsx` | K1, W1, W2 | Subtitles dropped to three facts. **Done.** |
 
 ### The seven files that carry the density round
 
