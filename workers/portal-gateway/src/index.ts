@@ -182,6 +182,16 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // `/api/tenancy/internal-rates` most of all: those are the agency's own books,
   // refused at the door as well as unnamed here, and R24 fails the build if a
   // line for one of them ever appears in this table.
+  // WHICH SECTION OF THEIR APP a ticket is about. The READ only, and it is the
+  // one module door on this surface: a client picks a section when they raise a
+  // request ("it's not difficult to identify the module — most of the times it's
+  // the active page on the sidebar"), and the fence on the door is their own
+  // account's, so this answers with the sections of their systems and nobody
+  // else's. The three WRITES are absent and refuse a portal caller at the door
+  // besides: a client files tickets AGAINST the structure of the software we
+  // built them, they do not author it, exactly as they do not author the app.
+  "GET /api/tenancy/app-modules": "TENANCY",
+
   "GET /api/tenancy/impact": "TENANCY",
   "GET /api/tenancy/processes/comments": "TENANCY",
   "POST /api/tenancy/processes/comments": "TENANCY",

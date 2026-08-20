@@ -391,6 +391,7 @@ function TriageQueue({
     helpType?: string
     accountId?: string
     appId?: string
+    moduleId?: string
     raisedByContactId?: string
   }) {
     if (!editing) return
@@ -509,6 +510,7 @@ function TriageQueue({
                 helpType: editing.helpType ?? undefined,
                 accountId: editing.accountId ?? undefined,
                 appId: editing.appId ?? undefined,
+                moduleId: editing.moduleId ?? undefined,
                 raisedByContactId: editing.raisedByContactId ?? undefined,
               }
             : undefined

@@ -58,6 +58,11 @@ export type TriageView = {
     helpType: string | null
     accountId: string | null
     appId: string | null
+    /** …and the SECTION, which is not a readiness gap (a ticket about no app has
+     * no section to name) but is carried for the same reason as the four above:
+     * the queue opens a prefilled edit form, and a form that shows "no module"
+     * on a ticket that has one is telling somebody something untrue. */
+    moduleId: string | null
     raisedByContactId: string | null
   }[]
   /** R16: the exact server count of those, over the same question */
@@ -109,6 +114,7 @@ export async function needsTriage(
     help_type: string | null
     account_id: string | null
     app_id: string | null
+    module_id: string | null
     raised_by_contact_id: string | null
   }>(
     cfg,
@@ -119,7 +125,7 @@ export async function needsTriage(
     // The four readiness columns come back with the row so the queue can say
     // WHY a ticket cannot move. Four more columns on a capped read, not a
     // second query.
-    `SELECT id, ref, description, created_at, help_type, account_id, app_id, raised_by_contact_id FROM help
+    `SELECT id, ref, description, created_at, help_type, account_id, app_id, module_id, raised_by_contact_id FROM help
       WHERE status = 'new' AND archived_at IS NULL AND created_at < ?
       ORDER BY created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [cutoff]
@@ -146,6 +152,7 @@ export async function needsTriage(
       helpType: r.help_type,
       accountId: r.account_id,
       appId: r.app_id,
+      moduleId: r.module_id,
       raisedByContactId: r.raised_by_contact_id,
     })),
     total: counted[0]?.n ?? 0,

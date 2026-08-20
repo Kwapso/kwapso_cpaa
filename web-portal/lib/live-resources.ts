@@ -24,6 +24,10 @@ export const cacheKeys = {
   context: "portal:context",
   company: (accountId: string) => `portal:company:${accountId}`,
   tickets: "portal:tickets",
+  /** THE SECTIONS OF THIS CLIENT'S APPS — what a ticket says it is about. One
+   * key for all of them, narrowed on screen, because the door is fenced to this
+   * caller's own accounts: what comes back is already only their systems. */
+  appModules: "portal:app-modules",
   ticketsTotal: "portal:tickets:total",
   ticketsCursor: "portal:tickets:cursor",
   /** ONE ticket, for a cold deep link out of an email — the ticket screen reads

@@ -753,6 +753,7 @@ export function HelpDetailScreen({
           helpType: ticket.helpType,
           accountId: ticket.accountId,
           appId: ticket.appId,
+          moduleId: ticket.moduleId,
           raisedByContactId: ticket.raisedByContactId,
         }}
         onSubmit={editTicket}

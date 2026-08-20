@@ -47,6 +47,9 @@ vi.mock("@/lib/live-resources", () => ({
   // through the store, so the key and its fetcher both have to exist here or the
   // dialog throws before any of these cases can look at it.
   appsKey: (t: string) => `apps:${t}`,
+  // …and the SECTIONS of that system, on the same terms: one bounded list
+  // through the store, so the key has to exist here too.
+  appModulesKey: (t: string) => `app-modules:${t}`,
   listFetch: { apps: async () => [] },
 }))
 
@@ -61,6 +64,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       ...actual.tenancy,
       accounts: door.accounts,
       accountDetail: async () => ({ account: { id: "acct-bergman", name: "Bergman" }, links: [] }),
+      appModules: async () => ({ modules: [], total: 0 }),
     },
   }
 })
