@@ -1811,7 +1811,27 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
   url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
   url.searchParams.set("orderBy", "createTime desc")
   const data = (await googleFetch(url.toString(), token)) as { messages?: unknown }
-  return (Array.isArray(data.messages) ? data.messages : []).map((raw) => {
+  const messages = Array.isArray(data.messages) ? data.messages : []
+  // AND THE SPACE TEACHES US THE REST OF THE NAMES ITSELF.
+  //
+  // Every avenue Google offers for "who is this person" came up short: a message
+  // carries no name for a human, a membership carries no name at all, and the
+  // directory came back EMPTY — reading it needs domain-wide contact sharing
+  // switched on across the whole Workspace, which is a far larger thing to ask
+  // of an organisation than a knowledge base deserves.
+  //
+  // But a MENTION carries both halves. When somebody writes "@Aurora Thalassa",
+  // Google attaches an annotation holding that person's resource id AND their
+  // display name — the exact pair every other endpoint withheld. So the page is
+  // read twice: once to learn who people are, once to attribute what they said.
+  // In a working team space nearly everybody is mentioned eventually, and
+  // anybody who is not falls back to the honest description.
+  //
+  // It costs no extra call and no extra permission, which is what makes it the
+  // right answer rather than the clever one.
+  const learned = mentionedNames(messages)
+  for (const [id, name] of learned) if (!members.has(id)) members.set(id, name)
+  return messages.map((raw) => {
     const m = raw as Record<string, unknown>
     const id = str(m.name)
     return {
@@ -1863,6 +1883,49 @@ async function chatMembers(token: string, spaceName: string): Promise<Map<string
   return peopleNames(token, ids)
 }
 
+/** NAMES LEARNED FROM THE CONVERSATION ITSELF — every `@mention` in a page of
+ * messages, as `users/…` → the name Google printed for them.
+ *
+ * A `USER_MENTION` annotation is the one place in the Chat API where an id and a
+ * human name arrive together. Read off whatever the page happens to contain, so
+ * it is a bonus rather than a guarantee: a space where nobody is ever mentioned
+ * teaches nothing, and a space where they are teaches a lot. */
+function mentionedNames(messages: unknown[]): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const raw of messages) {
+    const m = raw as Record<string, unknown>
+    const text = str(m.text)
+    const annotations = Array.isArray(m.annotations) ? (m.annotations as Record<string, unknown>[]) : []
+    for (const a of annotations) {
+      if (str(a.type) !== "USER_MENTION") continue
+      const mention = (a.userMention ?? {}) as Record<string, unknown>
+      const user = (mention.user ?? {}) as Record<string, unknown>
+      const id = str(user.name)
+      // THE NAME IS IN THE TEXT, AND THE ANNOTATION SAYS WHERE.
+      //
+      // `userMention.user` carries `name` and `type` and — like every other
+      // Chat payload — no `displayName`. But the annotation also carries
+      // `startIndex` and `length`, and those point at the mention as it was
+      // WRITTEN: {"startIndex":33,"length":16} against "Thanks for organising
+      // this today @Aurora Thalassa." is exactly "@Aurora Thalassa".
+      //
+      // So Google does give both halves; it just puts the id in one field and
+      // the name in another and leaves the offsets to join them. That join is
+      // this slice, and it is the only route to a colleague's name that needs
+      // neither a wider grant nor an administrator.
+      const start = Number(a.startIndex)
+      const length = Number(a.length)
+      if (!id || !Number.isFinite(start) || !Number.isFinite(length) || length <= 0) continue
+      const label = text.slice(start, start + length).replace(/^@/, "").trim()
+      // A slice that came back empty, or that looks like an id rather than a
+      // name, teaches nothing — and teaching the wrong thing is the one outcome
+      // this whole lane refuses.
+      if (label && !label.startsWith("users/")) out.set(id, label)
+    }
+  }
+  return out
+}
+
 /**
  * RESOURCE IDS → NAMES, through the People API.
  *
@@ -1892,9 +1955,66 @@ async function chatMembers(token: string, spaceName: string): Promise<Map<string
  * guess. The one thing it must never do is invent a name, because a wrong
  * attribution in a quoted conversation is worse than no attribution at all.
  */
+/**
+ * EVERY COLLEAGUE IN THE WORKSPACE DIRECTORY, as `users/…` → their name.
+ *
+ * One call for the whole organisation rather than one per person, and the only
+ * endpoint that answers for somebody who is a colleague but not a contact —
+ * which is the ordinary case in a team's chat space.
+ *
+ * Silent on failure, like everything else in this lane: a missing name leaves
+ * the honest description, never a guess. A domain with directory sharing turned
+ * off simply answers with nothing, and that is a legitimate configuration
+ * rather than an error to report.
+ */
+async function directoryNames(token: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const url = new URL("https://people.googleapis.com/v1/people:listDirectoryPeople")
+  url.searchParams.set("readMask", "names,emailAddresses")
+  url.searchParams.append("sources", "DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE")
+  url.searchParams.append("sources", "DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT")
+  // R14 hard cap — an agency's directory is tens of people, and Google's own
+  // ceiling for this call is 1000.
+  url.searchParams.set("pageSize", "1000")
+  try {
+    const data = (await googleFetch(url.toString(), token)) as { people?: unknown }
+    for (const raw of Array.isArray(data.people) ? data.people : []) {
+      const person = raw as Record<string, unknown>
+      const names = Array.isArray(person.names) ? (person.names as Record<string, unknown>[]) : []
+      const emails = Array.isArray(person.emailAddresses)
+        ? (person.emailAddresses as Record<string, unknown>[])
+        : []
+      const shown = str(names[0]?.displayName) || str(emails[0]?.value)
+      const id = str(person.resourceName)
+      if (id && shown) out.set(id.replace(/^people\//, "users/"), shown)
+    }
+  } catch {
+    // Directory sharing off, or the scope not granted. The batch below still
+    // answers for the caller themselves and their own contacts.
+  }
+  return out
+}
+
 async function peopleNames(token: string, userIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   if (userIds.length === 0) return out
+  // THE DIRECTORY FIRST, because it is the one that has colleagues in it.
+  //
+  // `people:batchGet` answers for profiles this person can already reach — their
+  // OWN, and anyone in their contacts. It does NOT answer for a colleague who
+  // is merely in the same Workspace, which is nearly everybody in a chat space.
+  // Measured the minute the People API was switched on: 19 of 49 senders named
+  // in one space and 6 of 50 in another, every single one of them the owner
+  // himself.
+  //
+  // `people:listDirectoryPeople` is the endpoint that reads the organisation's
+  // own directory, which is what `directory.readonly` was granted for. One call
+  // covers every colleague at once, so it is asked BEFORE the batch and the
+  // batch only fills what it missed.
+  for (const [id, name] of await directoryNames(token)) out.set(id, name)
+  const missing = userIds.filter((id) => !out.has(id))
+  if (missing.length === 0) return out
+  userIds = missing
   // Batched: one call for a whole space's roster rather than one per person.
   // Google caps `resourceNames` at 200 per request, which is far above the page
   // of memberships this is ever handed.
