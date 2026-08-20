@@ -30,7 +30,11 @@
 
 import * as React from "react"
 
+import { Paperclip, X } from "lucide-react"
+
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
+import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -39,12 +43,13 @@ import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, content as contentApi } from "@/lib/api"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { readFileAsDataUrl } from "@shared/web/file"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
@@ -110,6 +115,12 @@ const processField = {
   required: true,
   hint: "Every way of working this changes, or tick that it changes none.",
 }
+const fileField = {
+  ...defaultFieldConfig,
+  label: "Something to show",
+  required: false,
+  hint: "A recording, a page, a document somebody can open.",
+}
 const assigneeField = { ...defaultFieldConfig, label: "Who's doing it", required: false }
 
 export function StoryFormDialog({
@@ -126,6 +137,7 @@ export function StoryFormDialog({
   processes,
   storyTypes,
   typeMarks,
+  storyId,
   initial,
   draftKey,
   onSubmit,
@@ -179,10 +191,22 @@ export function StoryFormDialog({
    * own vocabulary cache — two reads the screen already holds, and joining
    * them here would make the dialog fetch. */
   typeMarks?: Map<string, string>
+  /** THE STORY BEING EDITED, when this is an edit. Present here for one
+   * reason: the file field below has to know where to hang what somebody
+   * picked, and on an edit that is known before the submit rather than after
+   * it. See `onSubmit` for the create half. */
+  storyId?: string
   /** Present = editing an existing story. */
   initial?: StoryFormValues
   draftKey?: string
-  onSubmit: (values: StoryFormValues) => Promise<void>
+  /** RETURNS THE NEW STORY'S ID on a create, when the caller has one.
+   *
+   * An attachment needs a story to belong to, and on a create there is no
+   * story until the submit returns — so the id comes back out rather than the
+   * form guessing which row is new (rank ordering means the newest is not
+   * reliably first). An edit already knows it, as `storyId`, and returns
+   * nothing; the upload below reads whichever of the two it has. */
+  onSubmit: (values: StoryFormValues) => Promise<string | void>
 }) {
   const t = useT()
   const editing = initial !== undefined
@@ -225,12 +249,42 @@ export function StoryFormDialog({
     values.storyType !== "" &&
     (values.changesNoStep || values.processIds.length > 0)
 
+  // WHAT SOMEBODY PICKED, held until there is a story to hang it on.
+  //
+  // A developer reading a story needs to SEE the thing being described, and a
+  // screenshot chosen while writing it is the moment they are most likely to
+  // get one. The files wait here rather than riding the create payload because
+  // R2 storage is addressed by story id, and on a create that id does not exist
+  // until the door answers.
+  const [pending, setPending] = React.useState<File[]>([])
+
+  /** ONE FILE AT A TIME, and a failure here never fails the story.
+   *
+   * The story is already written by the time this runs. Turning a rejected
+   * upload into a thrown submit would close nothing, clear no draft, and tell
+   * somebody their work was not saved when it was — so the toast names the
+   * attachment and the story stands. */
+  async function attach(target: string, files: File[]) {
+    for (const file of files) {
+      try {
+        await contentApi.addStoryAttachment({
+          id: target,
+          kind: "file",
+          label: file.name,
+          fileDataUrl: await readFileAsDataUrl(file),
+        })
+      } catch (err) {
+        toast.error(err instanceof ApiFailure ? err.message : t("Couldn't attach that."))
+      }
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!ready) return
     setBusy(true)
     try {
-      await onSubmit({
+      const madeId = await onSubmit({
         title: values.title.trim(),
         detail: richTextValue(values.detail),
         sprintId: values.sprintId,
@@ -241,6 +295,11 @@ export function StoryFormDialog({
         processIds: values.changesNoStep ? [] : values.processIds,
         changesNoStep: values.changesNoStep,
       })
+      // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `storyId` on an
+      // edit, the id the create door just handed back otherwise.
+      const target = storyId ?? (typeof madeId === "string" ? madeId : null)
+      if (target && pending.length) await attach(target, pending)
+      setPending([])
       clearDraft()
       onOpenChange(false)
     } catch (err) {
@@ -353,6 +412,39 @@ export function StoryFormDialog({
           placeholder={t("What good looks like when it's finished.")}
           className="min-h-32"
         />
+      </Field>
+      {/* THE SCREENSHOT, beside the words that describe it. On BOTH halves of
+          this dialog, which the header above makes a rule: one field, one code
+          path, and the upload simply knows a different id on an edit. */}
+      <Field config={fileField} htmlFor="story-files" className={fieldSpacing}>
+        <div className="flex flex-col gap-2">
+          {pending.length > 0 && (
+            <ul className="divide-border divide-y rounded-xl border">
+              {pending.map((file, i) => (
+                <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
+                  <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    aria-label={t("Take it off")}
+                    disabled={busy}
+                    onClick={() => setPending((f) => f.filter((_, j) => j !== i))}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <FileUpload
+            multiple
+            onChange={(files) => setPending((f) => [...f, ...files])}
+            className={busy ? "pointer-events-none opacity-60" : undefined}
+          />
+        </div>
       </Field>
       <Field config={sprintField} htmlFor="story-sprint" className={fieldSpacing}>
         {picker(

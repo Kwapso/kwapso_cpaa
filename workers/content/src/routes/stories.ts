@@ -85,13 +85,28 @@ async function storyPage(
   guard: Parameters<typeof listStories>[1],
   filter: StoryFilter,
   cursor: string | null,
-  ordering?: Parameters<typeof listStories>[4]
+  ordering?: Parameters<typeof listStories>[4],
+  /** THE ROW THIS REQUEST JUST MADE, when it made one.
+   *
+   * The create door answers with the refreshed PAGE — the shape every list
+   * screen wants — and used to throw the new id away with it. A screen that
+   * needs to do one more thing to the story it just created (attach the
+   * screenshot somebody picked before pressing Submit) then had to guess which
+   * row was new, and rank ordering means the newest is not reliably first.
+   *
+   * So the id rides beside the page. Additive: every existing caller reads
+   * `stories` exactly as before. */
+  createdId?: string
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
     listStories(cfg, guard, filter, cursor, ordering),
     countStories(cfg, guard, filter),
   ])
-  return pagedJson("stories", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
+  return pagedJson(
+    "stories",
+    { ...page, total: counts.total },
+    createdId ? { mineTotal: counts.mineTotal, createdId } : { mineTotal: counts.mineTotal }
+  )
 }
 
 /** GET /api/content/stories — the backlog (?id=<storyId> → just that one). */
@@ -142,7 +157,7 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   // it. R17 rides the flip, so a second story on an already-scheduled ticket
   // moves zero rows and publishes nothing.
   await announceScheduled(env, cfg, guard, actor, ticketId ?? null)
-  return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
+  return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null, undefined, id)
 }
 
 /** POST /api/content/stories/update — edit a story (work:edit). */

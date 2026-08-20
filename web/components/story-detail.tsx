@@ -390,6 +390,7 @@ export function StoryDetailScreen({
         appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
+        storyId={story.id}
         initial={{
           title: story.title,
           detail: story.detail ?? "",

@@ -300,7 +300,11 @@ export const content = {
   ) => api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(`/api/content/stories${listQuery(opts)}`),
   storyOne: (id: string) =>
     api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
-  createStory: (input: StoryWrite) => api<{ stories: Story[] }>("/api/content/stories", post(input)),
+  /** `createdId` is the story this call just made — the create door hands it
+   * back beside the refreshed page so a form can attach what somebody picked
+   * BEFORE the story existed. */
+  createStory: (input: StoryWrite) =>
+    api<{ stories: Story[]; createdId?: string }>("/api/content/stories", post(input)),
   updateStory: (input: StoryWrite & { id: string }) =>
     api<{ stories: Story[] }>("/api/content/stories/update", post(input)),
   /** Move a story. `review` carries what 6.9 requires before `in_review`: the

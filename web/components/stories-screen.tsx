@@ -166,9 +166,9 @@ export async function createStoryFrom(
   values: StoryFormValues,
   /** The caller's language — see `createAppFrom`. */
   t: (english: string) => string
-): Promise<void> {
+): Promise<string | undefined> {
   try {
-    await contentApi.createStory({
+    const made = await contentApi.createStory({
       title: values.title,
       storyType: values.storyType,
       detail: values.detail || undefined,
@@ -182,6 +182,10 @@ export async function createStoryFrom(
     invalidate(storiesKey(teamId))
     invalidate(sprintsKey(teamId))
     toast.success(t("Story added."))
+    // THE NEW STORY'S ID, so the form can hang the screenshots somebody picked
+    // before it existed. Undefined on an older worker, which the caller reads as
+    // "nothing to attach to" rather than as an error.
+    return made.createdId
   } catch (err) {
     throw err instanceof ApiFailure ? err : new Error("Couldn't add that story.")
   }
