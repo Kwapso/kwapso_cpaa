@@ -31,6 +31,7 @@ import {
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
 } from "@shared/rules/registry"
+import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
@@ -2057,11 +2058,107 @@ describe("RULES — the laws of the base", () => {
       "glossary-in-copy", // R33: the deny-list scan over shared/i18n-strings.json, above
       "linked-emails", // R30: web/test/linked-emails.test.ts — the email census, derived from the send sites themselves
       "wrapped-strings", // R33: web/test/wrapped-strings.test.ts — R28's walk read the other way round, over both front doors
+      "offered-rights", // R36: the offered-vs-consulted census below
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
         expect(known.has(r.checkId), `law ${r.id} (${r.checkId}) needs a real check`).toBe(true)
     }
+  })
+})
+
+/** R36 — EVERY SWITCH ON THE PERMISSION MATRIX DECIDES SOMETHING.
+ *
+ * The grid gives every module four boxes whether or not four decisions exist
+ * behind them, so an inert box looks exactly like a live one — and an owner who
+ * ticks it, saves, and gets a green toast has been told they granted something.
+ * On 21 Aug 2026 fifteen of eighty-eight decided nothing, seven of them with no
+ * note anywhere saying so, and one module (`screens`) had four boxes and no
+ * door at all: its two doors gate on `teams:edit`.
+ *
+ * OFFERED IS DATA, CONSULTED IS DERIVED, and the check fails both ways.
+ * Offered-but-unasked is theatre. Asked-but-unoffered is the dangerous half: a
+ * door written against a right no role can hold refuses everybody, and the
+ * Admin role is locked, so nobody can tick their way out of it.
+ *
+ * FOUR PLACES ASK FOR A RIGHT, and a census that knew only the first would have
+ * called four live rights dead — `work:create` among them:
+ *   1 · a literal pair — requireRight/gated/gatedBody(…, "help", "create")
+ *   2 · the MCP surface — TOOL_GATES values, which are "help:create" strings
+ *   3 · the record activity feed — every ACTIVITY_GATE_MAP module, asked for read
+ *   4 · the importer — every TARGETS module, asked for create
+ */
+describe("offered-rights: no permission switch decides nothing", () => {
+  const RIGHTS = ["read", "create", "edit", "delete"] as const
+
+  /** Everything the running code actually asks for, off the source. */
+  function consulted(): Map<string, Set<string>> {
+    const out = new Map<string, Set<string>>()
+    const add = (mod: string, right: string) => {
+      if (!out.has(mod)) out.set(mod, new Set())
+      out.get(mod)!.add(right)
+    }
+    const files = sourceFiles([join(ROOT, "workers"), join(ROOT, "shared")], {
+      extensions: [".ts"],
+      skipTests: true,
+    })
+    expect(files.length, "the gate-source walk found nothing — a blind check passes like a clean one")
+      .toBeGreaterThan(50)
+    for (const f of files) {
+      const flat = read(f.path).replace(/\s+/g, " ")
+      // 1 · the literal pair, and 2 · the MCP gate string
+      for (const m of flat.matchAll(/"([a-z_]+)"\s*,\s*"(read|create|edit|delete)"/g)) add(m[1], m[2])
+      for (const m of flat.matchAll(/"([a-z_]+):(read|create|edit|delete)"/g)) add(m[1], m[2])
+    }
+    // 3 · the record feed asks every mapped module for read
+    for (const mod of Object.values(ACTIVITY_GATE_MAP)) add(mod, "read")
+    // 4 · the importer asks every target's module for create
+    const targets = read(join(ROOT, "workers", "data-ops", "src", "lib", "targets.ts"))
+    const targetModules = [...targets.matchAll(/module\s*:\s*"([a-z_]+)"/g)].map((m) => m[1])
+    expect(targetModules.length, "no import target module was derived — the walk has gone blind")
+      .toBeGreaterThan(3)
+    for (const mod of targetModules) add(mod, "create")
+    return out
+  }
+
+  it("offered-rights: every right the matrix offers is asked for by something", () => {
+    const asked = consulted()
+    const theatre: string[] = []
+    for (const { key } of TEAM_MODULE_CATALOG)
+      for (const right of offeredRights(key))
+        if (!asked.get(key)?.has(right)) theatre.push(`${key}:${right}`)
+
+    expect(
+      theatre,
+      `The Roles screen offers ${theatre.length} switch(es) that no door, tool gate, activity map ` +
+        `or import target ever asks for. Somebody can tick one, save it, and believe they granted ` +
+        `something. Either wire it, or take it out of MODULE_OFFERED_RIGHTS in shared/team-modules.ts ` +
+        `with the reason:\n${theatre.join("\n")}`
+    ).toEqual([])
+  })
+
+  it("offered-rights: every right something asks for is one the matrix can grant", () => {
+    const asked = consulted()
+    const known = new Set(TEAM_MODULE_CATALOG.map((m) => m.key))
+    const ungrantable: string[] = []
+    for (const [mod, rights] of asked) {
+      if (!known.has(mod)) continue // not a team module (core-DB rights, tool names, unrelated pairs)
+      const offered = new Set<string>(offeredRights(mod))
+      for (const right of rights) if (!offered.has(right)) ungrantable.push(`${mod}:${right}`)
+    }
+
+    expect(
+      ungrantable,
+      `Something asks for a right the Roles screen cannot grant, so the door refuses EVERYBODY — ` +
+        `including Admin, which is locked and cannot be edited to fix it. Add the right to ` +
+        `MODULE_OFFERED_RIGHTS in shared/team-modules.ts:\n${ungrantable.join("\n")}`
+    ).toEqual([])
+  })
+
+  it("offered-rights: no module offers a right outside the four the grid draws", () => {
+    for (const { key } of TEAM_MODULE_CATALOG)
+      for (const right of offeredRights(key))
+        expect(RIGHTS as readonly string[], `${key} offers "${right}"`).toContain(right)
   })
 })
 

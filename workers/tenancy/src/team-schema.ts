@@ -3151,6 +3151,40 @@ CREATE TABLE chat_people (
 );
 `,
   },
+  {
+    // ── THREE PERMISSION MODULES THAT DECIDED NOTHING ───────────────────────
+    //
+    // The owner opened the Roles screen and asked what all of it was for. The
+    // honest answer was that some of it was for nothing.
+    //
+    // `learning` and `marketing` were PURGED FROM THE PRODUCT on 17 Aug 2026 —
+    // tables, routes, screens, tools, nav, glossary, the CREATE TABLE in their
+    // own migrations. What nobody removed was their permission rows, because
+    // migration 0021 had CROSS JOINed `marketing` onto every role that existed
+    // and a purge deletes forward, not backward. Six roles × two modules = 12
+    // rows in staging, gating nothing and rendering nowhere (they are not in
+    // TEAM_MODULES, so the screen never drew them).
+    //
+    // `screens` is the other kind of dead. It IS in TEAM_MODULES, it DOES draw
+    // four boxes on the Roles screen, and not one door has ever asked for it:
+    // `getScreen` and `postScreen` both gate on `teams:edit`, which is the
+    // right answer — a screen recipe is a team setting. So the row offered four
+    // grants that decided nothing, and the file defining the modules documents
+    // every OTHER inert switch and said nothing about this one. Removed from
+    // TEAM_MODULES in the same commit; this deletes the rows behind it.
+    //
+    // THE `screens` TABLE ITSELF STAYS. 0047 exists precisely because it went
+    // missing once. The recipe store is real and is reached through `teams:edit`.
+    //
+    // DELETE, NOT DEACTIVATE. The base's rule protects records a person made
+    // and an audit may need; a permission row for a module that does not exist
+    // is neither. `role_permissions` has no deactivated_at, and leaving these
+    // would mean the next reader has to re-derive what we just derived.
+    version: "0050_no_permission_without_a_door",
+    sql: `
+DELETE FROM role_permissions WHERE module IN ('learning', 'marketing', 'screens');
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

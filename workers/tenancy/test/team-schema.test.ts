@@ -169,7 +169,11 @@ describe("team schema", () => {
       "help",
       "knowledge",
       "selectable_data",
-      "screens",
+      // `screens` was here until 21 Aug 2026. It drew four boxes on the Roles
+      // screen and no door ever asked for one: both of the recipe store's doors
+      // gate on `teams:edit`, which is right — a screen layout is a team setting.
+      // R36 now fails the build on any switch nothing consults. Migration 0050
+      // deletes the rows; the `screens` TABLE stays, and 0047 says why.
       "agent",
       // The map and the money, kept apart on purpose. `processes` is CUSTOMER
       // material — a contact reads their own company's maps, so its doors are
@@ -506,7 +510,6 @@ describe("every module reaches the teams that already exist", () => {
     "member_roles",
     "help",
     "selectable_data",
-    "screens",
     "agent",
   ]
 

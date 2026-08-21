@@ -280,6 +280,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "records-carry-their-face",
     status: "enforced",
   },
+  {
+    id: "R36",
+    dimension: "arch",
+    law: "EVERY SWITCH ON THE PERMISSION MATRIX DECIDES SOMETHING. The matrix is a grid, so a module gets four boxes whether or not four decisions exist behind them — and a box that decides nothing is one an owner ticks, saves, and believes they granted by. The offered set is data (`MODULE_OFFERED_RIGHTS`, exceptions only, so it can only shrink), and the consulted set is DERIVED off the source: literal `requireRight`/`gated`/`gatedBody` pairs, the MCP `TOOL_GATES` strings, every module in `ACTIVITY_GATE_MAP` (which the record feed asks for `read` on) and every import `TARGETS` module (which the importer asks for `create` on). The check fails BOTH ways. Offered-but-unasked is theatre. Asked-but-unoffered is worse and is the half that matters: a door written against a right no role can be given refuses everybody, including the Admin role, which is locked and cannot be edited to fix it. Earned on 21 Aug 2026, when the owner asked what the twenty-three rows were for: fifteen of the eighty-eight boxes decided nothing, seven of them undocumented, and one whole module (`screens`) had four boxes and no door — its two doors gate on `teams:edit`. Two more modules, `learning` and `marketing`, still held permission rows six weeks after the product purged them, because a purge deletes forward and migration 0021 had CROSS JOINed them onto every role.",
+    checkId: "offered-rights",
+    status: "enforced",
+  },
 ]
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back

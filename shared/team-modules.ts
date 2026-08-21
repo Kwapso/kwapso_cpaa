@@ -22,7 +22,12 @@ export const TEAM_MODULES = [
   "help",
   "knowledge",
   "selectable_data",
-  "screens",
+  // `screens` WAS HERE, and it was the only module on the sheet whose four
+  // switches decided nothing at all (21 Aug 2026). Its two doors — read the
+  // screen recipes, save one — gate on `teams:edit`, which is the correct
+  // answer: a screen layout is a team setting. So the row offered four grants
+  // that no door has ever asked for, and an owner ticking one believed they had
+  // granted something. Removed here, and migration 0038 deletes its rows.
   "agent",
   "processes",
   // WHAT WE HAND OVER on an app (CHECKLIST 8.7). Its own switch and not four
@@ -102,7 +107,6 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // acts through this same sheet.
   knowledge: "Knowledge base",
   selectable_data: "Dropdown data",
-  screens: "Screens",
   agent: "AI agent",
   // THE MAP AND THE MONEY, kept apart on purpose — one is the client's own world
   // and the other is the agency's books.
@@ -225,3 +229,58 @@ export const TEAM_MODULE_CATALOG: { key: string; label: string }[] =
 
 /** The four rights each module row carries, in matrix order. */
 export const MODULE_RIGHTS = ["read", "create", "edit", "delete"] as const
+
+/** WHICH OF THE FOUR A MODULE ACTUALLY OFFERS (R36).
+ *
+ * The matrix is a grid, so every module gets four boxes whether or not four
+ * decisions exist behind them. On 21 Aug 2026 fifteen of the eighty-eight
+ * boxes decided nothing — a switch somebody could tick, save, and believe they
+ * had granted something by. Eight of those were deliberate and documented in
+ * this file; seven were not, and nothing anywhere said which was which.
+ *
+ * So the offered set is DATA, and `web/test/rules.test.ts` derives the
+ * consulted set off the source and fails BOTH ways: a right offered here that
+ * no door, tool gate, activity map or import target asks for, and a right
+ * something asks for that is not offered here. The second half is the one that
+ * matters — it is what stops a door being written against a right no role can
+ * ever hold.
+ *
+ * A module absent from this map offers all four. Only the exceptions are here,
+ * so the list can only shrink as doors get written.
+ *
+ * THE COLUMNS ARE STILL DRAWN. `@kwapso/ui`'s permission matrix takes
+ * `modules: {key, label}[]` and renders a fixed four columns; hiding a box per
+ * row needs a `rights?: Right[]` on that contract, which is a library change
+ * and this repo does not fork the library. Until it lands, this map is the
+ * truth and the grid is one line behind it. Nothing is mis-granted in the
+ * meantime: an unoffered right is one no door reads. */
+export const MODULE_OFFERED_RIGHTS: Record<string, readonly (typeof MODULE_RIGHTS)[number][]> = {
+  // The team's own settings, and the screen recipes that came with `screens`.
+  // Reading a team is `whoAmI`, not a right; a team is created at signup and is
+  // never deleted (SCOPE: one team per product).
+  teams: ["edit"],
+  // A contact is a person ACCOUNT, so editing one is `accounts:edit` — this
+  // right is about being able to LIST them, link one, and take a link away.
+  contacts: ["read", "create", "delete"],
+  // Same shape: granting and revoking a login are the two acts. A login has
+  // nothing on it to edit that is not the person's own account row.
+  portal_users: ["read", "create", "delete"],
+  // Deactivate, never delete — a ticket is archived, which is `edit`.
+  help: ["read", "create", "edit"],
+  // THE MODULE IS THE SWITCH. `read` is "see your threads", `create` is "say
+  // something to it". There is no third act: the assistant acts through the
+  // caller's OTHER rights, which is the whole security model.
+  agent: ["read", "create"],
+  // A story, sprint or work log is deactivated, not deleted.
+  work: ["read", "create", "edit"],
+  // A switch over a SIGHT, not over a record: "may this role see everyone's
+  // tasks, or only their own". Creating and editing a task is `work`'s call.
+  all_tasks: ["read"],
+  // Read as "kwapso may send mail on this person's behalf". One decision.
+  google_mail: ["create"],
+}
+
+/** The rights one module offers. Absent from the map means all four. */
+export function offeredRights(module: string): readonly (typeof MODULE_RIGHTS)[number][] {
+  return MODULE_OFFERED_RIGHTS[module] ?? MODULE_RIGHTS
+}
