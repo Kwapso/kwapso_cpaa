@@ -27,6 +27,49 @@ carefully got it wrong.
 | `chk-wave-price` | **€24,000 — what they were sold** | The sold-price / internal-split distinction is not clear. If either misses it, the wave screen must show the two numbers with different weight, and the internal one must never appear on the portal side. |
 | `chk-portal2` | **Nothing she could not reach in the portal** | The client fence is thought of as a permission rather than a wall. Worth catching: if the person who owns the product believes an extra tick box can widen a client's world, the roles screen is mislabelling what it does. |
 
+### The sync half — five more checks (chapters 11–18, added 21 Aug)
+
+| id | right answer | a wrong answer means |
+|---|---|---|
+| `chk-two-kinds` | **The email only** | The two-tier split has not landed. App records always sync; only Google material is a choice. If this is missed, the settings screen must separate the two visually rather than listing eight services in one list. |
+| `chk-services` | **His calendar and his Gmail** | The point of chapter 12 was missed — that Drive and Chat ask permission per item while Calendar and Gmail take everything. This is the check most likely to be failed, and failing it is the argument for the four per-service switches. |
+| `chk-mail` | **No — the supplier is not a known contact** | The invisible Gmail rule is not understood, which is itself the finding: nobody can be expected to know a rule that exists only in the code. Whatever replaces it must be visible on the screen where you connect. |
+| `chk-ownership` | **Nothing — the email is Alex's alone** | The private/shared line is not understood. If either of them expects Aurora to get the answer, that is a strong vote for `own-default` option two and it should be read as one. |
+| `chk-chain` | **Only for Alex** — and "Yes, from the email" is *also* true | Deliberately two-true. "Yes, from the email" shows they understood that sources are independent but not that the email is private. Picking "No, removing the meeting removes everything" means the chain is imagined to exist, which is exactly what chapter 18 exists to correct. |
+
+### Aurora's three items from 21 Aug
+
+- **Stakeholders grouped by project lead and project operator** → `stakeholder-grouping`, chapter 03.
+  Today an app's Stakeholders tab shows Ours and Theirs with the lead and main contact badged;
+  this turns a boolean into a named role. Both `app_staff` and `app_stakeholders` already carry the flag.
+- **Validation and refinement must not overlap** → `wave-no-overlap`, chapter 07. Proposed as a rule
+  for that pair specifically rather than a blanket no-overlap, which would be wrong within a month.
+- **The assistant should help plan waves and sprints** → `assistant-plan`, chapter 18. The permission
+  already exists — the assistant acts as the signed-in person through the same gated doors — so what
+  is missing is the tool and the confirm step, not the right.
+
+---
+
+## 4 · What the sync half is really asking
+
+Four things drive every question in chapters 11–18, and all four were measured on staging on
+21 Aug 2026 rather than assumed.
+
+1. **1,501 of 2,735 sources came out of somebody's Google account** — 55% of what the assistant
+   reads, almost none of it deliberately chosen.
+2. **The four services are scoped four different ways.** Drive: 24 named folders. Chat: 21 named
+   spaces. Calendar: hard-wired to `calendars/primary`, no selection possible. Gmail: one implicit
+   rule in the code — mail to or from a known contact at one of the accounts.
+3. **The private/shared line was never drawn.** All 435 emails and all 471 events carry
+   `owner_user_id` and are readable only by their person; 496 of 500 Drive documents carry none and
+   are readable by the whole team. Nobody decided that.
+4. **471 calendar events and 443 meetings describe the same conversations.** An eighth of the corpus
+   is bare calendar titles competing with real passages, which is part of why answers came back thin.
+
+Three limits inside Drive that nobody chose either: **50 files per folder**, **no sub-folder walk**,
+and an **8 MB per-file cap** (that last one added 21 Aug, and it is the only one that was a decision).
+
+
 ---
 
 ## 2 · Round one, reconciled
