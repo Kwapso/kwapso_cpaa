@@ -559,11 +559,21 @@ export async function driveThumbnail(
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) return null
-  const body = await res.arrayBuffer()
   // A preview is a small image. Anything larger is not a thumbnail and is not
   // worth putting through a worker's memory.
-  if (body.byteLength > DRIVE_THUMBNAIL_CAP) return null
-  return { body, contentType: res.headers.get("content-type") ?? "image/jpeg" }
+  //
+  // BOUNDED ON THE WAY IN, not measured on the way out. This read the whole
+  // thing with `arrayBuffer()` and checked the cap afterwards — which is the
+  // same shape as the fault that killed the document sweep, and only harmless
+  // here because Google's own thumbnails are tens of kilobytes. "Harmless
+  // because of what the other side usually sends" is not a bound, and this is
+  // now the same reader the file bodies use.
+  const bytes = await boundedBytes(res, DRIVE_THUMBNAIL_CAP)
+  if (bytes === null) return null
+  return {
+    body: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    contentType: res.headers.get("content-type") ?? "image/jpeg",
+  }
 }
 
 /** The most a preview may weigh. Google's own thumbnails are tens of kilobytes;

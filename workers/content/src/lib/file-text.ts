@@ -312,7 +312,10 @@ export const DRIVE_BYTES_CAP = 8_000_000
  * NULL RATHER THAN A TRUNCATED BUFFER, unlike the text read. Half a sentence is
  * still a sentence; half a ZIP is not a ZIP, and half a PDF's compressed
  * streams decode to nothing. There is nothing to salvage, so it says so. */
-export async function boundedBytes(res: Response): Promise<Uint8Array | null> {
+export async function boundedBytes(
+  res: Response,
+  cap: number = DRIVE_BYTES_CAP
+): Promise<Uint8Array | null> {
   if (!res.body) return null
   const reader = res.body.getReader()
   const chunks: Uint8Array[] = []
@@ -323,7 +326,7 @@ export async function boundedBytes(res: Response): Promise<Uint8Array | null> {
       const { done, value } = await reader.read()
       if (done) break
       total += value.byteLength
-      if (total > DRIVE_BYTES_CAP) {
+      if (total > cap) {
         overflowed = true
         break
       }
