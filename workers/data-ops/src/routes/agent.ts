@@ -432,6 +432,8 @@ export async function postTranslateText(request: Request, env: Env): Promise<Res
   let unreachable = 0
   let cutOff = 0
   let firstFailure: unknown = null
+  // Kept only to describe a failure, and only its shape is ever written down.
+  let lastAnswer: string | null = null
 
   for (const batch of attempts) {
     const carried = batch.map((i) => pieces[i])
@@ -450,6 +452,7 @@ export async function postTranslateText(request: Request, env: Env): Promise<Res
     }
     const read = readTranslations(answer.text, carried)
     if (read === null) {
+      lastAnswer = answer.text
       // An answer stopped at the ceiling is a DIFFERENT failure from an answer
       // the model wrote badly, and the reader is owed the difference.
       if (answer.truncated) cutOff++
@@ -469,6 +472,15 @@ export async function postTranslateText(request: Request, env: Env): Promise<Res
       return fail(502, "translate_unreachable", "The translation didn't come back. Try again in a moment.")
     if (cutOff > 0)
       return fail(502, "translate_too_long", "There's too much text here to translate in one go.")
+    // THE ONE FAILURE THAT USED TO LEAVE NO TRACE. Recorded as a shape, never as
+    // the words — see `describeUnreadable`.
+    if (lastAnswer !== null)
+      await recordWorkerError(
+        env.DB,
+        "data-ops",
+        "agent/translate",
+        new Error(`unreadable answer — ${describeUnreadable(lastAnswer)}`)
+      )
     return fail(502, "translate_unreadable", "We couldn't read the translation that came back. Try again in a moment.")
   }
   if (firstFailure !== null) await recordWorkerError(env.DB, "data-ops", "agent/translate", firstFailure)
@@ -485,6 +497,66 @@ export async function postTranslateText(request: Request, env: Env): Promise<Res
  * Exported for its unit test, like `sseFrame` above: this is the whole of the
  * door's defence against an answer that came back wrong, and reading the code
  * is not the same as running it. */
+/** WHY AN ANSWER COULD NOT BE READ, IN WORDS THAT CARRY NO CUSTOMER TEXT.
+ *
+ * The unreadable branch below used to record NOTHING — `recordWorkerError` only
+ * ran when the model call itself threw, which is the one failure that was
+ * already obvious. So the failure that actually shipped (a correct answer with
+ * unescaped newlines in it) left no trace anywhere, and finding it meant
+ * replaying the request by hand against the model.
+ *
+ * The content is deliberately NOT logged. This is a client's ticket being
+ * translated for somebody; the error store is not the place for it. What goes in
+ * is the SHAPE — how long, did it look like an array at all, how many raw
+ * control characters were in it — which is everything needed to tell the fault
+ * classes apart and nothing that identifies anybody. */
+export function describeUnreadable(answer: string): string {
+  const trimmed = answer.trim()
+  const start = trimmed.indexOf("[")
+  const end = trimmed.lastIndexOf("]")
+  // Counted rather than matched: a regex over a control range is exactly what
+  // the linter forbids, and a loop says the same thing without the escape.
+  let controls = 0
+  for (const ch of trimmed) if (ch.charCodeAt(0) < 0x20) controls += 1
+  if (start === -1) return `no array in a ${trimmed.length}-character answer (the model wrote prose)`
+  if (end <= start) return `array opened and never closed, ${trimmed.length} characters`
+  return `array present but unparseable: ${trimmed.length} characters, ${controls} raw control characters`
+}
+
+/** RAW CONTROL CHARACTERS INSIDE JSON STRINGS, ESCAPED — the one repair
+ * `readTranslations` makes to an answer before giving up on it.
+ *
+ * Walks the text tracking whether it is inside a string literal and whether the
+ * previous character was a backslash, so an already-escaped `\n` is left alone
+ * and a newline BETWEEN elements (which is legal whitespace) is left alone too.
+ * Only a literal newline, carriage return or tab sitting inside a string — the
+ * thing that is never valid there — is rewritten. */
+function escapeControlsInStrings(text: string): string {
+  const ESCAPES: Record<string, string> = { "\n": "\\n", "\r": "\\r", "\t": "\\t" }
+  let out = ""
+  let inString = false
+  let escaped = false
+  for (const ch of text) {
+    if (escaped) {
+      out += ch
+      escaped = false
+      continue
+    }
+    if (ch === "\\") {
+      out += ch
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      out += ch
+      continue
+    }
+    out += inString && ESCAPES[ch] ? ESCAPES[ch] : ch
+  }
+  return out
+}
+
 export function readTranslations(answer: string, pieces: string[]): string[] | null {
   const fenced = answer.match(/```(?:json)?\s*([\s\S]*?)```/)
   const raw = (fenced ? fenced[1] : answer).trim()
@@ -492,11 +564,34 @@ export function readTranslations(answer: string, pieces: string[]): string[] | n
   const end = raw.lastIndexOf("]")
   if (start === -1 || end <= start) return null
 
+  const array = raw.slice(start, end + 1)
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw.slice(start, end + 1))
+    parsed = JSON.parse(array)
   } catch {
-    return null
+    // A SECOND GO, AT THE ONE THING THAT ACTUALLY GOES WRONG.
+    //
+    // Measured against the real model on 2026-08-21, on a real ticket: the
+    // answer was a perfectly formed array of three correct English translations
+    // — and `JSON.parse` refused it, because the model had copied the
+    // PARAGRAPH BREAKS of the German it was translating straight through as raw
+    // newlines. A literal newline inside a JSON string is not JSON; it must be
+    // `\n`. Eighteen of them in that one answer.
+    //
+    // So the door's ONE unreadable-answer branch was firing on every ticket
+    // with more than one paragraph, which is nearly every real ticket, while
+    // the model was doing its job correctly. It read as "the AI is broken" and
+    // it was punctuation.
+    //
+    // The repair is narrow on purpose: escape the control characters inside
+    // string literals and change nothing else. If it still does not parse we
+    // return null exactly as before, so this can only ever turn a failure into
+    // an answer.
+    try {
+      parsed = JSON.parse(escapeControlsInStrings(array))
+    } catch {
+      return null
+    }
   }
   if (!Array.isArray(parsed)) return null
 

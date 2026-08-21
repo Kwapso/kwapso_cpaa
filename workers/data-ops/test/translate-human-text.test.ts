@@ -101,6 +101,48 @@ describe("a model's answer, read defensively", () => {
   })
 })
 
+describe("the answer that actually came back, on 21 Aug 2026", () => {
+  // NOT AN INVENTED SHAPE. This is the failure the owner hit on ticket
+  // CONFIA-T0016 and it was reproduced against the same model with the same
+  // system prompt: a correct three-element array of correct English, refused by
+  // `JSON.parse` because the model carried the German's paragraph breaks
+  // through as RAW newlines. `finish_reason` was "stop" — nothing was
+  // truncated, nothing was malformed in any way a reader would notice. The door
+  // called it unreadable and charged nobody, on every ticket with a blank line
+  // in it, which is nearly every real ticket.
+  const german = ["falsches Datum\n\nbei Eingabe eines Stornodatums", "Die Aufgaben-Logik\n\n- Liegt das Storno", "Hello :)"]
+
+  it("reads an array whose strings carry raw newlines", () => {
+    const answer = '["Incorrect date\n\nWhen entering a cancellation date", "The task logic\n\n- If the cancellation date", "Hello :)"]'
+    expect(() => JSON.parse(answer)).toThrow() // the exact reason it was refused
+    expect(readTranslations(answer, german)).toEqual([
+      "Incorrect date\n\nWhen entering a cancellation date",
+      "The task logic\n\n- If the cancellation date",
+      "Hello :)",
+    ])
+  })
+
+  it("leaves an ALREADY-escaped newline exactly as the model wrote it", () => {
+    const answer = '["one\\ntwo"]'
+    expect(readTranslations(answer, ["eins\nzwei"])).toEqual(["one\ntwo"])
+  })
+
+  it("does not touch newlines BETWEEN elements, which were always legal", () => {
+    const answer = '[\n  "one",\n  "two"\n]'
+    expect(readTranslations(answer, ["eins", "zwei"])).toEqual(["one", "two"])
+  })
+
+  it("still gives up on an answer the repair cannot save", () => {
+    expect(readTranslations("I am unable to translate this text.", german)).toBeNull()
+    expect(readTranslations('["unclosed', german)).toBeNull()
+  })
+
+  it("carries tabs and carriage returns through the same repair", () => {
+    const answer = '["a\tb\r\nc"]'
+    expect(readTranslations(answer, ["x"])).toEqual(["a\tb\r\nc"])
+  })
+})
+
 describe("the door itself", () => {
   const src = readFileSync(join(__dirname, "..", "src/routes/agent.ts"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
