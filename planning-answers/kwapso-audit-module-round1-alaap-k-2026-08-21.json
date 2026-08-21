@@ -1,0 +1,397 @@
+{
+  "meta": {
+    "tool": "plan_with_questions",
+    "slug": "kwapso-audit-module-round1",
+    "respondent": "Alaap K",
+    "answered": 59,
+    "total": 59,
+    "exported_at": "2026-08-21T06:04:34.194Z"
+  },
+  "answers": {
+    "audience": {
+      "section": "What we are building",
+      "question": "Before anything else — how much detail do you want in this document?",
+      "selected": "Give me the technical version, I want to see the data shapes",
+      "notes": ""
+    },
+    "wave-word": {
+      "section": "The words we will use",
+      "question": "Is <strong>wave</strong> the word, finally?",
+      "selected": "Yes — wave. Lock it and I will use it everywhere",
+      "notes": ""
+    },
+    "wave-customer": {
+      "section": "The words we will use",
+      "question": "Does the customer see this word too, or only we?",
+      "selected": "The customer sees it as well — one word everywhere",
+      "notes": ""
+    },
+    "chk-wave": {
+      "section": "The words we will use",
+      "question": "Alex sells Keno Group three packages. Each one contains an analysis, a build, a validation and a training. What has he sold, in the new words?",
+      "selected": "Three waves",
+      "notes": ""
+    },
+    "scope-of-records": {
+      "section": "The four new things",
+      "question": "Do departments, roles and tools belong to one customer each, or are they a shared library?",
+      "selected": "Each customer has their own — Keno Group's warehouse is not Hogo's (recommended)",
+      "notes": ""
+    },
+    "role-people": {
+      "section": "The four new things",
+      "question": "How do people get into a role?",
+      "selected": "Pick from the contacts we already hold for that company (recommended)",
+      "notes": ""
+    },
+    "role-multi": {
+      "section": "The four new things",
+      "question": "Can one person hold more than one role?",
+      "selected": "Yes",
+      "notes": ""
+    },
+    "role-dept": {
+      "section": "The four new things",
+      "question": "Does a role sit in exactly one department?",
+      "selected": "It can span several departments",
+      "notes": ""
+    },
+    "tool-fields": {
+      "section": "The four new things",
+      "question": "What does a tool record carry?",
+      "selected": [
+        "Name",
+        "What it costs",
+        "How often it is billed (monthly / yearly)",
+        "Which department or role uses it",
+        "Notes",
+        "Number of seats or licences"
+      ],
+      "notes": ""
+    },
+    "tool-cost-history": {
+      "section": "The four new things",
+      "question": "When a tool's price changes, what happens to the old price?",
+      "selected": "Keep the old one with a date, so “what did this cost in March” has an answer",
+      "notes": ""
+    },
+    "tool-owner": {
+      "section": "The four new things",
+      "question": "Do we track tools <em>we</em> pay for as well, or only the customer's?",
+      "selected": "Only the customer's — this is an audit of their spend (recommended)",
+      "notes": ""
+    },
+    "audit-rate-home": {
+      "section": "The money question",
+      "question": "Where does the customer's staff hourly cost live?",
+      "selected": "Its own new rate card, per customer — separate from both existing ones (recommended)",
+      "notes": ""
+    },
+    "audit-rate-level": {
+      "section": "The money question",
+      "question": "Is that hourly cost set on the role, the person, or the department?",
+      "selected": "On the role — “a supervisor costs €38” (recommended, matches Aurora's description)",
+      "notes": ""
+    },
+    "rate-visible": {
+      "section": "The money question",
+      "question": "Can the customer see these staff costs in their portal?",
+      "selected": "No — we use them to compute a saving, and only the saving is shown",
+      "notes": ""
+    },
+    "rate-currency": {
+      "section": "The money question",
+      "question": "Currency — how do we handle it?",
+      "selected": "One currency per customer, set once on the account (recommended)",
+      "notes": ""
+    },
+    "chk-rate": {
+      "section": "The money question",
+      "question": "Alex is auditing Keno Group. Their warehouse supervisor is paid about €38 an hour. Which of the three rate cards does that number belong on?",
+      "selected": null,
+      "notes": "I am not sure about this because my instinct just says this cost would belong at the role level, correct? "
+    },
+    "step-kind-list": {
+      "section": "What one step carries",
+      "question": "“Manual, automation, AI” — is that list fixed, or should you be able to add to it?",
+      "selected": "An editable dropdown, like ticket types are today (recommended)",
+      "notes": "And maybe that can become part of our selectable data as well. "
+    },
+    "step-status": {
+      "section": "What one step carries",
+      "question": "Aurora's design shows steps in different colours — she said “we have the colours to play with status, but I do not know how we will use that yet.” What should the colour mean?",
+      "selected": "What we plan to do to it: keep, automate, or eliminate (recommended)",
+      "notes": ""
+    },
+    "step-cost-live": {
+      "section": "What one step carries",
+      "question": "If a role's hourly cost is corrected later, should every step's cost move with it?",
+      "selected": "No — a step remembers the cost it had when it was recorded",
+      "notes": ""
+    },
+    "step-tools": {
+      "section": "What one step carries",
+      "question": "Can one step name more than one tool?",
+      "selected": "Yes, several",
+      "notes": ""
+    },
+    "step-who": {
+      "section": "What one step carries",
+      "question": "“Who does it” — a role, a named person, or either?",
+      "selected": "A role (recommended — people change, the job does not)",
+      "notes": ""
+    },
+    "step-frequency": {
+      "section": "What one step carries",
+      "question": "How often a step runs — per what?",
+      "selected": "Pick the period per step: day, week, month",
+      "notes": ""
+    },
+    "build-method": {
+      "section": "The shape of a process",
+      "question": "How do you add a step?",
+      "selected": "A form: name it, and pick what it comes after (recommended — Aurora's description)",
+      "notes": "whatever is easy and user friendly across any screens.. drag and drop on small screens seems tougher no?"
+    },
+    "decision-record": {
+      "section": "The shape of a process",
+      "question": "Is a decision (the diamond) a kind of step, or a different thing?",
+      "selected": "A kind of step, with its own kind value (recommended — one table, one picture)",
+      "notes": ""
+    },
+    "decision-cost": {
+      "section": "The shape of a process",
+      "question": "Does a decision take time and cost money?",
+      "selected": "Yes — deciding is work, and often the slowest part",
+      "notes": ""
+    },
+    "branch-count": {
+      "section": "The shape of a process",
+      "question": "How many ways can a decision split?",
+      "selected": "Any number, each with its own label",
+      "notes": ""
+    },
+    "branch-rejoin": {
+      "section": "The shape of a process",
+      "question": "Can two branches come back together into one step?",
+      "selected": "Yes — real processes rejoin all the time",
+      "notes": ""
+    },
+    "chk-decision": {
+      "section": "The shape of a process",
+      "question": "Looking at the picture above — how many steps does that process contain?",
+      "selected": "Four, if a decision counts as a step",
+      "notes": ""
+    },
+    "revision-model": {
+      "section": "Time travel",
+      "question": "Confirming the change: do we replace process versions with dated step history?",
+      "selected": "Yes — dated step history, versions go away (this is what the call agreed)",
+      "notes": ""
+    },
+    "revision-date": {
+      "section": "Time travel",
+      "question": "When a step changes, who decides the date?",
+      "selected": "You type it — an audit records what was true last March, not today (recommended)",
+      "notes": "But the date should default to today's date, and we can change it before submitting the form or whatever. "
+    },
+    "revision-future": {
+      "section": "Time travel",
+      "question": "Can a change be dated in the future — “this becomes automated on 1 September”?",
+      "selected": "Yes — that is a plan, and the map should hold it",
+      "notes": ""
+    },
+    "removed-default": {
+      "section": "Time travel",
+      "question": "A step that was removed — does it show in today's view?",
+      "selected": "Always shown, greyed out",
+      "notes": ""
+    },
+    "date-control": {
+      "section": "Time travel",
+      "question": "How do you pick the date you are looking at?",
+      "selected": "A slider you drag along the timeline (recommended — it makes the change visible)",
+      "notes": ""
+    },
+    "what-triggers": {
+      "section": "Time travel",
+      "question": "What makes a change get recorded?",
+      "selected": "Also automatically, when a story that touches this step is finished",
+      "notes": "And manual editing, of course. \n\nOh, and I know this is not the right answer to mention this in this, but the permission matrix has to be updated with all these new things we are doing, so just keep that in mind. "
+    },
+    "chk-timetravel": {
+      "section": "Time travel",
+      "question": "A step was removed on 15 August. You set the date on the process to 1 August. Do you see that step?",
+      "selected": "Yes, as it was — it had not been removed yet on 1 August",
+      "notes": ""
+    },
+    "baseline-def": {
+      "section": "What a saving is measured from",
+      "question": "With versions gone, what does “as it was” mean?",
+      "selected": "The state on one audit date set per process — Alex's visit, effectively",
+      "notes": ""
+    },
+    "baseline-new-step": {
+      "section": "What a saving is measured from",
+      "question": "A step that did not exist at the start and was added later — how does it count?",
+      "selected": "It is a cost: new time we added, shown as a negative saving",
+      "notes": ""
+    },
+    "baseline-slower": {
+      "section": "What a saving is measured from",
+      "question": "A step now takes longer than it did. Show it?",
+      "selected": "Yes — show it as a negative, it keeps the whole number honest (recommended)",
+      "notes": ""
+    },
+    "savings-scope": {
+      "section": "What a saving is measured from",
+      "question": "Should the savings number cover removed steps?",
+      "selected": "Yes — eliminating a step is the biggest kind of saving there is (recommended)",
+      "notes": ""
+    },
+    "tool-savings": {
+      "section": "What a saving is measured from",
+      "question": "We drop a €300-a-month tool. Where does that show up?",
+      "selected": "Alongside the hours, as money saved — a second figure next to the time (recommended)",
+      "notes": ""
+    },
+    "chk-savings": {
+      "section": "What a saving is measured from",
+      "question": "A customer opens their portal and sees “we have saved you 54 hours a month”. Under our rules, what must appear with that number?",
+      "selected": null,
+      "notes": "I don't know. Whatever Aurora says, we go with that. "
+    },
+    "wave-shape": {
+      "section": "Waves",
+      "question": "How should a wave be built?",
+      "selected": "Its own record, and a sprint says which wave it belongs to (recommended)",
+      "notes": ""
+    },
+    "wave-fields": {
+      "section": "Waves",
+      "question": "What does a wave carry?",
+      "selected": [
+        "A name",
+        "The customer it was sold to",
+        "What it sold for",
+        "A goal or description",
+        "A reference number like sprints have"
+      ],
+      "notes": ""
+    },
+    "wave-price": {
+      "section": "Waves",
+      "question": "Where does the price live?",
+      "selected": "Both: a sold price on the wave, and an internal split across sprints",
+      "notes": "I believe the price would come from the sprint level, right, because each sprint has a different engagement type, and engagement type contains the price mapping. Sure, we can always set the total statically every time we add or update sprints within a wave, but the actual price and things are calculated at the sprint level first, set statically there, and then taken to the wave level. "
+    },
+    "wave-required": {
+      "section": "Waves",
+      "question": "Must every sprint belong to a wave?",
+      "selected": "No — plenty of work is just a sprint (recommended)",
+      "notes": ""
+    },
+    "wave-portal": {
+      "section": "Waves",
+      "question": "Do customers see waves in their portal?",
+      "selected": "Yes — it is how they were sold to, so it is how they should read it back",
+      "notes": ""
+    },
+    "portal-maps": {
+      "section": "Who sees what",
+      "question": "Should a customer be able to open their own process maps in the portal?",
+      "selected": "Yes, read-only — it is a map of their business and it makes the savings believable",
+      "notes": ""
+    },
+    "portal-detail": {
+      "section": "Who sees what",
+      "question": "If they can see a map, how much of it?",
+      "selected": "Also the times and how often things run",
+      "notes": ""
+    },
+    "portal-tools": {
+      "section": "Who sees what",
+      "question": "Can a customer see the tools list and what those tools cost them?",
+      "selected": "Yes — it is their own spend",
+      "notes": ""
+    },
+    "portal-timetravel": {
+      "section": "Who sees what",
+      "question": "Does the customer get the date slider too?",
+      "selected": "Yes — “here is your business in June, here it is now” is the whole pitch",
+      "notes": ""
+    },
+    "chk-portal": {
+      "section": "Who sees what",
+      "question": "Which of these can a customer never see in their portal, no matter what anyone switches on?",
+      "selected": "What our own hour costs us, and our margin",
+      "notes": ""
+    },
+    "separate-app": {
+      "section": "Scope, and five days",
+      "question": "Still happy with that?",
+      "selected": "Yes — one app (recommended, and much less work)",
+      "notes": ""
+    },
+    "story-link": {
+      "section": "Scope, and five days",
+      "question": "Confirm that stays out of this round?",
+      "selected": "Actually I want it in — a finished story should update the step it changed",
+      "notes": ""
+    },
+    "cut-order": {
+      "section": "Scope, and five days",
+      "question": "If only part of this lands by the 25th, what matters most? Tick everything that must be in the first cut.",
+      "selected": [
+        "Departments, roles, people and tools — the records themselves",
+        "Steps carrying kind, who, tool and cost",
+        "The flowchart picture, readable",
+        "Branching and decisions",
+        "The date slider and dated history",
+        "The savings arithmetic surviving the change",
+        "Waves"
+      ],
+      "notes": "unrelated: 'One active timer per person, and clicking the timer takes you to the thing it is running on. It came from the same call and it is on the list — it is simply not part of the audit module, so it is not competing with anything here.' — but enforce the timer chnage as well."
+    },
+    "flowchart-first": {
+      "section": "Scope, and five days",
+      "question": "The flowchart itself — how finished does it need to be on day one?",
+      "selected": "Read-only picture first; you build the process on a form (recommended)",
+      "notes": ""
+    },
+    "alex-ready": {
+      "section": "Scope, and five days",
+      "question": "What does Alex actually need in front of him for the first real audit?",
+      "selected": "All of that, plus the savings figure calculated live",
+      "notes": ""
+    },
+    "migration-risk": {
+      "section": "Scope, and five days",
+      "question": "On the 25th we start moving data across. What worries you most about that?",
+      "selected": [
+        "Old records arriving wrong and nobody noticing",
+        "Something that works in the old system missing in the new one",
+        "Customers seeing a half-migrated portal",
+        "The team having to learn it during a live week"
+      ],
+      "notes": ""
+    },
+    "stop-using": {
+      "section": "Scope, and five days",
+      "question": "Honest question: what would make you quietly stop using this module and go back to a spreadsheet?",
+      "selected": [
+        "Too many fields to fill in during a live meeting",
+        "The picture not being good enough to show a customer",
+        "Having to keep it up to date afterwards",
+        "Not trusting the numbers it produces"
+      ],
+      "notes": ""
+    },
+    "missing": {
+      "section": "Scope, and five days",
+      "question": "What is missing entirely? Something you expected to be asked about and were not.",
+      "selected": "Nothing I can think of",
+      "notes": ""
+    }
+  }
+}
