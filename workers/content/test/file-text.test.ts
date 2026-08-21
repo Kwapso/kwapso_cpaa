@@ -13,7 +13,13 @@
 
 import { describe, expect, it } from "vitest"
 
-import { extractFileText, fileShape, looksLikeProse } from "../src/lib/file-text"
+import {
+  boundedBytes,
+  DRIVE_BYTES_CAP,
+  extractFileText,
+  fileShape,
+  looksLikeProse,
+} from "../src/lib/file-text"
 
 /** A ZIP holding STORED (uncompressed) entries. Enough to exercise the directory
  * walk without depending on the runtime's deflate. */
@@ -131,5 +137,52 @@ describe("plain text still reads exactly as it did", () => {
   it("passes a markdown file through untouched", async () => {
     const bytes = new TextEncoder().encode("# Sprint 3\n\nVouchers ship on Tuesday.")
     expect(await extractFileText(bytes, "notes.md", "text/markdown")).toContain("Vouchers ship on Tuesday.")
+  })
+})
+
+// ── the byte ceiling, which is a different ceiling from the text one ─────────
+//
+// `DRIVE_TEXT_CAP` bounds the WORDS we keep. It could never bound a .docx,
+// because a .docx has no words until it has been decompressed — so the file was
+// pulled in whole with `arrayBuffer()` and measured afterwards. One large
+// presentation in a shared folder is enough to exceed a worker's memory, and
+// when it does the error is "Memory limit would be exceeded before EOF" and
+// every OTHER document in the same pass dies with it. That is the fault this
+// bounds: not one unreadable file, a whole unreadable sweep.
+describe("a file too big to read", () => {
+  /** A body that hands out `chunk` repeatedly until `total` bytes are gone. */
+  function streamOf(total: number, chunk = 64 * 1024): Response {
+    let sent = 0
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent >= total) return controller.close()
+          const size = Math.min(chunk, total - sent)
+          sent += size
+          controller.enqueue(new Uint8Array(size))
+        },
+      })
+    )
+  }
+
+  it("reads a file under the cap whole", async () => {
+    const bytes = await boundedBytes(streamOf(200_000))
+    expect(bytes).not.toBeNull()
+    expect(bytes!.byteLength).toBe(200_000)
+  })
+
+  it("gives up on one past the cap rather than buffering it", async () => {
+    expect(await boundedBytes(streamOf(DRIVE_BYTES_CAP + 1))).toBeNull()
+  })
+
+  it("answers null rather than half a ZIP", async () => {
+    // Not a truncated buffer, unlike the text read: half a sentence is still a
+    // sentence, half a ZIP decodes to nothing at all.
+    const bytes = await boundedBytes(streamOf(DRIVE_BYTES_CAP * 2))
+    expect(bytes).toBeNull()
+  })
+
+  it("answers null for a response with no body at all", async () => {
+    expect(await boundedBytes(new Response(null))).toBeNull()
   })
 })

@@ -39,7 +39,7 @@ import {
   DRIVE_WALK_MAX_DEPTH,
   DRIVE_WALK_MAX_FILES,
 } from "@shared/workers/limits"
-import { extractFileText, fileShape } from "./file-text"
+import { DRIVE_BYTES_CAP, boundedBytes, extractFileText, fileShape } from "./file-text"
 import { GuardError } from "@shared/workers/gating"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
@@ -661,7 +661,16 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
     const meta = await driveFileMeta(token, id)
     const shape = fileShape(meta.name, meta.mime)
     if (shape !== "text") {
-      const bytes = new Uint8Array(await res.arrayBuffer())
+      // BOUNDED, for the same reason the text read below is — and this is the
+      // half that was still unbounded. `arrayBuffer()` takes the whole file
+      // whatever it weighs; `boundedBytes` stops at the cap and tells Google to
+      // stop sending. Google's own `size` is checked FIRST because it is free
+      // and it lets an enormous file be skipped without transferring any of it,
+      // but it is absent for some files and wrong for others, so the read is
+      // capped as well. A guess and a guard, not a guess instead of one.
+      if (meta.size > DRIVE_BYTES_CAP) return ""
+      const bytes = await boundedBytes(res)
+      if (bytes === null) return ""
       return extractFileText(bytes, meta.name, meta.mime)
     }
   }
@@ -716,18 +725,24 @@ const DRIVE_SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
 /** NAME AND MIME for one file, the two things `fileShape` needs to decide how
  * the bytes should be read. Separate from `driveReadable` because that one is
  * about following a shortcut and this one is about what to do at the end of it. */
-async function driveFileMeta(token: string, fileId: string): Promise<{ name: string; mime: string }> {
+async function driveFileMeta(
+  token: string,
+  fileId: string
+): Promise<{ name: string; mime: string; size: number }> {
   try {
     const meta = (await googleFetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name,mimeType&supportsAllDrives=true`,
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name,mimeType,size&supportsAllDrives=true`,
       token
-    )) as { name?: unknown; mimeType?: unknown }
-    return { name: str(meta.name), mime: str(meta.mimeType) }
+    )) as { name?: unknown; mimeType?: unknown; size?: unknown }
+    // `size` arrives as a STRING and is absent entirely for Google-native files.
+    // Absent reads as zero, which means "no answer" and lets the byte cap below
+    // do the deciding rather than refusing a file Google simply did not measure.
+    return { name: str(meta.name), mime: str(meta.mimeType), size: Number(meta.size) || 0 }
   } catch {
     // An unreadable header is not a reason to refuse the body — the extension in
     // the name is the fallback, and with no name at all the caller reads it as
     // plain text exactly as it always did.
-    return { name: "", mime: "" }
+    return { name: "", mime: "", size: 0 }
   }
 }
 

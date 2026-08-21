@@ -280,3 +280,66 @@ export async function extractFileText(
   const text = new TextDecoder().decode(bytes).slice(0, FILE_TEXT_CAP)
   return looksLikeProse(text) ? text : ""
 }
+
+/** THE MOST BYTES A FILE MAY WEIGH BEFORE WE READ IT, and the sibling of
+ * `DRIVE_TEXT_CAP` above — that one bounds the WORDS we keep, this one bounds
+ * the BYTES we take to get them.
+ *
+ * It exists because the text cap could not do this job. A .docx, .xlsx, .pptx
+ * or .pdf is not text: it has to be decompressed and parsed before there are
+ * any characters to count, so the whole file was pulled into memory with
+ * `arrayBuffer()` first — unbounded — and only then measured. One large
+ * presentation in a shared folder is enough to exceed a worker's memory budget,
+ * and when it does the error is "Memory limit would be exceeded before EOF" and
+ * EVERY document in that pass is lost with it, not just the big one.
+ *
+ * Eight megabytes is far above any real document (the largest thing this team
+ * has indexed came to 100,000 characters, the text cap, from a file measured in
+ * hundreds of kilobytes) and far below the point where unzipping one is a
+ * problem. A file past it is skipped with its name recorded rather than
+ * silently — a document nobody can read is a fact, not an error. */
+export const DRIVE_BYTES_CAP = 8_000_000
+
+/** A FILE'S BYTES, UP TO `DRIVE_BYTES_CAP`, or null if it is bigger than that.
+ *
+ * The binary twin of the chunked text read below, and it exists for the same
+ * reason: `arrayBuffer()` has no ceiling, so the size of the file decides
+ * whether the worker survives. This reads in chunks, counts as it goes, and the
+ * moment the total passes the cap it stops, cancels the download and answers
+ * null — a file we cannot read is skipped, rather than taking every other
+ * document in the same pass down with it.
+ *
+ * NULL RATHER THAN A TRUNCATED BUFFER, unlike the text read. Half a sentence is
+ * still a sentence; half a ZIP is not a ZIP, and half a PDF's compressed
+ * streams decode to nothing. There is nothing to salvage, so it says so. */
+export async function boundedBytes(res: Response): Promise<Uint8Array | null> {
+  if (!res.body) return null
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  let overflowed = false
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > DRIVE_BYTES_CAP) {
+        overflowed = true
+        break
+      }
+      chunks.push(value)
+    }
+  } catch {
+    return null
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+  if (overflowed) return null
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const chunk of chunks) {
+    out.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return out
+}
