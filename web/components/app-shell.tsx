@@ -411,7 +411,7 @@ export function AppShell({
          * The running timer sits on the same row on desktop (the mobile bar has
          * its own copy above): one line that is present on every screen and shows
          * nothing at all when nobody is timing anything. */}
-        <div className="flex items-center justify-between gap-2 px-4 pt-4 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between gap-2 px-4 pt-4 sm:px-6 lg:px-8">
           <div className="min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 && (
               <Breadcrumbs items={breadcrumbs} onNavigate={onNavigate ?? softNavigate} />
@@ -423,7 +423,7 @@ export function AppShell({
         </div>
 
         {/* THE PAGE GUTTERS (UI-RULEBOOK L1 / S2). One string, used here and by
-            the record header band so both align to the same left edge. `lg:px-10`
+            the record header band so both align to the same left edge. `lg:px-8`
             is 40px, the brand site's own `--margin--m`, and what `.nk-container`
             computes to at every desktop width.
 
@@ -435,7 +435,7 @@ export function AppShell({
             what happened to the record header and tab strip (D3) the first time
             they were built. `clip` clips the same overflow and creates no scroll
             container, so the document stays the scroller and sticky works. */}
-        <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-10">
+        <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-8">
           {children}
         </main>
 

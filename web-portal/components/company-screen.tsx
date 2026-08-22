@@ -63,7 +63,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
   ].filter((d): d is { label: string; value: string } => d !== null)
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-12">
       <div className="flex items-start gap-4">
         {/* THEIR OWN MARK, on their own page. The column is on the row the fence
             already hands this screen, and the portal drew no picture anywhere at

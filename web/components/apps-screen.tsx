@@ -182,7 +182,7 @@ export function AppsScreen({
             {tab === "inactive" ? t("Nothing is finished or put away yet.") : t("No apps yet.")}
           </p>
         ) : (
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-12">
             {groupByStage(shown).map((group) => (
               <section key={group.stage} className="flex flex-col gap-4">
                 <h2 className="text-lg font-medium">{t(group.stage)}</h2>

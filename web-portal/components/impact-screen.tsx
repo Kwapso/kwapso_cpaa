@@ -172,7 +172,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
     )
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-12">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-medium tracking-tight">{t("What this has been worth")}</h1>
         <p className="text-muted-foreground">

@@ -325,7 +325,7 @@ export function DeepLinkScreen() {
        * module screen. On the 1283px laptop the feedback screenshots were taken
        * at, that left a 138px gutter each side; on a 2560px display, over 700px.
        * 1600px keeps a comfortable measure on a large display while the shell's
-       * own `px-4 sm:px-6 lg:px-10` gutters (S2, and exactly the brand site's own
+       * own `px-4 sm:px-6 lg:px-8` gutters (S2, and exactly the brand site's own
        * 40px `--margin--m`) do the work at every width below it.
        *
        * `rounded-xl transition-shadow` went with it: it rounded and animated a

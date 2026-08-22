@@ -147,7 +147,7 @@ export function ContactsByCompany({
     groups.push({ key: "unattached", title: t("No company yet"), rows: unattached })
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-12">
       {/* The one sentence that keeps this honest — see (a) in the header. It is
           not shown once everything is loaded, because then a group IS the
           company's contacts and saying otherwise would be the opposite lie. */}

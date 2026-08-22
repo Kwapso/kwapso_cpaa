@@ -222,7 +222,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         ) : (
           // Outside the fence a real id and a made-up one are the same sentence —
           // the door answers null either way, and so do we.
-          <p className="text-muted-foreground rounded-xl border border-dashed p-10 text-center">
+          <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
             {t("We can't find that ticket.")}
           </p>
         )}

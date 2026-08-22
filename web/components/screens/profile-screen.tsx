@@ -55,7 +55,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
 
   return (
     <>
-      <div className="flex w-full flex-col gap-10">
+      <div className="flex w-full flex-col gap-12">
         <section className="animate-rise flex flex-col gap-4">
           <List
             surface="none"

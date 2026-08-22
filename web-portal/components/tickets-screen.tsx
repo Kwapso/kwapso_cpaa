@@ -75,7 +75,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
           <Skeleton className="h-20 w-full rounded-xl" />
         </div>
       ) : (tickets ?? []).length === 0 ? (
-        <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center">
+        <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
           <p>{t("Nothing here yet.")}</p>
           <p className="mt-1 text-sm">
             {t("Anything you ask us, a question, a problem, a change, lives on this page.")}

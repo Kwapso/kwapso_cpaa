@@ -355,7 +355,7 @@ export function SprintsScreen({
     }))
 
   const overview = (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-12">
       {sprints.length === 0 && <EmptyLine concept="sprints">{t("No sprints yet.")}</EmptyLine>}
       {SPRINT_STATES.map((state) => {
         const inState = sprints.filter((s) => sprintState(s, today) === state)

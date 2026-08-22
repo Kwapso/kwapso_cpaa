@@ -329,7 +329,7 @@ export function RecordBody({
       // was. The min-height keeps the field from reappearing under a short
       // record — a strip of drifting orange below the last row is exactly the
       // thing 11.5 is about.
-      className="bg-background relative z-0 -mx-4 min-h-[calc(100svh-9rem)] px-4 pb-16 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
+      className="bg-background relative z-0 -mx-4 min-h-[calc(100svh-9rem)] px-4 pb-16 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       style={
         {
           // Where the tab strip pins: under the app bar, and under the collapsed
