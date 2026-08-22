@@ -124,6 +124,26 @@ own repo logged this as F2-1 and reached the same conclusion.)
 **h · Search input height.** Chapter 6 draws it at 40; `--control-height-input`
 is 44. The app uses 44 everywhere. (Logged as F2-2.)
 
+**i · A code cell cannot be both "a box" and 24px at 44 wide.** Ruling 03 is
+emphatic that a one-time-code cell takes `--radius-card` and NOT the 6px
+selection exception, "because a code cell is a box". The cell is also fixed at
+44 × 52. Those two numbers fight: CSS clamps a corner radius to half the shorter
+side, so a 24px radius on a 44px-wide cell renders at 22 and the cell comes out
+as a stadium — visually a pill, which is the one thing the ruling was written to
+prevent. Built to the ruling exactly, so the app currently shows six very rounded
+cells. It needs either a smaller radius for this component or a wider cell; the
+reskin picked neither, because both are your call. Files:
+`shared/web/code-input.tsx`, both sign-in screens.
+
+**j · Translucent surfaces.** The kit bans opacity HOVERS explicitly and says
+every colour is one of the seven. It does not rule on a translucent SURFACE, and
+the library uses about sixty — `bg-muted/40` on an alternate table row,
+`bg-primary/10` on a selected item, `border-destructive/40` on an error edge. An
+alpha of a token is a colour the palette does not contain, so these are probably
+against the spirit of it; but they are subtle surfaces rather than hovers, mostly
+in components you have not drawn, so nothing was changed. The clearly-banned
+subset WAS fixed: every `disabled:opacity-*` is now the disabled fill and ink.
+
 ## 5 · Debt this reskin created or inherited
 
 - **The vendored library has no tests.** Upstream has 200+, including XSS-sanitisation and link-scheme regressions, but its `package.json` excludes `**/*.test.*` from the published package — so they were never in `node_modules` and could not be copied. Anything held only by an upstream test is unguarded here. Not a design question, but it is the largest thing the move cost.

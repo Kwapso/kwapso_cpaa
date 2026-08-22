@@ -54,7 +54,7 @@ function CommandInput({
       <Search className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
         className={cn(
-          "flex h-10 w-full bg-transparent py-3 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full bg-transparent py-3 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-ink-disabled",
           className
         )}
         {...props}

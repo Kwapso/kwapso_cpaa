@@ -167,7 +167,13 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 6. **[ROADMAP.md](ROADMAP.md)**, **history, not a plan.** The build record of ONE
    round (Phase C: members, roles & settings), closed 2026-07-02, with the
    type/endpoint contracts each of its phases plugged into. Kept so its decisions
-   aren't re-argued; it does not describe the eras that shipped after it. There is
+   aren't re-argued; it does not describe the eras that shipped after it.
+   **[RESKIN-REPORT.md](RESKIN-REPORT.md)** is history of the same kind, one era
+   later: the record of vendoring the component library into `shared/ui/` and
+   re-theming both front doors to the kwapso design kit (2026-08-22). Read it for
+   why a decision was made — the four token collisions, the four kit gaps decided
+   on the designer's behalf, and the one law exemption that was written and
+   deleted on the same day. There is
    deliberately no single "what's next" file. Open work lives beside the thing
    it's open on: **UI-GAPS.md** (library gaps), **EDGE-CASES.md** (the deferred
    perf wins), **AGENT-MODULES-PLAN.md** (the deferred agent hooks),
