@@ -106,10 +106,18 @@ worker reads and writes team data through that one layer. Never ad-hoc.
 
 `web/` is a Next.js app exported to **static** assets, served by the gateway
 alongside `/api/*` on the same origin. It is "lego assembled from a library": all
-UI primitives and collections come from `@kwapso/ui` (a separate repo);
-`web/` only composes *recipes* from them. **You do not edit the library from
-here**, if a primitive needs changing, surface it as a gap (UI-GAPS.md), don't
-fork it into the host. Screens are one client-resolved shell
+UI primitives and collections come from `shared/ui/`, imported as
+`@shared/ui/registry/primitives/button/button`; `web/` only composes *recipes*
+from them. The library was the npm package `@kwapso/ui`, installed from a
+separate repo, until it was **vendored into this repo on 2026-08-22**, because
+the re-theme needs to change what a component IS and not only what colour it is.
+**The two layers did not merge, only the address changed:** a primitive is
+generic, app-agnostic lego, and a control that only makes sense in this product
+still belongs in `web/components/`. If a primitive needs changing, change it in
+`shared/ui/` — that is now this repo's own code (UI-GAPS.md is the list of what
+it still cannot do). The one thing you must never do is edit the UPSTREAM
+library, which other Swift Struck products depend on; `shared/ui/README.md` says
+why in full. Screens are one client-resolved shell
 (`web/components/deep-link-screen.tsx`) rendering recipes from `web/lib/screens.ts`
 at `/t/<teamId>/<module>/<id>` URLs.
 
@@ -461,8 +469,11 @@ for some products and wrong for others.
    visibility of *other members*, a marketplace, a franchise network, a client
    portal where tenants share a team.
 
-**What a new product must NOT do.** Don't fork the UI library into the app (fix it in
-`@kwapso/ui`), don't add a public worker (only the two gateways are public, a third
+**What a new product must NOT do.** Don't hand-roll a second copy of a component that
+`shared/ui/` already ships (fix the one in `shared/ui/`, which this repo owns since
+2026-08-22), don't push a change of yours back to the UPSTREAM `swift-struck-ui` repo
+(other Swift Struck products depend on it), don't add a public worker (only the two
+gateways are public, a third
 public address is a third door onto `/internal/*`, the agent and the act-as-user
 surface), don't add
 a per-module database (one D1 per *team*, not per module, modules are tables inside

@@ -14,7 +14,7 @@
 // Mechanics: Chrome/Edge/Android fire `beforeinstallprompt` → we show a real
 // "Install" button that calls the captured event. iOS Safari fires no such
 // event, so we show the manual "Share → Add to Home Screen" walkthrough.
-// Composed entirely from @kwapso/ui (Sheet + Button) — no one-off UI.
+// Composed entirely from the library (Sheet + Button) — no one-off UI.
 
 import * as React from "react"
 import { usePathname } from "next/navigation"

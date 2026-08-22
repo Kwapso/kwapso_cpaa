@@ -38,7 +38,7 @@ export const VISIBLE_PROPS = new Set([
   "emptyText",
   // A FIELD'S HELP TEXT is the sentence under the input, and it is copy by
   // definition: `helpText` is the library `FieldConfig`'s own property name
-  // (@kwapso/ui/lib/config), so it cannot hold data the way a bare `title` can.
+  // (shared/ui/lib/config), so it cannot hold data the way a bare `title` can.
   // `translateRecipe` has translated `field.helpText` since the day it was
   // written; nothing was ever putting those sentences in the catalogue for it to
   // find, so the branch could only ever return the English it was given.

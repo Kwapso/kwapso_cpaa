@@ -1,9 +1,24 @@
 /* THE ONE PLACE EITHER FRONT DOOR OVERRIDES THE LIBRARY.
  *
- * @kwapso/ui is lego and is never edited from this repo — but an app may
- * override a token downstream. When BOTH doors need the same override, it lives
- * here, so the day the library adopts it as its default there is one line to
- * delete, not two to remember.
+ * ── READ THIS FIRST: THE REASON THIS FILE EXISTED HAS LARGELY GONE ─────────
+ *
+ * This file was built for a library that could not be edited. `@kwapso/ui` was
+ * a separate repo on somebody else's release schedule, so when a default was
+ * wrong the only honest move was to override it downstream, in one file rather
+ * than two, and wait.
+ *
+ * On 2026-08-22 the library was vendored into `shared/ui/` and this repo owns
+ * it. So the first question about any new rule below is no longer "which door
+ * needs this?" — it is "why is the component still doing the wrong thing?" An
+ * override is now a SECOND place a decision lives, and the post-mortem further
+ * down is what a second place costs: a rule written here on 30 June was still
+ * fighting a library fix that had shipped in v0.13.0, and it tinted every card
+ * in both apps for nine days before anyone connected the two.
+ *
+ * WHAT STILL BELONGS HERE: a rule that is genuinely about the APP rather than
+ * the component — the scroll-lock fix at the bottom is the model, because it
+ * corrects how a third-party overlay library interacts with these two shells,
+ * and no component owns that. Everything else should be fixed in `shared/ui/`.
  *
  * ── THERE ARE NO OVERRIDES RIGHT NOW, AND THAT IS THE POINT ────────────────
  *
@@ -107,8 +122,12 @@
  * gutter is reserved AND the margin is still added, which indents the page by a
  * scrollbar's width every time a dialog opens.
  *
- * It lives in the OVERRIDES file because both front doors need it and the
- * library is never edited from this repo. */
+ * It lives in the OVERRIDES file because both front doors need it and NO
+ * component owns it. That was true before the library was vendored and it is
+ * still true after: the fix corrects how a third-party overlay package
+ * (`react-remove-scroll`, pulled in by Radix) interacts with these two shells,
+ * and there is no component in `shared/ui/` whose stylesheet it belongs in.
+ * This is the shape of rule that still belongs here. */
 html {
   scrollbar-gutter: stable;
 }

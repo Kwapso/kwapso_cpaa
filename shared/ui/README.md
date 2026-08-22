@@ -1,9 +1,35 @@
 # shared/ui — the component library, vendored
 
-This is **Swift Struck UI v0.15.0** (`@swift-struck/ui`, installed here as
-`@kwapso/ui`), copied into this repo on **2026-08-22** from
-`node_modules/@kwapso/ui`. It is 94 components — 65 primitives, 26 collections
-and the token tier — plus the nine `lib/` helpers and `styles.css`.
+This is **Swift Struck UI** (`@swift-struck/ui`, installed here as `@kwapso/ui`),
+copied into this repo on **2026-08-22** out of `node_modules/@kwapso/ui`. It is
+94 components — 65 primitives, 26 collections and the token tier — plus the nine
+`lib/` helpers and `styles.css`.
+
+**The exact commit, because the version number is not trustworthy here.**
+
+```
+github.com/alaap-swift-struck/swift-struck-ui
+f679b456bca6571be97af43ba8a6846fa9b7291b
+```
+
+That SHA is what the lockfile pinned and therefore what was on disk and what was
+copied. Three things disagreed about what it was called: `package.json` asked for
+`#v0.15.0`, the installed `package.json` said `0.15.0`, and the lockfile's own
+cached metadata said `0.11.0`. The library's README warns about exactly this —
+npm resolves a GitHub dependency to a commit and reinstalls that commit forever,
+so an app can sit on months-old code while its `package.json` looks current, and
+*"the SHA in the lockfile is the truth, not the version field."*
+
+So the SHA is recorded and the version is not. Anyone diffing this directory
+against upstream should diff against that commit, not against a tag.
+
+**There are no tests in here, and there is no way there could have been.** The
+upstream repo has 200+, including XSS-sanitisation and link-scheme regressions,
+but its `package.json` `files` list ends with `"!**/*.test.*"` — the published
+package has never contained them, and the published package is all this repo ever
+had. Anything in these components that was only ever held by an upstream test is
+now unguarded here. That is written up in `NEEDS-A-SPEC.md`; it is the most
+significant thing the move cost.
 
 **It is ours now.** Not a mirror, not a cache, not a thing to keep in step with
 anything. The app owns this code, changes it in place, and will diverge from

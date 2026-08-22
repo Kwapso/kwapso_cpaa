@@ -3,7 +3,7 @@
 // THE CALENDAR — one component, every calendar screen, and every record on it
 // opens.
 //
-// WHY IT IS HERE AND NOT THE LIBRARY'S. `@kwapso/ui`'s `CalendarView` draws a
+// WHY IT IS HERE AND NOT THE LIBRARY'S. The library's `CalendarView` draws a
 // month grid on which nothing is clickable: an event is a plain `<div>`, the
 // component exposes no `onSelect` / `onEventClick` of any kind, and "+6 more" is
 // a second `<div>` naming records that no gesture can reach. So a task on the

@@ -27,10 +27,24 @@ paste-safe blocks (no `#` comment lines, their shell breaks on them) and say whi
 directory to run them in.
 
 ## The library is lego
-UI primitives and collections come from `@kwapso/ui` (its own repo). Apps
-assemble screens from them and never fork or hand-roll library components locally.
-If a primitive needs changing, flag the gap (the app's UI-GAPS list) and fix it in
-the library, then every app inherits the fix.
+UI primitives and collections come from Swift Struck UI. Apps assemble screens from
+them and never hand-roll a second copy of a library component locally. If a primitive
+needs changing, flag the gap (the app's UI-GAPS list) and fix it in the library, once,
+rather than working around it on each screen that hits it.
+
+**Where the library lives is a per-app decision, and it changed here.** The default is
+the shared package, `github.com/alaap-swift-struck/swift-struck-ui`, installed from npm,
+so a fix lands once and every product inherits it. This app took the other road on
+2026-08-22 and **vendored** its copy into the repo at `shared/ui/` (imported as
+`@shared/ui/…`), because it is being re-themed to a design kit that changes what a
+component IS, not only what colour it is — and a token remap cannot turn a bordered
+button into a borderless one. That is a deliberate, one-way fork: this app now owns and
+edits its components in place, and gives up inheriting upstream's fixes.
+
+**The rule that holds in both arrangements: never edit upstream from a fork.** Other
+Swift Struck products are live on that package. A vendored copy is a copy — no pushes,
+no PRs, no "syncing back" from the app that forked it. If you find a genuine upstream
+bug, report it there in its own words, and fix your copy separately.
 
 ## The ship pipeline
 Local → GitHub → staging (deploy ends with an automated smoke that must pass) →

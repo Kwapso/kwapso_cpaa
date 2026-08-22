@@ -2,8 +2,11 @@
 
 How screens in this app are arranged, so that a person reading one has less to hold in
 their head. This is a **rearrangement** rule book, not a redesign: every rule here is
-expressible with the components `@kwapso/ui` already ships and the tokens the theme
-already defines. Nothing in this document asks anyone to edit the library.
+expressible with the components `shared/ui/` already ships and the tokens the theme
+already defines. Nothing in this document asks anyone to change a component — which was
+originally because nobody here could (the library was an npm package from another
+repository until 2026-08-22), and is now a deliberate scope line: these are arrangement
+decisions, and they should hold whatever the reskin does to the lego underneath them.
 
 **Its relationship to the other law books.** [UI-CONVENTIONS.md](UI-CONVENTIONS.md) is
 the *enforced* law (R2, R3, R4, R6, R7, R8, R16 and the action-icon mapping); it stays
@@ -58,7 +61,7 @@ majority of what the owner and Aurora reported, and two of them are one-line fix
 
 ### Finding 1: the card is not pink, it is transparent
 
-The theme is already right. `node_modules/@kwapso/ui/styles.css` sets
+The theme is already right. `shared/ui/styles.css` sets
 `--card: #f7f2ea` (kw-soft-paper) on `--background: #fffef9` (kw-off-beige). The brand
 site independently sets `--color-scheme--dark-background: #f7f2eb` for every card and
 `--color-scheme--background: #fffdf8` for the page (`brand.css`, confirmed by computed
@@ -72,28 +75,33 @@ What makes it read pink is two files fighting:
 
 1. ~~The library defines the card surface as fully opaque paper.~~ **CORRECTED
    2026-08-19: it never did, and this line is why a dialog shipped unreadable.**
-   `.glass` in the installed library is
+   `.glass` in the library is
    `background-color: color-mix(in oklch, var(--card) 72%, transparent)` with a
    `backdrop-filter`, and the comment above it reads *"Frosted glass: a
    translucent pane that blurs (refracts) what's behind it."* The quoted brand
    line does not appear in `styles.css` at all. Two further claims in this
-   section are also untrue of the installed library: `--card` is `oklch(1 0 0)`,
+   section are also untrue of it: `--card` is `oklch(1 0 0)`,
    not `#f7f2ea`, which appears nowhere in the file. A paragraph of confident
    detail about a dependency, written once and never re-read against it, is how
    `shared/web/library-overrides.css` came to delete the one rule holding a
-   dialog together.
+   dialog together. (The library stopped being a dependency on 2026-08-22 and now
+   sits in `shared/ui/`, which makes it cheaper to re-read but no more likely to
+   be re-read. The habit is the point, not the address.)
    **What is true now:** `.glass` is still translucent and is still what a CARD
    uses, deliberately. Every FLOATING surface — dialog, sheet, alert-dialog,
    popover, dropdown, hover-card, select, command — is opaque `bg-card` /
-   `bg-popover` as of library v0.13.0, and a census in the library fails the
-   build if a ninth one appears without it.
+   `bg-popover`, which upstream settled in v0.13.0 and the vendored copy carries.
+   **Its guard did not come across:** upstream held that with a census test that
+   failed the build if a ninth floating surface shipped without an opaque fill,
+   and the vendoring copied `registry/`, `lib/` and `styles.css` — not the
+   library's own suite. A ninth one is on the person who adds it.
 2. `shared/web/library-overrides.css:12-14` then makes it translucent again:
    `.glass { background-color: color-mix(in oklch, var(--card) 94%, transparent); }`
 3. `web/app/globals.css:32-56` paints three blurred mango pools (`#fecc6d`) behind
    everything, drifting on 47s and 61s loops (`kw-drift-a`, `kw-drift-b`).
 
 `Card` carries `glass` in its base class
-(`node_modules/@kwapso/ui/registry/primitives/card/card.tsx:14`), so **every card,
+(`shared/ui/registry/primitives/card/card.tsx:27`), so **every card,
 dialog, popover, dropdown menu and sheet in the agency app is six per cent see-through
 onto a slowly moving orange field.** Warm beige plus a mango bleed reads as pink, and
 because the field drifts, the card colour changes while you look at it. That is both the
@@ -799,7 +807,7 @@ The busy label is "Submitting…" everywhere, replacing "Saving…", "Sending…
 
 Implement by giving `FormShell` a footer it renders itself rather than by editing 37 call
 sites one at a time. The library's own `Form` collection already defaults
-`submitLabel: "Submit"` (`node_modules/@kwapso/ui/registry/collections/form/form.tsx:40`),
+`submitLabel: "Submit"` (`shared/ui/registry/collections/form/form.tsx:40`),
 so this aligns the host with the library rather than diverging from it.
 
 Evidence: `P-4.10.31` and `P-4.10.36`, the portal's New Ticket form. The button says
@@ -982,10 +990,13 @@ it everywhere so the source stops implying a hierarchy that does not exist. Use
 
 One divergence to be aware of and **not** to "fix" unilaterally: the brand site's panel
 radius is **10px** (`--radius--radius: 10px`, 40 rendered elements), while the library's
-is 24px, recorded as a locked "two radii only" decision in `styles.css:79-82`. The pill
-value agrees (the site uses 50px, the library uses `rounded-full`). If the 24px panels
-read too soft beside the marketing site, that is a token change in the library repo, made
-once, not a per-component override in the host.
+is 24px, recorded as a locked "two radii only" decision in `shared/ui/styles.css` (the
+line number this used to cite no longer resolves — read the radius block in that file).
+The pill value agrees (the site uses 50px, the library uses `rounded-full`). If the 24px
+panels read too soft beside the marketing site, that is a token change in
+`shared/ui/styles.css`, made once — and since 2026-08-22 that file is in this repo, so
+it is a change this repo makes rather than one it asks for. It is still not a
+per-component override in the host.
 
 ---
 
@@ -1410,7 +1421,7 @@ divides by **ΔL\* ≥ 4**.
 light mode because the contrast between UI elements is much clearer on dark mode". That is
 not a preference, it is arithmetic, and here it is. Measured in a browser against the
 tokens the deployed app actually resolves (`shared/brand.ts` overrides `--background`,
-`--primary` and `--secondary`; the rest come from `node_modules/@kwapso/ui/styles.css`):
+`--primary` and `--secondary`; the rest come from `shared/ui/styles.css`):
 
 | Boundary | Light ΔL\* | Dark ΔL\* | Dark advantage |
 |---|---|---|---|
@@ -1724,10 +1735,15 @@ bottom of a scrolling sheet. This app has 31 different words for the same act. S
 
 ## Do not do
 
-1. **Do not edit `@kwapso/ui`.** It lives in a separate repo (`github:Kwapso/kwapso_ui`)
-   and the owner deploys it. Every rule in this document is implementable from `web/`,
-   `web-portal/` and `shared/`. If you reach a rule you cannot express, stop and surface
-   the gap as a written library change request, per UI-CONVENTIONS.md §1.
+1. **Do not change a component in `shared/ui/` to satisfy a rule in this document.**
+   Not because you can't — the library was vendored into this repo on 2026-08-22 and it
+   is ours to edit — but because this is a *rearrangement* rule book, and every rule in
+   it is implementable from `web/`, `web-portal/` and `shared/` without touching a
+   component. If you reach a rule you cannot express that way, stop: either the rule is
+   wrong or it belongs in the reskin's own work, and UI-CONVENTIONS.md §1 is where a
+   real component change gets decided. **And never edit UPSTREAM** (`swift-struck-ui`),
+   which other Swift Struck products still depend on — nothing here is ever pushed,
+   PR'd or synced back to it.
 2. **Do not re-implement a library primitive locally** because a prop is missing. Eleven
    library components ship unused already (`Title`, `Headline`, `Text`, `Hint`,
    `Container`, `Spacer`, `Clamp`, `ActionRow`, `RecordDetail`, `DetailView`,

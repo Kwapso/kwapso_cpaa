@@ -11,69 +11,96 @@ the voice section.
 
 The one-line mental model:
 
-> **The library (`@kwapso/ui`) is the lego. `web/` is the instructions for
+> **The library (`shared/ui/`) is the lego. `web/` is the instructions for
 > this particular model. Whole screens are described as _data_ (recipes) and rendered
 > by the library engine; the few screens the engine can't express are host-composed
 > from the same primitives. Everything speaks one dictionary and obeys one set of
 > laws.**
 
+That sentence survived the library moving into this repo unchanged, and that is the
+point of §1 below: the lego and the instructions are still two different things, they
+are simply kept in the same box now.
+
 ---
 
-## 1. The library is lego. Never fork it into the host
+## 1. The library is lego. Never re-implement it in the host
 
-Brimba's primitives and collections come from **`@kwapso/ui`**, a **separate
-repo** (`github:Kwapso/kwapso_ui`), pinned in both
-`package.json` and `web/package.json`. Both front ends, `web/` and `web-portal/`,
-import from that one package.
+Brimba's primitives and collections come from **`shared/ui/`**, a directory in this
+repository. Both front ends, `web/` and `web-portal/`, import from that one place.
 
-**One name, said once:** the package is **`@kwapso/ui`**. That is what
-`package.json` installs and what every import path starts with. Its documentation
-site is hosted at `swift-struck-ui.pages.dev` (Swift Struck builds and owns the
-library), which is the only reason the words "swift struck" appear near it, there is
-no `@swift-struck/ui` package, and an import from one would not resolve. If you see
-that name anywhere, it is a typo for this one.
+**One name, said once:** the library is **`shared/ui/`**, and every import path
+starts with **`@shared/ui/`**, the alias both front doors map to `shared/*` in their
+`tsconfig.json`. Upstream it is called Swift Struck UI (`@swift-struck/ui`), which is
+why the words "swift struck" appear in file headers all through the directory — that
+package still exists and other Swift Struck products still install it, but **this app
+installs nothing**. `@kwapso/ui` is gone from every `package.json`, from `node_modules`
+and from the lockfile, and an import from either name would not resolve here.
+
+**How it got here, because it matters when you read the older paragraphs in this
+file and in UI-GAPS.md.** Until 2026-08-22 the library was the npm package
+`@kwapso/ui`, installed from a separate GitHub repo that the owner built and released,
+and this section said in plain words that you could not edit it. It was **vendored**:
+copied, whole and unrewritten, into `shared/ui/`, and the package removed from every
+`package.json`, from `node_modules` and from the lockfile. The reason was the reskin.
+A theme is only most of a re-skin — a token remap repaints a button, it cannot change
+the button's SHAPE, and the kwapso kit's secondary button is a filled button with no
+border in any state. No arrangement of token values turns a bordered button into that,
+because the border is written into the component. The alternative was a growing pile of
+downstream overrides in `shared/web/library-overrides.css`, each one fighting a line in
+a file we could not edit; that file's own header is a post-mortem of what that costs.
 
 The host imports them by their registry path:
 
 ```ts
 // web/components/app-shell.tsx
-import { Breadcrumbs } from "@kwapso/ui/registry/primitives/breadcrumbs/breadcrumbs"
-import { ModeToggle }  from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
-import { toast }       from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Breadcrumbs } from "@shared/ui/registry/primitives/breadcrumbs/breadcrumbs"
+import { ModeToggle }  from "@shared/ui/registry/primitives/mode-toggle/mode-toggle"
+import { toast }       from "@shared/ui/registry/primitives/sonner/sonner"
 ```
 
 The theme itself is imported, not copied, `web/app/globals.css`:
 
 ```css
-/* THE theme — imported straight from the library package. ONE master copy
- * (kwapso_ui repo, styles.css); this app never carries its own. */
-@import "@kwapso/ui/styles.css";
+/* THE theme — the tokens, both palettes and the motion utilities. ONE master
+ * copy, in this repo at shared/ui/styles.css; this app never carries its own.
+ * It also carries the @source line that tells Tailwind to scan the component
+ * source, so this import is load-bearing twice over. */
+@import "../../shared/ui/styles.css";
 ```
 
-**The rule:** `web/` **assembles** recipes from library lego. It does **not** edit
-the library, and it does **not** re-implement a primitive locally because one is
-awkward.
+**The rule:** `web/` **assembles** recipes from library lego. It does **not**
+re-implement a primitive locally because one is awkward, and it does not keep a second
+copy of one in `web/components/`. Owning the library did not merge the two layers; it
+moved where one of them is kept.
 
 ### When a primitive needs to change
 
-You (the agent) cannot edit `@kwapso/ui` from this repo, it's owned and
-deployed separately (the owner runs it). So:
+Change it in `shared/ui/`. The fork already happened, deliberately, once — you are not
+forking anything by editing a component now, you are editing this app's own code. So:
 
-1. **Surface it.** Say plainly which primitive is wrong and what it needs.
-2. **Hand the owner a prompt**, a self-contained change request they run against the
-   library repo.
-3. **Work in-rule in the meantime.** If a host-side workaround is unavoidable, it must
-   be a small, *documented* seam that names the library change it's standing in for,
-   and that gets removed once the library lands it. Two live examples:
+1. **Decide which layer it belongs to first.** A generic, app-agnostic control is a
+   library change. A control that only makes sense in kwapso is a host component, and
+   putting it in `shared/ui/` is the mistake this section exists to prevent.
+2. **Change the component, in place, and delete the workaround it replaces.** A
+   host-side override that stands in for a component fix is now debt with an owner,
+   not a permanent arrangement.
+3. **Write the gap down if you cannot do it today.** UI-GAPS.md is still the list, and
+   a host-side workaround must still be a small, *documented* seam that names the
+   library change it stands in for, so somebody can find it and remove it. It used to
+   be a request to another repo; it is now a to-do in this one. The two workarounds
+   this section used to hold up as examples — a `.glass` opacity override and the
+   engine list's double-nested card — are both gone, and how the first one ended is
+   the argument for fixing components rather than overriding them: it outlived the
+   library fix it was standing in for and tinted every card in both apps for nine days.
+   The whole story is in the header of `shared/web/library-overrides.css`, which is
+   now empty of component overrides on purpose.
+4. **Never touch upstream.** `swift-struck-ui` is a live dependency of other Swift
+   Struck products. Do not push there, do not open a PR from here, do not "sync back"
+   a fix. If something in `shared/ui/` turns out to be a genuine upstream bug, report
+   it there in its own words, and then fix it here anyway — the two files are no longer
+   the same file. `shared/ui/README.md` is the full statement of this.
 
-   - `web/app/globals.css` overrides `.glass` opacity, with the comment: *"A library
-     prompt tracks adopting this as the default; remove this override once it lands."*
-   - `web/components/deep-link/screen-bits.tsx` (`CollectionCard`) notes that the
-     engine's list draws its own card, so it double-nests *"until the library passes
-     `surface="none"` there … Owner is applying that one-line library change."*
-
-Both are visible, reasoned, and self-terminating. That's the pattern: a library gap is
-a *tracked note*, never a silent fork.
+A library gap is still a *tracked note*, never a silent second copy of a component.
 
 ### Host-composed ≠ new library component
 
@@ -203,7 +230,7 @@ FormShell dialog** (Law R4, separators before the submit). Don't invent a differ
 | A bounded list of shaped rows                              | a `list` recipe                        | `membersListRecipe` |
 | A detail whose tabs are description-lists + activity        | a `detail` recipe                      | `memberDetailRecipe`, `inviteDetailRecipe`, `brandDetailRecipe` |
 | A detail carrying a control the engine has no block for     | a host-composed component              | `role-detail`, `help-detail`, `process-detail` |
-| A generic, app-agnostic control you keep re-needing         | **not here**, surface it to the library |, |
+| A generic, app-agnostic control you keep re-needing         | **not here**, a component in `shared/ui/` |, |
 
 The resolver holds both worlds together: `deep-link-screen.tsx` hands the URL to
 `renderModuleContent` (`web/components/deep-link/module-content.tsx`), which renders a
@@ -663,15 +690,24 @@ Every screen renders over the library's **`AmbientBackground`**, mounted once in
 
 ```tsx
 // web/app/layout.tsx
-import { AmbientBackground } from "@kwapso/ui/registry/primitives/ambient-background/ambient-background"
+import { AmbientBackground } from "@shared/ui/registry/primitives/ambient-background/ambient-background"
 // …
 <AmbientBackground />
 ```
 
 Surfaces that float over it (dialogs, sheets, the mobile bars) use the frosted
-**`.glass`** class. Because the living background shows through, the host bumps
-`.glass` to a mostly-opaque surface so text stays readable, a *tracked* override that
-points at the library change meant to replace it (§1).
+**`.glass`** class. Because the living background shows through, floating surfaces have
+to be readable over a moving field — and that is settled **in the component** now, not
+by a host override: all eight floating surfaces (`dialog`, `sheet`, `alert-dialog`,
+`popover`, `dropdown-menu`, `hover-card`, `select`, `command`) carry an opaque
+`bg-card` or `bg-popover` in `shared/ui/registry/primitives/`. The host override that
+used to stand in for this is gone; §1 and the header of
+`shared/web/library-overrides.css` explain why it had to go rather than be re-tuned.
+**One caveat worth knowing:** upstream guarded that with a census test that fails if a
+ninth floating surface ships without an opaque fill, and the vendoring copied only
+`registry/`, `lib/` and `styles.css` — not the library's own test suite. So today that
+rule is held by the eight components themselves and by whoever reads this paragraph. If
+you add a floating surface, give it an opaque fill by hand.
 
 ### Immovable, contentless pages
 
@@ -695,7 +731,8 @@ alive underneath, that's the "immovable, contentless page" feel.
 
 ## 8. Checklist, before you ship a UI change
 
-- [ ] New primitive-shaped control? **Surface it to the library**. Don't fork it here.
+- [ ] New primitive-shaped control? **Build it in `shared/ui/`**, which this repo owns.
+      Don't keep a second copy of it in `web/components/`.
 - [ ] New screen? Recipe if the engine can express it; a host-composed component only if
       it carries a control the engine has no block for (like `role-detail`).
 - [ ] New record detail? It has **Overview + Activity** tabs (R2), recipe data, or, if
@@ -865,7 +902,9 @@ recipe lists whose rows arrive carrying a picture — accounts, apps, members, t
 brand library — render as text. The workaround, a glyph inside the title string, is
 the one shape §5 refuses. And the library's `RecordDetail` draws a circular
 initials avatar on every recipe detail whether the record is a person or not
-(UI-GAPS #25). Both are one-line library changes; neither is forked here.
+(UI-GAPS #25). Both are one-line changes in `shared/ui/`, which this repo now owns —
+so neither is a wait on anybody, and neither is worked around with a second copy of a
+component here.
 
 ## Action-button rows never clip (C4) · the brand mark is never clipped (C5)
 

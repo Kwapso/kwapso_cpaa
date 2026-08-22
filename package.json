@@ -38,7 +38,6 @@
     "wrangler": "^4.0.0"
   },
   "dependencies": {
-    "@kwapso/ui": "github:alaap-swift-struck/swift-struck-ui#v0.15.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.8",

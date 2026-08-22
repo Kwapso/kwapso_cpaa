@@ -32,9 +32,13 @@ end with a live base you can sign into and build on.
   from the root, never inside a worker directory.
 - **Wrangler**, comes via `npx wrangler`, pinned at `^4.0.0` in the root
   `package.json`. No global install needed.
-- **`git`**, and read access to `github.com/Kwapso/kwapso_cpaa` (private). The UI
-  library `github.com/Kwapso/kwapso_ui` is public, so `npm install` needs no
-  extra credential.
+- **`git`**, and read access to `github.com/Kwapso/kwapso_cpaa` (private). That
+  one repository is now the whole story: the UI component library used to be
+  installed from its own public GitHub repo, and since it was vendored on
+  2026-08-22 it arrives with the clone, in `shared/ui/`. So there is no second
+  repository to reach and no extra credential to arrange — but note the flip
+  side, which is that the component source is inside a PRIVATE repo now. Nobody
+  gets it without being given access to this one.
 
 **Accounts, before you can deploy anything.** INVENTORY.md is the full list with
 who issues each credential; these are the ones that block this runbook:
@@ -60,7 +64,7 @@ who issues each credential; these are the ones that block this runbook:
 
 ```bash
 git clone <this-repo> brimba && cd brimba
-npm install            # also pulls @kwapso/ui from GitHub (a public repo)
+npm install            # every dependency from npm; the UI library is already here, in shared/ui
 npm run check          # sanity: lint + TypeScript across every workspace + the full test suite
 npx wrangler login     # authenticate wrangler to your Cloudflare account
 npx wrangler whoami    # CHECK IT. See the warning below before you go further

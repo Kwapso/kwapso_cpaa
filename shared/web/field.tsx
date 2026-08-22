@@ -78,7 +78,7 @@ export function translateFieldConfig(
 /** The library `Field`, with its config's words in the reader's language.
  *
  * Every prop is the library's own and is passed straight through, so this is a
- * drop-in for `@kwapso/ui/registry/primitives/field/field` — the ONE import line
+ * drop-in for `@shared/ui/registry/primitives/field/field` — the ONE import line
  * is the whole difference at a call site.
  *
  * Memoised on the config and the language so the object identity only changes

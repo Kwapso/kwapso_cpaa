@@ -1,5 +1,5 @@
 // Base screen recipes — whole screens described as DATA, rendered by the library
-// engine (@kwapso/ui ScreenRenderer). The host (deep-link-screen.tsx)
+// engine (the library's ScreenRenderer). The host (deep-link-screen.tsx)
 // shapes app types into the flat rows/records these recipes reference, supplies
 // the per-module rights, dispatches the named actions, and owns the router. A
 // team can OVERRIDE any recipe at runtime via the config store (M2); the

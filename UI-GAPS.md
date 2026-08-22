@@ -1,16 +1,45 @@
 # UI gaps, what the library is missing (the flag list)
 
-Rule: Brimba never invents UI. When a needed component doesn't exist in
-[@kwapso/ui](https://swift-struck-ui.pages.dev/documentation), we build a
-clearly-marked placeholder in `web/components/temp/`, list it HERE, and the
-library absorbs it later (built + tested there, then re-imported here and the
-placeholder deleted).
+Rule: Brimba never invents UI. When a needed component doesn't exist in the
+library, we build a clearly-marked placeholder in `web/components/temp/`, list it
+HERE, and the library absorbs it later — the placeholder is deleted the day the
+real component lands, so the temp folder never becomes a second component set.
+
+**What changed on 2026-08-22, and it changes what this list IS.** The library was
+the npm package `@kwapso/ui`, built and released from a separate repository the
+owner deployed. It now lives in this one, at `shared/ui/`, imported as
+`@shared/ui/…`. So a row on this list used to be a *request*: a written change
+proposal, handed over, then a wait on somebody else's release schedule, which is
+why almost every entry below is phrased as a flag and why several sat open for
+months. It is now simply **work this repo can do**, in `shared/ui/`, in the same
+commit as the screen that needs it. A gap is a to-do, not a dependency.
+
+Three things did NOT change, and they are the reason this file still exists.
+(1) The layering: a primitive is generic, app-agnostic lego, and a control that
+only makes sense in kwapso still belongs in `web/components/`, so "which side of
+the line is this?" is still the first question every row answers. (2) The
+discipline of writing the gap down before working around it — a host workaround
+that names the library change it stands in for can be removed; an unexplained one
+becomes permanent. (3) The rule about UPSTREAM: `swift-struck-ui` is a live
+dependency of other Swift Struck products, and nothing here is ever pushed,
+PR'd or synced back to it. Fixing something here does not fix it there, and is
+not meant to. See `shared/ui/README.md`.
+
+A note on how to read the rows below, because the status words were written under
+the old arrangement and are left as they were rather than reworded one by one.
+Entries marked **SHIPPED in the library** with a version number are history: that
+is what upstream released while this app was still installing the package, and
+the vendored copy carries it. Entries marked **flag for the library**,
+**waiting on library** or **nice-to-have** are the OPEN ones, and every one of
+them is now a task in this repo rather than a request to another. Nobody is
+waiting for anybody. Entries marked **app-side** or **CLOSED app-side** never
+concerned the library at all.
 
 | # | Missing component | Placeholder here | What the library version needs | Status |
 |---|---|---|---|---|
 | 1 | `code-input` (primitive), one-time-code boxes | `shared/web/code-input.tsx` (MOVED 2026-08-10. See note under the table) | Configurable length, auto-advance, backspace, paste-spread, numeric keypad on mobile, `one-time-code` autofill, disabled state | waiting on library |
 | 2 | `auth-card` (collection), full sign-in card | `web/components/temp/auth-card.tsx` | Config-driven: app name, logo, legal links; two-step email→code flow; error/busy states; uses `code-input`. UPDATED 2026-08-11: it now also carries a **Continue with Google** button beside the code (the portal's `sign-in.tsx` carries the same one), so the library version needs an optional list of alternative sign-in providers, each a label + mark + href, and the `?error=` message strip underneath. The mark and the failure wording live once in `shared/web/google-sign-in.tsx`, as the flow itself does in `shared/web/use-email-sign-in.ts`. | waiting on library |
-| 3 | ~~`permission-matrix` (collection)~~ |, | The roles access-rights grid. | **SHIPPED in the library (2026-06-13)**, live at `@kwapso/ui/registry/collections/permission-matrix`; integrated in the Member roles detail under `/t/<teamId>/roles/<id>` (host-composed). Temp removed before it was ever needed. |
+| 3 | ~~`permission-matrix` (collection)~~ |, | The roles access-rights grid. | **SHIPPED in the library (2026-06-13)**, live at `@shared/ui/registry/collections/permission-matrix`; integrated in the Member roles detail under `/t/<teamId>/roles/<id>` (host-composed). Temp removed before it was ever needed. |
 | 4 | Collection card-surface config (`data-table`, `permission-matrix`) | (overridden app-side via `className`) | The user wants NO card backgrounds. `permission-matrix` flattens cleanly with `className="bg-transparent"`, but its sticky module column keeps a `bg-card` fill (needed so scrolled cells stay opaque), and `data-table`'s frame lives on an inner div `className` can't reach. Proper fix: a `surface: "card" \| "none"` option on the collection config that also swaps the sticky fill to `bg-background`. | **nice-to-have, flag for the library** |
 | 5 | ~~`dropdown-menu` (+ `glass` popovers) translucent~~ |, | Menus over page content were see-through (the `glass` 72%-opaque surface, no `bg-popover`). | **SHIPPED in the library (2026-06-18, `c31a35c`)**, `dropdown-menu`/`popover`/`hover-card` now render on an opaque `bg-popover` surface (light + dark). App-side inline stopgaps removed. |
 | 6 | ~~Selectable list-row (collection)~~ |, | The role list needed a selected/active highlight; the `list` collection was hover-only. | **SHIPPED in the library (2026-06-18, `c31a35c`)**, `list` now has an opt-in `selectedId`/`onSelect` with an accessible teal accent (`aria-current`/`data-[selected]`) that reads in both themes and keeps the leading icon legible. The engine's role screens use it; the hand-built rows are gone (the old `roles-panel.tsx` host file was itself retired in the M3 engine migration). |
@@ -40,8 +69,11 @@ placeholder deleted).
 
 | 25 | `record-detail` **draws a circular avatar on every record, whether or not the record is a person or has a picture at all** | none — the circle is drawn by the library, above anything the host passes | `RecordDetail` renders the avatar on `hasAvatar = Boolean(avatarSrc \|\| avatarFallback)` and `ScreenRenderer` always supplies `avatarFallback={initials(title)}`, whose own floor is `"?"` — so the flag is true for every recipe detail there will ever be. Three of the five in this app have no image concept whatever (`invites.detail`, `brand.detail`, `purposes.detail`), and each opens with two letters of its own title in a circle: an invite is an email address, a brand asset is a file, a meeting purpose is a sentence, and none of the three is a face. It is also the wrong SHAPE for the two that do carry a picture — this app's rule (`shared/web/record-mark.tsx`) is that a person is a circle and a company, an app or an asset is a rounded square shown `object-contain`, because a wordmark cropped to a circle is a wordmark nobody can read. There is no host workaround: `RecordDetailConfig` exposes no way to suppress the avatar or to change its shape, and the fallback is computed inside `screen-renderer` from the title. **The change, exactly:** `avatarFallback` becomes optional and `ScreenRenderer` passes it only when the recipe's `header` declares an `avatar`, so a detail with no picture concept draws none; plus an optional `avatarShape?: "circle" \| "square"` on `RecordDetailConfig` (defaulting to `circle`, so nothing changes for a caller that omits it). With both, the five recipe details render the same mark as the eleven bespoke ones and this row closes. | **SHIPPED in the library (2026-08-19, v0.11.0, `avatarShape`)** — and WIRED here in the same commit. The check that held this row open now asserts the slot is FED rather than missing (`web/test/type-mark-slots.test.ts`), so this row can only be reopened by the wiring going away. |
 
-When the library ships one: re-run `npm install github:Kwapso/kwapso_ui`,
-swap the import, delete the temp file, update this table.
+Closing one of these, now that the library is in the repo: build the component in
+`shared/ui/registry/…`, swap the host import to `@shared/ui/…`, delete the temp
+file, and update this table in the same commit. There is no install step and no
+version to wait for — the instruction here used to be "re-run
+`npm install github:Kwapso/kwapso_ui`", and that command no longer exists.
 
 **One placeholder is not in `web/components/temp/`, and it needs saying.**
 `code-input` moved to `shared/web/code-input.tsx` when the client portal shipped:

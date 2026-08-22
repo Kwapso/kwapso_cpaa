@@ -2,7 +2,7 @@
 
 // THE VISUAL BLOCKS, AS PAINTED. One renderer per kind in shared/agent-blocks.ts,
 // composed from the library's own primitives (UI-CONVENTIONS: the library is lego —
-// nothing here forks @kwapso/ui, and a block that needs a primitive we don't have is
+// nothing here forks the component library, and a block that needs a primitive we don't have is
 // composed in the host and said out loud rather than added to the library from here).
 //
 // THE SAFETY STORY, in one paragraph, because it is the point of the whole feature.
@@ -230,7 +230,7 @@ function StepsBlock({ block }: { block: Extract<AgentBlock, { kind: "steps" }> }
  * Nothing is hidden and nothing is invented: every edge appears exactly once.
  *
  * Composed in the host, not taken from the library: there is no graph primitive in
- * @kwapso/ui, and this file does not fork it (see UI-GAPS.md). */
+ * the library in `shared/ui/`, and this file does not fork it (see UI-GAPS.md). */
 function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) {
   const labelOf = new Map(block.nodes.map((n) => [n.id, n.label]))
   return (

@@ -248,7 +248,7 @@ export const MODULE_RIGHTS = ["read", "create", "edit", "delete"] as const
  * A module absent from this map offers all four. Only the exceptions are here,
  * so the list can only shrink as doors get written.
  *
- * THE COLUMNS ARE STILL DRAWN. `@kwapso/ui`'s permission matrix takes
+ * THE COLUMNS ARE STILL DRAWN. The library's permission matrix takes
  * `modules: {key, label}[]` and renders a fixed four columns; hiding a box per
  * row needs a `rights?: Right[]` on that contract, which is a library change
  * and this repo does not fork the library. Until it lands, this map is the

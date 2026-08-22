@@ -2,7 +2,7 @@
   "name": "kwapso-portal-web",
   "version": "0.1.0",
   "private": true,
-  "description": "kwapso's CLIENT portal screens (Next.js static export). Built on @kwapso/ui; talks to the shared workers through the portal gateway's named /api doors.",
+  "description": "kwapso's CLIENT portal screens (Next.js static export). Built on the vendored component library in shared/ui; talks to the shared workers through the portal gateway's named /api doors.",
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
@@ -10,7 +10,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@kwapso/ui": "github:alaap-swift-struck/swift-struck-ui#v0.15.0",
     "lucide-react": "^1.17.0",
     "next": "^15.1.6",
     "react": "^19.0.0",

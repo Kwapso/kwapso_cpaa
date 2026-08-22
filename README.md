@@ -113,7 +113,7 @@ concrete + checkable:
 - **The Laws of the Base** (R1–R36), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
 - **Code house style**, [CONVENTIONS.md](CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
 - **UI conventions**, [UI-CONVENTIONS.md](UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
-- **How a screen is arranged**, [UI-RULEBOOK.md](UI-RULEBOOK.md): the layer above UI-CONVENTIONS. A *rearrangement* rule book, expressible with the components `@kwapso/ui` already ships, nothing in it asks anyone to edit the library.
+- **How a screen is arranged**, [UI-RULEBOOK.md](UI-RULEBOOK.md): the layer above UI-CONVENTIONS. A *rearrangement* rule book, expressible with the components `shared/ui/` already ships and the tokens the theme already defines, so every rule in it can be applied from `web/`, `web-portal/` and `shared/` without changing a component.
 - **What was asked for, and where each item stands**, [CHECKLIST.md](CHECKLIST.md): every request from the feedback round, with a status word beside it and, where something is not being done, the reason.
 - **Import + export rules**, [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md): audit parity, export-needs-read/import-needs-create, one-confirm, insert-only, and every import place offers a sample file (test-enforced).
 - **Error rules**, [ERROR-HANDLING.md](ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
@@ -181,11 +181,16 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    built vs. to build, and the cross-cutting model resolutions.
 9. **[SCREEN-ENGINE-PLAN.md](SCREEN-ENGINE-PLAN.md)**, the screen-recipe engine and
    the `/t/<teamId>/<module>/<id>` deep-link grammar the team area runs on.
-10. **[UI-GAPS.md](UI-GAPS.md)**, the running list of library gaps to close (UI is
-    fixed in the library, not per-app).
-11. The UI comes ONLY from **[@kwapso/ui](https://swift-struck-ui.pages.dev/documentation)**
-    (installed from GitHub). Missing a component? Add it to the LIBRARY first —
-    never build one-off UI here.
+10. **[UI-GAPS.md](UI-GAPS.md)**, the running list of things the component library
+    still cannot do (a gap is fixed in the library, once, not worked around on
+    each screen that hits it).
+11. The UI comes ONLY from the component library, which lives **in this repo** at
+    `shared/ui/` and is imported as `@shared/ui/…`. It was the npm package
+    `@kwapso/ui`, installed from a separate repo, until it was vendored on
+    2026-08-22 so the reskin could change component shape and not only colour.
+    Missing a component? Build it in `shared/ui/` — never one-off UI in `web/`.
+    Never edit the upstream `swift-struck-ui` repo, which other products depend
+    on; `shared/ui/README.md` has the whole rationale.
 
 ### The manual, build on it, understand it, rebuild it from zero
 
@@ -279,7 +284,7 @@ below run entirely on your machine. Deploying is a different list. BOOTSTRAP.md
 § 0 has it, and INVENTORY.md names every account and credential involved.
 
 ```bash
-npm install        # also pulls the UI library from GitHub (a public repo)
+npm install        # every dependency from npm; the UI library came with the clone, in shared/ui
 npm run dev        # the agency app on http://localhost:3000
 npm run dev:portal # the client portal on http://localhost:3001
 npm run lint       # the fast half of the gate — oxlint over every workspace (~15ms)

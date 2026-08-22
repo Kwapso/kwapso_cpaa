@@ -8,7 +8,10 @@
 // take and never inside a sentence. CHECKLIST 11.8 asks for one on every
 // collection and 21.6 asks for glyphs on the main screens. Both shipped PART
 // DONE, and both stop at the same wall in four places: the slot does not exist
-// in `@kwapso/ui`, which is a SEPARATE repo this one never edits.
+// in the component library. That wall was a SEPARATE repo this one never edited;
+// since 2026-08-22 the library is vendored into `shared/ui/` and the wall is
+// ours, which changes what these four entries are asking for — not another
+// repo's roadmap, but four slots this codebase can add whenever it decides to.
 //
 // UI-GAPS.md has carried those four as prose since. Prose is where a flag goes
 // to rot in two directions at once:
@@ -30,10 +33,17 @@
 // message says what to do: use it, and delete the UI-GAPS line in the same
 // commit. This list can only shrink.
 //
-// IT READS `node_modules`, DELIBERATELY. The library is pinned in package.json
-// and installed from GitHub, so what is on disk is what this app is built
-// against — asking a published changelog what version we run would be asking a
-// different question from the one that matters.
+// IT READS THE LIBRARY SOURCE, DELIBERATELY — and since 2026-08-22 that source
+// is `shared/ui/`, in this repo, rather than `node_modules/@kwapso/ui`. The
+// reason is unchanged and is now simply more true: what is on disk is what this
+// app is built against, and asking a published changelog what version we run
+// would be asking a different question from the one that matters.
+//
+// One thing about these four entries DID change with the move, and it is worth
+// saying plainly. "The fix is one line" used to mean "one line, in a repo we do
+// not own, on their release schedule". It now means one line, here, today. So a
+// failure below is no longer news about somebody else's library — it is a slot
+// this repo added and has not yet used.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { existsSync, readFileSync } from "node:fs"
@@ -42,7 +52,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
-const UI = join(ROOT, "node_modules", "@kwapso", "ui")
+const UI = join(ROOT, "shared", "ui")
 
 function library(...parts: string[]): string {
   const path = join(UI, ...parts)

@@ -17,7 +17,7 @@ the repository knows exactly what to go and ask for.
 | What | Detail | Without it |
 |---|---|---|
 | **Cloudflare account** | Workers **Paid** plan (Durable Objects require it). The account id is checked in as the `CF_ACCOUNT_ID` var in `workers/tenancy`, `content`, `data-ops`, `realtime` and `mcp`, so the id is recoverable from the repo; the **login is not** | nothing runs. Every worker, database, bucket and vector index lives here |
-| **GitHub** | `github.com/Kwapso/kwapso_cpaa`, a **private** repository in the `Kwapso` organisation. The UI library `github.com/Kwapso/kwapso_ui` is **public**, so `npm install` works for anyone who can clone this one | no source. Org access must be granted by an owner |
+| **GitHub** | `github.com/Kwapso/kwapso_cpaa`, a **private** repository in the `Kwapso` organisation, and since 2026-08-22 that is the only repository the app needs. The UI component library used to be installed from its own public repo, which is why this row once said `npm install` works for anyone who can clone this one; it is now vendored at `shared/ui/`, so the component source arrives with the clone and lives inside the **private** repo. Access to this one repository is access to everything | no source at all. Org access must be granted by an owner |
 | **Resend** | EU region, sending domain `kwapso.app`, from `kwapso <alerts@kwapso.app>` | no sign-in emails, so nobody can log in |
 | **Google Cloud** | **Two** OAuth clients in the project (see §3) | the "Continue with Google" button and every Drive/Gmail/Calendar/Chat connection |
 | **Anthropic** | Optional. Only sets which model the assistant thinks with | the assistant falls back to Cloudflare Workers AI and keeps working |

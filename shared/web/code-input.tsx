@@ -2,7 +2,7 @@
 
 // TEMPORARY PLACEHOLDER — flagged in UI-GAPS.md (#1).
 // The library has no one-time-code input yet. This stand-in composes six
-// library Inputs (auto-advance, backspace, paste). Once @kwapso/ui
+// library Inputs (auto-advance, backspace, paste). Once the library
 // ships `code-input`, this file gets DELETED and imports swap to the library.
 //
 // It sits in shared/web/ — the most permanent folder in the repo — and NOT in

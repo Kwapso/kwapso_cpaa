@@ -1,9 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* THE theme — imported straight from the library package, exactly as the agency
- * app does. ONE master copy (kwapso_ui repo, styles.css); neither front door
- * carries its own. The portal's difference from the agency app is SCALE, not a
+/* THE theme — imported exactly as the agency app imports it. ONE master copy,
+ * now IN this repo at shared/ui/styles.css; neither front door carries its own. The portal's difference from the agency app is SCALE, not a
  * second design language: same tokens, same components, more air. */
 @import "../../shared/ui/styles.css";
 

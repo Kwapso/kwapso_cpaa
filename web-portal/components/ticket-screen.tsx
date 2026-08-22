@@ -42,7 +42,7 @@
 //
 // WHY THE CONVERSATION IS COMPOSED HERE INSTEAD OF USING THE LIBRARY'S
 // TicketThread (it used to). The owner asked for WhatsApp-style sides, and no
-// component in @kwapso/ui can express them on a NAMED thread:
+// component in the library can express them on a NAMED thread:
 //   • TicketThread renders every reply in one left-aligned <li> — there is no
 //     per-reply side, and its <ol> is not ours to reach into.
 //   • Chat has the sides (and has them the right way round), but a ChatMessage
@@ -110,7 +110,7 @@ export function sideFor(authorId: string | null, meId: string): string {
   return authorId === meId ? OWN_SIDE : OTHER_SIDE
 }
 
-/** The bubble, in the library's own vocabulary — @kwapso/ui's Chat uses exactly
+/** The bubble, in the library's own vocabulary — the library's Chat uses exactly
  * these tokens for its me/them pair. Same radius, same surfaces, so the portal
  * and the library don't drift into two chat languages while we wait for a
  * primitive that can do both sides AND a name. */

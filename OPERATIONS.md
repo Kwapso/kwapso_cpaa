@@ -440,9 +440,26 @@ both environments, 600 requests per caller per worker per minute
 
 ## Notes
 
-- The UI library (`@kwapso/ui`) installs from GitHub. Update: `npm install github:Kwapso/kwapso_ui`.
-- `web/app/globals.css` is a COPY of the library theme (master: kwapso_ui repo, www/app/globals.css). Its `@source` points at the ROOT node_modules (workspaces hoist).
-- Missing UI components are placeholdered in `web/components/temp/` and tracked in UI-GAPS.md, the library absorbs them, then placeholders get deleted.
+- The UI component library is **in this repo**, at `shared/ui/`, since 2026-08-22. There is
+  nothing to install and nothing to update: it arrives with `git clone` like the rest of the
+  source. It used to be the npm package `@kwapso/ui`, refreshed with
+  `npm install github:Kwapso/kwapso_ui` — that command is now wrong and the package is gone
+  from every `package.json`, from `node_modules` and from the lockfile. The library's own 33
+  dependencies (Radix, cmdk, recharts, sonner, lucide-react and the rest) moved to the ROOT
+  `package.json` at the versions the library pinned, because `shared/` sits outside both npm
+  workspaces and node resolution from a file in there walks up to the repo root.
+- Neither front door carries its own theme. `web/app/globals.css` and
+  `web-portal/app/globals.css` both `@import "../../shared/ui/styles.css"` — one master copy,
+  imported, never copied. That stylesheet carries `@source "./registry"`, resolved relative to
+  itself, so Tailwind scans `shared/ui/registry` for class names. **That line is load-bearing:**
+  without it Tailwind decides every library class is unused and strips it, which shows up as a
+  build that passes and an app with no styling. (This note used to say globals.css was a COPY
+  of the library theme and that its `@source` pointed at the root `node_modules`. Both were
+  true of the installed package and neither is true now.)
+- Missing UI components are still placeholdered in `web/components/temp/` and tracked in
+  UI-GAPS.md, but closing one is no longer a wait: the library is ours, so the component is
+  built in `shared/ui/`, the import is swapped and the placeholder is deleted, in one commit
+  here.
 
 ## Custom domains, the agreed naming (decided 2026-08-08)
 

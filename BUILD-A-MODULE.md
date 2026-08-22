@@ -683,8 +683,10 @@ AFTER SHIP
   a record's Activity tab included (R8); an uncounted tab needs a reasoned
   `RECORD_TAB_COUNT_EXCEPTIONS` line.
 - **Refetching the whole list on a change.** Row-level live-sync only. (CACHING.md.)
-- **A new worker for a new module, or editing `@kwapso/ui`.** Add routes to an
-  existing worker; the library is lego you assemble, not fork. (CLAUDE.md.)
+- **A new worker for a new module, or a second copy of a library component.**
+  Add routes to an existing worker; the library is lego you assemble. It lives
+  in `shared/ui/` and this repo owns it, so a primitive that is wrong is fixed
+  THERE, once, never re-implemented in `web/components/`. (CLAUDE.md.)
 ```
 
 ## The hardening checklist (R13–R19 — a new module must satisfy these)

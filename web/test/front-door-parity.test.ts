@@ -88,10 +88,14 @@ describe("the product's identity is declared once", () => {
       ).toContain("shared/web/postcss.config.mjs")
   })
 
-  // @kwapso/ui is a separate repo and is never edited from here, so an override
-  // is the honest way to change a library default — but an override BOTH doors
-  // need belongs in one file, or the day the library adopts it there are two
-  // lines to remember to delete.
+  // An override BOTH doors need belongs in ONE file, or the day the default
+  // changes underneath it there are two lines to remember to delete.
+  //
+  // The reason for overriding at all has weakened, and the check has not: the
+  // library used to be a separate repo, so an override was the only honest way
+  // to change a default. It is vendored in `shared/ui/` now, so the first
+  // question is whether the default itself should change. What survives is this
+  // rule — whatever a door does not fix at the source, it must not restate.
   it("neither door restates a library override the other also carries", () => {
     for (const app of [AGENCY, PORTAL]) {
       const css = read(app, "app", "globals.css")

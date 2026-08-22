@@ -278,9 +278,9 @@ on top follows [CACHING.md](CACHING.md).
 - **Every record screen has an Overview tab + an Activity tab** (LOCKED
   2026-06-17): Overview = the audit block (created/edited/deactivated + who);
   Activity = that record's slice of the log. Both tabs render from LIBRARY
-  collections (`RecordDetail` / `DescriptionList` / `ActivityFeed` in
-  `@kwapso/ui`) through the screen engine. Never a hand-built app
-  component (UI comes only from the library, §6). See the activity read path in
+  collections (`RecordDetail` / `DescriptionList` / `ActivityFeed`, now in
+  `shared/ui/`) through the screen engine. Never a hand-built app
+  component (UI comes from the library, §6). See the activity read path in
   `workers/tenancy/src/lib/activity-read.ts`.
 - Race-safety for invariant writes follows [CONCURRENCY.md](CONCURRENCY.md);
   failures follow [ERROR-HANDLING.md](ERROR-HANDLING.md).
@@ -403,8 +403,22 @@ on top follows [CACHING.md](CACHING.md).
   beside its twin (action-button rows never clip). It is written down HERE as a
   locked decision and THERE as the convention you apply; it is not in the
   library's own rule-book, which governs the library, not this app.
-- **UI comes ONLY from `@kwapso/ui`.** Gaps go INTO the library first
-  (known gaps: 6-digit code input, step wizard). Never one-off components here.
+- **UI comes ONLY from the component library, and the library now lives IN this
+  repo (CHANGED 2026-08-22).** It is `shared/ui/`, imported as `@shared/ui/…`.
+  Until that date it was the npm package `@kwapso/ui`, installed from a separate
+  repository the owner deployed, and this line read "gaps go INTO the library
+  first". It was vendored because the app is being re-themed to the kwapso
+  design kit, and a theme is only most of a re-skin: a token remap repaints a
+  button, it cannot change the button's SHAPE, and the kit's secondary button is
+  a filled button with no border in any state. **The decision itself is
+  unchanged** — screens are assembled from library lego, never from one-off
+  components invented in `web/`, and a control that is specific to this app
+  still belongs in `web/components/`. What changed is who closes a gap: it used
+  to be a written request to another repo on somebody else's release schedule
+  (UI-GAPS.md is that list, and it still names the open ones), and it is now
+  work this repo can do in the same commit. The one thing still forbidden is
+  editing the UPSTREAM library, which other Swift Struck products depend on.
+  See `shared/ui/README.md` for the rationale in full.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
   recode; keep every piece small enough for an agent to reason about.
 

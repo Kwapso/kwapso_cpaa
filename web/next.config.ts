@@ -26,10 +26,14 @@ const staticExport = process.env.BUILD_STATIC
     }
 
 const nextConfig: NextConfig = {
-  // The Swift Struck UI library ships as TypeScript SOURCE from GitHub, so
-  // Next must compile it the same way it compiles our own files.
-  transpilePackages: ["@kwapso/ui"],
-  // Lets us import the repo-level shared/ types (one master copy of shapes).
+  // `transpilePackages: ["@kwapso/ui"]` used to sit here, because the library
+  // arrived from GitHub as TypeScript SOURCE and node_modules is not transpiled
+  // by default. The library now lives in `shared/ui/`, so it is not a package
+  // and there is nothing to name: it is compiled by `externalDir` below, on the
+  // same line as every other repo-level file the app imports.
+  //
+  // Lets us import the repo-level shared/ tree — the shapes, the host seams, and
+  // now the component library itself.
   experimental: { externalDir: true },
   ...staticExport,
 }

@@ -3,7 +3,7 @@
 // TEMPORARY PLACEHOLDER — flagged in UI-GAPS.md.
 // The library has no auth/login collection yet. This stand-in is built ENTIRELY
 // from library primitives (Button, Input, Field, Spinner, toast) so when
-// @kwapso/ui ships `auth-card`, swapping is a one-file change. Flat (no
+// the library ships `auth-card`, swapping is a one-file change. Flat (no
 // card surface), matching the app-wide flat look. No styles invented beyond layout.
 //
 // This file is the agency door's CHROME. The email → code → signed-in BEHAVIOUR

@@ -407,16 +407,20 @@ describe("every table in the agency app is one whose headers work", () => {
   })
 
   it("the library seam this works around is still the broken one", () => {
-    // If the library ever fixes it, this goes red and `RecordTable` can collapse
+    // If the seam is ever fixed, this goes red and `RecordTable` can collapse
     // onto `DataTable` — so the workaround cannot quietly outlive its reason.
     // (UI-GAPS #22(b) is the ask.)
+    //
+    // Read out of `shared/ui/` since 2026-08-22, not `node_modules`. "If the
+    // library ever fixes it" used to name somebody else's roadmap; the library
+    // is this repo's now, so the fix is ours to make and this check is the thing
+    // that will tell us the workaround has become dead weight.
     const frame = readFileSync(
       join(
         __dirname,
         "..",
         "..",
-        "node_modules",
-        "@kwapso",
+        "shared",
         "ui",
         "registry",
         "collections",

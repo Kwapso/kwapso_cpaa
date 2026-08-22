@@ -39,8 +39,10 @@ docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~
   that drives the real screens (overlay + Stop); trivial use should feel slow.
 - **R2 golden rule**, one bucket PER MODULE, per-team key prefix inside.
 - **Live-sync**, every new mutation publishes a row-level ping; bulk = one list-ping.
-- UI comes ONLY from `@kwapso/ui`, owner runs the library prompts; this repo
-  wires what the library ships.
+- UI comes ONLY from the component library; this repo wires what the library ships.
+  _(As written, the library was the npm package `@kwapso/ui` and the owner ran the
+  library prompts, so a missing component was a wait. It was vendored into this repo
+  at `shared/ui/` on 2026-08-22 — same rule, no wait: the component is built here.)_
 
 ## Phases (in order)
 

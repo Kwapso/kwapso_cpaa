@@ -1,18 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* THE theme — imported straight from the library package. ONE master copy
- * (kwapso_ui repo, styles.css); this app never carries its own. */
+/* THE theme — the tokens, both palettes and the motion utilities. ONE master
+ * copy, now IN this repo at shared/ui/styles.css; this app never carries its
+ * own. It also carries the @source line that tells Tailwind to scan the
+ * component source, so this import is load-bearing twice over. */
 @import "../../shared/ui/styles.css";
 
 /* The library overrides BOTH front doors carry, in one file. */
 @import "../../shared/web/library-overrides.css";
 
 /* ── The living mango field ────────────────────────────────────────────────
- * kwapso_ui ships with the ambient layer switched OFF, because the brand book
+ * The library ships with the ambient layer switched OFF, because the brand book
  * forbids gradients. The owner overruled that for product UI (planning round 3,
  * h1) and asked for a soft animated field in #FECC6D. That is an APP decision,
- * so it lives here — the library is never edited, only overridden downstream.
+ * so it lives here, in the AGENCY app, because it is this door's decision — the
+ * portal does not draw it. (It used to say "the library is never edited, only
+ * overridden downstream". The library is `shared/ui/` now and is edited freely;
+ * what keeps this rule here is ownership, not access.)
  *
  * Three blurred radial pools drift on long, prime-ish periods so they never
  * visibly loop, and the first one follows the pointer through --mx / --my,
