@@ -193,6 +193,23 @@
   --btn-inverse-hover: #333230;
   --btn-cancel-hover: #d8d2c7;
   --btn-destructive-hover: #d33e28;
+
+  /* ---- Motion (kit ch06) -------------------------------------------------
+   * One curve and three durations. No bounce, no parallax: an entrance is a fade
+   * plus a 4–8px rise, and nothing overshoots.
+   *
+   * The curve was already right. `cubic-bezier(.16, 1, .3, 1)` is what the
+   * library was using inline for its lift and its rise, and it is what the kit
+   * names — the same ease-out-expo, arrived at twice. What was wrong was that it
+   * sat inline in three places beside two plain `ease`s, so half the app
+   * decelerated on one curve and half on another.
+   *
+   * These are NOT per-mode: a duration does not change because the lights went
+   * out, so they are declared once here rather than three times. */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-colour: 120ms;
+  --duration-entrance: 200ms;
+  --duration-overlay: 360ms;
 }
 
 .dark,
@@ -470,6 +487,12 @@
   --color-ink-disabled: var(--ink-disabled);
   --color-hair-faint: var(--hair-faint);
   --color-focus: var(--focus);
+  /* Every `transition-*` utility in either app now decelerates on the kit's
+   * curve at the kit's colour duration, without one class changing: Tailwind
+   * reads these two as the defaults it applies when a utility names neither. */
+  --default-transition-timing-function: var(--ease);
+  --default-transition-duration: var(--duration-colour);
+  --ease-kw: var(--ease);
   --color-btn-primary-hover: var(--btn-primary-hover);
   --color-btn-primary-pressed: var(--btn-primary-pressed);
   --color-btn-secondary-hover: var(--btn-secondary-hover);
@@ -619,7 +642,7 @@
   /* Typing indicator dots (AgentChat). A gentle opacity pulse; staggered via an
    * inline animation-delay per dot. Disabled under reduced-motion below. */
   .ss-typing {
-    animation: ss-typing 1.2s ease-in-out infinite;
+    animation: ss-typing 1.2s var(--ease) infinite;
   }
   @keyframes ss-typing {
     0%,
@@ -641,10 +664,13 @@
     display: none;
   }
   .hover-lift {
+    /* One curve, one duration. It was 0.3s on the kit's curve for transform and
+     * 0.3s on a plain `ease` for the other two, so a card's lift and its shadow
+     * arrived on different accelerations. */
     transition:
-      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-      box-shadow 0.3s ease,
-      border-color 0.3s ease;
+      transform var(--duration-entrance) var(--ease),
+      box-shadow var(--duration-entrance) var(--ease),
+      border-color var(--duration-entrance) var(--ease);
   }
   /* The lift used to glow: a border mixed 40% with the brand and a shadow mixed
    * 35% with it. A brand-tinted shadow is a COLOURED shadow, and the kit allows
@@ -664,7 +690,7 @@
   }
   .animate-rise {
     opacity: 0;
-    animation: ss-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: ss-rise var(--duration-overlay) var(--ease) forwards;
   }
 
   /* THE LIBRARY'S AMBIENT FIELD IS GONE (2026-08-22).
@@ -685,7 +711,8 @@
 @keyframes ss-rise {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    /* The kit's entrance is a fade plus a 4-8px rise; this was 12. */
+    transform: translateY(8px);
   }
   to {
     opacity: 1;

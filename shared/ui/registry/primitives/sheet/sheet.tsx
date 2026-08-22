@@ -19,7 +19,7 @@ const sheetVariants = cva(
   // OPAQUE surface (bg-card, not glass), for the dialog's reason one component
   // along: a sheet slides over the page it was opened from, so a translucent
   // pane shows the very content it is covering straight through its own fields.
-  "fixed z-50 flex flex-col gap-4 border bg-card p-6 shadow-xl transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+  "fixed z-50 flex flex-col gap-4 border bg-card p-6 shadow-xl transition ease-kw data-[state=closed]:animate-out data-[state=closed]:duration-360 data-[state=open]:animate-in data-[state=open]:duration-360",
   {
     variants: {
       side: {

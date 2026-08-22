@@ -53,7 +53,7 @@ function CopilotOverlay({
       {highlightRect && (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-[60] rounded-xl ring-2 ring-primary ring-offset-2 ring-offset-background transition-all duration-300 motion-reduce:transition-none"
+          className="pointer-events-none fixed z-[60] rounded-xl ring-2 ring-primary ring-offset-2 ring-offset-background transition-all duration-360 motion-reduce:transition-none"
           style={{
             top: highlightRect.top,
             left: highlightRect.left,
