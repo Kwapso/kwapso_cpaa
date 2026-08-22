@@ -161,7 +161,7 @@ function RangeFacet({
           type="button"
           aria-label={`Clear ${label}`}
           onClick={() => onChange("")}
-          className="shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="size-3.5" aria-hidden />
         </button>

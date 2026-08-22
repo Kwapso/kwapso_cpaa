@@ -104,7 +104,7 @@ function FilterBar<T>({
                     aria-pressed={selected}
                     aria-label={`${f.label}: ${o.label}`}
                     onClick={() => onChange(f.field, selected ? "" : o.value)}
-                    className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Badge
                       variant={selected ? "default" : "outline"}
@@ -177,7 +177,7 @@ function FilterBar<T>({
                 type="button"
                 aria-label={`Clear ${f.label}`}
                 onClick={() => onChange(f.field, "")}
-                className="shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="size-3.5" aria-hidden />
               </button>
@@ -190,7 +190,7 @@ function FilterBar<T>({
         <button
           type="button"
           onClick={onClearAll}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex items-center gap-1 rounded-xl px-1.5 py-1 text-xs text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="size-3.5" aria-hidden /> Clear all
         </button>

@@ -56,7 +56,7 @@ function Chat({
           >
             <div
               className={cn(
-                "max-w-[75%] rounded-2xl px-3 py-2 text-sm",
+                "max-w-[75%] rounded-xl px-3 py-2 text-sm",
                 m.from === "me"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-foreground"

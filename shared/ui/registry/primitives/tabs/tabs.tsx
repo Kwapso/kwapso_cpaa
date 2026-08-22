@@ -30,7 +30,7 @@ const tabsListVariants = cva(
     variants: {
       variant: {
         // pill = Glide's "Button" style (a frosted segmented control)
-        pill: "gap-1 rounded-lg bg-muted p-1",
+        pill: "gap-1 rounded-xl bg-muted p-1",
         // line = Glide's "Line" style (an underline rail)
         line: "gap-4 border-b",
       },
@@ -63,7 +63,7 @@ const tabsTriggerVariants = cva(
   {
     variants: {
       variant: {
-        pill: "rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+        pill: "rounded-xl data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
         line: "-mb-px h-9 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground",
       },
     },

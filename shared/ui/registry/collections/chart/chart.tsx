@@ -119,7 +119,7 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="glass min-w-32 rounded-lg border px-3 py-2 text-xs shadow-lg">
+    <div className="glass min-w-32 rounded-xl border px-3 py-2 text-xs shadow-lg">
       {label != null && label !== "" && (
         <div className="mb-1.5 font-medium text-foreground">{label}</div>
       )}

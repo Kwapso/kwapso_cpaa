@@ -14,12 +14,17 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../../lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default:
-          "bg-gradient-to-b from-primary to-primary/90 text-primary-foreground shadow-sm hover:to-primary/80 hover:shadow-lg hover:shadow-primary/40",
+        // A FLAT FILL. It was `bg-gradient-to-b from-primary to-primary/90`
+        // with a `shadow-primary/40` glow on hover — a gradient and a coloured
+        // shadow, which are two of the kit's named Don'ts, on the most-used
+        // control in the app. Hover darkens to a named value rather than
+        // shifting opacity; the structural rest of this component (its sizes,
+        // its focus ring, its press) is dealt with where the kit specifies it.
+        default: "bg-primary text-primary-foreground shadow-sm hover:bg-btn-primary-hover",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         outline:
@@ -30,9 +35,9 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        sm: "h-8 rounded-md px-3 text-xs",
+        sm: "h-8 rounded-full px-3 text-xs",
         default: "h-9 px-4 py-2",
-        lg: "h-10 rounded-md px-6",
+        lg: "h-10 rounded-full px-6",
         icon: "size-9",
       },
     },

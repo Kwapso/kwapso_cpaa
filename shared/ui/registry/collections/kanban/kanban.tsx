@@ -111,7 +111,7 @@ function Kanban<T extends { id: string } & Record<string, unknown>>({
                 onDragStart={() => setDraggingId(card.id)}
                 onDragEnd={() => setDraggingId(null)}
                 className={cn(
-                  "cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-all hover:border-ring active:cursor-grabbing",
+                  "cursor-grab rounded-xl border bg-card p-3 shadow-sm transition-all hover:border-ring active:cursor-grabbing",
                   draggingId === card.id && "opacity-50"
                 )}
               >
@@ -135,7 +135,7 @@ function Kanban<T extends { id: string } & Record<string, unknown>>({
             ))}
 
             {cards.length === 0 && (
-              <div className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
+              <div className="rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">
                 {config.emptyColumnText}
               </div>
             )}

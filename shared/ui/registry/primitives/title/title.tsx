@@ -28,7 +28,7 @@ function Title({
   if (variant === "cover") {
     return (
       <div
-        className={cn("relative overflow-hidden rounded-2xl border", className)}
+        className={cn("relative overflow-hidden rounded-xl border", className)}
       >
         {image && (
           // eslint-disable-next-line @next/next/no-img-element

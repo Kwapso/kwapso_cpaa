@@ -31,7 +31,6 @@ import {
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
-  VENDORED_UI,
 } from "@shared/rules/registry"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
@@ -1963,13 +1962,11 @@ describe("RULES — the laws of the base", () => {
     // read it would go red on the rule's own text.
     const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
     const lawBook = join(ROOT, "shared", "rules")
-    // The vendored component library speaks its own radius vocabulary until the
-    // reskin collapses it into the kit's four. Out of scope WITH a reason
-    // (VENDORED_UI_SCOPE["two-radii"]) and with the ratchet below, so this is a
-    // dated decision rather than a hole.
-    const vendored = join(ROOT, VENDORED_UI)
+    // shared/ui/ IS IN SCOPE. It was excused for one day while the reskin's shape
+    // stage was pending; that stage collapsed 45 off-vocabulary radii in there
+    // into rounded-xl, the exemption's own rot check went red, and the exemption
+    // was deleted. The library is held to the same vocabulary as the app.
     const offenders: string[] = []
-    const vendoredStillOffends: string[] = []
     // An admitted exception has to be USED, or it is vocabulary nobody asked
     // for. Counted across the whole scan, vendored directory included, because
     // the selection controls the 6px exists for live in there.
@@ -1982,8 +1979,7 @@ describe("RULES — the laws of the base", () => {
           exceptionUsed.set(hit, exceptionUsed.get(hit)! + 1)
           continue
         }
-        if (f.path.startsWith(vendored)) vendoredStillOffends.push(`${f.rel}: ${hit}`)
-        else offenders.push(`${f.rel}: ${hit}`)
+        offenders.push(`${f.rel}: ${hit}`)
       }
     }
 
@@ -2004,16 +2000,6 @@ describe("RULES — the laws of the base", () => {
       `R31 — a surface is rounded-xl and a pill is rounded-full, nothing else:\n  ${offenders.join("\n  ")}`
     ).toEqual([])
 
-    // The ratchet, pointing the other way to R29's and R32's: those assert an
-    // exemption still names a real offender, and so does this — an exemption for
-    // a directory that has stopped offending is an exemption nobody re-read, and
-    // it would let the library drift back off-vocabulary under a green build.
-    // When the reskin gives shared/ui/ the kit's radii, this goes red and the
-    // entry, the skip and this block go with it.
-    expect(
-      vendoredStillOffends.length,
-      `VENDORED_UI_SCOPE["two-radii"] excuses shared/ui/, which no longer writes an off-vocabulary radius — delete the entry, the skip and this check, and let R31 reach it`
-    ).toBeGreaterThan(0)
   })
 
   // R32 — EVERY COLOUR RESOLVES THROUGH A TOKEN.

@@ -243,7 +243,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R31",
     dimension: "ui",
-    law: "TWO RADII AND NO THIRD. A rectangular surface is `rounded-xl` and a pill is `rounded-full`; a directional variant of the first (`rounded-t-xl`, for a sheet that meets the bottom of the screen) is the same word applied to one edge. No other step of the scale may be written in `web/`, `web-portal/` or `shared/`, and `shadow-*` stays at exactly one use. ONE further radius is admitted, as DATA with its reason in `RADIUS_EXCEPTION` and rot-checked so an exception nothing uses turns the build red: `rounded-select` (6px), on the mark of a selection control, because at `rounded-xl` a checkbox is a lozenge and at `rounded-full` it is a radio button. The kwapso kit admits a second (4px on a bar, on the grounds that a bar is not a box); it is not defined here until something draws one. A third BOX radius is still forbidden. Enforced by one grep, because every step from `sm` to `3xl` already resolves to the same 24px in this theme. ONE directory is out of scope with a reason and a ratchet — `shared/ui/`, the vendored component library, which still speaks its own radius vocabulary until the reskin collapses it into the kit's four (VENDORED_UI_SCOPE); the check asserts it still offends, so the exemption deletes itself the day that lands.",
+    law: "TWO RADII AND NO THIRD. A rectangular surface is `rounded-xl` and a pill is `rounded-full`; a directional variant of the first (`rounded-t-xl`, for a sheet that meets the bottom of the screen) is the same word applied to one edge. No other step of the scale may be written in `web/`, `web-portal/` or `shared/`, and `shadow-*` stays at exactly one use. ONE further radius is admitted, as DATA with its reason in `RADIUS_EXCEPTION` and rot-checked so an exception nothing uses turns the build red: `rounded-select` (6px), on the mark of a selection control, because at `rounded-xl` a checkbox is a lozenge and at `rounded-full` it is a radio button. The kwapso kit admits a second (4px on a bar, on the grounds that a bar is not a box); it is not defined here until something draws one. A third BOX radius is still forbidden. Enforced by one grep, because every step from `sm` to `3xl` already resolves to the same 24px in this theme. NOTHING is out of scope: the vendored component library was excused for one day and the exemption's own rot check deleted it the moment the reskin collapsed those radii.",
     why: "It is the cheapest rule in the book to obey and it was the most broken: 63 of 125 radius classes were off-vocabulary — `rounded-lg` 52 times, `rounded-md` 7, `rounded-2xl` 2 — and changing every one of them moved NOTHING on screen, because `--radius-sm` through `--radius-3xl` are all `var(--radius)`. So five words were in use for one value, which means five decisions a developer can make where there is only one, and the day the theme gives those steps different values the app acquires five radii it never chose. The law could not be written before the fix, because a law that ships with a 57-line exemption list is a list and not a law. It ships the moment the grep is clean. THE ONE THING IT DOES NOT REACH is the bare `rounded` class: that is 4px here, not 24px, so it is a genuinely different value on an inline highlight and a 32px thumbnail, and folding it in would be a redesign wearing a sweep's clothes.",
     checkId: "two-radii",
     status: "enforced",
@@ -484,17 +484,23 @@ export const RADIUS_EXCEPTION: Record<string, string> = {
  * `shared/ui/` and this table has no entry for it. That is the shape to prefer:
  * an exemption is the answer only when the alternative is worse.
  *
- * OUT OF SCOPE, with a reason each: the two below. Both entries are rot-checked
- * by their own law's test — if `shared/ui/` stops offending, the entry must be
- * deleted — so this table can only shrink, and the reskin cannot quietly leave
- * the library speaking a vocabulary the app has moved off. */
+ * OUT OF SCOPE, with a reason: the one below. It is rot-checked by its own
+ * law's test — if `shared/ui/` stops offending, the entry must be deleted — so
+ * this table can only shrink.
+ *
+ * IT HELD TWO, AND THE RATCHET TOOK ONE BACK. `two-radii` was excused here on
+ * 2026-08-22 because the library still wrote `rounded-sm/md/lg/2xl` at about
+ * sixty sites, and collapsing them was a decision about SHAPE that belonged
+ * with the kit's four radii in front of it rather than with the commit that
+ * moved some files. When that stage landed the same day, the check went red
+ * naming the entry, and the entry went with the commit that earned it. That is
+ * the mechanism working exactly once, in public, which is the only evidence
+ * worth having that it works at all. */
 export const VENDORED_UI = "shared/ui/"
 
 export const VENDORED_UI_SCOPE: Record<string, string> = {
   "catalogued-strings":
     "R28 already had a reasoned position on this code and it has not changed — only the code's address has. `resolveImport` refused a bare `@kwapso/ui/...` specifier with the words 'somebody else's code and is not ours to translate', so the library's strings were never in the catalogue and never translated. They are component DEFAULTS: the app says its own words through the props it already translates (`emptyText`, `placeholder`, `label`, `empty`), and R28's subject is what the two front doors SAY. Vendoring must not silently reverse that, because the reversal is expensive in the one direction nobody would notice — the ~150 library strings would enter the catalogue in English, and the only thing that turns an English key into German is `scripts/i18n-translate.mjs`, which spends the owner's Anthropic key. So the walk stops at this directory by PATH now that it can no longer stop by package name. THE RESIDUE IS REAL DEBT AND IS NOT PRETENDED AWAY: a handful of these strings are screen-reader labels the app cannot override from a prop ('Close' on Dialog and Sheet, 'Loading' on Spinner, 'Toggle theme' on ModeToggle), and a blind reader who chose German hears them in English. They are written up in NEEDS-A-SPEC.md rather than left for somebody to rediscover.",
-  "two-radii":
-    "R31's vocabulary is the APP's, and the vendored library still speaks its own — `rounded-sm/md/lg/2xl`, about sixty sites. Unlike R32's four ramp classes, these are not a fault to fix in place. R31's own `why` says the steps 'are all `var(--radius)`', and that is no longer true of the code it now scans: `shared/ui/styles.css` defines `--radius-sm/md/lg/xl` as four DIFFERENT `calc()`s off one `--radius`, so they are four different values by construction, whatever `--radius` is set to. Rewriting them to `rounded-xl` would therefore RESHAPE every button, input, menu and card in both apps. That is a visible redesign, and it belongs to the stage of the reskin that decides shape, with the kit's four radii (card 24 · pill 999 · select 6 · bar 4) in front of it — not to the commit that moved some files. Temporary by construction: the rot check below asserts `shared/ui/` still offends, so the day the radii are collapsed into the kit's vocabulary this entry turns the build red and has to go.",
 }
 
 /** R32 — the files that may hold a colour LITERAL, and why. Everything else in

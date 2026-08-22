@@ -31,7 +31,7 @@ function DropdownMenuContent({
           // OPAQUE surface (bg-popover, not glass): a menu floats over arbitrary
           // page content, so a translucent frost would make it unreadable. Mirrors
           // select/command. See styles.css `.glass`.
-          "z-50 min-w-[8rem] overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg",
+          "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg",
           overlayAnim,
           className
         )}
@@ -42,7 +42,7 @@ function DropdownMenuContent({
 }
 
 const itemClass =
-  "relative flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
+  "relative flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-none transition-colors select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
 
 function DropdownMenuItem({
   className,
@@ -141,7 +141,7 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       className={cn(
         // Opaque, same as the top-level content (a submenu also floats over content).
-        "z-50 min-w-[8rem] overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg",
+        "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg",
         overlayAnim,
         className
       )}

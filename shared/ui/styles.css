@@ -79,7 +79,10 @@
  * re-establish the light token scope even when nested inside a `.dark` page. */
 :root,
 .light {
-  --radius: 0.75rem;
+  /* THE BOX RADIUS. 24px — the kit's one rectangular radius, for cards, panels,
+   * sections, list rows, dialogs, menus and code-input cells alike. It was
+   * 0.75rem (12), which is where the library's four different calc()s came from. */
+  --radius: 1.5rem;
 
   /* ---- Surfaces ------------------------------------------------------- */
   /* Never pure white. `#FFFFFF` does not exist in this system; the kwapso
@@ -171,6 +174,25 @@
   --shadow-rest: 0 1px 2px rgb(26 25 24 / 0.05);
   --shadow-lifted: 0 6px 20px -6px rgb(26 25 24 / 0.14);
   --shadow-overlay: 0 18px 48px -12px rgb(26 25 24 / 0.22);
+
+  /* ---- Button fills (kit ch08) ------------------------------------------
+   * A hover moves the fill AWAY from the page it sits on — darker on a light
+   * fill, lighter on a dark one, by about one step of the palette's own ladder.
+   * That sentence is GAP-9's decision and it is what makes these values
+   * self-consistent across both modes; the four dark ones are the kit's own,
+   * adopted rather than recomputed.
+   *
+   * They are NAMED HEXES on purpose. "Darkens ~8%" describes the intent, and the
+   * specific value was chosen by eye and approved; computing them at runtime with
+   * color-mix would drift from what was signed off. This is also why an opacity
+   * hover (`hover:bg-primary/90`) is banned — it is a different colour every time
+   * the surface underneath changes. */
+  --btn-primary-hover: #f4be4b;
+  --btn-primary-pressed: #edb646;
+  --btn-secondary-hover: #f1ece4;
+  --btn-inverse-hover: #333230;
+  --btn-cancel-hover: #d8d2c7;
+  --btn-destructive-hover: #d33e28;
 }
 
 .dark,
@@ -235,6 +257,14 @@
   --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lifted: 0 6px 20px -6px rgb(0 0 0 / 0.55);
   --shadow-overlay: 0 18px 48px -12px rgb(0 0 0 / 0.7);
+
+  /* Button hovers, dark. Mango does not move, so neither do its two states. */
+  --btn-primary-hover: #f4be4b;
+  --btn-primary-pressed: #edb646;
+  --btn-secondary-hover: #454239;
+  --btn-inverse-hover: #ece8df;
+  --btn-cancel-hover: #322f29;
+  --btn-destructive-hover: #e05540;
 }
 
 /* The same dark values for a viewer who never chose. The guard is the point:
@@ -300,6 +330,14 @@
     --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-lifted: 0 6px 20px -6px rgb(0 0 0 / 0.55);
     --shadow-overlay: 0 18px 48px -12px rgb(0 0 0 / 0.7);
+
+    /* Button hovers, dark. Mango does not move, so neither do its two states. */
+    --btn-primary-hover: #f4be4b;
+    --btn-primary-pressed: #edb646;
+    --btn-secondary-hover: #454239;
+    --btn-inverse-hover: #ece8df;
+    --btn-cancel-hover: #322f29;
+    --btn-destructive-hover: #e05540;
   }
 }
 
@@ -432,6 +470,12 @@
   --color-ink-disabled: var(--ink-disabled);
   --color-hair-faint: var(--hair-faint);
   --color-focus: var(--focus);
+  --color-btn-primary-hover: var(--btn-primary-hover);
+  --color-btn-primary-pressed: var(--btn-primary-pressed);
+  --color-btn-secondary-hover: var(--btn-secondary-hover);
+  --color-btn-inverse-hover: var(--btn-inverse-hover);
+  --color-btn-cancel-hover: var(--btn-cancel-hover);
+  --color-btn-destructive-hover: var(--btn-destructive-hover);
 
   /* The three elevation tokens are NOT exposed here. A `@theme` key lands in the
    * same custom-property namespace as its source, so `--shadow-rest:
@@ -439,10 +483,51 @@
    * `box-shadow: var(--shadow-lifted)` in CSS for now; giving them utility names
    * is a shape decision and belongs with the rest of depth. */
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* ── ONE BOX RADIUS, SAID FIVE WAYS AND MEANING ONE THING ──────────────
+   *
+   * The kit has two radii: a box is 24 and a pill is 999. `--radius` above is
+   * the box, and every step of Tailwind's ramp is pinned to it, so `rounded-sm`
+   * through `rounded-3xl` are five spellings of ONE value rather than five
+   * different ones.
+   *
+   * That is the second half of R31, and it is the half a codemod cannot hold.
+   * The class names in this repo were collapsed to `rounded-xl` — 45 of them in
+   * this directory alone — and R31 now reaches in here to keep them that way.
+   * But a step that still resolved to its own number would mean the next person
+   * to type `rounded-lg` gets a radius nobody chose, silently, and the law only
+   * catches the word. Pinning the values is what makes the mistake harmless as
+   * well as red.
+   *
+   * These were four different `calc()`s off one `--radius` (-4px, -2px, +0,
+   * +4px), which is why R31's own reasoning — "they are all var(--radius)" —
+   * had stopped being true of the code it scanned. It is true again. */
+  /* ── THREE ELEVATIONS, AND NO FOURTH IS REACHABLE ──────────────────────
+   *
+   * The kit allows exactly three: rest, lifted, overlay — paper shadows, never
+   * blue, never inner. Tailwind ships seven steps, so the ramp is pinned the
+   * same way the weight ramp is: sm and md are rest, lg is lifted, xl and 2xl
+   * are overlay. The class names survive; the number of decisions does not.
+   *
+   * These reference the flipping tokens in :root, so a shadow is genuinely
+   * darker in dark mode (rgb(0 0 0 / .40) rather than the light rgb(26 25 24 /
+   * .05)) instead of being one value that only ever suited one palette.
+   *
+   * `--shadow-2xs` and `--shadow-xs` are pinned too, so a component reaching for
+   * a step nobody named still lands on a real elevation. */
+  --shadow-2xs: var(--shadow-rest);
+  --shadow-xs: var(--shadow-rest);
+  --shadow-sm: var(--shadow-rest);
+  --shadow-md: var(--shadow-rest);
+  --shadow-lg: var(--shadow-lifted);
+  --shadow-xl: var(--shadow-overlay);
+  --shadow-2xl: var(--shadow-overlay);
+
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
 
   /* THE ONE NAMED EXCEPTION TO THE TWO-RADIUS LAW — `rounded-select`, 6px.
    *

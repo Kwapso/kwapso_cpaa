@@ -204,10 +204,10 @@ function ActionButton({
 // force one. Built on the same Radix dialog the library's Dialog/Sheet use.
 const layerContent: Record<ScreenPresentation, string> = {
   responsive:
-    "inset-x-0 bottom-0 max-h-[90svh] rounded-t-2xl sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
+    "inset-x-0 bottom-0 max-h-[90svh] rounded-t-xl sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl",
   overlay:
-    "top-1/2 left-1/2 w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl",
-  sheet: "inset-x-0 bottom-0 max-h-[90svh] rounded-t-2xl",
+    "top-1/2 left-1/2 w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-xl",
+  sheet: "inset-x-0 bottom-0 max-h-[90svh] rounded-t-xl",
   fullscreen: "inset-0 rounded-none",
 }
 
@@ -244,7 +244,7 @@ function ScreenLayer({
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
               aria-label="Close"
-              className="rounded-sm opacity-70 transition-opacity outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-full opacity-70 transition-opacity outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

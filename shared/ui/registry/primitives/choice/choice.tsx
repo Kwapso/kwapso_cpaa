@@ -359,7 +359,7 @@ function Choice({
           type="button"
           aria-label="Clear selection"
           onClick={() => onChange([])}
-          className="shrink-0 rounded-sm p-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="size-4" aria-hidden />
         </button>

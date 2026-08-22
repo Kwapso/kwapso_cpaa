@@ -62,7 +62,7 @@ function TypingIndicator() {
 function ToolRow({ item }: { item: AgentChatItem }) {
   const status = item.status ?? "done"
   return (
-    <div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+    <div className="flex flex-col gap-1 rounded-xl border bg-muted/40 px-3 py-2 text-sm">
       <div className="flex items-start gap-2">
         <span
           className={cn(
@@ -192,7 +192,7 @@ function AgentChat({
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm break-words",
+                      "max-w-[85%] rounded-xl px-3.5 py-2 text-sm break-words",
                       isUser
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-foreground"
@@ -225,7 +225,7 @@ function AgentChat({
           {attachments.map((att, index) => (
             <span
               key={`${att.name}-${index}`}
-              className="inline-flex max-w-48 items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1 pl-2 text-xs"
+              className="inline-flex max-w-48 items-center gap-1 rounded-xl border bg-muted/40 py-0.5 pr-1 pl-2 text-xs"
             >
               <span className="truncate">{att.name}</span>
               {onRemoveAttachment && (
@@ -233,7 +233,7 @@ function AgentChat({
                   type="button"
                   onClick={() => onRemoveAttachment(index)}
                   aria-label={`Remove ${att.name}`}
-                  className="shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <X className="size-3" aria-hidden />
                 </button>

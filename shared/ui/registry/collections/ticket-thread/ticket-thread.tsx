@@ -91,7 +91,7 @@ function Attachments({ items }: { items: TicketAttachment[] }) {
     <div className="flex flex-wrap gap-2">
       {items.map((a) => {
         const inner = (
-          <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1 text-xs">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border bg-muted/40 px-2 py-1 text-xs">
             <Paperclip className="size-3.5 text-muted-foreground" aria-hidden />
             {a.name}
           </span>
@@ -288,7 +288,7 @@ function TicketThread({
           <ul
             role="listbox"
             aria-label="Mention a member"
-            className="absolute bottom-16 left-3 z-20 w-56 overflow-hidden rounded-lg border bg-popover p-1 shadow-lg"
+            className="absolute bottom-16 left-3 z-20 w-56 overflow-hidden rounded-xl border bg-popover p-1 shadow-lg"
           >
             {matches.map((m) => (
               <li key={m.id}>
@@ -297,7 +297,7 @@ function TicketThread({
                   role="option"
                   aria-selected={false}
                   onClick={() => pickMention(m)}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent"
+                  className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent"
                 >
                   <Avatar className="size-5">
                     <AvatarFallback className="text-[0.625rem]">
@@ -315,7 +315,7 @@ function TicketThread({
             {files.map((f, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1 text-xs"
+                className="inline-flex items-center gap-1.5 rounded-xl border bg-muted/40 px-2 py-1 text-xs"
               >
                 <Paperclip
                   className="size-3.5 text-muted-foreground"

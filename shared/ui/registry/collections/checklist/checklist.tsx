@@ -72,7 +72,7 @@ function Checklist({
       <ul className="flex flex-col">
         {items.map((item) => (
           <li key={item.id}>
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent">
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-accent">
               <Checkbox
                 checked={item.done}
                 onCheckedChange={(c) => toggle(item.id, c === true)}

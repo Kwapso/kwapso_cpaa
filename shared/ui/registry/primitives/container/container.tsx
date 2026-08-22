@@ -24,16 +24,16 @@ import { useIsVisible } from "../visibility/visibility"
 // inside a light container).
 const bgClass: Record<ContainerConfig["background"], string> = {
   none: "",
-  card: "glass rounded-2xl border",
+  card: "glass rounded-xl border",
   // The scope class (`dark` / `light`) is what re-resolves the palette; the
   // surface itself is then named by MEANING rather than by a colour, so the
   // container paints the same page surface its children resolve against. It
   // used to say `bg-neutral-900 / bg-neutral-50`, which named a colour, drifted
   // from the palette it sat in, and could not follow a re-theme (R32).
-  dark: "dark rounded-2xl border border-white/10 bg-background text-foreground",
+  dark: "dark rounded-xl border border-white/10 bg-background text-foreground",
   light:
-    "light rounded-2xl border border-black/10 bg-background text-foreground",
-  image: "dark relative overflow-hidden rounded-2xl border bg-cover bg-center",
+    "light rounded-xl border border-black/10 bg-background text-foreground",
+  image: "dark relative overflow-hidden rounded-xl border bg-cover bg-center",
 }
 const padClass = { none: "", sm: "p-2", md: "p-4", lg: "p-6" } as const
 const gapClass = {

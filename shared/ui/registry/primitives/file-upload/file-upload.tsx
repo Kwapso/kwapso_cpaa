@@ -77,7 +77,7 @@ function FileUpload({
           {files.map((f, i) => (
             <div
               key={i}
-              className="flex items-center gap-2 rounded-lg border bg-card p-2 text-xs"
+              className="flex items-center gap-2 rounded-xl border bg-card p-2 text-xs"
             >
               {f.type.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element

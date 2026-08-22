@@ -185,7 +185,7 @@ function CalendarView<T extends Record<string, unknown>>({
             <div
               key={i}
               className={cn(
-                "flex min-h-20 flex-col gap-1 rounded-lg border p-1.5 transition-colors hover:border-primary/40 hover:bg-accent/40",
+                "flex min-h-20 flex-col gap-1 rounded-xl border p-1.5 transition-colors hover:border-primary/40 hover:bg-accent/40",
                 !inMonth && "opacity-40",
                 isToday && "border-primary/50 bg-primary/5"
               )}

@@ -77,12 +77,12 @@ function RecordDetail({
             <Avatar
               className={cn(
                 "size-12",
-                avatarShape === "square" && "rounded-lg"
+                avatarShape === "square" && "rounded-xl"
               )}
             >
               {avatarSrc && <AvatarImage src={avatarSrc} />}
               <AvatarFallback
-                className={cn(avatarShape === "square" && "rounded-lg")}
+                className={cn(avatarShape === "square" && "rounded-xl")}
               >
                 {avatarFallback}
               </AvatarFallback>

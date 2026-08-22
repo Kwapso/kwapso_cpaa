@@ -130,7 +130,7 @@ function DatePicker({
                   setOpen(false)
                 }}
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-md text-sm transition-colors hover:bg-accent",
+                  "flex size-8 items-center justify-center rounded-xl text-sm transition-colors hover:bg-accent",
                   !inMonth && "text-muted-foreground/40",
                   isSelected &&
                     "bg-primary text-primary-foreground hover:bg-primary"

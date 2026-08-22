@@ -118,10 +118,10 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   calls it the one named exception. It is DATA in `RADIUS_EXCEPTION` with its
   reason, rot-checked so an exception nothing uses turns the build red. The kit
   names a second (4px on a bar) which is NOT defined here until something draws
-  one. A third BOX radius is still forbidden. Note the old reasoning — "every
-  step from `sm` to `3xl` resolves to the same 24px" — is no longer true of
-  `shared/ui/`, which defines four different `calc()`s; that directory is out of
-  R31's scope until the reskin collapses them (`VENDORED_UI_SCOPE`).
+  one. A third BOX radius is still forbidden. Every step from `sm` to `3xl` resolves to the same 24px again — the vendored
+  library defined four different `calc()`s when it landed, and the reskin's shape
+  stage pinned them all back to one `--radius`, which is what let R31's scope
+  exemption for `shared/ui/` be deleted the same day it was written.
   (`two-radii`. UI-RULEBOOK N9)
 - **Every extracted position asks for its translation (R33).** R28 makes the
   catalogue match the code; this makes the code READ the catalogue. Every

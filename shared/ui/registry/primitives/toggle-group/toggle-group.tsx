@@ -26,7 +26,7 @@ function ToggleGroup({
   return (
     <ToggleGroupPrimitive.Root
       className={cn(
-        "flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-1",
+        "flex w-fit items-center gap-1 rounded-xl border bg-muted/40 p-1",
         className
       )}
       {...props}
