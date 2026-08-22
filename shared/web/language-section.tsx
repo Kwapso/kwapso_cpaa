@@ -36,7 +36,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
+} from "@shared/ui/registry/primitives/select/select"
 import { toast } from "sonner"
 
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"

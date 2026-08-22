@@ -10,8 +10,8 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+} from "@shared/ui/registry/primitives/avatar/avatar"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import {
   Dialog,
   DialogContent,
@@ -19,13 +19,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import type { SessionUser } from "@shared/types"
 import { ApiFailure, auth } from "@/lib/api"

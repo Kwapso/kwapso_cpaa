@@ -61,8 +61,8 @@ import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
 
 import { shapeAccountsList } from "@/components/deep-link/shape"
 import { cursorKey } from "@/lib/live-resources"

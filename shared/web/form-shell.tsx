@@ -36,9 +36,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Dialog, DialogContent } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Dialog, DialogContent } from "@shared/ui/registry/primitives/dialog/dialog"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
 
 import { useT } from "./language"
 

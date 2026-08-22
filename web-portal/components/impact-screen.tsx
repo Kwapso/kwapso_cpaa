@@ -37,11 +37,11 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@kwapso/ui/registry/primitives/accordion/accordion"
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+} from "@shared/ui/registry/primitives/accordion/accordion"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Comments } from "@shared/ui/registry/collections/comments/comments"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 
 import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"

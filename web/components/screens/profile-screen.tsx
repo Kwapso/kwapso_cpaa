@@ -22,14 +22,14 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { List } from "@kwapso/ui/registry/collections/list/list"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+} from "@shared/ui/registry/primitives/avatar/avatar"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { List } from "@shared/ui/registry/collections/list/list"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
+} from "@shared/ui/registry/collections/activity-feed/activity-feed"
 import { Mail } from "lucide-react"
 
 import { EmailChangeDialog } from "@/components/email-change-dialog"

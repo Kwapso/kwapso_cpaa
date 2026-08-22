@@ -28,15 +28,15 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { List } from "@kwapso/ui/registry/collections/list/list"
-import { ToggleGroup, ToggleGroupItem } from "@kwapso/ui/registry/primitives/toggle-group/toggle-group"
+} from "@shared/ui/registry/primitives/dialog/dialog"
+import { List } from "@shared/ui/registry/collections/list/list"
+import { ToggleGroup, ToggleGroupItem } from "@shared/ui/registry/primitives/toggle-group/toggle-group"
 import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "lucide-react"
 
 import { useIsPhone } from "@/lib/use-is-phone"

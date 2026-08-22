@@ -16,8 +16,8 @@
 //     reason is worse than saying none.
 //   • Look like an error. Nothing is broken. Their login is fine.
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { LogOut } from "lucide-react"
 
 import { brand } from "@shared/brand"

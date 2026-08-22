@@ -21,7 +21,7 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import { toast } from "sonner"
 
 import { SCALE_STEPS, scaleFontSize } from "../scale"

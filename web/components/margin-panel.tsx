@@ -29,7 +29,7 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
 import { Banknote } from "lucide-react"
 
 import { tenancy } from "@/lib/api"

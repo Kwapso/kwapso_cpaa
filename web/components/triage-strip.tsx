@@ -14,8 +14,8 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { AlarmClock, UserCheck } from "lucide-react"
 
 import { RecordPicker } from "@/components/record-picker"

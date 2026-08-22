@@ -41,9 +41,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { RefreshCw } from "lucide-react"
 
 import { ApiFailure, content } from "@/lib/api"

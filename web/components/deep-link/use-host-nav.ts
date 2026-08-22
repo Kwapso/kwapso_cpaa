@@ -8,7 +8,7 @@
 import * as React from "react"
 import { usePathname, type useRouter } from "next/navigation"
 
-import { buildScreenQuery, type ScreenQuery } from "@kwapso/ui/lib/recipe"
+import { buildScreenQuery, type ScreenQuery } from "@shared/ui/lib/recipe"
 
 import { parseRoute, TOP_LEVEL_MODULES, type Route } from "@/components/deep-link/route"
 

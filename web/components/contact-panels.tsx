@@ -12,8 +12,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
 import { ChevronRight } from "lucide-react"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"

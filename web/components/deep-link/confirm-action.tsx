@@ -13,9 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
+} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { type ScreenQuery } from "@shared/ui/lib/recipe"
 
 import { personName } from "@/lib/identity"
 import { useT } from "@shared/web/language"

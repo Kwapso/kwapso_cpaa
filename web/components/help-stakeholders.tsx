@@ -7,9 +7,9 @@
 
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/registry/primitives/avatar/avatar"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { UserPlus } from "lucide-react"
 
 import type { HelpStakeholder } from "@shared/types"

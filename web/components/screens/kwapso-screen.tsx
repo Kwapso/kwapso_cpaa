@@ -22,9 +22,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import { ChevronRight, Palette, Pencil } from "lucide-react"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"

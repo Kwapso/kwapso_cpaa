@@ -17,13 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { ScrollArea } from "@kwapso/ui/registry/primitives/scroll-area/scroll-area"
+} from "@shared/ui/registry/primitives/dialog/dialog"
+import { ScrollArea } from "@shared/ui/registry/primitives/scroll-area/scroll-area"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
   type ActivityItem as ActivityFeedItem,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
+} from "@shared/ui/registry/collections/activity-feed/activity-feed"
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"

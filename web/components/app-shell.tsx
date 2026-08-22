@@ -10,9 +10,9 @@
 import * as React from "react"
 import { usePathname } from "next/navigation"
 
-import { Breadcrumbs } from "@kwapso/ui/registry/primitives/breadcrumbs/breadcrumbs"
-import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Breadcrumbs } from "@shared/ui/registry/primitives/breadcrumbs/breadcrumbs"
+import { ModeToggle } from "@shared/ui/registry/primitives/mode-toggle/mode-toggle"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import {
   AppWindow,
   BadgeCheck,
@@ -58,7 +58,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@kwapso/ui/registry/primitives/sheet/sheet"
+} from "@shared/ui/registry/primitives/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 

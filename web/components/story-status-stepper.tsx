@@ -17,7 +17,7 @@
 // change here — see help-status-stepper.tsx, which made the same move for the
 // same reason on the same day.
 
-import { StatusStepper, type StepperTone } from "@kwapso/ui/registry/primitives/status-stepper/status-stepper"
+import { StatusStepper, type StepperTone } from "@shared/ui/registry/primitives/status-stepper/status-stepper"
 
 import { STORY_STATUSES, type StoryStatus } from "@shared/types"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"

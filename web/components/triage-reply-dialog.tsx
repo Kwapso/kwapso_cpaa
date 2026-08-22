@@ -19,12 +19,12 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Textarea } from "@shared/ui/registry/primitives/textarea/textarea"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"

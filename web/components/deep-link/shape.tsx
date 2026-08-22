@@ -3,7 +3,7 @@
 // fetching: the resolver guards loading/errors then calls these, so they're
 // trivially unit-testable and keep the resolver lean.
 
-import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
+import { type ScreenData } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
 
 import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"

@@ -18,11 +18,11 @@ import * as React from "react"
 import {
   DialogDescription,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { Notes } from "@shared/ui/registry/primitives/notes/notes"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 import { Plus } from "lucide-react"
 
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -35,7 +35,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
+} from "@shared/ui/registry/primitives/select/select"
 
 import { ApiFailure, appModules } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"

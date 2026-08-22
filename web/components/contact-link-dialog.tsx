@@ -29,15 +29,15 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
+import { Checkbox } from "@shared/ui/registry/primitives/checkbox/checkbox"
 import {
   DialogDescription,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 import { Plus } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"

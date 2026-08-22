@@ -26,8 +26,8 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { Languages } from "lucide-react"
 
 import { ApiFailure, dataOps } from "@/lib/api"

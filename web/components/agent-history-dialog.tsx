@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { ScrollArea } from "@kwapso/ui/registry/primitives/scroll-area/scroll-area"
+} from "@shared/ui/registry/primitives/dialog/dialog"
+import { ScrollArea } from "@shared/ui/registry/primitives/scroll-area/scroll-area"
 
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"

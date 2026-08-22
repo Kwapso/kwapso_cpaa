@@ -43,9 +43,9 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { List } from "@kwapso/ui/registry/collections/list/list"
+} from "@shared/ui/registry/primitives/avatar/avatar"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { List } from "@shared/ui/registry/collections/list/list"
 import { ChevronRight } from "lucide-react"
 
 import { AccessTokensSection } from "@/components/access-tokens"

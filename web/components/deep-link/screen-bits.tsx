@@ -4,8 +4,8 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Card, CardContent } from "@shared/ui/registry/primitives/card/card"
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "lucide-react"
 import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 

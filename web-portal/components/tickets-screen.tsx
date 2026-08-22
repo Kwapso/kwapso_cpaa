@@ -22,9 +22,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
 import { Plus } from "lucide-react"
 
 import { invalidate } from "@shared/web/store"

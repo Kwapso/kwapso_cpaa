@@ -6,7 +6,7 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import {
   Dialog,
   DialogContent,
@@ -14,13 +14,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import {
   RadioGroup,
   RadioGroupItem,
-} from "@kwapso/ui/registry/primitives/radio-group/radio-group"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+} from "@shared/ui/registry/primitives/radio-group/radio-group"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 
 import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"

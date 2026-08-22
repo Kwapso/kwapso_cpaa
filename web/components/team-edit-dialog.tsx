@@ -9,17 +9,17 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@kwapso/ui/registry/primitives/avatar/avatar"
+} from "@shared/ui/registry/primitives/avatar/avatar"
 import {
   DialogDescription,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import type { TeamSummary } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"

@@ -7,7 +7,7 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 
 import { reportError } from "@shared/web/log"
 import { useT } from "@shared/web/language"

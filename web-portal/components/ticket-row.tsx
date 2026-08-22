@@ -10,7 +10,7 @@
 
 import Link from "next/link"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
 import { ChevronRight } from "lucide-react"
 
 import type { HelpTicket } from "@shared/types"

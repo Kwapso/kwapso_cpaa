@@ -1,7 +1,7 @@
 import { Inter } from "next/font/google"
 
-import { Toaster } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { ThemeProvider } from "@kwapso/ui/registry/tokens/theme-provider"
+import { Toaster } from "@shared/ui/registry/primitives/sonner/sonner"
+import { ThemeProvider } from "@shared/ui/registry/tokens/theme-provider"
 
 import { BrandTheme } from "@shared/web/brand-theme"
 import { MarkRuntime } from "@shared/web/mark-runtime"

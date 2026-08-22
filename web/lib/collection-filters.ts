@@ -44,7 +44,7 @@
 // `paged-sort.test.ts` makes of a sort menu. A facet naming a parameter its door
 // does not parse is a control that quietly answers nothing.
 
-import type { FilterFacet } from "@kwapso/ui/lib/config"
+import type { FilterFacet } from "@shared/ui/lib/config"
 
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 

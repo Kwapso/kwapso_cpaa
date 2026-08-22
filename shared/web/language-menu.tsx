@@ -22,8 +22,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import { Check } from "lucide-react"
 import { toast } from "sonner"
 

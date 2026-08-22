@@ -15,8 +15,8 @@
 import * as React from "react"
 
 import { Field } from "@shared/web/field"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"

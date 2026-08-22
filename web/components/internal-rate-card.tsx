@@ -27,12 +27,12 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
+} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
 import { Pencil, Plus, Power } from "lucide-react"
 
 import type { InternalRate, RoleRate } from "@shared/types"

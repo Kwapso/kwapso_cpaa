@@ -23,15 +23,15 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
-import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { Checkbox } from "@shared/ui/registry/primitives/checkbox/checkbox"
+import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Label } from "@kwapso/ui/registry/primitives/label/label"
-import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Label } from "@shared/ui/registry/primitives/label/label"
+import { Notes } from "@shared/ui/registry/primitives/notes/notes"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { Plus } from "lucide-react"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import { FilePicker } from "@/components/file-picker"
 import { ApiFailure } from "@/lib/api"

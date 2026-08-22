@@ -26,8 +26,8 @@
 import * as React from "react"
 import Link from "next/link"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
 import { ArrowRight, Plus } from "lucide-react"
 
 import { SAVINGS_CAPTION, hoursText } from "@shared/workers/savings"

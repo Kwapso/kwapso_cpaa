@@ -8,20 +8,20 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Input } from "@shared/ui/registry/primitives/input/input"
 import { Field } from "@shared/web/field"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +31,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
+} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
 import { Ban, ClipboardCopy, Copy } from "lucide-react"
 
 import type { McpTokenSummary } from "@shared/types"

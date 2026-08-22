@@ -46,7 +46,7 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import {
   Command,
   CommandEmpty,
@@ -54,15 +54,15 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@kwapso/ui/registry/primitives/command/command"
+} from "@shared/ui/registry/primitives/command/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@kwapso/ui/registry/primitives/popover/popover"
-import { Sheet, SheetContent, SheetTitle } from "@kwapso/ui/registry/primitives/sheet/sheet"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { useDebouncedCallback } from "@kwapso/ui/registry/primitives/use-debounce/use-debounce"
+} from "@shared/ui/registry/primitives/popover/popover"
+import { Sheet, SheetContent, SheetTitle } from "@shared/ui/registry/primitives/sheet/sheet"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { useDebouncedCallback } from "@shared/ui/registry/primitives/use-debounce/use-debounce"
 import { Check, ChevronsUpDown, X } from "lucide-react"
 
 import { useIsPhone } from "@/lib/use-is-phone"

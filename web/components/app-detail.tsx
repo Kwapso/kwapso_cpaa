@@ -16,10 +16,10 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import { ModulesPanel } from "@/components/modules-panel"
 import { Pencil, Power } from "lucide-react"
 

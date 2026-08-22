@@ -20,9 +20,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import { Check, Pencil, Undo2 } from "lucide-react"
 
 import { ActivityPanel } from "@/components/activity-panel"
@@ -43,7 +43,7 @@ import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 

@@ -14,7 +14,7 @@
 // every file. It now looks for THIS component in the details, and for the feed
 // and the pager in here — same guarantee, one place to get it right.
 
-import { ActivityFeed, defaultActivityFeedConfig } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
+import { ActivityFeed, defaultActivityFeedConfig } from "@shared/ui/registry/collections/activity-feed/activity-feed"
 
 import { LoadMore } from "@/components/load-more"
 import type { ActivityFeedRow } from "@/lib/use-record-activity"

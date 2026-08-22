@@ -5,7 +5,7 @@
 
 import { useRouter } from "next/navigation"
 
-import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
+import { ModeToggle } from "@shared/ui/registry/primitives/mode-toggle/mode-toggle"
 
 import { AuthCard } from "@/components/temp/auth-card"
 

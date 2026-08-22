@@ -54,10 +54,10 @@
 
 import * as React from "react"
 
-import { FilterBar } from "@kwapso/ui/registry/primitives/filter-bar/filter-bar"
-import { SearchInput } from "@kwapso/ui/registry/primitives/search-input/search-input"
-import { SortControl } from "@kwapso/ui/registry/primitives/sort-control/sort-control"
-import type { FilterFacet, SortOption } from "@kwapso/ui/lib/config"
+import { FilterBar } from "@shared/ui/registry/primitives/filter-bar/filter-bar"
+import { SearchInput } from "@shared/ui/registry/primitives/search-input/search-input"
+import { SortControl } from "@shared/ui/registry/primitives/sort-control/sort-control"
+import type { FilterFacet, SortOption } from "@shared/ui/lib/config"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"

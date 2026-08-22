@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { ScreenRecipe } from "@kwapso/ui/lib/recipe"
+import type { ScreenRecipe } from "@shared/ui/lib/recipe"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"

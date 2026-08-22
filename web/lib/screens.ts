@@ -14,13 +14,13 @@ import type {
   RecipeNode,
   RecipeTab,
   ScreenRecipe,
-} from "@kwapso/ui/lib/recipe"
+} from "@shared/ui/lib/recipe"
 import {
   defaultCollectionConfig,
   defaultFieldConfig,
   type CollectionConfig,
   type FilterFacet,
-} from "@kwapso/ui/lib/config"
+} from "@shared/ui/lib/config"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { formatCount } from "@shared/web/format-count"

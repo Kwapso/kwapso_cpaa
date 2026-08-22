@@ -31,15 +31,15 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { Check, ChevronsUpDown } from "lucide-react"
 
 import { clearCache } from "@shared/web/store"

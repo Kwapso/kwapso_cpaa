@@ -42,8 +42,8 @@ import * as React from "react"
 
 import dynamic from "next/dynamic"
 
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { StatGrid, defaultStatGridConfig } from "@kwapso/ui/registry/collections/stat-grid/stat-grid"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { StatGrid, defaultStatGridConfig } from "@shared/ui/registry/collections/stat-grid/stat-grid"
 import { ChartNoAxesColumn } from "lucide-react"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"

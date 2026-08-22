@@ -12,9 +12,9 @@ import * as React from "react"
 
 import { useT } from "@shared/web/language"
 
-import type { AgentChatItem } from "@kwapso/ui/registry/collections/agent-chat/agent-chat"
-import type { RunStep } from "@kwapso/ui/registry/collections/run-steps/run-steps"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import type { AgentChatItem } from "@shared/ui/registry/collections/agent-chat/agent-chat"
+import type { RunStep } from "@shared/ui/registry/collections/run-steps/run-steps"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, PendingCall } from "@shared/types"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"

@@ -10,14 +10,14 @@ import * as React from "react"
 import {
   DialogDescription,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { Mail } from "lucide-react"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"

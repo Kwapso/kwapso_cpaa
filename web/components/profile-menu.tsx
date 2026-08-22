@@ -10,7 +10,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@kwapso/ui/registry/primitives/avatar/avatar"
+} from "@shared/ui/registry/primitives/avatar/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
+} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
 import { LogOut, Settings, UserRound } from "lucide-react"
 
 import { auth } from "@/lib/api"

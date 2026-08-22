@@ -22,12 +22,12 @@
 // The wording of a failure and the brand mark are shared with the agency door
 // (shared/web/google-sign-in.tsx) so the two can't drift apart.
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import { Field } from "@shared/web/field"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import { brand } from "@shared/brand"
 import { CodeInput } from "@shared/web/code-input"

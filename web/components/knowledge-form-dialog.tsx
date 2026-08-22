@@ -25,24 +25,24 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Notes } from "@shared/ui/registry/primitives/notes/notes"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+} from "@shared/ui/registry/primitives/select/select"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"

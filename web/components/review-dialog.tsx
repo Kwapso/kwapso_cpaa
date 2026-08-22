@@ -30,16 +30,16 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Textarea } from "@shared/ui/registry/primitives/textarea/textarea"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { ClipboardCheck, Link as LinkIcon, Paperclip, Plus, X } from "lucide-react"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
 import type { StoryAttachment } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { ApiFailure, content as contentApi } from "@/lib/api"

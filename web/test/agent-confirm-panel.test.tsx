@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url"
 import { act, render, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { RunSteps } from "@kwapso/ui/registry/collections/run-steps/run-steps"
+import { RunSteps } from "@shared/ui/registry/collections/run-steps/run-steps"
 import type { PendingCall } from "@shared/types"
 
 /** The stream the mocked door plays back for the next send(). */

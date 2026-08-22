@@ -12,7 +12,7 @@
 //
 // Anything beyond that one override belongs at the call site, or in the library.
 
-import { DescriptionList, defaultDescriptionListConfig, type DescriptionItem } from "@kwapso/ui/registry/collections/description-list/description-list"
+import { DescriptionList, defaultDescriptionListConfig, type DescriptionItem } from "@shared/ui/registry/collections/description-list/description-list"
 
 export function OverviewList({ items }: { items: DescriptionItem[] }) {
   return <DescriptionList config={{ ...defaultDescriptionListConfig, columns: 1 }} items={items} />

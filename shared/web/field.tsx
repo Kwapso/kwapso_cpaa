@@ -47,8 +47,8 @@
 
 import * as React from "react"
 
-import { Field as LibraryField } from "@kwapso/ui/registry/primitives/field/field"
-import { type FieldConfig } from "@kwapso/ui/lib/config"
+import { Field as LibraryField } from "@shared/ui/registry/primitives/field/field"
+import { type FieldConfig } from "@shared/ui/lib/config"
 
 import { useT } from "./language"
 
@@ -94,4 +94,4 @@ export function Field(props: React.ComponentProps<typeof LibraryField>) {
 // `fieldProps` is pure machinery — it maps a config's validation onto native
 // HTML attributes and reads no words at all — so it is re-exported unchanged
 // rather than wrapped. A call site that needs both gets both from one import.
-export { fieldProps } from "@kwapso/ui/registry/primitives/field/field"
+export { fieldProps } from "@shared/ui/registry/primitives/field/field"

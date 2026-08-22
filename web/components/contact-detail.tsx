@@ -44,9 +44,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,8 +56,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import { KeyRound, Pencil, Power } from "lucide-react"
 
 import type { AccountDetail } from "@shared/types"

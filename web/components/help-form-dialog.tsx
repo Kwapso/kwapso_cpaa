@@ -30,13 +30,13 @@ import * as React from "react"
 import {
   DialogDescription,
   DialogTitle,
-} from "@kwapso/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
-import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { Notes } from "@shared/ui/registry/primitives/notes/notes"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/ui/lib/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { appModulesKey, appsKey, listFetch } from "@/lib/live-resources"

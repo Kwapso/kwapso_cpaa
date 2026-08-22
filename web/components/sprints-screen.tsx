@@ -24,17 +24,17 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { List } from "@kwapso/ui/registry/collections/list/list"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { List } from "@shared/ui/registry/collections/list/list"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 // The picture comes from pulse.tsx, which holds the agency shell's ONE lazy

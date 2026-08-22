@@ -31,7 +31,7 @@
 // read" on the triage screen, and the resolve panel — and they live beside the
 // record, not on this strip.
 
-import { StatusStepper, type StepperTone } from "@kwapso/ui/registry/primitives/status-stepper/status-stepper"
+import { StatusStepper, type StepperTone } from "@shared/ui/registry/primitives/status-stepper/status-stepper"
 
 import { HELP_STATUSES, type HelpStatus } from "@shared/types"
 import { HELP_STATUS } from "@/components/deep-link/shape"

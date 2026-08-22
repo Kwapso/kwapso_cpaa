@@ -9,15 +9,15 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import {
   TicketThread,
   type TicketMember,
   type TicketStatus,
-} from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
+} from "@shared/ui/registry/collections/ticket-thread/ticket-thread"
 import { ArchiveRestore, Archive, CheckCheck, Languages, Pencil, Send } from "lucide-react"
 
 import type {

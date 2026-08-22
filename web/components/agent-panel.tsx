@@ -17,17 +17,17 @@
 import * as React from "react"
 import { History, Plus } from "lucide-react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@kwapso/ui/registry/primitives/sheet/sheet"
-import { AgentChat } from "@kwapso/ui/registry/collections/agent-chat/agent-chat"
-import { RunSteps } from "@kwapso/ui/registry/collections/run-steps/run-steps"
+} from "@shared/ui/registry/primitives/sheet/sheet"
+import { AgentChat } from "@shared/ui/registry/collections/agent-chat/agent-chat"
+import { RunSteps } from "@shared/ui/registry/collections/run-steps/run-steps"
 
 import { AgentHistoryDialog } from "@/components/agent-history-dialog"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"

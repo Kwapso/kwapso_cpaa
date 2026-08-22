@@ -5,7 +5,7 @@
  * app does. ONE master copy (kwapso_ui repo, styles.css); neither front door
  * carries its own. The portal's difference from the agency app is SCALE, not a
  * second design language: same tokens, same components, more air. */
-@import "@kwapso/ui/styles.css";
+@import "../../shared/ui/styles.css";
 
 /* The library overrides BOTH front doors carry, in one file. */
 @import "../../shared/web/library-overrides.css";

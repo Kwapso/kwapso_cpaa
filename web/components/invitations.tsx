@@ -20,12 +20,12 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { List } from "@kwapso/ui/registry/collections/list/list"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+} from "@shared/ui/registry/primitives/avatar/avatar"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { List } from "@shared/ui/registry/collections/list/list"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 
 import type { ReceivedInvite } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"

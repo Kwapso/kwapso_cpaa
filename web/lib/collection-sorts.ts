@@ -19,7 +19,7 @@
 // dates newest-first, names A→Z — because landing on oldest-first reads as
 // broken (the library's own SortControl header says the same).
 
-import type { SortOption } from "@kwapso/ui/lib/config"
+import type { SortOption } from "@shared/ui/lib/config"
 
 /** One collection's sort control: what it offers, and which of those the DOOR
  * falls back to when the screen asks for nothing. The default is never sent —

@@ -21,8 +21,8 @@
 
 import * as React from "react"
 
-import { StatGrid, defaultStatGridConfig } from "@kwapso/ui/registry/collections/stat-grid/stat-grid"
-import { Progress } from "@kwapso/ui/registry/primitives/progress/progress"
+import { StatGrid, defaultStatGridConfig } from "@shared/ui/registry/collections/stat-grid/stat-grid"
+import { Progress } from "@shared/ui/registry/primitives/progress/progress"
 import {
   Table,
   TableBody,
@@ -30,7 +30,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@kwapso/ui/registry/primitives/table/table"
+} from "@shared/ui/registry/primitives/table/table"
 
 import { ArrowDown, CornerDownRight } from "lucide-react"
 

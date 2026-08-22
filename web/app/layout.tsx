@@ -1,8 +1,8 @@
 import { Inter } from "next/font/google"
 
-import { AmbientBackground } from "@kwapso/ui/registry/primitives/ambient-background/ambient-background"
-import { Toaster } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { ThemeProvider } from "@kwapso/ui/registry/tokens/theme-provider"
+import { AmbientBackground } from "@shared/ui/registry/primitives/ambient-background/ambient-background"
+import { Toaster } from "@shared/ui/registry/primitives/sonner/sonner"
+import { ThemeProvider } from "@shared/ui/registry/tokens/theme-provider"
 import { BrandTheme } from "@shared/web/brand-theme"
 import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"

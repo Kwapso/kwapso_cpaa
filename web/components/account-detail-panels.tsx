@@ -17,8 +17,8 @@
 // or write an account, which is what keeps the record's tabs (R2/R8) and its
 // counts (R16) in one place.
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import { Ban, KeyRound, Link2, Power, UserMinus } from "lucide-react"
 
 import type { AccountDetail } from "@shared/types"

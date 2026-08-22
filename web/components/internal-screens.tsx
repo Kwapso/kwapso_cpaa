@@ -17,8 +17,8 @@ import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"

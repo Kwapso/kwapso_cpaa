@@ -15,11 +15,11 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import {
   ScreenRenderer,
-} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
+} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
 
 import { ProcessesScreen } from "@/components/processes-screen"
 import { AppsScreen } from "@/components/apps-screen"

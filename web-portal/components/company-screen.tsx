@@ -18,9 +18,9 @@
 import {
   DescriptionList,
   defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+} from "@shared/ui/registry/collections/description-list/description-list"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"

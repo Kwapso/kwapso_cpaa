@@ -25,11 +25,11 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import type { ScreenActionContext, ScreenIntent } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import type { ScreenActionContext, ScreenIntent } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"

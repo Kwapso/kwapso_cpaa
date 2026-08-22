@@ -26,7 +26,7 @@
 // caller may not read, a set that is all zeros — is decided in pulse.tsx, before
 // this file is ever asked for.
 
-import { Chart, defaultChartConfig } from "@kwapso/ui/registry/collections/chart/chart"
+import { Chart, defaultChartConfig } from "@shared/ui/registry/collections/chart/chart"
 
 /** The band height every chart on a page-band shares. Restated here rather than
  * imported from pulse.tsx, because an import BACK would put this module in the

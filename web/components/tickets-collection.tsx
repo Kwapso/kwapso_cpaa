@@ -32,12 +32,12 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
 import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Send } from "lucide-react"
 
 import { CollectionHeading } from "@/components/collection-heading"

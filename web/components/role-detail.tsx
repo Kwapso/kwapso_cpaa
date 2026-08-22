@@ -12,10 +12,10 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,13 +25,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
+} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
 import {
   PermissionMatrix,
   defaultPermissionMatrixConfig,
   type PermissionMatrixConfig,
-} from "@kwapso/ui/registry/collections/permission-matrix/permission-matrix"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+} from "@shared/ui/registry/collections/permission-matrix/permission-matrix"
+import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
 import type { PermissionValue, RolePermissions, TeamRole } from "@shared/types"

@@ -26,7 +26,7 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
 import { ChevronRight } from "lucide-react"
 
 import { RecordMark } from "@shared/web/record-mark"

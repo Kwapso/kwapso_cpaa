@@ -24,14 +24,14 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
+} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 
 import { RecordMark } from "@shared/web/record-mark"

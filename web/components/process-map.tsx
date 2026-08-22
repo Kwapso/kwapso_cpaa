@@ -31,7 +31,7 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Badge } from "@shared/ui/registry/primitives/badge/badge"
 import { ArrowDown } from "lucide-react"
 
 import { useT } from "@shared/web/language"
