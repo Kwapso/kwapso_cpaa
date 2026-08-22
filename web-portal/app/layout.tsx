@@ -3,7 +3,6 @@ import { Inter } from "next/font/google"
 import { Toaster } from "@shared/ui/registry/primitives/sonner/sonner"
 import { ThemeProvider } from "@shared/ui/registry/tokens/theme-provider"
 
-import { BrandTheme } from "@shared/web/brand-theme"
 import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"
 
@@ -32,7 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
          * animator is published before the parser reaches the loader further
          * down it. shared/web/splash.ts. */}
         <MarkRuntime />
-        <BrandTheme />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ErrorReporter />
           <ErrorBoundary>{children}</ErrorBoundary>

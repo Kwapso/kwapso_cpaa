@@ -3,7 +3,6 @@ import { Inter } from "next/font/google"
 import { AmbientBackground } from "@shared/ui/registry/primitives/ambient-background/ambient-background"
 import { Toaster } from "@shared/ui/registry/primitives/sonner/sonner"
 import { ThemeProvider } from "@shared/ui/registry/tokens/theme-provider"
-import { BrandTheme } from "@shared/web/brand-theme"
 import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"
 import { AgentHost } from "@/components/agent-host"
@@ -37,7 +36,6 @@ export default function RootLayout({
          * being fetched. There is no overlay here any more and nothing to clear
          * — the loader is the page's own content. shared/web/splash.ts. */}
         <MarkRuntime />
-        <BrandTheme />
         {/* defaultTheme="system" = follow the device's day/night setting; a
          * ModeToggle (in the app bar + on the auth screens) lets people
          * override it, and next-themes remembers their choice. */}

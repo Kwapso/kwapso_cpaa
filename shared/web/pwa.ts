@@ -39,18 +39,33 @@ export const appViewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // Tint the browser/status-bar chrome to match the app surface, per mode.
+  // Tint the browser/status-bar chrome to match the app SURFACE, per mode — so
+  // the chrome above the page is the same paper the page is printed on. These
+  // are the palette's two page tones written out, because the browser reads this
+  // from a meta tag before any stylesheet exists and cannot resolve a token.
+  // They were #f5f5f5 and #141414: neutral greys, from no palette at all, and
+  // the kit is explicit that a dark surface here is warm unlit paper rather than
+  // grey, because a neutral grey reads as a different product.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f5" },
-    { media: "(prefers-color-scheme: dark)", color: "#141414" },
+    { media: "(prefers-color-scheme: light)", color: "#FFFEF9" },
+    { media: "(prefers-color-scheme: dark)", color: "#141310" },
   ],
 }
 
 /** The PWA manifest body — what makes a door installable to a home screen or
  * dock. Each app re-exports it from its own app/manifest.ts with
  * `dynamic = "force-static"`, so the static export emits a plain
- * /manifest.webmanifest for its gateway to serve. */
-export function appManifest(): MetadataRoute.Manifest {
+ * /manifest.webmanifest for its gateway to serve.
+ *
+ * IT TAKES THE DOOR, because ruling 09 makes the theme colour TWO values rather
+ * than one. It follows the app ICON, not the brand: the client portal is a mango
+ * tile with a charcoal isotype, the agency app is a charcoal tile with a mango
+ * isotype. So the two doors are deliberately opposite here, and a shared
+ * constant could only have been right for one of them.
+ *
+ * It was `#0e9e86` for both — an off-palette teal inherited from the base this
+ * product was forked from, belonging to neither door. */
+export function appManifest(door: "agency" | "portal"): MetadataRoute.Manifest {
   return {
     name: brand.name,
     short_name: brand.name,
@@ -58,8 +73,10 @@ export function appManifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#0f1112",
-    theme_color: "#0e9e86",
+    // The splash the OS paints while the app starts: the page tone in dark,
+    // which is what an installed app opens into.
+    background_color: "#141310",
+    theme_color: brand.manifestTheme[door],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

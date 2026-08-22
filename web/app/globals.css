@@ -19,6 +19,11 @@
  * overridden downstream". The library is `shared/ui/` now and is edited freely;
  * what keeps this rule here is ownership, not access.)
  *
+ * IT RESOLVES THROUGH THE TOKEN NOW. The three stops used to be a literal
+ * #fecc6d, hand-copied out of brand.ts — the one live brand colour in either
+ * app that no re-theme could reach, because R32 does not scan .css files. It
+ * is var(--primary), so the field follows the palette like everything else.
+ *
  * Three blurred radial pools drift on long, prime-ish periods so they never
  * visibly loop, and the first one follows the pointer through --mx / --my,
  * the vars the library's <AmbientBackground /> already writes each frame.
@@ -38,12 +43,12 @@
   background:
     radial-gradient(
       42rem 42rem at calc(var(--mx, 50%) * 0.55 + 22%) calc(var(--my, 38%) * 0.55 + 12%),
-      color-mix(in oklch, #fecc6d 62%, transparent) 0%,
+      color-mix(in oklch, var(--primary) 62%, transparent) 0%,
       transparent 62%
     ),
     radial-gradient(
       36rem 36rem at 82% 78%,
-      color-mix(in oklch, #fecc6d 46%, transparent) 0%,
+      color-mix(in oklch, var(--primary) 46%, transparent) 0%,
       transparent 66%
     );
   filter: blur(72px) saturate(112%);
@@ -53,7 +58,7 @@
 .ambient::after {
   background: radial-gradient(
     30rem 30rem at 16% 88%,
-    color-mix(in oklch, #fecc6d 40%, transparent) 0%,
+    color-mix(in oklch, var(--primary) 40%, transparent) 0%,
     transparent 64%
   );
   filter: blur(84px);

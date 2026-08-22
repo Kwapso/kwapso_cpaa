@@ -156,7 +156,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     // already resolved by the time this paints, so there is no flash of English.
     <LanguageProvider value={session.user?.language}>
     <div className="flex min-h-[100svh] flex-col">
-      <header className="bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
+      <header className="bg-background sticky top-0 z-30 border-b">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-5 py-3">
           <AccountSwitcher
             accounts={session.accounts}
@@ -198,7 +198,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
       {/* The nav sits at the BOTTOM on a phone, where a thumb is — and it is the
        * same three items on every screen, always in the same order, always
        * showing where you are. Nothing collapses, nothing hides in a menu. */}
-      <nav className="bg-background/90 sticky bottom-0 border-t backdrop-blur">
+      <nav className="bg-background sticky bottom-0 border-t">
         <div className="mx-auto flex w-full max-w-3xl">
           {DESTINATIONS.map(({ href, label, icon: Icon }) => {
             const here = pathname === href || pathname.startsWith(`${href}/`)

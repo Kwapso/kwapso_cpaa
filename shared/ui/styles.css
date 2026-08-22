@@ -1,31 +1,79 @@
-/* Swift Struck UI — THE THEME (the one master copy).
+/* THE THEME — the one master copy, wearing the kwapso design kit.
  *
- * Apps import this from the package, AFTER tailwind, in their main stylesheet:
+ * Both front doors import it AFTER tailwind, in their own stylesheet:
  *   @import "tailwindcss";
  *   @import "tw-animate-css";
- *   @import "@swift-struck/ui/styles.css";
+ *   @import "../../shared/ui/styles.css";
  *
- * It carries the design tokens (light + dark), the motion/surface utilities
- * (glass, hover-lift, animate-rise, ambient, required-ring) — and the @source
- * below tells Tailwind to scan the library's components for class names.
- * The path resolves relative to THIS file, so it works both in this repo and
- * from node_modules when installed in an app. */
+ * It carries the design tokens (light + dark), and the surface utilities
+ * (glass, hover-lift, animate-rise, required-ring).
+ *
+ * THE LINE BELOW IS LOAD-BEARING AND EASY TO MISS. Tailwind v4 discovers its own
+ * sources, rooted at the project it is built from — which is `web/` or
+ * `web-portal/`, neither of which contains this directory. `@source` is what
+ * tells it to scan the component source as well, and it resolves relative to
+ * THIS file, so it followed the stylesheet when the library was vendored out of
+ * node_modules into `shared/ui/` and needed no edit. Break it and the build
+ * still passes: Tailwind simply strips every class it now believes is unused,
+ * and the app renders with no styling at all. */
 @source "./registry";
 
 /* ---------------------------------------------------------------------------
  * LAYER 0 — DESIGN TOKENS (the single source of truth)
  *
- * Every color, radius, and surface in Swift Struck UI resolves to a variable defined
- * here. Primitives and collections reference these tokens (e.g. `bg-background`,
- * `text-foreground`, `rounded-lg`) and NEVER hardcode a hex value or pixel size.
- * Re-theming any project — including future native skins — is a matter of
- * editing this block alone. See registry/tokens/README.md and ARCHITECTURE.md.
+ * Every colour, radius and surface in this library resolves to a variable
+ * defined here. Components reference these tokens (`bg-background`,
+ * `text-muted-foreground`, `rounded-lg`) and never hardcode a value, so a
+ * re-theme is an edit to this block and nothing else.
  *
- * Current preset: "Teal" brand + "Amber" chart accent, medium radius.
- * Swapping the brand is the ~4 lines marked PRIMARY / RING below.
+ * CURRENT PALETTE: kwapso, from the design kit (`design-mothership`), swapped in
+ * on 2026-08-22. It replaces the library's own "Teal" preset outright.
+ *
+ * ── WHY THE NAMES ARE THE LIBRARY'S AND THE VALUES ARE THE KIT'S ───────────
+ *
+ * 94 components reference these token names. Renaming them to the kit's names
+ * would be a 600-line rewrite with a typo in it, and it would buy nothing: a
+ * token is a name for a JOB, and the jobs match. So `--card` still means "the
+ * surface a panel is made of" and now holds the kit's soft paper. The crosswalk
+ * both ways is `design/library-map.md`, filled and committed beside this file.
+ *
+ * TWO PAIRS OF NAMES CROSS OVER, and getting either backwards is a bad day:
+ *
+ *   --accent   is a SUBTLE TINTED SURFACE here (hovers, highlighted rows). The
+ *              kit's `--accent` is the brand mango. They are NOT the same token
+ *              wearing two names, so they are not mapped to each other: this one
+ *              takes the kit's `--surface-panel` and goes on being a quiet tint.
+ *              Map it to mango and every hover state in both apps turns yellow.
+ *
+ *   --ring     followed --primary here ("RING follows PRIMARY"). Ruling 24 unties
+ *              them: the focus ring is charcoal on light and off-beige on dark,
+ *              one spec for every control. A mango ring on a mango button is
+ *              invisible, which is the practical half of the same point.
+ *
+ * --warning has no counterpart at all — the kit's palette is accent / info /
+ * success / danger, and mango is banned as a status. It maps to `--info` (sky),
+ * because the app's load-bearing use of warning is "nothing moves until somebody
+ * outside answers", and the kit defines info as "in review, awaiting an answer".
+ * The reasoning, and the one use this does not serve, are in library-map.md.
+ *
+ * ── HOW DARK WORKS, AND WHY IT IS WRITTEN TWICE ────────────────────────────
+ *
+ * "Dark is a token flip, not a second drawing" — the kit's words. Light lives on
+ * bare `:root`; dark is defined TWICE, and the two copies must stay identical
+ * (`web/test/theme-tokens.test.ts` fails the build if they drift, which is the
+ * one bug in this shape that is miserable to find by eye).
+ *
+ *   .dark, :root[data-theme="dark"]      an explicit choice, either convention
+ *   @media (prefers-color-scheme: dark)  a viewer who never chose
+ *
+ * next-themes writes `.light` or `.dark` on <html> from a blocking script, so in
+ * this app the class is always present and the media query is the belt to its
+ * braces — it only decides anything before hydration or with JS off. It is still
+ * written, because the guard is what makes an explicit LIGHT choice survive a
+ * dark OS, and that is the half people actually notice.
  * ------------------------------------------------------------------------- */
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 /* `:root` is the light palette; `.light` re-applies it so a `light` Container can
  * re-establish the light token scope even when nested inside a `.dark` page. */
@@ -33,118 +81,226 @@
 .light {
   --radius: 0.75rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* ---- Surfaces ------------------------------------------------------- */
+  /* Never pure white. `#FFFFFF` does not exist in this system; the kwapso
+   * white is off-beige, and a card is separated by TONE rather than a stroke. */
+  --background: #fffef9; /* surface-page  */
+  --foreground: #1a1918; /* ink-primary   */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card: #f7f2eb; /* surface-panel */
+  --card-foreground: #1a1918;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --popover: #fffef9; /* surface-raised: card over sheet */
+  --popover-foreground: #1a1918;
 
-  /* PRIMARY (brand) */
-  --primary: oklch(0.55 0.095 185);
-  /* Pure white, not 0.985: a label on a fill is measured against THAT FILL, and
-   * off-white gave 4.43:1 on --primary (4.37 on --success) — under the 4.5 text
-   * floor on every filled button and badge. White buys ~0.2 for free and is
-   * indistinguishable on a coloured fill. See registry/tokens/README.md, trap 3. */
-  --primary-foreground: oklch(1 0 0);
+  /* PRIMARY (brand) — kwapso mango. A FILL, never a data colour and never a
+   * status. It does NOT change across modes: mango and sky are already light
+   * enough to carry charcoal type on unlit paper, so lifting them on dark would
+   * break the charcoal-on-every-accent rule from the other direction. */
+  --primary: #fed069;
+  /* Charcoal on EVERY accent, both modes, no exceptions. The library found half
+   * of this from the other end: near-white on mango measured 1.4:1 and read as a
+   * disabled control. */
+  --primary-foreground: #1a1918;
 
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --secondary: #e2ddd4; /* surface-quiet: cancel buttons, disabled wells */
+  --secondary-foreground: #1a1918;
 
-  --muted: oklch(0.97 0 0);
-  /* Secondary text. Measured against the TINTED surfaces it actually sits on
-   * (a hovered list row, a chat bubble, a command-menu highlight), not white:
-   * at 0.556 those were 4.14–4.35:1, under the 4.5 text floor, while plain
-   * white read a comfortable 4.73. See registry/tokens/README.md, trap 2. */
-  --muted-foreground: oklch(0.525 0 0);
+  --muted: #e2ddd4;
+  /* ink-TERTIARY, not secondary. This token carries labels, metadata,
+   * timestamps, placeholders and hints — which is the kit's tertiary tier word
+   * for word (rulings 25 + 27 folded the old hint tier into it). The kit's
+   * secondary is a body-copy tone the library has no token for; it is added
+   * below as --ink-secondary. */
+  --muted-foreground: #5f5d59;
 
-  --accent: oklch(0.96 0.02 185);
-  --accent-foreground: oklch(0.3 0.06 185);
+  /* The quiet tint — a hover, a highlighted row, a selected menu item. NOT the
+   * brand. See the header. */
+  --accent: #f7f2eb;
+  --accent-foreground: #1a1918;
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(1 0 0); /* 4.56 → 4.76 on its own fill */
+  --destructive: #e94a32; /* poppy */
+  /* Charcoal on poppy is 4.59:1 and passes; off-beige on poppy fails. The kit
+   * ruled on this case explicitly, and the accent rule wins over the instinct
+   * that a "red" button takes white text. */
+  --destructive-foreground: #1a1918;
 
-  --success: oklch(0.548 0.155 149);
-  --success-foreground: oklch(1 0 0); /* was 4.37 on its own fill — under 4.5 */
+  --success: #1f9259; /* forest */
+  --success-foreground: #1a1918;
 
-  /* --warning is a FILL (badges, stepper tones, status dots) carrying the
-   * near-black --warning-foreground on top — that pairing is fine and the light
-   * amber is the accent identity, so it stays put. But at 1.92:1 it can never be
-   * TEXT on a light surface. --warning-strong is that on-surface tone (4.88:1).
-   * Two different checks; see registry/tokens/README.md, trap 3. */
-  --warning: oklch(0.795 0.16 86);
-  --warning-foreground: oklch(0.205 0 0);
-  --warning-strong: oklch(0.55 0.135 86);
+  /* No warning colour exists in this palette. Sky carries it — see the header. */
+  --warning: #89bce6;
+  --warning-foreground: #1a1918;
+  --warning-strong: #89bce6;
 
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.55 0.095 185); /* RING follows PRIMARY */
+  --border: rgb(26 25 24 / 0.08); /* hair        */
+  --input: rgb(26 25 24 / 0.2); /* hair-strong */
+  --ring: #1a1918; /* focus — NOT primary */
 
-  /* Chart palette. These are GRAPHICS tokens — chart areas, rating stars,
-   * calendar dots — never text (chart axis/legend text uses muted-foreground).
-   * So the bar is WCAG 1.4.11 non-text contrast, 3:1, NOT the 4.5:1 text bar.
-   * Don't darken them to 4.5:1: it turns the amber accent to ochre for no
-   * accessibility gain. Do keep them >= 3:1 — the original amber was 2.13:1
-   * and failed even this floor. --primary/--success are separate BECAUSE they
-   * are used as text and must hold 4.5:1. */
-  --chart-1: oklch(0.58 0.1 185);
-  --chart-2: oklch(0.673 0.146 70);
-  --chart-3: oklch(0.6 0.13 250);
-  --chart-4: oklch(0.65 0.18 320);
-  --chart-5: oklch(0.64 0.15 145); /* was 0.7 — 2.52:1, under the 3:1 floor */
+  /* Chart series — sky, forest, poppy, cycling in that order. Mango is excluded
+   * because a brand colour inside a dataset reads as "this series is special";
+   * grey is excluded because it reads as disabled. There are THREE, so 4 and 5
+   * restart the cycle rather than introducing colours the palette lacks. */
+  --chart-1: #89bce6;
+  --chart-2: #1f9259;
+  --chart-3: #e94a32;
+  --chart-4: #89bce6;
+  --chart-5: #1f9259;
+  --chart-negative: #e94a32;
+
+  /* ---- Tokens the library never had, added with the kit ---------------- */
+  --surface-inverse: #1a1918;
+  --ink-on-inverse: #fffef9;
+  --surface-brand: #fed069;
+  --surface-idle: #faf9f7;
+  --ink-secondary: #4a4946;
+  --ink-disabled: #a8a59f;
+  /* Defined and unassigned. The kit's two chapters give same-tone card
+   * separation to 6% and to 8% and disagree; GAP-4 was decided for 8% (--border
+   * above) on the grounds that the kit's own hairline card renders at 8% and
+   * nothing anywhere consumes 6%. Kept so a reversal is one reference. */
+  --hair-faint: rgb(26 25 24 / 0.06);
+
+  /* Focus, as ONE spec for every control (ruling 24). No component defines its
+   * own ring, and nothing focusable may set `outline: none`. */
+  --focus: #1a1918;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  /* Paper shadows. Never blue, never inner, and only three. */
+  --shadow-rest: 0 1px 2px rgb(26 25 24 / 0.05);
+  --shadow-lifted: 0 6px 20px -6px rgb(26 25 24 / 0.14);
+  --shadow-overlay: 0 18px 48px -12px rgb(26 25 24 / 0.22);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+.dark,
+:root[data-theme="dark"] {
+  --background: #141310;
+  --foreground: #fffef9;
 
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
+  --card: #1c1b18;
+  --card-foreground: #fffef9;
 
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --popover: #26241f;
+  --popover-foreground: #fffef9;
 
-  /* PRIMARY (brand) */
-  /* Near-black label, matching --success/--warning below. The dark brand fills
-   * are LIGHTER than their light-mode counterparts, so a near-white label sat
-   * at 3.30:1 on --primary and 2.77:1 on --destructive — under the 4.5:1 floor
-   * a filled control's own label has to clear. Near-black gives 5.20 and 6.19. */
-  --primary: oklch(0.62 0.11 185);
-  --primary-foreground: oklch(0.205 0 0);
+  /* Mango does not move. Nor does its label. */
+  --primary: #fed069;
+  --primary-foreground: #1a1918;
 
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
+  --secondary: #2f2d28;
+  --secondary-foreground: #fffef9;
 
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted: #2f2d28;
+  --muted-foreground: #bdb9b1;
 
-  --accent: oklch(0.3 0.04 185);
-  --accent-foreground: oklch(0.95 0.02 185);
+  --accent: #1c1b18;
+  --accent-foreground: #fffef9;
 
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.205 0 0); /* was 2.77 on its own fill */
+  /* The two that LIFT on dark. Everything else in the palette is already light
+   * enough to carry charcoal type on unlit paper. */
+  --destructive: #f2634b;
+  --destructive-foreground: #1a1918;
 
-  --success: oklch(0.696 0.17 149);
-  --success-foreground: oklch(0.205 0 0);
+  --success: #2fb673;
+  --success-foreground: #1a1918;
 
-  --warning: oklch(0.828 0.16 86);
-  --warning-foreground: oklch(0.205 0 0);
-  /* Dark mode never had the light-mode problem: the same amber reads 11.5:1 on
-   * the dark background. The token exists here so `text-warning-strong` resolves
-   * in both themes — this is an ADDITION, no existing dark value changed. */
-  --warning-strong: oklch(0.828 0.16 86);
+  --warning: #89bce6;
+  --warning-foreground: #1a1918;
+  --warning-strong: #89bce6;
 
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.62 0.11 185); /* RING follows PRIMARY */
+  --border: rgb(255 254 249 / 0.12);
+  --input: rgb(255 254 249 / 0.24);
+  --ring: #fffef9;
 
-  --chart-1: oklch(0.65 0.12 185);
-  --chart-2: oklch(0.79 0.16 70);
-  --chart-3: oklch(0.65 0.14 250);
-  --chart-4: oklch(0.7 0.18 320);
-  --chart-5: oklch(0.72 0.15 145);
+  --chart-1: #89bce6;
+  --chart-2: #2fb673;
+  --chart-3: #f2634b;
+  --chart-4: #89bce6;
+  --chart-5: #2fb673;
+  --chart-negative: #f2634b;
+
+  --surface-inverse: #fffef9;
+  --ink-on-inverse: #1a1918;
+  --surface-brand: #fed069;
+  --surface-idle: #2f2d28;
+  --ink-secondary: #d5d1c9;
+  --ink-disabled: #76746f;
+  --hair-faint: rgb(255 254 249 / 0.08);
+
+  --focus: #fffef9;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lifted: 0 6px 20px -6px rgb(0 0 0 / 0.55);
+  --shadow-overlay: 0 18px 48px -12px rgb(0 0 0 / 0.7);
+}
+
+/* The same dark values for a viewer who never chose. The guard is the point:
+ * `:not(.light):not([data-theme="light"])` is what lets an explicit LIGHT choice
+ * survive a dark operating system. Byte-identical to the block above by law —
+ * web/test/theme-tokens.test.ts compares them and fails on any drift. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not([data-theme="light"]) {
+    --background: #141310;
+    --foreground: #fffef9;
+
+    --card: #1c1b18;
+    --card-foreground: #fffef9;
+
+    --popover: #26241f;
+    --popover-foreground: #fffef9;
+
+    --primary: #fed069;
+    --primary-foreground: #1a1918;
+
+    --secondary: #2f2d28;
+    --secondary-foreground: #fffef9;
+
+    --muted: #2f2d28;
+    --muted-foreground: #bdb9b1;
+
+    --accent: #1c1b18;
+    --accent-foreground: #fffef9;
+
+    --destructive: #f2634b;
+    --destructive-foreground: #1a1918;
+
+    --success: #2fb673;
+    --success-foreground: #1a1918;
+
+    --warning: #89bce6;
+    --warning-foreground: #1a1918;
+    --warning-strong: #89bce6;
+
+    --border: rgb(255 254 249 / 0.12);
+    --input: rgb(255 254 249 / 0.24);
+    --ring: #fffef9;
+
+    --chart-1: #89bce6;
+    --chart-2: #2fb673;
+    --chart-3: #f2634b;
+    --chart-4: #89bce6;
+    --chart-5: #2fb673;
+    --chart-negative: #f2634b;
+
+    --surface-inverse: #fffef9;
+    --ink-on-inverse: #1a1918;
+    --surface-brand: #fed069;
+    --surface-idle: #2f2d28;
+    --ink-secondary: #d5d1c9;
+    --ink-disabled: #76746f;
+    --hair-faint: rgb(255 254 249 / 0.08);
+
+    --focus: #fffef9;
+    --focus-width: 2px;
+    --focus-offset: 2px;
+
+    --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lifted: 0 6px 20px -6px rgb(0 0 0 / 0.55);
+    --shadow-overlay: 0 18px 48px -12px rgb(0 0 0 / 0.7);
+  }
 }
 
 /* Expose the tokens to Tailwind's utility engine so `bg-background`,
@@ -189,6 +345,24 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-negative: var(--chart-negative);
+
+  /* The kit's tokens the library never had, exposed so a component can spend
+   * them as `bg-surface-inverse`, `text-ink-secondary`, `border-hair-faint`. */
+  --color-surface-inverse: var(--surface-inverse);
+  --color-ink-on-inverse: var(--ink-on-inverse);
+  --color-surface-brand: var(--surface-brand);
+  --color-surface-idle: var(--surface-idle);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-disabled: var(--ink-disabled);
+  --color-hair-faint: var(--hair-faint);
+  --color-focus: var(--focus);
+
+  /* The three elevation tokens are NOT exposed here. A `@theme` key lands in the
+   * same custom-property namespace as its source, so `--shadow-rest:
+   * var(--shadow-rest)` is a cycle rather than an alias. They are spent as
+   * `box-shadow: var(--shadow-lifted)` in CSS for now; giving them utility names
+   * is a shape decision and belongs with the rest of depth. */
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -229,46 +403,24 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     min-height: 100svh;
-    /* A soft "source of light" from the top, two brand-tinted corner glows,
-     * and a gentle vignette that pulls focus to the centre. The
-     * AmbientBackground layers flowing light + a slow heartbeat on top, and
-     * body::after adds a fine film grain. Elegant and alive, never a gloss. */
-    background-image:
-      radial-gradient(
-        62rem 42rem at 50% -16%,
-        color-mix(in oklch, var(--primary) 14%, transparent),
-        transparent 60%
-      ),
-      radial-gradient(
-        46rem 46rem at 100% -6%,
-        color-mix(in oklch, var(--primary) 11%, transparent),
-        transparent 58%
-      ),
-      radial-gradient(
-        44rem 44rem at -8% 6%,
-        color-mix(in oklch, var(--chart-3) 11%, transparent),
-        transparent 55%
-      ),
-      /* vignette — subtle depth, frames the content */
-        radial-gradient(
-          130% 130% at 50% 32%,
-          transparent 56%,
-          color-mix(in oklch, black 16%, transparent)
-        );
-    background-attachment: fixed;
   }
-  /* Fine film grain — a barely-there premium texture over the light. Fixed,
-   * non-interactive, sits between the ambient light and the content. */
-  body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -5;
-    pointer-events: none;
-    opacity: 0.05;
-    mix-blend-mode: soft-light;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
+  /* THE FOUR RADIAL GRADIENTS AND THE FILM GRAIN ARE GONE (2026-08-22).
+   *
+   * The body used to paint three brand-tinted glows, a vignette, and a
+   * fractal-noise film grain at 5% soft-light over the whole page. All of it
+   * is banned outright by the kwapso kit: "no gradients, anywhere", and
+   * "introduce a third radius, a gradient, or a blur" is one of the seven
+   * Don'ts. The grain is not named because nobody thought to ban a texture.
+   *
+   * ONE ambient field survives, by an explicit exception (ruling 19A), and it
+   * does not live here: it is the AGENCY app's decision and it is drawn in
+   * `web/app/globals.css`. The portal deliberately has none.
+   *
+   * That is also why the vignette had to go rather than be re-tinted. It was
+   * `color-mix(black 16%)` over every screen — a darkening wash that no token
+   * can reach, sitting on top of a palette whose whole argument is that the
+   * paper tones are exact.
+   */
 }
 
 /* ---------------------------------------------------------------------------
@@ -281,15 +433,25 @@
  *   .hover-lift   subtle lift + brand glow on hover for interactive cards
  * ------------------------------------------------------------------------- */
 @layer components {
-  /* Frosted glass: a translucent pane that blurs (refracts) what's behind it,
-   * with a single hairline top-edge highlight. The realism comes from the
-   * blur — NOT a painted gradient sheen. Central: every card/dialog/popover/
-   * menu/toast inherits it. */
+  /* `.glass` IS NO LONGER GLASS (2026-08-22), and the name is kept only because
+   * ~30 components carry it in their base class. It is now a flat, fully opaque
+   * panel surface.
+   *
+   * It was a 72% `color-mix` with a 16px backdrop blur and a white inset
+   * highlight. Every part of that is banned by the kwapso kit: blur is one of
+   * the seven named Don'ts, `#FFFFFF` does not exist in the palette, and a card
+   * is separated by TONE rather than by a highlight.
+   *
+   * IT IS ALSO THE FIX A POST-MORTEM WAS ALREADY REACHING FOR. Read the top of
+   * `shared/web/library-overrides.css`: a downstream override existed for six
+   * weeks because dialog text was unreadable against the moving background, was
+   * deleted on a claim that turned out to be false, and left the app with no
+   * opaque dialog surface for nine days — during which the app-creation form was
+   * reported unreadable over the client logo grid. The translucency was the
+   * cause every time. It is gone at the source now, which is the level it should
+   * have been fixed at, and is the reason owning this file matters. */
   .glass {
-    background-color: color-mix(in oklch, var(--card) 72%, transparent);
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    box-shadow: inset 0 1px 0 0 color-mix(in oklch, white 7%, transparent);
+    background-color: var(--card);
   }
   /* Typing indicator dots (AgentChat). A gentle opacity pulse; staggered via an
    * inline animation-delay per dot. Disabled under reduced-motion below. */
@@ -321,11 +483,16 @@
       box-shadow 0.3s ease,
       border-color 0.3s ease;
   }
+  /* The lift used to glow: a border mixed 40% with the brand and a shadow mixed
+   * 35% with it. A brand-tinted shadow is a COLOURED shadow, and the kit allows
+   * paper shadows only — "never blue in a shadow" generalises to never anything.
+   * It is one of the three named elevations now, and the border stays a hairline
+   * that darkens rather than a mango outline (mango as a border is its own
+   * named Don't). */
   .hover-lift:hover {
     transform: translateY(-2px);
-    border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
-    box-shadow: 0 12px 30px -12px
-      color-mix(in oklch, var(--primary) 35%, transparent);
+    border-color: var(--input);
+    box-shadow: var(--shadow-lifted);
   }
   /* opt a nested/static surface out of the lift (keeps the glass) */
   .hover-lift-none:hover {
@@ -337,62 +504,19 @@
     animation: ss-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  /* Ambient interactive background — an abstract field of drifting,
-   * token-colored light that slowly wanders and breathes, and blooms toward
-   * the pointer. Alive and engaging, but soft (blurred light, never a painted
-   * gloss). Driven by <AmbientBackground />; fills behind every screen. */
-  .ambient::before {
-    content: "";
-    position: absolute;
-    inset: -35%;
-    background:
-      radial-gradient(
-        40% 40% at 14% 22%,
-        color-mix(in oklch, var(--chart-3) 22%, transparent),
-        transparent 62%
-      ),
-      radial-gradient(
-        38% 38% at 86% 72%,
-        color-mix(in oklch, var(--chart-4) 20%, transparent),
-        transparent 62%
-      ),
-      /* the breathing core — a slow heartbeat of brand light at center */
-        radial-gradient(
-          42% 42% at 50% 42%,
-          color-mix(in oklch, var(--primary) 20%, transparent),
-          transparent 64%
-        ),
-      radial-gradient(
-        30% 30% at 66% 12%,
-        color-mix(in oklch, var(--chart-2) 16%, transparent),
-        transparent 62%
-      ),
-      radial-gradient(
-        32% 32% at 28% 84%,
-        color-mix(in oklch, var(--primary) 15%, transparent),
-        transparent 62%
-      );
-    /* big, soft, flowing light — elegant aurora rather than tight blobs */
-    filter: blur(96px) saturate(1.35);
-    opacity: 0.7;
-    /* drift = slow flowing wander; breathe = the heartbeat (opacity pulse) */
-    animation:
-      ambient-drift 38s ease-in-out infinite,
-      ambient-breathe 9s ease-in-out infinite;
-  }
-  /* the pointer-following bloom (faint on move, brighter on tap) */
-  .ambient::after {
-    content: "";
-    position: absolute;
-    inset: -25%;
-    background: radial-gradient(
-      22% 22% at var(--mx, 50%) var(--my, 38%),
-      color-mix(in oklch, var(--primary) 36%, transparent),
-      transparent 55%
-    );
-    filter: blur(64px);
-    opacity: calc(0.12 + 0.5 * var(--bloom, 0));
-  }
+  /* THE LIBRARY'S AMBIENT FIELD IS GONE (2026-08-22).
+   *
+   * It was five brand-tinted radial gradients under a 96px blur, drifting and
+   * "breathing" on two loops. Gradients and blur are both named Don'ts in the
+   * kwapso kit, and this one was already dead code in both apps: the portal
+   * renders no ambient layer at all, and the agency app overrides every property
+   * of `.ambient::before` and `.ambient::after` in `web/app/globals.css`.
+   *
+   * ONE field survives, by ruling 19A, and it is the agency app's — drawn there,
+   * against tokens, because it is that door's decision and not the library's.
+   * The `<AmbientBackground />` component stays: it is the thing that writes
+   * --mx / --my each frame, which the app's field reads.
+   */
 }
 
 @keyframes ss-rise {

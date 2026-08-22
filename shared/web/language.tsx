@@ -2,7 +2,7 @@
 
 // THE LANGUAGE, ON THE CLIENT — one provider, both front doors.
 //
-// It lives in shared/web/ beside BrandTheme for the same reason that does: the
+// It lives in shared/web/ for the reason everything here does: the
 // agency app and the client portal are two views of one system, and a person who
 // reads Spanish reads Spanish in whichever one they open. Two copies of this
 // would be two chances for the two apps to disagree about what a word means.

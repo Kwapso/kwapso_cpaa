@@ -247,11 +247,20 @@ export const ARCS = [
 
 // The composition's two palettes. `onyx` is the authored one and the app's dark
 // mode; `amber` is its inverse and the app's light mode. The mark and the amber
-// field are the BRAND's colours, so a re-skin reaches the opening frame; the
-// onyx field and the two glows are the composition's own, and the onyx is
-// deliberately deeper than the app's dark screen — this is an ident, and an
-// ident is shown against black.
-const FIELD_DARK = "#08090b"
+// field are the BRAND's colours, so a re-skin reaches the opening frame.
+//
+// THE DARK FIELD IS THE APP'S OWN UNLIT PAPER NOW (ruling 22: mango in light,
+// #141310 in dark). It was #08090b, with a real argument attached — "this is an
+// ident, and an ident is shown against black" — and the ruling overrides it for
+// a reason the argument did not consider: #08090b is a COLD near-black, and the
+// kit's dark surfaces are warm unlit paper on the stated grounds that "a neutral
+// grey reads as a different product". The splash is the first frame of the app,
+// so opening on a colder surface than the app itself is the one place that
+// mismatch is guaranteed to be seen, back to back, every launch.
+//
+// The two glows are still the composition's own. The kit does not specify them
+// and they are not invented here; they are logged in NEEDS-A-SPEC.md.
+const FIELD_DARK = "#141310"
 const GLOW_DARK = "#3a2c10"
 const GLOW_LIGHT = "#f6b83f"
 

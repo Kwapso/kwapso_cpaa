@@ -56,8 +56,6 @@ const MAY_INJECT: Record<string, string> = {
     "two module constants (the mark's CSS and its animator script) written in this repo — no value from a request or a row reaches them",
   "shared/web/mark-loader.tsx":
     "the mark's own markup, a module constant built from module constants (shared/web/splash.ts → splashInner). It is server-rendered on purpose: an empty box in the exported HTML is a blank screen until the bundle lands.",
-  "shared/web/brand-theme.tsx":
-    "a CSS string built from shared/brand.ts, a build-time constant",
 }
 
 describe("no screen injects markup except through the one seam", () => {

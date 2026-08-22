@@ -69,10 +69,21 @@ describe("the product's identity is declared once", () => {
     }
   })
 
-  it("both manifests return the shared manifest body", () => {
-    for (const app of [AGENCY, PORTAL]) {
+  it("both manifests return the shared manifest body, each naming its own door", () => {
+    // `appManifest` TAKES THE DOOR since ruling 09 made the theme colour two
+    // values rather than one: the portal is a mango tile with a charcoal
+    // isotype, the agency the reverse. So parity here is not "the same call" —
+    // it is "the same shared body, and each door says which one it is". A door
+    // passing the other's name would be the interesting bug, so the argument is
+    // asserted rather than just the function.
+    for (const [app, door] of [
+      [AGENCY, "agency"],
+      [PORTAL, "portal"],
+    ] as const) {
       const src = read(app, "app", "manifest.ts")
-      expect(src, `${app}/app/manifest.ts must return appManifest()`).toContain("appManifest()")
+      expect(src, `${app}/app/manifest.ts must return appManifest("${door}")`).toContain(
+        `appManifest("${door}")`
+      )
       // Static export or the gateway serves nothing at /manifest.webmanifest.
       expect(src, `${app}: the manifest must stay statically emitted`).toContain(
         'export const dynamic = "force-static"'
