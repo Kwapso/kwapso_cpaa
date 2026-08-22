@@ -194,6 +194,20 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* THE ONE NAMED EXCEPTION TO THE TWO-RADIUS LAW — `rounded-select`, 6px.
+   *
+   * A flat value, not a step off `--radius`, because it is not a smaller box: a
+   * checkbox at 24px is a lozenge, and at 999px it is a radio button, so the
+   * mark on a selection control genuinely needs a third number. The kwapso kit
+   * admits exactly this and says so (ruling 03), and R31 admits it back as DATA
+   * with a reason, in `RADIUS_EXCEPTION`.
+   *
+   * The kit names a SECOND exception, 4px for a bar or a heat cell, on the
+   * grounds that a bar is not a box. It is deliberately not defined here yet:
+   * nothing in either app draws one, and R31's ratchet would turn an unused
+   * exception red on the next build. It gets added by the commit that needs it. */
+  --radius-select: 0.375rem;
 }
 
 @layer base {

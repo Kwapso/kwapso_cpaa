@@ -108,12 +108,21 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   screens capping themselves at 60% of the room they had, one of them the shell's own
   loading skeleton, under a green build, because a width is invisible to every other
   check here. (`one-page-width`. UI-RULEBOOK N8)
-- **Two radii and no third (R31).** A rectangular surface is `rounded-xl`, a pill
-  is `rounded-full`, and a sheet that meets the bottom of the screen is
-  `rounded-t-xl`. Nothing else, because every step from `sm` to `3xl` already
-  resolves to the same 24px here — so five spellings of one value were five
+- **Two radii, one named exception, and no third box (R31).** A rectangular
+  surface is `rounded-xl`, a pill is `rounded-full`, and a sheet that meets the
+  bottom of the screen is `rounded-t-xl` — five spellings of one value were five
   decisions where there is one. Bare `rounded` is 4px and is deliberately outside
-  the rule. (`two-radii`. UI-RULEBOOK N9)
+  the rule. **The exception is `rounded-select` (6px), on the mark of a selection
+  control**, because at `rounded-xl` a checkbox is a lozenge and at
+  `rounded-full` it is a radio button; the design kit rules exactly this and
+  calls it the one named exception. It is DATA in `RADIUS_EXCEPTION` with its
+  reason, rot-checked so an exception nothing uses turns the build red. The kit
+  names a second (4px on a bar) which is NOT defined here until something draws
+  one. A third BOX radius is still forbidden. Note the old reasoning — "every
+  step from `sm` to `3xl` resolves to the same 24px" — is no longer true of
+  `shared/ui/`, which defines four different `calc()`s; that directory is out of
+  R31's scope until the reskin collapses them (`VENDORED_UI_SCOPE`).
+  (`two-radii`. UI-RULEBOOK N9)
 - **Every extracted position asks for its translation (R33).** R28 makes the
   catalogue match the code; this makes the code READ the catalogue. Every
   position the one shared definition reports must sit inside a `t(...)` call —

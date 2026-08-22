@@ -243,7 +243,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R31",
     dimension: "ui",
-    law: "TWO RADII AND NO THIRD. A rectangular surface is `rounded-xl` and a pill is `rounded-full`; a directional variant of the first (`rounded-t-xl`, for a sheet that meets the bottom of the screen) is the same word applied to one edge. No other step of the scale may be written in `web/`, `web-portal/` or `shared/`, and `shadow-*` stays at exactly one use. Enforced by one grep, because every step from `sm` to `3xl` already resolves to the same 24px in this theme. ONE directory is out of scope with a reason and a ratchet — `shared/ui/`, the vendored component library, which still speaks its own radius vocabulary until the reskin collapses it into the kit's four (VENDORED_UI_SCOPE); the check asserts it still offends, so the exemption deletes itself the day that lands.",
+    law: "TWO RADII AND NO THIRD. A rectangular surface is `rounded-xl` and a pill is `rounded-full`; a directional variant of the first (`rounded-t-xl`, for a sheet that meets the bottom of the screen) is the same word applied to one edge. No other step of the scale may be written in `web/`, `web-portal/` or `shared/`, and `shadow-*` stays at exactly one use. ONE further radius is admitted, as DATA with its reason in `RADIUS_EXCEPTION` and rot-checked so an exception nothing uses turns the build red: `rounded-select` (6px), on the mark of a selection control, because at `rounded-xl` a checkbox is a lozenge and at `rounded-full` it is a radio button. The kwapso kit admits a second (4px on a bar, on the grounds that a bar is not a box); it is not defined here until something draws one. A third BOX radius is still forbidden. Enforced by one grep, because every step from `sm` to `3xl` already resolves to the same 24px in this theme. ONE directory is out of scope with a reason and a ratchet — `shared/ui/`, the vendored component library, which still speaks its own radius vocabulary until the reskin collapses it into the kit's four (VENDORED_UI_SCOPE); the check asserts it still offends, so the exemption deletes itself the day that lands.",
     why: "It is the cheapest rule in the book to obey and it was the most broken: 63 of 125 radius classes were off-vocabulary — `rounded-lg` 52 times, `rounded-md` 7, `rounded-2xl` 2 — and changing every one of them moved NOTHING on screen, because `--radius-sm` through `--radius-3xl` are all `var(--radius)`. So five words were in use for one value, which means five decisions a developer can make where there is only one, and the day the theme gives those steps different values the app acquires five radii it never chose. The law could not be written before the fix, because a law that ships with a 57-line exemption list is a list and not a law. It ships the moment the grep is clean. THE ONE THING IT DOES NOT REACH is the bare `rounded` class: that is 4px here, not 24px, so it is a genuinely different value on an inline highlight and a 32px thumbnail, and folding it in would be a redesign wearing a sweep's clothes.",
     checkId: "two-radii",
     status: "enforced",
@@ -439,6 +439,31 @@ export const GLOSSARY_SYNONYMS: { word: string; term: string; why: string }[] = 
  * where the banned word is genuinely the right one — and it costs a line of
  * prose to use, which is the correct price. */
 export const GLOSSARY_SYNONYM_OK: Record<string, string> = {}
+
+/** R31 — the radii admitted BESIDE `rounded-xl` and `rounded-full`, and why each
+ * one earns a third number.
+ *
+ * The two-radius law is right about the thing it was written against: five
+ * spellings of one pixel value are five decisions where there is one. It is not
+ * right that two numbers can draw everything, and the kwapso design kit says so
+ * outright — ruling 03 admits exactly two exceptions, "a bar is not a box", and
+ * the kit's own specimen page calls the first of them "the ONE named exception
+ * to the two-radius law: 6px. Nothing else may."
+ *
+ * So the vocabulary grows by data rather than by drift, in the shape R32 uses
+ * for colour literals: one entry, one reason, and a rot check that turns the
+ * build red when an entry stops describing anything. The list can only shrink,
+ * and a third box radius is still forbidden — these are not box radii.
+ *
+ * WHY THE KIT'S SECOND EXCEPTION IS NOT HERE YET. It names 4px for a bar, a heat
+ * cell or a rotated decision node. Nothing in either app draws one today, so an
+ * entry for it would be an exception with no use — precisely what the ratchet
+ * exists to catch. It gets added by the commit that needs it, which is the only
+ * moment anyone can check the reason is true. */
+export const RADIUS_EXCEPTION: Record<string, string> = {
+  "rounded-select":
+    "6px, on the mark of a selection control — the checkbox. It is the one place a third number is unavoidable rather than convenient: at `rounded-xl` a 16px checkbox is a lozenge, and at `rounded-full` it is a radio button, so the two-radius vocabulary cannot express 'a square box with softened corners' at this size. Fixed at 0.375rem rather than derived from `--radius`, because it is not a smaller box — it is a different shape doing a different job.",
+}
 
 /** THE VENDORED COMPONENT LIBRARY — the one directory in `shared/` that is not
  * this team's own screen code, and the laws whose SCOPE that changes.

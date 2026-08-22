@@ -22,6 +22,7 @@ import {
   GROWING_COLLECTIONS,
   MUTATING_WORKERS,
   PAGE_WIDTH_OWNER,
+  RADIUS_EXCEPTION,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_NOT,
   PALETTE_LITERAL_OK,
@@ -1969,14 +1970,35 @@ describe("RULES — the laws of the base", () => {
     const vendored = join(ROOT, VENDORED_UI)
     const offenders: string[] = []
     const vendoredStillOffends: string[] = []
+    // An admitted exception has to be USED, or it is vocabulary nobody asked
+    // for. Counted across the whole scan, vendored directory included, because
+    // the selection controls the 6px exists for live in there.
+    const exceptionUsed = new Map(Object.keys(RADIUS_EXCEPTION).map((k) => [k, 0]))
     for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
       if (f.path.startsWith(lawBook)) continue
       for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)?[a-z0-9]+/g) ?? []) {
         if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
+        if (exceptionUsed.has(hit)) {
+          exceptionUsed.set(hit, exceptionUsed.get(hit)! + 1)
+          continue
+        }
         if (f.path.startsWith(vendored)) vendoredStillOffends.push(`${f.rel}: ${hit}`)
         else offenders.push(`${f.rel}: ${hit}`)
       }
     }
+
+    // The exceptions carry their reasons, and the reasons have to be there.
+    for (const [cls, why] of Object.entries(RADIUS_EXCEPTION)) {
+      expect(why.trim(), `RADIUS_EXCEPTION["${cls}"] must say WHY it earns a third radius`).not.toBe("")
+    }
+    // …and the ratchet, the same one R29 and R32 run: an exception nothing uses
+    // is a radius somebody added and nobody spends, and it widens the vocabulary
+    // for free. The list can only shrink.
+    const unusedExceptions = [...exceptionUsed].filter(([, n]) => n === 0).map(([cls]) => cls)
+    expect(
+      unusedExceptions,
+      `these RADIUS_EXCEPTION entries are not used anywhere — delete them, or use them where their reason says they belong:\n  ${unusedExceptions.join("\n  ")}`
+    ).toEqual([])
     expect(
       offenders,
       `R31 — a surface is rounded-xl and a pill is rounded-full, nothing else:\n  ${offenders.join("\n  ")}`
