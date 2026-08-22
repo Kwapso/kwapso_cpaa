@@ -157,15 +157,15 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
             >
               <span className="font-medium">{token.label}</span>
               {token.revokedAt ? (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground text-badge">
                   {t("Revoked")}
                 </Badge>
               ) : hasExpired(token) ? (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground text-badge">
                   {t("Expired")}
                 </Badge>
               ) : (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-badge">
                   {t("Active")}
                 </Badge>
               )}

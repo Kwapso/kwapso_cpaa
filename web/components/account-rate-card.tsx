@@ -123,7 +123,7 @@ export function AccountRateCard({
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.label}</span>
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {!r.active && (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground text-badge">
                   {t("Inactive")}
                 </Badge>
               )}

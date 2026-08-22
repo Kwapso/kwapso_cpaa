@@ -193,7 +193,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                 />
                 <div className="flex min-w-0 flex-col gap-1 p-3">
                   {d.kind && (
-                    <span className="text-muted-foreground truncate text-[11px] font-medium tracking-wide uppercase">
+                    <span className="text-muted-foreground truncate text-badge font-medium tracking-wide uppercase">
                       {d.kind}
                     </span>
                   )}
@@ -232,7 +232,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                         {t("Client can see this")}
                       </Badge>
                       {!d.active && (
-                        <span className="text-muted-foreground text-[11px]">
+                        <span className="text-muted-foreground text-badge">
                           {t("Hidden while archived")}
                         </span>
                       )}

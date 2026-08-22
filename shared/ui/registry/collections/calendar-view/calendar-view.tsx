@@ -131,7 +131,7 @@ function CalendarView<T extends Record<string, unknown>>({
   return (
     <div className={cn("flex w-full flex-col gap-3", className)}>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold">
+        <div className="text-sm font-medium">
           {MONTHS[month]} {year}
         </div>
         <div className="flex items-center gap-1">
@@ -193,7 +193,7 @@ function CalendarView<T extends Record<string, unknown>>({
               <div
                 className={cn(
                   "text-right text-xs",
-                  isToday && "font-semibold text-primary"
+                  isToday && "font-medium text-primary"
                 )}
               >
                 {d.getDate()}

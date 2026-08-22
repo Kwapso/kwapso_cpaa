@@ -233,7 +233,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                 {batch.plan.order.length} {t("table(s), in order. Review, then run once.")}
               </p>
             </div>
-            <Badge variant="secondary" className="shrink-0 text-[10px]">
+            <Badge variant="secondary" className="shrink-0 text-badge">
               {batch.plan.bySource === "agent" ? t("Planned by the assistant") : t("Auto-matched")}
             </Badge>
           </div>
@@ -263,7 +263,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           {batch.plan.steps.map((step, i) => (
             <div key={step.fileId} className="flex flex-col gap-4 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-badge">
                   {t("Step")} {i + 1}
                 </Badge>
                 <span className="text-sm font-medium">{step.fileName}</span>
@@ -308,7 +308,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                           <span className="text-muted-foreground italic">{t("not in your file")}</span>
                         )}
                         {step.transforms[ourCol] && (
-                          <Badge variant="secondary" className="text-[9px]">
+                          <Badge variant="secondary" className="text-badge">
                             {step.transforms[ourCol]}
                           </Badge>
                         )}
@@ -523,7 +523,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: "goo
   // without a box drawn round each.
   return (
     <div className="flex-1 text-center">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className={`text-2xl font-medium ${color}`}>{value}</p>
       <p className="text-muted-foreground text-xs">{label}</p>
     </div>
   )

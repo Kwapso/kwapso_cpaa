@@ -12,7 +12,7 @@ function Headline({ className, ...props }: React.ComponentProps<"h2">) {
   return (
     <h2
       className={cn(
-        "text-2xl font-semibold tracking-tight text-foreground",
+        "text-2xl font-medium tracking-tight text-foreground",
         className
       )}
       {...props}

@@ -89,7 +89,7 @@ function RecordDetail({
             </Avatar>
           )}
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold tracking-tight">
+            <h2 className="truncate text-lg font-medium tracking-tight">
               {title}
             </h2>
             {subtitle != null && (

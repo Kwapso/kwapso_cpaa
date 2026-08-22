@@ -66,14 +66,14 @@ function renderBody(md: string): React.ReactNode {
     if (/^##\s/.test(line)) {
       flush()
       blocks.push(
-        <h4 key={k++} className="text-sm font-semibold">
+        <h4 key={k++} className="text-sm font-medium">
           {inline(line.replace(/^##\s/, ""))}
         </h4>
       )
     } else if (/^#\s/.test(line)) {
       flush()
       blocks.push(
-        <h3 key={k++} className="text-base font-semibold">
+        <h3 key={k++} className="text-base font-medium">
           {inline(line.replace(/^#\s/, ""))}
         </h3>
       )
@@ -115,7 +115,7 @@ function ArticleBody({
     <div className={cn("flex w-full flex-col gap-4", className)}>
       {(title || contentType) && (
         <div className="flex flex-wrap items-center gap-2">
-          {title && <h2 className="text-lg font-semibold">{title}</h2>}
+          {title && <h2 className="text-lg font-medium">{title}</h2>}
           {contentType && <Badge variant="secondary">{contentType}</Badge>}
         </div>
       )}

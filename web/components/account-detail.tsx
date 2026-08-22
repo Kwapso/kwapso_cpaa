@@ -686,7 +686,7 @@ export function AccountDetailScreen({
                 {moneyBack && (
                   <div className="rounded-xl border p-4">
                     <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
-                    <p className="text-2xl font-semibold tracking-tight tabular-nums">{moneyBack}</p>
+                    <p className="text-2xl font-medium tracking-tight tabular-nums">{moneyBack}</p>
                     <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
                   </div>
                 )}

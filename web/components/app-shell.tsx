@@ -453,7 +453,7 @@ export function AppShell({
                 type="button"
                 onClick={() => navigate(item.path)}
                 aria-current={activeNav ? "page" : undefined}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
+                className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium transition-colors ${
                   activeNav ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -474,7 +474,7 @@ export function AppShell({
               aria-current={
                 overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
               }
-              className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
+              className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium transition-colors ${
                 overflowNav.some((i) => isNavActive(i.path, here))
                   ? "text-foreground"
                   : "text-muted-foreground"

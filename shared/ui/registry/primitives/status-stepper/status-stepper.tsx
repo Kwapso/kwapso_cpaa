@@ -113,7 +113,7 @@ function StatusStepper({
                   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   reached ? toneSolid[tone] : "bg-muted text-muted-foreground",
                   isActive &&
-                    "font-semibold ring-2 ring-ring ring-offset-2 ring-offset-background",
+                    "font-medium ring-2 ring-ring ring-offset-2 ring-offset-background",
                   interactive
                     ? "cursor-pointer hover:opacity-90"
                     : "cursor-default"

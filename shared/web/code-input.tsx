@@ -68,7 +68,7 @@ export function CodeInput({
           inputMode="numeric"
           autoComplete={i === 0 ? "one-time-code" : "off"}
           aria-label={`Digit ${i + 1} of ${length}`}
-          className="h-12 w-10 px-0 text-center text-lg font-semibold"
+          className="h-12 w-10 px-0 text-center text-lg font-medium"
         />
       ))}
     </div>

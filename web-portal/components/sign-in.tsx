@@ -62,7 +62,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="flex flex-col items-center gap-2 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={brand.logoUrl ?? "/icons/icon.svg"} alt="" className="size-12 rounded-xl" />
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Sign in to")} {brand.name}</h1>
+        <h1 className="text-2xl font-medium tracking-tight">{t("Sign in to")} {brand.name}</h1>
         <p className="text-muted-foreground">
           {step === "email"
             ? t("We'll email you a six-digit code, or you can use Google. No password to remember.")

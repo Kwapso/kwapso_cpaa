@@ -44,7 +44,7 @@ export function DeliveryBlock() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">{t("What you bought")}</h2>
+      <h2 className="text-lg font-medium">{t("What you bought")}</h2>
       <ul className="flex flex-col gap-2">
         {sprints.map((s) => (
           <li key={`${s.ref ?? s.name}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">

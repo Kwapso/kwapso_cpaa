@@ -154,7 +154,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
                 <span className="flex items-center gap-2">
                   <span className="truncate">{team.name}</span>
                   {team.id === ctx.team?.id && (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-badge">
                       {t("Active")}
                     </Badge>
                   )}

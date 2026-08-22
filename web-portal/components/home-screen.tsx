@@ -66,7 +66,7 @@ function TimeGivenBack() {
   return (
     <Link href="/impact" className="hover:bg-muted/40 rounded-xl border p-6 transition-colors">
       <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
-      <p className="text-3xl font-semibold tracking-tight">{hoursText(data.savedSecondsPerMonth)}</p>
+      <p className="text-3xl font-medium tracking-tight">{hoursText(data.savedSecondsPerMonth)}</p>
       <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
       <span className="text-muted-foreground mt-3 flex items-center gap-1 text-sm">
         {t("See where it comes from")}
@@ -99,7 +99,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-3xl font-medium tracking-tight">
           {greeting()}
           {ready.user.firstName ? `, ${ready.user.firstName}` : ""}.
         </h1>

@@ -36,7 +36,7 @@ function Title({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
         <div className="absolute bottom-0 flex flex-col gap-1 p-5 text-white">
-          <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+          <h2 className="text-2xl font-medium tracking-tight">{title}</h2>
           {subtitle && <p className="text-sm text-white/80">{subtitle}</p>}
         </div>
       </div>
@@ -50,7 +50,7 @@ function Title({
           <AvatarFallback>{title.slice(0, 2)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+          <h2 className="text-xl font-medium tracking-tight">{title}</h2>
           {subtitle && (
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
@@ -70,7 +70,7 @@ function Title({
           />
         )}
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+          <h2 className="text-2xl font-medium tracking-tight">{title}</h2>
           {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
         </div>
       </div>
@@ -78,7 +78,7 @@ function Title({
   }
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-2xl font-medium tracking-tight">{title}</h2>
       {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
     </div>
   )

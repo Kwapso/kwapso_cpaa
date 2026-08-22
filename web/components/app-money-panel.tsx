@@ -102,13 +102,13 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <p className="text-muted-foreground text-sm">{t("Hours given back, every month")}</p>
-          <p className="text-2xl font-semibold tracking-tight tabular-nums">
+          <p className="text-2xl font-medium tracking-tight tabular-nums">
             {hoursText(view.savedSecondsPerMonth)}
           </p>
         </div>
         <div>
           <p className="text-muted-foreground text-sm">{t("What those hours are worth")}</p>
-          <p className="text-2xl font-semibold tracking-tight tabular-nums">
+          <p className="text-2xl font-medium tracking-tight tabular-nums">
             {moneyText(view.moneyCentsPerMonth, null)}
           </p>
         </div>

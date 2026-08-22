@@ -92,7 +92,7 @@ function StatGrid({
               </div>
               {/* never overflow: shrink + ellipsis if the value is too wide */}
               <span
-                className="truncate text-2xl font-semibold tabular-nums"
+                className="truncate text-2xl font-medium tabular-nums"
                 title={s.value}
               >
                 {s.value}

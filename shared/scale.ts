@@ -17,6 +17,31 @@
 // A value the code has never met reads as comfortable rather than throwing —
 // the same discipline `toLanguage` keeps, and the reason the database column
 // carries no CHECK constraint.
+//
+// ── THIS CONTROL SUPERSEDES THE DESIGN KIT'S, AND THE KIT SAYS SO ──────────
+//
+// The kwapso kit ships a text-size control of its own: `data-scale` on <html>,
+// three steps at 13 / 15 / 17px, and ruling 18 saying "both doors default to
+// 15". Two mechanisms doing one job is one too many, so one had to win.
+//
+// This one does, on the kit's own instruction. `tokens.css` names its standing
+// law in its header: "CLAUDE.md — overrides the kit where the two disagree".
+// And they disagree on the half that matters: ruling 18 gives both doors the
+// same default, while UI-RULEBOOK L5 is a LOCKED decision that the portal reads
+// a step larger than the agency app, because the portal is a reading surface for
+// one client and the agency app is a working surface. A single number cannot say
+// that, which is why each step here carries two.
+//
+// It is also the mechanism that actually wins at runtime: `applyScale` sets an
+// inline `style.fontSize` on <html>, and an inline style beats any
+// `:root[data-scale=…]` rule regardless of which was intended. So adopting the
+// kit's attribute would have changed nothing except how many places a reader has
+// to look.
+//
+// What DID come across from the kit is the discipline underneath: every size is
+// rem against a 16px authoring base, and a px value in consuming code silently
+// opts that property out of this control. That is why the reskin deleted 54
+// hand-set `text-[10px]`-family sizes rather than re-tuning them.
 
 /** One step: what it is called, and the root font size it sets on each front
  * door. `agencyPx` is `web/`; `portalPx` is `web-portal/`. */

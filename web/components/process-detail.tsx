@@ -577,7 +577,7 @@ export function ProcessDetailScreen({
                           <p className="truncate text-sm font-medium">
                             {i + 1}. {step.name}
                             {step.removed && (
-                              <Badge variant="secondary" className="ml-2 text-[10px]">
+                              <Badge variant="secondary" className="ml-2 text-badge">
                                 {t("no longer done")}
                               </Badge>
                             )}
@@ -657,7 +657,7 @@ export function ProcessDetailScreen({
                         {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
                         {t("describes it")}
                       </span>
-                      <span className="text-sm font-semibold tabular-nums">
+                      <span className="text-sm font-medium tabular-nums">
                         {hoursText(shownTotalSeconds)} {t("a month")}
                       </span>
                     </div>
@@ -680,7 +680,7 @@ export function ProcessDetailScreen({
                       {baseline ? versionLabel(baseline) : t("the baseline")} {t("minus")}{" "}
                       {current ? versionLabel(current) : t("today")}
                     </p>
-                    <p className="text-2xl font-semibold tracking-tight">
+                    <p className="text-2xl font-medium tracking-tight">
                       {hoursText(saving.savedSecondsPerMonth)}
                     </p>
                     {/* R25 — the sentence that makes the number honest, from the
@@ -731,12 +731,12 @@ export function ProcessDetailScreen({
                             {v.label ? `, ${v.label}` : ""}
                           </span>
                           {v.isBaseline && (
-                            <Badge variant="secondary" className="shrink-0 text-[10px]">
+                            <Badge variant="secondary" className="shrink-0 text-badge">
                               {t("baseline")}
                             </Badge>
                           )}
                           {v.id === current?.id && (
-                            <Badge variant="outline" className="shrink-0 text-[10px]">
+                            <Badge variant="outline" className="shrink-0 text-badge">
                               {t("current")}
                             </Badge>
                           )}

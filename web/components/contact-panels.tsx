@@ -102,12 +102,12 @@ export function CompaniesPanel({
               <span className="text-muted-foreground text-xs">{c.relationship}</span>
             )}
             {c.isMainStakeholder && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-badge">
                 {t("Main contact")}
               </Badge>
             )}
             {!c.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
+              <Badge variant="outline" className="text-muted-foreground text-badge">
                 {t("No longer")}
               </Badge>
             )}

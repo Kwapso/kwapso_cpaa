@@ -62,7 +62,7 @@ export function WaitingOnYou() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">{t("We're waiting on you")}</h2>
+      <h2 className="text-lg font-medium">{t("We're waiting on you")}</h2>
       <ul className="flex flex-col gap-2">
         {open.map((todo) => (
           <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">

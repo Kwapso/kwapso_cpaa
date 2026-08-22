@@ -147,10 +147,10 @@ export function StaffPanel({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h2 className="flex items-center gap-2 text-lg font-medium tracking-tight">
           {t("Profile")}
           {profile && !profile.active && (
-            <Badge variant="outline" className="text-muted-foreground text-[10px]">
+            <Badge variant="outline" className="text-muted-foreground text-badge">
               {t("Inactive")}
             </Badge>
           )}
@@ -212,7 +212,7 @@ export function StaffPanel({
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h2 className="flex items-center gap-2 text-lg font-medium tracking-tight">
           {t("Certificates")}
           {/* R16: the number is the door's exact total through the ONE seam. This
               one counts the TEAM's register, which is what the door counts — a
@@ -258,7 +258,7 @@ export function StaffPanel({
                         c.title
                       )}
                       {!c.active && (
-                        <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                        <Badge variant="outline" className="text-muted-foreground text-badge">
                           {t("Archived")}
                         </Badge>
                       )}

@@ -118,7 +118,7 @@ export function MarginPanel({
       <div className="rounded-xl border p-4">
         <p className="text-muted-foreground text-sm">{t("What this account leaves us")}</p>
         <p
-          className={`text-2xl font-semibold tracking-tight tabular-nums ${down ? "text-destructive" : ""}`}
+          className={`text-2xl font-medium tracking-tight tabular-nums ${down ? "text-destructive" : ""}`}
         >
           {down ? "−" : ""}
           {moneyText(Math.abs(m.marginCents))}

@@ -224,20 +224,20 @@ export function KnowledgeDetailScreen({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2 text-2xl font-medium tracking-tight">
             <span className="truncate">{item.title}</span>
             {!item.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
+              <Badge variant="outline" className="text-muted-foreground text-badge">
                 {t("Not in use")}
               </Badge>
             )}
             {item.visibility === "private" && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-badge">
                 {t("Private to you")}
               </Badge>
             )}
             {item.visibility === "app" && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-badge">
                 {item.visibleToAppName ?? t("Limited to one app")}
               </Badge>
             )}

@@ -72,7 +72,7 @@ export function TeamSwitcher({
           {ctx?.team?.logoUrl && <AvatarImage src={ctx.team.logoUrl} alt={ctx.team.name} />}
           <AvatarFallback className="text-xs">{letterMark(ctx?.team?.name)}</AvatarFallback>
         </Avatar>
-        <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold">{name}</span>
+        <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{name}</span>
       </div>
     )
 
@@ -96,7 +96,7 @@ export function TeamSwitcher({
               {ctx?.team?.logoUrl && <AvatarImage src={ctx.team.logoUrl} alt={ctx.team.name} />}
               <AvatarFallback className="text-xs">{letterMark(ctx?.team?.name)}</AvatarFallback>
             </Avatar>
-            <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold">
+            <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
               {name}
             </span>
             <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" />
@@ -111,7 +111,7 @@ export function TeamSwitcher({
             <DropdownMenuItem onSelect={() => softNavigate("/invitations")} className="gap-2">
               <Inbox className="size-4" />
               <span className="min-w-0 flex-1">{t("Invites")}</span>
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-badge">
                 {pendingInvites}
               </Badge>
             </DropdownMenuItem>
@@ -123,7 +123,7 @@ export function TeamSwitcher({
           <DropdownMenuItem key={team.id} onSelect={() => void handleSwitch(team.id)} className="gap-2">
             <Avatar className="size-6">
               {team.logoUrl && <AvatarImage src={team.logoUrl} alt={team.name} />}
-              <AvatarFallback className="text-[10px]">{letterMark(team.name)}</AvatarFallback>
+              <AvatarFallback className="text-badge">{letterMark(team.name)}</AvatarFallback>
             </Avatar>
             <span className="min-w-0 flex-1 truncate">{team.name}</span>
             {team.id === ctx.team?.id && <Check className="size-4" />}

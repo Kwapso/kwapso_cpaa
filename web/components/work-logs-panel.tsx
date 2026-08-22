@@ -373,12 +373,12 @@ export function WorkLogsPanel({
                 {[l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
               </span>
               {l.kind && (
-                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                <Badge variant="secondary" className="shrink-0 text-badge">
                   {l.kind}
                 </Badge>
               )}
               {l.discarded && (
-                <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground shrink-0 text-badge">
                   {t("Discarded")}
                 </Badge>
               )}

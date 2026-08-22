@@ -130,7 +130,7 @@ export function ContactsPanel({
                 <span className="text-muted-foreground text-xs">{l.relationship}</span>
               )}
               {l.isMainStakeholder && (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-badge">
                   {t("Main contact")}
                 </Badge>
               )}

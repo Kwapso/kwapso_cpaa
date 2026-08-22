@@ -501,7 +501,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                           Google recorded against this entry, the other two are
                           matches — so the record says which one found it rather
                           than presenting all three as equally certain. */}
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-badge">
                         {FOUND_BY[item.transcriptFoundBy ?? ""] ?? t("Found in Google")}
                       </Badge>
                       {/* AND WHETHER THE WORDS ARE ANSWERABLE, which is a
@@ -511,7 +511,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                           state rather than a failure — it says so. */}
                       <Badge
                         variant={item.knowledgeIndexedAt ? "secondary" : "outline"}
-                        className="text-[10px]"
+                        className="text-badge"
                       >
                         {item.knowledgeIndexedAt
                           ? t("In the knowledge base")
@@ -685,12 +685,12 @@ function CalendarPanel({
                   <span className="font-medium">{g.name || g.email}</span>
                   {g.name && <span className="text-muted-foreground text-xs">{g.email}</span>}
                   {g.organizer && (
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-badge">
                       {t("Organiser")}
                     </Badge>
                   )}
                   {g.optional && (
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-badge">
                       {t("Optional")}
                     </Badge>
                   )}
@@ -698,17 +698,17 @@ function CalendarPanel({
                       two different relationships, and somebody can be neither —
                       which is what an empty row here honestly says. */}
                   {known?.memberName && (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-badge">
                       {t("One of us")}
                     </Badge>
                   )}
                   {known?.accountName && (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-badge">
                       {known.accountName}
                     </Badge>
                   )}
                   {loadingLinks && !known && (
-                    <span className="text-muted-foreground text-[10px]">…</span>
+                    <span className="text-muted-foreground text-badge">…</span>
                   )}
                   <span className="text-muted-foreground ml-auto text-xs">
                     {RESPONSE[g.response] ?? g.response}

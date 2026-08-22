@@ -88,7 +88,7 @@ export function AgentPanel({
                   >
                     <Badge
                       variant={chat.quota?.blocked ? "destructive" : "secondary"}
-                      className="cursor-pointer text-[10px]"
+                      className="cursor-pointer text-badge"
                     >
                       {chat.quotaLabel}
                     </Badge>

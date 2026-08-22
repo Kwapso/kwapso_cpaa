@@ -361,7 +361,7 @@ export function GoogleSourceDialog({
                    * theirs — and a picker that presented it as a name would be
                    * the same lie the raw ids were, better dressed. */}
                   {!o.named && (
-                    <span className="text-muted-foreground shrink-0 text-[10px]">
+                    <span className="text-muted-foreground shrink-0 text-badge">
                       {t("no name in Google")}
                     </span>
                   )}

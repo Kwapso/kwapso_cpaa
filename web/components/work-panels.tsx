@@ -238,7 +238,7 @@ export function StoriesPanel({
                 <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind)}</p>
               </div>
               {s.status === "done" && (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-badge">
                   {t("Done")}
                 </Badge>
               )}
@@ -376,7 +376,7 @@ export function SprintsPanel({
                 <p className="text-muted-foreground truncate text-xs">{sprintLine(s)}</p>
               </div>
               {s.completedAt && (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-badge">
                   {t("Complete")}
                 </Badge>
               )}
@@ -445,7 +445,7 @@ export function AppsPanel({
                 <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>
               </div>
               {!a.active && (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground text-badge">
                   {t("Archived")}
                 </Badge>
               )}
@@ -752,7 +752,7 @@ export function TodosPanel({
                 </p>
               </div>
               {todo.completedAt && (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-badge">
                   {t("Done")}
                 </Badge>
               )}

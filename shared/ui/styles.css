@@ -307,14 +307,89 @@
  * `text-muted-foreground`, `rounded-lg`, `bg-chart-2`, etc. all resolve from
  * the block above. */
 @theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* SAANS IS NAMED FIRST AND IS NOT HERE YET. The kit's type is Saans (Light 300
+   * and Medium 500) with Serrif Condensed beside it, and `assets/fonts/` in the
+   * kit is empty on purpose — redistribution is an open licence question, not a
+   * technical one. So the name leads the stack and the app falls back to what it
+   * already loads; the day the files land, this line already points at them.
+   *
+   * The kit also bans a fallback stack outright ("if Saans fails to load,
+   * nothing renders"), which is not a rule an app with no Saans can obey. Keeping
+   * Inter is the honest reading of the no-invention rule: do not improvise a
+   * substitute, do not pretend the font is here. Logged in NEEDS-A-SPEC.md. */
+  --font-sans: "Saans", var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "SerrifCondensed", Georgia, serif;
 
-  /* Type scale — the floor is raised one notch (xs 12→13, sm 14→15) so the
-   * smallest text in the UI reads larger everywhere. Override here only. */
-  --text-xs: 0.8125rem; /* 13px */
-  --text-xs--line-height: 1.125rem;
-  --text-sm: 0.9375rem; /* 15px */
-  --text-sm--line-height: 1.375rem;
+  /* ── THE THIRTEEN STEPS ────────────────────────────────────────────────
+   *
+   * The kit's scale, expressed where Tailwind can act on it: each step carries
+   * its own leading and tracking, so a size class brings the whole decision with
+   * it and nobody has to remember that 32px wants -0.02em. Sizes are rem against
+   * a 16px authoring base, which is what makes the text-size control work — a px
+   * value silently opts out of it.
+   *
+   * Two steps have no Tailwind default to override and are new names:
+   *   text-badge  12/500  badge, count, status (ruling 02)
+   *   text-micro  11/500  UPPERCASE eyebrows only
+   * They exist because the kit BANS hand-set micro sizes — 9, 10 and 11px as
+   * arbitrary values — and this app had 55 of them, nearly all on badges. */
+  --text-micro: 0.6875rem; /* 11 — eyebrows */
+  --text-micro--line-height: 1.3;
+  --text-badge: 0.75rem; /* 12 — badge, count, status */
+  --text-badge--line-height: 1.3;
+  --text-xs: 0.8125rem; /* 13 — caption: timestamps, helper text */
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.875rem; /* 14 — body-s: button and control labels */
+  --text-sm--line-height: 1.45;
+  --text-base: 1rem; /* 16 — body */
+  --text-base--line-height: 1.45;
+  --text-lg: 1.125rem; /* 18 — body-l */
+  --text-lg--line-height: 1.45;
+  --text-xl: 1.25rem; /* 20 — h4 */
+  --text-xl--line-height: 1.3;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.5rem; /* 24 — h3 */
+  --text-2xl--line-height: 1.25;
+  --text-2xl--letter-spacing: -0.014em;
+  --text-3xl: 2rem; /* 32 — h2 */
+  --text-3xl--line-height: 1.18;
+  --text-3xl--letter-spacing: -0.02em;
+  --text-4xl: 2.75rem; /* 44 — h1 */
+  --text-4xl--line-height: 1.18;
+  --text-4xl--letter-spacing: -0.025em;
+  --text-5xl: 3.5rem; /* 56 — display-m */
+  --text-5xl--line-height: 1.08;
+  --text-5xl--letter-spacing: -0.025em;
+  --text-6xl: 4.5rem; /* 72 — display-l */
+  --text-6xl--line-height: 1.05;
+  --text-6xl--letter-spacing: -0.026em;
+  --text-7xl: 6rem; /* 96 — display-xl */
+  --text-7xl--line-height: 1.02;
+  --text-7xl--letter-spacing: -0.028em;
+
+  /* ── TWO WEIGHTS, AND NO THIRD IS REACHABLE ────────────────────────────
+   *
+   * Saans ships Light 300 and Medium 500 only; Medium is the "bold" of this
+   * system, and display sizes get their emphasis from scale and tight tracking
+   * rather than from a heavier weight.
+   *
+   * The ramp is REDEFINED rather than policed. `font-semibold` and `font-bold`
+   * were rewritten to `font-medium` at their 59 call sites, so the source says
+   * what it means — but the remaining names are also pinned to 500 here, because
+   * a rule that depends on nobody typing `font-bold` again is a rule with a
+   * half-life. There is now no Tailwind class in the vocabulary that can produce
+   * a third weight. */
+  --font-weight-light: 300;
+  --font-weight-normal: 300;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 500;
+  --font-weight-extrabold: 500;
+
+  /* Tracking, for the two places it is not carried by a size step: the eyebrow
+   * (ruling 16) and the serif face. */
+  --tracking-eyebrow: 0.08em;
+  --tracking-serif: -0.005em;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -402,6 +477,9 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    /* Light 300 is the body weight of this system, not a lighter variant of it.
+     * Anything that does not say otherwise inherits it. */
+    font-weight: 300;
     min-height: 100svh;
   }
   /* THE FOUR RADIAL GRADIENTS AND THE FILM GRAIN ARE GONE (2026-08-22).

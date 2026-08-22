@@ -39,7 +39,7 @@ function Stopwatch({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <span className="text-2xl font-semibold tabular-nums">{format(ms)}</span>
+      <span className="text-2xl font-medium tabular-nums">{format(ms)}</span>
       <Button
         size="icon"
         variant="outline"

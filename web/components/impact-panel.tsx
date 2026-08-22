@@ -63,7 +63,7 @@ export function SavingStepLine({ step }: { step: StepSaving }) {
         <p className="text-foreground truncate text-sm font-medium">
           {step.name}
           {step.removed && (
-            <Badge variant="secondary" className="ml-2 text-[10px]">
+            <Badge variant="secondary" className="ml-2 text-badge">
               {t("no longer done")}
             </Badge>
           )}
@@ -111,7 +111,7 @@ export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border p-4">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
-        <p className="text-2xl font-semibold tracking-tight">
+        <p className="text-2xl font-medium tracking-tight">
           {hoursText(view.savedSecondsPerMonth)}
         </p>
         {/* R25 — the sentence that makes the number honest, from the one place it

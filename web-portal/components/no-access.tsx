@@ -50,7 +50,7 @@ export function NoAccess({ email }: { email: string }) {
 
   return (
     <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
-      <h1 className="text-2xl font-semibold tracking-tight">{t("You're signed in")}</h1>
+      <h1 className="text-2xl font-medium tracking-tight">{t("You're signed in")}</h1>
       <p className="text-muted-foreground">
         {t("There's nothing here for")} <span className="text-foreground">{email}</span> {t("yet. Someone at")}{" "}
         {brand.name} {t("needs to switch your access on before your company's work shows up.")}

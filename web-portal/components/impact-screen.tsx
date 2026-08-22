@@ -105,7 +105,7 @@ function StepLine({ step }: { step: StepSaving }) {
           <p className="text-foreground truncate text-sm font-medium">
             {step.name}
             {step.removed && (
-              <Badge variant="secondary" className="ml-2 text-[10px]">
+              <Badge variant="secondary" className="ml-2 text-badge">
                 {t("no longer needed")}
               </Badge>
             )}
@@ -164,7 +164,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
   if (data.apps.length === 0)
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight">{t("What this has been worth")}</h1>
+        <h1 className="text-3xl font-medium tracking-tight">{t("What this has been worth")}</h1>
         <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
           {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
         </p>
@@ -174,7 +174,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{t("What this has been worth")}</h1>
+        <h1 className="text-3xl font-medium tracking-tight">{t("What this has been worth")}</h1>
         <p className="text-muted-foreground">
           {t("Time your team gets back, every month, and where every hour of it comes from.")}
         </p>
@@ -188,7 +188,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
           likely to show somebody else, one fewer drawn line is worth having. */}
       <section className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
-        <p className="text-3xl font-semibold tracking-tight">
+        <p className="text-3xl font-medium tracking-tight">
           {hoursText(data.savedSecondsPerMonth)}
         </p>
         {/* R25 — the sentence that makes the number honest, from the one place it

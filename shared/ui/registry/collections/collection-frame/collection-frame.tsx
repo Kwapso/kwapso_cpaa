@@ -156,7 +156,7 @@ function CollectionFrame<T>({
           const titleBlock = (
             <div className="flex items-baseline gap-2">
               {config.title && (
-                <h3 className="text-sm font-semibold">{config.title}</h3>
+                <h3 className="text-sm font-medium">{config.title}</h3>
               )}
               {config.showCount && (
                 <span className="text-xs text-muted-foreground tabular-nums">

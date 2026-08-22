@@ -65,7 +65,7 @@ function Chat({
               {m.text}
               <div
                 className={cn(
-                  "mt-0.5 text-[10px]",
+                  "mt-0.5 text-badge",
                   // Full opacity, not /70: at 10px the faded variant measured
                   // 2.6:1 (light) and 2.3:1 (dark) against the bubble fill. The
                   // size difference already carries the hierarchy.
