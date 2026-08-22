@@ -68,7 +68,13 @@ export function CodeInput({
           inputMode="numeric"
           autoComplete={i === 0 ? "one-time-code" : "off"}
           aria-label={`Digit ${i + 1} of ${length}`}
-          className="h-12 w-10 px-0 text-center text-lg font-medium"
+          // A CODE CELL IS A BOX, NOT A PILL, and the kit says so in as many
+          // words: code-input cells are 24px, explicitly NOT the 6px selection
+          // exception, because "a code cell is a box". It has to say so here
+          // because the cell is built from the library `Input`, and an input IS
+          // a pill in this system — so without the override the six cells
+          // render as six circles. 44 x 52 and tabular, per the kit's spec.
+          className="h-13 w-11 rounded-xl px-0 text-center text-lg font-medium tabular-nums"
         />
       ))}
     </div>
