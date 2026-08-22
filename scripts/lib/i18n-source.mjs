@@ -210,12 +210,29 @@ export function parseFile(path) {
   )
 }
 
+/** The vendored component library. The walk stops here, and the reason is the
+ * one directly below rather than a new one.
+ *
+ * This used to need no line at all: the library arrived as `@kwapso/ui/...`, a
+ * bare specifier, and `resolveImport` refused every bare specifier as somebody
+ * else's code. On 2026-08-22 it was copied into `shared/ui/` so the app could
+ * own and re-theme it, which changed its ADDRESS and nothing else — it is still
+ * a generic component library whose strings are defaults, and the app still says
+ * its own words through the props it already translates (`emptyText`,
+ * `placeholder`, `label`, `empty`).
+ *
+ * So the refusal that was free has to be paid for in a line, and it is stated
+ * here rather than in a skip-list somewhere downstream, because THIS is the
+ * function whose answer everything else stands on. Reason and residue:
+ * VENDORED_UI_SCOPE in shared/rules/registry.ts. */
+export const VENDORED_UI = join(ROOT, "shared", "ui") + sep
+
 /** One import specifier → the repo file it means, or null for a package.
  *
  * The two aliases are the ones both front doors declare in their own
  * tsconfig — `@/*` for the door's own tree and `@shared/*` for `shared/`.
- * Anything bare (`react`, `@kwapso/ui/...`, `sonner`) is somebody else's code
- * and is not ours to translate. */
+ * Anything bare (`react`, `sonner`) is somebody else's code and is not ours to
+ * translate, and so is the vendored library above. */
 export function resolveImport(spec, fromFile) {
   let base
   if (spec.startsWith("@shared/")) base = join(ROOT, "shared", spec.slice("@shared/".length))
@@ -226,6 +243,10 @@ export function resolveImport(spec, fromFile) {
     base = join(ROOT, door, spec.slice(2))
   } else if (spec.startsWith(".")) base = resolve(dirname(fromFile), spec)
   else return null
+  // Checked on the RESOLVED path, not the specifier, so every way of spelling
+  // the same file lands on the same answer — `@shared/ui/...` from a screen and
+  // `../../primitives/button/button` from inside the library alike.
+  if (base.startsWith(VENDORED_UI)) return null
   const candidates = [`${base}.ts`, `${base}.tsx`, join(base, "index.ts"), join(base, "index.tsx"), base]
   return candidates.find((c) => /\.tsx?$/.test(c) && existsSync(c)) ?? null
 }

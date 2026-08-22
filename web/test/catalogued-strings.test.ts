@@ -43,6 +43,7 @@ import ts from "typescript"
 
 import {
   ROOT,
+  VENDORED_UI,
   appFiles,
   isUserVisible,
   parseFile,
@@ -204,11 +205,17 @@ const UNWALKED_OK: Record<string, string> = {
 
 /** Every .ts/.tsx under the three roots that could hold front-door copy, minus
  * the ones no person ever reads: a test is not a screen, and neither is an
- * end-to-end spec. */
+ * end-to-end spec — and neither is the vendored component library, which the
+ * walk itself refuses (VENDORED_UI, and the reason with it). The census has to
+ * agree with the walk about that one directory or it would report all 96 of its
+ * files as unreachable, which is true and is not a finding: they are unreachable
+ * BY DECISION, and a census that restates a decision as a fault teaches everyone
+ * to scroll past it. */
 function everySourceFile(): string[] {
   const skip = (path: string) => /(^|\/)(test|e2e)(\/|$)/.test(path) || /\.test\.tsx?$/.test(path)
   return ["web", "web-portal", "shared"]
     .flatMap((dir) => sourceFiles(join(ROOT, dir)) as string[])
+    .filter((path) => !path.startsWith(VENDORED_UI))
     .filter((path) => !skip(relative(ROOT, path)))
     .sort()
 }

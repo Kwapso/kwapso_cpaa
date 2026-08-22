@@ -16,6 +16,11 @@
   },
   // shared/web/ is the BROWSER half of shared/ — React modules both front doors
   // render. A worker compiles with no DOM and no React, so it never sees them.
-  "exclude": ["../../shared/web/**"],
+  // shared/ui/ is the vendored component library and is the same case one step
+  // further: every file in it is a browser module, and the .ts logic halves that
+  // sit beside the .tsx reach for document, Node and NodeFilter, none of which
+  // exist in a worker. Excluded HERE rather than made DOM-agnostic, because the
+  // two front doors are the only things that ever render it.
+  "exclude": ["../../shared/web/**", "../../shared/ui/**"],
   "include": ["src/**/*.ts", "test/**/*.ts", "../../shared/**/*.ts", "../../types/node-shims.d.ts"]
 }

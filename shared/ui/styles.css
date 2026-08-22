@@ -1,0 +1,497 @@
+/* Swift Struck UI — THE THEME (the one master copy).
+ *
+ * Apps import this from the package, AFTER tailwind, in their main stylesheet:
+ *   @import "tailwindcss";
+ *   @import "tw-animate-css";
+ *   @import "@swift-struck/ui/styles.css";
+ *
+ * It carries the design tokens (light + dark), the motion/surface utilities
+ * (glass, hover-lift, animate-rise, ambient, required-ring) — and the @source
+ * below tells Tailwind to scan the library's components for class names.
+ * The path resolves relative to THIS file, so it works both in this repo and
+ * from node_modules when installed in an app. */
+@source "./registry";
+
+/* ---------------------------------------------------------------------------
+ * LAYER 0 — DESIGN TOKENS (the single source of truth)
+ *
+ * Every color, radius, and surface in Swift Struck UI resolves to a variable defined
+ * here. Primitives and collections reference these tokens (e.g. `bg-background`,
+ * `text-foreground`, `rounded-lg`) and NEVER hardcode a hex value or pixel size.
+ * Re-theming any project — including future native skins — is a matter of
+ * editing this block alone. See registry/tokens/README.md and ARCHITECTURE.md.
+ *
+ * Current preset: "Teal" brand + "Amber" chart accent, medium radius.
+ * Swapping the brand is the ~4 lines marked PRIMARY / RING below.
+ * ------------------------------------------------------------------------- */
+
+@custom-variant dark (&:is(.dark *));
+
+/* `:root` is the light palette; `.light` re-applies it so a `light` Container can
+ * re-establish the light token scope even when nested inside a `.dark` page. */
+:root,
+.light {
+  --radius: 0.75rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* PRIMARY (brand) */
+  --primary: oklch(0.55 0.095 185);
+  /* Pure white, not 0.985: a label on a fill is measured against THAT FILL, and
+   * off-white gave 4.43:1 on --primary (4.37 on --success) — under the 4.5 text
+   * floor on every filled button and badge. White buys ~0.2 for free and is
+   * indistinguishable on a coloured fill. See registry/tokens/README.md, trap 3. */
+  --primary-foreground: oklch(1 0 0);
+
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  --muted: oklch(0.97 0 0);
+  /* Secondary text. Measured against the TINTED surfaces it actually sits on
+   * (a hovered list row, a chat bubble, a command-menu highlight), not white:
+   * at 0.556 those were 4.14–4.35:1, under the 4.5 text floor, while plain
+   * white read a comfortable 4.73. See registry/tokens/README.md, trap 2. */
+  --muted-foreground: oklch(0.525 0 0);
+
+  --accent: oklch(0.96 0.02 185);
+  --accent-foreground: oklch(0.3 0.06 185);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0); /* 4.56 → 4.76 on its own fill */
+
+  --success: oklch(0.548 0.155 149);
+  --success-foreground: oklch(1 0 0); /* was 4.37 on its own fill — under 4.5 */
+
+  /* --warning is a FILL (badges, stepper tones, status dots) carrying the
+   * near-black --warning-foreground on top — that pairing is fine and the light
+   * amber is the accent identity, so it stays put. But at 1.92:1 it can never be
+   * TEXT on a light surface. --warning-strong is that on-surface tone (4.88:1).
+   * Two different checks; see registry/tokens/README.md, trap 3. */
+  --warning: oklch(0.795 0.16 86);
+  --warning-foreground: oklch(0.205 0 0);
+  --warning-strong: oklch(0.55 0.135 86);
+
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.55 0.095 185); /* RING follows PRIMARY */
+
+  /* Chart palette. These are GRAPHICS tokens — chart areas, rating stars,
+   * calendar dots — never text (chart axis/legend text uses muted-foreground).
+   * So the bar is WCAG 1.4.11 non-text contrast, 3:1, NOT the 4.5:1 text bar.
+   * Don't darken them to 4.5:1: it turns the amber accent to ochre for no
+   * accessibility gain. Do keep them >= 3:1 — the original amber was 2.13:1
+   * and failed even this floor. --primary/--success are separate BECAUSE they
+   * are used as text and must hold 4.5:1. */
+  --chart-1: oklch(0.58 0.1 185);
+  --chart-2: oklch(0.673 0.146 70);
+  --chart-3: oklch(0.6 0.13 250);
+  --chart-4: oklch(0.65 0.18 320);
+  --chart-5: oklch(0.64 0.15 145); /* was 0.7 — 2.52:1, under the 3:1 floor */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+
+  /* PRIMARY (brand) */
+  /* Near-black label, matching --success/--warning below. The dark brand fills
+   * are LIGHTER than their light-mode counterparts, so a near-white label sat
+   * at 3.30:1 on --primary and 2.77:1 on --destructive — under the 4.5:1 floor
+   * a filled control's own label has to clear. Near-black gives 5.20 and 6.19. */
+  --primary: oklch(0.62 0.11 185);
+  --primary-foreground: oklch(0.205 0 0);
+
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+
+  --accent: oklch(0.3 0.04 185);
+  --accent-foreground: oklch(0.95 0.02 185);
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.205 0 0); /* was 2.77 on its own fill */
+
+  --success: oklch(0.696 0.17 149);
+  --success-foreground: oklch(0.205 0 0);
+
+  --warning: oklch(0.828 0.16 86);
+  --warning-foreground: oklch(0.205 0 0);
+  /* Dark mode never had the light-mode problem: the same amber reads 11.5:1 on
+   * the dark background. The token exists here so `text-warning-strong` resolves
+   * in both themes — this is an ADDITION, no existing dark value changed. */
+  --warning-strong: oklch(0.828 0.16 86);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.11 185); /* RING follows PRIMARY */
+
+  --chart-1: oklch(0.65 0.12 185);
+  --chart-2: oklch(0.79 0.16 70);
+  --chart-3: oklch(0.65 0.14 250);
+  --chart-4: oklch(0.7 0.18 320);
+  --chart-5: oklch(0.72 0.15 145);
+}
+
+/* Expose the tokens to Tailwind's utility engine so `bg-background`,
+ * `text-muted-foreground`, `rounded-lg`, `bg-chart-2`, etc. all resolve from
+ * the block above. */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale — the floor is raised one notch (xs 12→13, sm 14→15) so the
+   * smallest text in the UI reads larger everywhere. Override here only. */
+  --text-xs: 0.8125rem; /* 13px */
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem; /* 15px */
+  --text-sm--line-height: 1.375rem;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-strong: var(--warning-strong);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  /* No rubber-band / overscroll bounce anywhere — a page only moves when it
+   * genuinely has content past the fold. Single-screen pages (sign-in,
+   * onboarding) sit perfectly still on every device. See UI-RULES.md. */
+  html {
+    overscroll-behavior: none;
+    /* No screen scrolls horizontally — the root clamps it (UI-RULES.md rule 2).
+     * Only designated scrollers (a table, a collection, a tab strip) scroll
+     * sideways, inside a contained wrapper that never widens the page. */
+    overflow-x: hidden;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    min-height: 100svh;
+    /* A soft "source of light" from the top, two brand-tinted corner glows,
+     * and a gentle vignette that pulls focus to the centre. The
+     * AmbientBackground layers flowing light + a slow heartbeat on top, and
+     * body::after adds a fine film grain. Elegant and alive, never a gloss. */
+    background-image:
+      radial-gradient(
+        62rem 42rem at 50% -16%,
+        color-mix(in oklch, var(--primary) 14%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        46rem 46rem at 100% -6%,
+        color-mix(in oklch, var(--primary) 11%, transparent),
+        transparent 58%
+      ),
+      radial-gradient(
+        44rem 44rem at -8% 6%,
+        color-mix(in oklch, var(--chart-3) 11%, transparent),
+        transparent 55%
+      ),
+      /* vignette — subtle depth, frames the content */
+        radial-gradient(
+          130% 130% at 50% 32%,
+          transparent 56%,
+          color-mix(in oklch, black 16%, transparent)
+        );
+    background-attachment: fixed;
+  }
+  /* Fine film grain — a barely-there premium texture over the light. Fixed,
+   * non-interactive, sits between the ambient light and the content. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -5;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * MOTION & SURFACE UTILITIES — the shared "alive" layer.
+ *
+ * A tiny, reusable vocabulary applied via className on existing components, so
+ * the whole library inherits the feel from one place. No per-component CSS.
+ *   .glass        frosted translucent surface (pairs with the body glow above)
+ *   .animate-rise gentle staggered entrance (respects reduced-motion)
+ *   .hover-lift   subtle lift + brand glow on hover for interactive cards
+ * ------------------------------------------------------------------------- */
+@layer components {
+  /* Frosted glass: a translucent pane that blurs (refracts) what's behind it,
+   * with a single hairline top-edge highlight. The realism comes from the
+   * blur — NOT a painted gradient sheen. Central: every card/dialog/popover/
+   * menu/toast inherits it. */
+  .glass {
+    background-color: color-mix(in oklch, var(--card) 72%, transparent);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    box-shadow: inset 0 1px 0 0 color-mix(in oklch, white 7%, transparent);
+  }
+  /* Typing indicator dots (AgentChat). A gentle opacity pulse; staggered via an
+   * inline animation-delay per dot. Disabled under reduced-motion below. */
+  .ss-typing {
+    animation: ss-typing 1.2s ease-in-out infinite;
+  }
+  @keyframes ss-typing {
+    0%,
+    80%,
+    100% {
+      opacity: 0.3;
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+  /* Hide the scrollbar while keeping the element scrollable — used by overflowing
+   * tab bars and any horizontally-scrolling strip that shouldn't show a bar. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hover-lift {
+    transition:
+      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+    box-shadow: 0 12px 30px -12px
+      color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+  /* opt a nested/static surface out of the lift (keeps the glass) */
+  .hover-lift-none:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .animate-rise {
+    opacity: 0;
+    animation: ss-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Ambient interactive background — an abstract field of drifting,
+   * token-colored light that slowly wanders and breathes, and blooms toward
+   * the pointer. Alive and engaging, but soft (blurred light, never a painted
+   * gloss). Driven by <AmbientBackground />; fills behind every screen. */
+  .ambient::before {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    background:
+      radial-gradient(
+        40% 40% at 14% 22%,
+        color-mix(in oklch, var(--chart-3) 22%, transparent),
+        transparent 62%
+      ),
+      radial-gradient(
+        38% 38% at 86% 72%,
+        color-mix(in oklch, var(--chart-4) 20%, transparent),
+        transparent 62%
+      ),
+      /* the breathing core — a slow heartbeat of brand light at center */
+        radial-gradient(
+          42% 42% at 50% 42%,
+          color-mix(in oklch, var(--primary) 20%, transparent),
+          transparent 64%
+        ),
+      radial-gradient(
+        30% 30% at 66% 12%,
+        color-mix(in oklch, var(--chart-2) 16%, transparent),
+        transparent 62%
+      ),
+      radial-gradient(
+        32% 32% at 28% 84%,
+        color-mix(in oklch, var(--primary) 15%, transparent),
+        transparent 62%
+      );
+    /* big, soft, flowing light — elegant aurora rather than tight blobs */
+    filter: blur(96px) saturate(1.35);
+    opacity: 0.7;
+    /* drift = slow flowing wander; breathe = the heartbeat (opacity pulse) */
+    animation:
+      ambient-drift 38s ease-in-out infinite,
+      ambient-breathe 9s ease-in-out infinite;
+  }
+  /* the pointer-following bloom (faint on move, brighter on tap) */
+  .ambient::after {
+    content: "";
+    position: absolute;
+    inset: -25%;
+    background: radial-gradient(
+      22% 22% at var(--mx, 50%) var(--my, 38%),
+      color-mix(in oklch, var(--primary) 36%, transparent),
+      transparent 55%
+    );
+    filter: blur(64px);
+    opacity: calc(0.12 + 0.5 * var(--bloom, 0));
+  }
+}
+
+@keyframes ss-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ambient-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(3%, -3%, 0) scale(1.12) rotate(2deg);
+  }
+}
+
+/* The heartbeat: a slow, shallow opacity pulse so the light feels alive
+ * without ever being busy. Disabled under prefers-reduced-motion below. */
+@keyframes ambient-breathe {
+  0%,
+  100% {
+    opacity: 0.66;
+  }
+  50% {
+    opacity: 0.86;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * REQUIRED-FIELD RING — a thin teal gradient that slowly runs around a field,
+ * signalling "this is required" (paired with the red asterisk). Wrap the input
+ * in <div class="required-ring">. Global rule for forms/edit containers.
+ * ------------------------------------------------------------------------- */
+@property --ss-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@layer components {
+  /* Never shear letters: an overflowing placeholder ends in an ellipsis rather
+     than a hard clip, at any width. The value side is handled by the Input
+     primitive's `truncate`; this covers the placeholder, which `truncate`
+     cannot reach (it's a pseudo-element). */
+  input::placeholder,
+  textarea::placeholder {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .required-ring {
+    position: relative;
+    /* Inheritable: a wrapped control can publish its own corner radius via
+       --ss-ring-radius so the ring hugs a pill/rounded trigger instead of
+       drawing a rectangle around it. Defaults to the input radius. */
+    border-radius: var(--ss-ring-radius, var(--radius-md));
+  }
+  .required-ring::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--ss-angle),
+      transparent 0deg,
+      color-mix(in oklch, var(--primary) 90%, transparent) 70deg,
+      transparent 150deg,
+      transparent 360deg
+    );
+    /* mask so only the 1.5px padding shows = a ring, not a filled box */
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: ss-rotate 3.5s linear infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes ss-rotate {
+  to {
+    --ss-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+    opacity: 1;
+  }
+  .hover-lift {
+    transition: none;
+  }
+  .ambient::before {
+    animation: none;
+  }
+  .required-ring::before {
+    animation: none;
+  }
+  .ss-typing {
+    animation: none;
+  }
+}

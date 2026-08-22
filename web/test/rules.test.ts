@@ -30,6 +30,7 @@ import {
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
+  VENDORED_UI,
 } from "@shared/rules/registry"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
@@ -1961,18 +1962,36 @@ describe("RULES — the laws of the base", () => {
     // read it would go red on the rule's own text.
     const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
     const lawBook = join(ROOT, "shared", "rules")
+    // The vendored component library speaks its own radius vocabulary until the
+    // reskin collapses it into the kit's four. Out of scope WITH a reason
+    // (VENDORED_UI_SCOPE["two-radii"]) and with the ratchet below, so this is a
+    // dated decision rather than a hole.
+    const vendored = join(ROOT, VENDORED_UI)
     const offenders: string[] = []
+    const vendoredStillOffends: string[] = []
     for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
       if (f.path.startsWith(lawBook)) continue
       for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)?[a-z0-9]+/g) ?? []) {
         if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
-        offenders.push(`${f.rel}: ${hit}`)
+        if (f.path.startsWith(vendored)) vendoredStillOffends.push(`${f.rel}: ${hit}`)
+        else offenders.push(`${f.rel}: ${hit}`)
       }
     }
     expect(
       offenders,
       `R31 — a surface is rounded-xl and a pill is rounded-full, nothing else:\n  ${offenders.join("\n  ")}`
     ).toEqual([])
+
+    // The ratchet, pointing the other way to R29's and R32's: those assert an
+    // exemption still names a real offender, and so does this — an exemption for
+    // a directory that has stopped offending is an exemption nobody re-read, and
+    // it would let the library drift back off-vocabulary under a green build.
+    // When the reskin gives shared/ui/ the kit's radii, this goes red and the
+    // entry, the skip and this block go with it.
+    expect(
+      vendoredStillOffends.length,
+      `VENDORED_UI_SCOPE["two-radii"] excuses shared/ui/, which no longer writes an off-vocabulary radius — delete the entry, the skip and this check, and let R31 reach it`
+    ).toBeGreaterThan(0)
   })
 
   // R32 — EVERY COLOUR RESOLVES THROUGH A TOKEN.
