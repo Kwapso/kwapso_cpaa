@@ -158,7 +158,7 @@ function groupByKind(
  * heading already said where it is. */
 function endingBadge(s: Sprint, t: Translate): React.ReactNode {
   if (s.completedAt) return <Badge variant="secondary">{t("Complete")}</Badge>
-  if (!s.active) return <Badge variant="outline">{t("Cancelled")}</Badge>
+  if (!s.active) return <Badge variant="secondary">{t("Cancelled")}</Badge>
   return undefined
 }
 

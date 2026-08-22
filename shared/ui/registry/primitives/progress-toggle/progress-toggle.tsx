@@ -21,7 +21,7 @@ function ProgressToggle({
   return (
     <Button
       type="button"
-      variant={done ? "secondary" : "outline"}
+      variant={done ? "default" : "secondary"}
       onClick={onToggle}
       aria-pressed={done}
       className={cn("gap-1.5", className)}

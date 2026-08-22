@@ -102,7 +102,7 @@ function Attachments({ items }: { items: TicketAttachment[] }) {
             href={safeHref(a.url)}
             target="_blank"
             rel="noreferrer"
-            className="outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="  "
           >
             {inner}
           </a>
@@ -198,14 +198,14 @@ function TicketThread({
       {/* header */}
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{ticket.type}</Badge>
+          <Badge variant="secondary">{ticket.type}</Badge>
           <Badge variant={statusVariant[ticket.status]}>
             {statusLabel[ticket.status]}
           </Badge>
           {ticket.fromScreen && (
             <a
               href={safeHref(ticket.fromScreen.href)}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 transition-colors outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
               raised from {ticket.fromScreen.label}
               <ExternalLink className="size-3" aria-hidden />
@@ -297,7 +297,7 @@ function TicketThread({
                   role="option"
                   aria-selected={false}
                   onClick={() => pickMention(m)}
-                  className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent"
+                  className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent"
                 >
                   <Avatar className="size-5">
                     <AvatarFallback className="text-[0.625rem]">

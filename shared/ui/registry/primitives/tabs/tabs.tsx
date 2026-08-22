@@ -32,7 +32,7 @@ const tabsListVariants = cva(
         // pill = Glide's "Button" style (a frosted segmented control)
         pill: "gap-1 rounded-xl bg-muted p-1",
         // line = Glide's "Line" style (an underline rail)
-        line: "gap-4 border-b",
+        line: "gap-6 border-b",
       },
     },
     defaultVariants: { variant: "pill" },
@@ -59,12 +59,12 @@ const tabBadgeClass =
   "min-w-5 justify-center rounded-full px-1.5 py-0 text-xs leading-5"
 
 const tabsTriggerVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 px-3 py-1 text-sm font-medium whitespace-nowrap transition-all hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 py-3 text-sm whitespace-nowrap transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        pill: "rounded-xl data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-        line: "-mb-px h-9 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground",
+        pill: "rounded-full px-3 py-1 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+        line: "-mb-px rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-foreground data-[state=active]:font-medium data-[state=active]:text-foreground",
       },
     },
     defaultVariants: { variant: "pill" },
@@ -122,7 +122,7 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       className={cn(
-        "mt-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        "mt-2",
         className
       )}
       {...props}

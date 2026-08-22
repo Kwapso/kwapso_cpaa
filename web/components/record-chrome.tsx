@@ -71,7 +71,7 @@ export type RecordAction = {
  * computed from a comparison), and a rule that reads source has no way to tell a
  * fake toggle from an honest one. Writing the table is cheaper than arguing with
  * the check, and the check stays as sharp as it was. */
-const TRIGGER_TONE = { header: "outline", row: "ghost" } as const
+const TRIGGER_TONE = { header: "secondary", row: "ghost" } as const
 
 export function RecordActionsMenu({
   actions,

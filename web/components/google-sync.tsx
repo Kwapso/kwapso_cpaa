@@ -175,7 +175,7 @@ export function GoogleSyncButton({
 
   return (
     <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className ?? ""}`}>
-      <Button variant="outline" size="sm" disabled={syncing} onClick={sync} className="gap-1">
+      <Button variant="secondary" size="sm" disabled={syncing} onClick={sync} className="gap-1">
         {syncing ? <Spinner /> : <RefreshCw className="size-3.5" aria-hidden />}
         {syncing ? t("Bringing it in…") : t("Bring it in")}
       </Button>

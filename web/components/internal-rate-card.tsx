@@ -178,7 +178,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.label}</span>
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {!r.active ? (
-                <Badge variant="outline" className="text-muted-foreground shrink-0 text-badge">
+                <Badge variant="secondary" className="text-muted-foreground shrink-0 text-badge">
                   {t("Inactive")}
                 </Badge>
               ) : (
@@ -391,7 +391,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.roleName}</span>
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, null)}</span>
               {!r.active && (
-                <Badge variant="outline" className="text-muted-foreground shrink-0 text-badge">
+                <Badge variant="secondary" className="text-muted-foreground shrink-0 text-badge">
                   {t("Inactive")}
                 </Badge>
               )}

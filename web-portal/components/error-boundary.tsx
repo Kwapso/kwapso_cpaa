@@ -50,7 +50,7 @@ function Broken({ onRetry }: { onRetry: () => void }) {
       <p className="text-muted-foreground">
         {t("We've been told about it. Try again, and if it keeps happening, raise a ticket and we'll sort it out.")}
       </p>
-      <Button variant="outline" onClick={onRetry}>
+      <Button variant="secondary" onClick={onRetry}>
         <RotateCcw className="size-3.5" />
         {t("Try again")}
       </Button>

@@ -66,11 +66,11 @@ export function AgentPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      {/* outline-none: the Radix panel itself takes focus on open — without this,
+      {/* : the Radix panel itself takes focus on open — without this,
        * pressing Enter/arrows draws the browser's focus ring around the WHOLE
        * slide-in (the owner's "weird outline"). Harmless but ugly; the effect
        * above moves focus into the composer instead. */}
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 outline-none sm:max-w-lg">
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
         {/* pe-12 reserves room on the right for the Sheet's own absolute close ✕
          * (top-4 right-4) — without it the ✕ sits on top of the New chat button and
          * swallows its taps (the bug the owner hit). */}
@@ -83,7 +83,7 @@ export function AgentPanel({
                   <button
                     type="button"
                     onClick={() => setUsageOpen(true)}
-                    className="rounded-full focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
+                    className="rounded-full"
                     title={t("See where your assistant credits went")}
                   >
                     <Badge
@@ -99,7 +99,7 @@ export function AgentPanel({
                  * was too small to hit on a phone); bordered so they read as
                  * buttons, not decorations. */}
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="icon"
                   className="size-10"
                   onClick={() => setHistoryOpen(true)}
@@ -111,7 +111,7 @@ export function AgentPanel({
                 </Button>
                 {chat.items.length > 0 && (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="icon"
                     className="size-10"
                     onClick={chat.newChat}
@@ -187,7 +187,7 @@ export function AgentPanel({
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => void chat.resolve(false)}
                     disabled={chat.busy}

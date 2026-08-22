@@ -66,7 +66,7 @@ function DatePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
+          variant="secondary"
           className={cn(
             "w-56 justify-start gap-2 font-normal",
             !value && "text-muted-foreground",

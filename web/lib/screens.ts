@@ -170,7 +170,7 @@ const teamDetailRecipe: ScreenRecipe = {
       id: "team.edit",
       label: "Edit team",
       action: "team.edit",
-      variant: "outline",
+      variant: "secondary",
       gate: { module: "teams", right: "edit" },
     },
   ],
@@ -238,7 +238,7 @@ const memberDetailRecipe: ScreenRecipe = {
       id: "members.changeRole",
       label: "Change role",
       action: "members.changeRole",
-      variant: "outline",
+      variant: "secondary",
       gate: { module: "team_members", right: "edit" },
     },
     {
@@ -651,7 +651,7 @@ function internalDetailTabs(rows: { label: string; column: string }[]): RecipeTa
  * records somebody works through, so there is no status to move along. */
 function internalDetailActions(module: string, prefix: string, archiveLabel: string): RecipeAction[] {
   return [
-    { id: `${prefix}.edit`, label: "Edit", action: `${prefix}.edit`, variant: "outline", gate: { module, right: "edit" } },
+    { id: `${prefix}.edit`, label: "Edit", action: `${prefix}.edit`, variant: "secondary", gate: { module, right: "edit" } },
     {
       id: `${prefix}.archive`,
       label: archiveLabel,

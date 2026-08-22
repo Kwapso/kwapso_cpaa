@@ -94,7 +94,7 @@ export function AddLinkDialog({
         <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="lg"
             className="flex-1 sm:order-2 sm:flex-none"
             disabled={busy}

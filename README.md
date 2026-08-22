@@ -183,7 +183,12 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    the `/t/<teamId>/<module>/<id>` deep-link grammar the team area runs on.
 10. **[UI-GAPS.md](UI-GAPS.md)**, the running list of things the component library
     still cannot do (a gap is fixed in the library, once, not worked around on
-    each screen that hits it).
+    each screen that hits it). Its twin pointing the other way is
+    **[NEEDS-A-SPEC.md](NEEDS-A-SPEC.md)**: what the app RENDERS that the design
+    kit does not yet draw, written for the designer rather than for us. UI-GAPS
+    is work we owe the library; NEEDS-A-SPEC is work the kit owes the app, and
+    everything on it is wearing the new tokens with its old shape untouched,
+    because the kit's own rule is to log rather than improvise.
 11. The UI comes ONLY from the component library, which lives **in this repo** at
     `shared/ui/` and is imported as `@shared/ui/…`. It was the npm package
     `@kwapso/ui`, installed from a separate repo, until it was vendored on

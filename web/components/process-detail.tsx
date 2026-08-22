@@ -108,7 +108,7 @@ import { ProcessMap } from "@/components/process-map"
  * what somebody called it. Written once so the picker, the banner and the
  * versions list cannot describe the same version three ways. */
 function versionLabel(v: ProcessVersion): string {
-  return `Version ${v.versionNo}${v.label ? `, ${v.label}` : ""}${v.isBaseline ? " (baseline)" : ""}`
+  return `Version ${v.versionNo}${v.label ? `, ${v.label}` : ""}${v.isBaseline ? "(baseline)" : ""}`
 }
 
 /** One step's whole monthly cost: how long it takes, times how often it happens.
@@ -399,7 +399,7 @@ export function ProcessDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
+            <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -508,7 +508,7 @@ export function ProcessDetailScreen({
                   // — a skeleton that never resolves is the same screen as a hang.
                   <div className="flex flex-col items-start gap-2">
                     <p className="text-destructive text-sm">{t("Couldn't load that version.")}</p>
-                    <Button variant="outline" size="sm" onClick={() => setVersionId(null)}>
+                    <Button variant="secondary" size="sm" onClick={() => setVersionId(null)}>
                       {t("Show the current version")}
                     </Button>
                   </div>
@@ -722,7 +722,7 @@ export function ProcessDetailScreen({
                         setVersionId(v.id === current?.id ? null : v.id)
                         setTab("steps")
                       }}
-                      className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center justify-between gap-2 border-b p-3 text-left transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:outline-none"
+                      className="hover:bg-muted/50 flex w-full items-center justify-between gap-2 border-b p-3 text-left transition-colors last:border-b-0"
                     >
                       <span className="min-w-0">
                         <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
@@ -736,7 +736,7 @@ export function ProcessDetailScreen({
                             </Badge>
                           )}
                           {v.id === current?.id && (
-                            <Badge variant="outline" className="shrink-0 text-badge">
+                            <Badge variant="secondary" className="shrink-0 text-badge">
                               {t("current")}
                             </Badge>
                           )}

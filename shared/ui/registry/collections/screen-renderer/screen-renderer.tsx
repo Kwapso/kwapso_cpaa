@@ -234,7 +234,7 @@ function ScreenLayer({
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className={cn(
-            "glass fixed z-50 flex flex-col gap-4 overflow-y-auto border p-6 shadow-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0",
+            "glass fixed z-50 flex flex-col gap-4 overflow-y-auto border p-6 shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0",
             layerContent[presentation]
           )}
         >
@@ -244,7 +244,7 @@ function ScreenLayer({
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
               aria-label="Close"
-              className="rounded-full opacity-70 transition-opacity outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-full opacity-70 transition-opacity hover:opacity-100"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

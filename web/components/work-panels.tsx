@@ -445,7 +445,7 @@ export function AppsPanel({
                 <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>
               </div>
               {!a.active && (
-                <Badge variant="outline" className="text-muted-foreground text-badge">
+                <Badge variant="secondary" className="text-muted-foreground text-badge">
                   {t("Archived")}
                 </Badge>
               )}

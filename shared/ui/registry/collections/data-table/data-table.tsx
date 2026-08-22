@@ -174,7 +174,7 @@ function DataTableRows<T extends Record<string, unknown>>({
             className={cn(
               config.striped && i % 2 === 1 && "bg-muted/40",
               rowInteractive &&
-                "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                "cursor-pointer"
             )}
           >
             {config.columns.map((c) => (

@@ -58,7 +58,7 @@ export function NoAccess({ email }: { email: string }) {
       <p className="text-muted-foreground text-sm">
         {t("Ask whoever you work with here, and try again after they've done it.")}
       </p>
-      <Button variant="outline" onClick={() => void signOut()}>
+      <Button variant="secondary" onClick={() => void signOut()}>
         <LogOut className="size-3.5" />
         {t("Sign out")}
       </Button>

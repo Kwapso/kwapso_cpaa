@@ -313,7 +313,7 @@ export function RecordPicker({
       id={id}
       aria-label={ariaLabel}
       type="button"
-      variant="outline"
+      variant="secondary"
       role="combobox"
       aria-expanded={open}
       disabled={disabled}
@@ -380,7 +380,7 @@ export function RecordPicker({
           type="button"
           aria-label={t("Clear")}
           onClick={clear}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring size-9 shrink-0 rounded-full outline-none focus-visible:ring-2"
+          className="text-muted-foreground hover:text-foreground size-9 shrink-0 rounded-full"
         >
           <X className="mx-auto size-4" aria-hidden />
         </button>

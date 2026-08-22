@@ -229,7 +229,7 @@ function CollectionFrame<T>({
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         size="icon"
                         aria-label={
                           showFilterBar && showSort
@@ -322,7 +322,7 @@ function CollectionFrame<T>({
           </span>
           <div className="flex gap-1">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={current === 0}
               onClick={() => goTo(current - 1)}
@@ -330,7 +330,7 @@ function CollectionFrame<T>({
               <ChevronLeft /> Prev
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={current >= pageCount - 1}
               onClick={() => goTo(current + 1)}

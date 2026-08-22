@@ -449,7 +449,7 @@ function TriageQueue({
           </span>
           {canEdit && (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => setEditing(w)}
               className="shrink-0 gap-1"
@@ -478,7 +478,7 @@ function TriageQueue({
           </Button>
           {canTriage && (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={busy === w.id || w.missing.length > 0}
               title={

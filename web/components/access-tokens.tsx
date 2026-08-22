@@ -157,11 +157,11 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
             >
               <span className="font-medium">{token.label}</span>
               {token.revokedAt ? (
-                <Badge variant="outline" className="text-muted-foreground text-badge">
+                <Badge variant="secondary" className="text-muted-foreground text-badge">
                   {t("Revoked")}
                 </Badge>
               ) : hasExpired(token) ? (
-                <Badge variant="outline" className="text-muted-foreground text-badge">
+                <Badge variant="secondary" className="text-muted-foreground text-badge">
                   {t("Expired")}
                 </Badge>
               ) : (
@@ -195,7 +195,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                    * Nothing to set up with an expired token — make a new one. */}
                   {!hasExpired(token) && (
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN", t)}
                       className="gap-1"
@@ -206,7 +206,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                     </Button>
                   )}
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setRevoking(token)}
                     className="text-destructive hover:text-destructive gap-1"
@@ -246,7 +246,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               <div className="bg-muted/60 flex items-center gap-2 rounded-xl border p-3">
                 <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="shrink-0 gap-1"
                   onClick={() => {
@@ -262,7 +262,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               {/* One-tap: the whole connect prompt WITH this token embedded, ready to
                * paste into Claude, Gemini, GPT — the fastest way to hand it off. */}
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="gap-1 self-start"
                 onClick={() => copyInstructions(secret, t)}

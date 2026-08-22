@@ -74,7 +74,7 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
         </div>
         {can("teams", "edit") && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1">
+            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -169,7 +169,7 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
           {t("Logos, decks, templates and photography.")} {formatCount(total)}
         </p>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={() => softNavigate("/brand")}
           className="ml-auto gap-1"

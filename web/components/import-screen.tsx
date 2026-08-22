@@ -263,7 +263,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           {batch.plan.steps.map((step, i) => (
             <div key={step.fileId} className="flex flex-col gap-4 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="text-badge">
+                <Badge variant="secondary" className="text-badge">
                   {t("Step")} {i + 1}
                 </Badge>
                 <span className="text-sm font-medium">{step.fileName}</span>
@@ -346,7 +346,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           </div>
 
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="outline" onClick={() => setPhase("upload")} disabled={busy}>
+            <Button variant="secondary" onClick={() => setPhase("upload")} disabled={busy}>
               {t("Back")}
             </Button>
             <Button onClick={() => void run()} disabled={busy || !batch.plan.order.length} className="gap-1">
@@ -395,7 +395,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium">{t("Rejected rows (")}{report.rejections.length})</p>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => downloadRejections(report.rejections, "import-rejections.csv")}
                   className="gap-1"
@@ -495,7 +495,7 @@ function PlanSummary({
             {t("Skipped rows are listed with reasons. Fix them and re-import, or run now without them.")}
           </p>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => onDownload(rejections, "rows-to-fix.csv")}
             className="gap-1"

@@ -24,7 +24,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
         // here rather than per-consumer means it can't recur every time
         // something wide lands in a Card. (No effect outside flex/grid: for a
         // plain block, `min-width: auto` already computes to 0.)
-        "glass hover-lift min-w-0 rounded-xl border text-card-foreground shadow-sm",
+        "glass hover-lift min-w-0 rounded-xl text-card-foreground shadow-sm",
         className
       )}
       {...props}

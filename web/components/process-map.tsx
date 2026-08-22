@@ -115,7 +115,7 @@ function StepBox({ step, tone, t }: { step: ProcessStep | null; tone: Tone; t: (
         ].join(" · ")}
       </p>
       {step.removed && (
-        <Badge variant="outline" className="mt-2">
+        <Badge variant="secondary" className="mt-2">
           {t("no longer done")}
         </Badge>
       )}

@@ -87,7 +87,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
             <TicketRow key={t.id} ticket={t} />
           ))}
           {hasMore ? (
-            <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
+            <Button variant="secondary" onClick={() => void loadMore()} disabled={loadingMore}>
               {loadingMore ? <Spinner /> : null}
               {t("Show older")}
             </Button>

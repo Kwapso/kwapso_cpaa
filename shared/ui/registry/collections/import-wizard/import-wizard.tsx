@@ -189,7 +189,7 @@ function ImportWizard({
             </p>
           )}
           <div className="flex justify-between gap-2">
-            <Button variant="outline" onClick={() => setStage(1)}>
+            <Button variant="secondary" onClick={() => setStage(1)}>
               Back
             </Button>
             <Button
@@ -210,7 +210,7 @@ function ImportWizard({
             totalCount={previewRows.length}
           />
           <div className="flex justify-between gap-2">
-            <Button variant="outline" onClick={() => setStage(2)}>
+            <Button variant="secondary" onClick={() => setStage(2)}>
               Back
             </Button>
             <Button onClick={onConfirm}>

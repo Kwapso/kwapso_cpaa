@@ -72,7 +72,7 @@ function SortControl({
       />
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="icon"
         className="size-8 shrink-0"
         disabled={toggleDisabled}

@@ -120,7 +120,7 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
         <ul className="flex flex-wrap gap-2">
           {mine.map((s) => (
             <li key={s.id}>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => start(s.id)}>
+              <Button variant="secondary" size="sm" className="gap-1" onClick={() => start(s.id)}>
                 <Play className="size-3.5" />
                 {s.title.length > 34 ? `${s.title.slice(0, 34)}…` : s.title}
               </Button>
@@ -161,7 +161,7 @@ function RunawayPrompts({
             {t("has been running for")} {clockFrom(timer.elapsedSeconds)}.
           </span>
           <span className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1" onClick={() => onAnswer(timer.id, "keep")}>
+            <Button variant="secondary" size="sm" className="gap-1" onClick={() => onAnswer(timer.id, "keep")}>
               <CircleStop className="size-3.5" />
               {t("Keep it all")}
             </Button>
@@ -289,7 +289,7 @@ export function TimePanel({
                       all time is billable and most of it has no kind said, and a
                       badge on every row is a badge that says nothing. */}
                   {!l.billable && (
-                    <Badge variant="outline" className="shrink-0">
+                    <Badge variant="secondary" className="shrink-0">
                       {t("not billable")}
                     </Badge>
                   )}

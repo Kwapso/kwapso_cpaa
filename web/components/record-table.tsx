@@ -274,9 +274,9 @@ export function RecordTable<T extends TableRowData>({
                       : undefined
                   }
                   className={
-                    (i % 2 === 1 ? "bg-muted " : "") +
+                    (i % 2 === 1 ? "bg-muted" : "") +
                     (onRowClick
-                      ? "focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                      ? "cursor-pointer"
                       : "")
                   }
                 >

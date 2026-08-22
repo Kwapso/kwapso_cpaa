@@ -95,7 +95,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
             </div>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               className="w-full"
               disabled={busy}
               onClick={() => window.location.assign(auth.googleStartUrl)}

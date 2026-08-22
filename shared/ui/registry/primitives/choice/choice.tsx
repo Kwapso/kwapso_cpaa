@@ -204,7 +204,7 @@ function Choice({
               key={o.value}
               type="button"
               size="sm"
-              variant={active ? "default" : "outline"}
+              variant={active ? "default" : "secondary"}
               disabled={!active && atMax}
               onClick={() => toggle(o.value)}
               className="rounded-full"
@@ -286,7 +286,7 @@ function Choice({
         ))}
         <Popover open={open} onOpenChange={setOpen} modal={modal}>
           <PopoverTrigger asChild>
-            <Button type="button" size="sm" variant="outline" disabled={atMax}>
+            <Button type="button" size="sm" variant="secondary" disabled={atMax}>
               + Add
             </Button>
           </PopoverTrigger>
@@ -308,7 +308,7 @@ function Choice({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             role="combobox"
             aria-expanded={open}
             className="min-w-0 flex-1 justify-between font-normal"
@@ -359,7 +359,7 @@ function Choice({
           type="button"
           aria-label="Clear selection"
           onClick={() => onChange([])}
-          className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="size-4" aria-hidden />
         </button>

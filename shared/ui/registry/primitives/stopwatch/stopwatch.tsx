@@ -42,7 +42,7 @@ function Stopwatch({ className }: { className?: string }) {
       <span className="text-2xl font-medium tabular-nums">{format(ms)}</span>
       <Button
         size="icon"
-        variant="outline"
+        variant="secondary"
         onClick={() => setRunning((r) => !r)}
         aria-label={running ? "Pause" : "Start"}
       >

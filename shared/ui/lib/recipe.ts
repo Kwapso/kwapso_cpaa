@@ -44,11 +44,16 @@ export type RecipeFieldType =
   | "switch"
   | "notes"
 
-/** The action button styles map 1:1 to the Button primitive's variants. */
+/** The action button styles map 1:1 to the Button primitive's variants.
+ *
+ * `outline` is gone: a button carries no border in any state, so a secondary
+ * action is a FILLED button in the other paper tone. A recipe is DATA, so this
+ * union is what stops a screen asking for a variant the button no longer has —
+ * it fails at the type level rather than rendering something arbitrary. */
 export type ActionVariant =
   | "default"
   | "secondary"
-  | "outline"
+  | "text"
   | "ghost"
   | "destructive"
   | "link"

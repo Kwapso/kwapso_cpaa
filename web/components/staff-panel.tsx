@@ -150,7 +150,7 @@ export function StaffPanel({
         <h2 className="flex items-center gap-2 text-lg font-medium tracking-tight">
           {t("Profile")}
           {profile && !profile.active && (
-            <Badge variant="outline" className="text-muted-foreground text-badge">
+            <Badge variant="secondary" className="text-muted-foreground text-badge">
               {t("Inactive")}
             </Badge>
           )}
@@ -158,7 +158,7 @@ export function StaffPanel({
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="ml-auto flex flex-wrap gap-2">
           {mayWrite && (
-            <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)} className="gap-1">
+            <Button variant="secondary" size="sm" onClick={() => setProfileOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {profile?.active ? t("Edit profile") : t("Write a profile")}
             </Button>
@@ -170,7 +170,7 @@ export function StaffPanel({
             profile &&
             (profile.active ? (
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => void setProfileActive(profile, false)}
                 className="text-destructive hover:text-destructive gap-1"
@@ -180,7 +180,7 @@ export function StaffPanel({
               </Button>
             ) : (
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => void setProfileActive(profile, true)}
                 className="gap-1"
@@ -258,7 +258,7 @@ export function StaffPanel({
                         c.title
                       )}
                       {!c.active && (
-                        <Badge variant="outline" className="text-muted-foreground text-badge">
+                        <Badge variant="secondary" className="text-muted-foreground text-badge">
                           {t("Archived")}
                         </Badge>
                       )}

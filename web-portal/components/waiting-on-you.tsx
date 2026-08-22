@@ -92,7 +92,7 @@ export function WaitingOnYou() {
                 }}
               />
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="gap-1"
                 disabled={busy === todo.id}

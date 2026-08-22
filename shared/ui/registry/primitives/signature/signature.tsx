@@ -86,7 +86,7 @@ function Signature({
       </div>
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="sm"
         onClick={clear}
         className="w-fit"

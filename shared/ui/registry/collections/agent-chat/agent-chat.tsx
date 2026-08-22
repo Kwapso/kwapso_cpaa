@@ -89,7 +89,7 @@ function ToolRow({ item }: { item: AgentChatItem }) {
             <button
               type="button"
               onClick={item.onView}
-              className="inline-flex items-center gap-1 text-primary transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center gap-1 text-primary transition-colors hover:underline"
             >
               <Eye className="size-3.5" aria-hidden /> View
             </button>
@@ -98,7 +98,7 @@ function ToolRow({ item }: { item: AgentChatItem }) {
             <button
               type="button"
               onClick={item.onUndo}
-              className="inline-flex items-center gap-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
             >
               <RotateCcw className="size-3.5" aria-hidden /> Undo
             </button>
@@ -233,7 +233,7 @@ function AgentChat({
                   type="button"
                   onClick={() => onRemoveAttachment(index)}
                   aria-label={`Remove ${att.name}`}
-                  className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <X className="size-3" aria-hidden />
                 </button>

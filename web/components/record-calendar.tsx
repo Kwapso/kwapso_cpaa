@@ -147,7 +147,7 @@ function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: (id: strin
       onClick={() => onOpen(entry.id)}
       title={entry.title}
       aria-label={t("Open {name}", { name: entry.title })}
-      className="bg-accent hover:bg-muted focus-visible:ring-ring flex w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-left text-xs transition-colors focus:outline-none focus-visible:ring-2"
+      className="bg-accent hover:bg-muted flex w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-left text-xs transition-colors"
     >
       {entry.accent ? (
         <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${accentClass(entry.accent)}`} />
@@ -314,11 +314,11 @@ export function RecordCalendar({
             </ToggleGroupItem>
           </ToggleGroup>
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
+            <Button variant="secondary" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
               {t("Today")}
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               size="icon"
               className="size-8"
               aria-label={t("Previous month")}
@@ -327,7 +327,7 @@ export function RecordCalendar({
               <ChevronLeft />
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               size="icon"
               className="size-8"
               aria-label={t("Next month")}
@@ -387,7 +387,7 @@ export function RecordCalendar({
                       <button
                         type="button"
                         onClick={() => setOpenDay(key)}
-                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded px-1 text-left text-xs underline-offset-2 transition-colors hover:underline focus:outline-none focus-visible:ring-2"
+                        className="text-muted-foreground hover:text-foreground rounded px-1 text-left text-xs underline-offset-2 transition-colors hover:underline"
                       >
                         {t("+{n} more", { n: hidden })}
                       </button>

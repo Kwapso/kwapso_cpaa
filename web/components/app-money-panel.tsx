@@ -136,7 +136,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
                 {roleless.map(({ line }) => (
                   <Button
                     key={line.processId}
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="gap-1"
                     onClick={() => softNavigate(`${host.base}/processes/${line.processId}`)}
@@ -156,7 +156,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
               </p>
               <div>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="gap-1"
                   onClick={() => softNavigate(`${host.base}/internal-rates`)}

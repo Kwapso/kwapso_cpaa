@@ -162,13 +162,13 @@ export function TaskDetailScreen({
               button stands down rather than opening a form that will be
               rejected. */}
           {canEdit && !done && (
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="gap-1">
+            <Button size="sm" variant="secondary" onClick={() => setEditing(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
           )}
           {canEdit && (
-            <Button size="sm" variant="outline" onClick={onToggleDone} className="gap-1">
+            <Button size="sm" variant="secondary" onClick={onToggleDone} className="gap-1">
               {done ? <Undo2 className="size-3.5" /> : <Check className="size-3.5" />}
               {done ? t("Put it back") : t("Tick it off")}
             </Button>

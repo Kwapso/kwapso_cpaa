@@ -103,14 +103,14 @@ function StatusStepper({
               <button
                 type="button"
                 aria-current={isActive ? "step" : undefined}
-                aria-label={`${stage.label}${isActive ? " (current)" : ""}`}
+                aria-label={`${stage.label}${isActive ? "(current)" : ""}`}
                 disabled={!interactive}
                 onClick={
                   interactive ? () => onChange?.(stage.value) : undefined
                 }
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors outline-none",
-                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                  "   ",
                   reached ? toneSolid[tone] : "bg-muted text-muted-foreground",
                   isActive &&
                     "font-medium ring-2 ring-ring ring-offset-2 ring-offset-background",

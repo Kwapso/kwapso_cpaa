@@ -70,7 +70,7 @@ function StaleShell() {
   return (
     <div className="text-muted-foreground flex flex-col items-start gap-2 rounded-xl border p-4 text-sm">
       <p>{t("A new version of the app is ready.")}</p>
-      <Button variant="outline" size="sm" onClick={() => location.reload()}>
+      <Button variant="secondary" size="sm" onClick={() => location.reload()}>
         {t("Reload")}
       </Button>
     </div>
@@ -97,7 +97,7 @@ function Broken({
       </p>
       <p className="text-muted-foreground break-words font-mono text-xs">{detail}</p>
       <div>
-        <Button variant="outline" size="sm" onClick={onRetry}>
+        <Button variant="secondary" size="sm" onClick={onRetry}>
           {t("Try again")}
         </Button>
       </div>

@@ -105,7 +105,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
             </div>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="lg"
               className="w-full"
               disabled={busy}

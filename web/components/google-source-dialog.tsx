@@ -295,7 +295,7 @@ export function GoogleSourceDialog({
             disabled={busy}
             autoFocus
           />
-          <Button type="button" variant="outline" onClick={look} disabled={busy || looking} className="gap-1">
+          <Button type="button" variant="secondary" onClick={look} disabled={busy || looking} className="gap-1">
             {looking ? <Spinner /> : <Search className="size-3.5" aria-hidden />}
             {looking ? t("Looking…") : t("Look")}
           </Button>

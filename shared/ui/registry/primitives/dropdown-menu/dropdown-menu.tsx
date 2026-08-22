@@ -42,7 +42,7 @@ function DropdownMenuContent({
 }
 
 const itemClass =
-  "relative flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-none transition-colors select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
+  "relative flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0"
 
 function DropdownMenuItem({
   className,

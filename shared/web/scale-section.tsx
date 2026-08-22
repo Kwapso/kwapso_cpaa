@@ -92,7 +92,7 @@ export function ScaleSection({
             <Button
               key={step.value}
               type="button"
-              variant={active ? "default" : "outline"}
+              variant={active ? "default" : "secondary"}
               disabled={saving !== null}
               aria-pressed={active}
               onClick={() => void choose(step.value)}

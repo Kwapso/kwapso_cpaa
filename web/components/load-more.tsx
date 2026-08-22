@@ -48,7 +48,7 @@ export function LoadMore<T>({
   return (
     <div className="flex justify-center">
       <Button
-        variant="outline"
+        variant="secondary"
         size="sm"
         disabled={busy}
         onClick={() => {

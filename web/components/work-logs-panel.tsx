@@ -378,7 +378,7 @@ export function WorkLogsPanel({
                 </Badge>
               )}
               {l.discarded && (
-                <Badge variant="outline" className="text-muted-foreground shrink-0 text-badge">
+                <Badge variant="secondary" className="text-muted-foreground shrink-0 text-badge">
                   {t("Discarded")}
                 </Badge>
               )}

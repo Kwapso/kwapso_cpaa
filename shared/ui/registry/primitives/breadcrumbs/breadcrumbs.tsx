@@ -123,7 +123,7 @@ function Breadcrumbs({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Show hidden steps"
-              className="flex size-7 items-center justify-center rounded-xl transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex size-7 items-center justify-center rounded-xl transition-colors hover:text-foreground"
             >
               <MoreHorizontal className="size-4" />
             </DropdownMenuTrigger>

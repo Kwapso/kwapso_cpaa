@@ -81,7 +81,7 @@ export function HelpStakeholders({
                 <p className="truncate text-sm font-medium">{s.name || s.email}</p>
                 <p className="text-muted-foreground truncate text-xs">{s.email}</p>
               </div>
-              <Badge variant="outline" className="text-badge">
+              <Badge variant="secondary" className="text-badge">
                 {ORIGIN_LABEL[s.origin]}
               </Badge>
             </li>

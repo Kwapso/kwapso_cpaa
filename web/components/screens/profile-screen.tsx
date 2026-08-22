@@ -71,7 +71,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
                 ),
                 title: name,
                 trailing: (
-                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
                     {t("Edit profile")}
                   </Button>
                 ),
@@ -85,7 +85,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
                 ),
                 title: user?.email,
                 trailing: (
-                  <Button variant="outline" size="sm" onClick={() => setChangingEmail(true)}>
+                  <Button variant="secondary" size="sm" onClick={() => setChangingEmail(true)}>
                     {t("Change email")}
                   </Button>
                 ),

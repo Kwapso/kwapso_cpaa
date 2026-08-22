@@ -255,7 +255,7 @@ export function RecordTimerButton({
 
   return (
     <Button
-      variant="outline"
+      variant="secondary"
       size="sm"
       className="gap-1"
       disabled={busy || disabled}

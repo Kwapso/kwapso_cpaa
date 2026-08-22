@@ -187,6 +187,16 @@
    * color-mix would drift from what was signed off. This is also why an opacity
    * hover (`hover:bg-primary/90`) is banned — it is a different colour every time
    * the surface underneath changes. */
+  /* A secondary button is a FILLED button in THE OTHER PAPER TONE, which is why
+   * this is a token and not a colour: which tone is "the other" depends on the
+   * band the button is sitting in. The two context classes at the bottom of this
+   * file re-resolve it. GAP-10, provisionally — the kit's own candidate
+   * mechanism, adopted because it invents nothing.
+   *
+   * The kit's law, and the reason it matters: "a header band and the buttons
+   * inside it are never the same paper tone, or filled buttons disappear." */
+  --btn-secondary-fill: var(--card);
+  --btn-secondary-label: var(--foreground);
   --btn-primary-hover: #f4be4b;
   --btn-primary-pressed: #edb646;
   --btn-secondary-hover: #f1ece4;
@@ -276,6 +286,8 @@
   --shadow-overlay: 0 18px 48px -12px rgb(0 0 0 / 0.7);
 
   /* Button hovers, dark. Mango does not move, so neither do its two states. */
+  --btn-secondary-fill: #3a3833;
+  --btn-secondary-label: #fffef9;
   --btn-primary-hover: #f4be4b;
   --btn-primary-pressed: #edb646;
   --btn-secondary-hover: #454239;
@@ -349,6 +361,8 @@
     --shadow-overlay: 0 18px 48px -12px rgb(0 0 0 / 0.7);
 
     /* Button hovers, dark. Mango does not move, so neither do its two states. */
+    --btn-secondary-fill: #3a3833;
+    --btn-secondary-label: #fffef9;
     --btn-primary-hover: #f4be4b;
     --btn-primary-pressed: #edb646;
     --btn-secondary-hover: #454239;
@@ -493,6 +507,8 @@
   --default-transition-timing-function: var(--ease);
   --default-transition-duration: var(--duration-colour);
   --ease-kw: var(--ease);
+  --color-btn-secondary-fill: var(--btn-secondary-fill);
+  --color-btn-secondary-label: var(--btn-secondary-label);
   --color-btn-primary-hover: var(--btn-primary-hover);
   --color-btn-primary-pressed: var(--btn-primary-pressed);
   --color-btn-secondary-hover: var(--btn-secondary-hover);
@@ -581,6 +597,30 @@
      * sideways, inside a contained wrapper that never widens the page. */
     overflow-x: hidden;
   }
+  /* ── THE FOCUS RING (ruling 24) — one spec, every control ──────────────
+   *
+   * A keyboard-focused control takes a 2px outline held 2px off its edge:
+   * charcoal on light, off-beige on dark. Bound to `:focus-visible`, so tabbing
+   * shows it and a mouse press does not. It follows the element's OWN radius, so
+   * a pill rings as a pill and a 24px card rings at 24.
+   *
+   * This one rule replaced 150 per-component utilities across 38 files —
+   * `focus-visible:ring-2`, `ring-offset-background`, and the rest. They came out
+   * together with every `outline-none` beside them, which is the half that
+   * mattered: removing a ring and leaving the outline suppressed would have left
+   * those controls with NO focus indicator at all, which is worse than what they
+   * had. Nothing focusable may set `outline: none` again — `web/test/focus-ring.test.ts`
+   * fails the build on either half coming back.
+   *
+   * The kit contradicts itself once here, and this follows the sentence that is
+   * achievable: chapter 6 says both "it follows the control's own radius" and
+   * "the ring is always a pill". The second would mean deforming the element's
+   * corners while focused, or per-component ring machinery, which ruling 24
+   * forbids in the same breath. Logged as F2-1; the first sentence stands. */
+  :focus-visible {
+    outline: var(--focus-width) solid var(--focus);
+    outline-offset: var(--focus-offset);
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -662,6 +702,21 @@
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+  /* The kit's pulse: .35 to .8 over 1.4s on the one curve. Tailwind's
+   * `animate-pulse` runs 1 -> .5 over 2s on a different easing, which is a
+   * livelier, shallower blink than the kit draws. */
+  .animate-pulse {
+    animation: kw-pulse 1.4s var(--ease) infinite;
+  }
+  @keyframes kw-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.8;
+    }
   }
   .hover-lift {
     /* One curve, one duration. It was 0.3s on the kit's curve for transform and
@@ -822,4 +877,31 @@
   .ss-typing {
     animation: none;
   }
+}
+
+/* ── THE PAPER-TONE FLIP (GAP-10, provisionally) ────────────────────────────
+ *
+ * A card flips against its context: off-beige on paper, paper on beige. A flat
+ * token pair cannot express "the other tone from whatever I am sitting on", so
+ * a container states which tone IT is and the affected tokens re-resolve inside
+ * it.
+ *
+ * This is the design kit's own candidate mechanism, built and rendered in its
+ * specimens, and it is adopted here for that reason: it invents nothing, needs
+ * no new token, and degrades safely — a container that forgets to say which tone
+ * it is gets the default rather than something broken. The alternatives were
+ * each a bigger invention (`@container style()` is not broadly supported, and a
+ * React context prop would put a design decision in a component API where CSS
+ * can hold it).
+ *
+ * NOT SETTLED LAW. The kit marks it provisional and defines --sheetFlip /
+ * --cardFlip that it never references; those are the start of a different
+ * mechanism, and adopting them would be guessing at an intent rather than
+ * reading one. If Aurora rules differently the cost is this block plus the
+ * containers that spend it — real, but not the token layer. */
+.kw-on-panel {
+  --btn-secondary-fill: var(--background);
+}
+.kw-on-page {
+  --btn-secondary-fill: var(--card);
 }

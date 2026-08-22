@@ -223,7 +223,7 @@ export function KnowledgeUploadDialog({
               <p className="text-muted-foreground text-sm">{t("Drop a file here, or")}</p>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => inputRef.current?.click()}
                 disabled={busy}

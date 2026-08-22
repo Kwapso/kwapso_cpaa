@@ -28,7 +28,7 @@ function Slider({
       {thumbs.map((_, i) => (
         <SliderPrimitive.Thumb
           key={i}
-          className="block size-4 shrink-0 rounded-full border border-primary bg-background shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:pointer-events-none"
+          className="block size-4 shrink-0 rounded-full border border-primary bg-background shadow-sm transition-colors disabled:pointer-events-none"
         />
       ))}
     </SliderPrimitive.Root>

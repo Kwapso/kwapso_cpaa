@@ -209,7 +209,7 @@ export function HelpAttachmentsPanel({
         <div className="flex flex-wrap items-end gap-2">
           <input ref={fileRef} type="file" hidden onChange={(e) => void pickFile(e)} />
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
@@ -241,7 +241,7 @@ export function HelpAttachmentsPanel({
             </>
           ) : (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={busy}
               onClick={() => setAddingLink(true)}

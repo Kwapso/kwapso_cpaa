@@ -77,7 +77,7 @@ function RangeFacet({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             aria-label={label}
             className="h-8 w-auto max-w-[14rem] min-w-[8rem] justify-between gap-1 font-normal"
           >
@@ -161,7 +161,7 @@ function RangeFacet({
           type="button"
           aria-label={`Clear ${label}`}
           onClick={() => onChange("")}
-          className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="size-3.5" aria-hidden />
         </button>

@@ -232,7 +232,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
       />
       <div className="mt-4 flex gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
           className="flex-1 gap-1"
           disabled={!!busy}
           onClick={() => picker.current?.click()}
@@ -241,7 +241,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
           {t("Send a file")}
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           className="flex-1 gap-1"
           disabled={!!busy}
           onClick={() => setAdding(true)}

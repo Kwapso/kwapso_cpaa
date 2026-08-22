@@ -506,7 +506,7 @@ export function MeetingsScreen({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={syncing}
               onClick={() => void bringInSeries()}

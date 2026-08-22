@@ -136,7 +136,7 @@ function CalendarView<T extends Record<string, unknown>>({
         </div>
         <div className="flex items-center gap-1">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() =>
               setCursor(
@@ -147,7 +147,7 @@ function CalendarView<T extends Record<string, unknown>>({
             Today
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             className="size-8"
             aria-label="Previous month"
@@ -156,7 +156,7 @@ function CalendarView<T extends Record<string, unknown>>({
             <ChevronLeft />
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             className="size-8"
             aria-label="Next month"

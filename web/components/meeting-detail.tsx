@@ -501,7 +501,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                           Google recorded against this entry, the other two are
                           matches — so the record says which one found it rather
                           than presenting all three as equally certain. */}
-                      <Badge variant="outline" className="text-badge">
+                      <Badge variant="secondary" className="text-badge">
                         {FOUND_BY[item.transcriptFoundBy ?? ""] ?? t("Found in Google")}
                       </Badge>
                       {/* AND WHETHER THE WORDS ARE ANSWERABLE, which is a
@@ -656,7 +656,7 @@ function CalendarPanel({
           </Button>
         )}
         {meeting.googleEventUrl && (
-          <Button asChild variant="outline" size="sm" className="gap-1">
+          <Button asChild variant="secondary" size="sm" className="gap-1">
             <a href={safeHref(meeting.googleEventUrl)} target="_blank" rel="noreferrer noopener">
               <ExternalLink className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
             </a>
@@ -685,12 +685,12 @@ function CalendarPanel({
                   <span className="font-medium">{g.name || g.email}</span>
                   {g.name && <span className="text-muted-foreground text-xs">{g.email}</span>}
                   {g.organizer && (
-                    <Badge variant="outline" className="text-badge">
+                    <Badge variant="secondary" className="text-badge">
                       {t("Organiser")}
                     </Badge>
                   )}
                   {g.optional && (
-                    <Badge variant="outline" className="text-badge">
+                    <Badge variant="secondary" className="text-badge">
                       {t("Optional")}
                     </Badge>
                   )}

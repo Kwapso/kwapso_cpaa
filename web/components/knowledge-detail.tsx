@@ -227,7 +227,7 @@ export function KnowledgeDetailScreen({
           <h1 className="flex items-center gap-2 text-2xl font-medium tracking-tight">
             <span className="truncate">{item.title}</span>
             {!item.active && (
-              <Badge variant="outline" className="text-muted-foreground text-badge">
+              <Badge variant="secondary" className="text-muted-foreground text-badge">
                 {t("Not in use")}
               </Badge>
             )}
@@ -248,7 +248,7 @@ export function KnowledgeDetailScreen({
         </div>
         {canEdit && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setEditingOpen(true)}
             className="shrink-0 gap-1"
@@ -361,7 +361,7 @@ export function KnowledgeDetailScreen({
                 <div className="flex flex-wrap items-center gap-2">
                   {item.active ? (
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => void setActive(false)}
                       disabled={busyActive}

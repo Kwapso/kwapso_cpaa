@@ -157,7 +157,7 @@ export function MailReplyDialog({
           <div className="ml-auto flex flex-wrap gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               disabled={!ready || busy !== null}
               onClick={() => void writeDraft()}
               className="gap-1"

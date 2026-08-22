@@ -217,7 +217,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                       {live.googleEmail}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-muted-foreground text-badge">
+                    <Badge variant="secondary" className="text-muted-foreground text-badge">
                       {t("Not connected")}
                     </Badge>
                   )}
@@ -231,7 +231,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   <div className="flex items-center gap-2">
                     {live && NAMED.includes(service) && (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => setSharing(service as "drive" | "chat")}
                         className="gap-1"
@@ -243,7 +243,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                     )}
                     {live ? (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => setDisconnecting(service)}
                         className="text-destructive gap-1"
@@ -257,7 +257,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                        * 302 to Google's own consent screen, and a page has to GO
                        * there rather than read it. */
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => {
                           window.location.href = `/api/content/google/start?service=${encodeURIComponent(service)}`
@@ -347,11 +347,11 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                            * difference between "why can it see this?" and "of
                            * course it can". */}
                           {s.kind === "file" && (
-                            <Badge variant="outline" className="text-badge">
+                            <Badge variant="secondary" className="text-badge">
                               {t("One file")}
                             </Badge>
                           )}
-                          <Badge variant="outline" className="text-badge">
+                          <Badge variant="secondary" className="text-badge">
                             {s.shelf === "team" ? t("The team can read it") : t("Just you")}
                           </Badge>
                           {/* AND WHOSE MATERIAL IT IS. The second decision made
@@ -360,7 +360,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                            * "which client does the assistant think this is
                            * about?" is a question somebody has to be able to
                            * answer by looking. */}
-                          <Badge variant="outline" className="text-badge">
+                          <Badge variant="secondary" className="text-badge">
                             {s.accountName ? `Filed under ${s.accountName}` : t("Ours")}
                           </Badge>
                           <Button

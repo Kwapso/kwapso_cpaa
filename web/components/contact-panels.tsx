@@ -107,7 +107,7 @@ export function CompaniesPanel({
               </Badge>
             )}
             {!c.active && (
-              <Badge variant="outline" className="text-muted-foreground text-badge">
+              <Badge variant="secondary" className="text-muted-foreground text-badge">
                 {t("No longer")}
               </Badge>
             )}

@@ -174,14 +174,14 @@ export function SelectableScreen({
          * the shared form dialog (Law R4), never an inline row. */}
         <div className="flex flex-wrap justify-end gap-2">
           {values.length > 0 && (
-            <Button asChild variant="outline" className="gap-1">
+            <Button asChild variant="secondary" className="gap-1">
               <a href="/api/tenancy/selectable/export">
                 <Download className="size-4" aria-hidden /> {t("Export CSV")}
               </a>
             </Button>
           )}
           {canCreate && onImport && (
-            <Button variant="outline" onClick={onImport} className="gap-1">
+            <Button variant="secondary" onClick={onImport} className="gap-1">
               <Upload className="size-4" aria-hidden /> {t("Import CSV")}
             </Button>
           )}
@@ -305,7 +305,7 @@ export function SelectableScreen({
                         )}
                         <span className="flex-1 text-sm">{v.value}</span>
                         {!v.active && (
-                          <Badge variant="outline" className="shrink-0">
+                          <Badge variant="secondary" className="shrink-0">
                             {t("Inactive")}
                           </Badge>
                         )}

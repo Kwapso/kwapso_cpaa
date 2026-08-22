@@ -197,7 +197,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       }
       actions={
         canSave ? (
-          <Button variant="outline" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1">
+          <Button variant="secondary" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1">
             <Pencil className="size-3.5" />
             {t("Edit details")}
           </Button>
@@ -247,7 +247,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {!role.isDefault && canDeactivate && (
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => setConfirmDeactivate(true)}
                       disabled={busyActive}

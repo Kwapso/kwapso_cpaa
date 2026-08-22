@@ -278,7 +278,7 @@ export function ReviewDialog({
           />
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             disabled={busy || uploading || values.reviewFileUrl.trim() === ""}
             onClick={() => void attachLink()}
             className="shrink-0 gap-1"

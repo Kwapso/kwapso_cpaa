@@ -94,7 +94,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
             className="w-56"
           />
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
+          <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>
             {triage.onDuty ? t("Change") : t("Put somebody on duty")}
           </Button>
         ))}

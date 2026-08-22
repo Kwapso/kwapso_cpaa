@@ -116,7 +116,7 @@ export function FilePicker({
       />
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="sm"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || uploading}

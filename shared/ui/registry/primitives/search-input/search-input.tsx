@@ -63,7 +63,7 @@ function SearchInput({
           type="button"
           aria-label="Clear search"
           onClick={() => set("")}
-          className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="size-4" />
         </button>

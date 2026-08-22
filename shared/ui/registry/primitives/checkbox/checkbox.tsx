@@ -19,7 +19,7 @@ function Checkbox({
       className={cn(
         // `rounded-select` (6px) is the ONE named exception to the two-radius
         // law, and this is the control it exists for. See RADIUS_EXCEPTION.
-        "peer size-4 shrink-0 rounded-select border border-input shadow-sm transition-all hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none active:scale-90 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+        "peer size-[1.375rem] shrink-0 rounded-select border border-input bg-background shadow-none transition-colors hover:border-foreground disabled:cursor-not-allowed disabled:bg-secondary data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
         className
       )}
       {...props}

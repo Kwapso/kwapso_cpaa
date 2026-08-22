@@ -184,7 +184,7 @@ export function SectionWithCreate({
         // Global UI rule — see UI-CONVENTIONS "Action-button rows never clip".
         <div className="flex flex-wrap justify-end gap-2">
           {showDownload && download && (
-            <Button asChild variant="outline" className="gap-1">
+            <Button asChild variant="secondary" className="gap-1">
               <a href={download.href}>
                 <Download className="size-4" />
                 {download.label}
@@ -192,7 +192,7 @@ export function SectionWithCreate({
             </Button>
           )}
           {showSecondary && secondary && (
-            <Button variant="outline" onClick={secondary.onClick} className="gap-1">
+            <Button variant="secondary" onClick={secondary.onClick} className="gap-1">
               <Upload className="size-4" />
               {secondary.label}
             </Button>
