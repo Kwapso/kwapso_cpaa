@@ -11,7 +11,7 @@
 // team crumb because the team genuinely IS what they sit inside; the sidebar
 // pages sit inside nothing, so they get one crumb and stop.
 
-import { sectionTitle } from "@/components/deep-link/route"
+import { sectionTitle, trailPath } from "@/components/deep-link/route"
 import { personName } from "@/lib/identity"
 import { type Crumb } from "@/lib/pages"
 import type {
@@ -82,20 +82,16 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
  * link that lands exactly where it says.
  *
  * `/accounts/CONFIA/sprints/S1/tickets/T9` at level 1 is
- * `/accounts/CONFIA/sprints/S1` — the sprint, still inside the client. Rebuilt
- * from the trail rather than sliced off the current URL, so it cannot drift
- * from what `parseRoute` would read back. */
-function pathTo(
+ * `/accounts/CONFIA/sprints/S1` — the sprint, still inside the client. It is
+ * `trailPath` in route.ts, which the SHELL now builds its own address with too:
+ * the crumbs and the screen cannot disagree about where a nested record lives,
+ * because there is one function that answers it. */
+const pathTo = (
   levels: { module: string; id: string }[],
   upto: number,
   teamPath: string,
   topLevel: boolean
-): string {
-  const parts = levels
-    .slice(0, upto + 1)
-    .flatMap((l, i) => (i === upto ? [l.module, l.id].filter(Boolean) : [l.module, l.id]))
-  return (topLevel ? "" : teamPath) + "/" + parts.filter(Boolean).join("/")
-}
+): string => trailPath(levels, teamPath, topLevel, { upto })
 
 export function buildCrumbs({
   topLevel,

@@ -106,6 +106,124 @@ describe("a nested address renders the innermost level and remembers the way in"
   })
 })
 
+// ── THE ADDRESS A SCREEN BUILDS FOR ITSELF ───────────────────────────────────
+//
+// THE OWNER, 24 Aug 2026, going Accounts → Confia → Apps → CONFIA → Sprints →
+// a sprint and landing on `/apps/…/sprints/…`:
+//
+//   "that middle screen that I went to has just been erased. I spoke about
+//    nesting, not replacing. Please fix this at the root level."
+//
+// The root was one line: every screen rebuilt its own base from its CURRENT
+// MODULE (`/${module}`), so a nested address lost every ancestor the moment the
+// screen computed where it was. The panels then appended to that truncated
+// base, which is why nesting worked for exactly ONE hop and then reset.
+//
+// These walk his journey, hop by hop, the way the shell does it.
+
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+import { stripComments } from "@shared/rules/source-scan"
+import { trailPath } from "@/components/deep-link/route"
+
+const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
+
+/** What the shell hands a detail screen as its base (the collection in
+ * context), and what that screen then hands its panels (itself). */
+const sectionOf = (path: string) => {
+  const r = parseRoute(path, "")
+  return trailPath(r.levels, "/t/TEAM1", r.topLevel, { withRecord: false })
+}
+const hereOf = (path: string) => {
+  const r = parseRoute(path, "")
+  return trailPath(r.levels, "/t/TEAM1", r.topLevel)
+}
+
+describe("a screen's own address keeps everything it was opened inside", () => {
+  it("a flat address is exactly what it always was", () => {
+    // The regression guard: one level in, this must return what `/${module}`
+    // returned, or every un-nested screen in the app moves.
+    expect(sectionOf("/apps")).toBe("/apps")
+    expect(sectionOf("/apps/A1")).toBe("/apps")
+    expect(hereOf("/apps/A1")).toBe("/apps/A1")
+  })
+
+  it("the team-scoped form keeps its team", () => {
+    expect(sectionOf("/t/TEAM1/apps/A1")).toBe("/t/TEAM1/apps")
+    expect(hereOf("/t/TEAM1/apps/A1")).toBe("/t/TEAM1/apps/A1")
+  })
+
+  it("A NESTED address does not lose the client — the reported bug", () => {
+    expect(
+      sectionOf("/accounts/CONFIA/apps/A1"),
+      "the base handed to the app screen dropped the client it was opened from"
+    ).toBe("/accounts/CONFIA/apps")
+    expect(hereOf("/accounts/CONFIA/apps/A1")).toBe("/accounts/CONFIA/apps/A1")
+  })
+
+  it("HIS EXACT JOURNEY: client → app → sprint, and nothing is erased", () => {
+    // 1. He opens Confia.
+    let at = "/accounts/CONFIA"
+    // 2. The account screen hands its Apps panel `${base}/${accountId}`, and the
+    //    panel appends the app. (work-panels.tsx: `${host.base}/apps/${id}`)
+    at = `${hereOf(at)}/apps/A1`
+    expect(at).toBe("/accounts/CONFIA/apps/A1")
+    // 3. Now the APP screen computes its own base — this is where the client
+    //    used to disappear — and hands its Sprints panel `${base}/${appId}`.
+    at = `${hereOf(at)}/sprints/S1`
+    expect(
+      at,
+      "the client was erased on the second hop, which is exactly what he reported"
+    ).toBe("/accounts/CONFIA/apps/A1/sprints/S1")
+  })
+
+  it("…and it keeps going, because nothing caps it", () => {
+    // The property he asked for by name: "the nesting must be unlimited".
+    let at = "/accounts/CONFIA"
+    for (const [module, id] of [
+      ["apps", "A1"],
+      ["sprints", "S1"],
+      ["stories", "ST1"],
+      ["members", "U9"],
+    ] as const)
+      at = `${hereOf(at)}/${module}/${id}`
+    expect(at).toBe("/accounts/CONFIA/apps/A1/sprints/S1/stories/ST1/members/U9")
+    // …and the address still parses back to the innermost record.
+    const r = parseRoute(at, "")
+    expect(r.module).toBe("members")
+    expect(r.recordId).toBe("U9")
+    expect(r.levels).toHaveLength(5)
+  })
+
+  it("a nested COLLECTION addresses the collection, not the record above it", () => {
+    expect(hereOf("/accounts/CONFIA/apps")).toBe("/accounts/CONFIA/apps")
+    expect(sectionOf("/accounts/CONFIA/apps")).toBe("/accounts/CONFIA/apps")
+  })
+
+  // AND THE SHELL ACTUALLY USES IT. The tests above prove the FUNCTION is right,
+  // and every one of them passed while the shell was still building its address
+  // the broken way — because they call `trailPath` directly and the bug was in
+  // the wiring. A green test that asserts the wrong thing is the failure mode
+  // this codebase has been bitten by before, so the wiring gets its own check.
+  it("the shell derives BOTH of its paths from the trail, not from the module", () => {
+    const src = stripComments(
+      readFileSync(join(WEB, "components", "deep-link-screen.tsx"), "utf8")
+    )
+    for (const name of ["sectionPath", "currentPath"]) {
+      const line = new RegExp(`const ${name}\\s*=([\\s\\S]*?)\\n\\s*const `).exec(src)?.[1] ?? ""
+      expect(
+        line.includes("trailPath("),
+        `${name} is not built from the trail. That is the bug the owner reported on ` +
+          `24 Aug 2026 — every screen rebuilding its address from its own module, so a ` +
+          `nested one lost the record it was opened inside and the next hop appended to ` +
+          `a path already missing a level.`
+      ).toBe(true)
+    }
+  })
+})
+
 // ── THE TRAIL A PERSON READS ─────────────────────────────────────────────────
 //
 // The owner, 24 Aug 2026, answering which repair he meant and removing the cap:

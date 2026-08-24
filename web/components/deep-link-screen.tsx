@@ -36,7 +36,7 @@ import { TeamSectionNav } from "@/components/team-section-nav"
 import { CountedTabs } from "@/components/counted-tabs"
 import { buildCrumbs } from "@/components/deep-link/crumbs"
 import { renderModuleContent } from "@/components/deep-link/module-content"
-import { ACCOUNT_MODULES, sectionFor, type SectionKey } from "@/components/deep-link/route"
+import { ACCOUNT_MODULES, sectionFor, trailPath, type SectionKey } from "@/components/deep-link/route"
 import { useHostNav, useUrlRoute } from "@/components/deep-link/use-host-nav"
 import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
@@ -152,8 +152,35 @@ export function DeepLinkScreen() {
     : module && module !== "team"
       ? `/t/${teamId}/${module}`
       : teamPath
-  const sectionPath = moduleBase
-  const currentPath = recordId ? `${moduleBase}/${recordId}` : moduleBase
+  // ── THE ADDRESS OF THIS SCREEN, WITH EVERYTHING IT WAS OPENED INSIDE ────────
+  //
+  // THE OWNER, 24 Aug 2026, after going Accounts → Confia → Apps → CONFIA →
+  // Sprints → a sprint and landing on `/apps/…/sprints/…`: "that middle screen
+  // that I went to has just been erased. I spoke about nesting, not replacing."
+  //
+  // `moduleBase` above is built from the CURRENT MODULE alone, which is correct
+  // for a flat address and wrong for every nested one: at
+  // `/accounts/CONFIA/apps/A1` the module is `apps`, so the base came out
+  // `/apps` and the client was gone before a single link was built. The detail
+  // screen then handed its panels that truncated base, so the NEXT hop appended
+  // to a path that had already lost a level — one hop in, and the trail was one
+  // level long again. That is why nesting appeared to work and then quietly
+  // stopped: nothing was capping the depth, each screen was resetting it.
+  //
+  // Both are derived from the TRAIL now, through the same `trailPath` the
+  // breadcrumbs use, so the shell and the crumbs cannot disagree about where a
+  // nested record lives. `sectionPath` is the deepest level's COLLECTION IN
+  // CONTEXT (`/accounts/CONFIA/apps`) — a detail screen appends its own id to it
+  // and passes that down, so the level after it appends rather than restarts,
+  // for as many levels as somebody goes.
+  //
+  // A flat address is untouched: one level in, `trailPath` returns exactly what
+  // `moduleBase` did, which is why nothing else on this screen had to change.
+  const trail = route?.levels ?? []
+  const sectionPath = trail.length
+    ? trailPath(trail, teamPath, topLevel, { withRecord: false })
+    : moduleBase
+  const currentPath = trail.length ? trailPath(trail, teamPath, topLevel) : moduleBase
 
   const { go, replace, closePanel } = useHostNav({ router, setRoute, currentPath })
 

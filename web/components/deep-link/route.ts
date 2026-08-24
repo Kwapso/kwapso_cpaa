@@ -108,6 +108,42 @@ function deepest(levels: { module: string; id: string }[]): { module: string; re
   return { module: last?.module || "team", recordId: last?.id || "" }
 }
 
+/** THE ADDRESS OF A SCREEN, BUILT FROM THE TRAIL IT WAS OPENED THROUGH.
+ *
+ * THE OWNER, 24 Aug 2026, going Accounts → Confia → Apps → CONFIA → Sprints →
+ * a sprint, and landing on `/apps/…/sprints/…`:
+ *
+ *   "that middle screen that I went to has just been erased. I spoke about
+ *    nesting, not replacing."
+ *
+ * He was reading the symptom of one line. Every screen used to rebuild its own
+ * address out of its CURRENT MODULE — `/${module}` — so at
+ * `/accounts/CONFIA/apps/A1` the module is `apps` and the base became `/apps`.
+ * The account was gone before a single link was built, and every link the screen
+ * then handed to its panels was already missing it. One hop in, and the trail
+ * was one level long again — which is why it looked like nesting worked and then
+ * quietly stopped.
+ *
+ * So the address is DERIVED FROM THE TRAIL, in the one place both the shell and
+ * the crumbs read it from. `withRecord: false` gives the COLLECTION the deepest
+ * level belongs to, in its context — `/accounts/CONFIA/apps` — which is what a
+ * detail screen hands its panels as their base, so the next hop appends rather
+ * than restarts. Nothing caps how deep that goes, which was the point. */
+export function trailPath(
+  levels: { module: string; id: string }[],
+  teamPath: string,
+  topLevel: boolean,
+  opts: { upto?: number; withRecord?: boolean } = {}
+): string {
+  const upto = opts.upto ?? levels.length - 1
+  const withRecord = opts.withRecord ?? true
+  const parts = levels
+    .slice(0, upto + 1)
+    .flatMap((l, i) => (i === upto && !withRecord ? [l.module] : [l.module, l.id]))
+    .filter(Boolean)
+  return (topLevel ? "" : teamPath) + "/" + parts.join("/")
+}
+
 /** The friendly title for a module segment (for breadcrumbs). */
 export function sectionTitle(module: string): string {
   return TEAM_SECTIONS.find((s) => s.segment === module)?.title ?? "Team"
