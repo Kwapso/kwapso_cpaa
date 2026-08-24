@@ -3583,7 +3583,26 @@ SELECT lower(hex(randomblob(16))), s.process_id, s.account_id, s.step_key,
        strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'Carried over'
   FROM process_steps s
   JOIN process_versions v ON v.id = s.version_id
- WHERE NOT EXISTS (
+ -- ONE ROW PER (STEP, DAY), AND THE LAST WORD WINS. Two versions cut on the SAME
+ -- DAY both date to that day, so a plain insert collides on the unique index —
+ -- and a NOT EXISTS guard cannot see rows the SAME statement is inserting, which
+ -- is precisely the trap 0052's own carry-over comment was written about. It
+ -- happened here on real data: 24 versions across 12 maps, several cut minutes
+ -- apart while somebody was setting them up.
+ --
+ -- The HIGHEST version number for that day is the one kept, because that is what
+ -- "the map as it was at the end of that day" means. Nothing is lost: an earlier
+ -- cut on the same day described a state that was superseded before the day was
+ -- out, and the slider's grain is a day.
+ WHERE v.version_no = (
+   SELECT MAX(v2.version_no)
+     FROM process_steps s2
+     JOIN process_versions v2 ON v2.id = s2.version_id
+    WHERE s2.process_id = s.process_id
+      AND s2.step_key = s.step_key
+      AND date(v2.created_at) = date(v.created_at)
+ )
+ AND NOT EXISTS (
    SELECT 1 FROM process_step_revisions r
     WHERE r.process_id = s.process_id AND r.step_key = s.step_key
       AND r.effective_on = date(v.created_at)
