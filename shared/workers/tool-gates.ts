@@ -169,6 +169,20 @@ export const TOOL_GATES: Record<string, string> = {
   // module has — create maps and steps, edit them, and `delete` for the two acts
   // that take something out of the picture (archiving, and recording that a step
   // stopped happening).
+  // THE CLIENT'S OWN ORGANISATION — the same module as the map, because a role
+  // exists to carry an hourly cost so a step's minutes can become money. Whoever
+  // may change a client's process map may change its cast list.
+  create_client_department: "processes:create",
+  update_client_department: "processes:edit",
+  set_client_department_active: "processes:delete",
+  create_client_role: "processes:create",
+  update_client_role: "processes:edit",
+  set_client_role_person: "processes:edit",
+  set_client_role_active: "processes:delete",
+  create_client_tool: "processes:create",
+  update_client_tool: "processes:edit",
+  set_client_tool_price: "processes:edit",
+  set_client_tool_active: "processes:delete",
   create_app: "processes:create",
   update_app: "processes:edit",
   set_app_active: "processes:delete",

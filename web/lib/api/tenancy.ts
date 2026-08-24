@@ -13,6 +13,10 @@
 
 import { ApiFailure } from "@shared/web/api"
 import type {
+  ClientDepartment,
+  ClientRole,
+  ClientTool,
+  ClientToolPrice,
   AppModule,
   Account,
   AccountDetail,
@@ -168,6 +172,72 @@ export const tenancy = {
     api<{ modules: AppModule[] }>(`/api/tenancy/app-modules?id=${encodeURIComponent(id)}`).then(
       (r) => r.modules[0] ?? null
     ),
+  // ── THE CLIENT'S OWN ORGANISATION ──────────────────────────────────────────
+  // Who does the work at a client, what an hour of them costs, and what they run
+  // on. Every read takes the client; every write names either the client (create)
+  // or the row (everything else).
+  clientDepartments: (accountId?: string) =>
+    api<{ departments: ClientDepartment[]; total: number }>(
+      `/api/tenancy/client/departments${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`
+    ),
+  createClientDepartment: (input: { accountId: string; name: string }) =>
+    api<{ id: string }>("/api/tenancy/client/departments", { method: "POST", body: JSON.stringify(input) }),
+  updateClientDepartment: (input: { id: string; name: string }) =>
+    api<{ ok: true }>("/api/tenancy/client/departments/update", { method: "POST", body: JSON.stringify(input) }),
+  setClientDepartmentActive: (id: string, active: boolean) =>
+    api<{ ok: true; moved: boolean }>("/api/tenancy/client/departments/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
+    }),
+  clientRoles: (accountId?: string) =>
+    api<{ roles: ClientRole[]; total: number }>(
+      `/api/tenancy/client/roles${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`
+    ),
+  createClientRole: (input: {
+    accountId: string
+    name: string
+    centsPerHour?: number | null
+    departmentIds?: string[]
+  }) => api<{ id: string }>("/api/tenancy/client/roles", { method: "POST", body: JSON.stringify(input) }),
+  updateClientRole: (input: {
+    id: string
+    name: string
+    centsPerHour?: number | null
+    departmentIds?: string[]
+  }) => api<{ ok: true }>("/api/tenancy/client/roles/update", { method: "POST", body: JSON.stringify(input) }),
+  setClientRolePerson: (input: { id: string; personAccountId: string; attached: boolean }) =>
+    api<{ ok: true }>("/api/tenancy/client/roles/people", { method: "POST", body: JSON.stringify(input) }),
+  setClientRoleActive: (id: string, active: boolean) =>
+    api<{ ok: true; moved: boolean }>("/api/tenancy/client/roles/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
+    }),
+  clientTools: (accountId?: string, asOf?: string) => {
+    const q = new URLSearchParams()
+    if (accountId) q.set("accountId", accountId)
+    if (asOf) q.set("asOf", asOf)
+    return api<{ tools: ClientTool[]; total: number }>(
+      `/api/tenancy/client/tools${q.toString() ? `?${q}` : ""}`
+    )
+  },
+  clientToolPrices: (id: string) =>
+    api<{ prices: ClientToolPrice[] }>(`/api/tenancy/client/tools/prices?id=${encodeURIComponent(id)}`),
+  createClientTool: (input: { accountId: string; name: string; mark?: string }) =>
+    api<{ id: string }>("/api/tenancy/client/tools", { method: "POST", body: JSON.stringify(input) }),
+  updateClientTool: (input: { id: string; name: string; mark?: string }) =>
+    api<{ ok: true }>("/api/tenancy/client/tools/update", { method: "POST", body: JSON.stringify(input) }),
+  setClientToolPrice: (input: {
+    toolId: string
+    cents: number
+    billingPeriod: "month" | "year"
+    effectiveOn: string
+  }) => api<{ ok: true }>("/api/tenancy/client/tools/price", { method: "POST", body: JSON.stringify(input) }),
+  setClientToolActive: (id: string, active: boolean) =>
+    api<{ ok: true; moved: boolean }>("/api/tenancy/client/tools/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
+    }),
+
   createAppModule: (input: { appId: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
     api<{ id: string }>("/api/tenancy/app-modules", { method: "POST", body: JSON.stringify(input) }),
   updateAppModule: (input: { id: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>

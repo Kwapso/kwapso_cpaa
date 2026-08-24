@@ -577,6 +577,25 @@ export function accountImpactKey(accountId: string): string {
 export function appsKey(teamId: string): string {
   return `apps:${teamId}`
 }
+/** THE CLIENT'S OWN ORGANISATION, keyed by TEAM rather than by client.
+ *
+ * A department, a role and a tool each belong to one client, so the obvious key
+ * is the account — and it is the wrong one here, because the live listener that
+ * drops these (SIMPLE_INVALIDATIONS) is handed a team and nothing else. A key it
+ * cannot name is a screen that goes quietly stale, which is precisely the
+ * failure R15 exists to stop. Team-wide, bounded (R14) and small — a company has
+ * a handful of each — so the screen narrows to the client it is showing and the
+ * door fences by scope regardless. */
+export function clientDepartmentsKey(teamId: string): string {
+  return `client_departments:${teamId}`
+}
+export function clientRolesKey(teamId: string): string {
+  return `client_roles:${teamId}`
+}
+export function clientToolsKey(teamId: string): string {
+  return `client_tools:${teamId}`
+}
+
 /** One account's rate card, and the margin computed on it. Both keyed by the
  * ACCOUNT: a card is read on its account's screen, and a margin is about one
  * account. */
@@ -1159,6 +1178,22 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // from here — that panel re-reads when the card it is computed from changes,
   // exactly as the margin panel does.
   role_rates: (t) => [roleRatesKey(t)],
+  // THE CLIENT'S OWN ORGANISATION — departments, roles and tools. A coarse drop
+  // for the same reason as the two rate cards above: each is a small, bounded,
+  // settled list (R14 hard cap, and a company has a handful of each), read whole
+  // on the client's own record. There is nothing here that a row-level patch
+  // would save that re-reading the list does not.
+  //
+  // THE KEY IS TEAM-WIDE, not per client, and that is what makes the coarse drop
+  // possible at all: `SIMPLE_INVALIDATIONS` is handed a team and nothing else, so
+  // a per-client key would be one this function could not name — it would have
+  // to guess an account id, and a listener that names the wrong key is a screen
+  // that goes quietly stale, which is the exact failure R15 exists to stop. The
+  // screen narrows to the client it is showing; the door fences by scope either
+  // way, so a client login still only ever receives its own.
+  client_departments: (t) => [clientDepartmentsKey(t)],
+  client_roles: (t) => [clientRolesKey(t)],
+  client_tools: (t) => [clientToolsKey(t)],
   // The rota has no list of its own: it is one line above the ticket list saying
   // whose week it is, read together with the backlog it is about. A ping drops
   // both, because the answer to "is anything sitting?" moves with the answer to

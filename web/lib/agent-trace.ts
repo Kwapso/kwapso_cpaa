@@ -186,6 +186,16 @@ export function traceFor(
     case "update_app_module":
     case "set_app_module_active":
       return { path: seg(teamId, "apps"), highlight: "main" }
+    // THE CLIENT'S OWN ORGANISATION lands on the CLIENT, because that is whose
+    // it is: a department, a role and a tool are all read on the company they
+    // belong to, never on a collection of their own. These three carry
+    // `accountId`, so the trace can say which company; their siblings carry only
+    // a row id and are listed in SCREENLESS_WRITE_TOOLS for the same reason the
+    // certificate writes are.
+    case "create_client_department":
+    case "create_client_role":
+    case "create_client_tool":
+      return { path: `${seg(teamId, "accounts")}/${str(input, "accountId")}`, highlight: "main" }
     case "create_process":
       return { path: seg(teamId, "processes"), highlight: "main" }
     case "update_process":
@@ -352,6 +362,21 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "update_staff_certificate",
   "set_staff_certificate_active",
   "set_staff_profile_active",
+  // THE EIGHT CLIENT-ORGANISATION EDITS, and it is the SAME split as the three
+  // above rather than a second excuse. A department, a role and a tool are read
+  // on the company they belong to, and these tools name only the ROW — an id for
+  // a role says nothing about whose role it is, so there is no client to drive
+  // to. Their CREATE siblings carry `accountId` and do trace, which is the line:
+  // when the tool says whose it is, land there; when it says only which row,
+  // stay put rather than invent a URL that resolves to nothing.
+  "update_client_department",
+  "set_client_department_active",
+  "update_client_role",
+  "set_client_role_person",
+  "set_client_role_active",
+  "update_client_tool",
+  "set_client_tool_price",
+  "set_client_tool_active",
   // EVERY GOOGLE WRITE. All of them change something in GOOGLE — a file in a
   // Drive folder, a draft or a label in a mailbox, an event in a calendar, a message
   // in a space — and kwapso has no screen showing any of those, deliberately: a

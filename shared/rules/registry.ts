@@ -795,6 +795,26 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
+  // THE CLIENT'S OWN ORGANISATION — departments, roles and tools. `null`, for
+  // the same reason as the six above and one of its own.
+  //
+  // The ROWS are theirs and the portal shows them (the owner ticked all four in
+  // round two: departments, the people against each role, their tools and what
+  // those cost). Their HISTORY is our record of OUR work on their company, and
+  // every line of it names a staff member — "Ana added the role Dispatch clerk",
+  // "Ana switched a tool off" — which is exactly the sentence SCOPE ch.06 says
+  // the portal never shows, and which the owner said again himself on 24 Aug
+  // 2026: "Never show our staff names to the customer! We are all kwapso."
+  //
+  // The one of its own: a role's history carries WHAT AN HOUR COSTS THEM, and
+  // those costs sit side by side across a company. Alaap's ruling on the rate
+  // being visible turned on precisely that — "everybody who is a stakeholder
+  // from the client side can see all the costs. They could just get to know each
+  // other's salary… so it's not advisable." A feed of rate changes is that
+  // disclosure with a timeline attached.
+  client_departments: { fence: null, why: "our record of shaping their org chart — every line names the staff member who typed it, and the departments themselves are readable in the portal" },
+  client_roles: { fence: null, why: "a role's history carries what an hour costs them, and those costs sit side by side across one company: a stakeholder reading the feed learns their colleagues' rates. The role and its people are shown; the trail of who set which number is not" },
+  client_tools: { fence: null, why: "a tool's price history is our working note about their spend — the tool and its current price are shown, the record of us revising it is ours" },
   // WHAT WE HANDED OVER. `null` — and THE DAY THIS LINE ANTICIPATED HAS COME, so
   // it is worth saying what changed and what did not.
   //
@@ -921,6 +941,20 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_versions: "processes",
   process_steps: "processes",
   process_comments: "processes",
+  // THE CLIENT'S OWN ORGANISATION — who does the work, and what they use to do
+  // it. Same module as the map, because that is the only reason any of it
+  // exists: a role carries an hourly cost so a step's minutes can become money,
+  // and a tool carries a price so a step that replaces it can be subtracted. A
+  // person who may read a client's process map is exactly the person who may
+  // read "Ana added the role Dispatch clerk" — the sentence is about the map.
+  //
+  // THE COST ITSELF IS A DIFFERENT QUESTION and is answered elsewhere: what an
+  // hour costs the CLIENT is theirs and rides with the map; what an hour costs
+  // US is `internal_rates` above, on `commercials`, which a client login never
+  // holds (R24).
+  client_departments: "processes",
+  client_roles: "processes",
+  client_tools: "processes",
   // WHAT WE HANDED OVER on an app. Its OWN module and not `processes`, which is
   // the whole point of it being a module: "Ana handed over the Payroll API
   // reference" names a deliverable, and a role that may read the app but not its
@@ -1215,6 +1249,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, and the paragraph about it. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+  "account-detail.organisation":
+    "THREE collections on one tab — the client's departments, their roles and their tools — so there is no single number a badge could carry. R16 badges ONE collection's exact count, and a total across three would be an arithmetic nobody asked for: 'this client has 11 things' answers no question. Each list carries its own heading, and a role row carries its own department and holder chips, which is where the counting actually happens. The tab exists at all because a role is what turns a process map's minutes into money — see the panel's own note.",
   "account-detail.impact":
     "what this client's apps have given back: the hours, their step-by-step derivation, and the same hours in money. It is one ARITHMETIC, not a set of rows — the steps under it are the workings of a single figure, so a count on the tab would number the sum's terms rather than anything a person asked for. It sat at the bottom of Overview until 19 Aug 2026, under the cover, eight fields and the About, which is where the headline number of the whole product had been living.",
   "account-detail.knowledge":

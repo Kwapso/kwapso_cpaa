@@ -76,6 +76,12 @@ const DESCRIPTION_VOCABULARY: Record<string, string> = {
   // every other shorthand property was seen. The lookbehind fixed that and this
   // entry became derivable — which the rot-check said, unprompted, the moment the
   // derivation improved. That is the exemption list working the way it should.
+  roleCount:
+    "how many roles sit in a department — a real field on every row list_client_departments returns, and one no column supplies: the list door counts the joining table in a sub-select and the mapper reads `Number(r.role_count)`, so the row-mapper derivation (which looks for a column copied straight across) cannot see it. Counted in the one statement rather than per row on purpose — a query per department is the N+1 this module would otherwise have been born with.",
+  departmentIds:
+    "the departments a role sits in — several, deliberately (the owner: \"one role is doing things across multiple departments, especially in slightly smaller companies\"). It is a real field on every row list_client_roles returns AND a real body field update_client_role sends, and it is derivable from neither side: the value is stitched in memory from a second statement over `client_role_departments`, not copied off a column.",
+  peopleIds:
+    "the contacts holding a role, stitched from `client_role_people` in the same read as the departments above and for the same reason — one statement for the whole page rather than one per role. There is deliberately no person table behind it: a person on a role is a contact we already have, because a second address book is one that goes out of step with the first.",
   export_too_large:
     "the refusal code a too-big export answers with, thrown by the one CSV seam (shared/workers/csv.ts) — R14's posture applied to files: the export is whole or it is an error, never a silently short CSV. An error VALUE rather than a response key, so no door's own source names it.",
   memberUserId:

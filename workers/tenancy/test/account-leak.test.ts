@@ -90,6 +90,208 @@ type Burglary = {
 }
 
 const BURGLARIES: Burglary[] = [
+  // ── THE VICTIM'S OWN ORGANISATION ──────────────────────────────────────────
+  //
+  // Fifteen doors, and the two things behind them are among the most valuable
+  // rows in this database to a rival: what an hour of the victim's staff costs
+  // them, and what they pay for every tool they run on. A burglar who reads the
+  // roles list knows Bergman's wage structure; one who reads the tools list
+  // knows their software spend to the euro.
+  //
+  // Every attack names the victim's row BY ID where a door takes one, because
+  // that is the shape the fence has actually failed at twice in this codebase —
+  // the list door looked fine and the by-id door was the way in.
+  {
+    route: "GET /api/tenancy/client/departments",
+    why: "read the shape of the victim's company off the department list",
+    attack: () => req("GET /api/tenancy/client/departments"),
+    honest: () => req("GET /api/tenancy/client/departments"),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/client/departments",
+    why: "ask for the victim's departments directly, by their account id",
+    attack: () =>
+      req("GET /api/tenancy/client/departments", undefined, `?accountId=${IDS.victimAccount}`),
+    honest: () =>
+      req("GET /api/tenancy/client/departments", undefined, `?accountId=${IDS.victimAccount}`),
+    expect: "nothing",
+  },
+  {
+    route: "POST /api/tenancy/client/departments",
+    why: "file a department under the victim's company",
+    attack: () =>
+      req("POST /api/tenancy/client/departments", {
+        accountId: IDS.victimAccount,
+        name: "Planted",
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/departments", {
+        accountId: IDS.victimAccount,
+        name: "Planted",
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/departments/update",
+    why: "rename one of the victim's departments",
+    attack: () =>
+      req("POST /api/tenancy/client/departments/update", {
+        id: IDS.victimDepartment,
+        name: "Renamed",
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/departments/update", {
+        id: IDS.victimDepartment,
+        name: "Renamed",
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/departments/active",
+    why: "switch off a department of the victim's",
+    attack: () =>
+      req("POST /api/tenancy/client/departments/active", {
+        id: IDS.victimDepartment,
+        active: false,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/departments/active", {
+        id: IDS.victimDepartment,
+        active: false,
+      }),
+    expect: "refused",
+  },
+  {
+    route: "GET /api/tenancy/client/roles",
+    why: "read what the victim's staff cost them an hour, off the roles list",
+    attack: () => req("GET /api/tenancy/client/roles"),
+    honest: () => req("GET /api/tenancy/client/roles"),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/client/roles",
+    why: "ask for the victim's wage structure directly, by their account id",
+    attack: () => req("GET /api/tenancy/client/roles", undefined, `?accountId=${IDS.victimAccount}`),
+    honest: () => req("GET /api/tenancy/client/roles", undefined, `?accountId=${IDS.victimAccount}`),
+    expect: "nothing",
+  },
+  {
+    route: "POST /api/tenancy/client/roles",
+    why: "create a role, with a rate, inside the victim's company",
+    attack: () =>
+      req("POST /api/tenancy/client/roles", {
+        accountId: IDS.victimAccount,
+        name: "Planted",
+        centsPerHour: 1,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/roles", {
+        accountId: IDS.victimAccount,
+        name: "Planted",
+        centsPerHour: 1,
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/roles/update",
+    why: "rewrite what one of the victim's roles costs them an hour",
+    attack: () =>
+      req("POST /api/tenancy/client/roles/update", {
+        id: IDS.victimRole,
+        name: "Renamed",
+        centsPerHour: 1,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/roles/update", {
+        id: IDS.victimRole,
+        name: "Renamed",
+        centsPerHour: 1,
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/roles/people",
+    why: "attach themselves to a role inside the victim's company",
+    attack: () =>
+      req("POST /api/tenancy/client/roles/people", {
+        id: IDS.victimRole,
+        personAccountId: IDS.burglarPerson,
+        attached: true,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/roles/people", {
+        id: IDS.victimRole,
+        personAccountId: IDS.burglarPerson,
+        attached: true,
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/roles/active",
+    why: "switch off one of the victim's roles",
+    attack: () => req("POST /api/tenancy/client/roles/active", { id: IDS.victimRole, active: false }),
+    honest: () => req("POST /api/tenancy/client/roles/active", { id: IDS.victimRole, active: false }),
+    expect: "refused",
+  },
+  {
+    route: "GET /api/tenancy/client/tools",
+    why: "read the victim's whole software spend off the tools list",
+    attack: () => req("GET /api/tenancy/client/tools"),
+    honest: () => req("GET /api/tenancy/client/tools"),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/client/tools/prices",
+    why: "ask one of the victim's tools what it has cost them over time, by id",
+    attack: () => req("GET /api/tenancy/client/tools/prices", undefined, `?id=${IDS.victimTool}`),
+    honest: () => req("GET /api/tenancy/client/tools/prices", undefined, `?id=${IDS.victimTool}`),
+    expect: "nothing",
+  },
+  {
+    route: "POST /api/tenancy/client/tools",
+    why: "add a tool to the victim's estate",
+    attack: () =>
+      req("POST /api/tenancy/client/tools", { accountId: IDS.victimAccount, name: "Planted" }),
+    honest: () =>
+      req("POST /api/tenancy/client/tools", { accountId: IDS.victimAccount, name: "Planted" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/tools/update",
+    why: "rename one of the victim's tools",
+    attack: () =>
+      req("POST /api/tenancy/client/tools/update", { id: IDS.victimTool, name: "Renamed" }),
+    honest: () =>
+      req("POST /api/tenancy/client/tools/update", { id: IDS.victimTool, name: "Renamed" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/tools/price",
+    why: "rewrite what the victim pays for a tool, and from when",
+    attack: () =>
+      req("POST /api/tenancy/client/tools/price", {
+        toolId: IDS.victimTool,
+        cents: 1,
+        billingPeriod: "month",
+        effectiveOn: "2026-01-01",
+      }),
+    honest: () =>
+      req("POST /api/tenancy/client/tools/price", {
+        toolId: IDS.victimTool,
+        cents: 1,
+        billingPeriod: "month",
+        effectiveOn: "2026-01-01",
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/client/tools/active",
+    why: "switch off one of the victim's tools",
+    attack: () => req("POST /api/tenancy/client/tools/active", { id: IDS.victimTool, active: false }),
+    honest: () => req("POST /api/tenancy/client/tools/active", { id: IDS.victimTool, active: false }),
+    expect: "refused",
+  },
   {
     route: "GET /api/tenancy/accounts",
     why: "list every account in the team and read the victim's off the page",

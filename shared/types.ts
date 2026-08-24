@@ -729,6 +729,61 @@ export type Account = {
 }
 
 /** A person's relationship to an account — the "contact of" row. */
+/** THE CLIENT'S OWN ORGANISATION — who does the work at a client, what an hour
+ * of them costs, and what they run on. A role exists so a step's minutes can
+ * become money; a tool exists so a step that replaces one can be subtracted. */
+export type ClientDepartment = {
+  id: string
+  accountId: string
+  name: string
+  active: boolean
+  /** how many roles sit in it — counted by the list door in one statement, not
+   * one query per row. */
+  roleCount: number
+}
+
+export type ClientRole = {
+  id: string
+  accountId: string
+  name: string
+  /** What an hour costs the CLIENT, in cents. `null` is a real answer — "nobody
+   * has said yet" — and is deliberately not zero, which would read as "this
+   * person is free" and would come out of the arithmetic as a saving of nothing
+   * with nothing to say a number was missing. */
+  centsPerHour: number | null
+  active: boolean
+  /** SEVERAL, deliberately: "one role is doing things across multiple
+   * departments, especially in slightly smaller companies" (the owner). */
+  departmentIds: string[]
+  /** The contacts holding it — their own `accounts` rows. There is no separate
+   * person table here, because a second address book is one that goes out of
+   * step with the first. */
+  peopleIds: string[]
+}
+
+export type ClientTool = {
+  id: string
+  accountId: string
+  name: string
+  mark: string | null
+  active: boolean
+  /** The price in force on the day asked about — null when it has never been
+   * priced. Read from `client_tool_prices`, never a column on the tool, which is
+   * what stops the two ever disagreeing. */
+  cents: number | null
+  billingPeriod: "month" | "year" | null
+  effectiveOn: string | null
+}
+
+export type ClientToolPrice = {
+  id: string
+  toolId: string
+  cents: number
+  billingPeriod: "month" | "year"
+  /** the day this price started being true */
+  effectiveOn: string
+}
+
 export type AccountLink = {
   id: string
   accountId: string

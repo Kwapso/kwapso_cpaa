@@ -149,6 +149,25 @@ Today it covers:
     `list_process_comments`, `read_impact`, `list_account_rates`,
     `list_story_attachments`, `add_story_link`, `remove_story_attachment`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
+  - **the client's own organisation** — who does the work at a client, what an
+    hour of them costs, and what they run on. `list_client_departments`,
+    `create_client_department`, `update_client_department`,
+    `set_client_department_active`; `list_client_roles`, `create_client_role`,
+    `update_client_role`, `set_client_role_person`, `set_client_role_active`;
+    `list_client_tools`, `list_client_tool_prices`, `create_client_tool`,
+    `update_client_tool`, `set_client_tool_price`, `set_client_tool_active`.
+    They are on this surface because a saving is only MONEY once a step's
+    minutes meet a role's hourly cost — an assistant asked "what would
+    automating this save Bergman" has to be able to read and fill these.
+    Three things are worth knowing before you call them. A ROLE can sit in
+    SEVERAL departments, and `departmentIds` on `update_client_role` is the
+    WHOLE set rather than an addition — anything you leave out is removed. A
+    PERSON on a role is a contact you already have, never a new record. And a
+    TOOL's price is DATED: `set_client_tool_price` files an amount under the day
+    it started being true, `list_client_tools` takes `asOf` to read the price in
+    force on a given day, and `list_client_tool_prices` is the whole history —
+    which is what lets a map set to March cost March correctly instead of
+    rewriting it with today's number.
   - what we hand over on a system, `list_deliverables` (`appId` names the app
     whose handover shelf you want; `id` narrows to one row). The CLIENT's own
     view of the same shelf is a separate door on the portal and is deliberately
@@ -190,7 +209,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **235 doors, 188 with a tool, 47 with a written reason**, the
+  red build. Today: **250 doors, 203 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -209,7 +228,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 188, **164 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 203, **179 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 

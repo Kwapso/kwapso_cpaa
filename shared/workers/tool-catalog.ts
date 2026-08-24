@@ -1900,6 +1900,194 @@ export const SHARED_TOOLS: SharedTool[] = [
       (opt(i, "versionId") ? `&versionId=${encodeURIComponent(str(i, "versionId"))}` : ""),
     agent: { write: false, summarize: (i) => `Look up process map ${str(i, "id")}` },
   },
+  // ── THE CLIENT'S OWN ORGANISATION ──────────────────────────────────────────
+  // Who does the work at a client, what an hour of them costs, and what they run
+  // on. The reason it is on the machine surface at all: a saving is only MONEY
+  // once a step's minutes meet a role's hourly cost, so an assistant asked "what
+  // would automating this save Bergman" needs to be able to read and fill these.
+  {
+    name: "list_client_departments",
+    summary:
+      "The departments inside a client's own company. `accountId` narrows to one client; leave it off for every client you may see. Each carries `name`, whether it is `active`, and `roleCount` — how many roles sit in it. Answers `departments` and an exact `total`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/departments",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List the client's departments" },
+  },
+  {
+    name: "create_client_department",
+    summary:
+      "Add a department to a client's company. `accountId` is the client it belongs to and `name` is what they call it. Two live departments of one client cannot share a name.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments",
+    schema: obj({ accountId: S, name: S }, ["accountId", "name"]),
+    buildBody: (i) => ({ accountId: str(i, "accountId"), name: str(i, "name") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the department "${str(i, "name")}"` },
+  },
+  {
+    name: "update_client_department",
+    summary: "Rename a department. `id` is the department and `name` is the new word for it.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments/update",
+    schema: obj({ id: S, name: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Rename a department to "${str(i, "name")}"` },
+  },
+  {
+    name: "set_client_department_active",
+    summary:
+      "Switch a department off, or bring it back. `active` false retires it; true restores it. Nothing is deleted — a retired department is still the one an old map was drawn against.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.active === true ? "Bring a department back" : "Switch a department off"),
+    },
+  },
+  {
+    name: "list_client_roles",
+    summary:
+      "The roles inside a client's own company — the jobs their people do. `accountId` narrows to one client. Each carries `name`, `centsPerHour` (what an hour of that role costs THE CLIENT, null when nobody has said yet — which is not the same as free), whether it is `active`, the `departmentIds` it sits in (a role can be in several) and the `peopleIds` holding it. Answers `roles` and an exact `total`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/roles",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List the client's roles" },
+  },
+  {
+    name: "create_client_role",
+    summary:
+      "Add a role to a client's company. `accountId` is the client, `name` is the job. `centsPerHour` is what an hour of it costs them, in cents — leave it off if nobody knows yet, and a saving computed from it will read as incomplete rather than as zero. `departmentIds` is the list of departments it sits in, and it may be more than one.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles",
+    schema: obj(
+      { accountId: S, name: S, centsPerHour: N, departmentIds: { type: "array" } },
+      ["accountId", "name"]
+    ),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      name: str(i, "name"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      departmentIds: Array.isArray(i.departmentIds) ? i.departmentIds : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the role "${str(i, "name")}"` },
+  },
+  {
+    name: "update_client_role",
+    summary:
+      "Edit a role: its `name`, what an hour costs (`centsPerHour`, in cents), and the `departmentIds` it sits in. The departments are the WHOLE set, not an addition — send every department the role should be in, because anything left out is removed.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/update",
+    schema: obj({ id: S, name: S, centsPerHour: N, departmentIds: { type: "array" } }, ["id", "name"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      departmentIds: Array.isArray(i.departmentIds) ? i.departmentIds : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Update the role "${str(i, "name")}"` },
+  },
+  {
+    name: "set_client_role_person",
+    summary:
+      "Say that somebody holds a role, or that they no longer do. `id` is the role and `personAccountId` is a CONTACT you already have — there is no separate person record here on purpose. `attached` true links them, false unlinks. One person can hold several roles and one role can be held by several people.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/people",
+    schema: obj({ id: S, personAccountId: S, attached: B }, ["id", "personAccountId", "attached"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      personAccountId: str(i, "personAccountId"),
+      attached: i.attached === true,
+    }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.attached === true ? "Put somebody on a role" : "Take somebody off a role"),
+    },
+  },
+  {
+    name: "set_client_role_active",
+    summary:
+      "Switch a role off, or bring it back. Nothing is deleted: a retired role is still the one a two-year-old map was drawn against, and deleting it would quietly turn that map's saving into nothing.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.active === true ? "Bring a role back" : "Switch a role off"),
+    },
+  },
+  {
+    name: "list_client_tools",
+    summary:
+      "The tools a client runs on — anything a step uses, digital or physical. `accountId` narrows to one client. `asOf` (a day, like 2026-03-01) reads the price that was in force ON THAT DAY rather than today's, which is what lets a map set to March cost March correctly; leave it off for today. Each carries `name`, `mark`, whether it is `active`, and `cents` / `billingPeriod` / `effectiveOn` for the price that applied. Answers `tools` and an exact `total`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/tools",
+    schema: obj({ accountId: S, asOf: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["accountId", "asOf"])
+        if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "List the client's tools" },
+  },
+  {
+    name: "list_client_tool_prices",
+    summary:
+      "What one tool has cost over time, newest first. `id` is the tool. Each row carries `cents`, `billingPeriod` and the `effectiveOn` day it started being true — the record behind the single number a map shows.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/tools/prices",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: () => "Read a tool's price history" },
+  },
+  {
+    name: "create_client_tool",
+    summary:
+      "Add a tool to a client's estate. `accountId` is the client, `name` is the tool, `mark` is an optional icon. It is created with NO price — set one with set_client_tool_price, which files it under the day it started being true.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools",
+    schema: obj({ accountId: S, name: S, mark: S }, ["accountId", "name"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      name: str(i, "name"),
+      mark: opt(i, "mark"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the tool "${str(i, "name")}"` },
+  },
+  {
+    name: "update_client_tool",
+    summary:
+      "Rename a tool or change its `mark`. Its price is NOT here — a price belongs to a date, so it is set through set_client_tool_price and never overwritten in place.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/update",
+    schema: obj({ id: S, name: S, mark: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), mark: opt(i, "mark") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Update the tool "${str(i, "name")}"` },
+  },
+  {
+    name: "set_client_tool_price",
+    summary:
+      "Say what a tool costs, from a given day. `toolId` is the tool, `cents` the amount, `billingPeriod` either 'month' or 'year', and `effectiveOn` the day that price started being true (like 2026-03-01). Setting a price for a day that already has one REPLACES it — that is a correction. Any other day is a new row, which is what keeps the history a history.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/price",
+    schema: obj(
+      { toolId: S, cents: N, billingPeriod: S, effectiveOn: S },
+      ["toolId", "cents", "billingPeriod", "effectiveOn"]
+    ),
+    buildBody: (i) => ({
+      toolId: str(i, "toolId"),
+      cents: typeof i.cents === "number" ? i.cents : undefined,
+      billingPeriod: str(i, "billingPeriod"),
+      effectiveOn: str(i, "effectiveOn"),
+    }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => `Set a tool's price from ${str(i, "effectiveOn")}`,
+    },
+  },
+  {
+    name: "set_client_tool_active",
+    summary:
+      "Switch a tool off, or bring it back. Nothing is deleted — its price history is what an old map reads to cost itself.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.active === true ? "Bring a tool back" : "Switch a tool off"),
+    },
+  },
   {
     name: "create_process",
     summary:
