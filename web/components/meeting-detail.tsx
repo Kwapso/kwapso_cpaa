@@ -34,14 +34,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { Notes } from "@shared/ui/registry/primitives/notes/notes"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { ExternalLink, FileText, Pencil, Power, Video } from "lucide-react"
+import { cn } from "@shared/ui/lib/utils"
+import { Button, buttonVariants } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { Notes } from "@shared/web/notes-editor/notes-editor"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { ExternalLink, FileText, Pencil, Power, Video } from "@shared/ui/icons"
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
@@ -649,18 +650,24 @@ function CalendarPanel({
           can open the meeting within my calendar." */}
       <div className="flex flex-wrap gap-2">
         {meeting.googleJoinUrl && (
-          <Button asChild size="sm" className="gap-1">
-            <a href={safeHref(meeting.googleJoinUrl)} target="_blank" rel="noreferrer noopener">
-              <Video className="size-3.5" aria-hidden /> {t("Join the call")}
-            </a>
-          </Button>
+          <a
+            href={safeHref(meeting.googleJoinUrl)}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={cn(buttonVariants({ size: "sm" }), "gap-1")}
+          >
+            <Video className="size-3.5" aria-hidden /> {t("Join the call")}
+          </a>
         )}
         {meeting.googleEventUrl && (
-          <Button asChild variant="secondary" size="sm" className="gap-1">
-            <a href={safeHref(meeting.googleEventUrl)} target="_blank" rel="noreferrer noopener">
-              <ExternalLink className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
-            </a>
-          </Button>
+          <a
+            href={safeHref(meeting.googleEventUrl)}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "gap-1")}
+          >
+            <ExternalLink className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
+          </a>
         )}
       </div>
 

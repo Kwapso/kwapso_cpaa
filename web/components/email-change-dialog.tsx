@@ -7,19 +7,19 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@shared/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Input } from "@shared/ui/controls/input/input"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, auth } from "@/lib/api"
 import { CodeInput } from "@shared/web/code-input"

@@ -11,8 +11,8 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { RotateCcw } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { RotateCcw } from "@shared/ui/icons"
 
 import { reportError } from "@shared/web/log"
 import { useT } from "@shared/web/language"

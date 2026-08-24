@@ -8,8 +8,8 @@
 
 import * as React from "react"
 
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { type ScreenQuery } from "@shared/ui/lib/recipe"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { AccountFormDialog } from "@/components/account-form-dialog"
 import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
@@ -34,8 +34,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
 import type { InternalKind } from "@/lib/use-screen-actions"
 import { ApiFailure } from "@/lib/api"
 import { personName } from "@/lib/identity"

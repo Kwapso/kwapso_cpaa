@@ -39,7 +39,7 @@ describe("the switcher is a dropdown, from the library (R3)", () => {
   it("Settings offers a Select, not a row of buttons", () => {
     const src = read(SECTION)
     expect(src, "the switcher must use the library Select").toContain(
-      "primitives/select/select"
+      "controls/select/select"
     )
     expect(
       src.includes("primitives/button/button"),
@@ -48,7 +48,7 @@ describe("the switcher is a dropdown, from the library (R3)", () => {
   })
 
   it("the portal's compact twin is the library DropdownMenu", () => {
-    expect(read(MENU)).toContain("primitives/dropdown-menu/dropdown-menu")
+    expect(read(MENU)).toContain("controls/dropdown-menu/dropdown-menu")
   })
 
   it("Settings still says how complete a part-written language is", () => {

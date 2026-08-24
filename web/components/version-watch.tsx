@@ -29,7 +29,7 @@
 
 import * as React from "react"
 
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import { useT } from "@shared/web/language"
 
 // Reload-loop guard: WHEN we last reloaded to heal a stale shell. It is a

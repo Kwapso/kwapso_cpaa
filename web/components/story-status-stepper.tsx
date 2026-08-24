@@ -17,7 +17,7 @@
 // change here — see help-status-stepper.tsx, which made the same move for the
 // same reason on the same day.
 
-import { StatusStepper, type StepperTone } from "@shared/ui/registry/primitives/status-stepper/status-stepper"
+import { StatusStepper } from "@shared/ui/controls/status-stepper/status-stepper"
 
 import { STORY_STATUSES, type StoryStatus } from "@shared/types"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
@@ -26,13 +26,15 @@ import { STORY_STATUS_LABEL } from "@/components/work-panels"
  * and labelled from the one map every other story screen reads. */
 const STAGES = STORY_STATUSES.map((value) => ({ value, label: STORY_STATUS_LABEL[value] }))
 
-const TONES: Record<string, StepperTone> = {
-  open: "neutral",
-  in_progress: "warning",
-  in_review: "warning",
-  done: "success",
-}
-
+// The kit's stepper derives done / current / later from the index and owns
+// their colours; the old per-stage tones await Aurora's ruling (NEEDS-A-SPEC
+// §4a), same note as help-status-stepper.tsx.
 export function StoryStatusStepper({ status }: { status: StoryStatus }) {
-  return <StatusStepper stages={STAGES} value={status} tones={TONES} disabled />
+  return (
+    <StatusStepper
+      stages={STAGES.map((s) => ({ id: s.value, label: s.label }))}
+      current={STAGES.findIndex((s) => s.value === status)}
+      disabled
+    />
+  )
 }

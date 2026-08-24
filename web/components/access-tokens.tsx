@@ -8,20 +8,20 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Input } from "@shared/ui/controls/input/input"
 import { Field } from "@shared/web/field"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/controls/dialog/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,8 +31,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Ban, ClipboardCopy, Copy } from "lucide-react"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { Ban, ClipboardCopy, Copy } from "@shared/ui/icons"
 
 import type { McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"

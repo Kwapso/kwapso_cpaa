@@ -21,8 +21,8 @@
 
 import * as React from "react"
 
-import { StatGrid, defaultStatGridConfig } from "@shared/ui/registry/collections/stat-grid/stat-grid"
-import { Progress } from "@shared/ui/registry/primitives/progress/progress"
+import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
+import { Progress } from "@shared/ui/controls/progress/progress"
 import {
   Table,
   TableBody,
@@ -30,9 +30,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@shared/ui/registry/primitives/table/table"
+} from "@shared/ui/controls/table/table"
 
-import { ArrowDown, CornerDownRight } from "lucide-react"
+import { ArrowDown, CornerDownRight } from "@shared/ui/icons"
 
 import type { AgentBlock } from "@shared/agent-blocks"
 
@@ -78,7 +78,15 @@ function MetricBlock({ block }: { block: Extract<AgentBlock, { kind: "metric" }>
   }))
   return (
     <BlockFrame title={block.title}>
-      <StatGrid items={items} config={{ ...defaultStatGridConfig, columns: 2, showDelta }} />
+      <StatGrid
+        items={items.map((m) => ({
+          id: m.id,
+          label: m.label,
+          value: m.value,
+          delta: m.delta || undefined,
+          deltaDirection: m.trend,
+        }))}
+      />
     </BlockFrame>
   )
 }

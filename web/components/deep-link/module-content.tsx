@@ -16,13 +16,13 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@shared/ui/lib/recipe"
+} from "@shared/web/screen-engine/screen-renderer"
+import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { AccountDetailScreen } from "@/components/account-detail"
 import { RoleDetailScreen } from "@/components/role-detail"

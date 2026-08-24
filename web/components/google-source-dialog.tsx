@@ -44,14 +44,14 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
+import { Button } from "@shared/ui/controls/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Check, Plus, Search } from "lucide-react"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Input } from "@shared/ui/controls/input/input"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Check, Plus, Search } from "@shared/ui/icons"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
 import { ApiFailure, content } from "@/lib/api"

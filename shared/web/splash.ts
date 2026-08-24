@@ -341,13 +341,13 @@ function markSvg(): string {
  * near-white is not a mark, it is a suggestion.
  *
  * THREE WAYS THE THEME IS ANSWERED, AND THE ORDER MATTERS. The media query is
- * the one that works with scripting off; the two `html.light` / `html.dark`
- * rules come after it and beat it on specificity, so an explicit choice wins in
- * both directions. This can lean on next-themes' class where the overlay could
- * not: next-themes writes it from a blocking script that sits ABOVE the loader
- * in the body, so the class is already on <html> when the parser reaches the
- * mark. The overlay was FIRST in the body and had to resolve the theme itself —
- * nine lines of script that went with it.
+ * the one that works with scripting off; the two `data-theme` rules come after
+ * it and beat it on specificity, so an explicit choice wins in both directions.
+ * The attribute is the design kit's own mechanism (tokens.css §6-§7: light and
+ * dark write `data-theme`, system writes NOTHING) and it is applied by the
+ * boot script in shared/web/theme-provider.tsx, which sits ABOVE the loader in
+ * the body — so the attribute is already on <html> when the parser reaches the
+ * mark. next-themes and its `.dark` class are gone with the old library.
  *
  * REDUCED MOTION IS THE RESTING FRAME, not a shorter spin: the animator refuses
  * to start (it asks the same media query), so what stays on screen is the mark
@@ -366,8 +366,8 @@ function markSvg(): string {
 export function splashStyle(): string {
   return `.ks-mark-host{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT};min-height:100svh;display:grid;place-items:center;background:var(--ks-field)}
 @media (prefers-color-scheme:dark){.ks-mark-host{--ks-field:${FIELD_DARK};--ks-mark:${brand.accentHex.primary};--ks-glow:${GLOW_DARK}}}
-html.light .ks-mark-host{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT}}
-html.dark .ks-mark-host{--ks-field:${FIELD_DARK};--ks-mark:${brand.accentHex.primary};--ks-glow:${GLOW_DARK}}
+html[data-theme=light] .ks-mark-host{--ks-field:${brand.accentHex.primary};--ks-mark:${brand.accentHex.ink};--ks-glow:${GLOW_LIGHT}}
+html[data-theme=dark] .ks-mark-host{--ks-field:${FIELD_DARK};--ks-mark:${brand.accentHex.primary};--ks-glow:${GLOW_DARK}}
 .ks-mark-host svg,.ks-mark-host video,.ks-mark-host img{width:min(56vmin,320px);height:auto;overflow:visible;display:block}`
 }
 

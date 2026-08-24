@@ -30,18 +30,18 @@
 
 import * as React from "react"
 
-import { Paperclip, X } from "lucide-react"
+import { Paperclip, X } from "@shared/ui/icons"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Checkbox } from "@shared/ui/registry/primitives/checkbox/checkbox"
-import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
-import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
+import { Button } from "@shared/ui/controls/button/button"
+import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
+import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Label } from "@shared/ui/registry/primitives/label/label"
-import { Notes } from "@shared/ui/registry/primitives/notes/notes"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Input } from "@shared/ui/controls/input/input"
+import { Label } from "@shared/ui/controls/label/label"
+import { Notes } from "@shared/web/notes-editor/notes-editor"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
@@ -441,7 +441,7 @@ export function StoryFormDialog({
           )}
           <FileUpload
             multiple
-            onChange={(files) => setPending((f) => [...f, ...files])}
+            onFilesSelected={(files) => setPending((f) => [...f, ...files])}
             className={busy ? "pointer-events-none opacity-60" : undefined}
           />
         </div>

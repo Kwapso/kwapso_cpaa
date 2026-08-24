@@ -22,11 +22,11 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Trash2 } from "lucide-react"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Trash2 } from "@shared/ui/icons"
 
 import { LoadMore } from "@/components/load-more"
 import { clockFrom } from "@/components/timer-bar"

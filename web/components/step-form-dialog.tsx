@@ -18,20 +18,20 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
+import { Button } from "@shared/ui/controls/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Input } from "@shared/ui/controls/input/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/registry/primitives/select/select"
-import { Notes } from "@shared/ui/registry/primitives/notes/notes"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+} from "@shared/ui/controls/select/select"
+import { Notes } from "@shared/web/notes-editor/notes-editor"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"

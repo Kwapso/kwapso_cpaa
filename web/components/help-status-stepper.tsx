@@ -31,7 +31,7 @@
 // read" on the triage screen, and the resolve panel — and they live beside the
 // record, not on this strip.
 
-import { StatusStepper, type StepperTone } from "@shared/ui/registry/primitives/status-stepper/status-stepper"
+import { StatusStepper } from "@shared/ui/controls/status-stepper/status-stepper"
 
 import { HELP_STATUSES, type HelpStatus } from "@shared/types"
 import { HELP_STATUS } from "@/components/deep-link/shape"
@@ -48,29 +48,18 @@ export type HelpStatusValue = HelpStatus
  * different things. */
 const STAGES = HELP_STATUSES.map((value) => ({ value, label: HELP_STATUS[value] }))
 
-// Per-stage tone (waiting / in-motion / done) — the same semantic tokens the
-// library Badge variants use, so the strip matches the rest of the app's status
-// colours. `awaiting_validation` is a WARNING tone and it is the only one that
-// points outward: it is the single stage where nothing will happen until somebody
-// outside this building answers, which is exactly what an amber mark should mean.
-// `ready` is a success tone before `resolved`: the work IS finished, and only the
-// telling is left.
-const TONES: Record<string, StepperTone> = {
-  awaiting_validation: "warning",
-  new: "neutral",
-  triaged: "neutral",
-  scheduled: "neutral",
-  in_progress: "warning",
-  ready: "success",
-  resolved: "success",
-}
+// The kit's stepper knows three states — done, current, later — derived from
+// the current index, and owns their colours. The old per-stage TONE map
+// (amber for "waiting on somebody outside", green for "finished, telling
+// left") is a design question the kit has not answered (NEEDS-A-SPEC §4a);
+// until Aurora rules, the strip says WHERE the ticket is and not what kind
+// of wait each stage is.
 
 export function HelpStatusStepper({ status }: { status: HelpStatusValue }) {
   return (
     <StatusStepper
-      stages={STAGES}
-      value={status}
-      tones={TONES}
+      stages={STAGES.map((s) => ({ id: s.value, label: s.label }))}
+      current={STAGES.findIndex((s) => s.value === status)}
       // NOT PRESSABLE, and both halves are needed. No `onChange` means there is
       // nothing to press; `disabled` is what stops it LOOKING pressable, which is
       // the half the tester actually reported ("it should not look pressable").

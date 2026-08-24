@@ -20,7 +20,7 @@
 // the same tiles for one client's systems.
 
 import * as React from "react"
-import { ChevronRight, Lock } from "lucide-react"
+import { ChevronRight, Lock } from "@shared/ui/icons"
 
 import { softNavigate } from "@/lib/nav"
 import { safeHref } from "@shared/web/rich-text"

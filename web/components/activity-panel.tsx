@@ -14,7 +14,7 @@
 // every file. It now looks for THIS component in the details, and for the feed
 // and the pager in here — same guarantee, one place to get it right.
 
-import { ActivityFeed, defaultActivityFeedConfig } from "@shared/ui/registry/collections/activity-feed/activity-feed"
+import { ActivityFeed } from "@shared/ui/structures/activity-feed/activity-feed"
 
 import { LoadMore } from "@/components/load-more"
 import type { ActivityFeedRow } from "@/lib/use-record-activity"
@@ -35,8 +35,13 @@ export function ActivityPanel({
   return (
     <div className="flex flex-col gap-4">
       <ActivityFeed
-        config={{ ...defaultActivityFeedConfig, emptyText: t("No activity yet.") }}
-        items={activity.items}
+        emptyLabel={t("No activity yet.")}
+        items={activity.items.map((a) => ({
+          id: a.id,
+          description: a.description,
+          actor: a.actor,
+          time: a.timestamp,
+        }))}
       />
       <LoadMore listKey={activity.listKey} fetchPage={activity.fetchPage} label={t("Load more activity")} />
     </div>

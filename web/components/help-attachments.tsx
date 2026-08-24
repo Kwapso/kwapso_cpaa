@@ -17,11 +17,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Link2, Paperclip, Plus, Trash2, Upload } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Input } from "@shared/ui/controls/input/input"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Link2, Paperclip, Plus, Trash2, Upload } from "@shared/ui/icons"
 
 import type { HelpAttachment } from "@shared/types"
 import { ApiFailure, content as contentApi } from "@/lib/api"

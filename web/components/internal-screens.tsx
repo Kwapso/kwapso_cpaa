@@ -17,8 +17,8 @@ import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
+} from "@shared/web/screen-engine/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"

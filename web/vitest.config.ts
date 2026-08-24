@@ -26,6 +26,7 @@ export default defineConfig({
      * re-run until green, and then the real red gets the same treatment. */
     testTimeout: 20_000,
     environment: "jsdom",
+    setupFiles: ["./test/setup.ts"],
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     exclude: ["node_modules", "e2e/**", ".next", "out"],
   },

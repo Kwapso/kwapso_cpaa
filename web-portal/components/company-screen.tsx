@@ -15,12 +15,9 @@
 // one it wasn't given — the fence would refuse it anyway, with the same 404 a
 // made-up id gets, but not asking is the cheaper guarantee.
 
-import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@shared/ui/registry/collections/description-list/description-list"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Badge } from "@shared/ui/controls/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
@@ -84,7 +81,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
       {details.length > 0 ? (
         <section>
           <h2 className="mb-4 text-lg font-medium">{t("Your details")}</h2>
-          <DescriptionList config={defaultDescriptionListConfig} items={details} />
+          <DescriptionList layout="rows" items={details.map((d, n) => ({ id: `${n}-${d.label}`, label: d.label, value: d.value }))} />
         </section>
       ) : null}
 

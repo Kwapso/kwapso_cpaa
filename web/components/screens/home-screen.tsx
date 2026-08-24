@@ -24,20 +24,10 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { List } from "@shared/ui/registry/collections/list/list"
-import {
-  Building2,
-  CalendarClock,
-  ChevronRight,
-  Hammer,
-  LifeBuoy,
-  ListTodo,
-  Settings,
-  Timer,
-  Users,
-} from "lucide-react"
+} from "@shared/ui/controls/avatar/avatar"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { List } from "@shared/web/list-compat"
+import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/icons"
 
 import { PulseBand } from "@/components/pulse"
 import { letterMark } from "@/lib/identity"

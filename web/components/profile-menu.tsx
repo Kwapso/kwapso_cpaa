@@ -10,7 +10,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
+} from "@shared/ui/controls/avatar/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,8 +18,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { LogOut, Settings, UserRound } from "lucide-react"
+} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
+import { LogOut, Settings, UserRound } from "@shared/ui/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"

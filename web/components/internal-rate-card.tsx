@@ -27,12 +27,12 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Input } from "@shared/ui/controls/input/input"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,8 +42,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Pencil, Plus, Power } from "lucide-react"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { Pencil, Plus, Power } from "@shared/ui/icons"
 
 import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"

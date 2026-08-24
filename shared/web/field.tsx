@@ -47,8 +47,9 @@
 
 import * as React from "react"
 
-import { Field as LibraryField } from "@shared/ui/registry/primitives/field/field"
-import { type FieldConfig } from "@shared/ui/lib/config"
+import { Field as KitField } from "@shared/ui/controls/field/field"
+import { type FieldConfig } from "@shared/web/screen-engine/config"
+import { useIsVisible } from "@shared/web/screen-engine/visibility"
 
 import { useT } from "./language"
 
@@ -62,8 +63,8 @@ import { useT } from "./language"
  * form rather than reword it. Same line `translateRecipe` draws when it
  * translates `field.label` and leaves `field.column` alone.
  *
- * An empty label is left empty: `Field` reads it as "no label at all" and skips
- * the whole `<Label>`, and "" is not a sentence anybody translates. */
+ * An empty label is left empty: the kit Field reads it as "no label at all" and
+ * skips the label row, and "" is not a sentence anybody translates. */
 export function translateFieldConfig(
   config: FieldConfig,
   t: (english: string) => string
@@ -75,23 +76,78 @@ export function translateFieldConfig(
   }
 }
 
-/** The library `Field`, with its config's words in the reader's language.
+/** What shape the wrapped control is. Kept from the old library contract so no
+ * call site moves; the kit draws required/error itself, so `ringed` and `shape`
+ * are accepted and no longer draw anything (the old gold required-ring was the
+ * old system's; the kit has its own required marking). */
+export type FieldShape = "input" | "pill" | "group"
+
+/** The kit `Field`, spoken to in the OLD library's contract.
  *
- * Every prop is the library's own and is passed straight through, so this is a
- * drop-in for `@shared/ui/registry/primitives/field/field` — the ONE import line
- * is the whole difference at a call site.
+ * The old library's Field was config-driven (`config`, `htmlFor`, `error`,
+ * `ringed`, `shape`); the kit's takes words as props (`label`, `help`,
+ * `error`, `required`). ~140 call sites across both doors write the old
+ * contract, so this seam keeps it and translates — the same decision as the
+ * screen engine's TabsView. The translation to the reader's language happens
+ * here too, which is this file's original job (R33).
  *
- * Memoised on the config and the language so the object identity only changes
- * when one of those does; a form that re-renders on every keystroke does not
- * hand its children a new config each time. */
-export function Field(props: React.ComponentProps<typeof LibraryField>) {
+ * `htmlFor` becomes the kit Field's `id`: the kit seeds its control id from it
+ * and clones the id onto a single-element child, so label/input association
+ * holds for every existing call site without moving any of them. */
+export function Field({
+  config,
+  htmlFor,
+  error,
+  // Tolerated, no longer drawn — the kit owns required/error presentation.
+  ringed: _ringed = true,
+  shape: _shape = "input",
+  className,
+  children,
+}: {
+  config: FieldConfig
+  /** id of the input inside — wires the label's association. */
+  htmlFor?: string
+  /** validation message to show (overrides helpText while present). */
+  error?: string
+  ringed?: boolean
+  shape?: FieldShape
+  className?: string
+  children: React.ReactNode
+}) {
   const t = useT()
-  const { config, ...rest } = props
+  // Hooks before any early return so hook order stays stable.
+  const visible = useIsVisible(config)
   const translated = React.useMemo(() => translateFieldConfig(config, t), [config, t])
-  return <LibraryField config={translated} {...rest} />
+  if (!visible) return null
+
+  return (
+    <KitField
+      id={htmlFor}
+      label={translated.label || undefined}
+      help={translated.helpText || undefined}
+      error={error || undefined}
+      required={config.required}
+      disabled={config.disabled}
+      className={className}
+    >
+      {children}
+    </KitField>
+  )
 }
 
-// `fieldProps` is pure machinery — it maps a config's validation onto native
-// HTML attributes and reads no words at all — so it is re-exported unchanged
-// rather than wrapped. A call site that needs both gets both from one import.
-export { fieldProps } from "@shared/ui/registry/primitives/field/field"
+/** Map a FieldConfig to native HTML validation attributes. Spread onto the
+ * input inside a Field; the browser ignores attributes that don't apply to its
+ * type. The old library exported this beside Field; the kit has no config
+ * layer, so the helper lives here now — it reads no words at all. */
+export function fieldProps(config: FieldConfig) {
+  const v = config.validation
+  return {
+    required: config.required || undefined,
+    disabled: config.disabled || undefined,
+    min: v.min ?? undefined,
+    max: v.max ?? undefined,
+    minLength: v.minLength ?? undefined,
+    maxLength: v.maxLength ?? undefined,
+    pattern: v.pattern || undefined,
+  }
+}

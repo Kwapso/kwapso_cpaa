@@ -28,8 +28,8 @@ import { useRouter } from "next/navigation"
 import {
   type ScreenActionContext,
   type ScreenIntent,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import { type ScreenRights } from "@shared/ui/lib/recipe"
+} from "@shared/web/screen-engine/screen-renderer"
+import { type ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { TeamSectionNav } from "@/components/team-section-nav"
@@ -47,7 +47,7 @@ import { ProfileScreen } from "@/components/screens/profile-screen"
 import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
 import type { HelpScope, TaskView } from "@/lib/live-resources"

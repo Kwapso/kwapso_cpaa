@@ -24,15 +24,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { MoreHorizontal } from "lucide-react"
+} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
+import { MoreHorizontal } from "@shared/ui/icons"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { formatRelative } from "@shared/web/format"

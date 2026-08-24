@@ -16,9 +16,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Check, Paperclip } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Check, Paperclip } from "@shared/ui/icons"
 
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatDate } from "@shared/web/format"

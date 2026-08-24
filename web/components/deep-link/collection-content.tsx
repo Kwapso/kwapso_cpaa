@@ -15,11 +15,11 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import {
   ScreenRenderer,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
+} from "@shared/web/screen-engine/screen-renderer"
 
 import { ProcessesScreen } from "@/components/processes-screen"
 import { AppsScreen } from "@/components/apps-screen"

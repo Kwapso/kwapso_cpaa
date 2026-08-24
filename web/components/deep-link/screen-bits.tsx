@@ -4,9 +4,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Card, CardContent } from "@shared/ui/registry/primitives/card/card"
-import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "lucide-react"
+import { cn } from "@shared/ui/lib/utils"
+import { Button, buttonVariants } from "@shared/ui/controls/button/button"
+import { Card, CardContent } from "@shared/ui/controls/card/card"
+import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/icons"
 import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -184,12 +185,10 @@ export function SectionWithCreate({
         // Global UI rule — see UI-CONVENTIONS "Action-button rows never clip".
         <div className="flex flex-wrap justify-end gap-2">
           {showDownload && download && (
-            <Button asChild variant="secondary" className="gap-1">
-              <a href={download.href}>
-                <Download className="size-4" />
-                {download.label}
-              </a>
-            </Button>
+            <a href={download.href} className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}>
+              <Download className="size-4" />
+              {download.label}
+            </a>
           )}
           {showSecondary && secondary && (
             <Button variant="secondary" onClick={secondary.onClick} className="gap-1">

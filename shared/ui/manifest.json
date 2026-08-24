@@ -1,0 +1,2546 @@
+{
+  "name": "kwapso-design",
+  "version": "0.6.0",
+  "status": "IN PROGRESS. Restructured 2026-08-24 to the four names the client uses: foundations (tokens/ icons/ motion/) · controls/ (67) · structures/ (42) · compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states). components/ no longer exists. Twenty-four files and 11,731 lines of example collection and detail routes were deleted — the kit ships the TEMPLATE and the application builds the page. Outstanding: BUILD-A-SCREEN.md, and `foundations/` is not yet a folder (see foundationsFolder below).",
+  "tokens": {
+    "declared": [
+      "--accent",
+      "--accent-foreground",
+      "--avatar-lg",
+      "--avatar-md",
+      "--avatar-sm",
+      "--background",
+      "--border",
+      "--btn-cancel-fill",
+      "--btn-cancel-hover",
+      "--btn-cancel-label",
+      "--btn-destructive-fill",
+      "--btn-destructive-hover",
+      "--btn-destructive-label",
+      "--btn-disabled-fill",
+      "--btn-disabled-label",
+      "--btn-inverse-fill",
+      "--btn-inverse-hover",
+      "--btn-inverse-label",
+      "--btn-primary-fill",
+      "--btn-primary-hover",
+      "--btn-primary-label",
+      "--btn-primary-pressed",
+      "--btn-secondary-fill",
+      "--btn-secondary-hover",
+      "--btn-secondary-label",
+      "--card",
+      "--card-foreground",
+      "--chart-1",
+      "--chart-2",
+      "--chart-3",
+      "--chart-4",
+      "--chart-5",
+      "--chart-negative",
+      "--container-app",
+      "--container-document",
+      "--container-marketing",
+      "--control-height-button",
+      "--control-height-dense",
+      "--control-height-field",
+      "--control-height-input",
+      "--control-height-pill",
+      "--control-height-row",
+      "--default-transition-duration",
+      "--default-transition-timing-function",
+      "--destructive",
+      "--destructive-foreground",
+      "--dot-archived",
+      "--dot-blocked",
+      "--dot-building",
+      "--dot-done",
+      "--dot-review",
+      "--dot-shipped",
+      "--dot-status",
+      "--duration-advance",
+      "--duration-bar",
+      "--duration-caret",
+      "--duration-colour",
+      "--duration-entrance",
+      "--duration-exit",
+      "--duration-lift",
+      "--duration-overlay",
+      "--duration-pulse",
+      "--duration-settle",
+      "--duration-spin",
+      "--ease",
+      "--ease-entrance",
+      "--ease-exit",
+      "--ease-linear",
+      "--ease-move",
+      "--focus",
+      "--focus-offset",
+      "--focus-width",
+      "--font-sans",
+      "--font-serif",
+      "--font-weight-bold",
+      "--font-weight-extrabold",
+      "--font-weight-light",
+      "--font-weight-medium",
+      "--font-weight-normal",
+      "--font-weight-semibold",
+      "--foreground",
+      "--grid-columns",
+      "--hair",
+      "--hair-faint",
+      "--hair-strong",
+      "--icon-16",
+      "--icon-20",
+      "--icon-22",
+      "--icon-24",
+      "--icon-32",
+      "--icon-button",
+      "--info",
+      "--ink-disabled",
+      "--ink-on-accent",
+      "--ink-on-inverse",
+      "--ink-primary",
+      "--ink-secondary",
+      "--ink-tertiary",
+      "--input",
+      "--kw-charcoal",
+      "--kw-forest",
+      "--kw-forest-lift",
+      "--kw-mango",
+      "--kw-off-beige",
+      "--kw-poppy",
+      "--kw-poppy-lift",
+      "--kw-sky",
+      "--kw-soft-paper",
+      "--kw-unlit-page",
+      "--kw-unlit-panel",
+      "--kw-unlit-quiet",
+      "--kw-unlit-raised",
+      "--leading-h3",
+      "--leading-h4",
+      "--leading-loose",
+      "--leading-normal",
+      "--leading-snug",
+      "--leading-tight",
+      "--measure-body",
+      "--motion-lift-scale",
+      "--motion-rise",
+      "--motion-rise-tight",
+      "--motion-stagger",
+      "--muted",
+      "--muted-foreground",
+      "--pill-fill",
+      "--pill-fill-building",
+      "--pill-label",
+      "--pill-label-building",
+      "--popover",
+      "--popover-foreground",
+      "--primary",
+      "--primary-foreground",
+      "--radius",
+      "--radius-2xl",
+      "--radius-3xl",
+      "--radius-bar",
+      "--radius-card",
+      "--radius-lg",
+      "--radius-md",
+      "--radius-pill",
+      "--radius-select",
+      "--radius-sm",
+      "--radius-xl",
+      "--ring",
+      "--secondary",
+      "--secondary-foreground",
+      "--shadow-2xl",
+      "--shadow-2xs",
+      "--shadow-lg",
+      "--shadow-lifted",
+      "--shadow-md",
+      "--shadow-overlay",
+      "--shadow-rest",
+      "--shadow-sm",
+      "--shadow-xl",
+      "--shadow-xs",
+      "--space-1",
+      "--space-10",
+      "--space-11",
+      "--space-1h",
+      "--space-2",
+      "--space-2h",
+      "--space-3",
+      "--space-3h",
+      "--space-4",
+      "--space-4h",
+      "--space-5",
+      "--space-6",
+      "--space-7",
+      "--space-8",
+      "--space-9",
+      "--success",
+      "--success-foreground",
+      "--surface-brand",
+      "--surface-idle",
+      "--surface-inverse",
+      "--surface-page",
+      "--surface-panel",
+      "--surface-quiet",
+      "--surface-raised",
+      "--text-2xl",
+      "--text-2xl--letter-spacing",
+      "--text-2xl--line-height",
+      "--text-3xl",
+      "--text-3xl--letter-spacing",
+      "--text-3xl--line-height",
+      "--text-4xl",
+      "--text-4xl--letter-spacing",
+      "--text-4xl--line-height",
+      "--text-5xl",
+      "--text-5xl--letter-spacing",
+      "--text-5xl--line-height",
+      "--text-6xl",
+      "--text-6xl--letter-spacing",
+      "--text-6xl--line-height",
+      "--text-7xl",
+      "--text-7xl--letter-spacing",
+      "--text-7xl--line-height",
+      "--text-badge",
+      "--text-badge--letter-spacing",
+      "--text-badge--line-height",
+      "--text-base",
+      "--text-base--letter-spacing",
+      "--text-base--line-height",
+      "--text-caption",
+      "--text-caption--letter-spacing",
+      "--text-caption--line-height",
+      "--text-lg",
+      "--text-lg--letter-spacing",
+      "--text-lg--line-height",
+      "--text-micro",
+      "--text-micro--letter-spacing",
+      "--text-micro--line-height",
+      "--text-sm",
+      "--text-sm--letter-spacing",
+      "--text-sm--line-height",
+      "--text-xl",
+      "--text-xl--letter-spacing",
+      "--text-xl--line-height",
+      "--text-xs",
+      "--text-xs--letter-spacing",
+      "--text-xs--line-height",
+      "--tracking-display-l",
+      "--tracking-display-m",
+      "--tracking-display-xl",
+      "--tracking-eyebrow",
+      "--tracking-h1",
+      "--tracking-h2",
+      "--tracking-h3",
+      "--tracking-h4",
+      "--tracking-normal",
+      "--tracking-serif",
+      "--warning",
+      "--warning-foreground",
+      "--warning-strong"
+    ],
+    "renamedFrom": {},
+    "renamedFromNote": "Empty by decision. The commission's section-4 names are used verbatim; only the VALUES come from the kwapso design kit. There is nothing to bridge and no alias layer, so the token file drops in clean. All 95 section-4 names are present."
+  },
+  "components": {
+    "accordion": {
+      "file": "controls/accordion/accordion.tsx",
+      "exports": [
+        "Accordion",
+        "AccordionContent",
+        "AccordionItem",
+        "AccordionTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "action-row": {
+      "file": "controls/action-row/action-row.tsx",
+      "exports": [
+        "ActionRow"
+      ],
+      "props": {
+        "align": [
+          "start",
+          "end",
+          "between"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "alert": {
+      "file": "controls/alert/alert.tsx",
+      "exports": [
+        "Alert",
+        "AlertDescription",
+        "AlertTitle"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "destructive",
+          "success",
+          "info",
+          "warning"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "alert-dialog": {
+      "file": "controls/alert-dialog/alert-dialog.tsx",
+      "exports": [
+        "AlertDialog",
+        "AlertDialogAction",
+        "AlertDialogCancel",
+        "AlertDialogContent",
+        "AlertDialogDescription",
+        "AlertDialogFooter",
+        "AlertDialogHeader",
+        "AlertDialogTitle",
+        "AlertDialogTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "ambient-background": {
+      "file": "controls/ambient-background/ambient-background.tsx",
+      "exports": [
+        "AmbientBackground"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "brand",
+          "info"
+        ],
+        "anchor": [
+          "absolute",
+          "fixed"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "aspect-ratio": {
+      "file": "controls/aspect-ratio/aspect-ratio.tsx",
+      "exports": [
+        "AspectRatio"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "avatar": {
+      "file": "controls/avatar/avatar.tsx",
+      "exports": [
+        "Avatar",
+        "AvatarFallback",
+        "AvatarImage"
+      ],
+      "props": {
+        "shape": [
+          "pill",
+          "square"
+        ],
+        "size": [
+          "sm",
+          "md",
+          "lg"
+        ],
+        "variant": [
+          "default",
+          "inverse",
+          "brand",
+          "quiet"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "badge": {
+      "file": "controls/badge/badge.tsx",
+      "exports": [
+        "Badge"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "secondary",
+          "outline",
+          "destructive",
+          "success",
+          "warning",
+          "inverse",
+          "info"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "brand": {
+      "file": "controls/brand/brand.tsx",
+      "exports": [
+        "Isotype",
+        "Logotype",
+        "Wordmark",
+        "brandVariants"
+      ]
+    },
+    "breadcrumb": {
+      "file": "controls/breadcrumb/breadcrumb.tsx",
+      "exports": [
+        "Breadcrumb",
+        "BreadcrumbEllipsis",
+        "BreadcrumbItem",
+        "BreadcrumbLink",
+        "BreadcrumbList",
+        "BreadcrumbPage",
+        "BreadcrumbSeparator"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "breadcrumbs": {
+      "file": "controls/breadcrumbs/breadcrumbs.tsx",
+      "exports": [
+        "Breadcrumbs"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "button": {
+      "file": "controls/button/button.tsx",
+      "exports": [
+        "Button"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "secondary",
+          "destructive",
+          "text",
+          "ghost",
+          "link",
+          "inverse",
+          "cancel"
+        ],
+        "size": [
+          "default",
+          "sm",
+          "lg",
+          "icon"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "card": {
+      "file": "controls/card/card.tsx",
+      "exports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardFooter",
+        "CardHeader",
+        "CardTitle"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "raised",
+          "brand",
+          "inverse",
+          "well"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "checkbox": {
+      "file": "controls/checkbox/checkbox.tsx",
+      "exports": [
+        "Checkbox"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "choice": {
+      "file": "controls/choice/choice.tsx",
+      "exports": [
+        "Choice"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "clamp": {
+      "file": "controls/clamp/clamp.tsx",
+      "exports": [
+        "Clamp"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "collapsible": {
+      "file": "controls/collapsible/collapsible.tsx",
+      "exports": [
+        "Collapsible",
+        "CollapsibleContent",
+        "CollapsibleTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "command": {
+      "file": "controls/command/command.tsx",
+      "exports": [
+        "Command",
+        "CommandDialog",
+        "CommandEmpty",
+        "CommandGroup",
+        "CommandInput",
+        "CommandItem",
+        "CommandList",
+        "CommandSeparator",
+        "CommandShortcut"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "container": {
+      "file": "controls/container/container.tsx",
+      "exports": [
+        "Container"
+      ],
+      "props": {
+        "size": [
+          "app",
+          "marketing",
+          "document",
+          "full"
+        ],
+        "gutter": [
+          "true",
+          "false"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "date-picker": {
+      "file": "controls/date-picker/date-picker.tsx",
+      "exports": [
+        "DatePicker"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error",
+          "readOnly",
+          "disabled"
+        ],
+        "tone": [
+          "default",
+          "outside",
+          "selected",
+          "disabled"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "dialog": {
+      "file": "controls/dialog/dialog.tsx",
+      "exports": [
+        "Dialog",
+        "DialogClose",
+        "DialogContent",
+        "DialogDescription",
+        "DialogFooter",
+        "DialogHeader",
+        "DialogTitle",
+        "DialogTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "dropdown-menu": {
+      "file": "controls/dropdown-menu/dropdown-menu.tsx",
+      "exports": [
+        "DropdownMenu",
+        "DropdownMenuCheckboxItem",
+        "DropdownMenuContent",
+        "DropdownMenuGroup",
+        "DropdownMenuItem",
+        "DropdownMenuLabel",
+        "DropdownMenuSeparator",
+        "DropdownMenuShortcut",
+        "DropdownMenuSub",
+        "DropdownMenuSubContent",
+        "DropdownMenuSubTrigger",
+        "DropdownMenuTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "field": {
+      "file": "controls/field/field.tsx",
+      "exports": [
+        "Field"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "file-upload": {
+      "file": "controls/file-upload/file-upload.tsx",
+      "exports": [
+        "FileUpload"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error",
+          "disabled"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "filter-bar": {
+      "file": "controls/filter-bar/filter-bar.tsx",
+      "exports": [
+        "FilterBar",
+        "RangeFacet",
+        "SearchableFacet"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "disabled",
+          "error",
+          "readOnly"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "folder": {
+      "file": "controls/folder/folder.tsx",
+      "exports": [
+        "FolderPanel",
+        "FolderShape",
+        "folderPanelVariants"
+      ]
+    },
+    "hover-card": {
+      "file": "controls/hover-card/hover-card.tsx",
+      "exports": [
+        "HoverCard",
+        "HoverCardContent",
+        "HoverCardTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "image": {
+      "file": "controls/image/image.tsx",
+      "exports": [
+        "Image"
+      ],
+      "props": {
+        "fit": [
+          "cover",
+          "contain"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "input": {
+      "file": "controls/input/input.tsx",
+      "exports": [
+        "Input"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error",
+          "readOnly",
+          "disabled"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "label": {
+      "file": "controls/label/label.tsx",
+      "exports": [
+        "Label"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "mode-toggle": {
+      "file": "controls/mode-toggle/mode-toggle.tsx",
+      "exports": [
+        "ModeToggle"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "notes": {
+      "file": "controls/notes/notes.tsx",
+      "exports": [
+        "Notes"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "notifications": {
+      "file": "controls/notifications/notifications.tsx",
+      "exports": [
+        "Notifications",
+        "NOTIFICATION_FACETS",
+        "NOTIFICATION_ITEMS",
+        "NOTIFICATION_PANEL_MEASURE",
+        "NOTIFICATION_PANEL_ROWS"
+      ],
+      "movedFrom": "compositions/screens/notifications.tsx",
+      "note": "Was a 619-line screen. The client ruled it a component (2026-08-24); the PANEL branch is what became the control and the MainScreen page branch was deleted. Export renamed from NotificationsScreen."
+    },
+    "pagination": {
+      "file": "controls/pagination/pagination.tsx",
+      "exports": [
+        "Pagination",
+        "PaginationContent",
+        "PaginationEllipsis",
+        "PaginationItem",
+        "PaginationLink",
+        "PaginationNext",
+        "PaginationPrevious"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "popover": {
+      "file": "controls/popover/popover.tsx",
+      "exports": [
+        "Popover",
+        "PopoverAnchor",
+        "PopoverContent",
+        "PopoverTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "progress": {
+      "file": "controls/progress/progress.tsx",
+      "exports": [
+        "Progress"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "progress-toggle": {
+      "file": "controls/progress-toggle/progress-toggle.tsx",
+      "exports": [
+        "ProgressToggle"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "radio-group": {
+      "file": "controls/radio-group/radio-group.tsx",
+      "exports": [
+        "RadioGroup",
+        "RadioGroupItem"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "rating": {
+      "file": "controls/rating/rating.tsx",
+      "exports": [
+        "Rating"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "scroll-area": {
+      "file": "controls/scroll-area/scroll-area.tsx",
+      "exports": [
+        "ScrollArea",
+        "ScrollBar"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "search-input": {
+      "file": "controls/search-input/search-input.tsx",
+      "exports": [
+        "SearchInput"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "disabled",
+          "readOnly"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "select": {
+      "file": "controls/select/select.tsx",
+      "exports": [
+        "Select",
+        "SelectContent",
+        "SelectGroup",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "separator": {
+      "file": "controls/separator/separator.tsx",
+      "exports": [
+        "Separator"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "section"
+        ],
+        "orientation": [
+          "horizontal",
+          "vertical"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "sheet": {
+      "file": "controls/sheet/sheet.tsx",
+      "exports": [
+        "Sheet",
+        "SheetClose",
+        "SheetContent",
+        "SheetDescription",
+        "SheetFooter",
+        "SheetHeader",
+        "SheetTitle",
+        "SheetTrigger"
+      ],
+      "props": {
+        "side": [
+          "left",
+          "right",
+          "top",
+          "bottom"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "signature": {
+      "file": "controls/signature/signature.tsx",
+      "exports": [
+        "Signature"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error",
+          "readOnly",
+          "disabled"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "skeleton": {
+      "file": "controls/skeleton/skeleton.tsx",
+      "exports": [
+        "Skeleton"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "slider": {
+      "file": "controls/slider/slider.tsx",
+      "exports": [
+        "Slider"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "sonner": {
+      "file": "controls/sonner/sonner.tsx",
+      "exports": [
+        "Toaster",
+        "toast"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "sort-control": {
+      "file": "controls/sort-control/sort-control.tsx",
+      "exports": [
+        "SortControl"
+      ],
+      "props": {
+        "size": [
+          "default",
+          "sm"
+        ],
+        "state": [
+          "default",
+          "disabled",
+          "readOnly"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "spacer": {
+      "file": "controls/spacer/spacer.tsx",
+      "exports": [
+        "Spacer"
+      ],
+      "props": {
+        "size": [
+          "1",
+          "1h",
+          "2",
+          "2h",
+          "3",
+          "3h",
+          "4",
+          "4h",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11"
+        ],
+        "axis": [
+          "block",
+          "inline"
+        ],
+        "grow": [
+          "true",
+          "false"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "spinner": {
+      "file": "controls/spinner/spinner.tsx",
+      "exports": [
+        "Spinner"
+      ],
+      "props": {
+        "size": [
+          "default",
+          "sm"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "status-stepper": {
+      "file": "controls/status-stepper/status-stepper.tsx",
+      "exports": [
+        "StatusStepper"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "stopwatch": {
+      "file": "controls/stopwatch/stopwatch.tsx",
+      "exports": [
+        "Stopwatch"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "switch": {
+      "file": "controls/switch/switch.tsx",
+      "exports": [
+        "Switch"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "table": {
+      "file": "controls/table/table.tsx",
+      "exports": [
+        "Table",
+        "TableBody",
+        "TableCaption",
+        "TableCell",
+        "TableFooter",
+        "TableHead",
+        "TableHeader",
+        "TableRow"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "tabs": {
+      "file": "controls/tabs/tabs.tsx",
+      "exports": [
+        "Tabs",
+        "TabsContent",
+        "TabsList",
+        "TabsTrigger",
+        "TabsView"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "textarea": {
+      "file": "controls/textarea/textarea.tsx",
+      "exports": [
+        "Textarea"
+      ],
+      "props": {
+        "state": [
+          "default",
+          "error",
+          "readOnly",
+          "disabled"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "title": {
+      "file": "controls/title/title.tsx",
+      "exports": [
+        "Title"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "toggle": {
+      "file": "controls/toggle/toggle.tsx",
+      "exports": [
+        "Toggle"
+      ],
+      "props": {
+        "variant": [
+          "default",
+          "outline"
+        ],
+        "size": [
+          "sm",
+          "default",
+          "lg"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "toggle-group": {
+      "file": "controls/toggle-group/toggle-group.tsx",
+      "exports": [
+        "ToggleGroup",
+        "ToggleGroupItem"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "tooltip": {
+      "file": "controls/tooltip/tooltip.tsx",
+      "exports": [
+        "Tooltip",
+        "TooltipContent",
+        "TooltipProvider",
+        "TooltipTrigger"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "typography": {
+      "file": "controls/typography/typography.tsx",
+      "exports": [
+        "Headline",
+        "Hint",
+        "Text"
+      ],
+      "props": {
+        "numeric": [
+          "true",
+          "false"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "use-debounce": {
+      "file": "controls/use-debounce/use-debounce.ts",
+      "exports": [
+        "useDebouncedCallback"
+      ],
+      "states": [
+        "default"
+      ]
+    },
+    "use-virtual-rows": {
+      "file": "controls/use-virtual-rows/use-virtual-rows.ts",
+      "exports": [
+        "SPACER_ATTR",
+        "VIRTUALIZE_THRESHOLD",
+        "useVirtualRows"
+      ],
+      "states": [
+        "default"
+      ]
+    },
+    "video": {
+      "file": "controls/video/video.tsx",
+      "exports": [
+        "Video"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "visibility": {
+      "file": "controls/visibility/visibility.tsx",
+      "exports": [
+        "VisibilityProvider",
+        "Visible",
+        "useIsVisible",
+        "useVisibilityContext"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
+    "web-embed": {
+      "file": "controls/web-embed/web-embed.tsx",
+      "exports": [
+        "WebEmbed"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    }
+  },
+  "icons": [
+    "Pencil",
+    "Power",
+    "UserMinus",
+    "Ban",
+    "Plus",
+    "Upload",
+    "AlarmClock",
+    "AlarmClockOff",
+    "AppWindow",
+    "ArchiveRestore",
+    "Archive",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowUpDown",
+    "ArrowUpRight",
+    "BadgeCheck",
+    "Banknote",
+    "Building2",
+    "CalendarClock",
+    "CalendarDays",
+    "CalendarRange",
+    "CalendarSync",
+    "ChartNoAxesColumn",
+    "Check",
+    "CheckCheck",
+    "ChevronLeft",
+    "ChevronRight",
+    "ChevronsUpDown",
+    "CircleStop",
+    "ClipboardCheck",
+    "ClipboardCopy",
+    "Clock",
+    "Copy",
+    "CornerDownRight",
+    "Download",
+    "ExternalLink",
+    "Eye",
+    "EyeOff",
+    "FileSpreadsheet",
+    "FileText",
+    "GitBranch",
+    "Hammer",
+    "History",
+    "Home",
+    "House",
+    "Inbox",
+    "KeyRound",
+    "Languages",
+    "LibraryBig",
+    "LifeBuoy",
+    "Link",
+    "Link2",
+    "ListOrdered",
+    "ListTodo",
+    "Loader2",
+    "Lock",
+    "LogOut",
+    "Mail",
+    "MailOpen",
+    "MoreHorizontal",
+    "Package",
+    "Palette",
+    "PanelLeftClose",
+    "PanelLeftOpen",
+    "Paperclip",
+    "PenLine",
+    "PiggyBank",
+    "Play",
+    "RefreshCw",
+    "RotateCcw",
+    "Route",
+    "Search",
+    "SearchX",
+    "Send",
+    "Settings",
+    "Settings2",
+    "Share",
+    "Shield",
+    "ShieldOff",
+    "Sparkles",
+    "SquareArrowOutUpRight",
+    "Timer",
+    "Trash2",
+    "TriangleAlert",
+    "Undo2",
+    "UserCheck",
+    "UserPlus",
+    "UserRound",
+    "Users",
+    "Video",
+    "X"
+  ],
+  "iconsAdded": {
+    "ChevronDown": "accordion, select, dropdown-menu and collapsible all need a down chevron; the 93 have ChevronLeft, ChevronRight and ChevronsUpDown but no ChevronDown. Commission rule 3 permits adding; it forbids removing or renaming.",
+    "ChevronUp": "select's scroll-up affordance and the collapsed half of a disclosure",
+    "Star": "the `rating` primitive in section 6 has no glyph in the 93"
+  },
+  "iconSubstitutions": {},
+  "iconSizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32
+  ],
+  "compositions": {
+    "note": "RESTRUCTURED 2026-08-24. compositions/ is four folders — templates, screens, overlays, states — and the client's sentence for it is \"everything currently compositions/xyz is compositions (and then sections inside of it)\". compositions/shapes/, compositions/system/ and compositions/portal/ NO LONGER EXIST. Twenty-four files and 11,731 lines of example collection and detail pages were deleted: the kit ships the TEMPLATE for a main screen and a detail screen, and the application builds the page. Every barrel is compositions/<folder>/index.ts, and compositions/index.ts re-exports all four.",
+    "templates": {
+      "collection-screen": {
+        "file": "compositions/templates/collection-screen.tsx",
+        "exports": [
+          "CollectionScreen"
+        ]
+      },
+      "detail-screen": {
+        "file": "compositions/templates/detail-screen.tsx",
+        "exports": [
+          "DetailScreen"
+        ]
+      },
+      "form-screen": {
+        "file": "compositions/templates/form-screen.tsx",
+        "exports": [
+          "FormScreen"
+        ]
+      },
+      "import-flow": {
+        "file": "compositions/templates/import-flow.tsx",
+        "exports": [
+          "IMPORT_STEPS",
+          "ImportFlow"
+        ]
+      },
+      "main-screen": {
+        "file": "compositions/templates/main-screen.tsx",
+        "exports": [
+          "MainScreen"
+        ]
+      },
+      "multi-step-form": {
+        "file": "compositions/templates/multi-step-form.tsx",
+        "exports": [
+          "MAX_WIZARD_STEPS",
+          "MultiStepForm",
+          "WizardPickList"
+        ]
+      },
+      "portal-home": {
+        "file": "compositions/templates/portal-home.tsx",
+        "exports": [
+          "PortalHome",
+          "PortalSavingsFigure"
+        ]
+      },
+      "rail": {
+        "file": "compositions/templates/rail.tsx",
+        "exports": [
+          "RAIL_PLACEHOLDER_GROUPS",
+          "Rail"
+        ]
+      },
+      "record-chrome": {
+        "file": "compositions/templates/record-chrome.tsx",
+        "exports": [
+          "RECORD_STAGE_COUNT",
+          "RecordChrome"
+        ]
+      },
+      "record-route": {
+        "file": "compositions/templates/record-route.tsx",
+        "exports": [
+          "RecordRoute",
+          "SYSTEM_STAGES"
+        ]
+      },
+      "screen-shell": {
+        "file": "compositions/templates/screen-shell.tsx",
+        "exports": [
+          "RAIL_WIDTH",
+          "ScreenShell"
+        ]
+      },
+      "search-results": {
+        "file": "compositions/templates/search-results.tsx",
+        "exports": [
+          "SEARCH_PAGE_SIZE",
+          "SEARCH_PORTAL_KINDS",
+          "SearchResults"
+        ]
+      },
+      "sign-in": {
+        "file": "compositions/templates/sign-in.tsx",
+        "exports": [
+          "AuthPhotograph",
+          "SIGN_IN_CODE_LENGTH",
+          "SignIn",
+          "SignInSplash"
+        ]
+      },
+      "stat-strip": {
+        "file": "compositions/templates/stat-strip.tsx",
+        "exports": [
+          "MAX_SPARK_SERIES",
+          "MAX_STRIP_FIGURES",
+          "StatStrip"
+        ]
+      },
+      "stepper-hero": {
+        "file": "compositions/templates/stepper-hero.tsx",
+        "exports": [
+          "STEPPER_FOLD_AFTER",
+          "STEPPER_STAGE_COUNT",
+          "StepperHero"
+        ]
+      }
+    },
+    "screens": {
+      "brand": {
+        "file": "compositions/screens/brand.tsx",
+        "exports": [
+          "BRAND_COLOURS",
+          "BRAND_TYPE",
+          "BrandRoute"
+        ]
+      },
+      "company-hub": {
+        "file": "compositions/screens/company-hub.tsx",
+        "exports": [
+          "COMPANY_FIGURES",
+          "COMPANY_FIGURE_COUNT",
+          "CompanyHubScreen"
+        ]
+      },
+      "home": {
+        "file": "compositions/screens/home.tsx",
+        "exports": [
+          "HomeRoute",
+          "SYSTEM_ROOT_REDIRECT"
+        ]
+      },
+      "invite-acceptance": {
+        "file": "compositions/screens/invite-acceptance.tsx",
+        "exports": [
+          "InviteAcceptanceScreen"
+        ]
+      },
+      "link-sent": {
+        "file": "compositions/screens/link-sent.tsx",
+        "exports": [
+          "LinkSentScreen",
+          "formatResendCountdown"
+        ]
+      },
+      "not-found": {
+        "file": "compositions/screens/not-found.tsx",
+        "exports": [
+          "NotFoundScreen"
+        ]
+      },
+      "onboarding": {
+        "file": "compositions/screens/onboarding.tsx",
+        "exports": [
+          "OnboardingRoute"
+        ]
+      },
+      "portal-boot": {
+        "file": "compositions/screens/portal-boot.tsx",
+        "exports": [
+          "PortalIndexRoute"
+        ]
+      },
+      "portal-home": {
+        "file": "compositions/screens/portal-home.tsx",
+        "exports": [
+          "PortalHomeRoute"
+        ]
+      },
+      "portal-impact": {
+        "file": "compositions/screens/portal-impact.tsx",
+        "exports": [
+          "PortalImpactRoute"
+        ]
+      },
+      "profile": {
+        "file": "compositions/screens/profile.tsx",
+        "exports": [
+          "ProfileRoute"
+        ]
+      },
+      "session-expired": {
+        "file": "compositions/screens/session-expired.tsx",
+        "exports": [
+          "SessionExpiredScreen"
+        ]
+      },
+      "settings": {
+        "file": "compositions/screens/settings.tsx",
+        "exports": [
+          "SettingsRoute"
+        ]
+      },
+      "sign-in": {
+        "file": "compositions/screens/sign-in.tsx",
+        "exports": [
+          "AuthShell",
+          "SignInScreen"
+        ]
+      },
+      "sign-in-portal": {
+        "file": "compositions/screens/sign-in-portal.tsx",
+        "exports": [
+          "PortalLoginRoute"
+        ]
+      },
+      "sign-in-system": {
+        "file": "compositions/screens/sign-in-system.tsx",
+        "exports": [
+          "LoginRoute"
+        ]
+      },
+      "splash": {
+        "file": "compositions/screens/splash.tsx",
+        "exports": [
+          "SplashScreen"
+        ]
+      }
+    },
+    "overlays": {
+      "access-denied": {
+        "file": "compositions/overlays/access-denied.tsx",
+        "exports": [
+          "AccessDeniedScreen"
+        ]
+      },
+      "assistant": {
+        "file": "compositions/overlays/assistant.tsx",
+        "exports": [
+          "Assistant",
+          "AssistantConfirmation",
+          "AssistantResult",
+          "AssistantThread"
+        ]
+      },
+      "bulk-edit": {
+        "file": "compositions/overlays/bulk-edit.tsx",
+        "exports": [
+          "BulkEditScreen"
+        ]
+      },
+      "export": {
+        "file": "compositions/overlays/export.tsx",
+        "exports": [
+          "ExportScreen",
+          "defaultColumnIds"
+        ]
+      },
+      "filter-builder": {
+        "file": "compositions/overlays/filter-builder.tsx",
+        "exports": [
+          "FilterBuilderScreen"
+        ]
+      },
+      "import": {
+        "file": "compositions/overlays/import.tsx",
+        "exports": [
+          "IMPORT_STEPS",
+          "ImportScreen",
+          "NOT_IMPORTED"
+        ]
+      },
+      "import-proposal": {
+        "file": "compositions/overlays/import-proposal.tsx",
+        "exports": [
+          "ImportProposalScreen",
+          "NEEDS_YOU_BELOW",
+          "PROPOSAL_STEPS"
+        ]
+      },
+      "quick-view": {
+        "file": "compositions/overlays/quick-view.tsx",
+        "exports": [
+          "QUICK_VIEW_ASK_LIMIT",
+          "QuickView",
+          "cutAsk"
+        ]
+      }
+    },
+    "states": {
+      "archive": {
+        "file": "compositions/states/archive.tsx",
+        "exports": [
+          "ArchiveScreen"
+        ]
+      },
+      "empty-collection": {
+        "file": "compositions/states/empty-collection.tsx",
+        "exports": [
+          "EmptyCollectionScreen"
+        ]
+      },
+      "new-empty-record": {
+        "file": "compositions/states/new-empty-record.tsx",
+        "exports": [
+          "NEW_RECORD_CREATION_LOG",
+          "NEW_RECORD_EMPTY_PANELS",
+          "NewEmptyRecordScreen"
+        ]
+      },
+      "no-results": {
+        "file": "compositions/states/no-results.tsx",
+        "exports": [
+          "NoResultsScreen"
+        ]
+      },
+      "states": {
+        "file": "compositions/states/states.tsx",
+        "exports": [
+          "SHAPE_HEADING_SIZE",
+          "SHAPE_SHELL",
+          "SHAPE_STATE_COPY",
+          "ShapeStateBody",
+          "shapeCopy",
+          "shapeStateTone"
+        ]
+      }
+    }
+  },
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "scales": {
+    "small": "13px",
+    "medium": "15px",
+    "large": "17px"
+  },
+  "scalesNote": "Authoring base is 16px; :root renders 15px. Neither app's default is forced — each sets data-scale on <html>. The portal deliberately sits one step above the system app.",
+  "breakpoints": {
+    "mobile": "<40rem",
+    "tablet": "40rem-63.99rem",
+    "desktop": ">=64rem",
+    "note": "Tailwind v4 defaults: sm 40rem / md 48rem / lg 64rem / xl 80rem. Components state their behaviour per breakpoint in their own header comment."
+  },
+  "rtl": false,
+  "extraDependencies": {
+    "recharts": "^3.10.1 - the Chart collection. On the commission permitted list but was not installed.",
+    "vite": "dev only - builds demo/. Not shipped; consuming apps bring their own bundler.",
+    "@vitejs/plugin-react": "dev only - demo build.",
+    "@tailwindcss/vite": "dev only - demo build."
+  },
+  "notDelivered": [
+    {
+      "item": "Right-to-left support",
+      "reason": "NOT SUPPORTED, by client decision on 2026-08-22. Kwapso kit ruling 10 already put RTL out of scope; the commission asked for rtl:true and the client has now settled it as LTR-only.",
+      "note": "The 65 primitives are nevertheless written with CSS logical properties throughout, and motion.css carries [dir=rtl] mirrors for the sheet, tab indicator and stepper connector. That was not reverted: reverting 65 files to physical properties would be pure risk for zero gain, and logical properties resolve identically in LTR. If RTL is ever wanted, the components are most of the way there and the missing piece is a Radix DirectionProvider at the app root.",
+      "severity": "out-of-scope"
+    },
+    {
+      "item": "Icon artwork — all 93, plus the 3 added",
+      "reason": "Placeholder art by instruction: a rounded frame with a per-name dot pattern, deliberately not final and visibly not final. The client is supplying the real icons. The NAMES, the React API, the five sizes and the currentColor wiring are FINAL.",
+      "swapProcedure": "Drop the real <Name>.svg over the placeholder in icons/, run `node icons/generate-icons.mjs`. No component and no call site changes. The generator reads each file's own viewBox, so incoming art may be drawn on any grid.",
+      "severity": "expected",
+      "owner": "client"
+    },
+    {
+      "item": "--warning / --warning-foreground / --warning-strong",
+      "reason": "There is no warning colour in the kwapso palette — seven brand colours and none is amber. The kit assigns overdue to Poppy, and ruling 26 states mango is the brand, not a status. Folded into danger by decision, so Badge variant=\"warning\" still renders (poppy). --warning-strong resolves identically to --warning rather than inventing a deeper amber.",
+      "recommendation": "Leave folded, or open a kit ruling to admit an eighth brand colour.",
+      "severity": "accepted"
+    },
+    {
+      "item": "--chart-4 and --chart-5",
+      "reason": "The kit designs three series colours (sky, forest, poppy) and says they cycle. 4 and 5 are placeholders repeating 1 and 2, so a five-series chart currently shows two indistinguishable pairs.",
+      "recommendation": "Two dedicated data-safe hues need a kit ruling. Never mango (brand, not data) and never grey (reads as disabled).",
+      "severity": "known-limitation"
+    },
+    {
+      "item": "Dark value for --accent, the neutral row/item hover wash",
+      "reason": "The kit states the light wash at rgba(26,25,24,.05) — the command palette's active row and the destructive menu item, ch12 — and draws no dark twin. Derived by the kit's own hairline method: carry the alpha, flip the ink, giving rgba(255,254,249,.05). Charcoal at 5% on unlit paper would be invisible, so holding the light value would have been a broken hover, not a cautious one.",
+      "recommendation": "Confirm or replace with a kit ruling. Tracked upstream as T12-3.",
+      "severity": "derived"
+    },
+    {
+      "item": "Font files — Saans and SerrifCondensed",
+      "reason": "Redistribution is an open licence question, not a technical one. Both families are named first in --font-sans / --font-serif with a real fallback stack behind them, so nothing renders blank if the files never land.",
+      "recommendation": "Resolve the licence, then add the files and an @font-face block.",
+      "severity": "blocked-externally"
+    }
+  ],
+  "collections": {
+    "activity-feed": {
+      "file": "structures/activity-feed/activity-feed.tsx",
+      "exports": [
+        "ActivityFeed"
+      ]
+    },
+    "agenda": {
+      "file": "structures/agenda/agenda.tsx",
+      "exports": [
+        "Agenda"
+      ]
+    },
+    "agent-chat": {
+      "file": "structures/agent-chat/agent-chat.tsx",
+      "exports": [
+        "AgentChat"
+      ]
+    },
+    "article-body": {
+      "file": "structures/article-body/article-body.tsx",
+      "exports": [
+        "ArticleBody"
+      ]
+    },
+    "calendar-view": {
+      "file": "structures/calendar-view/calendar-view.tsx",
+      "exports": [
+        "CalendarView"
+      ]
+    },
+    "card-grid": {
+      "file": "structures/card-grid/card-grid.tsx",
+      "exports": [
+        "CardGrid"
+      ]
+    },
+    "chart": {
+      "file": "structures/chart/chart.tsx",
+      "exports": [
+        "Chart"
+      ]
+    },
+    "chat": {
+      "file": "structures/chat/chat.tsx",
+      "exports": [
+        "Chat"
+      ]
+    },
+    "checklist": {
+      "file": "structures/checklist/checklist.tsx",
+      "exports": [
+        "Checklist"
+      ]
+    },
+    "collection-frame": {
+      "file": "structures/collection-frame/collection-frame.tsx",
+      "exports": [
+        "CollectionFrame",
+        "CollectionRegister"
+      ]
+    },
+    "comments": {
+      "file": "structures/comments/comments.tsx",
+      "exports": [
+        "Comments"
+      ]
+    },
+    "compare": {
+      "file": "structures/compare/compare.tsx",
+      "exports": [
+        "Compare",
+        "MAX_COMPARE_COLUMNS",
+        "MIN_COMPARE_COLUMNS"
+      ]
+    },
+    "copilot-overlay": {
+      "file": "structures/copilot-overlay/copilot-overlay.tsx",
+      "exports": [
+        "CopilotOverlay",
+        "CopilotTouched"
+      ]
+    },
+    "data-preview-table": {
+      "file": "structures/data-preview-table/data-preview-table.tsx",
+      "exports": [
+        "DataPreviewTable"
+      ]
+    },
+    "data-table": {
+      "file": "structures/data-table/data-table.tsx",
+      "exports": [
+        "DataTable",
+        "SPACER_ATTR",
+        "VIRTUALIZE_THRESHOLD"
+      ]
+    },
+    "description-list": {
+      "file": "structures/description-list/description-list.tsx",
+      "exports": [
+        "DescriptionList"
+      ]
+    },
+    "detail-view": {
+      "file": "structures/detail-view/detail-view.tsx",
+      "exports": [
+        "DetailView"
+      ]
+    },
+    "flowchart": {
+      "file": "structures/flowchart/flowchart.tsx",
+      "exports": [
+        "Flowchart",
+        "KIND_ICON"
+      ]
+    },
+    "flowdetail": {
+      "file": "structures/flowdetail/flowdetail.tsx",
+      "exports": [
+        "Flowdetail",
+        "FLOW_STEP_FIELDS"
+      ]
+    },
+    "form": {
+      "file": "structures/form/form.tsx",
+      "exports": [
+        "Form",
+        "FormActions",
+        "FormSection"
+      ]
+    },
+    "gallery": {
+      "file": "structures/gallery/gallery.tsx",
+      "exports": [
+        "Gallery"
+      ]
+    },
+    "gantt": {
+      "file": "structures/gantt/gantt.tsx",
+      "exports": [
+        "Gantt",
+        "GanttPeriodStepper"
+      ]
+    },
+    "heatmap": {
+      "file": "structures/heatmap/heatmap.tsx",
+      "exports": [
+        "Heatmap",
+        "HEAT_FILL",
+        "HEAT_LEVELS"
+      ]
+    },
+    "import-wizard": {
+      "file": "structures/import-wizard/import-wizard.tsx",
+      "exports": [
+        "ImportWizard"
+      ]
+    },
+    "kanban": {
+      "file": "structures/kanban/kanban.tsx",
+      "exports": [
+        "Kanban"
+      ]
+    },
+    "list": {
+      "file": "structures/list/list.tsx",
+      "exports": [
+        "List"
+      ]
+    },
+    "map": {
+      "file": "structures/map/map.tsx",
+      "exports": [
+        "Map"
+      ],
+      "movedFrom": "components/primitives/map/map.tsx",
+      "note": "Client ruling 2026-08-24, and 27.29 agrees: a map is always paired with the records beside it, which is a collection view."
+    },
+    "matrix": {
+      "file": "structures/matrix/matrix.tsx",
+      "exports": [
+        "Matrix"
+      ]
+    },
+    "permission-matrix": {
+      "file": "structures/permission-matrix/permission-matrix.tsx",
+      "exports": [
+        "PermissionMatrix",
+        "PERMISSION_CAPABILITIES",
+        "PERMISSION_LEVELS",
+        "RIGHTS",
+        "WRITE_RIGHTS"
+      ]
+    },
+    "portal-conversation": {
+      "file": "structures/portal-conversation/portal-conversation.tsx",
+      "exports": [
+        "PortalApprovalBand",
+        "PortalConversation"
+      ],
+      "movedFrom": "compositions/shapes/portal-conversation.tsx",
+      "note": "A thread of bubbles with a composer — the same category as chat and ticket-thread."
+    },
+    "progress-dashboard": {
+      "file": "structures/progress-dashboard/progress-dashboard.tsx",
+      "exports": [
+        "ProgressDashboard"
+      ]
+    },
+    "pulse-band": {
+      "file": "structures/pulse-band/pulse-band.tsx",
+      "exports": [
+        "PulseBand",
+        "DAYS_IN_WEEK"
+      ]
+    },
+    "queue": {
+      "file": "structures/queue/queue.tsx",
+      "exports": [
+        "Queue"
+      ]
+    },
+    "record-detail": {
+      "file": "structures/record-detail/record-detail.tsx",
+      "exports": [
+        "RecordDetail"
+      ]
+    },
+    "run-steps": {
+      "file": "structures/run-steps/run-steps.tsx",
+      "exports": [
+        "RunSteps"
+      ]
+    },
+    "screen-renderer": {
+      "file": "structures/screen-renderer/screen-renderer.tsx",
+      "exports": [
+        "ScreenRegister",
+        "ScreenRegistryProvider",
+        "ScreenRenderer",
+        "useScreenRegistry"
+      ]
+    },
+    "split": {
+      "file": "structures/split/split.tsx",
+      "exports": [
+        "Split"
+      ]
+    },
+    "stat-grid": {
+      "file": "structures/stat-grid/stat-grid.tsx",
+      "exports": [
+        "StatGrid"
+      ]
+    },
+    "swimlane": {
+      "file": "structures/swimlane/swimlane.tsx",
+      "exports": [
+        "Swimlane"
+      ]
+    },
+    "ticket-thread": {
+      "file": "structures/ticket-thread/ticket-thread.tsx",
+      "exports": [
+        "TicketThread"
+      ]
+    },
+    "tiles": {
+      "file": "structures/tiles/tiles.tsx",
+      "exports": [
+        "Tiles"
+      ]
+    },
+    "timeline": {
+      "file": "structures/timeline/timeline.tsx",
+      "exports": [
+        "Timeline"
+      ]
+    }
+  },
+  "iconSizesNote": "28 is the sixth and was admitted by client ruling T2, 2026-08-23: 27.42 draws the module wall's icon at 28 and the ladder had five. Snapping the tile to 24 or 32 was the alternative and was declined.",
+  "foundationsFolder": {
+    "status": "NOT DONE — needs a client decision, flagged rather than guessed.",
+    "reason": "The agreed structure groups tokens/, icons/ and motion/ under a foundations/ folder. Thirteen DECISION AND INDEX PAGES under verify/ link tokens/tokens.css and motion/motion.css by relative path, and those pages are the record of what the client was looking at when they ruled. Moving the folders means editing all thirteen. The three folders therefore stay at the repository root for now. The DEMO LABEL 'foundations' is applied regardless, which is the part the client actually asked for."
+  }
+}

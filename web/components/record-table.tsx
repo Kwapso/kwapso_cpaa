@@ -62,19 +62,19 @@
 
 import * as React from "react"
 
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from "@shared/ui/icons"
 
-import { CollectionFrame } from "@shared/ui/registry/collections/collection-frame/collection-frame"
-import type { ScreenActionContext } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { CollectionConfig } from "@shared/ui/lib/config"
-import { gateState, type ScreenRecipe, type ScreenRights } from "@shared/ui/lib/recipe"
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
+import type { ScreenActionContext } from "@shared/web/screen-engine/screen-renderer"
+import type { CollectionConfig } from "@shared/web/screen-engine/config"
+import { gateState, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
+} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -82,7 +82,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@shared/ui/registry/primitives/table/table"
+} from "@shared/ui/controls/table/table"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 

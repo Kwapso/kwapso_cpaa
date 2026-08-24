@@ -5,7 +5,20 @@
  * copy, now IN this repo at shared/ui/styles.css; this app never carries its
  * own. It also carries the @source line that tells Tailwind to scan the
  * component source, so this import is load-bearing twice over. */
-@import "../../shared/ui/styles.css";
+@import "../../shared/ui/tokens/tokens.css";
+@import "../../shared/ui/motion/motion.css";
+
+/* THE KIT'S CLASSES EXIST ONLY IF TAILWIND READS THE KIT'S SOURCE. The old
+ * stylesheet carried `@source "./registry"` inside itself; the kit's
+ * tokens.css carries none, because in its own repo vite scans everything. So
+ * the scan instruction lives HERE now, at the door that owns the build —
+ * paths relative to THIS file. A utility used only inside a kit component
+ * (a tab's folder shape, a table's sticky header) is emitted because of
+ * these three lines and for no other reason. (compositions/ joins the list
+ * the day a door renders one.) */
+@source "../../shared/ui/controls";
+@source "../../shared/ui/structures";
+@source "../../shared/ui/icons";
 
 /* The library overrides BOTH front doors carry, in one file. */
 @import "../../shared/web/library-overrides.css";

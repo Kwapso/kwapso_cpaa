@@ -22,9 +22,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Check } from "lucide-react"
+} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
+import { Button } from "@shared/ui/controls/button/button"
+import { Check } from "@shared/ui/icons"
 import { toast } from "sonner"
 
 import { LANGUAGES, translate, type Language } from "../i18n"

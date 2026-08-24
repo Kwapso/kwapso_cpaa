@@ -151,7 +151,7 @@ describe("the parser paints a correct mark before anything runs", () => {
   it("is the right colour in both themes, chosen or inherited", () => {
     const media = css.indexOf("@media (prefers-color-scheme:dark)")
     expect(media, "no OS-preference fallback — with scripting off the dark screen gets the light mark").toBeGreaterThan(-1)
-    for (const rule of ["html.light .ks-mark-host", "html.dark .ks-mark-host"])
+    for (const rule of ["html[data-theme=light] .ks-mark-host", "html[data-theme=dark] .ks-mark-host"])
       expect(
         css.indexOf(rule),
         `${rule} is missing or sits above the media query — an explicit theme choice loses to the OS preference`

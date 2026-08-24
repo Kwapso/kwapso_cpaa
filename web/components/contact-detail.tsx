@@ -44,9 +44,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/controls/button/button"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,9 +56,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { KeyRound, Pencil, Power } from "lucide-react"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { KeyRound, Pencil, Power } from "@shared/ui/icons"
 
 import type { AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"

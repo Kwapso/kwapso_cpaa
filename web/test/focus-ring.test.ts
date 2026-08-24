@@ -56,7 +56,7 @@ describe("the focus ring", () => {
   it("focus-ring: …and the one rule that replaced them is still there", () => {
     // A census of absences passes perfectly against an app that has no focus
     // styling at all, which is precisely the state this check exists to prevent.
-    const css = readFileSync(join(ROOT, "shared", "ui", "styles.css"), "utf8")
+    const css = readFileSync(join(ROOT, "shared", "ui", "tokens", "tokens.css"), "utf8")
     expect(css, "the one :focus-visible rule is gone — every control now has no ring at all").toMatch(
       /:focus-visible\s*\{[^}]*outline:\s*var\(--focus-width\)\s+solid\s+var\(--focus\)/
     )

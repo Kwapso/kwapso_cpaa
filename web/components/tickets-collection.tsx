@@ -32,13 +32,13 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
-import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Send } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Send } from "@shared/ui/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"

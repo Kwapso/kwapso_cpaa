@@ -1,14 +1,17 @@
 // THE TWO DARK BLOCKS SAY THE SAME THING, OR THE BUILD GOES RED.
 //
-// `shared/ui/styles.css` defines dark twice, on purpose, and the design kit's
-// own build script enforces the same thing on its side:
+// The design kit's `tokens/tokens.css` defines dark twice, on purpose, and the
+// kit's own build script enforces the same thing upstream — but that script
+// runs in the kit's repo, not this one, and a vendored copy is exactly the
+// place a hand-edit or a bad sync could split them. So the APP asserts it too:
 //
-//   .dark, :root[data-theme="dark"]       an explicit choice, either convention
+//   :root[data-theme="dark"]              an explicit choice
 //   @media (prefers-color-scheme: dark)   a viewer who never chose
 //
-// One block cannot be dropped. The class is what next-themes writes, so it is
-// what decides the theme in practice; the media query is what makes an explicit
-// LIGHT choice survive a dark operating system, because of its `:not()` guard.
+// One block cannot be dropped. `data-theme` is what the kit's ModeToggle
+// writes, so it is what decides the theme in practice; the media query is what
+// makes an explicit LIGHT choice survive a dark operating system, because of
+// its `:not()` guard.
 //
 // WHY IT NEEDS A TEST RATHER THAN A CAREFUL DEVELOPER. A token defined in only
 // one of them renders differently for "system dark" than for "I picked dark" —
@@ -25,7 +28,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
-const CSS = readFileSync(join(ROOT, "shared", "ui", "styles.css"), "utf8")
+const CSS = readFileSync(join(ROOT, "shared", "ui", "tokens", "tokens.css"), "utf8")
 
 /** Every `--token: value` inside one brace-balanced block, as a sorted map. */
 function declarations(startAt: number): Map<string, string> {
@@ -49,8 +52,8 @@ function declarations(startAt: number): Map<string, string> {
 
 describe("the theme's two dark blocks", () => {
   it("theme-tokens: an explicit dark choice and a dark system resolve identically", () => {
-    const explicit = declarations(CSS.indexOf('.dark,\n:root[data-theme="dark"]'))
-    const media = declarations(CSS.indexOf(':root:not(.light):not([data-theme="light"])'))
+    const explicit = declarations(CSS.indexOf(':root[data-theme="dark"]'))
+    const media = declarations(CSS.indexOf(':root:not([data-theme="light"])'))
 
     // Neither may go blind: a selector that stopped matching would leave both
     // maps empty and this test would pass by finding nothing.
@@ -80,9 +83,25 @@ describe("the theme's two dark blocks", () => {
     // `@media (prefers-color-scheme: dark)` has no light value at all, so it
     // falls back to whatever it inherits and the light theme quietly loses a
     // token. Checked by asserting every dark token has a light counterpart.
-    const light = declarations(CSS.indexOf(":root,\n.light"))
-    const dark = declarations(CSS.indexOf('.dark,\n:root[data-theme="dark"]'))
-    expect(light.size, "the light block was not found — has its selector changed?").toBeGreaterThan(20)
+    // The kit spreads its light declarations across SEVERAL bare `:root`
+    // blocks (surfaces, type, spacing, per-section), so light is the union of
+    // every `:root {` that sits OUTSIDE a media query.
+    const light = new Map<string, string>()
+    for (let at = CSS.indexOf(":root {"); at !== -1; at = CSS.indexOf(":root {", at + 1)) {
+      // inside a media query? count unbalanced braces before this point that
+      // belong to an @media wrapper.
+      const before = CSS.slice(0, at)
+      const opens = (before.match(/@media[^{]*\{/g) ?? []).length
+      let depth = 0
+      for (const ch of before) {
+        if (ch === "{") depth++
+        else if (ch === "}") depth--
+      }
+      if (opens > 0 && depth > 0) continue
+      for (const [k, v] of declarations(at)) if (!light.has(k)) light.set(k, v)
+    }
+    const dark = declarations(CSS.indexOf(':root[data-theme="dark"]'))
+    expect(light.size, "the light blocks were not found — has the selector changed?").toBeGreaterThan(20)
 
     const darkOnly = [...dark.keys()].filter((k) => !light.has(k))
     expect(

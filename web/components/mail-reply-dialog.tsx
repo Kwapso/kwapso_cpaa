@@ -29,15 +29,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
+import { Button } from "@shared/ui/controls/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { Textarea } from "@shared/ui/registry/primitives/textarea/textarea"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
-import { ExternalLink, PenLine, Send } from "lucide-react"
+import { Input } from "@shared/ui/controls/input/input"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { Textarea } from "@shared/ui/controls/textarea/textarea"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { ExternalLink, PenLine, Send } from "@shared/ui/icons"
 
 import { ApiFailure, content } from "@/lib/api"
 import { safeHref } from "@shared/web/rich-text"

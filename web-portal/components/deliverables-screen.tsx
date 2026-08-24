@@ -29,7 +29,7 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 
 import { formatDate } from "@shared/web/format"
 import { useT } from "@shared/web/language"

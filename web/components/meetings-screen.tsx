@@ -20,19 +20,19 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { CalendarSync } from "lucide-react"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { CalendarSync } from "@shared/ui/icons"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
-import type { CollectionConfig } from "@shared/ui/lib/config"
+} from "@shared/web/screen-engine/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import type { CollectionConfig } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { GoogleSyncButton } from "@/components/google-sync"

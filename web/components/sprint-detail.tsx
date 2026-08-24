@@ -14,12 +14,12 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { CheckCheck, Pencil, RotateCcw } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { CheckCheck, Pencil, RotateCcw } from "@shared/ui/icons"
 
 import {
   SprintFormDialog,

@@ -1,0 +1,912 @@
+/* ============================================================================
+   kwapso-design · motion
+   Commission section 10 — all fifteen cases, with values.
+
+   HOW THIS FILE IS USED
+   ---------------------------------------------------------------------------
+   A primitive gets correct motion by adding ONE class. It never writes a
+   duration, a curve, a distance or a keyframe of its own. If a component
+   needs motion this file does not have, the fix is a new class here, not a
+   local transition.
+
+       <DialogContent className={cn("motion-dialog", className)} />
+       <li className="motion-row" data-state="open" />
+       <button className="motion-button" />
+
+   Most classes are STATEFUL: they read `data-state="open" | "closed"`, which
+   every Radix primitive already sets, so one class covers entrance and exit.
+   Where a component is not Radix-driven, the same keyframes are reachable
+   through explicit `-in` / `-out` classes on the same rule.
+
+   FOUR LAWS
+   ---------------------------------------------------------------------------
+   1 · THE ENTRANCE SIGNATURE IS FADE PLUS A RISE.
+       Opacity 0 -> 1 and translateY(--motion-rise) -> 0, over
+       --duration-entrance, on --ease-entrance. 8px for a panel, 4px for a
+       row. This is the kit's signature; it is used, not redesigned. Nothing
+       enters by scaling up, spinning in, or flying from a corner.
+
+   2 · NO BOUNCE, NO PARALLAX. kwapso law from the kit. No curve in this
+       system overshoots; no two layers move at different rates to fake
+       depth. Depth is carried by --shadow-*, which is paper, not physics.
+
+   3 · EVERY DURATION AND EVERY CURVE IS A var(). There is not one literal
+       `200ms` or `cubic-bezier(...)` in a rule body below. Change the feel
+       of the whole system by editing tokens/tokens.css, nowhere else.
+
+   4 · NO px, WITH ONE STATED EXCEPTION. Distances are rem so they scale
+       with the text-size control. The single px in this file is the 1px
+       button press nudge, and it says why at the point of use.
+
+   REDUCED MOTION
+   ---------------------------------------------------------------------------
+   tokens/tokens.css already zeroes all seven non-looping duration tokens
+   under `prefers-reduced-motion: reduce`. That covers every transition and
+   every keyframe animation below, because each one resolves its duration to
+   one of those tokens — they complete instantly at their end state rather
+   than being cancelled mid-way. It does NOT cover three things, and section
+   18 at the foot of this file handles exactly those and nothing else:
+
+     · looping animations, whose durations are deliberately not zeroed;
+     · transforms that persist as a state rather than playing out (the drag
+       lift), where a zero duration makes it snap instead of removing it;
+     · travel that is pointer-driven and therefore has no duration at all.
+
+   RTL
+   ---------------------------------------------------------------------------
+   Nothing here translates on X by a fixed distance, so the entrance
+   signature is direction-neutral. The three cases that do have a horizontal
+   direction — sheet side, stepper connector fill, tab indicator — are
+   mirrored under [dir="rtl"] where a transform-origin makes that necessary.
+   ============================================================================ */
+
+
+/* ============================================================================
+   1 · THE SHARED KEYFRAMES
+   Defined once. Everything below reaches for these rather than restating a
+   fade.
+   ========================================================================= */
+
+@keyframes motion-rise-in {
+  from { opacity: 0; transform: translateY(var(--motion-rise)); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes motion-rise-in-tight {
+  from { opacity: 0; transform: translateY(var(--motion-rise-tight)); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Exits fall by the tight distance whatever they rose by. A dismissal that
+   retraces its entrance exactly reads as an undo, not as a close. */
+@keyframes motion-fall-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(var(--motion-rise-tight)); }
+}
+
+@keyframes motion-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+
+/* ============================================================================
+   2 · PAGE AND ROUTE TRANSITION
+   Fade plus the full 8px rise, on the route's own content — never on the
+   app chrome. The sidebar, header band and tab strip must not restage
+   themselves when the route under them changes; if they do, every
+   navigation reads as a full page load.
+
+   Next's App Router has no exit hook of its own, so `.motion-page-out` is
+   applied by whatever transition wrapper the app uses. Without a wrapper the
+   enter class alone is correct and complete: the old route is simply gone.
+   ========================================================================= */
+
+.motion-page,
+.motion-page-in {
+  animation: motion-rise-in var(--duration-entrance) var(--ease-entrance) both;
+}
+
+.motion-page-out {
+  animation: motion-fade-out var(--duration-exit) var(--ease-exit) both;
+}
+
+/* A route that only swaps a panel inside a persistent record shell uses the
+   tight rise, because the thing that moved is small. */
+.motion-panel-in {
+  animation: motion-rise-in-tight var(--duration-entrance) var(--ease-entrance) both;
+}
+
+
+/* ============================================================================
+   3 · DIALOG AND SHEET — ENTRANCE AND EXIT
+
+   The division of labour between the two overlay durations:
+     --duration-overlay (360ms) is for the SCRIM and for a surface travelling
+       its own full width or height, i.e. a sheet. It is a long distance and
+       a long dim.
+     --duration-entrance (200ms) is for the 8px rise of a dialog, which
+       barely travels at all. A dialog held at 360ms feels reluctant.
+
+   The scrim fades; it does not blur and it does not slide.
+   ========================================================================= */
+
+.motion-scrim,
+.motion-scrim-in {
+  animation: motion-fade-in var(--duration-overlay) var(--ease-entrance) both;
+}
+.motion-scrim[data-state="closed"],
+.motion-scrim-out {
+  animation: motion-fade-out var(--duration-exit) var(--ease-exit) both;
+}
+
+/* Dialog / alert-dialog: centred, so it rises. */
+.motion-dialog,
+.motion-dialog-in {
+  animation: motion-rise-in var(--duration-entrance) var(--ease-entrance) both;
+}
+.motion-dialog[data-state="closed"],
+.motion-dialog-out {
+  animation: motion-fall-out var(--duration-exit) var(--ease-exit) both;
+}
+
+/* Sheet: edge-anchored, so it translates its own full extent. Percentages,
+   not lengths — the distance is the sheet, whatever size the sheet is.
+   The primitive must set data-side; Sheet already takes side as a prop. */
+@keyframes motion-sheet-in-right  { from { transform: translateX(100%);  } to { transform: translateX(0); } }
+@keyframes motion-sheet-out-right { from { transform: translateX(0); } to { transform: translateX(100%);  } }
+@keyframes motion-sheet-in-left   { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes motion-sheet-out-left  { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes motion-sheet-in-top    { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@keyframes motion-sheet-out-top   { from { transform: translateY(0); } to { transform: translateY(-100%); } }
+@keyframes motion-sheet-in-bottom { from { transform: translateY(100%);  } to { transform: translateY(0); } }
+@keyframes motion-sheet-out-bottom{ from { transform: translateY(0); } to { transform: translateY(100%);  } }
+
+.motion-sheet[data-side="right"][data-state="open"]   { animation: motion-sheet-in-right  var(--duration-overlay) var(--ease-entrance) both; }
+.motion-sheet[data-side="right"][data-state="closed"] { animation: motion-sheet-out-right var(--duration-exit)    var(--ease-exit)     both; }
+.motion-sheet[data-side="left"][data-state="open"]    { animation: motion-sheet-in-left   var(--duration-overlay) var(--ease-entrance) both; }
+.motion-sheet[data-side="left"][data-state="closed"]  { animation: motion-sheet-out-left  var(--duration-exit)    var(--ease-exit)     both; }
+.motion-sheet[data-side="top"][data-state="open"]     { animation: motion-sheet-in-top    var(--duration-overlay) var(--ease-entrance) both; }
+.motion-sheet[data-side="top"][data-state="closed"]   { animation: motion-sheet-out-top   var(--duration-exit)    var(--ease-exit)     both; }
+.motion-sheet[data-side="bottom"][data-state="open"]  { animation: motion-sheet-in-bottom var(--duration-overlay) var(--ease-entrance) both; }
+.motion-sheet[data-side="bottom"][data-state="closed"]{ animation: motion-sheet-out-bottom var(--duration-exit)   var(--ease-exit)     both; }
+
+/* CORRECTED 2026-08-22 — the note that used to sit here said "nothing to flip",
+   and that was wrong once `sheet.tsx` landed.
+
+   The primitive anchors LOGICALLY (`start-0` / `end-0`), so under [dir="rtl"]
+   a side="left" sheet sits on the physical RIGHT. The keyframes above are
+   physical, so it would have slid in from the left edge and arrived on the
+   right — crossing the whole viewport. Placement right, entrance wrong.
+
+   Swapping the two pairs under [dir="rtl"] realigns the animation with where
+   the primitive actually puts the panel. `side` keeps its LTR-physical prop
+   names because 18 call sites already pass them; only the behaviour mirrors.
+   Logged as GAPS-A.md SHT-1. */
+[dir="rtl"] .motion-sheet[data-side="right"][data-state="open"]   { animation-name: motion-sheet-in-left;   }
+[dir="rtl"] .motion-sheet[data-side="right"][data-state="closed"] { animation-name: motion-sheet-out-left;  }
+[dir="rtl"] .motion-sheet[data-side="left"][data-state="open"]    { animation-name: motion-sheet-in-right;  }
+[dir="rtl"] .motion-sheet[data-side="left"][data-state="closed"]  { animation-name: motion-sheet-out-right; }
+
+
+/* ============================================================================
+   4 · DROPDOWN, POPOVER, TOOLTIP, HOVER-CARD, SELECT, COMMAND — OPEN/CLOSE
+   Anchored surfaces. The rise is tight (4px) and takes its direction from
+   the side the surface opened on, so the surface always appears to come OUT
+   OF its trigger. A menu below the trigger rises; a menu above it falls.
+
+   No scale-in. A menu that scales from its corner is a different motion
+   language from the rest of this system, and mixing the two is what makes an
+   interface feel assembled from parts.
+
+   Radix sets data-side and data-state on the content element.
+   ========================================================================= */
+
+@keyframes motion-anchored-in-up   { from { opacity: 0; transform: translateY(var(--motion-rise-tight)); } to { opacity: 1; transform: translateY(0); } }
+@keyframes motion-anchored-in-down { from { opacity: 0; transform: translateY(calc(-1 * var(--motion-rise-tight))); } to { opacity: 1; transform: translateY(0); } }
+@keyframes motion-anchored-in-start{ from { opacity: 0; transform: translateX(var(--motion-rise-tight)); } to { opacity: 1; transform: translateX(0); } }
+@keyframes motion-anchored-in-end  { from { opacity: 0; transform: translateX(calc(-1 * var(--motion-rise-tight))); } to { opacity: 1; transform: translateX(0); } }
+
+.motion-anchored,
+.motion-anchored-in {
+  animation: motion-anchored-in-up var(--duration-entrance) var(--ease-entrance) both;
+}
+.motion-anchored[data-side="top"]   { animation-name: motion-anchored-in-up; }
+.motion-anchored[data-side="bottom"]{ animation-name: motion-anchored-in-down; }
+.motion-anchored[data-side="left"]  { animation-name: motion-anchored-in-start; }
+.motion-anchored[data-side="right"] { animation-name: motion-anchored-in-end; }
+
+/* Every side closes the same way: a straight fade. A close that retraces its
+   own direction draws attention to a surface the reader has finished with. */
+.motion-anchored[data-state="closed"],
+.motion-anchored-out {
+  animation: motion-fade-out var(--duration-exit) var(--ease-exit) both;
+}
+
+/* Menu and command rows. Hover is a fill swap only — never an opacity, never
+   a movement. A row that shifts under the cursor is a row you cannot click. */
+.motion-menu-item {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    color            var(--duration-colour) var(--ease);
+}
+
+
+/* ============================================================================
+   5 · TOAST — IN AND OUT
+   A toast is anchored to an edge and enters from beyond it. It uses the full
+   8px rise rather than the tight one: it is an interruption and is allowed
+   to be the one thing on screen that moved.
+
+   sonner sets data-state and its own position attributes; `.motion-toast` is
+   passed through Toaster's classNames so one class does both directions.
+   Swipe-to-dismiss is pointer-driven and has no duration — the settle after
+   the release does, and it is --duration-settle, section 16's rule.
+   ========================================================================= */
+
+@keyframes motion-toast-in-bottom { from { opacity: 0; transform: translateY(var(--motion-rise)); } to { opacity: 1; transform: translateY(0); } }
+@keyframes motion-toast-in-top    { from { opacity: 0; transform: translateY(calc(-1 * var(--motion-rise))); } to { opacity: 1; transform: translateY(0); } }
+
+.motion-toast,
+.motion-toast-in {
+  animation: motion-toast-in-bottom var(--duration-entrance) var(--ease-entrance) both;
+}
+.motion-toast[data-y-position="top"],
+.motion-toast-in-top {
+  animation-name: motion-toast-in-top;
+}
+
+.motion-toast[data-state="closed"],
+.motion-toast[data-removed="true"],
+.motion-toast-out {
+  animation: motion-fade-out var(--duration-exit) var(--ease-exit) both;
+}
+
+/* The stack behind the front toast reflows when one leaves. That is a move
+   between two on-screen positions, so it is --duration-settle on --ease-move,
+   the same rule as a reordered list row. */
+.motion-toast {
+  transition: transform var(--duration-settle) var(--ease-move);
+}
+
+
+/* ============================================================================
+   6 · SKELETON TO CONTENT
+   Two separate things, and conflating them is the usual mistake.
+
+   (a) THE WAIT. The skeleton breathes between two defined paper tones. It is
+       a background-colour animation, not an opacity animation — an alpha of
+       a token is a colour the palette does not contain (tokens.css
+       convention 4), and a half-faded skeleton over a card reads as broken
+       rather than pending. --surface-quiet and --surface-panel are chosen
+       because they are distinguishable from each other in BOTH themes;
+       --muted and --surface-quiet resolve to the same unlit tone in dark and
+       would not breathe at all there.
+
+   (b) THE HANDOVER. The skeleton fades out, the content rises in behind it,
+       and the content's start is delayed by exactly the skeleton's exit so
+       the two do not stack. No cross-dissolve: two half-transparent copies
+       of the same layout is the one thing that looks worse than a hard cut.
+   ========================================================================= */
+
+/* KIT-STATED, and it is opacity rather than a colour swap: "Pulse, not
+   shimmer. Opacity breathes between .30 and .75 on the standard ease,
+   staggered 100ms down the list. No travelling gradient — the brand has no
+   gradients to travel."
+
+   Opacity here is the kit's drawn design for a waiting mark, not an opacity
+   standing in for a state colour — the thing commission rule "no opacity for
+   states" exists to forbid. A skeleton is not a control and has no states.
+
+   ! KIT CONTRADICTION — the prose says .30/.75; the kit's own stylesheet
+   ships `@keyframes kwpulse { 0%,100% { opacity: .35 } 50% { opacity: .8 } }`.
+   Taking the prose, consistent with how ch09-vs-kwapso-ui.css was settled
+   elsewhere in this build: the prose is authored spec, the inline CSS is the
+   demo's implementation of it, and the prose is also where the stagger comes
+   from. Logged in GAPS.md. One value change if ruled the other way. */
+@keyframes motion-skeleton-breathe {
+  0%, 100% { opacity: .30; }
+  50%      { opacity: .75; }
+}
+
+.motion-skeleton {
+  background-color: var(--surface-quiet);
+  animation: motion-skeleton-breathe var(--duration-pulse) var(--ease) infinite;
+}
+
+/* "Staggered 100ms down the list." The kit draws two to five list lines, so
+   five steps covers every case it admits; a sixth bar restarts the cycle,
+   which is correct — the stagger is a ripple, not an ever-growing delay. */
+.motion-skeleton:nth-child(2) { animation-delay: calc(var(--motion-stagger) * 1); }
+.motion-skeleton:nth-child(3) { animation-delay: calc(var(--motion-stagger) * 2); }
+.motion-skeleton:nth-child(4) { animation-delay: calc(var(--motion-stagger) * 3); }
+.motion-skeleton:nth-child(5) { animation-delay: calc(var(--motion-stagger) * 4); }
+
+.motion-skeleton-out {
+  animation: motion-fade-out var(--duration-exit) var(--ease-exit) both;
+}
+
+.motion-content-in {
+  animation: motion-rise-in-tight var(--duration-entrance) var(--ease-entrance) both;
+  animation-delay: var(--duration-exit);
+}
+
+
+/* ============================================================================
+   7 · LIST ROW — INSERT, REMOVE, REORDER
+   Rows use the tight rise. A list of twenty rows each rising 8px is a wave,
+   and a wave is the parallax ruling in disguise.
+
+   Insert and remove animate the row. Reorder does NOT animate the row's own
+   properties — it animates the transform a FLIP measurement puts on it, which
+   is why `.motion-row-move` is a transition and not an animation. The
+   component measures first and last positions and sets the transform; this
+   file only decides how long the trip takes.
+   ========================================================================= */
+
+.motion-row,
+.motion-row-enter {
+  animation: motion-rise-in-tight var(--duration-entrance) var(--ease-entrance) both;
+}
+
+.motion-row[data-state="closed"],
+.motion-row-exit {
+  animation: motion-fall-out var(--duration-exit) var(--ease-exit) both;
+}
+
+/* A removal that also has to close the gap it leaves. grid-template-rows
+   0fr/1fr rather than a height, because a row's height is not knowable in
+   advance and `height: auto` does not animate. */
+.motion-row-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--duration-exit) var(--ease-exit),
+    opacity            var(--duration-exit) var(--ease-exit);
+}
+.motion-row-collapse[data-state="closed"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.motion-row-collapse > * { overflow: hidden; min-height: 0; }
+
+/* Reorder. --duration-settle, because the row is crossing a real distance
+   and arriving somewhere, which is the same event as a dropped card. */
+.motion-row-move {
+  transition: transform var(--duration-settle) var(--ease-move);
+}
+
+/* Row hover — fill only, and it is a separate class so a static list can
+   take the move behaviour without becoming interactive. */
+.motion-row-hover {
+  transition: background-color var(--duration-colour) var(--ease);
+}
+
+
+/* ============================================================================
+   8 · TAB CHANGE
+   Two moving parts, two different curves.
+
+   The INDICATOR travels between two on-screen positions: --ease-move. It is
+   the one element the eye tracks continuously, so it must not decelerate
+   like an entrance.
+
+   The PANEL does not travel — it is replaced. It gets the tight rise, and
+   only the incoming panel animates. Sliding panels horizontally to imply a
+   carousel is a lie about the information architecture: tabs are peers, not
+   a sequence, and the tab strip is not a filmstrip.
+
+   The indicator's own geometry is set by the component (a measured transform
+   and width, or a grid column). This file times it.
+   ========================================================================= */
+
+.motion-tab-indicator {
+  transition:
+    transform var(--duration-entrance) var(--ease-move),
+    width     var(--duration-entrance) var(--ease-move),
+    height    var(--duration-entrance) var(--ease-move);
+}
+
+.motion-tab-trigger {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    color            var(--duration-colour) var(--ease);
+}
+
+.motion-tab-panel[data-state="active"],
+.motion-tab-panel-in {
+  animation: motion-rise-in-tight var(--duration-entrance) var(--ease-entrance) both;
+}
+
+
+/* ============================================================================
+   9 · ACCORDION AND COLLAPSIBLE EXPAND
+   Height, from the height Radix measures for us. Opening settles
+   (--ease-entrance); closing accelerates away (--ease-exit). Content inside
+   must be clipped while it moves or the text spills past the closed edge.
+
+   `.motion-disclosure` is the Radix path. `.motion-disclosure-grid` is the
+   same behaviour for anything not Radix-driven, using 0fr/1fr so no height
+   has to be known.
+   ========================================================================= */
+
+@keyframes motion-accordion-open   { from { height: 0; } to { height: var(--radix-accordion-content-height); } }
+@keyframes motion-accordion-close  { from { height: var(--radix-accordion-content-height); } to { height: 0; } }
+@keyframes motion-collapsible-open { from { height: 0; } to { height: var(--radix-collapsible-content-height); } }
+@keyframes motion-collapsible-close{ from { height: var(--radix-collapsible-content-height); } to { height: 0; } }
+
+.motion-disclosure { overflow: hidden; }
+.motion-disclosure[data-state="open"]   { animation: motion-accordion-open  var(--duration-entrance) var(--ease-entrance); }
+.motion-disclosure[data-state="closed"] { animation: motion-accordion-close var(--duration-exit)     var(--ease-exit); }
+
+.motion-disclosure-collapsible { overflow: hidden; }
+.motion-disclosure-collapsible[data-state="open"]   { animation: motion-collapsible-open  var(--duration-entrance) var(--ease-entrance); }
+.motion-disclosure-collapsible[data-state="closed"] { animation: motion-collapsible-close var(--duration-exit)     var(--ease-exit); }
+
+.motion-disclosure-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-entrance) var(--ease-entrance);
+}
+.motion-disclosure-grid[data-state="open"] { grid-template-rows: 1fr; }
+.motion-disclosure-grid > * { overflow: hidden; min-height: 0; }
+
+/* The chevron. A rotation, not a swap to a second icon — the same mark
+   turning is what tells the reader the two states are one control. */
+.motion-disclosure-marker {
+  transition: transform var(--duration-entrance) var(--ease-entrance);
+}
+[data-state="open"] > .motion-disclosure-marker,
+.motion-disclosure-marker[data-state="open"] {
+  transform: rotate(180deg);
+}
+
+
+/* ============================================================================
+   10 · STREAMING TEXT ARRIVAL
+   The assistant and the ticket thread stream. Two rules, and the second one
+   is the one that gets forgotten.
+
+   (a) EACH ARRIVING CHUNK fades in over --duration-colour with a 4px rise.
+       --duration-colour, not --duration-entrance: chunks land several times
+       a second and a 200ms entrance on each one produces a permanent
+       shimmer. The component wraps each streamed chunk in an element
+       carrying `.motion-stream-chunk`; it must NOT re-render existing chunks,
+       or the whole reply re-animates on every token.
+
+   (b) THE CONTAINER MUST NOT ANIMATE ITS OWN HEIGHT while streaming. A
+       growing message that eases its height on every chunk fights the
+       scroll position and makes the text unreadable. Height is immediate;
+       only the new text fades.
+
+   The caret is a blink, and it is the one place opacity is the right tool —
+   it is not a state, it is a cursor.
+   ========================================================================= */
+
+.motion-stream-chunk {
+  animation: motion-rise-in-tight var(--duration-colour) var(--ease-entrance) both;
+}
+
+.motion-stream-body {
+  transition: none;   /* (b) — stated, not omitted */
+}
+
+@keyframes motion-caret-blink {
+  0%, 45%   { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+
+.motion-stream-caret {
+  animation: motion-caret-blink var(--duration-caret) var(--ease-linear) infinite;
+}
+
+/* The "thinking" state before the first chunk: three dots breathing on the
+   same rhythm as the skeleton, because it is the same event — waiting. */
+@keyframes motion-thinking {
+  0%, 100% { background-color: var(--surface-quiet); }
+  50%      { background-color: var(--ink-tertiary); }
+}
+.motion-thinking-dot {
+  animation: motion-thinking var(--duration-pulse) var(--ease-move) infinite;
+}
+.motion-thinking-dot:nth-child(2) { animation-delay: calc(var(--duration-pulse) / 6); }
+.motion-thinking-dot:nth-child(3) { animation-delay: calc(var(--duration-pulse) / 3); }
+
+
+/* ============================================================================
+   11 · PROGRESS AND STEPPER ADVANCE
+   --duration-advance (480ms) is the slowest non-looping duration in the
+   system, and it is deliberate: a progress bar is the one element whose
+   whole job is to be watched changing. A bar that snaps to its new value has
+   told the reader a number; a bar that travels has told them a direction.
+
+   Radix Progress moves its indicator with translateX, so the transition is
+   on transform. --ease-move, because the bar is going from one value to
+   another, not entering.
+   ========================================================================= */
+
+.motion-progress-fill {
+  transition:
+    transform        var(--duration-advance) var(--ease-move),
+    background-color var(--duration-colour)  var(--ease);
+}
+
+@keyframes motion-progress-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(200%); }
+}
+/* KIT-STATED at 1.4s ("700ms spin / 1.4s bar", ch07 Loading row). It is a
+   different clock from the spinner: a bar crosses the full width, a spinner
+   turns in place. */
+.motion-progress-indeterminate {
+  animation: motion-progress-sweep var(--duration-bar) var(--ease-move) infinite;
+}
+
+/* Stepper. The dot changes colour; the connector between two dots fills.
+   The connector is a scaleX from its start edge, so it fills in reading
+   order — which means the origin has to mirror in RTL. */
+.motion-step {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    color            var(--duration-colour) var(--ease),
+    box-shadow       var(--duration-entrance) var(--ease);
+}
+
+.motion-step-connector {
+  transform-origin: 0 50%;
+  transition: transform var(--duration-advance) var(--ease-move);
+}
+[dir="rtl"] .motion-step-connector {
+  transform-origin: 100% 50%;
+}
+
+/* The spinner. Linear, or the rotation visibly hesitates once per turn. */
+@keyframes motion-spin { to { transform: rotate(360deg); } }
+.motion-spinner {
+  animation: motion-spin var(--duration-spin) var(--ease-linear) infinite;
+}
+
+
+/* ============================================================================
+   12 · BUTTON PRESS
+   The paper metaphor: pressing pushes the control INTO the page. It moves
+   down 1px and drops from --shadow-lifted to --shadow-rest. It does not
+   scale down — a scaling button changes size under a finger that is already
+   on it, which is how you get a mis-tap.
+
+   THE ONE px IN THIS FILE. 1px is a fixed optical nudge, not a measurement:
+   it must stay exactly one device-independent pixel at all three text
+   scales, because its whole job is to be the smallest visible displacement.
+   Expressed in rem it would be 0.94px at data-scale="small" and 1.06px at
+   "large" — sub-pixel values that render as a blur on the button's edge
+   rather than as a press. tokens.css says the same thing in its spacing
+   note: "Only 1px and 2px live off the scale, as grid lines and optical
+   nudges" — this is one of those, and --focus-width is the other.
+
+   The press is on --duration-lift, the same duration as a drag pick-up:
+   both are "the interface acknowledging a finger", and they must match or
+   pressing a draggable card produces two different responses to one gesture.
+
+   The offset is written with the `translate` property rather than inside a
+   `transform`, here and everywhere else this file moves something of its
+   own. A component may already carry a transform of its own — a measured
+   FLIP offset, a drag library's pointer tracking — and `transform` is a
+   single slot: whoever writes it last wins, silently. `translate`, `scale`
+   and `rotate` are separate slots that compose, so this file can own the
+   press without ever colliding with what a component owns.
+   ========================================================================= */
+
+.motion-button {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    color            var(--duration-colour) var(--ease),
+    box-shadow       var(--duration-colour) var(--ease),
+    translate        var(--duration-lift)   var(--ease-move);
+}
+
+.motion-button:active:not(:disabled):not([aria-disabled="true"]),
+.motion-button[data-pressed="true"] {
+  translate: 0 1px;   /* see the note above — the one px */
+  box-shadow: var(--shadow-rest);
+}
+
+/* A disabled control does not respond to a press at all. Disabled is a fill
+   and an ink (tokens.css convention 4); it is also a stillness. */
+.motion-button:disabled,
+.motion-button[aria-disabled="true"] {
+  translate: none;
+}
+
+
+/* ============================================================================
+   13 · HOVER
+   Hover is a fill swap and nothing else. Not an opacity — commission section
+   5 forbids it, and an alpha of a token is a colour the palette does not
+   contain. Not a lift, not a scale, not a shadow bloom on a row.
+
+   Only the three elevated things — a card that is a link, a draggable card,
+   the copilot launcher — are allowed to gain elevation on hover, and they
+   gain --shadow-lifted, not a transform.
+
+   Hover is also gated on a device that HAS one. On touch, :hover sticks
+   after a tap and leaves the last-tapped row looking selected.
+   ========================================================================= */
+
+.motion-hover {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    border-color     var(--duration-colour) var(--ease),
+    color            var(--duration-colour) var(--ease),
+    fill             var(--duration-colour) var(--ease),
+    stroke           var(--duration-colour) var(--ease);
+}
+
+.motion-hover-lift {
+  transition:
+    background-color var(--duration-colour)   var(--ease),
+    box-shadow       var(--duration-entrance) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .motion-hover-lift:hover { box-shadow: var(--shadow-lifted); }
+}
+
+
+/* ============================================================================
+   14 · FOCUS
+   The ring itself is INSTANT, and that is a decision rather than an
+   omission. tokens.css §8 owns the one global :focus-visible rule; this file
+   does not restate it and must not. An outline going from `none` to
+   `1px solid` has nothing to interpolate — a fade-in ring would have to be
+   faked with a persistent transparent outline on every focusable element,
+   and the cost of getting that wrong is an invisible focus ring, which is an
+   accessibility failure, not a motion one. Keyboard focus must be present on
+   the frame it is earned.
+
+   What DOES animate is the control's own fill moving to its focus tone,
+   under --duration-colour, so the ring does not appear over a surface that
+   is still catching up. That is what `.motion-focus` buys.
+   ========================================================================= */
+
+.motion-focus {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    border-color     var(--duration-colour) var(--ease),
+    outline-color    var(--duration-colour) var(--ease);
+}
+
+/* Focus moving BETWEEN items inside one composite widget — a menu, a command
+   list, a roving-tabindex toolbar — is a move, and the highlight travels.
+   This is the only focus motion in the system. */
+.motion-focus-roving {
+  transition: transform var(--duration-entrance) var(--ease-move);
+}
+
+
+/* ============================================================================
+   15 · DRAG AND DROP
+   Three moments, three durations.
+
+     PICK UP   --duration-lift (90ms). Fast enough that the card feels
+               attached to the finger. It rises to --shadow-overlay and takes
+               --motion-lift-scale — 1.5%, held for the whole drag. Held, not
+               sprung: no overshoot, no bounce.
+     CARRY     no duration. The card is under the pointer and the pointer is
+               the clock. Any transition on transform here produces the
+               classic lag where the card trails the cursor, so the dragging
+               state kills it.
+     DROP      --duration-settle (280ms) on --ease-move. Long enough to see
+               where it landed; the cards that shuffle to make room use the
+               same duration via .motion-row-move, so the whole column
+               resolves as one event.
+
+   WHY THE LIFT IS `scale:` AND NOT `transform: scale()`. A drag library
+   writes the pointer position into the element's `transform`, every frame.
+   If this file put the lift in `transform` too, one of the two would erase
+   the other — in practice the library wins and the lift silently never
+   happens. `scale` is its own property and composes with whatever
+   `transform` the library sets, so the two can be owned by different code
+   and transitioned on different clocks: the scale eases in over
+   --duration-lift while the pointer offset stays untransitioned and exact.
+   ========================================================================= */
+
+.motion-drag {
+  transition:
+    scale      var(--duration-lift) var(--ease),
+    box-shadow var(--duration-lift) var(--ease);
+}
+
+.motion-drag[data-dragging="true"] {
+  scale: var(--motion-lift-scale);
+  box-shadow: var(--shadow-overlay);
+  cursor: grabbing;
+  will-change: transform;
+  /* CARRY: `transform` is deliberately absent from every transition on this
+     element. The pointer is the clock. */
+}
+
+/* Applied for the release, replacing the lift timing. Both slots are listed
+   so the card settles whether the component animates its own transform back
+   to zero or hands the position to a layout. */
+.motion-drag-settle {
+  transition:
+    transform  var(--duration-settle) var(--ease-move),
+    translate  var(--duration-settle) var(--ease-move),
+    scale      var(--duration-settle) var(--ease-move),
+    box-shadow var(--duration-settle) var(--ease-move);
+}
+
+/* The hole the card came from, and the target it is over. Both are fill
+   changes; neither moves. */
+.motion-drag-placeholder {
+  transition:
+    background-color var(--duration-colour) var(--ease),
+    border-color     var(--duration-colour) var(--ease);
+}
+
+.motion-drop-target {
+  transition: background-color var(--duration-colour) var(--ease);
+}
+.motion-drop-target[data-over="true"] {
+  background-color: var(--accent);
+}
+
+
+/* ============================================================================
+   16 · PULL TO REFRESH
+   Mobile only, and the surface follows the finger — while the pointer is
+   down there is no duration at all, which is why the pulling state sets
+   `transition: none`. A pull that eases behind the finger feels like a
+   dropped frame.
+
+   The two moments that DO have a duration are both arrivals, so both are
+   --duration-settle on --ease-move:
+     ARM      the finger releases past the threshold and the surface snaps
+              back to the rest position where the indicator sits spinning;
+     COLLAPSE the refresh finishes and the surface returns to zero.
+
+   The threshold and the rest position are spacing, not motion, so they come
+   from the spacing scale: --space-9 (64) to arm, --space-8 (48) at rest.
+   Stated here because the component needs both numbers and there is nowhere
+   else they would be written down.
+
+   No rubber-banding past the threshold — that is a bounce.
+   ========================================================================= */
+
+.motion-pull-surface {
+  --motion-pull-arm:  var(--space-9);   /* 64 · release past this to refresh */
+  --motion-pull-rest: var(--space-8);   /* 48 · where it sits while working  */
+  transition: translate var(--duration-settle) var(--ease-move);
+}
+
+.motion-pull-surface[data-pulling="true"] {
+  transition: none;          /* CARRY — the finger is the clock */
+  will-change: translate;
+}
+
+/* The component writes `translate: 0 <finger distance>` while pulling; this
+   is the rest position it snaps to once the finger is gone. Same `translate`
+   slot, so the handover from finger to transition is continuous. */
+.motion-pull-surface[data-refreshing="true"] {
+  translate: 0 var(--motion-pull-rest);
+}
+
+.motion-pull-indicator {
+  transition:
+    opacity   var(--duration-colour) var(--ease),
+    translate var(--duration-settle) var(--ease-move);
+}
+.motion-pull-indicator[data-armed="true"] {
+  animation: motion-spin var(--duration-spin) var(--ease-linear) infinite;
+}
+
+
+/* ============================================================================
+   17 · AMBIENT
+   The one background flourish in the system, listed so it is not mistaken
+   for an oversight elsewhere. AmbientBackground drifts extremely slowly and
+   never in response to scroll — scroll-linked background movement is
+   parallax, which is forbidden. It is off entirely under reduced motion.
+   ========================================================================= */
+
+@keyframes motion-ambient-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(var(--motion-rise), calc(-1 * var(--motion-rise)), 0); }
+}
+.motion-ambient {
+  animation: motion-ambient-drift calc(var(--duration-pulse) * 24) var(--ease-move) infinite;
+}
+
+
+/* ============================================================================
+   18 · REDUCED MOTION — the three things the token layer cannot reach
+
+   tokens/tokens.css zeroes --duration-colour, --duration-entrance,
+   --duration-overlay, --duration-exit, --duration-lift, --duration-settle
+   and --duration-advance. Every transition and every non-looping animation
+   above therefore completes at its end state instantly, with no further help
+   needed. None of that is repeated here.
+
+   What is left, and only what is left:
+
+     A · LOOPS. Their durations are deliberately not zeroed, because a
+         zero-length infinite animation does not run and a frozen spinner
+         removes the only evidence that work is happening. So the loops that
+         report STATUS are kept — the spinner keeps turning, a steady
+         in-place rotation that carries no travel across the screen — and the
+         loops that are DECORATION are switched off and pinned to a resting
+         value: the skeleton breathe, the thinking dots, the caret blink, the
+         ambient drift.
+
+     B · THE INDETERMINATE PROGRESS SWEEP is status, but unlike the spinner
+         it travels the full width of the bar. It is replaced by a static
+         filled track: the state still reads as "working", nothing moves
+         across the viewport.
+
+     C · THE DRAG LIFT SCALE persists for the whole drag rather than playing
+         over a duration, so zeroing a duration only makes it snap on. It is
+         removed. The card still lifts — it lifts on --shadow-overlay, which
+         is elevation, not movement. The same applies to the 1px press nudge,
+         which is held only while the finger is down; it is small enough to
+         be below any motion-sensitivity threshold, but it is a persisting
+         offset rather than a timed one, so it is stated rather than assumed.
+
+   The caret is pinned visible rather than hidden: a text cursor that has
+   stopped blinking must still be a cursor.
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+  /* A · decorative loops off, at a resting value */
+  /* Derived, not kit-stated: the kit says nothing anywhere about reduced
+     motion. Pinned fully opaque rather than at a mid-breathe value, because
+     a waiting mark that is permanently half-faded reads as disabled. */
+  .motion-skeleton {
+    animation: none;
+    opacity: 1;
+    background-color: var(--surface-quiet);
+  }
+
+  .motion-thinking-dot {
+    animation: none;
+    background-color: var(--ink-tertiary);
+  }
+
+  .motion-stream-caret {
+    animation: none;
+    opacity: 1;
+  }
+
+  .motion-ambient {
+    animation: none;
+    transform: none;
+  }
+
+  /* B · the sweep becomes a static track */
+  .motion-progress-indeterminate {
+    animation: none;
+    transform: none;
+    width: 100%;
+  }
+
+  /* C · the lift is elevation only */
+  .motion-drag[data-dragging="true"] {
+    scale: none;
+  }
+
+  /* Kept turning, but SLOWED. A rotation in place is the accepted exception —
+     it is the only signal that a request is still open, and it does not
+     travel across the viewport, which is what triggers vestibular
+     discomfort. Freezing it would remove the signal entirely.
+
+     2.4s is not kit law: the kit says nothing about reduced motion anywhere
+     (zero matches for "reduced motion", "prefers-reduced" or "vestibular").
+     It is the design-mothership convention — kwapso-ui.css `.kw-spinner` and
+     kwapso-patterns.css `.kw-loader` both slow to 2.4s — and button.tsx
+     already ships `motion-reduce:[animation-duration:2.4s]`. This file held
+     700ms, so a busy button and a standalone spinner turned at different
+     speeds for the same reader. Harmonised here rather than in the
+     component. Logged as GAPS-CE SPN-2. */
+  .motion-spinner,
+  .motion-pull-indicator[data-armed] {
+    animation-duration: 2.4s;
+  }
+}

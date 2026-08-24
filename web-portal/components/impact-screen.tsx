@@ -37,11 +37,11 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@shared/ui/registry/primitives/accordion/accordion"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Comments } from "@shared/ui/registry/collections/comments/comments"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+} from "@shared/ui/controls/accordion/accordion"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Comments } from "@shared/ui/structures/comments/comments"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 
 import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"
@@ -335,9 +335,10 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
           id: c.id,
           author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
           body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
-          time: new Date(c.createdAt).toLocaleDateString(),
+          timestamp: new Date(c.createdAt).toLocaleDateString(),
         }))}
-        onAdd={busy ? undefined : (body) => void add(body)}
+        composer="inline"
+        onSend={busy ? undefined : (body: string) => void add(body)}
       />
     </div>
   )

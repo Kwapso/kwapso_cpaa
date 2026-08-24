@@ -12,10 +12,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,16 +25,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
 import {
   PermissionMatrix,
-  defaultPermissionMatrixConfig,
-  type PermissionMatrixConfig,
-} from "@shared/ui/registry/collections/permission-matrix/permission-matrix"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { Pencil, Power } from "lucide-react"
+  type PermissionRight,
+} from "@shared/ui/structures/permission-matrix/permission-matrix"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { Pencil, Power } from "@shared/ui/icons"
 
-import type { PermissionValue, RolePermissions, TeamRole } from "@shared/types"
+import type { PermissionValue, RightSet, RolePermissions, TeamRole } from "@shared/types"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -144,13 +143,29 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
   if (rolesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!role) return <p className="text-muted-foreground text-sm">{t("That role doesn't exist.")}</p>
 
-  const matrixConfig: PermissionMatrixConfig | null = perms && {
-    ...defaultPermissionMatrixConfig,
-    modules: perms.modules,
-    mode: perms.isDefault ? "locked" : perms.canEdit ? "edit" : "read",
-    autoFlipRead: true,
-    surface: "card",
+  // SERVER ⇄ KIT rights vocabulary. The app's sheet says read/create; the kit
+  // ruled its four ids are the client's own words, see/add (the older
+  // view/create vocabulary is gone from it on purpose). One mapping here, both
+  // directions, so neither side ever learns the other's words.
+  const RIGHT_TO_KIT = { read: "see", create: "add", edit: "edit", delete: "delete" } as const
+  const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
+    see: "read",
+    add: "create",
+    edit: "edit",
+    delete: "delete",
   }
+  const matrixModules = perms
+    ? perms.modules.map((m) => ({
+        id: m.key,
+        label: m.label,
+        locked: perms.isDefault,
+        held: {
+          [roleId]: (Object.keys(RIGHT_TO_KIT) as (keyof RightSet)[])
+            .filter((r) => draft?.[m.key]?.[r])
+            .map((r) => RIGHT_TO_KIT[r]),
+        },
+      }))
+    : null
   const canSave = perms != null && !perms.isDefault && perms.canEdit
 
   const overviewItems = [
@@ -232,7 +247,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                 </Button>
               )}
             </div>
-          ) : permsQ.loading || !matrixConfig || !draft ? (
+          ) : permsQ.loading || !matrixModules || !draft ? (
             <Skeleton className="h-64 w-full rounded-xl" />
           ) : (
             <div className="flex flex-col gap-4">
@@ -266,9 +281,26 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                 </div>
               </div>
               <PermissionMatrix
-                config={matrixConfig}
-                value={draft}
-                onChange={(next) => setDraft(next)}
+                modules={matrixModules ?? []}
+                roles={[{ id: roleId, label: role.title }]}
+                disabled={!canSave}
+                onChange={(moduleId, _roleId, capabilityId, next) => {
+                  const right = KIT_TO_RIGHT[capabilityId as PermissionRight]
+                  setDraft((prev) => {
+                    const cur = prev?.[moduleId] ?? {
+                      read: false,
+                      create: false,
+                      edit: false,
+                      delete: false,
+                    }
+                    const val = { ...cur, [right]: next }
+                    // The old matrix's autoFlipRead, kept as behaviour: granting
+                    // any write grants read with it — a right to change a thing
+                    // you cannot open is a sheet nobody means.
+                    if (next && right !== "read") val.read = true
+                    return { ...prev, [moduleId]: val }
+                  })
+                }}
               />
             </div>
           )

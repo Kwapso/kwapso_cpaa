@@ -11,18 +11,18 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
-import { Button } from "@shared/ui/registry/primitives/button/button"
+} from "@shared/ui/controls/avatar/avatar"
+import { Button } from "@shared/ui/controls/button/button"
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { ModeToggle } from "@shared/ui/registry/primitives/mode-toggle/mode-toggle"
+import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { Input } from "@shared/ui/controls/input/input"
+import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
 // Still here for the SUBMIT button's busy state, which is a different thing from
 // a boot wait and stays a spinner: it says "this button is working", inside a
 // screen that is already drawn.
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, auth, tenancy } from "@/lib/api"
 import { BrandMark } from "@/components/brand-mark"
@@ -207,7 +207,7 @@ export default function OnboardingPage() {
                 {photo && <AvatarImage src={photo} alt={t("Your photo")} />}
                 <AvatarFallback className="text-lg">{initials}</AvatarFallback>
               </Avatar>
-              <FileUpload accept="image/*" multiple={false} onChange={handlePhoto} />
+              <FileUpload accept="image/*" multiple={false} onFilesSelected={handlePhoto} />
             </div>
 
             <Field config={firstNameField} htmlFor="first-name">

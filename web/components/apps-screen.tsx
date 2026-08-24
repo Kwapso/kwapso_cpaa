@@ -25,13 +25,13 @@
 
 import * as React from "react"
 
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { Search } from "lucide-react"
-import type { ScreenActionContext, ScreenIntent } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
+import { Input } from "@shared/ui/controls/input/input"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { Search } from "@shared/ui/icons"
+import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"

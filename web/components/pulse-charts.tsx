@@ -26,7 +26,7 @@
 // caller may not read, a set that is all zeros — is decided in pulse.tsx, before
 // this file is ever asked for.
 
-import { Chart, defaultChartConfig } from "@shared/ui/registry/collections/chart/chart"
+import { Chart } from "@shared/ui/structures/chart/chart"
 
 /** The band height every chart on a page-band shares. Restated here rather than
  * imported from pulse.tsx, because an import BACK would put this module in the
@@ -43,17 +43,13 @@ export function StageChart({ rows, label }: { rows: { label: string; count: numb
   return (
     <Chart
       data={rows}
-      config={{
-        ...defaultChartConfig,
-        type: "bar",
-        xKey: "label",
-        series: [{ key: "count", label, color: "chart-1" }],
-        showLegend: false,
-        showGrid: false,
-        showYAxis: false,
-        showDataLabels: true,
-        height: BAND_HEIGHT,
-      }}
+      type="bar"
+      xKey="label"
+      series={[{ key: "count", label, color: "var(--chart-1)" }]}
+      legend={false}
+      grid={false}
+      yAxis={false}
+      height={`${BAND_HEIGHT}px`}
     />
   )
 }
@@ -65,15 +61,11 @@ export function WeeksChart({ rows, label }: { rows: { label: string; hours: numb
   return (
     <Chart
       data={rows}
-      config={{
-        ...defaultChartConfig,
-        type: "area",
-        xKey: "label",
-        series: [{ key: "hours", label, color: "chart-2" }],
-        showLegend: false,
-        showDots: true,
-        height: BAND_HEIGHT,
-      }}
+      type="area"
+      xKey="label"
+      series={[{ key: "hours", label, color: "var(--chart-2)" }]}
+      legend={false}
+      height={`${BAND_HEIGHT}px`}
     />
   )
 }
@@ -90,17 +82,13 @@ export function HoursByChart({ rows, label }: { rows: { label: string; hours: nu
   return (
     <Chart
       data={rows}
-      config={{
-        ...defaultChartConfig,
-        type: "bar",
-        xKey: "label",
-        series: [{ key: "hours", label, color: "chart-3" }],
-        showLegend: false,
-        showGrid: false,
-        showYAxis: false,
-        showDataLabels: true,
-        height: BAND_HEIGHT,
-      }}
+      type="bar"
+      xKey="label"
+      series={[{ key: "hours", label, color: "var(--chart-3)" }]}
+      legend={false}
+      grid={false}
+      yAxis={false}
+      height={`${BAND_HEIGHT}px`}
     />
   )
 }
@@ -121,19 +109,15 @@ export function SprintBurndownChart({
   return (
     <Chart
       data={rows}
-      config={{
-        ...defaultChartConfig,
-        type: "bar",
-        xKey: "label",
-        series: [
-          { key: "done", label: doneLabel, color: "chart-2" },
-          { key: "open", label: openLabel, color: "chart-4" },
-        ],
-        stacked: true,
-        showGrid: false,
-        showYAxis: false,
-        height: BAND_HEIGHT,
-      }}
+      type="bar"
+      xKey="label"
+      series={[
+          { key: "done", label: doneLabel, color: "var(--chart-2)" },
+          { key: "open", label: openLabel, color: "var(--chart-4)" },
+        ]}
+      grid={false}
+      yAxis={false}
+      height={`${BAND_HEIGHT}px`}
     />
   )
 }

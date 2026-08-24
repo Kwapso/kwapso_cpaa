@@ -17,12 +17,12 @@
 // the person who used a code last week and Google today is one row. Unset
 // credentials simply mean no button; the code path is untouched (ARCHITECTURE §5).
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Input } from "@shared/ui/controls/input/input"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { brand } from "@shared/brand"
 import { CodeInput } from "@shared/web/code-input"
 import { GoogleMark, useSignInError } from "@shared/web/google-sign-in"

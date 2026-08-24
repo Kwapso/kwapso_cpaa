@@ -47,11 +47,11 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,10 +61,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { Comments } from "@shared/ui/registry/collections/comments/comments"
-import { GitBranch, ListOrdered, Pencil, Power } from "lucide-react"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { Comments } from "@shared/ui/structures/comments/comments"
+import { GitBranch, ListOrdered, Pencil, Power } from "@shared/ui/icons"
 
 import type {
   ClientRole,
@@ -811,9 +811,10 @@ export function ProcessDetailScreen({
                   id: c.id,
                   author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
                   body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
-                  time: new Date(c.createdAt).toLocaleDateString(),
+                  timestamp: new Date(c.createdAt).toLocaleDateString(),
                 }))}
-                onAdd={
+                composer="inline"
+                onSend={
                   canCreate
                     ? (body) =>
                         void run(

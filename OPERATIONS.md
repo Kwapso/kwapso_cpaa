@@ -78,6 +78,22 @@ obviously fictional client world so there is something to click around.
   `--confirm-production`, and auth's test-login door refuses production anyway,
   so the sign-in would fail even then.
 
+## The design system (a pinned dependency)
+
+The UI lives in `shared/ui/` and is the kwapso design system, vendored from
+`github.com/Kwapso/design` at a tag by `scripts/sync-design.mjs`. It is a
+DEPENDENCY: `web/test/vendored-kit.test.ts` recomputes a content hash on every
+check, so a hand-edit under `shared/ui/` turns the build red — kit changes are
+made upstream and pulled. When Aurora ships a new tag:
+
+    node scripts/sync-design.mjs v1.1.0     # replace shared/ui at the new tag
+    node scripts/design-imports.mjs         # idempotent; converts any new old-path imports
+    npm run check                           # the laws + the hand-edit guard
+    # then ship as usual
+
+Cloning needs the `alaap-kwapso` GitHub identity (the machine's default
+credential is a different account); the sync script's URL carries it.
+
 ## The pieces
 
 | Worker | Staging name | Production name | What it is |

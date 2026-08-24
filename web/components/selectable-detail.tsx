@@ -23,8 +23,8 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { OverviewList } from "@/components/overview-list"

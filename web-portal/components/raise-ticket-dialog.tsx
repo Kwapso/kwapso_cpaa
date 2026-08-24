@@ -18,12 +18,12 @@ import * as React from "react"
 import {
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Notes } from "@shared/ui/registry/primitives/notes/notes"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
-import { Plus } from "lucide-react"
+import { Notes } from "@shared/web/notes-editor/notes-editor"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { Plus } from "@shared/ui/icons"
 
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -35,7 +35,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/registry/primitives/select/select"
+} from "@shared/ui/controls/select/select"
 
 import { ApiFailure, appModules } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"

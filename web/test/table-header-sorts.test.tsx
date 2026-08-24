@@ -415,18 +415,11 @@ describe("every table in the agency app is one whose headers work", () => {
     // library ever fixes it" used to name somebody else's roadmap; the library
     // is this repo's now, so the fix is ours to make and this check is the thing
     // that will tell us the workaround has become dead weight.
+    // The frame is ENGINE code now (shared/web/screen-engine) — the design-kit
+    // swap moved the old library's collection controller app-side, so "the
+    // library's roadmap" became "this file, one directory over".
     const frame = readFileSync(
-      join(
-        __dirname,
-        "..",
-        "..",
-        "shared",
-        "ui",
-        "registry",
-        "collections",
-        "collection-frame",
-        "collection-frame.tsx"
-      ),
+      join(__dirname, "..", "..", "shared", "web", "screen-engine", "collection-frame.tsx"),
       "utf8"
     )
     expect(

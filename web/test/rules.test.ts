@@ -251,11 +251,11 @@ describe("RULES — the laws of the base", () => {
     const picker = read(join(WEB, "components", "record-picker.tsx"))
     // A blind check reports "all clear" exactly like a passing one.
     expect(picker, "the record picker must be the library Command + Popover").toContain(
-      "primitives/command/command"
+      "controls/command/command"
     )
     const offenders = componentFiles()
       .filter((f) => !f.endsWith("record-picker.tsx"))
-      .filter((f) => stripComments(read(f)).includes("primitives/command/command"))
+      .filter((f) => stripComments(read(f)).includes("controls/command/command"))
     expect(
       offenders,
       `use <RecordPicker> instead of composing a second searchable picker: ${offenders.join(", ")}`
@@ -2002,8 +2002,14 @@ describe("RULES — the laws of the base", () => {
     const exceptionUsed = new Map(Object.keys(RADIUS_EXCEPTION).map((k) => [k, 0]))
     for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
       if (f.path.startsWith(lawBook)) continue
-      for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)?[a-z0-9]+/g) ?? []) {
+      for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)*(?:\[[^\]]+\]|[a-z0-9]+)/g) ?? []) {
         if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
+        // The kit's one-edge spellings of the SAME two radii, through its
+        // tokens: the `rounded-t-xl` move in token clothing (R31's law text).
+        // …and any bracket spelling that RESOLVES THROUGH A RADIUS TOKEN
+        // (plain, one edge, inherited, or a calc over the token for a
+        // concentric inner corner). A NAMED third step stays forbidden.
+        if (/^rounded-(?:[tbse]-)?\[(?:inherit|var\(--radius[a-z-]*\)|calc\([^\]]*--radius[^\]]*\))\]$/.test(hit)) continue
         if (exceptionUsed.has(hit)) {
           exceptionUsed.set(hit, exceptionUsed.get(hit)! + 1)
           continue

@@ -17,13 +17,13 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { Paperclip, Pencil, Power } from "lucide-react"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { Paperclip, Pencil, Power } from "@shared/ui/icons"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"

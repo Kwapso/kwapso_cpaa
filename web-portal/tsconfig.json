@@ -35,5 +35,7 @@
     "../shared/**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "out", ".next"]
+  "exclude": ["node_modules", "out", ".next",
+    "../shared/ui/compositions/**"
+  ]
 }

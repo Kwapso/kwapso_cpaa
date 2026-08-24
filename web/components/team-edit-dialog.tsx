@@ -9,17 +9,17 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
+} from "@shared/ui/controls/avatar/avatar"
 import {
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { Input } from "@shared/ui/controls/input/input"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { TeamSummary } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -109,7 +109,7 @@ export function TeamEditDialog({
             {letterMark(name)}
           </AvatarFallback>
         </Avatar>
-        <FileUpload accept="image/*" multiple={false} onChange={handlePhoto} />
+        <FileUpload accept="image/*" multiple={false} onFilesSelected={handlePhoto} />
       </div>
       <Field config={nameField} htmlFor="team-name" className={fieldSpacing}>
         <Input

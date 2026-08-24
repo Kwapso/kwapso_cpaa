@@ -10,28 +10,10 @@
 import * as React from "react"
 import { usePathname } from "next/navigation"
 
-import { Breadcrumbs } from "@shared/ui/registry/primitives/breadcrumbs/breadcrumbs"
-import { ModeToggle } from "@shared/ui/registry/primitives/mode-toggle/mode-toggle"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import {
-  AppWindow,
-  BadgeCheck,
-  Building2,
-  CalendarClock,
-  CalendarRange,
-  Hammer,
-  Home,
-  LibraryBig,
-  ListTodo,
-  Palette,
-  Route,
-  Settings,
-  LifeBuoy,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Timer,
-  MoreHorizontal,
-} from "lucide-react"
+import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
+import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/icons"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
@@ -58,7 +40,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@shared/ui/registry/primitives/sheet/sheet"
+} from "@shared/ui/controls/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 
@@ -425,7 +407,21 @@ export function AppShell({
         <div className="flex items-center justify-between gap-2 px-4 pt-4 sm:px-6 lg:px-8">
           <div className="min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 && (
-              <Breadcrumbs items={breadcrumbs} onNavigate={onNavigate ?? softNavigate} />
+              /* The kit's Breadcrumbs renders real <a href> links; the shell
+                 intercepts the click so navigation stays soft (client-side)
+                 the way the old component's onNavigate did. */
+              <div
+                onClickCapture={(e) => {
+                  const a = (e.target as HTMLElement).closest("a")
+                  if (!a) return
+                  const href = a.getAttribute("href")
+                  if (!href || !href.startsWith("/")) return
+                  e.preventDefault()
+                  ;(onNavigate ?? softNavigate)(href)
+                }}
+              >
+                <Breadcrumbs items={breadcrumbs} />
+              </div>
             )}
           </div>
           <div className="hidden shrink-0 md:flex">

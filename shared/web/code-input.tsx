@@ -13,7 +13,7 @@
 
 import * as React from "react"
 
-import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Input } from "@shared/ui/controls/input/input"
 
 export function CodeInput({
   length = 6,

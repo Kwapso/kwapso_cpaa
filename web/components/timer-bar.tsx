@@ -17,9 +17,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { CircleStop, Play, Timer } from "lucide-react"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/controls/button/button"
+import { CircleStop, Play, Timer } from "@shared/ui/icons"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {

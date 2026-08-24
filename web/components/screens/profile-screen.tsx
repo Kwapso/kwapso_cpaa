@@ -22,15 +22,12 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { List } from "@shared/ui/registry/collections/list/list"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@shared/ui/registry/collections/activity-feed/activity-feed"
-import { Mail } from "lucide-react"
+} from "@shared/ui/controls/avatar/avatar"
+import { Button } from "@shared/ui/controls/button/button"
+import { List } from "@shared/web/list-compat"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { ActivityFeed } from "@shared/ui/structures/activity-feed/activity-feed"
+import { Mail } from "@shared/ui/icons"
 
 import { EmailChangeDialog } from "@/components/email-change-dialog"
 import { ProfileDialog } from "@/components/profile-dialog"
@@ -110,11 +107,12 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
             <Skeleton variant="list" lines={3} />
           ) : (
             <ActivityFeed
-              config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: t("No account activity yet.") }}
+              reverse
+              emptyLabel={t("No account activity yet.")}
               items={accountActivityQ.data.map((a) => ({
                 id: a.id,
                 description: a.description,
-                timestamp: formatDateTime(a.createdAt),
+                time: formatDateTime(a.createdAt),
               }))}
             />
           )}

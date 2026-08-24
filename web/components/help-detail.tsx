@@ -9,16 +9,17 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import {
-  TicketThread,
-  type TicketMember,
-  type TicketStatus,
-} from "@shared/ui/registry/collections/ticket-thread/ticket-thread"
-import { ArchiveRestore, Archive, CheckCheck, Languages, Pencil, Send } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TicketThread } from "@shared/ui/structures/ticket-thread/ticket-thread"
+
+// The old library's thread exported this; the kit's thread is messages-only,
+// so the app owns the word now: who can be @mentioned.
+type TicketMember = { id: string; name: string }
+import { ArchiveRestore, Archive, CheckCheck, Languages, Pencil, Send } from "@shared/ui/icons"
 
 import type {
   HelpMessage,
@@ -64,27 +65,6 @@ import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
 
-// LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
-// ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
-// and the library is a separate repo we do not edit from here (UI-CONVENTIONS,
-// "the library is lego"). So this is a MAPPING, not a mismatch — and the
-// narrowing only reaches the library's own badge, because the real control is
-// HelpStatusStepper below, which speaks all five.
-const TO_LIBRARY: Record<HelpTicket["status"], TicketStatus> = {
-  // Waiting on the client, raised and unread, and read but not begun are all
-  // "with us, nothing has started".
-  awaiting_validation: "open",
-  new: "open",
-  triaged: "open",
-  // Booked into a sprint IS in motion as far as the library's four words go:
-  // there is a date on it now, which is the fact "open" would hide.
-  scheduled: "in-progress",
-  in_progress: "in-progress",
-  // Every story is done and the client has not been told yet — still in motion,
-  // because the telling is the part that finishes it.
-  ready: "in-progress",
-  resolved: "resolved",
-}
 /** The one map every ticket screen reads. Imported rather than retyped here: this
  * file used to keep its own copy, and a copy is how the list and the record end
  * up calling the same fact two different things. */
@@ -669,23 +649,47 @@ export function HelpDetailScreen({
               <div className="flex justify-end">
                 <TranslateAction translation={translation} />
               </div>
+              {/* The kit's thread is messages + composer; the old library's
+                  carried the ticket header, a status control and an @mention
+                  autocomplete inside it. The header rides in the kit's `banner`
+                  slot; the status controls stay off exactly as before (the one
+                  way to answer this ticket is the panel on the title); and a
+                  mention is now read OUT OF the sent text by name-match against
+                  the same members list the autocomplete used to offer —
+                  autocomplete itself needs a kit spec (logged for Aurora). */}
               <TicketThread
-                ticket={{
-                  description: <RichText html={translation.of(ticket.description)} />,
-                  type: ticket.helpType || "General",
-                  status: TO_LIBRARY[ticket.status],
-                  fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,
-                }}
-                replies={replies}
-                members={mentionableMembers}
-                // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
-                // is off now too, because the library's resolve button moves a
-                // status with no words attached and CHECKLIST 5.6 says resolving is
-                // refused until a resolution is written. The one way to answer this
-                // ticket is the panel on the title, which sends what a person typed.
-                canResolve={false}
-                showStatusControl={false}
-                onReply={onReply}
+                banner={
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Badge variant="secondary">{ticket.helpType || t("General")}</Badge>
+                    {ticket.sourceScreen && (
+                      <span className="text-muted-foreground">{ticket.sourceScreen}</span>
+                    )}
+                  </div>
+                }
+                messages={[
+                  {
+                    id: "description",
+                    side: "theirs",
+                    author: ticket.raisedByContactName || ticket.raiserName || undefined,
+                    body: <RichText html={translation.of(ticket.description)} />,
+                  },
+                  ...replies.map((r) => ({
+                    id: r.id,
+                    side: "mine" as const,
+                    author: r.author,
+                    authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
+                    time: r.time,
+                    body: typeof r.body === "string" ? <RichText html={r.body} /> : r.body,
+                  })),
+                ]}
+                composer
+                onSend={(body) =>
+                  onReply(
+                    body,
+                    [],
+                    mentionableMembers.filter((m) => body.includes(`@${m.name}`))
+                  )
+                }
               />
             </>
           )

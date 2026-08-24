@@ -20,9 +20,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Pencil, Power } from "lucide-react"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Pencil, Power } from "@shared/ui/icons"
 
 import type { AccountRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"

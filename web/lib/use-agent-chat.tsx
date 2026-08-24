@@ -12,9 +12,16 @@ import * as React from "react"
 
 import { useT } from "@shared/web/language"
 
-import type { AgentChatItem } from "@shared/ui/registry/collections/agent-chat/agent-chat"
-import type { RunStep } from "@shared/ui/registry/collections/run-steps/run-steps"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import type { AgentChatMessage } from "@shared/ui/structures/agent-chat/agent-chat"
+
+/** One chat row. The kit's message, or a TOOL STEP — the old library's chat
+ * drew tool rows itself; the kit's does not, so the row is app data here and
+ * the panel renders it as an assistant-side step chip. */
+export type AgentChatItem =
+  | AgentChatMessage
+  | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed" }
+import type { RunStep } from "@shared/ui/structures/run-steps/run-steps"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, PendingCall } from "@shared/types"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
@@ -86,9 +93,9 @@ const toChatItems = (messages: AgentMessage[]): AgentChatItem[] =>
 export function confirmStepsFrom(calls: PendingCall[]): RunStep[] {
   return calls.map((c) => ({
     label: c.summary,
-    status: "pending" as const,
-    detail: c.details?.length ? (
-      <span className="flex flex-col gap-1">
+    state: "pending" as const,
+    description: c.details?.length ? (
+      <span data-details className="flex flex-col gap-1">
         {c.details.map((line, i) => (
           <span key={i}>{line}</span>
         ))}
@@ -417,7 +424,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // bubble still has no text — so it fills the gap before the first event, every
   // step_end→step_start gap, and the wait for the first reply delta, then vanishes
   // the moment reply text streams (or a confirm/final drops the empty bubble).
-  const lastAssistant = [...items].reverse().find((it) => it.role === "assistant")
+  const lastAssistant = [...items].reverse().find((it): it is AgentChatMessage => it.role === "assistant")
   const showTyping = busy && !pending && !lastAssistant?.content
 
   // The proposed actions as RunSteps (pending until the user decides).

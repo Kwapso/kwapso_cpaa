@@ -31,8 +31,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { ArrowDown } from "lucide-react"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { ArrowDown } from "@shared/ui/icons"
 
 import { useT } from "@shared/web/language"
 import { hoursText, minutesText } from "@shared/workers/savings"

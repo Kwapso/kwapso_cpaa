@@ -32,10 +32,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,8 +45,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Link2, Paperclip, Trash2 } from "lucide-react"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { Link2, Paperclip, Trash2 } from "@shared/ui/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpAttachment } from "@shared/types"

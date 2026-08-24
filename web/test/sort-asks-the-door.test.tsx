@@ -69,7 +69,9 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
 }
 
 /** The direction toggle, found by what it SAYS it will do. */
-const flip = () => fireEvent.click(screen.getByRole("button", { name: /switch to/i }))
+// The kit's direction button names ITSELF and the CURRENT direction ("Sort
+// direction: Descending"), where the old control named the flip target.
+const flip = () => fireEvent.click(screen.getByRole("button", { name: /sort direction/i }))
 const shownKey = () => screen.getByTestId("listkey").textContent as string
 
 afterEach(cleanup)
@@ -81,7 +83,7 @@ describe("a sort on a paged collection asks the door", () => {
     // I sorted?" with a shrug, while the list is very much in an order.
     expect(screen.getByText("Newest first"), "the active order is named").toBeTruthy()
     expect(
-      screen.getByRole("button", { name: /switch to ascending/i }),
+      screen.getByRole("button", { name: /sort direction: descending/i }),
       "…and the toggle shows the direction it is in, not a guess"
     ).toBeTruthy()
   })

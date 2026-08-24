@@ -7,10 +7,10 @@
 
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { UserPlus } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/controls/avatar/avatar"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { UserPlus } from "@shared/ui/icons"
 
 import type { HelpStakeholder } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"

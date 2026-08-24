@@ -13,9 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { type ScreenQuery } from "@shared/ui/lib/recipe"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { personName } from "@/lib/identity"
 import { useT } from "@shared/web/language"

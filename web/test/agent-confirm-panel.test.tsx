@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url"
 import { act, render, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { RunSteps } from "@shared/ui/registry/collections/run-steps/run-steps"
+import { RunSteps } from "@shared/ui/structures/run-steps/run-steps"
 import type { PendingCall } from "@shared/types"
 
 /** The stream the mocked door plays back for the next send(). */
@@ -73,13 +73,17 @@ describe("the confirm panel shows what it is asking the admin to approve", () =>
     expect(shown).toContain("Roles & permissions: read, edit")
     // A module being taken down to nothing is a change too — it must be readable.
     expect(shown).toContain("Knowledge base: no access")
-    // Still pending: nothing has run, the human hasn't decided.
-    expect(shown).toContain("Pending")
+    // Still pending: nothing has run, the human hasn't decided. "Not started"
+    // is the kit's own word for that state (RunSteps stateLabels).
+    expect(shown).toContain("Not started")
   })
 
   it("renders one line per detail, so a long payload can't collapse into one blur", () => {
     const { container } = render(<RunSteps steps={confirmStepsFrom([grant])} />)
-    const lines = [...container.querySelectorAll("p > span > span")].map((n) => n.textContent)
+    // The kit renders the step's `description` node; the app builds it as a
+    // column of spans, one per detail line — the selector follows the node the
+    // APP builds, not the kit's wrapper, so a kit re-skin can't blind it.
+    const lines = [...container.querySelectorAll("[data-details] > span")].map((n) => n.textContent)
     expect(lines).toEqual(grant.details)
   })
 
@@ -87,7 +91,7 @@ describe("the confirm panel shows what it is asking the admin to approve", () =>
     const bare: PendingCall = { name: "x", input: {}, summary: "Run the attached file import", details: [] }
     const { container } = render(<RunSteps steps={confirmStepsFrom([bare])} />)
     expect(container.textContent).toContain("Run the attached file import")
-    expect(container.querySelectorAll("p > span > span")).toHaveLength(0)
+    expect(container.querySelectorAll("[data-details] > span")).toHaveLength(0)
   })
 })
 

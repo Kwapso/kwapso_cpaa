@@ -15,14 +15,14 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
+} from "@shared/web/screen-engine/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { RecordMark } from "@shared/web/record-mark"

@@ -28,16 +28,16 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@shared/ui/registry/primitives/dialog/dialog"
-import { List } from "@shared/ui/registry/collections/list/list"
-import { ToggleGroup, ToggleGroupItem } from "@shared/ui/registry/primitives/toggle-group/toggle-group"
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "lucide-react"
+} from "@shared/ui/controls/dialog/dialog"
+import { List } from "@shared/web/list-compat"
+import { ToggleGroup, ToggleGroupItem } from "@shared/ui/controls/toggle-group/toggle-group"
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"

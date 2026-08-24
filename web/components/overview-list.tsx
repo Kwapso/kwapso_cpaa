@@ -12,8 +12,17 @@
 //
 // Anything beyond that one override belongs at the call site, or in the library.
 
-import { DescriptionList, defaultDescriptionListConfig, type DescriptionItem } from "@shared/ui/registry/collections/description-list/description-list"
+import * as React from "react"
+
+import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
+
+export type DescriptionItem = { id?: string; label: string; value?: React.ReactNode }
 
 export function OverviewList({ items }: { items: DescriptionItem[] }) {
-  return <DescriptionList config={{ ...defaultDescriptionListConfig, columns: 1 }} items={items} />
+  return (
+    <DescriptionList
+      layout="rows"
+      items={items.map((i, n) => ({ id: i.id ?? `${n}-${i.label}`, label: i.label, value: i.value }))}
+    />
+  )
 }

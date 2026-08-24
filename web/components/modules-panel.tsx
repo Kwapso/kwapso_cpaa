@@ -38,12 +38,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Pencil, Power } from "lucide-react"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Pencil, Power } from "@shared/ui/icons"
 
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { InternalRecordDialog, moduleFields, type InternalRecordValues } from "@/components/internal-record-dialog"

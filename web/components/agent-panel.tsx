@@ -15,19 +15,20 @@
 // agent:create; the server re-gates every action AS the signed-in user.
 
 import * as React from "react"
-import { History, Plus } from "lucide-react"
+import { Check, History, Paperclip, Plus, X } from "@shared/ui/icons"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@shared/ui/registry/primitives/sheet/sheet"
-import { AgentChat } from "@shared/ui/registry/collections/agent-chat/agent-chat"
-import { RunSteps } from "@shared/ui/registry/collections/run-steps/run-steps"
+} from "@shared/ui/controls/sheet/sheet"
+import { AgentChat } from "@shared/ui/structures/agent-chat/agent-chat"
+import { RunSteps } from "@shared/ui/structures/run-steps/run-steps"
 
 import { AgentHistoryDialog } from "@/components/agent-history-dialog"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
@@ -45,6 +46,7 @@ export function AgentPanel({
   onOpenChange: (open: boolean) => void
 }) {
   const t = useT()
+  const attachInputRef = React.useRef<HTMLInputElement>(null)
   const { can } = usePermissions(teamId)
   const canUse = can("agent", "create")
 
@@ -151,7 +153,28 @@ export function AgentPanel({
                * in the gap before the first streamed event. */}
               <AgentChat
                 className="h-full rounded-none border-0 bg-transparent"
-                items={chat.items}
+                // The kit's chat knows user and assistant; a TOOL STEP renders
+                // as a quiet assistant-side chip carrying the step's outcome.
+                messages={chat.items.map((it) =>
+                  it.role === "tool"
+                    ? {
+                        id: it.id,
+                        role: "assistant" as const,
+                        content: (
+                          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                            {it.status === "pending" ? (
+                              <Spinner size="sm" />
+                            ) : it.status === "failed" ? (
+                              <X className="text-destructive size-3.5" aria-hidden />
+                            ) : (
+                              <Check className="text-success size-3.5" aria-hidden />
+                            )}
+                            {it.actionLabel}
+                          </span>
+                        ),
+                      }
+                    : it
+                )}
                 streaming={chat.showTyping}
                 disabled={chat.busy || chat.quota?.blocked || !!chat.pending}
                 // Stacked, email-free example prompts: an inline address gets auto-
@@ -163,14 +186,48 @@ export function AgentPanel({
                   </div>
                 }
                 onSend={(t) => void chat.send(t)}
-                // The chat import: the composer's own paperclip (files go to the
-                // import batch engine with the next message; the run passes through
-                // the normal confirm panel).
-                onAttachFiles={(files) => void chat.addAttachments(files)}
-                attachAccept=".csv,.tsv,.xlsx,.xls,text/csv"
-                attachments={chat.attached}
-                onRemoveAttachment={chat.removeAttachment}
               />
+            </div>
+
+            {/* THE CHAT IMPORT. The old library's composer carried its own
+                paperclip; the kit's composer does not (yet — logged for
+                Aurora), so the strip lives beside it: files go to the import
+                batch engine with the next message, and the run passes through
+                the normal confirm panel. Drag-and-drop onto the panel still
+                works above. */}
+            <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2">
+              <input
+                ref={attachInputRef}
+                type="file"
+                accept=".csv,.tsv,.xlsx,.xls,text/csv"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  void chat.addAttachments(e.currentTarget.files)
+                  e.currentTarget.value = ""
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("Attach a file to import")}
+                onClick={() => attachInputRef.current?.click()}
+                disabled={chat.busy || !!chat.pending}
+              >
+                <Paperclip className="size-4" aria-hidden />
+              </Button>
+              {chat.attached.map((f, i) => (
+                <Badge key={`${f.name}-${i}`} variant="secondary" className="gap-1">
+                  {f.name}
+                  <button
+                    type="button"
+                    aria-label={t("Remove attachment")}
+                    onClick={() => chat.removeAttachment(i)}
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                </Badge>
+              ))}
             </div>
 
             {/* A paused turn: the proposed actions + approve / decline. */}

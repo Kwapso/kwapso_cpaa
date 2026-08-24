@@ -27,15 +27,15 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import { DynamicIcon, type IconName } from "lucide-react/dynamic"
-import { StatGrid, defaultStatGridConfig } from "@shared/ui/registry/collections/stat-grid/stat-grid"
+import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
 
 import { CONCEPT_ICON } from "@/lib/pages"
-import { Pencil } from "lucide-react"
+import { Pencil } from "@shared/ui/icons"
 
 import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
@@ -147,17 +147,11 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
     },
   ]
   return (
-    <StatGrid
-      items={items}
-      config={{
-        // Three, and the delta line OFF across the whole grid: these are the
-        // record's numbers as they stand and nothing on the door claims to know
-        // last week's, so an arrow beside them would be an assertion nobody made.
-        ...defaultStatGridConfig,
-        columns: 3,
-        showDelta: false,
-      }}
-    />
+    // The delta line stays off: these are the record's numbers as they stand
+    // and nothing on the door claims to know last week's, so an arrow beside
+    // them would be an assertion nobody made. The kit's grid sizes its own
+    // columns.
+    <StatGrid items={items.map((s) => ({ id: s.id, label: s.label, value: s.value, support: s.icon }))} />
   )
 }
 

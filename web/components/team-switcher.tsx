@@ -16,9 +16,9 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
+} from "@shared/ui/controls/avatar/avatar"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,9 +26,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Check, ChevronsUpDown, Inbox, Plus } from "lucide-react"
+} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Check, ChevronsUpDown, Inbox, Plus } from "@shared/ui/icons"
 
 import { useReceivedInvites } from "@/components/invitations"
 import { letterMark } from "@/lib/identity"

@@ -26,9 +26,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Languages } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Languages } from "@shared/ui/icons"
 
 import { ApiFailure, dataOps } from "@/lib/api"
 import { usePermissions } from "@/lib/perms"

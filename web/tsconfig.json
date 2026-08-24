@@ -31,5 +31,15 @@
     "../shared/**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "e2e/**", "playwright.config.ts"]
+  "exclude": [
+    "node_modules",
+    "e2e/**",
+    "playwright.config.ts",
+    // The kit's COMPOSITIONS are reference pages built under the kit's own
+    // vite tsconfig (a .png import is a string there; under Next it is a
+    // StaticImageData). Neither door imports them — screens are built from
+    // controls/structures — so they stay out of this program. The kit's own
+    // `npm run check` typechecks them upstream.
+    "../shared/ui/compositions/**"
+  ]
 }

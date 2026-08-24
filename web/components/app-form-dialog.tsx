@@ -24,15 +24,15 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@shared/ui/registry/primitives/checkbox/checkbox"
-import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
-import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
+import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
+import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Notes } from "@shared/ui/registry/primitives/notes/notes"
-import { Textarea } from "@shared/ui/registry/primitives/textarea/textarea"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { Input } from "@shared/ui/controls/input/input"
+import { Notes } from "@shared/web/notes-editor/notes-editor"
+import { Textarea } from "@shared/ui/controls/textarea/textarea"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
@@ -380,7 +380,7 @@ export function AppFormDialog({
               appStageMark(values.stage) || values.name.slice(0, 1).toUpperCase()
             )}
           </span>
-          <FileUpload accept="image/*" multiple={false} onChange={pickLogo} />
+          <FileUpload accept="image/*" multiple={false} onFilesSelected={pickLogo} />
         </div>
       </Field>
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>

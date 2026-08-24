@@ -46,7 +46,7 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   Command,
   CommandEmpty,
@@ -54,16 +54,16 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@shared/ui/registry/primitives/command/command"
+} from "@shared/ui/controls/command/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@shared/ui/registry/primitives/popover/popover"
-import { Sheet, SheetContent, SheetTitle } from "@shared/ui/registry/primitives/sheet/sheet"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { useDebouncedCallback } from "@shared/ui/registry/primitives/use-debounce/use-debounce"
-import { Check, ChevronsUpDown, X } from "lucide-react"
+} from "@shared/ui/controls/popover/popover"
+import { Sheet, SheetContent, SheetTitle } from "@shared/ui/controls/sheet/sheet"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
+import { Check, ChevronsUpDown, X } from "@shared/ui/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached } from "@shared/web/store"
@@ -255,7 +255,9 @@ export function RecordPicker({
       // running cmdk's own matcher over its reply would filter the answer by the
       // same words a second time, and drop any row whose match was in a field the
       // door searched and the label does not show.
-      shouldFilter={!serverSide}
+      // Her Command filters internally; in server mode the door already
+      // answered, so the pass-everything filter stops a second, narrower match.
+      filter={serverSide ? () => true : undefined}
       // In the SHEET the palette owns the whole 85dvh and the list is the part
       // that scrolls; in the POPOVER it is as tall as its contents, up to the
       // library's own ceiling. Without the distinction the popover has no height
@@ -263,9 +265,12 @@ export function RecordPicker({
       // the window and took its own search box with it.
       className={phone ? "h-full" : ""}
     >
+      {/* The kit's Command owns the query text; the picker OBSERVES it through
+          the input's own onInput (spread through to the <input>) so server mode
+          can ask the door as the person types. */}
       <CommandInput
-        value={text}
-        onValueChange={(next) => {
+        onInput={(e: React.FormEvent<HTMLInputElement>) => {
+          const next = e.currentTarget.value
           setText(next)
           if (serverSide) askDoor(next.trim())
         }}

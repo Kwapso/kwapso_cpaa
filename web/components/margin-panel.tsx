@@ -29,8 +29,8 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Banknote } from "lucide-react"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Banknote } from "@shared/ui/icons"
 
 import { tenancy } from "@/lib/api"
 import { InAppLink } from "@/components/in-app-link"

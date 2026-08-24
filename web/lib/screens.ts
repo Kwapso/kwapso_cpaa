@@ -14,13 +14,13 @@ import type {
   RecipeNode,
   RecipeTab,
   ScreenRecipe,
-} from "@shared/ui/lib/recipe"
+} from "@shared/web/screen-engine/recipe"
 import {
   defaultCollectionConfig,
   defaultFieldConfig,
   type CollectionConfig,
   type FilterFacet,
-} from "@shared/ui/lib/config"
+} from "@shared/web/screen-engine/config"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { formatCount } from "@shared/web/format-count"

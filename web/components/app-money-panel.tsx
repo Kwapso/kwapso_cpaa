@@ -39,9 +39,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Banknote, Route } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Banknote, Route } from "@shared/ui/icons"
 
 import { tenancy } from "@/lib/api"
 import { appMoneyKey } from "@/lib/live-resources"

@@ -18,9 +18,9 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
-import { Download, Plus, Share } from "lucide-react"
+import { Download, Plus, Share } from "@shared/ui/icons"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   Sheet,
   SheetContent,
@@ -28,7 +28,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@shared/ui/registry/primitives/sheet/sheet"
+} from "@shared/ui/controls/sheet/sheet"
 
 import { brand } from "@shared/brand"
 import { detectPlatform, isIOSSafari, isStandalone, type PwaPlatform } from "@/lib/pwa"

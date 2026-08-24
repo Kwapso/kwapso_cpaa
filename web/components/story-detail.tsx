@@ -16,11 +16,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { Check, ClipboardCheck, Pencil } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { Check, ClipboardCheck, Pencil } from "@shared/ui/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"

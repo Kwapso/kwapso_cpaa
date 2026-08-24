@@ -48,11 +48,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Input } from "@shared/ui/controls/input/input"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "@shared/ui/icons"
 
 import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"

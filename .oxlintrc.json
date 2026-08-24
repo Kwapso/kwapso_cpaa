@@ -1,6 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "react", "promise"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "react",
+    "promise"
+  ],
   "categories": {
     "correctness": "error"
   },
@@ -13,6 +18,7 @@
     "**/out/**",
     "glide/**",
     "**/next-env.d.ts",
-    ".claude/**"
+    ".claude/**",
+    "shared/ui/**"
   ]
 }

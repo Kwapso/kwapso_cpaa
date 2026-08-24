@@ -1,8 +1,8 @@
 import { Inter } from "next/font/google"
 
-import { AmbientBackground } from "@shared/ui/registry/primitives/ambient-background/ambient-background"
-import { Toaster } from "@shared/ui/registry/primitives/sonner/sonner"
-import { ThemeProvider } from "@shared/ui/registry/tokens/theme-provider"
+import { AmbientBackground } from "@shared/ui/controls/ambient-background/ambient-background"
+import { Toaster } from "@shared/ui/controls/sonner/sonner"
+import { ThemeProvider } from "@shared/web/theme-provider"
 import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"
 import { AgentHost } from "@/components/agent-host"
@@ -36,15 +36,11 @@ export default function RootLayout({
          * being fetched. There is no overlay here any more and nothing to clear
          * — the loader is the page's own content. shared/web/splash.ts. */}
         <MarkRuntime />
-        {/* defaultTheme="system" = follow the device's day/night setting; a
-         * ModeToggle (in the app bar + on the auth screens) lets people
-         * override it, and next-themes remembers their choice. */}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        {/* The kit's theme mechanism: system by default (no attribute on
+         * <html>), an explicit choice writes `data-theme` — the ModeToggle
+         * (app bar + auth screens) owns it, localStorage remembers it, and
+         * the provider's only job is the pre-paint boot script. */}
+        <ThemeProvider>
           <AmbientBackground />
           <ErrorReporter />
           <VersionWatch />

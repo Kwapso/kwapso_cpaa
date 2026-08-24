@@ -31,16 +31,16 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Check, ChevronsUpDown } from "lucide-react"
+} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Check, ChevronsUpDown } from "@shared/ui/icons"
 
 import { clearCache } from "@shared/web/store"
 import { ApiFailure, portal } from "@/lib/api"

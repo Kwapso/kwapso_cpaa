@@ -14,9 +14,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { AlarmClock, UserCheck } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { AlarmClock, UserCheck } from "@shared/ui/icons"
 
 import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"

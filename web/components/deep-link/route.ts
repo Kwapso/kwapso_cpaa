@@ -2,7 +2,7 @@
 // deep-link screen. /t/<teamId>/<module>/<id>?panel|confirm. Kept separate so the
 // resolver component stays focused on data + rendering.
 
-import { parseScreenPath, parseScreenQuery, type ScreenQuery } from "@shared/ui/lib/recipe"
+import { parseScreenPath, parseScreenQuery, type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { TEAM_SECTIONS, type TeamSection } from "@/lib/pages"
 

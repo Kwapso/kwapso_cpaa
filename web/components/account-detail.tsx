@@ -39,10 +39,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,11 +52,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+} from "@shared/ui/controls/alert-dialog/alert-dialog"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
-import { Pencil, Power } from "lucide-react"
+import { Pencil, Power } from "@shared/ui/icons"
 
 import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"

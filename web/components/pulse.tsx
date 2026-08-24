@@ -42,9 +42,9 @@ import * as React from "react"
 
 import dynamic from "next/dynamic"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { StatGrid, defaultStatGridConfig } from "@shared/ui/registry/collections/stat-grid/stat-grid"
-import { ChartNoAxesColumn } from "lucide-react"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
+import { ChartNoAxesColumn } from "@shared/ui/icons"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"
@@ -269,17 +269,12 @@ export function PulseBand({ teamId }: { teamId: string }) {
 
   return (
     <div className="animate-rise flex flex-col gap-4">
+      {/* The delta line stays off: these are today's numbers and nothing on
+          the door claims to know last week's, so an arrow beside them would be
+          an assertion nobody made (the rule the assistant's metric block
+          follows). The kit's grid sizes its own columns. */}
       <StatGrid
-        items={stats}
-        config={{
-          ...defaultStatGridConfig,
-          // Up to five cards, two per row on a phone. The delta line is OFF across
-          // the whole grid: these are today's numbers and nothing on the door
-          // claims to know last week's, so an arrow beside them would be an
-          // assertion nobody made (the rule the assistant's metric block follows).
-          columns: 4,
-          showDelta: false,
-        }}
+        items={stats.map((s) => ({ id: s.id, label: s.label, value: s.value }))}
       />
       {(tickets || work) && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

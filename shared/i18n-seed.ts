@@ -1842,4 +1842,34 @@ export const SEED: Catalogue = {
   "{created} added · {skipped} skipped · {failed} failed": { de: "{created} hinzugefügt · {skipped} übersprungen · {failed} fehlgeschlagen", es: "{created} añadidos · {skipped} omitidos · {failed} fallidos", ca: "{created} afegits · {skipped} omesos · {failed} fallits"},
   "{name} is on triage this week": { de: "{name} macht diese Woche die Triage", es: "{name} está de triaje esta semana", ca: "{name} fa el triatge aquesta setmana"},
   "{title} · current": { de: "{title} · aktuell", es: "{title} · actual", ca: "{title} · actual"},
+  /* ── The screen engine + notes editor, moved app-side by the design-kit swap
+     (2026-08-24). These sentences lived in the old library, exempt from the
+     walk; moving the code moved the words into R28's territory, and these are
+     their translations — hand-written here so no generator run (and no API
+     spend) stands between the swap and a German reader. Register per the note
+     above: plain, short, sentence case. */
+  "Bold": { de: "Fett", es: "Negrita", ca: "Negreta" },
+  "Italic": { de: "Kursiv", es: "Cursiva", ca: "Cursiva" },
+  "Highlight": { de: "Hervorheben", es: "Resaltar", ca: "Ressaltar" },
+  "Bullet list": { de: "Aufzählung", es: "Lista con viñetas", ca: "Llista amb pics" },
+  "Numbered list": { de: "Nummerierte Liste", es: "Lista numerada", ca: "Llista numerada" },
+  "Separator": { de: "Trennlinie", es: "Separador", ca: "Separador" },
+  "Showing {shown} of {total}": { de: "{shown} von {total} angezeigt", es: "Mostrando {shown} de {total}", ca: "Es mostren {shown} de {total}" },
+  "Page {page} of {pages}": { de: "Seite {page} von {pages}", es: "Página {page} de {pages}", ca: "Pàgina {page} de {pages}" },
+  "Prev": { de: "Zurück", es: "Anterior", ca: "Anterior" },
+  "Next": { de: "Weiter", es: "Siguiente", ca: "Següent" },
+  "Filters and sort": { de: "Filter und Sortierung", es: "Filtros y orden", ca: "Filtres i ordre" },
+  "Sort": { de: "Sortieren", es: "Ordenar", ca: "Ordenar" },
+  "Filters": { de: "Filter", es: "Filtros", ca: "Filtres" },
+  "Clear all": { de: "Alle zurücksetzen", es: "Borrar todo", ca: "Esborrar-ho tot" },
+  "Min": { de: "Min.", es: "Mín.", ca: "Mín." },
+  "Max": { de: "Max.", es: "Máx.", ca: "Màx." },
+  "No matches.": { de: "Keine Treffer.", es: "Sin coincidencias.", ca: "Sense coincidències." },
+  "Search {what}…": { de: "{what} durchsuchen…", es: "Buscar {what}…", ca: "Cercar {what}…" },
+  "Actions": { de: "Aktionen", es: "Acciones", ca: "Accions" },
+  "Are you sure?": { de: "Sind Sie sicher?", es: "¿Está seguro?", ca: "N'esteu segur?" },
+  "AI drafted": { de: "KI-Entwurf", es: "Borrador de IA", ca: "Esborrany d'IA" },
+  "General": { de: "Allgemein", es: "General", ca: "General" },
+  "Attach a file to import": { de: "Datei zum Import anhängen", es: "Adjuntar un archivo para importar", ca: "Adjuntar un fitxer per importar" },
+  "Remove attachment": { de: "Anhang entfernen", es: "Quitar el adjunto", ca: "Treure l'adjunt" },
 }

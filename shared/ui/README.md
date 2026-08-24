@@ -1,117 +1,189 @@
-# shared/ui — the component library, vendored
+# kwapso-design
 
-This is **Swift Struck UI** (`@swift-struck/ui`, installed here as `@kwapso/ui`),
-copied into this repo on **2026-08-22** out of `node_modules/@kwapso/ui`. It is
-94 components — 65 primitives, 26 collections and the token tier — plus the nine
-`lib/` helpers and `styles.css`.
+The kwapso design system as **React + TypeScript source**. Tokens, icons,
+motion and components that two production Next.js apps vendor directly.
 
-**The exact commit, because the version number is not trustworthy here.**
+*"Work, structured."*
 
-```
-github.com/alaap-swift-struck/swift-struck-ui
-f679b456bca6571be97af43ba8a6846fa9b7291b
-```
+---
 
-That SHA is what the lockfile pinned and therefore what was on disk and what was
-copied. Three things disagreed about what it was called: `package.json` asked for
-`#v0.15.0`, the installed `package.json` said `0.15.0`, and the lockfile's own
-cached metadata said `0.11.0`. The library's README warns about exactly this —
-npm resolves a GitHub dependency to a commit and reinstalls that commit forever,
-so an app can sit on months-old code while its `package.json` looks current, and
-*"the SHA in the lockfile is the truth, not the version field."*
+## What this is, and what the last attempt got wrong
 
-So the SHA is recorded and the version is not. Anyone diffing this directory
-against upstream should diff against that commit, not against a tag.
+A previous handover delivered a *specification* — tokens, rulings, prose and
+CSS classes with plain-HTML demo pages. It was rigorous and it could not be
+installed, because a CSS class is not a React component. The apps got
+re-coloured and kept their old shape.
 
-**There are no tests in here, and there is no way there could have been.** The
-upstream repo has 200+, including XSS-sanitisation and link-scheme regressions,
-but its `package.json` `files` list ends with `"!**/*.test.*"` — the published
-package has never contained them, and the published package is all this repo ever
-had. Anything in these components that was only ever held by an upstream test is
-now unguarded here. That is written up in `NEEDS-A-SPEC.md`; it is the most
-significant thing the move cost.
+The test for everything here is one sentence:
 
-**It is ours now.** Not a mirror, not a cache, not a thing to keep in step with
-anything. The app owns this code, changes it in place, and will diverge from
-upstream on purpose.
+> An engineer deletes the old component folder, drops this one in its place,
+> changes no application code, and both apps run and look completely new.
 
-## Why it moved
+**Their names, our values.** Every custom property and every export is spelled
+exactly as the applications already read it, so `manifest.json`'s
+`renamedFrom` is empty and nothing needs a bridge. The *values* are the kwapso
+kit's.
 
-The app is being re-themed to the kwapso design kit (`design-mothership`), and a
-theme is only most of a re-skin. A token remap repaints a button; it cannot
-change the button's SHAPE. The kit specifies a secondary button as a filled
-button in the other paper tone with no border in any state — and no arrangement
-of token values turns a bordered button into that, because the border is written
-into the component. Owning the source is what makes the rest of the kit
-reachable.
+## Using it
 
-The alternative was a growing pile of downstream overrides in
-`shared/web/library-overrides.css`, each one fighting a line in a file we could
-not edit. That file's own comment is a post-mortem of what that costs: one stale
-override tinted every card in both apps for nine days because it was written
-against a library behaviour that had already changed underneath it.
-
-## The rule that has not changed: NEVER edit upstream from here
-
-`github.com/alaap-swift-struck/swift-struck-ui` is a live dependency of other
-Swift Struck products. **This is a copy. Their copy is untouched.** Do not push
-here, do not open a PR from here, do not "sync back" a fix. If something in this
-directory turns out to be a genuine upstream bug, report it there in its own
-words, on its own terms, against their v0.15.0 — and then fix it here anyway,
-because these two files are no longer the same file.
-
-Nothing in this repo may install `@kwapso/ui` again. The package was removed
-from every `package.json`; its 33 dependencies (Radix, cmdk, recharts, sonner,
-lucide-react, class-variance-authority, clsx, tailwind-merge, leaflet,
-react-leaflet, next-themes) now sit in the ROOT `package.json`, at the exact
-versions the library pinned. They live at the root rather than in the two front
-doors because `shared/` is a root-level directory outside both npm workspaces:
-node resolution from a file in here walks up to the repo root, and one
-declaration cannot drift from a second one.
-
-## Layout, and why it was not tidied
-
-```
-shared/ui/
-  registry/primitives/…    65 primitives, one folder each
-  registry/collections/…   26 data-bound collections
-  registry/tokens/…        the theme provider
-  lib/…                    config, recipe, collection, text, url, … (9 files)
-  styles.css               the theme: tokens, both palettes, motion utilities
+```bash
+npm install
+npm run check      # tokens + icons + tsc, all three gates
+npm run dev        # the demo
 ```
 
-The folder shape is upstream's, unchanged, and the internal imports are still
-the relative paths they always were (`../../../lib/config`,
-`../../primitives/button/button`). That is deliberate on both counts. The
-relative imports resolve unaltered because `registry/` and `lib/` are still
-siblings, so the copy needed no rewriting and could not acquire a rewriting
-mistake; and a diff against upstream v0.15.0 is still readable line for line,
-which is the only way to answer "what have we actually changed?" a year from now.
+```css
+@import "kwapso-design/tokens/tokens.css";
+@import "kwapso-design/motion/motion.css";
+```
 
-`styles.css` carries `@source "./registry"`, resolved relative to itself, so it
-points at `shared/ui/registry` here exactly as it pointed at the package's own
-registry before. That line is load-bearing: without it Tailwind never scans the
-component source and strips every class it thinks is unused, which shows up as a
-build that passes and an app with no styling.
+The two CSS paths did **not** move. `tokens/`, `icons/` and `motion/` are the
+foundations and the agreed structure groups them under a `foundations/`
+folder; that move is not made yet, because thirteen decision pages under
+`verify/` link `tokens/tokens.css` directly and those pages are the record of
+what the client was looking at when they ruled.
 
-## What the laws say about this directory
+```tsx
+import { Button } from "kwapso-design/controls/button/button";
+import { DataTable } from "kwapso-design/structures/data-table/data-table";
+import { MainScreen } from "kwapso-design/compositions/templates";
+import { Pencil } from "kwapso-design/icons";
+```
 
-Three laws scan `shared/`, so three had to say which side of the line this code
-sits on. The answers are data in `VENDORED_UI_SCOPE`
-(`shared/rules/registry.ts`), with a reason each:
+### THE IMPORT PATHS MOVED ON 2026-08-24 — the whole table
 
-- **R32 · closed palette — HELD, no exemption.** The library named a Tailwind
-  ramp in one file and a dead hex fallback in another. Both were FIXED rather
-  than excused, so R32 keeps its full reach in here. Prefer this shape.
-- **R28 · catalogued strings — out of scope.** The walk always refused this code
-  as "somebody else's code and not ours to translate"; vendoring changed its
-  address, not what it is. The screen-reader residue is recorded as debt in
-  `NEEDS-A-SPEC.md`.
-- **R31 · two radii — out of scope, dated.** The library still speaks
-  `rounded-sm/md/lg/2xl`. The check asserts it STILL offends, so when the reskin
-  collapses those into the kit's four radii, the exemption turns the build red
-  and is deleted by the commit that earns it.
+The folders were renamed to the four words the client uses. **No export was
+renamed** except the two named at the foot, and nothing changed what it does.
+Rewrite an app's imports with these six rules and it compiles.
 
-Everything else — lint, TypeScript, and the rest of the rule suite — applies to
-this directory exactly as it applies to the rest of `shared/`. It is not a
-quarantine; it is the app's code with three sentences written about it.
+| was | is |
+|---|---|
+| `components/primitives/<x>/<x>` | `controls/<x>/<x>` |
+| `components/collections/<x>/<x>` | `structures/<x>/<x>` |
+| `components/lib/utils` | `lib/utils` |
+| `compositions/shapes` · `compositions/shapes/<x>` | `compositions/templates` · `compositions/templates/<x>` |
+| `compositions/system/<x>` · `compositions/portal/<x>` | **gone.** Four of each survive as `compositions/screens/<x>` — see below |
+| `compositions/screens/<x>` | one of `compositions/screens/` · `compositions/overlays/` · `compositions/states/` |
+
+Four moved ACROSS tiers rather than just down a path:
+
+| was | is |
+|---|---|
+| `components/primitives/map/map` | `structures/map/map` |
+| `compositions/screens/notifications` → `NotificationsScreen` | `controls/notifications/notifications` → **`Notifications`** |
+| `compositions/shapes/portal-conversation` | `structures/portal-conversation/portal-conversation` |
+| `compositions/system/t` → `RecordRoute` | `compositions/templates/record-route` → `RecordRoute` |
+
+And four route files were renamed as they became screens:
+
+| was | is |
+|---|---|
+| `compositions/system/login` | `compositions/screens/sign-in-system` |
+| `compositions/portal/login` | `compositions/screens/sign-in-portal` |
+| `compositions/portal/home` | `compositions/screens/portal-home` |
+| `compositions/portal/root` | `compositions/screens/portal-boot` |
+
+**The cheapest migration is the barrels.** `compositions/index.ts` re-exports
+all four folders, so `import { MainScreen, QuickView, ArchiveScreen } from
+"kwapso-design/compositions"` resolves whichever of the four a name lives in
+and an app never has to know. Importing the folder directly is cheaper at
+build time and is what application code should settle on.
+
+**TWO EXPORTS CHANGED NAME, and only two.** `NotificationsScreen` is now
+`Notifications` (it is a control, and the panel is all that is left of it —
+read its header), and `NotificationsScreenProps` is `NotificationsProps`.
+
+**ONE EXPORT IS AMBIGUOUS AND THE TOP BARREL PICKS FOR YOU.** `IMPORT_STEPS`
+is exported by both `compositions/templates/import-flow` and
+`compositions/overlays/import`, because import is written three times in this
+repository. `compositions/index.ts` exports the template's. Import the folder
+directly if you want the other.
+
+**24 FILES WERE DELETED**, 11,731 lines of example pages — every collection
+route and every detail route. If an app imported one of them it now builds
+the screen from `compositions/templates`, which is the point of the change.
+`AccountsRoute`, `AppsRoute`, `TicketsRoute` and the twenty-one others are
+gone and are not coming back.
+
+Light and dark come along automatically. Pin a theme with `data-theme="light"`
+or `"dark"` on `<html>`; leave it off to follow the system. Move the text size
+with `data-scale="small" | "medium" | "large"`.
+
+## Layout
+
+```
+tokens/       tokens.css is the ONLY file where a colour or a size is decided
+icons/        96 React exports · ART IS PLACEHOLDER, names and API are final
+motion/       100 rules, all 16 of the commission's motion cases
+assets/fonts/ Saans and SerrifCondensed — the client's real type, shipped
+              here as .woff2 (what browsers fetch) with the .otf/.ttf masters
+              beside them. `LicenseAgreement.pdf` is the paper record: the
+              client confirmed in writing on 2026-08-24 that the licence
+              permits redistribution inside this repo and that both consuming
+              apps are internal. Nobody read the PDF and nobody needs to —
+              that decision is the client's and it is made. The @font-face
+              block lives in tokens/tokens.css §5.0; `build-fonts.mjs`
+              regenerates the .woff2 if a new cut ever arrives.
+controls/      67 components — the primitives. One folder each
+structures/    42 collection views — tables, boards, threads, gantt, heat,
+               timeline, map. The things that draw MANY records
+lib/           the cn helper and use-has-room
+compositions/  the client: "everything currently compositions/xyz is
+               compositions (and then sections inside of it)"
+  templates/   15 — the SHAPE of a screen with nothing product-specific in
+               it. MainScreen, DetailScreen, the shell, the rail. THIS IS
+               WHAT THE KIT SHIPS INSTEAD OF ONE FILE PER COLLECTION
+  screens/     17 — the finished pages the client named as exceptions:
+               home, settings, profile, onboarding, brand, company hub, the
+               external doors
+  overlays/    8 — what opens OVER a screen rather than replacing it
+  states/      5 — the same screen with nothing in it
+docs/          RULES · BUILD-A-COMPONENT · TOKENS (BUILD-A-SCREEN pending)
+demo/          four views: foundations · controls · structures · compositions
+verify/        decision artefacts and a smoke build — NOT delivered
+KWAPSO-SPEC.md the artifact, verbatim. The king. Its OVERRIDE REGISTER lists
+               every place a client decision beats the artifact text — read it
+               before "correcting" the build back to a chapter.
+manifest.json  the machine-checkable contract
+GAPS.md        every unresolved question and every ruling, with reasoning
+```
+
+## Four rules that are easy to break by accident
+
+1. **No px in a component.** Everything is rem against a 16px authoring base;
+   the root renders at 15px and a user control moves it to 13 or 17.
+2. **No colour defined only inside a media query.** Light lives on bare
+   `:root`; dark is defined twice, once under `prefers-color-scheme` and once
+   under `[data-theme]`. `build-tokens.mjs` fails if the two drift.
+3. **Disabled is a fill and an ink. Hover is a token.** Never an opacity.
+4. **Focus is one global rule.** No component defines a ring, and nothing sets
+   `outline: none`.
+
+## Status
+
+Commission steps 1–6 delivered; 7 and 8 in progress. This repo previously held
+the specification-era kit (tags v0.1.0–v0.3.0); `assets/` is carried forward
+from it, everything else is superseded.
+
+| | |
+|---|---|
+| Tokens — 276, both palettes, three scales | done |
+| Icons — 96 exports, five sizes | **placeholder art** |
+| Motion — 100 rules | done |
+| Controls — 67 | done |
+| Structures — 42 | done |
+| Compositions — 45: 15 templates · 17 screens · 8 overlays · 5 states | done |
+| Demo | four views: foundations · controls · structures · compositions |
+| Docs | 3 of 4 — BUILD-A-SCREEN waits on the screens |
+
+**Where to look first.** `verify/decisions.html` is the record of every design
+question that has been settled and why — fifteen of them, each with the
+side-by-side that settled it. Serve the repo (`python3 -m http.server 8080`)
+and open it; the same server runs the demo at `/demo/dist/`.
+
+`GAPS.md` holds everything unsettled. Read it before trusting a value.
+
+## Versioning
+
+Apps pin to a tag. A design change reaches an app only when someone
+deliberately bumps it. A version that is not tagged here does not exist.

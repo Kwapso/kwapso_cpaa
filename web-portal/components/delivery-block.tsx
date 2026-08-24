@@ -16,7 +16,7 @@
 // here would be a second route to the same figure with none of that reasoning
 // attached.
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
+import { Badge } from "@shared/ui/controls/badge/badge"
 
 import { useCached } from "@shared/web/store"
 import { delivery } from "@/lib/api"

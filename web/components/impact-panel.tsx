@@ -29,9 +29,9 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@shared/ui/registry/primitives/accordion/accordion"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
+} from "@shared/ui/controls/accordion/accordion"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 
 // Hours and minutes come from `shared/workers/savings.ts`, beside the rounding
 // they spell — not written again here, which is what they were. Both front doors

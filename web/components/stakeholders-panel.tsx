@@ -26,8 +26,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { ChevronRight } from "lucide-react"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { ChevronRight } from "@shared/ui/icons"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"

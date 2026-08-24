@@ -52,7 +52,10 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
-const UI = join(ROOT, "shared", "ui")
+// The four slots are ENGINE behaviour now: the old library's config-driven
+// pieces live in shared/web (screen-engine, list-compat), drawn by the design
+// kit underneath. Same four checks, at the code's current address.
+const UI = join(ROOT, "shared", "web")
 
 function library(...parts: string[]): string {
   const path = join(UI, ...parts)
@@ -65,7 +68,7 @@ function library(...parts: string[]): string {
  * so a `leading` anywhere ELSE in that 900-line file (the detail header has
  * one) cannot be mistaken for the row slot having arrived. */
 function renderListBody(): string {
-  const src = library("registry", "collections", "screen-renderer", "screen-renderer.tsx")
+  const src = library("screen-engine", "screen-renderer.tsx")
   const from = src.indexOf("function renderList(")
   expect(from, "screen-renderer no longer has a `renderList` — UI-GAPS #16 needs re-reading").toBeGreaterThan(-1)
   const to = src.indexOf("\nfunction renderDetail(", from)
@@ -81,7 +84,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // is the ONE shape §5 refuses. Widened 19 Aug 2026: the same missing slot
   // costs a PICTURE too, on four lists whose rows arrive carrying one.
   it("#16 · SHIPPED — renderList fills the leading slot, and the host feeds it", () => {
-    const list = library("registry", "collections", "list", "list.tsx")
+    const list = library("list-compat.tsx")
     expect(list, "ListItem must still declare `leading` — the slot the row is drawn in").toMatch(
       /leading\?:\s*React\.ReactNode/
     )
@@ -122,9 +125,9 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
   // renders nothing at all.
   it("#18 · SHIPPED — a tab takes a node, and the ticket kinds carry their marks", () => {
-    const tabs = library("registry", "primitives", "tabs", "tabs.tsx")
+    const tabs = library("screen-engine", "tabs-view.tsx")
     expect(
-      /icon\?:\s*(React\.)?ReactNode/.test(tabs),
+      /icon\??:\s*(React\.)?ReactNode/.test(tabs),
       "TabItem no longer takes a node — the type marks on the ticket strip have gone dark"
     ).toBe(true)
 
@@ -144,13 +147,13 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
 
   it("#19 · SHIPPED — an empty state carries its concept glyph, and every recipe feeds one", () => {
     // The library half: the config declares the slot and the frame renders it.
-    const config = library("lib", "config.ts")
+    const config = library("screen-engine", "config.ts")
     expect(config, "CollectionConfig must still declare emptyText").toMatch(/emptyText:\s*string/)
     expect(
       /emptyIcon/.test(config),
       "CollectionConfig no longer takes an `emptyIcon` — every recipe's empty state is a bare grey sentence again"
     ).toBe(true)
-    const frame = library("registry", "collections", "collection-frame", "collection-frame.tsx")
+    const frame = library("screen-engine", "collection-frame.tsx")
     expect(
       /config\.emptyIcon/.test(frame),
       "the collection frame no longer reads `emptyIcon`, so the slot is declared and drawn by nobody"
@@ -181,13 +184,15 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
 
   // ── #20 · A BIG NUMBER ───────────────────────────────────────────────────
   it("#20 · SHIPPED — a stat card takes a glyph, and the numbers band carries one", () => {
-    const grid = library("registry", "collections", "stat-grid", "stat-grid.tsx")
+    const grid = readFileSync(join(ROOT, "shared", "ui", "structures", "stat-grid", "stat-grid.tsx"), "utf8")
     expect(grid, "StatItem must still be the shape this check reads").toContain(
       "export interface StatItem"
     )
     const from = grid.indexOf("export interface StatItem")
     const item = grid.slice(from, grid.indexOf("}", from))
-    expect(/icon/.test(item), "StatItem no longer takes an icon").toBe(true)
+    // The kit's glyph slot is `support` (a node beside the value); `chart` is
+    // the second. Either carries a mark, so the slot exists.
+    expect(/support\?:|chart\?:/.test(item), "StatItem no longer has a glyph slot (support/chart)").toBe(true)
 
     const panel = readFileSync(join(ROOT, "web", "components", "work-logs-panel.tsx"), "utf8")
     expect(

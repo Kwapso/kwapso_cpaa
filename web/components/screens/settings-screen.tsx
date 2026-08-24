@@ -43,10 +43,10 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { List } from "@shared/ui/registry/collections/list/list"
-import { ChevronRight } from "lucide-react"
+} from "@shared/ui/controls/avatar/avatar"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { List } from "@shared/web/list-compat"
+import { ChevronRight } from "@shared/ui/icons"
 
 import { AccessTokensSection } from "@/components/access-tokens"
 import { GoogleConnectionsSection } from "@/components/google-connections"

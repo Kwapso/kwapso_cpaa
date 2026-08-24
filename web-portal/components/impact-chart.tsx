@@ -16,7 +16,7 @@
 // it at all — one app is the headline figure drawn twice — is decided before
 // this file is ever asked for.
 
-import { Chart, defaultChartConfig } from "@shared/ui/registry/collections/chart/chart"
+import { Chart } from "@shared/ui/structures/chart/chart"
 
 /** Hours a month, per app.
  *
@@ -34,14 +34,12 @@ export function AppSavingsChart({
   return (
     <Chart
       data={rows}
-      config={{
-        ...defaultChartConfig,
-        type: "bar",
-        xKey: "label",
-        series: [{ key: "hours", label, color: "chart-2" }],
-        showLegend: false,
-        height: 190,
-      }}
+      type="bar"
+      xKey="label"
+      series={[{ key: "hours", label, color: "var(--chart-2)" }]}
+      legend={false}
+      zeroLine
+      height="190px"
     />
   )
 }

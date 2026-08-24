@@ -22,18 +22,18 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Progress } from "@shared/ui/registry/primitives/progress/progress"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Progress } from "@shared/ui/controls/progress/progress"
 import type {
   ScreenActionContext,
   ScreenIntent,
-} from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
-import { type CollectionConfig } from "@shared/ui/lib/config"
-import { Inbox } from "lucide-react"
+} from "@shared/web/screen-engine/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import { type CollectionConfig } from "@shared/web/screen-engine/config"
+import { Inbox } from "@shared/ui/icons"
 
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"

@@ -22,10 +22,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
-import { ChevronRight, Palette, Pencil } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { ChevronRight, Palette, Pencil } from "@shared/ui/icons"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"
 import { OverviewList } from "@/components/overview-list"

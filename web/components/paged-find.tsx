@@ -54,10 +54,10 @@
 
 import * as React from "react"
 
-import { FilterBar } from "@shared/ui/registry/primitives/filter-bar/filter-bar"
-import { SearchInput } from "@shared/ui/registry/primitives/search-input/search-input"
-import { SortControl } from "@shared/ui/registry/primitives/sort-control/sort-control"
-import type { FilterFacet, SortOption } from "@shared/ui/lib/config"
+import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { SearchInput } from "@shared/ui/controls/search-input/search-input"
+import { SortControl } from "@shared/ui/controls/sort-control/sort-control"
+import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
@@ -259,7 +259,7 @@ export function PagedFind<T>({
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={text} onChange={setText} placeholder={placeholder} className="w-56" />
+        <SearchInput value={text} onChange={(e) => setText(e.currentTarget.value)} placeholder={placeholder} className="w-56" />
         {/* THE ORDER, beside the search box and the filters because it is the
             third half of one question and belongs on the same row (the library's
             own CollectionFrame places it exactly here). What it changes is what
@@ -268,12 +268,10 @@ export function PagedFind<T>({
         {showSort && (
           <SortControl
             options={sorts}
-            sortBy={sortBy}
-            sortDir={sortDir ?? landsOn}
-            onChange={(by, dir) => {
-              setSortBy(by)
-              setSortDir(dir)
-            }}
+            value={sortBy}
+            onValueChange={(by) => setSortBy(by)}
+            direction={sortDir ?? landsOn}
+            onDirectionChange={(dir) => setSortDir(dir)}
           />
         )}
         {showFilters && (

@@ -8,7 +8,7 @@
 // for are hidden (the server re-checks too). Tabs here are just a nicer way to
 // reach the sub-pages, so selecting one navigates (no panel content).
 
-import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import type { PermissionValue } from "@shared/types"
 import { CONCEPT_ICON, TEAM_SECTIONS, type TeamSection } from "@/lib/pages"

@@ -8,19 +8,20 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/registry/primitives/badge/badge"
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Input } from "@shared/ui/registry/primitives/input/input"
+import { Badge } from "@shared/ui/controls/badge/badge"
+import { cn } from "@shared/ui/lib/utils"
+import { Button, buttonVariants } from "@shared/ui/controls/button/button"
+import { Input } from "@shared/ui/controls/input/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/registry/primitives/select/select"
-import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "lucide-react"
+} from "@shared/ui/controls/select/select"
+import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "@shared/ui/icons"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -179,11 +180,12 @@ export function SelectableScreen({
          * the shared form dialog (Law R4), never an inline row. */}
         <div className="flex flex-wrap justify-end gap-2">
           {values.length > 0 && (
-            <Button asChild variant="secondary" className="gap-1">
-              <a href="/api/tenancy/selectable/export">
-                <Download className="size-4" aria-hidden /> {t("Export CSV")}
-              </a>
-            </Button>
+            <a
+              href="/api/tenancy/selectable/export"
+              className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
+            >
+              <Download className="size-4" aria-hidden /> {t("Export CSV")}
+            </a>
           )}
           {canCreate && onImport && (
             <Button variant="secondary" onClick={onImport} className="gap-1">

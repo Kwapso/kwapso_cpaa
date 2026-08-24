@@ -10,8 +10,8 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/registry/primitives/avatar/avatar"
-import { Button } from "@shared/ui/registry/primitives/button/button"
+} from "@shared/ui/controls/avatar/avatar"
+import { Button } from "@shared/ui/controls/button/button"
 import {
   Dialog,
   DialogContent,
@@ -19,13 +19,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@shared/ui/registry/primitives/dialog/dialog"
+} from "@shared/ui/controls/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/registry/primitives/file-upload/file-upload"
-import { Input } from "@shared/ui/registry/primitives/input/input"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@shared/ui/lib/config"
+import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { Input } from "@shared/ui/controls/input/input"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { SessionUser } from "@shared/types"
 import { ApiFailure, auth } from "@/lib/api"
@@ -108,7 +108,7 @@ export function ProfileDialog({
               )}
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
-            <FileUpload accept="image/*" multiple={false} onChange={handlePhoto} />
+            <FileUpload accept="image/*" multiple={false} onFilesSelected={handlePhoto} />
           </div>
           <Field config={firstField} htmlFor="pf-first">
             <Input

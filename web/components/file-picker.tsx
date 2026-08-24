@@ -23,10 +23,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/registry/primitives/button/button"
-import { Spinner } from "@shared/ui/registry/primitives/spinner/spinner"
-import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
-import { Paperclip } from "lucide-react"
+import { Button } from "@shared/ui/controls/button/button"
+import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Paperclip } from "@shared/ui/icons"
 
 import { ApiFailure } from "@/lib/api"
 // No canvas re-encode: a certificate is a document, and a PDF put through an
