@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { ACCOUNT_MODULES, TOP_LEVEL_MODULES } from "@/components/deep-link/route"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
@@ -43,6 +44,63 @@ describe("the one shell — no reload on in-app navigation", () => {
       const src = read(f)
       expect(/router\.push\(/.test(src), `${f} must not router.push (use softNavigate for in-app nav)`).toBe(false)
     }
+  })
+
+  // ENUMERATE BY WHAT NAVIGATES, NOT BY A LIST SOMEBODY MAINTAINS.
+  //
+  // The test above reads SIX hand-listed files for ONE spelling of the mistake.
+  // The other spelling is a bare `<a href="/t/…">`, which no framework and no
+  // check was watching, and there are two hundred components it could live in.
+  // It reached production three times: the knowledge base (see the note in
+  // deep-link/route.ts), "Manage dropdowns", and the internal rate card — whose
+  // own comment says it copied the dropdowns one. Three occurrences of one
+  // class, under a green build, because the guard enumerated files rather than
+  // links.
+  //
+  // So this reads EVERY component off disk and asks the only question that
+  // matters: does this anchor's href point INSIDE the app? An in-app href must
+  // go through <InAppLink> (or carry its own softNavigate/onOpen interception,
+  // which is the same thing written inline). An href to /api/…, to an external
+  // site, or to a pre-auth route is not this rule's business.
+  it("in-app-anchors: no component links into the app with a bare anchor", () => {
+    const offenders: string[] = []
+    // Off the DISK, so a component written tomorrow is held to this without
+    // anybody adding it to a list.
+    const files = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+    expect(files.length, "the component census found nothing — it has gone blind").toBeGreaterThan(50)
+    for (const { path: file, source } of files) {
+      const src = stripComments(source)
+      // Every anchor's href, whether written as a literal or a template.
+      for (const m of src.matchAll(/<a\b[\s\S]{0,400}?href=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        const href = m[1] ?? m[2] ?? ""
+        // Not ours: an API door (export/download), an absolute URL, a mailto,
+        // or an expression we cannot read statically.
+        if (!href.startsWith("/") || href.startsWith("/api/")) continue
+        // A pre-auth destination is a real navigation on purpose.
+        if (/^\/(login|onboarding)\b/.test(href)) continue
+        // The interception, written inline — app-tiles.tsx and the dropdown
+        // list do this, and it is exactly what <InAppLink> wraps.
+        const anchor = m[0]
+        const after = src.slice(m.index ?? 0, (m.index ?? 0) + anchor.length + 500)
+        if (/preventDefault\(\)/.test(after) && /(softNavigate|onOpen|onNavigate|go)\(/.test(after))
+          continue
+        offenders.push(`${file} → ${href}`)
+      }
+    }
+    expect(
+      offenders,
+      `these anchors point inside the app and would reload the whole shell — use <InAppLink>: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("in-app-anchors: the InAppLink seam actually intercepts", () => {
+    // A component everything is routed through, that forgot to preventDefault,
+    // would turn the rule above into decoration.
+    const src = read("components/in-app-link.tsx")
+    expect(src, "InAppLink must render a real <a> so middle-click still works").toMatch(/<a\b/)
+    expect(src, "InAppLink must cancel the browser's own navigation").toContain("preventDefault()")
+    expect(src, "InAppLink must move through the soft-nav bus").toContain("softNavigate")
+    expect(src, "InAppLink must leave a modified click to the browser").toContain("metaKey")
   })
 
   it("softNavigate is the one bus, backed by the host's registered go()", () => {

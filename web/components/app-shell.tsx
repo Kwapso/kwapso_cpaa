@@ -40,8 +40,8 @@ import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // The row-level registry + coarse invalidations moved to lib (R15): they're DATA
 // the live-collections check imports, and the thread/help_threads + agent_usage
 // deaf-exemptions live beside them in the rules registry.
-import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, totalKey } from "@/lib/live-resources"
-import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcile } from "@shared/web/store"
+import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, liveCoveredKeys, totalKey } from "@/lib/live-resources"
+import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcile, registerLiveCoverage } from "@shared/web/store"
 import { NAV, TEAM_SECTIONS, bottomNavItems, overflowNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
@@ -221,6 +221,17 @@ export function AppShell({
       </button>
     )
   }
+
+  // WHICH KEYS THE SOCKET VOUCHES FOR. Registered here because this is where
+  // the team channel is opened — the promise and the connection have to belong
+  // to the same component, or the cache could be told a key is covered by a
+  // socket nobody opened. Re-registered whenever the team changes, and dropped
+  // on unmount, which takes the app back to always-revalidate.
+  React.useEffect(() => {
+    if (!teamId) return
+    const covered = liveCoveredKeys(teamId)
+    return registerLiveCoverage((key) => covered.has(key))
+  }, [teamId])
 
   // The active team's live channel. A ping patches ONLY the changed row in place
   // (row-level), via the generic registry above — no full-collection refetch.

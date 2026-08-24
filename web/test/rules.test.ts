@@ -2088,6 +2088,7 @@ describe("RULES — the laws of the base", () => {
       "linked-emails", // R30: web/test/linked-emails.test.ts — the email census, derived from the send sites themselves
       "wrapped-strings", // R33: web/test/wrapped-strings.test.ts — R28's walk read the other way round, over both front doors
       "offered-rights", // R36: the offered-vs-consulted census below
+      "in-app-anchors", // R37: web/test/shell-nav.test.ts — every component's anchors, classified by where the href points
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

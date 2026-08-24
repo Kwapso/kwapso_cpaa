@@ -287,6 +287,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "offered-rights",
     status: "enforced",
   },
+  {
+    id: "R37",
+    dimension: "arch",
+    law: "A LINK INSIDE THE APP NEVER LEAVES THE SHELL. The whole post-auth app is ONE client-resolved shell that mounts once and never unmounts, so every move within it is a History-API push through the single soft-navigation bus (`softNavigate` / the host's `go()`) and nothing is fetched. A bare `<a href=\"/t/…\">` opts out of all of it: the browser discards the document, every module re-runs from nothing, the warm cache and any running agent are destroyed, and the boot mark plays again because the module-level session cache has reset to empty. So an in-app destination is written with `<InAppLink>` — a REAL anchor, so middle-click, copy-address and screen readers still work, with only the plain left click intercepted — or it carries that same interception inline. The check is a CENSUS OFF THE DISK of every component's anchors, classified by where the href points: inside the app, an `/api/` door, a pre-auth route, or elsewhere. Not a hand-list of files, and not one spelling of the mistake.",
+    why: "Earned three times, by one class of bug, under a green build each time. First the knowledge base, which was missing from `TOP_LEVEL_MODULES` so every tap on a sidebar page left the History API — the note is still in `deep-link/route.ts`. Then \"Manage dropdowns\", which the owner reported himself on 24 Aug 2026 in the words that name the mechanism exactly: \"I can see the app reload because I see the boot loading animation\" — and the boot mark's trigger is a module-level `sessionCache` that only a fresh document can reset. Then the internal rate card, whose own comment says it copied the dropdowns link, which is what turns a typo into a pattern. THE GUARD THAT EXISTED COULD NOT SEE TWO OF THE THREE: `shell-nav.test.ts` read SIX hand-listed files for ONE spelling (`router.push`), and a bare anchor in any of two hundred other components is a different spelling in a file nobody listed. That is R21's lesson arriving in a second module — enumerate by what NAVIGATES, never by what somebody remembered to write down — and it is why the seam is a component rather than a convention: a bare anchor is now a red build, and there is exactly one way to write the right thing.",
+    checkId: "in-app-anchors",
+    status: "enforced",
+  },
 ]
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back

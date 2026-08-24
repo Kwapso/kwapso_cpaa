@@ -1112,6 +1112,36 @@ export const TEAM_RESOURCES: Record<
 
 /** Coarse listeners for resources with no row-shaped cache: the ping just drops
  * these keys (cache-first refetch on next read). Part of the R15 listener set. */
+/** THE KEYS THE LIVE LAYER DEMONSTRABLY MOVES, for this team.
+ *
+ * `useCached` uses this to decide whether it may paint from cache without
+ * re-asking the server (shared/web/store.ts `registerLiveCoverage`). The whole
+ * point of the socket is that it tells us when something changed; revalidating
+ * on every mount anyway is asking a question we are already being sent the
+ * answer to, and it is why moving between two screens the app already had in
+ * memory still waited on the network.
+ *
+ * IT IS DELIBERATELY CONSERVATIVE, and under-claiming is the safe direction. It
+ * names the COLLECTION keys — every `TEAM_RESOURCES` entry's own key, every
+ * `SIMPLE_INVALIDATIONS` target, and the team feed that any change refreshes —
+ * and it does NOT try to name the record-scoped `deps` or `slicePrefix` keys,
+ * which are parameterised by a row id this function does not have. Those simply
+ * keep revalidating exactly as they did before, which costs a request and can
+ * never be wrong. A key that is not here is not a bug; a key that is here
+ * wrongly is a screen that goes quietly stale, so the list is derived from the
+ * registry itself and never hand-written.
+ *
+ * Derived, not listed, for the same reason R15 makes the registry the one
+ * source: a resource added tomorrow is covered without anybody remembering
+ * this function exists. */
+export function liveCoveredKeys(teamId: string): Set<string> {
+  const keys = new Set<string>([`activity:team:${teamId}`])
+  for (const r of Object.values(TEAM_RESOURCES)) keys.add(r.key(teamId))
+  for (const simple of Object.values(SIMPLE_INVALIDATIONS))
+    for (const k of simple(teamId)) keys.add(k)
+  return keys
+}
+
 export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> = {
   // Team name/logo — the shell also refreshes the active context (see app-shell).
   team: (t) => [`team-meta:${t}`],

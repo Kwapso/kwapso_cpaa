@@ -28,8 +28,25 @@ import { GuardError } from "../src/lib/permissions"
 import { TEAM_MODULE_CATALOG } from "../src/team-schema"
 
 const cfg = { accountId: "a", apiToken: "t" } as never
-const guard = { userId: "ME", teamId: "TEAM", roleId: "ADMIN", databaseId: "db" }
 const actor = { id: "ME", email: "me@x.com", name: "Me" }
+
+/** A FRESH GUARD PER TEST, because a guard object IS a request.
+ *
+ * It was one module-level object shared by all fourteen tests, which is a shape
+ * production never has: `requireMember` (shared/workers/gating.ts) builds a new
+ * object literal for every request, and the per-request permission memo in
+ * `hasRight` is keyed on exactly that identity. One shared object means one
+ * shared request, so the sheet the first test mocked was still answering in the
+ * twelfth — the fixture was asserting against a cache, not against its own mock.
+ *
+ * Keeping it a `let` reassigned in `beforeEach` mirrors the real lifetime and
+ * costs nothing; the alternative (reaching into the memo to clear it) would test
+ * a shape the app does not have. */
+let guard = newGuard()
+
+function newGuard() {
+  return { userId: "ME", teamId: "TEAM", roleId: "ADMIN", databaseId: "db" }
+}
 
 /** Make d1Query answer the role lookup with the given row (or none = missing).
  *
@@ -58,6 +75,8 @@ beforeEach(() => {
   d1Query.mockReset()
   d1ExecScript.mockReset()
   d1ExecScript.mockResolvedValue(undefined)
+  // A new request, so a new guard — see newGuard() above.
+  guard = newGuard()
 })
 
 describe("normalizeRights (auto-flip-read)", () => {
