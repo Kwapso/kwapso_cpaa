@@ -39,8 +39,11 @@ stage). A Process is a way of working inside it. A Step is one part of that.
 they worked before we touched anything. Every later version is what we changed
 it to.
 
-**A new version is cut automatically when a sprint completes, plus a manual
-button** (the owner confirmed both).
+**A new version is cut BY HAND, and only by hand** (the owner, 24 Aug 2026,
+settling round two of the audit-module questions). An earlier draft of this
+document said a completing sprint cut one automatically and called it confirmed;
+nothing was ever wired to do it, and the decision is purged rather than switched
+off — see team migration 0051.
 
 **A story must name the step it changes, or explicitly say it changes none, and
 it cannot close without doing so.** That is the hook everything here hangs on.

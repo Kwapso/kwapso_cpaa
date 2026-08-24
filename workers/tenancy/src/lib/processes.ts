@@ -1236,14 +1236,13 @@ export async function listProcessVersions(
     id: string
     version_no: number
     label: string | null
-    cut_from_sprint_id: string | null
     created_at: string
     creator_name: string | null
   }>(
     cfg,
     guard.databaseId,
     // R14 hard cap — a version list is bounded by how many sprints have completed.
-    `SELECT id, version_no, label, cut_from_sprint_id, created_at, creator_name
+    `SELECT id, version_no, label, created_at, creator_name
        FROM process_versions${where([fence.sql, "process_id = ?"])}
       ORDER BY version_no DESC LIMIT ${LIST_HARD_CAP}`,
     [...fence.params, processId]
@@ -1256,7 +1255,6 @@ export async function listProcessVersions(
     // v1 IS the baseline, always — it is written with the process itself and the
     // unique index on (process_id, version_no) means there can never be a second.
     isBaseline: r.version_no === 1,
-    cutFromSprintId: scope.kind === "portal" ? null : r.cut_from_sprint_id,
     createdAt: r.created_at,
     createdByName: scope.kind === "portal" ? null : r.creator_name,
   }))
@@ -1401,7 +1399,6 @@ export async function createProcess(
     account_id: app.accountId,
     version_no: 1,
     label: input.baselineLabel ?? "How it worked before",
-    cut_from_sprint_id: null,
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,
@@ -1669,23 +1666,24 @@ export async function removeStep(
  * `step_key`, so the next edit describes the new way of working and the old one
  * stays exactly as it was agreed.
  *
- * TWO CALLERS, ONE FUNCTION (SCOPE, confirmed by the owner): a sprint completing
- * cuts one automatically, and a person can cut one from the button. The only
- * difference is `sprintId`.
+ * ONE CALLER: a person, pressing the button (owner, 24 Aug 2026). An earlier
+ * plan had a completing sprint cut one too, and nothing was ever wired to do it
+ * — the parameter, the column and its index existed and only tests ever used
+ * them. The decision was purged rather than switched off (migration 0051).
  *
  * IDEMPOTENT (R17), and this is the one transition in the build where "the same
  * thing happened twice" is an INSERT rather than an UPDATE — so the predicate
- * cannot ride a WHERE. It rides the partial unique index on
- * (process_id, cut_from_sprint_id) instead: a sprint that completes twice — a
- * double click, a retried job, a replayed hook — is refused by the database, not
- * by a check a second request could slip past. `null` back means "already cut",
- * which is a 200 with no activity row and no ping, exactly like a zero-row move. */
+ * cannot ride a WHERE. It rides the unique index on (process_id, version_no)
+ * instead: two quick presses both read version N and both try to insert N+1, and
+ * the loser is refused by the database rather than by a check a second request
+ * could slip past. `null` back means "already cut", which is a 200 with no
+ * activity row and no ping, exactly like a zero-row move. */
 export async function cutVersion(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { processId: string; label?: string; sprintId?: string }
+  input: { processId: string; label?: string }
 ): Promise<{ versionId: string; versionNo: number } | null> {
   const process = await processOrThrow(cfg, guard, scope, input.processId)
   const current = await latestVersionOrThrow(cfg, guard, scope, input.processId)
@@ -1699,7 +1697,6 @@ export async function cutVersion(
       account_id: process.accountId,
       version_no: current.versionNo + 1,
       label: input.label ?? null,
-      cut_from_sprint_id: input.sprintId ?? null,
       created_at: now,
       creator_id: actor.id,
       creator_email: actor.email,
@@ -1732,9 +1729,7 @@ export async function cutVersion(
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Version cut",
-    description: `${actor.name} cut version ${current.versionNo + 1} of ${process.name}${
-      input.sprintId ? " when a sprint completed" : ""
-    }`,
+    description: `${actor.name} cut version ${current.versionNo + 1} of ${process.name}`,
     relatedTable: "process_versions",
     relatedRowId: versionId,
   })

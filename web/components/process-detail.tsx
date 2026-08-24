@@ -743,7 +743,6 @@ export function ProcessDetailScreen({
                         </span>
                         <span className="text-muted-foreground block text-xs">
                           {new Date(v.createdAt).toLocaleDateString()}
-                          {v.cutFromSprintId ? ` · ${t("cut when a sprint completed")}` : ""}
                           {v.createdByName ? ` · ${v.createdByName}` : ""}
                         </span>
                       </span>

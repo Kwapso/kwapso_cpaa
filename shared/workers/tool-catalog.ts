@@ -1992,13 +1992,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "cut_process_version",
     summary:
-      "Cut a new version of a process map: today's steps are copied forward and the current version is frozen exactly as it was agreed. `sprintId` marks the cut as the automatic one a completed sprint makes. Pass the same sprint twice and the second call answers `alreadyCut: true` rather than cutting again.",
+      "Cut a new version of a process map: today's steps are copied forward and the current version is frozen exactly as it was agreed. A version is only ever cut by hand. Press twice in quick succession and the second call answers `alreadyCut: true` rather than cutting a second one.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/versions",
-    schema: obj({ processId: S, label: S, sprintId: S }, ["processId"]),
+    schema: obj({ processId: S, label: S }, ["processId"]),
     buildBody: (i) => ({
       processId: str(i, "processId"),
       label: opt(i, "label"),
-      sprintId: opt(i, "sprintId"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Cut a new version of map ${str(i, "processId")}` },
   },

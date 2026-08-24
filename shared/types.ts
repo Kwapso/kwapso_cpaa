@@ -1150,9 +1150,6 @@ export type ProcessVersion = {
   versionNo: number
   label: string | null
   isBaseline: boolean
-  /** the sprint whose completion cut it; null = the manual button. `null` on the
-   * way out to a client login — which sprint we ran is the agency's own record. */
-  cutFromSprintId: string | null
   createdAt: string
   createdByName: string | null
 }
@@ -1341,8 +1338,9 @@ export type Sprint = {
   endsOn: string | null
   soldPriceCents: number
   currency: string | null
-  /** the MOMENT it completed, not a status word — the version cut on the money
-   * side keys off exactly that (process_versions.cut_from_sprint_id). */
+  /** the MOMENT it completed, not a status word. It used to be what an automatic
+   * version cut keyed off; that decision was purged on 24 Aug 2026 (a version is
+   * cut by hand), and the moment is still the honest way to ask "is it done?". */
   completedAt: string | null
   active: boolean
   /** exact server counts of the work inside it (R16) — never a loaded length. */

@@ -151,12 +151,11 @@ describe("the two facts we borrow from the work engine", () => {
   })
 })
 
-describe("a version is cut once per sprint, whatever fires it twice", () => {
+describe("a version is cut by hand, and a double press cuts one", () => {
   it("copies every step forward, keeping the key that makes a saving a subtraction", async () => {
     const cut = await cutVersion(cfg, guard, staff, actor, {
       processId: IDS.victimProcess,
       label: "After the first sprint",
-      sprintId: "SPRINT_1",
     })
     expect(cut?.versionNo).toBe(2)
 
@@ -174,15 +173,26 @@ describe("a version is cut once per sprint, whatever fires it twice", () => {
   })
 
   // R17, for a transition that is an INSERT. The predicate cannot ride a WHERE,
-  // so it rides the partial unique index — the database refuses, not a check.
-  it("the SAME sprint completing twice cuts one version, and the second is silent", async () => {
-    const first = await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess, sprintId: "SPRINT_1" })
-    const second = await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess, sprintId: "SPRINT_1" })
-    expect(first?.versionNo).toBe(2)
-    expect(second, "a repeat cut moves nothing and says so with null").toBeNull()
+  // so it rides the unique index on (process_id, version_no) — the database
+  // refuses, not a check a second request could slip past.
+  //
+  // THE RACE IS THE DOUBLE CLICK, not the second thought. Two submissions that
+  // overlap both read version N and both try to insert N+1; the loser is refused
+  // and reads that as "already cut". A person who presses, sees version 2, and
+  // then deliberately presses again gets version 3, because they meant it — that
+  // is the test below this one.
+  it("two overlapping presses cut ONE version, and the second is silent", async () => {
+    const before = await latestVersionNo()
+    const [first, second] = await Promise.all([
+      cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess }),
+      cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess }),
+    ])
+    const cuts = [first, second].filter(Boolean)
+    expect(cuts, "exactly one of two overlapping presses may cut").toHaveLength(1)
+    expect(cuts[0]?.versionNo).toBe(before + 1)
 
     const versions = await listProcessVersions(cfg, guard, staff, IDS.victimProcess)
-    expect(versions.map((v) => v.versionNo)).toEqual([2, 1])
+    expect(versions.map((v) => v.versionNo)).toEqual([before + 1, before])
     // Zero rows moved = no activity row, exactly like every other transition.
     const history = db()
       .prepare("SELECT COUNT(*) AS n FROM activity WHERE type = 'Version cut'")
@@ -190,17 +200,20 @@ describe("a version is cut once per sprint, whatever fires it twice", () => {
     expect(history.n, "history says what happened, not how many times it was fired").toBe(1)
   })
 
-  it("a DIFFERENT sprint cuts the next version, and the manual button always may", async () => {
-    await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess, sprintId: "SPRINT_1" })
-    await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess, sprintId: "SPRINT_2" })
-    // No sprint id at all is the manual cut — two in a row are two versions,
-    // because a person pressing the button twice means it twice.
+  it("pressing again, deliberately, cuts the next one — because they meant it", async () => {
+    await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess })
     await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess })
     await cutVersion(cfg, guard, staff, actor, { processId: IDS.victimProcess })
     const versions = await listProcessVersions(cfg, guard, staff, IDS.victimProcess)
-    expect(versions.map((v) => v.versionNo)).toEqual([5, 4, 3, 2, 1])
+    expect(versions.map((v) => v.versionNo)).toEqual([4, 3, 2, 1])
   })
 })
+
+/** The highest version number this process currently carries. */
+async function latestVersionNo(): Promise<number> {
+  const versions = await listProcessVersions(cfg, guard, staff, IDS.victimProcess)
+  return versions[0]?.versionNo ?? 0
+}
 
 describe("the saving a client reads, end to end, against a real database", () => {
   it("subtracts the LATEST version from version 1 — not the other way round", async () => {

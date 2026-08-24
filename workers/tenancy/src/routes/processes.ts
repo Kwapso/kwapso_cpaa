@@ -533,13 +533,15 @@ export async function postRemoveStep(request: Request, env: Env): Promise<Respon
 
 /** POST /api/tenancy/processes/versions — cut a new version.
  *
- * ONE DOOR, TWO CALLERS (the owner confirmed both): a person pressing the button
- * sends no `sprintId`; the work engine, when a sprint completes, sends the
- * sprint's id. That id is what makes the automatic cut idempotent — the partial
- * unique index refuses a second version for the same sprint, so a completion
- * that fires twice cuts once (R17), and the door answers 200 with
- * `alreadyCut: true` rather than an error, because nothing is wrong: the version
- * it asked for exists. */
+ * ONE DOOR, ONE CALLER: a person pressing the button (owner, 24 Aug 2026). It
+ * used to take a `sprintId` as well, for an automatic cut on sprint completion
+ * that nothing was ever wired to perform — that decision is purged, not switched
+ * off (migration 0051).
+ *
+ * R17 rides the unique index on (process_id, version_no): two quick presses both
+ * read version N and both try to insert N+1, the loser is refused by the
+ * database, and the door answers 200 with `alreadyCut: true` rather than an
+ * error — because nothing is wrong, the version it asked for exists. */
 export async function postCutVersion(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
   const scope = await refusePortalCaller(cfg, guard)
@@ -547,7 +549,6 @@ export async function postCutVersion(request: Request, env: Env): Promise<Respon
   const cut = await cutVersion(cfg, guard, scope, actor, {
     processId,
     label: optionalText(body.label, "Name", TEXT_LIMITS.short),
-    sprintId: optionalText(body.sprintId, "Sprint", TEXT_LIMITS.short),
   })
   if (!cut) return json({ alreadyCut: true })
   await publishChange(env, guard.teamId, "processes", processId)

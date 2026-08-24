@@ -309,6 +309,32 @@ describe("portal rules the agency app doesn't have", () => {
       expect(ticket, `${field} must be withheld from a client login, not just left off the screen`).toMatch(
         new RegExp(`${field}: hide\\w+ \\? null :`)
       )
+
+    // A THIRD SEAM, and the file's own argument is why it is here: a promise with
+    // three places to make the same decision needs three lines watching them.
+    //
+    // A client may comment on a process map, so the conversation has both sides
+    // on it, exactly like a ticket thread. `listProcessComments` already withholds
+    // the staff writer's name and the portal screen already falls back to "Your
+    // team" — but nothing pinned it, so the whole guarantee rested on that one
+    // ternary surviving every future edit to a file in a different worker. The
+    // owner re-affirmed the rule on 24 Aug 2026 ("only their contact person,
+    // never the rest of us"), which is the moment to pin it rather than to
+    // re-verify it by hand.
+    const processes = read(join(PORTAL, "..", "workers", "tenancy", "src", "lib", "processes.ts"))
+    const commentSeam = (() => {
+      const at = processes.indexOf("export async function listProcessComments(")
+      expect(at, "listProcessComments is where a comment's author is decided — did it move?").toBeGreaterThan(-1)
+      return processes
+        .slice(at, processes.indexOf("\n}", at))
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+    })()
+    expect(
+      commentSeam,
+      "a comment from our side must reach a client login with no staff name on it"
+    ).toMatch(/scope\.kind === "portal"[\s\S]*createdByName|createdByName[\s\S]*scope\.kind === "portal"/)
+    expect(commentSeam, "…and it must be a null, not a different string").toContain("? null :")
   })
 
   // THE SAME SENTENCE, ONE TABLE OVER. An account row is mostly the client's own
