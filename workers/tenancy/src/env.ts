@@ -31,4 +31,15 @@ export type Env = {
   /** Per-user ceiling on CREATED teams (each provisions a database). The owner's
    * override: set it higher per environment; unset falls back to the code default. */
   MAX_TEAMS_PER_USER?: string
+  /** Workers AI — reading a call into a proposed process map
+   *  (lib/process-extract.ts). OPTIONAL: without it that ONE door refuses with a
+   *  503 that says so, rather than throwing at the top of somebody's call notes. */
+  AI?: Ai
+  /** Swap the cheap model without a code change. Same var name as data-ops and
+   *  content, so one setting moves the whole cheap path. */
+  WORKERS_AI_MODEL?: string
+  /** The free daily AI allowance — MUST match data-ops and content, or one
+   *  allowance is enforced at two different heights. */
+  AGENT_FREE_DAILY?: string
+  AGENT_NO_DAILY_CAP?: string
 }

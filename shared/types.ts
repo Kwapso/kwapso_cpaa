@@ -1195,6 +1195,9 @@ export type ProcessSummary = {
    * new step starts from (0053); a step's own role is what the money is actually
    * computed against. `roleName` stays as the word the map was mapped with. */
   roleId: string | null
+  /** THE DAY THE SAVING IS MEASURED FROM. Null on a map nobody has dated, which
+   * reads as the day the map was created. */
+  auditDate?: string | null
   /** how many versions have been cut (1 = the baseline alone) */
   versionCount: number
   /** steps in the CURRENT version */
@@ -1239,9 +1242,28 @@ export type ProcessStep = {
    * unnamed OR when its cost has not been looked up yet — two different reasons
    * for the same honest gap, told apart by whether `roleId` is set. */
   roleCentsPerHour: number | null
-  /** WHAT IT IS DONE IN. Several, because a step is: open the spreadsheet, copy
-   * it into the portal, send the email. Empty is ordinary, not missing. */
-  tools: { id: string; name: string; mark: string | null }[]
+  /** WHAT IT IS DONE IN — exactly ONE, by both respondents' ruling. Aurora's
+   * reason is the good one: "if it's multiple tools, it's multiple steps". A step
+   * done in two systems has a handoff in the middle of it, and the handoff is
+   * what a process map exists to show. Null is ordinary, not missing. */
+  toolId: string | null
+  toolName: string | null
+  toolMark: string | null
+  /** HOW OFTEN, IN THE PERIOD SOMEBODY SAYS IT IN. `runsPerMonth` above is this
+   * converted, once, in the one place that conversion lives. */
+  runsPerPeriod: number
+  frequencyPeriod: "day" | "week" | "month" | "year"
+  /** THE WORD ON A FORK. Two steps at the SAME position are branches of one
+   * decision; this is what distinguishes them ("if approved" / "if rejected").
+   * Null on an ordinary step, which is nearly all of them. */
+  branchLabel: string | null
+  /** THE WAY BACK. The step key this one can return to — "if rejected, go back
+   * to step two". Rejections and rework are real work and a map that cannot draw
+   * them is describing a process nobody runs. */
+  loopsBackTo: string | null
+  /** WHICH DAY THIS DESCRIPTION STARTED BEING TRUE — set only when the step came
+   * out of the dated history rather than off the live row. */
+  effectiveOn?: string
 }
 
 /** One process opened: its versions, the steps of ONE of them, the exact totals
@@ -1251,6 +1273,18 @@ export type ProcessStep = {
  * says which, and it is the latest unless the reader asked for an older one. The
  * two travel together deliberately: a list of steps with no version beside it is
  * how a reader ends up checking today's times against last year's total. */
+export type ProcessLink = {
+  id: string
+  /** the OTHER map — never this one */
+  processId: string
+  name: string
+  note: string | null
+  /** `to` = this map hands over to it; `from` = it hands over to this one. Read
+   * both ways on purpose: making somebody remember which way round they typed a
+   * connection is how a feature stops being used. */
+  direction: "to" | "from"
+}
+
 export type ProcessDetail = {
   process: ProcessSummary
   versions: ProcessVersion[]
@@ -1266,6 +1300,18 @@ export type ProcessDetail = {
   saving: ProcessSaving | null
   /** the sentence the figure above must be quoted with (R25), carried with it */
   savingsCaption: string
+  /** THE DAY THE SAVING IS MEASURED FROM — Alex's visit, not "version 1"
+   * (Aurora's ruling). A version number is a thing WE did; this is the moment
+   * the client recognises as "before". */
+  auditDate: string
+  /** the day the slider is parked on, or null for today's live map */
+  asOf: string | null
+  /** every day this map changed, plus the audit date — the stops the slider
+   * snaps to, so no position on it is a day nothing happened */
+  revisionDates: string[]
+  /** the maps this one hands over to, and the ones that hand over to it. LOOSE
+   * by ruling: naming a link changes no duration and no saving on either side. */
+  links: ProcessLink[]
 }
 
 /** A comment on a process map — a conversation, never an edit. */

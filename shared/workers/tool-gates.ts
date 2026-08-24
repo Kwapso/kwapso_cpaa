@@ -200,6 +200,27 @@ export const TOOL_GATES: Record<string, string> = {
   update_process_step: "processes:edit",
   remove_process_step: "processes:delete",
   cut_process_version: "processes:create",
+  // MOVING THE AUDIT DATE IS AN EDIT ON THE MAP, not a new record — it changes
+  // which agreed version counts as the "before" and therefore every figure the
+  // map reports. Same right as editing a step, because it moves the same number.
+  // WAVES — what a client bought. The module is `work`, the same one the sprints
+  // inside a wave gate on, because they are one record from a reader's point of
+  // view: "what did they buy" and "what are we doing this fortnight" are the same
+  // shelf at two depths.
+  //
+  // `set_wave_active` gates on EDIT and not DELETE, deliberately: `work` offers
+  // read/create/edit only, so a door on `work:delete` would refuse everybody
+  // including the locked Admin role (R36).
+  create_wave: "work:create",
+  update_wave: "work:edit",
+  set_wave_active: "work:edit",
+  set_sprint_wave: "work:edit",
+  set_audit_date: "processes:edit",
+  // A CONNECTION IS A SIGNPOST, and an edit to the map that carries it. Not
+  // `create`: nothing is authored, and gating it behind create would mean a
+  // person who may correct a map's times may not say where its work goes next.
+  connect_processes: "processes:edit",
+  disconnect_processes: "processes:edit",
   comment_on_process: "processes:create",
   // The money. Both rate cards live under one module because they are one
   // decision-maker's job — and they live in two TABLES and two FILES because they

@@ -28,7 +28,13 @@ import { ulid } from "@shared/workers/id"
 import { APP_MODULE_CAP, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
-import { savingsView, type SavingsView, type StepFigures } from "@shared/workers/savings"
+import {
+  PERIODS,
+  runsPerMonthFrom,
+  savingsView,
+  type SavingsView,
+  type StepFigures,
+} from "@shared/workers/savings"
 import type { AppModule, AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
@@ -61,6 +67,7 @@ async function insertRow(
     | "app_staff"
     | "app_stakeholders"
     | "process_step_tools"
+    | "process_links"
     | "processes"
     | "process_versions"
     | "process_steps"
@@ -582,6 +589,43 @@ export async function mainStakeholderOf(
     [appId]
   )
   return rows[0]?.contact_id ?? null
+}
+
+/** THE APPS THIS PORTAL CALLER IS THE MAIN STAKEHOLDER OF.
+ *
+ * The owner's ruling, 24 Aug 2026, settling his disagreement with Aurora about
+ * whether a client sees what their own people cost per hour:
+ *
+ *   "everybody from the Kwapso system can see this, but from the client portal
+ *    site, the main stakeholder of that app could see it."
+ *
+ * Aurora said every contact; he said none. This is the answer that respects
+ * both: the person who signed the contract can check our arithmetic, and nobody
+ * else at their company learns a colleague's salary from a screen we built. His
+ * own objection, in his words: "they could just get to know each other's salary,
+ * given that we are having cost per hour on roles, so it's not advisable."
+ *
+ * A staff caller gets `null`, meaning "no restriction" — a wave of `undefined`
+ * would read the same as "restricted to nothing", and this is the kind of
+ * boolean where the two must not be confused.
+ */
+async function mainStakeholderApps(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope
+): Promise<Set<string> | null> {
+  if (scope.kind !== "portal") return null
+  const rows = await d1Query<{ app_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — the apps of one client, and only the ones this contact is
+    // named the main stakeholder of.
+    `SELECT app_id FROM app_stakeholders
+      WHERE contact_id = ? AND is_main = 1 AND deactivated_at IS NULL
+      LIMIT ${LIST_HARD_CAP}`,
+    [scope.personAccountId]
+  )
+  return new Set(rows.map((r) => r.app_id))
 }
 
 export async function createApp(
@@ -1109,6 +1153,7 @@ type ProcessListRow = {
   description: string | null
   role_name: string | null
   role_id: string | null
+  audit_date: string | null
   deactivated_at: string | null
   created_at: string
   version_count: number
@@ -1164,7 +1209,7 @@ export async function listProcesses(
     d1Query<ProcessListRow>(
       cfg,
       guard.databaseId,
-      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name, p.role_id,
+      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name, p.role_id, p.audit_date,
               p.deactivated_at, p.created_at,
               (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
               (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -1193,6 +1238,7 @@ export async function listProcesses(
       description: r.description,
       roleName: r.role_name,
       roleId: r.role_id,
+      auditDate: r.audit_date,
       versionCount: r.version_count,
       stepCount: r.step_count,
       active: r.deactivated_at == null,
@@ -1228,17 +1274,25 @@ export async function getProcess(
   guard: MemberGuard,
   scope: AccountScope,
   id: string,
-  opts: { versionId?: string } = {}
+  opts: { versionId?: string; asOf?: string } = {}
 ): Promise<ProcessDetail> {
   const summary = await processOrThrow(cfg, guard, scope, id)
+  const auditDate = summary.auditDate ?? summary.createdAt.slice(0, 10)
   const shown = await versionOrThrow(cfg, guard, scope, id, opts.versionId)
-  const [versions, steps, shownStepCount, commentsTotal, savings] = await Promise.all([
+  const [versions, liveSteps, shownStepCount, commentsTotal, savings, dates, links] = await Promise.all([
     listProcessVersions(cfg, guard, scope, id),
     listProcessSteps(cfg, guard, scope, id, shown.id),
     countVersionSteps(cfg, guard, scope, shown.id),
     countProcessComments(cfg, guard, scope, id),
     listSavings(cfg, guard, scope, { processId: id }),
+    revisionDates(cfg, guard, scope, id),
+    listProcessLinks(cfg, guard, scope, id),
   ])
+  // THE SLIDER. `asOf` is a DAY, and it reads the dated history rather than the
+  // live rows — which is what makes moving it show the client's business as it
+  // was rather than as it is. Without it the screen shows the live map, which is
+  // the same thing as "as of today" and is worth one fewer read.
+  const steps = opts.asOf ? await mapAsOf(cfg, guard, scope, id, opts.asOf) : liveSteps
   return {
     process: summary,
     versions,
@@ -1248,6 +1302,14 @@ export async function getProcess(
     commentsTotal,
     saving: savings.apps[0]?.processes[0] ?? null,
     savingsCaption: savings.caption,
+    auditDate,
+    asOf: opts.asOf ?? null,
+    // EVERY DAY THIS MAP CHANGED, plus the audit date itself. A slider whose
+    // stops are the days something happened spends none of its travel on days
+    // nothing did — and the audit date has to be reachable even when no step
+    // changed on it, because it is the day every figure is measured from.
+    revisionDates: [...new Set([auditDate, ...dates])].sort(),
+    links,
   }
 }
 
@@ -1312,71 +1374,54 @@ export async function listProcessSteps(
   versionId?: string
 ): Promise<ProcessStep[]> {
   const fence = accountScopeClause(scope, "s.account_id")
-  // WHICH VERSION, said once. It is either the one asked for or the newest, and
-  // BOTH the steps and their tools have to agree about it — a tool list read for
-  // the current version beside version 1's steps is the same class of quietly
-  // wrong number `countVersionSteps` exists to prevent.
+  // WHICH VERSION, said once — the one asked for, or the newest.
   const versionSql = versionId
     ? "?"
     : "(SELECT id FROM process_versions v WHERE v.process_id = ? ORDER BY v.version_no DESC LIMIT 1)"
   const versionParam = versionId ?? processId
 
-  const toolFence = accountScopeClause(scope, "t.account_id")
-  const [rows, toolRows] = await Promise.all([
-    d1Query<{
-      id: string
-      version_id: string
-      step_key: string
-      name: string
-      description: string | null
-      position: number
-      seconds_per_run: number
-      runs_per_month: number
-      removed_at: string | null
-      client_role_id: string | null
-      role_name: string | null
-      role_cents_per_hour: number | null
-    }>(
-      cfg,
-      guard.databaseId,
-      // R14 hard cap — the steps of ONE version of ONE process. A map a person can
-      // read is tens of steps; the cap is the honest refusal past that.
-      //
-      // THE ROLE IS READ ALONG THE JOIN rather than looked up per step, and its
-      // COST comes with it: a step's minutes and the price of the person spending
-      // them arrive in one row, which is what makes step 4's arithmetic a
-      // multiplication rather than a second pass. A LEFT JOIN, because a step
-      // with no role named is ordinary and must still be listed.
-      `SELECT s.id, s.version_id, s.step_key, s.name, s.description, s.position,
-              s.seconds_per_run, s.runs_per_month, s.removed_at, s.client_role_id,
-              r.name AS role_name, r.cents_per_hour AS role_cents_per_hour
-         FROM process_steps s
-         LEFT JOIN client_roles r ON r.id = s.client_role_id
-        ${where([fence.sql, "s.process_id = ?", `s.version_id = ${versionSql}`])}
-        ORDER BY s.position ASC, s.created_at ASC, s.id ASC LIMIT ${LIST_HARD_CAP}`,
-      [...fence.params, processId, versionParam]
-    ),
-    // THE TOOLS OF EVERY STEP IN THIS VERSION, in ONE read rather than one per
-    // step. A map is tens of steps and each carries a handful of tools, so the
-    // cap is the same honest ceiling the steps themselves take.
-    d1Query<{ step_key: string; id: string; name: string; mark: string | null }>(
-      cfg,
-      guard.databaseId,
-      `SELECT st.step_key, t.id, t.name, t.mark
-         FROM process_step_tools st
-         JOIN client_tools t ON t.id = st.tool_id
-        ${where([toolFence.sql, `st.version_id = ${versionSql}`, "t.deactivated_at IS NULL"])}
-        ORDER BY t.name ASC LIMIT ${LIST_HARD_CAP}`,
-      [...toolFence.params, versionParam]
-    ),
-  ])
-
-  const toolsByStep = new Map<string, { id: string; name: string; mark: string | null }[]>()
-  for (const t of toolRows) {
-    const list = toolsByStep.get(t.step_key)
-    if (list) list.push({ id: t.id, name: t.name, mark: t.mark })
-    else toolsByStep.set(t.step_key, [{ id: t.id, name: t.name, mark: t.mark }])
-  }
+  const rows = await d1Query<{
+    id: string
+    version_id: string
+    step_key: string
+    name: string
+    description: string | null
+    position: number
+    seconds_per_run: number
+    runs_per_month: number
+    frequency_period: string
+    removed_at: string | null
+    client_role_id: string | null
+    role_name: string | null
+    role_cents_per_hour: number | null
+    client_tool_id: string | null
+    tool_name: string | null
+    tool_mark: string | null
+    branch_label: string | null
+    loops_back_to: string | null
+  }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — the steps of ONE version of ONE process. A map a person can
+    // read is tens of steps; the cap is the honest refusal past that.
+    //
+    // THE ROLE AND THE TOOL RIDE THE JOIN rather than being looked up per step,
+    // and the role's cost comes off the STEP rather than off the role: it was
+    // frozen at write time, so a rate corrected later cannot move a figure a
+    // client already agreed. Both LEFT JOINs, because a step with neither named
+    // is ordinary and must still be listed.
+    `SELECT s.id, s.version_id, s.step_key, s.name, s.description, s.position,
+            s.seconds_per_run, s.runs_per_month, s.frequency_period, s.removed_at,
+            s.client_role_id, r.name AS role_name, s.role_cents_per_hour,
+            s.client_tool_id, t.name AS tool_name, t.mark AS tool_mark,
+            s.branch_label, s.loops_back_to
+       FROM process_steps s
+       LEFT JOIN client_roles r ON r.id = s.client_role_id
+       LEFT JOIN client_tools t ON t.id = s.client_tool_id
+      ${where([fence.sql, "s.process_id = ?", `s.version_id = ${versionSql}`])}
+      ORDER BY s.position ASC, s.created_at ASC, s.id ASC LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, processId, versionParam]
+  )
 
   return rows.map((r) => ({
     id: r.id,
@@ -1387,16 +1432,23 @@ export async function listProcessSteps(
     description: r.description,
     position: r.position,
     secondsPerRun: r.seconds_per_run,
-    runsPerMonth: r.runs_per_month,
+    // `runs_per_month` HOLDS THE COUNT IN ITS OWN PERIOD, and the column keeps
+    // its old name because this codebase does not rename a column that thousands
+    // of rows already sit in. The pair (count, period) is the fact; the monthly
+    // figure is derived, once, where every other conversion happens.
+    runsPerPeriod: r.runs_per_month,
+    frequencyPeriod: (r.frequency_period as ProcessStep["frequencyPeriod"]) ?? "month",
+    runsPerMonth: runsPerMonthFrom(r.runs_per_month, r.frequency_period ?? "month"),
     removed: r.removed_at != null,
     roleId: r.client_role_id,
     roleName: r.role_name,
-    // NULL WHEN THE ROLE IS UNNAMED, AND NULL WHEN ITS COST IS NOT KNOWN — two
-    // different gaps that read the same here on purpose, because the arithmetic
-    // treats them the same way (hours, no money). `roleId` tells them apart for
-    // anything that needs to say WHICH is missing.
+    // FROZEN, off the step. See the note on the column.
     roleCentsPerHour: r.role_cents_per_hour,
-    tools: toolsByStep.get(r.step_key) ?? [],
+    toolId: r.client_tool_id,
+    toolName: r.tool_name,
+    toolMark: r.tool_mark,
+    branchLabel: r.branch_label,
+    loopsBackTo: r.loops_back_to,
   }))
 }
 
@@ -1590,7 +1642,7 @@ async function roleInScopeOrThrow(
   scope: AccountScope,
   roleId: string,
   accountId: string | null
-): Promise<string> {
+): Promise<{ name: string; cents_per_hour: number | null }> {
   if (!accountId)
     throw new GuardError(
       400,
@@ -1598,16 +1650,39 @@ async function roleInScopeOrThrow(
       "This map isn't filed under a client yet, so it has nobody's roles to choose from."
     )
   const fence = accountScopeClause(scope, "account_id")
-  const rows = await d1Query<{ name: string }>(
+  const rows = await d1Query<{ name: string; cents_per_hour: number | null }>(
     cfg,
     guard.databaseId,
-    `SELECT name FROM client_roles
+    `SELECT name, cents_per_hour FROM client_roles
       ${where([fence.sql, "id = ?", "account_id = ?", "deactivated_at IS NULL"])} LIMIT 1`,
     [...fence.params, roleId, accountId]
   )
   if (!rows[0])
     throw new GuardError(404, "role_not_found", "That role isn't one of this client's live roles.")
-  return rows[0].name
+  return rows[0]
+}
+
+/** The role's hourly cost, checked into scope on the way — what gets FROZEN onto
+ * a step. Null is a real answer ("nobody has said yet") and is deliberately not
+ * zero, which would read as "this person is free". */
+async function roleCostOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  roleId: string,
+  accountId: string | null
+): Promise<number | null> {
+  return (await roleInScopeOrThrow(cfg, guard, scope, roleId, accountId)).cents_per_hour
+}
+
+/** ONE OF FOUR WORDS, checked at the boundary rather than trusted. An unknown
+ * period would silently convert as "month" and quietly divide a daily step's
+ * frequency by thirty. */
+function frequencyPeriodOrThrow(period: string | undefined): string {
+  if (period === undefined) return "month"
+  if (!PERIODS.includes(period as (typeof PERIODS)[number]))
+    throw new GuardError(400, "invalid_input", "How often it happens must be per day, week, month or year.")
+  return period
 }
 
 /** WHAT A STEP IS DONE IN — the WHOLE set, every time.
@@ -1622,27 +1697,26 @@ async function roleInScopeOrThrow(
  * Every tool is checked against the client that owns the map, for exactly the
  * reason the role above is.
  */
-/** EVERY NAMED TOOL IS THIS CLIENT'S, OR NONE OF THEM IS SAVED — and it answers
- * that question BEFORE anything is written.
+/** THE TOOL ON A STEP IS THIS CLIENT'S TOOL — checked before anything is
+ * written, and returning its name so the history can say it.
  *
- * It is a separate function from the write for one reason, and the reason was a
- * bug this codebase's own test caught: `addStep` inserted the step row and THEN
- * saved its tools, so a caller naming one tool belonging to another client got a
- * refusal AND a step, sitting on the map with no tools on it. A refusal that
- * leaves a row behind is worse than either answer on its own — the map looks
- * finished and is wrong, and nobody re-reads a step that saved.
+ * The account fence stops a caller REACHING another client's rows. It does not
+ * stop them WRITING one client's tool id onto another client's step, because a
+ * staff member can see both. Same argument as the role above, same shape.
  *
- * Returns the de-duplicated set, because naming a tool twice is the same
- * sentence rather than two. */
-async function toolsInScopeOrThrow(
+ * IT ANSWERS BEFORE THE ROW EXISTS, and that is not tidiness: `addStep` used to
+ * insert the step and then save its tools, so naming a tool belonging to another
+ * client returned a refusal AND left a step behind on the map with nothing on it.
+ * A refusal that leaves a row is worse than either answer alone, because the map
+ * looks finished and nobody re-reads a step that saved.
+ */
+async function toolInScopeOrThrow(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  toolIds: string[],
+  toolId: string,
   accountId: string | null
-): Promise<string[]> {
-  const wanted = [...new Set(toolIds.filter(Boolean))]
-  if (!wanted.length) return wanted
+): Promise<string> {
   if (!accountId)
     throw new GuardError(
       400,
@@ -1650,57 +1724,193 @@ async function toolsInScopeOrThrow(
       "This map isn't filed under a client yet, so it has no tools to choose from."
     )
   const fence = accountScopeClause(scope, "account_id")
-  // ONE read for the whole set, and its COUNT is the check: a caller naming four
-  // tools of which one belongs to another client gets a refusal, not three tools
-  // saved and one silently dropped.
-  const live = await d1Query<{ id: string }>(
+  const rows = await d1Query<{ name: string }>(
     cfg,
     guard.databaseId,
-    `SELECT id FROM client_tools
-      ${where([
-        fence.sql,
-        "account_id = ?",
-        `id IN (${wanted.map(() => "?").join(", ")})`,
-        "deactivated_at IS NULL",
-      ])} LIMIT ${LIST_HARD_CAP}`,
-    [...fence.params, accountId, ...wanted]
+    `SELECT name FROM client_tools
+      ${where([fence.sql, "id = ?", "account_id = ?", "deactivated_at IS NULL"])} LIMIT 1`,
+    [...fence.params, toolId, accountId]
   )
-  if (live.length !== wanted.length)
-    throw new GuardError(404, "tool_not_found", "One of those tools isn't one of this client's live tools.")
-  return wanted
+  if (!rows[0])
+    throw new GuardError(404, "tool_not_found", "That tool isn't one of this client's live tools.")
+  return rows[0].name
 }
 
-async function setStepTools(
+/** APPEND WHAT THE STEP NOW SAYS, DATED TODAY.
+ *
+ * `process_steps` is the LIVE row — what the map says right now, and what every
+ * screen that is not the slider reads. `process_step_revisions` is its LOG. That
+ * is one fact and its history, not two sources of truth, and the direction is
+ * strict: every write to the row appends here, and nothing ever writes here
+ * alone.
+ *
+ * ONE REVISION PER STEP PER DAY. Typing a duration, looking at it, and typing a
+ * better one is a person correcting themselves — it is one description of the
+ * step, not two — so the same day overwrites rather than stacking. A slider with
+ * eleven entries for last Tuesday would be a record of somebody's keystrokes
+ * rather than of the client's business.
+ *
+ * THE ROLE'S COST IS COPIED, NOT REFERENCED. That is the owner's ruling and the
+ * reason this table can be trusted a year later: a rate corrected in 2027 must
+ * not move a figure a client agreed in 2026.
+ */
+async function writeRevision(
   cfg: D1Rest,
   guard: MemberGuard,
-  scope: AccountScope,
   actor: Actor,
-  input: { versionId: string; stepKey: string; accountId: string | null; toolIds: string[] }
+  step: {
+    processId: string
+    accountId: string | null
+    stepKey: string
+    name: string
+    description: string | null
+    position: number
+    secondsPerRun: number
+    runsPerPeriod: number
+    frequencyPeriod: string
+    roleId: string | null
+    roleCentsPerHour: number | null
+    toolId: string | null
+    branchLabel: string | null
+    loopsBackTo: string | null
+    removed: boolean
+  },
+  on?: string
 ): Promise<void> {
-  const wanted = await toolsInScopeOrThrow(cfg, guard, scope, input.toolIds, input.accountId)
-  // Replace the set: clear, then write what was asked for. Both statements carry
-  // the fence, so a caller who cannot reach this step clears nothing.
-  const stepFence = accountScopeClause(scope, "account_id")
+  const day = on ?? new Date().toISOString().slice(0, 10)
+  const now = new Date().toISOString()
   await d1Query(
     cfg,
     guard.databaseId,
-    `DELETE FROM process_step_tools
-      ${where([stepFence.sql, "version_id = ?", "step_key = ?"])}`,
-    [...stepFence.params, input.versionId, input.stepKey]
+    `INSERT INTO process_step_revisions
+       (id, process_id, account_id, step_key, effective_on, name, description, position,
+        seconds_per_run, runs_per_period, frequency_period, client_role_id, role_cents_per_hour,
+        client_tool_id, branch_label, loops_back_to, removed, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (process_id, step_key, effective_on) DO UPDATE SET
+       name = excluded.name, description = excluded.description, position = excluded.position,
+       seconds_per_run = excluded.seconds_per_run, runs_per_period = excluded.runs_per_period,
+       frequency_period = excluded.frequency_period, client_role_id = excluded.client_role_id,
+       role_cents_per_hour = excluded.role_cents_per_hour, client_tool_id = excluded.client_tool_id,
+       branch_label = excluded.branch_label, loops_back_to = excluded.loops_back_to,
+       removed = excluded.removed`,
+    [
+      ulid(), step.processId, step.accountId, step.stepKey, day, step.name, step.description,
+      step.position, step.secondsPerRun, step.runsPerPeriod, step.frequencyPeriod, step.roleId,
+      step.roleCentsPerHour, step.toolId, step.branchLabel, step.loopsBackTo, step.removed ? 1 : 0,
+      now, actor.id, actor.email, actor.name,
+    ]
   )
-  const now = new Date().toISOString()
-  for (const toolId of wanted)
-    await insertRow(cfg, guard, "process_step_tools", {
-      id: ulid(),
-      version_id: input.versionId,
-      step_key: input.stepKey,
-      tool_id: toolId,
-      account_id: input.accountId,
-      created_at: now,
-      creator_id: actor.id,
-      creator_email: actor.email,
-      creator_name: actor.name,
-    })
+}
+
+/** WHAT THE MAP LOOKED LIKE ON ONE DAY — the newest revision on or before it, per
+ * step key.
+ *
+ * This is the whole date slider, and the whole baseline of every saving. A step
+ * with no revision on or before the date DID NOT EXIST YET, and is simply absent
+ * — which is what makes "a step we added later makes the saving smaller" come
+ * out right without a special case anywhere.
+ */
+export async function mapAsOf(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  processId: string,
+  on: string
+): Promise<ProcessStep[]> {
+  const fence = accountScopeClause(scope, "r.account_id")
+  const rows = await d1Query<{
+    step_key: string
+    effective_on: string
+    name: string
+    description: string | null
+    position: number
+    seconds_per_run: number
+    runs_per_period: number
+    frequency_period: string
+    client_role_id: string | null
+    role_name: string | null
+    role_cents_per_hour: number | null
+    client_tool_id: string | null
+    tool_name: string | null
+    tool_mark: string | null
+    branch_label: string | null
+    loops_back_to: string | null
+    removed: number
+  }>(
+    cfg,
+    guard.databaseId,
+    // THE NEWEST ON OR BEFORE, per step key, in one statement. The correlated
+    // MAX is what makes it "as of" rather than "everything up to" — and the date
+    // comparison is a plain string compare because every date here is ISO
+    // YYYY-MM-DD, where lexical order IS chronological order.
+    //
+    // R14 hard cap — one version of one map, which is tens of steps.
+    `SELECT r.step_key, r.effective_on, r.name, r.description, r.position,
+            r.seconds_per_run, r.runs_per_period, r.frequency_period,
+            r.client_role_id, cr.name AS role_name, r.role_cents_per_hour,
+            r.client_tool_id, ct.name AS tool_name, ct.mark AS tool_mark,
+            r.branch_label, r.loops_back_to, r.removed
+       FROM process_step_revisions r
+       LEFT JOIN client_roles cr ON cr.id = r.client_role_id
+       LEFT JOIN client_tools ct ON ct.id = r.client_tool_id
+      ${where([fence.sql, "r.process_id = ?", "r.effective_on <= ?"])}
+        AND r.effective_on = (
+          SELECT MAX(r2.effective_on) FROM process_step_revisions r2
+           WHERE r2.process_id = r.process_id AND r2.step_key = r.step_key
+             AND r2.effective_on <= ?)
+      ORDER BY r.position ASC, r.step_key ASC LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, processId, on, on]
+  )
+  return rows.map((r) => ({
+    // A REVISION HAS NO STEP ROW ID of its own to hand back — it is a
+    // description, not the live row — so the key doubles as the identity here.
+    // Nothing edits a historic revision, which is why that is safe.
+    id: r.step_key,
+    processId,
+    versionId: "",
+    stepKey: r.step_key,
+    name: r.name,
+    description: r.description,
+    position: r.position,
+    secondsPerRun: r.seconds_per_run,
+    runsPerMonth: runsPerMonthFrom(r.runs_per_period, r.frequency_period),
+    runsPerPeriod: r.runs_per_period,
+    frequencyPeriod: r.frequency_period as ProcessStep["frequencyPeriod"],
+    removed: r.removed === 1,
+    roleId: r.client_role_id,
+    roleName: r.role_name,
+    roleCentsPerHour: r.role_cents_per_hour,
+    toolId: r.client_tool_id,
+    toolName: r.tool_name,
+    toolMark: r.tool_mark,
+    branchLabel: r.branch_label,
+    loopsBackTo: r.loops_back_to,
+    effectiveOn: r.effective_on,
+  }))
+}
+
+/** EVERY DAY THIS MAP CHANGED — the stops the slider snaps to.
+ *
+ * A slider over a continuous date range would spend most of its travel on days
+ * nothing happened. These are the days something did, which makes every position
+ * on it a real state of the client's business. */
+export async function revisionDates(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  processId: string
+): Promise<string[]> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ effective_on: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT DISTINCT effective_on FROM process_step_revisions
+      ${where([fence.sql, "process_id = ?"])}
+      ORDER BY effective_on ASC LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, processId]
+  )
+  return rows.map((r) => r.effective_on)
 }
 
 export async function addStep(
@@ -1713,12 +1923,17 @@ export async function addStep(
     name: string
     description?: string
     secondsPerRun: number
-    runsPerMonth: number
+    runsPerPeriod: number
+    frequencyPeriod?: string
     position?: number
     /** who does it — one of the CLIENT's own roles. Undefined inherits the map's. */
     roleId?: string | null
-    /** what it is done in — the WHOLE set, so saving is idempotent. */
-    toolIds?: string[]
+    /** what it is done in — exactly ONE (both respondents' ruling). */
+    toolId?: string | null
+    /** the word on a fork, when this step is one branch of a decision */
+    branchLabel?: string | null
+    /** the step key this one can send the work back to */
+    loopsBackTo?: string | null
   }
 ): Promise<string> {
   const process = await processOrThrow(cfg, guard, scope, input.processId)
@@ -1731,11 +1946,15 @@ export async function addStep(
   // an older version keeps saying what it was mapped with even after the map's
   // default changes, which a fallback would quietly rewrite (0053).
   const roleId = input.roleId === undefined ? (process.roleId ?? null) : input.roleId
-  // BOTH REFUSALS HAPPEN BEFORE THE ROW EXISTS. A step that saved without the
-  // tools the person named is a map that looks finished and is not — see
-  // toolsInScopeOrThrow for the day that was caught.
-  if (roleId) await roleInScopeOrThrow(cfg, guard, scope, roleId, process.accountId)
-  if (input.toolIds) await toolsInScopeOrThrow(cfg, guard, scope, input.toolIds, process.accountId)
+  const toolId = input.toolId ?? null
+  // EVERY REFUSAL HAPPENS BEFORE THE ROW EXISTS. See toolInScopeOrThrow for the
+  // day a half-saved step taught us that.
+  const roleCents = roleId
+    ? await roleCostOrThrow(cfg, guard, scope, roleId, process.accountId)
+    : null
+  if (toolId) await toolInScopeOrThrow(cfg, guard, scope, toolId, process.accountId)
+  const period = frequencyPeriodOrThrow(input.frequencyPeriod)
+  const position = input.position ?? (await nextPosition(cfg, guard, version.id))
   await insertRow(cfg, guard, "process_steps", {
     id,
     process_id: input.processId,
@@ -1743,23 +1962,42 @@ export async function addStep(
     account_id: process.accountId,
     step_key: stepKey,
     client_role_id: roleId,
+    // FROZEN AT WRITE TIME (the owner's ruling). A rate corrected next year must
+    // not move a figure a client agreed this year.
+    role_cents_per_hour: roleCents,
+    client_tool_id: toolId,
+    branch_label: input.branchLabel ?? null,
+    loops_back_to: input.loopsBackTo ?? null,
     name: input.name,
     description: input.description ?? null,
-    position: input.position ?? (await nextPosition(cfg, guard, version.id)),
+    position,
     seconds_per_run: input.secondsPerRun,
-    runs_per_month: input.runsPerMonth,
+    runs_per_month: input.runsPerPeriod,
+    frequency_period: period,
     created_at: new Date().toISOString(),
     creator_id: actor.id,
     creator_email: actor.email,
     creator_name: actor.name,
   })
-  if (input.toolIds)
-    await setStepTools(cfg, guard, scope, actor, {
-      versionId: version.id,
-      stepKey,
-      accountId: process.accountId,
-      toolIds: input.toolIds,
-    })
+  // …AND THE SAME FACT, DATED. The live row is what the map says now; this is
+  // what it said on the day. Nothing reads the history without it.
+  await writeRevision(cfg, guard, actor, {
+    processId: input.processId,
+    accountId: process.accountId,
+    stepKey,
+    name: input.name,
+    description: input.description ?? null,
+    position,
+    secondsPerRun: input.secondsPerRun,
+    runsPerPeriod: input.runsPerPeriod,
+    frequencyPeriod: period,
+    roleId,
+    roleCentsPerHour: roleCents,
+    toolId,
+    branchLabel: input.branchLabel ?? null,
+    loopsBackTo: input.loopsBackTo ?? null,
+    removed: false,
+  })
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step added",
     description: `${actor.name} added the step "${input.name}" to ${process.name}`,
@@ -1783,34 +2021,56 @@ export async function updateStep(
     name: string
     description?: string | null
     secondsPerRun: number
-    runsPerMonth: number
+    runsPerPeriod: number
+    frequencyPeriod?: string
     position?: number
     /** who does it. Undefined leaves it alone; null clears it. */
     roleId?: string | null
-    /** what it is done in — the WHOLE set. Undefined leaves it alone. */
-    toolIds?: string[]
+    /** what it is done in — ONE. Undefined leaves it alone; null clears it. */
+    toolId?: string | null
+    branchLabel?: string | null
+    loopsBackTo?: string | null
   }
 ): Promise<string> {
   const before = await stepOrThrow(cfg, guard, scope, id)
   const process = await processOrThrow(cfg, guard, scope, before.processId)
   const nextRoleId = input.roleId === undefined ? before.roleId : input.roleId
-  const nextRoleName =
-    nextRoleId === before.roleId
-      ? before.roleName
-      : nextRoleId
-        ? await roleInScopeOrThrow(cfg, guard, scope, nextRoleId, process.accountId)
-        : null
+  const nextTool = input.toolId === undefined ? before.toolId : input.toolId
+  // THE ROLE'S COST IS RE-FROZEN ONLY WHEN THE ROLE CHANGES, and that is the
+  // owner's ruling working: leaving the role alone keeps the cost the step was
+  // recorded with, so editing a duration does not silently re-price history at
+  // today's rate. Picking a DIFFERENT role is a new fact and takes that role's
+  // cost as of now.
+  const roleChanged = nextRoleId !== before.roleId
+  const nextRole = roleChanged && nextRoleId
+    ? await roleInScopeOrThrow(cfg, guard, scope, nextRoleId, process.accountId)
+    : null
+  const nextRoleName = roleChanged ? (nextRole?.name ?? null) : before.roleName
+  const nextRoleCents = roleChanged
+    ? (nextRole?.cents_per_hour ?? null)
+    : before.roleCentsPerHour
+  if (nextTool && nextTool !== before.toolId)
+    await toolInScopeOrThrow(cfg, guard, scope, nextTool, process.accountId)
+  const period = input.frequencyPeriod === undefined
+    ? before.frequencyPeriod
+    : frequencyPeriodOrThrow(input.frequencyPeriod)
+  const nextDescription = input.description === undefined ? before.description : input.description
+  const nextPos = input.position ?? before.position
+  const nextBranch = input.branchLabel === undefined ? before.branchLabel : input.branchLabel
+  const nextLoop = input.loopsBackTo === undefined ? before.loopsBackTo : input.loopsBackTo
+
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
   const changed = await d1Query<{ process_id: string }>(
     cfg,
     guard.databaseId,
-    // `client_role_id = COALESCE(?, client_role_id)` would be wrong: null is how a
-    // caller CLEARS the role, and coalesce cannot tell "clear it" from "leave it".
-    // So the decision is made above in JS, where undefined and null are still two
+    // `COALESCE(?, client_role_id)` would be wrong: null is how a caller CLEARS
+    // the role, and coalesce cannot tell "clear it" from "leave it". So the
+    // decision is made above in JS, where undefined and null are still two
     // different things, and one settled value arrives here.
     `UPDATE process_steps SET name = ?, description = ?, seconds_per_run = ?, runs_per_month = ?,
-       position = ?, client_role_id = ?, ${audit.sql}
+       frequency_period = ?, position = ?, client_role_id = ?, role_cents_per_hour = ?,
+       client_tool_id = ?, branch_label = ?, loops_back_to = ?, ${audit.sql}
      ${where([
        fence.sql,
        "id = ?",
@@ -1819,11 +2079,16 @@ export async function updateStep(
      ])} RETURNING process_id`,
     [
       input.name,
-      input.description === undefined ? before.description : input.description,
+      nextDescription,
       input.secondsPerRun,
-      input.runsPerMonth,
-      input.position ?? before.position,
+      input.runsPerPeriod,
+      period,
+      nextPos,
       nextRoleId,
+      nextRoleCents,
+      nextTool,
+      nextBranch,
+      nextLoop,
       ...audit.params,
       ...fence.params,
       id,
@@ -1835,17 +2100,27 @@ export async function updateStep(
       "not_latest",
       "That step belongs to an older version of the process. Only the current version can be edited."
     )
-  if (input.toolIds)
-    await setStepTools(cfg, guard, scope, actor, {
-      versionId: before.versionId,
-      stepKey: before.stepKey,
-      accountId: process.accountId,
-      toolIds: input.toolIds,
-    })
+  await writeRevision(cfg, guard, actor, {
+    processId: before.processId,
+    accountId: process.accountId,
+    stepKey: before.stepKey,
+    name: input.name,
+    description: nextDescription,
+    position: nextPos,
+    secondsPerRun: input.secondsPerRun,
+    runsPerPeriod: input.runsPerPeriod,
+    frequencyPeriod: period,
+    roleId: nextRoleId,
+    roleCentsPerHour: nextRoleCents,
+    toolId: nextTool,
+    branchLabel: nextBranch,
+    loopsBackTo: nextLoop,
+    removed: false,
+  })
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
     { label: "Minutes per run", from: String(Math.round(before.secondsPerRun / 60)), to: String(Math.round(input.secondsPerRun / 60)) },
-    { label: "Times a month", from: String(before.runsPerMonth), to: String(input.runsPerMonth) },
+    { label: "How often", from: `${before.runsPerPeriod} a ${before.frequencyPeriod}`, to: `${input.runsPerPeriod} a ${period}` },
     // WHO DOES IT is a change worth a history line, because it changes the MONEY
     // the map reports without changing a single minute on it. The ids are what
     // is compared and the names are what is said — a reader of the feed should
@@ -1914,6 +2189,27 @@ export async function removeStep(
       "That step belongs to an older version of the process. Only the current version can be changed."
     )
   if (!changed[0]) return null
+  // THE HISTORY SAYS IT STOPPED, on the day it stopped. Without this the slider
+  // would show the step still running for ever, and the saving for the largest
+  // kind of change we make — taking work away entirely — would never appear on
+  // the timeline at all.
+  await writeRevision(cfg, guard, actor, {
+    processId: before.processId,
+    accountId: null,
+    stepKey: before.stepKey,
+    name: before.name,
+    description: before.description,
+    position: before.position,
+    secondsPerRun: 0,
+    runsPerPeriod: before.runsPerPeriod,
+    frequencyPeriod: before.frequencyPeriod,
+    roleId: before.roleId,
+    roleCentsPerHour: before.roleCentsPerHour,
+    toolId: before.toolId,
+    branchLabel: before.branchLabel,
+    loopsBackTo: before.loopsBackTo,
+    removed: true,
+  })
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step removed",
     description: `${actor.name} recorded that the step "${before.name}" no longer happens`,
@@ -1988,27 +2284,15 @@ export async function cutVersion(
     `INSERT INTO process_steps
        (id, process_id, version_id, account_id, step_key, name, description, position,
         seconds_per_run, runs_per_month, removed_at, client_role_id,
+        role_cents_per_hour, client_tool_id, frequency_period, branch_label, loops_back_to,
         created_at, creator_id, creator_email, creator_name)
      SELECT lower(hex(randomblob(16))), s.process_id, ?, s.account_id, s.step_key, s.name, s.description,
-            s.position, s.seconds_per_run, s.runs_per_month, s.removed_at, s.client_role_id, ?, ?, ?, ?
+            s.position, s.seconds_per_run, s.runs_per_month, s.removed_at, s.client_role_id,
+            s.role_cents_per_hour, s.client_tool_id, s.frequency_period, s.branch_label, s.loops_back_to,
+            ?, ?, ?, ?
        FROM process_steps s
       WHERE s.process_id = ? AND s.version_id = ?`,
     [versionId, now, actor.id, actor.email, actor.name, input.processId, current.id]
-  )
-  // AND WHAT EACH STEP IS DONE IN. One statement, no id mapping, because the join
-  // hangs off (version_id, step_key) rather than the step's own id — which is
-  // precisely why 0053 chose that key. Version 1 keeps saying which tools version
-  // 1 used, so a tool the client stopped paying for does not vanish from the
-  // history of the map that used to need it.
-  await d1Query(
-    cfg,
-    guard.databaseId,
-    `INSERT INTO process_step_tools
-       (id, version_id, step_key, tool_id, account_id, created_at, creator_id, creator_email, creator_name)
-     SELECT lower(hex(randomblob(16))), ?, st.step_key, st.tool_id, st.account_id, ?, ?, ?, ?
-       FROM process_step_tools st
-      WHERE st.version_id = ?`,
-    [versionId, now, actor.id, actor.email, actor.name, current.id]
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -2190,6 +2474,9 @@ export async function listSavings(
     ).map((r) => r.explains_step_key)
   )
 
+  // WHO MAY SEE AN HOURLY COST, decided once and applied on the row.
+  const mainOf = await mainStakeholderApps(cfg, guard, scope)
+
   const rows = await d1Query<{
     app_id: string
     app_name: string
@@ -2199,21 +2486,78 @@ export async function listSavings(
     step_name: string | null
     baseline_seconds: number | null
     latest_seconds: number | null
-    runs_per_month: number | null
-    removed_at: string | null
+    runs_per_period: number | null
+    frequency_period: string | null
+    role_cents_per_hour: number | null
+    removed: number | null
   }>(
     cfg,
     guard.databaseId,
+    // MEASURED FROM THE AUDIT DATE — Aurora's ruling, replacing "version 1".
+    // A version number is a thing WE did; the audit date is the day Alex walked
+    // in, which is the moment a client recognises as "before". A map that has
+    // been re-cut three times for our own reasons must still subtract from the
+    // day the client remembers.
+    //
+    // BOTH SIDES ARE THE SAME QUERY at two dates: the newest revision on or
+    // before the audit date, and the newest revision full stop. That is what
+    // makes the slider and the saving the same mechanism rather than two — move
+    // the slider to the audit date and the "after" column becomes the "before".
+    //
+    // A step with no revision at the audit date DID NOT EXIST THEN. It comes out
+    // with a null baseline, which the pure function reads as zero seconds of old
+    // work — so work we ADDED correctly makes the saving smaller, with no
+    // special case anywhere. That is the comprehension check both respondents
+    // passed, holding as arithmetic rather than as a rule somebody remembered.
+    //
     // R14 hard cap — every step of every process of every app the caller may see.
-    // A map a person can read is tens of steps; past the cap the caller narrows
-    // by account or by app (both filters are on this door).
-    `WITH baseline AS (
-       SELECT s.process_id, s.step_key, s.name, s.seconds_per_run, s.runs_per_month
+    // Past the cap the caller narrows by account or by app; both filters are on
+    // this door.
+    `WITH baseline_version AS (
+       -- WHICH VERSION WAS IN FORCE ON THE AUDIT DATE. Aurora's ruling put the
+       -- baseline on a DATE rather than on "version 1", and this is what a date
+       -- means here: the map as it was agreed on the day Alex walked in.
+       --
+       -- IT IS THE VERSION AND NOT THE DATED REVISIONS, and that distinction was
+       -- earned. Revisions are one-per-day, so a map drawn in the morning and
+       -- improved the same afternoon has ONE revision for that day — and the
+       -- baseline and the current state would be the same row, reporting a
+       -- saving of zero on a real afternoon's work. A VERSION is a moment
+       -- somebody deliberately marked as agreed, which is exactly the
+       -- disambiguation that needs. Revisions drive the SLIDER, where
+       -- one-per-day is the right grain; versions drive the SUBTRACTION, where
+       -- "what did we agree" is the question.
+       --
+       -- Falls back to version 1 for a map whose audit date predates every cut,
+       -- which is what "before we touched anything" has always meant here.
+       -- …AND NEVER THE CURRENT ONE. A version cut TODAY is on or before an audit
+       -- date of today, so without this the newest version would be picked as its
+       -- own baseline and every map would report a saving of exactly zero — which
+       -- is the shape of a bug that looks like an honest answer. You cannot
+       -- subtract today from today. If the only version is the first, it is both
+       -- sides and the saving is zero, which is correct: nothing has changed yet.
+       SELECT p.id AS process_id,
+              COALESCE(
+                (SELECT v.id FROM process_versions v
+                  WHERE v.process_id = p.id
+                    AND date(v.created_at) <= COALESCE(p.audit_date, date(p.created_at))
+                    AND v.version_no < (SELECT MAX(v3.version_no) FROM process_versions v3
+                                         WHERE v3.process_id = p.id)
+                  ORDER BY v.version_no DESC LIMIT 1),
+                (SELECT v.id FROM process_versions v
+                  WHERE v.process_id = p.id ORDER BY v.version_no ASC LIMIT 1)
+              ) AS version_id
+         FROM processes p
+     ),
+     baseline AS (
+       SELECT s.process_id, s.step_key, s.name, s.seconds_per_run, s.runs_per_month,
+              s.frequency_period
          FROM process_steps s
-         JOIN process_versions v ON v.id = s.version_id AND v.version_no = 1
+         JOIN baseline_version bv ON bv.version_id = s.version_id AND bv.process_id = s.process_id
      ),
      newest AS (
-       SELECT s.process_id, s.step_key, s.name, s.seconds_per_run, s.runs_per_month, s.removed_at
+       SELECT s.process_id, s.step_key, s.name, s.seconds_per_run, s.runs_per_month,
+              s.frequency_period, s.role_cents_per_hour, s.removed_at
          FROM process_steps s
         WHERE s.version_id = (SELECT id FROM process_versions v2
                                WHERE v2.process_id = s.process_id
@@ -2224,8 +2568,10 @@ export async function listSavings(
             COALESCE(n.name, b.name) AS step_name,
             b.seconds_per_run AS baseline_seconds,
             n.seconds_per_run AS latest_seconds,
-            COALESCE(n.runs_per_month, b.runs_per_month) AS runs_per_month,
-            n.removed_at
+            COALESCE(n.runs_per_month, b.runs_per_month) AS runs_per_period,
+            COALESCE(n.frequency_period, b.frequency_period) AS frequency_period,
+            n.role_cents_per_hour,
+            CASE WHEN n.removed_at IS NULL THEN 0 ELSE 1 END AS removed
        FROM processes p
        JOIN apps a ON a.id = p.app_id
        LEFT JOIN baseline b ON b.process_id = p.id
@@ -2233,7 +2579,8 @@ export async function listSavings(
       ${sql}
       UNION
      SELECT a.id, a.name, p.id, p.name, n.step_key, n.name, NULL, n.seconds_per_run,
-            n.runs_per_month, n.removed_at
+            n.runs_per_month, n.frequency_period, n.role_cents_per_hour,
+            CASE WHEN n.removed_at IS NULL THEN 0 ELSE 1 END
        FROM processes p
        JOIN apps a ON a.id = p.app_id
        JOIN newest n ON n.process_id = p.id
@@ -2258,8 +2605,20 @@ export async function listSavings(
       name: r.step_name ?? "Step",
       baselineSecondsPerRun: r.baseline_seconds ?? 0,
       latestSecondsPerRun: r.latest_seconds ?? 0,
-      runsPerMonth: r.runs_per_month ?? 0,
-      removed: r.removed_at != null,
+      // CONVERTED ONCE, in the one place a period becomes a month.
+      runsPerMonth: runsPerMonthFrom(r.runs_per_period ?? 0, r.frequency_period ?? "month"),
+      // THE RATE THE STEP WAS RECORDED WITH, never today's (savings.ts) — AND
+      // WITHHELD HERE, on the row, from a portal caller who is not this app's
+      // main stakeholder.
+      //
+      // It is withheld at the row rather than at the three screens for the
+      // reason R24 gives about the internal figures one table over: a redaction
+      // you have to remember is one somebody forgets, and a number that never
+      // crosses the wire cannot be read out of the network tab. Withholding it
+      // takes the MONEY with it — `savedCentsPerMonth` comes out null — which is
+      // the honest result rather than a zero pretending the work is free.
+      roleCentsPerHour: mainOf && !mainOf.has(r.app_id) ? null : r.role_cents_per_hour,
+      removed: r.removed === 1,
       explained: explained.has(r.step_key),
     })
   }
@@ -2343,6 +2702,7 @@ async function processOrThrow(
     description: string | null
     role_name: string | null
     role_id: string | null
+    audit_date: string | null
     deactivated_at: string | null
     created_at: string
     version_count: number
@@ -2350,7 +2710,7 @@ async function processOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name, p.role_id,
+    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name, p.role_id, p.audit_date,
             p.deactivated_at, p.created_at,
             (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
             (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -2370,6 +2730,7 @@ async function processOrThrow(
     description: r.description,
     roleName: r.role_name,
     roleId: r.role_id,
+    auditDate: r.audit_date,
     versionCount: r.version_count,
     stepCount: r.step_count,
     active: r.deactivated_at == null,
@@ -2477,9 +2838,14 @@ async function stepOrThrow(
   description: string | null
   position: number
   secondsPerRun: number
-  runsPerMonth: number
+  runsPerPeriod: number
+  frequencyPeriod: string
   roleId: string | null
   roleName: string | null
+  roleCentsPerHour: number | null
+  toolId: string | null
+  branchLabel: string | null
+  loopsBackTo: string | null
 }> {
   const fence = accountScopeClause(scope, "s.account_id")
   const rows = await d1Query<{
@@ -2492,33 +2858,203 @@ async function stepOrThrow(
     position: number
     seconds_per_run: number
     runs_per_month: number
+    frequency_period: string | null
     client_role_id: string | null
     role_name: string | null
+    role_cents_per_hour: number | null
+    client_tool_id: string | null
+    branch_label: string | null
+    loops_back_to: string | null
   }>(
     cfg,
     guard.databaseId,
-    // The role's WORD travels with its id, so an edit can say "Who does it:
+    // EVERYTHING AN EDIT CAN LEAVE ALONE has to be read here, because "undefined
+    // means leave it" is decided against this row. A field missing from this
+    // SELECT is a field an edit would silently blank.
+    //
+    // The role's WORD travels with its id so an edit can say "Who does it:
     // Dispatch clerk → Adjuster" in the history rather than two ULIDs nobody can
     // read. LEFT JOIN: a step with no role is ordinary.
     `SELECT s.id, s.process_id, s.version_id, s.step_key, s.name, s.description, s.position,
-            s.seconds_per_run, s.runs_per_month, s.client_role_id, r.name AS role_name
+            s.seconds_per_run, s.runs_per_month, s.frequency_period, s.client_role_id,
+            r.name AS role_name, s.role_cents_per_hour, s.client_tool_id,
+            s.branch_label, s.loops_back_to
        FROM process_steps s
        LEFT JOIN client_roles r ON r.id = s.client_role_id
        ${where([fence.sql, "s.id = ?"])} LIMIT 1`,
     [...fence.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That step doesn't exist.")
+  const r = rows[0]
   return {
-    id: rows[0].id,
-    processId: rows[0].process_id,
-    versionId: rows[0].version_id,
-    stepKey: rows[0].step_key,
-    name: rows[0].name,
-    description: rows[0].description,
-    position: rows[0].position,
-    secondsPerRun: rows[0].seconds_per_run,
-    runsPerMonth: rows[0].runs_per_month,
-    roleId: rows[0].client_role_id,
-    roleName: rows[0].role_name,
+    id: r.id,
+    processId: r.process_id,
+    versionId: r.version_id,
+    stepKey: r.step_key,
+    name: r.name,
+    description: r.description,
+    position: r.position,
+    secondsPerRun: r.seconds_per_run,
+    runsPerPeriod: r.runs_per_month,
+    frequencyPeriod: r.frequency_period ?? "month",
+    roleId: r.client_role_id,
+    roleName: r.role_name,
+    roleCentsPerHour: r.role_cents_per_hour,
+    toolId: r.client_tool_id,
+    branchLabel: r.branch_label,
+    loopsBackTo: r.loops_back_to,
   }
+}
+
+// ── the audit date, and the maps a map is connected to ───────────────────────
+
+/** MOVE THE DAY THE SAVING IS MEASURED FROM.
+ *
+ * Editable, and it warns — Aurora's ruling. The warning is the screen's job; the
+ * door's job is to make the move honest, which means it happens in one write and
+ * the activity feed says what it was and what it became. Every figure on every
+ * screen changes the instant this does, which is exactly why it is worth a line
+ * in the history rather than a silent column update. */
+export async function setAuditDate(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  processId: string,
+  auditDate: string
+): Promise<void> {
+  const process = await processOrThrow(cfg, guard, scope, processId)
+  const fence = accountScopeClause(scope, "account_id")
+  const audit = editedBy(actor, new Date().toISOString())
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R17: the current value rides the UPDATE, so setting it to what it already
+    // is moves zero rows — no second history line, no ping, no "changed X → X".
+    `UPDATE processes SET audit_date = ?, ${audit.sql}
+      ${where([fence.sql, "id = ?", "COALESCE(audit_date, '') <> ?"])} RETURNING id`,
+    [auditDate, ...audit.params, ...fence.params, processId, auditDate]
+  )
+  if (!rows[0]) return
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Audit date moved",
+    description: `${actor.name} set the audit date of ${process.name} to ${auditDate}`,
+    relatedTable: "processes",
+    relatedRowId: processId,
+  })
+}
+
+/** THE MAPS THIS ONE CONNECTS TO, both ways.
+ *
+ * The owner: "many times the last step of a process is the first step — or
+ * connected to — another process". LOOSE, by his ruling: naming a link changes
+ * no duration, no frequency and no saving on either side. It is a signpost, and
+ * a signpost that altered the road would be worse than none.
+ *
+ * Read in BOTH directions on purpose. A person who linked "Taking the order" to
+ * "Packing it" should find the link from either end; making them remember which
+ * way round they typed it is the kind of small cruelty that stops a feature
+ * being used. */
+export async function listProcessLinks(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  processId: string
+): Promise<{ id: string; processId: string; name: string; note: string | null; direction: "to" | "from" }[]> {
+  const fence = accountScopeClause(scope, "l.account_id")
+  const rows = await d1Query<{
+    id: string
+    other_id: string
+    other_name: string
+    note: string | null
+    direction: string
+  }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — a map connects to a handful of others, not thousands.
+    `SELECT l.id, p.id AS other_id, p.name AS other_name, l.note, 'to' AS direction
+       FROM process_links l JOIN processes p ON p.id = l.to_process_id
+      ${where([fence.sql, "l.from_process_id = ?", "p.deactivated_at IS NULL"])}
+      UNION ALL
+     SELECT l.id, p.id, p.name, l.note, 'from'
+       FROM process_links l JOIN processes p ON p.id = l.from_process_id
+      ${where([fence.sql, "l.to_process_id = ?", "p.deactivated_at IS NULL"])}
+      ORDER BY other_name ASC LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, processId, ...fence.params, processId]
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    processId: r.other_id,
+    name: r.other_name,
+    note: r.note,
+    direction: r.direction === "to" ? "to" : "from",
+  }))
+}
+
+/** Connect one map to another. Both ends are checked into the fence, which is
+ * what stops a caller wiring their own client's map to somebody else's. */
+export async function linkProcesses(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  input: { fromProcessId: string; toProcessId: string; note?: string | null }
+): Promise<string | null> {
+  if (input.fromProcessId === input.toProcessId)
+    throw new GuardError(400, "same_process", "A process can't be connected to itself.")
+  const from = await processOrThrow(cfg, guard, scope, input.fromProcessId)
+  const to = await processOrThrow(cfg, guard, scope, input.toProcessId)
+  const id = ulid()
+  try {
+    await insertRow(cfg, guard, "process_links", {
+      id,
+      account_id: from.accountId,
+      from_process_id: input.fromProcessId,
+      to_process_id: input.toProcessId,
+      note: input.note ?? null,
+      created_at: new Date().toISOString(),
+      creator_id: actor.id,
+      creator_email: actor.email,
+      creator_name: actor.name,
+    })
+  } catch (e) {
+    // R17 through the unique index: connecting the same pair twice is the same
+    // sentence, so the second one is not an error — it is already true.
+    if (!/UNIQUE constraint/i.test(String((e as Error)?.message ?? ""))) throw e
+    return null
+  }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Processes connected",
+    description: `${actor.name} connected ${from.name} to ${to.name}`,
+    relatedTable: "processes",
+    relatedRowId: input.fromProcessId,
+  })
+  return id
+}
+
+/** Take a connection away. A link is a signpost, not a record of work, so this
+ * is the one thing in the module that really deletes: there is no history to
+ * lose and a "removed connection" on a screen would be noise. */
+export async function unlinkProcesses(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string
+): Promise<boolean> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ from_process_id: string }>(
+    cfg,
+    guard.databaseId,
+    `DELETE FROM process_links ${where([fence.sql, "id = ?"])} RETURNING from_process_id`,
+    [...fence.params, id]
+  )
+  if (!rows[0]) return false
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Processes disconnected",
+    description: `${actor.name} removed a connection between process maps`,
+    relatedTable: "processes",
+    relatedRowId: rows[0].from_process_id,
+  })
+  return true
 }

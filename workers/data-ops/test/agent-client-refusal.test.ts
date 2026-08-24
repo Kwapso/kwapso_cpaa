@@ -64,11 +64,9 @@ beforeEach(() => {
   // hold no `agent` right and every 403 below could be the ordinary permission
   // refusal wearing the fence's clothes. Granted to BOTH roles, because the staff
   // control has to get through the same gate the client is stopped in front of.
-  db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES
-       ('${IDS.adminRole}_agent', '${IDS.adminRole}', 'agent', 1, 1, 1, 1),
-       ('${IDS.clientRole}_agent', '${IDS.clientRole}', 'agent', 1, 1, 1, 1);`
-  )
+  // The grant now comes from the spine harness, which gives BOTH roles every
+  // module including `agent` — which is what this suite needs and why it used to
+  // insert its own. Two inserts collide on the unique index; one place is the fix.
 })
 
 describe("a client login never reaches the agency's assistant", () => {

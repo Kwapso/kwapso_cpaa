@@ -139,6 +139,8 @@ describe("there is exactly one comment stripper", () => {
 // meant to be a decision somebody makes on purpose.
 const DIRECT_READDIR: Record<string, string> = {
   "shared/rules/source-scan.ts": "the one walker itself — this is where the recursion lives",
+  "web/test/vendored-kit.test.ts":
+    "the hand-edit guard hashes EVERY delivered byte of the vendored kit — css, svg, fonts, json, not just source — and must walk byte-for-byte the same way scripts/sync-design.mjs does, or the two hashes drift and the guard lies",
   "web/test/rules.test.ts":
     "roster read: lists the worker directories to build the scan's roots, then hands them to sourceFiles",
   "web/test/config-vars.test.ts":

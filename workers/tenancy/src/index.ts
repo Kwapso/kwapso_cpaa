@@ -48,6 +48,20 @@
 //   POST /api/tenancy/processes            -> map a process + its baseline (agency only)
 //   POST /api/tenancy/processes/update     -> rename / re-describe a process
 //   POST /api/tenancy/processes/active     -> archive / restore a process
+//   GET  /api/tenancy/waves               -> the packages clients bought (?accountId)
+//   GET  /api/tenancy/waves/one           -> one wave, its sprints, and any date clash
+//   POST /api/tenancy/waves               -> sell a wave
+//   POST /api/tenancy/waves/update        -> rename it / re-word what it is for
+//   POST /api/tenancy/waves/active        -> switch it off, or bring it back
+//   POST /api/tenancy/waves/sprint        -> put a sprint in a wave, or take it out
+//   POST /api/tenancy/processes/audit-date -> move the day the saving measures from
+//   POST /api/tenancy/processes/link       -> connect one map to another (loose)
+//   POST /api/tenancy/processes/unlink     -> take that connection away
+//   GET  /api/tenancy/processes/drafts     -> calls we have had read
+//   GET  /api/tenancy/processes/drafts/detail -> one proposal, in full (?id)
+//   POST /api/tenancy/processes/drafts     -> read a call, propose a map (spends AI)
+//   POST /api/tenancy/processes/drafts/apply   -> write only what survived the review
+//   POST /api/tenancy/processes/drafts/discard -> throw the proposal away
 //   POST /api/tenancy/processes/steps      -> add a step to the current version
 //   POST /api/tenancy/processes/steps/update -> edit a step (current version only)
 //   POST /api/tenancy/processes/steps/remove -> the step no longer happens
@@ -98,6 +112,21 @@ import { sweepCoreRetention } from "@shared/workers/retention"
 import { GuardError } from "./lib/permissions"
 import { alertNewAlarms, checkDatabaseSizes } from "./lib/sharding"
 import { d1Config } from "./lib/teams"
+import {
+  getProcessDraftDetail,
+  getProcessDrafts,
+  postApplyProcessDraft,
+  postCreateProcessDraft,
+  postDiscardProcessDraft,
+} from "./routes/process-drafts"
+import {
+  getWaveOne,
+  getWaves,
+  postCreateWave,
+  postUpdateWave,
+  postWaveActive,
+  postWaveSprint,
+} from "./routes/waves"
 import type { Env } from "./env"
 import {
   active,
@@ -160,13 +189,16 @@ import {
   getProcesses,
   getImpact,
   postAddStep,
+  postAuditDate,
   postAppActive,
   postCreateApp,
   postCreateProcess,
   postCutVersion,
+  postLinkProcesses,
   postProcessActive,
   postProcessComment,
   postRemoveStep,
+  postUnlinkProcesses,
   postUpdateApp,
   postUpdateProcess,
   postUpdateStep,
@@ -300,6 +332,22 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/processes": { handler: postCreateProcess, kind: "mutation" },
   "POST /api/tenancy/processes/update": { handler: postUpdateProcess, kind: "mutation" },
   "POST /api/tenancy/processes/active": { handler: postProcessActive, kind: "mutation" },
+  // WAVES — what a client bought. A package of sprints, so the module is `work`,
+  // and every door refuses a client login for the reason the rest of `work` does.
+  "GET /api/tenancy/waves": { handler: getWaves, kind: "read" },
+  "GET /api/tenancy/waves/one": { handler: getWaveOne, kind: "read" },
+  "POST /api/tenancy/waves": { handler: postCreateWave, kind: "mutation" },
+  "POST /api/tenancy/waves/update": { handler: postUpdateWave, kind: "mutation" },
+  "POST /api/tenancy/waves/active": { handler: postWaveActive, kind: "mutation" },
+  "POST /api/tenancy/waves/sprint": { handler: postWaveSprint, kind: "mutation" },
+  "POST /api/tenancy/processes/audit-date": { handler: postAuditDate, kind: "mutation" },
+  "POST /api/tenancy/processes/link": { handler: postLinkProcesses, kind: "mutation" },
+  "POST /api/tenancy/processes/unlink": { handler: postUnlinkProcesses, kind: "mutation" },
+  "GET /api/tenancy/processes/drafts": { handler: getProcessDrafts, kind: "read" },
+  "GET /api/tenancy/processes/drafts/detail": { handler: getProcessDraftDetail, kind: "read" },
+  "POST /api/tenancy/processes/drafts": { handler: postCreateProcessDraft, kind: "mutation" },
+  "POST /api/tenancy/processes/drafts/apply": { handler: postApplyProcessDraft, kind: "mutation" },
+  "POST /api/tenancy/processes/drafts/discard": { handler: postDiscardProcessDraft, kind: "mutation" },
   "POST /api/tenancy/processes/steps": { handler: postAddStep, kind: "mutation" },
   "POST /api/tenancy/processes/steps/update": { handler: postUpdateStep, kind: "mutation" },
   "POST /api/tenancy/processes/steps/remove": { handler: postRemoveStep, kind: "mutation" },

@@ -7,6 +7,7 @@
 // bug, so the check derives the publisher set by scanning publishChange calls
 // and fails the build on any resource no listener claims. Lives in lib (not the
 // shell component) so the check can import it as data.
+import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 //
 // The list fetchers here ALSO prime the `total:` sidecar each door now returns
 // (R16): a badge shows the server COUNT(*), never rows.length, so whoever pulls
@@ -168,6 +169,18 @@ export const listFetch = {
   // is ever deleted (the savings computed from a baseline have to stay checkable
   // years later). Page one lands in the cache, its next cursor in the sidecar
   // <LoadMore> reads.
+  // Waves are BOUNDED, not paged — a package is something an agency SELLS, so
+  // this list grows at the speed of contracts. Just the exact total to prime.
+  waves: (teamId: string) =>
+    wavesApi.list().then((r) => {
+      primeCache(totalKey("waves", teamId), r.total)
+      return r.waves
+    }),
+  processDrafts: (teamId: string) =>
+    tenancy.processDrafts().then((r) => {
+      primeCache(totalKey("process_drafts", teamId), r.total)
+      return r.drafts
+    }),
   processes: (teamId: string) =>
     tenancy.processes().then((r) => {
       primeCache(totalKey("processes", teamId), r.total)
@@ -533,6 +546,16 @@ export function staffCertificatesKey(teamId: string): string {
 }
 
 /** The process-map list's cache key (the paged maps list). */
+/** The drafts list. TEAM-WIDE on purpose, like the client-organisation lists: a
+ * draft is one call about one process, the read is bounded (R14), and a
+ * per-process key is one a listener handed only a team could not name. */
+export function processDraftsKey(teamId: string): string {
+  return `process_drafts:${teamId}`
+}
+/** One opened proposal — read on its own review screen, so its own key. */
+export function processDraftKey(draftId: string): string {
+  return `process-draft:${draftId}`
+}
 export function processesKey(teamId: string): string {
   return `processes:${teamId}`
 }
@@ -589,6 +612,8 @@ export function appsKey(teamId: string): string {
 export function clientDepartmentsKey(teamId: string): string {
   return `client_departments:${teamId}`
 }
+export { waveOneKey, wavesKey } from "@/lib/api/waves"
+
 export function clientRolesKey(teamId: string): string {
   return `client_roles:${teamId}`
 }
@@ -867,6 +892,30 @@ export const TEAM_RESOURCES: Record<
   // record that move with it: the opened map, its conversation, its history, and
   // the SAVINGS, because a duration changing is precisely when a value figure
   // stops being true.
+  // A WAVE — what a client bought. A ping patches the wave row in the list; the
+  // deps carry the two things that move with it: the record's own screen (which
+  // reads its sprints and their clashes, and is not a row out of this list) and
+  // its history. A wave's dates move when a SPRINT moves, and the door publishes
+  // `waves` on exactly those writes — so this is how the list and the open
+  // record both learn about a change neither of them made.
+  // WHAT A CALL PROPOSED — row-level live. Applying or discarding on somebody
+  // else's screen patches just that draft in the cached list; the deps carry the
+  // open review screen, the MAP whose steps just changed, and the SAVINGS, because
+  // steps landing is exactly when a value figure stops being true.
+  process_drafts: {
+    key: (t) => processDraftsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.processDraftRow(id) as Promise<Record<string, unknown> | null>,
+    fetchList: (t) => listFetch.processDrafts(t) as Promise<Record<string, unknown>[]>,
+    deps: (t, id) => [processDraftKey(id), processesKey(t), impactKey(t)],
+  },
+  waves: {
+    key: (t) => wavesKey(t),
+    idField: "id",
+    fetchOne: (id) => wavesApi.one(id).then((r) => r.wave as unknown as Record<string, unknown>),
+    fetchList: (t) => listFetch.waves(t),
+    deps: (_t, id) => [waveOneKey(id), `activity:record:waves:${id}`],
+  },
   processes: {
     key: (t) => processesKey(t),
     idField: "id",

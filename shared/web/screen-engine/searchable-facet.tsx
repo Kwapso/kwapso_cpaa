@@ -5,7 +5,7 @@
 // filter-bar.tsx; see RangeFacet for the sibling control.
 
 import * as React from "react"
-import { Check, ChevronsUpDown, X } from "lucide-react"
+import { Check, ChevronsUpDown, X } from "@shared/ui/icons"
 
 import { type FacetOption, type FilterFacet } from "./config"
 import { cn } from "@shared/ui/lib/utils"

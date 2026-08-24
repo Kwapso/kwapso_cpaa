@@ -40,6 +40,21 @@ export type StepFigures = {
   /** the newest version — how long it takes now. */
   latestSecondsPerRun: number
   runsPerMonth: number
+  /** WHAT AN HOUR OF THE PERSON DOING IT COSTS THE CLIENT, in cents, AS IT WAS
+   * WHEN THE STEP WAS RECORDED — never today's rate.
+   *
+   * The owner's ruling, and it is the architecture half of the tie-breaker: "even
+   * if the cost changes, they have to be retained as they were at the time we
+   * recorded them". A saving computed live from today's rate would rewrite a
+   * figure a client already agreed, the day somebody gave a payroll rise — their
+   * own number moving because of something they did, with nothing on screen
+   * saying so.
+   *
+   * `null` means nobody has said yet, which is a real answer and deliberately
+   * not zero: zero reads as "this person is free" and comes out of the
+   * arithmetic as a saving of nothing with nothing to flag that a number is
+   * missing. A null here produces hours with NO money beside them. */
+  roleCentsPerHour?: number | null
   /** true once the step no longer happens at all. */
   removed: boolean
   /** A STAFF EXPLANATION IS ATTACHED to this step (a comment on the map naming
@@ -57,6 +72,9 @@ export type StepSaving = StepFigures & {
   savedSecondsPerRun: number
   /** savedSecondsPerRun × runsPerMonth. */
   savedSecondsPerMonth: number
+  /** THE HOURS, IN THE CLIENT'S OWN MONEY. Null when no hourly cost is known —
+   * see roleCentsPerHour. Never 0 for "unknown", because 0 is a real saving. */
+  savedCentsPerMonth: number | null
   /** a step that now takes LONGER than the baseline. Information, not a mistake
    * — internal screens always show it (see the regression rule in BUILD-3 §3). */
   regression: boolean
@@ -67,6 +85,15 @@ export type ProcessSaving = {
   processId: string
   name: string
   savedSecondsPerMonth: number
+  /** The money the hours above are worth, summed from the steps that HAVE a
+   * rate. See `pricedSteps` for why the two counts travel with it. */
+  savedCentsPerMonth: number
+  /** How many of this process's steps carry an hourly cost, and how many there
+   * are. A figure built from four steps out of nine is not wrong, it is
+   * INCOMPLETE — and a screen that cannot tell the difference will quote it to a
+   * client as if it were the whole picture. */
+  pricedSteps: number
+  totalSteps: number
   steps: StepSaving[]
 }
 
@@ -75,15 +102,49 @@ export type AppSaving = {
   appId: string
   name: string
   savedSecondsPerMonth: number
+  savedCentsPerMonth: number
+  pricedSteps: number
+  totalSteps: number
   processes: ProcessSaving[]
 }
 
 /** The whole drill-down, App → Process → Step, with its total at the top. */
 export type SavingsView = {
   savedSecondsPerMonth: number
+  savedCentsPerMonth: number
+  pricedSteps: number
+  totalSteps: number
   apps: AppSaving[]
   /** the sentence that ships with the number — never assembled at a call site. */
   caption: string
+}
+
+/** HOW OFTEN, IN THE PERIOD SOMEBODY ACTUALLY SAYS IT IN.
+ *
+ * "Twice a day" and "forty times a month" are the same fact, and asking a person
+ * to convert it in their head at the moment they are describing their own job is
+ * how a wrong number gets typed. So the form takes the period, and everything
+ * downstream converts to MONTHS here — one function, so a week can never be 4 in
+ * one file and 4.33 in another.
+ *
+ * A month is 365.25 / 12 days, not 30: thirty would lose five days a year, which
+ * on a daily step is a fortnight of work missing from an annual figure. */
+export const PERIODS = ["day", "week", "month", "year"] as const
+export type FrequencyPeriod = (typeof PERIODS)[number]
+const PER_MONTH: Record<FrequencyPeriod, number> = {
+  day: 365.25 / 12,
+  week: 365.25 / 84,
+  month: 1,
+  year: 1 / 12,
+}
+export function runsPerMonthFrom(count: number, period: FrequencyPeriod | string): number {
+  const per = PER_MONTH[period as FrequencyPeriod] ?? 1
+  const n = typeof count === "number" && Number.isFinite(count) && count > 0 ? count : 0
+  // ROUNDED ONCE, HERE. A step run daily is 30.4 times a month; carrying the
+  // fraction into the multiplication and rounding at the screen would make the
+  // steps of a process fail to add up to the process, which is the exact shape
+  // of a number a client stops believing.
+  return Math.round(n * per)
 }
 
 /** Whole seconds, or zero. A duration is typed INTEGER NOT NULL with a
@@ -116,6 +177,17 @@ export function stepSaving(figures: StepFigures): StepSaving {
     // "-0" — so the screen whose entire job is being believable would show a
     // client "-0 hours a month" on a step that costs them nothing.
     savedSecondsPerMonth: perMonth === 0 ? 0 : perMonth,
+    // THE SAME SUBTRACTION, IN THEIR MONEY. Seconds → hours → cents, in that
+    // order and rounded once at the end, so a step's euros and its hours are the
+    // same fact rather than two roundings of it.
+    //
+    // NULL, NOT ZERO, when nobody has priced the role. The distinction is the
+    // whole reason this is nullable: a step nobody has priced contributes no
+    // money AND says so, where a zero would quietly claim the work is free.
+    savedCentsPerMonth:
+      typeof figures.roleCentsPerHour === "number" && figures.roleCentsPerHour >= 0
+        ? Math.round((perMonth / 3600) * figures.roleCentsPerHour)
+        : null,
     // A step that is slower but never runs is not a regression anybody feels, and
     // showing one would spend the client's attention on nothing. The test is what
     // it costs per MONTH, which is the number on the screen.
@@ -129,9 +201,13 @@ function processSaving(
   steps: StepFigures[]
 ): ProcessSaving {
   const computed = steps.map(stepSaving)
+  const priced = computed.filter((s) => s.savedCentsPerMonth !== null)
   return {
     ...process,
     savedSecondsPerMonth: computed.reduce((n, s) => n + s.savedSecondsPerMonth, 0),
+    savedCentsPerMonth: priced.reduce((n, s) => n + (s.savedCentsPerMonth ?? 0), 0),
+    pricedSteps: priced.length,
+    totalSteps: computed.length,
     steps: computed,
   }
 }
@@ -154,12 +230,18 @@ export function savingsView(
       appId: app.appId,
       name: app.name,
       savedSecondsPerMonth: processes.reduce((n, p) => n + p.savedSecondsPerMonth, 0),
+      savedCentsPerMonth: processes.reduce((n, p) => n + p.savedCentsPerMonth, 0),
+      pricedSteps: processes.reduce((n, p) => n + p.pricedSteps, 0),
+      totalSteps: processes.reduce((n, p) => n + p.totalSteps, 0),
       processes,
     }
   })
   rolled.sort((a, b) => b.savedSecondsPerMonth - a.savedSecondsPerMonth)
   return {
     savedSecondsPerMonth: rolled.reduce((n, a) => n + a.savedSecondsPerMonth, 0),
+    savedCentsPerMonth: rolled.reduce((n, a) => n + a.savedCentsPerMonth, 0),
+    pricedSteps: rolled.reduce((n, a) => n + a.pricedSteps, 0),
+    totalSteps: rolled.reduce((n, a) => n + a.totalSteps, 0),
     apps: rolled,
     caption: SAVINGS_CAPTION,
   }

@@ -18,7 +18,8 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, ChevronLeft, ChevronRight, Filter } from "lucide-react"
+import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/icons"
+import { Filter } from "lucide-react"
 import { kitIcon } from "./tabs-view"
 
 import { selectRows } from "./collection"

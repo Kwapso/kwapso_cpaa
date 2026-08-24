@@ -5,7 +5,7 @@
 // row that chooses between them.
 
 import * as React from "react"
-import { ChevronsUpDown, X } from "lucide-react"
+import { ChevronsUpDown, X } from "@shared/ui/icons"
 
 import { type FilterFacet } from "./config"
 import { formatRange, parseRange } from "./range"

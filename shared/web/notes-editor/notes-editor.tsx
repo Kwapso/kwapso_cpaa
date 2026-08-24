@@ -17,14 +17,8 @@
 // can never smuggle in executable HTML — see ./logic.
 
 import * as React from "react"
-import {
-  Bold,
-  Highlighter,
-  Italic,
-  List as ListIcon,
-  ListOrdered,
-  Minus,
-} from "lucide-react"
+import { ListOrdered } from "@shared/ui/icons"
+import { Bold, Highlighter, Italic, List as ListIcon, Minus } from "lucide-react"
 
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"

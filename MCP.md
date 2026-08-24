@@ -209,7 +209,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **250 doors, 203 with a tool, 47 with a written reason**, the
+  red build. Today: **264 doors, 212 with a tool, 52 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -228,7 +228,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 203, **179 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 212, **188 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 
@@ -323,8 +323,22 @@ Today it covers:
   - dropdown values, `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_default`, `set_dropdown_value_active`. A value marked as one of the team's defaults refuses to switch off — `set_dropdown_value_default` is how the mark comes off, and renaming a default is always allowed
   - process maps, `create_app`, `update_app`, `set_app_active`, `create_process`,
     `update_process`, `set_process_active`, `add_process_step`, `update_process_step`,
-    `remove_process_step`, `cut_process_version`, `comment_on_process` (all need
-    `processes:*`). `read_impact` beside them is the savings drilled App → Process →
+    `remove_process_step`, `cut_process_version`, `comment_on_process`,
+    `set_audit_date`, `connect_processes`, `disconnect_processes` (all need
+    `processes:*`).
+  - waves, `list_waves`, `get_wave`, `create_wave`, `update_wave`,
+    `set_wave_active`, `set_sprint_wave` (all need `work:*`). A WAVE is what a
+    client bought: several sprints sold together. It carries NO price — what a
+    wave costs is deliberately out of this module's first version — and its dates
+    are DERIVED from the sprints inside it, so `set_sprint_wave` re-dates both the
+    wave a sprint joined and the one it left. Two sprints whose dates overlap are
+    reported and never refused: the overlap is real, and a door that said no would
+    be enforcing a rule nobody agreed to. `set_audit_date` moves the day a map's savings are measured
+    FROM, which changes every figure on it and on the client's own portal while
+    changing not one minute of their work — so it confirms before it writes.
+    `connect_processes` is LOOSE by ruling: the last step of one map is very
+    often the first step of another, and saying so alters no duration and no
+    saving on either side. `read_impact` beside them is the savings drilled App → Process →
     Step, with the caption that says what the numbers are made of — the times are
     estimates the agency and the client agreed, the subtraction is arithmetic. A step
     that got SLOWER is included and counted; nothing filters one out.

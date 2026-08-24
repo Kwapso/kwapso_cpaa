@@ -43,7 +43,8 @@
     "run_worker_first": [
       "/api/*", "/media/*", "/mcp", "/t/*",
       "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
-      "/stories/*", "/sprints/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
+      "/stories/*", "/sprints/*",
+        "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
       "/brand/*", "/purposes/*"
     ]
   },
@@ -78,7 +79,8 @@
         "run_worker_first": [
           "/api/*", "/media/*", "/mcp", "/t/*",
           "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
-          "/stories/*", "/sprints/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
+          "/stories/*", "/sprints/*",
+        "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
           "/brand/*", "/purposes/*"
         ]
       },

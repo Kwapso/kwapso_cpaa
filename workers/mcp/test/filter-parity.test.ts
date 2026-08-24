@@ -55,6 +55,36 @@ import { DOORS, doorBodyFields, doorParams, key, ROOT, WORKERS, type Door } from
  * which is what this census exists to end. Keyed "METHOD /path". */
 const TOOLLESS_DOORS: Record<string, string> = {
   /* ------------------------------- tenancy ------------------------------- */
+  // ── READING A CALL INTO A PROPOSED MAP ────────────────────────────────────
+  // Five doors, deliberately off the machine surface, and the reasoning is worth
+  // reading before anybody "completes" it.
+  //
+  // The WRITE half cannot be here: a proposal is applied only after a PERSON has
+  // reviewed it, which is the one ruling this whole feature was built around
+  // ("a person reviews the draft and confirms it — always, no exception"). A tool
+  // that applied one would be a machine agreeing to a machine's guess about a
+  // client's business, with the review it is named after performed by nobody.
+  //
+  // The READ half is not here for a smaller reason: an unreviewed proposal is
+  // eleven sentences a model invented about a client's staff and their hours.
+  // Handing that to another model as if it were the record is exactly the
+  // confusion `process_drafts` exists as a separate table to prevent. The MAP is
+  // readable through `get_process` the moment a person has agreed to it, which is
+  // the point at which it is true.
+  //
+  // If this is ever reopened, the safe pair is list + get, they must expose AND
+  // forward `processId`, `appId` and `status` (R19), and every backticked word in
+  // their descriptions must name something real (R27).
+  "GET /api/tenancy/processes/drafts":
+    "an unreviewed proposal is a model's guess about a client's business, not the client's record — see the block above.",
+  "GET /api/tenancy/processes/drafts/detail":
+    "the same, in full: the payload is what a call suggested, before anybody agreed to a word of it.",
+  "POST /api/tenancy/processes/drafts":
+    "it spends the team's AI allowance from inside what would itself be an AI turn — a model deciding to spend the allowance on asking a model.",
+  "POST /api/tenancy/processes/drafts/apply":
+    "the review is the feature. Applying without a person is the one thing the ruling behind this whole module forbids.",
+  "POST /api/tenancy/processes/drafts/discard":
+    "the other half of the same decision: throwing away somebody's proposal is a judgement about a client's business, made by whoever is going to be asked about it later.",
   "POST /api/tenancy/bootstrap":
     "the teamless first step — it accepts a pending invite, or makes the personal team, for someone who has no team at all yet. A machine token is minted FROM an existing membership and pinned to that team, so its caller is already through this door; there is nothing here it could ask for.",
   "GET /api/tenancy/active":

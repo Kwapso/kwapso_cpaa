@@ -10,6 +10,17 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
+  // SMART PLACEMENT — run this worker NEAR THE DATABASE rather than near the
+  // caller. Measured on staging, 25 Aug 2026: one screen made eight team-database
+  // trips at about 150ms each, because the database is in APAC and the worker ran
+  // wherever the reader was. A native binding removes the API round trip; it does
+  // not remove the distance.
+  //
+  // It is safe HERE and would not be on a gateway: this worker is reached through
+  // a service binding and serves no assets, so nothing a person waits on is being
+  // moved away from them. The gateway stays at the edge and crosses the world
+  // ONCE, instead of once per read.
+  "placement": { "mode": "smart" },
   "d1_databases": [
     {
       "binding": "DB",
@@ -34,7 +45,12 @@
   "ratelimits": [
     { "name": "CALLER_LIMIT", "namespace_id": "1101", "simple": { "limit": 600, "period": 60 } }
   ],
+  // Workers AI — one door spends it: reading a call into a proposed process map.
+  "ai": { "binding": "AI" },
   "vars": {
+    "AGENT_FREE_DAILY": "50",
+    "AGENT_NO_DAILY_CAP": "0",
+    "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
     // The public web origin the SPA is served on — used for links in outbound
     // emails (invite CTA). NOT request-derived, so agent-sent invites are correct.
@@ -55,6 +71,17 @@
       "workers_dev": false,
       "preview_urls": false,
       "observability": { "enabled": true },
+      // SMART PLACEMENT — run this worker NEAR THE DATABASE rather than near the
+      // caller. Measured on staging, 25 Aug 2026: one screen made eight team-database
+      // trips at about 150ms each, because the database is in APAC and the worker ran
+      // wherever the reader was. A native binding removes the API round trip; it does
+      // not remove the distance.
+      //
+      // It is safe HERE and would not be on a gateway: this worker is reached through
+      // a service binding and serves no assets, so nothing a person waits on is being
+      // moved away from them. The gateway stays at the edge and crosses the world
+      // ONCE, instead of once per read.
+      "placement": { "mode": "smart" },
       "d1_databases": [
         {
           "binding": "DB",
@@ -81,7 +108,11 @@
       "ratelimits": [
         { "name": "CALLER_LIMIT", "namespace_id": "1101", "simple": { "limit": 600, "period": 60 } }
       ],
+      "ai": { "binding": "AI" },
       "vars": {
+        "AGENT_FREE_DAILY": "50",
+        "AGENT_NO_DAILY_CAP": "0",
+        "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
         // The public staging web origin — used for invite-email links.

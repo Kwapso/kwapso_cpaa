@@ -94,6 +94,11 @@ export function d1ConfigFrom(env: GatingEnv): D1Rest {
     accountId: env.CF_ACCOUNT_ID,
     apiToken: env.CF_D1_TOKEN,
     natives: nativeTeamDatabases(env),
+    // Where a NEW team's database is born. See d1CreateDatabase: measured on
+    // staging, a database that landed in APAC while its workers sat in WEUR
+    // cost about 150ms a trip, which a native binding does not fix — a binding
+    // removes the API round trip, not the distance.
+    location: (env as unknown as { D1_LOCATION?: string }).D1_LOCATION,
   }
 }
 

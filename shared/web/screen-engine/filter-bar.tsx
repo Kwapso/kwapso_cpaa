@@ -12,7 +12,8 @@
 // so each stays readable on its own.
 
 import * as React from "react"
-import { Filter, X } from "lucide-react"
+import { X } from "@shared/ui/icons"
+import { Filter } from "lucide-react"
 
 import { facetOptions } from "./collection"
 import { SEARCHABLE_THRESHOLD, type FilterFacet } from "./config"

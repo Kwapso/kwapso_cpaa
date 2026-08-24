@@ -14,6 +14,9 @@ import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
 import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/icons"
+// `Layers` is the audit module's mark and the kit's 96 have no glyph of that
+// name yet — it rides on lucide until Aurora ships one (logged for her).
+import { Layers } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
@@ -64,6 +67,8 @@ const SECTION_ICONS: Record<string, typeof Home> = {
   processes: Route,
   stories: Hammer,
   sprints: CalendarRange,
+  // The package a client bought — several sprints arriving together.
+  waves: Layers,
   apps: AppWindow,
   tasks: ListTodo,
   time: Timer,

@@ -861,6 +861,14 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   // ships no activity feed at all to put it in (PORTAL_ACTIVITY_EXEMPT).
   apps: { fence: null, why: "an app's history names the staff who recorded it and quotes what it costs US to run — the client sees the system, never our ledger about it" },
   processes: { fence: null, why: "a map's history names the staff who mapped and re-mapped it; the client is shown the map itself, which is the part that is theirs" },
+  process_drafts: {
+    fence: null,
+    why: "a proposal is our own working — what a call suggested and what a person accepted or threw away. The client sees the map that resulted, never the eleven things a model guessed at. Every draft door refuses a portal caller outright; this is the second lock.",
+  },
+  waves: {
+    fence: null,
+    why: "a wave is what a client BOUGHT, and its history is our own selling and planning of it — who added which sprint, when the dates moved, what we switched off. The client sees the wave's name and its dates on their portal, which is the part that is theirs; the sentences about how it got that way are ours. Every wave door refuses a portal caller outright for the same reason (the module is `work`), so this fence is the second lock rather than the first.",
+  },
   app_modules: { fence: null, why: "who renamed a section of their app, and when, is our record of our own work — the client picks the module on a ticket and never needs the history of how it got its name" },
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
@@ -1011,6 +1019,11 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_versions: "processes",
   process_steps: "processes",
   process_comments: "processes",
+  // A PROPOSAL ABOUT A MAP is read by whoever may read the map. "Ana had a call
+  // read for Bergman invoice approval: 11 steps proposed, none applied" is a
+  // sentence about the process, and a role that may not see the process must not
+  // read it out of the feed either.
+  process_drafts: "processes",
   // THE CLIENT'S OWN ORGANISATION — who does the work, and what they use to do
   // it. Same module as the map, because that is the only reason any of it
   // exists: a role carries an hourly cost so a step's minutes can become money,
@@ -1022,6 +1035,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // hour costs the CLIENT is theirs and rides with the map; what an hour costs
   // US is `internal_rates` above, on `commercials`, which a client login never
   // holds (R24).
+  // A WAVE is the package a client's sprints were sold inside — the same record
+  // from a reader's point of view, so the same module. A client login holds
+  // neither.
+  waves: "work",
   client_departments: "processes",
   client_roles: "processes",
   client_tools: "processes",
@@ -1359,8 +1376,12 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // that law was written about rather than a way of obeying it.
   "process-detail.list":
     "the LIST view of a process's steps. It is a view switch inside the Steps tab, not a collection tab: the count belongs to the tab above it and is already shown there, and a number on both would be R16's own failure case (the same total, twice, on one screen).",
-  "process-detail.map":
-    "the MAP view of the same steps, drawn as a route rather than a list. Same collection, same count, same reason as `process-detail.list` — and it writes nothing, so there is not even a second thing to count.",
+  "wave-detail.overview":
+    "one package's own fields — whose it is, what it covers, when it runs, and how many sprints are in it. One record, not a collection. Its two sibling tabs, sprints and activity, each carry the exact server total. The dates on it are DERIVED from the sprints and stored, so they are a fact about the record rather than a count of anything.",
+  "process-detail.flow":
+    "the PICTURE of the same steps, drawn as a flowchart — the forks, the joins and the ways back that a list cannot show. Same collection, same count, same reason as `process-detail.list`: the Steps tab above already carries the exact server total for the version being shown, and repeating it on a view switch would number the same rows twice. It writes nothing, so there is not even a second thing to count.",
+  "process-detail.compare":
+    "the same steps beside ANOTHER version's, which is a subtraction rather than a collection. A count here would answer 'how many rows are in this comparison', which is not a question anybody asks of a before-and-after. Renamed from `process-detail.map` on 24 Aug 2026 when the switch grew a third view and the old word stopped saying which one it meant.",
   "app-detail.overview":
     "one system's own fields — whose it is, its stage, the four paragraphs of context, the four prose fields and the address, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
   "app-detail.impact":

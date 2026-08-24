@@ -41,6 +41,13 @@ import type {
   TeamRole,
   TeamSummary,
 } from "@shared/types"
+import type {
+  DraftApplyResult,
+  DraftDecisions,
+  ProcessDraftDetail,
+  ProcessDraftPayload,
+  ProcessDraftSummary,
+} from "@shared/process-drafts"
 import type { RecordCounts } from "@shared/record-counts"
 import type { SavingsView } from "@shared/workers/savings"
 import { api, enc, listQuery, post } from "@shared/web/api"
@@ -516,9 +523,49 @@ export const tenancy = {
    * `versionId` reads an OLDER version — its steps and times exactly as they
    * were when it was cut. Omitted means the current one, which is what every
    * caller before the version selector existed was asking for. */
-  processDetail: (id: string, versionId?: string) =>
+  /** Move the day the saving is measured from. Every figure on every screen
+   * changes with it, which is why the screen warns before calling this. */
+  setAuditDate: (input: { processId: string; auditDate: string }) =>
+    api<{ ok: true }>("/api/tenancy/processes/audit-date", post(input)),
+  /** Connect one map to another. LOOSE: it changes no duration and no saving on
+   * either side. Connecting the same pair twice answers `alreadyLinked`. */
+  linkProcesses: (input: { fromProcessId: string; toProcessId: string; note?: string }) =>
+    api<{ ok: true } | { alreadyLinked: true }>("/api/tenancy/processes/link", post(input)),
+  unlinkProcesses: (input: { id: string; processId: string }) =>
+    api<{ ok: true }>("/api/tenancy/processes/unlink", post(input)),
+  /** THE CALLS WE HAVE HAD READ. Bounded, not paged (R14): a draft is one
+   * conversation about one process, and it does not grow with ordinary use. */
+  processDrafts: (opts: { processId?: string; appId?: string; status?: string } = {}) =>
+    api<{ drafts: ProcessDraftSummary[]; total: number }>(
+      `/api/tenancy/processes/drafts${listQuery(opts)}`
+    ),
+  /** One proposal, in full — the payload and the caption its figures must be
+   * quoted with (R25). */
+  processDraftDetail: (id: string) =>
+    api<ProcessDraftDetail>(`/api/tenancy/processes/drafts/detail?id=${enc(id)}`),
+  /** ONE draft row (the row-level live re-pull). A 404 means it is genuinely
+   * gone; anything else propagates, so a blip never drops a row off a list. */
+  processDraftRow: (id: string): Promise<ProcessDraftSummary | null> =>
+    tenancy
+      .processDraftDetail(id)
+      .then((d) => d.draft)
+      .catch((err) => {
+        if (err instanceof ApiFailure && err.status === 404) return null
+        throw err
+      }),
+  /** READ A CALL. Spends one unit of the team's AI allowance. Nothing is written
+   * to the map — "the draft is not the record" is the whole point of the table. */
+  createProcessDraft: (input: { processId: string; meetingId?: string; sourceText?: string }) =>
+    api<{ id: string; payload: ProcessDraftPayload }>("/api/tenancy/processes/drafts", post(input)),
+  /** WRITE ONLY WHAT SURVIVED THE REVIEW. */
+  applyProcessDraft: (id: string, decisions: DraftDecisions) =>
+    api<DraftApplyResult>("/api/tenancy/processes/drafts/apply", post({ id, ...decisions })),
+  /** Throw the proposal away. Nothing reaches the map. */
+  discardProcessDraft: (id: string) =>
+    api<{ ok: true; changed: boolean }>("/api/tenancy/processes/drafts/discard", post({ id })),
+  processDetail: (id: string, versionId?: string, asOf?: string) =>
     api<ProcessDetail>(
-      `/api/tenancy/processes/detail?id=${enc(id)}${versionId ? `&versionId=${enc(versionId)}` : ""}`
+      `/api/tenancy/processes/detail${listQuery({ id, versionId, asOf })}`
     ),
   /** ONE process row (the row-level live re-pull). A 404 means it's genuinely gone
    * — anything else propagates, so a network blip never drops a row off a list. */

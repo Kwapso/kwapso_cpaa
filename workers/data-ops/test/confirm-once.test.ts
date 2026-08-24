@@ -158,14 +158,11 @@ function storedStatuses(threadId: string): string[] {
 beforeEach(() => {
   holder.db = buildSpineDb()
   doorCalls = []
-  // The metering tables live in the GLOBAL core database, which the spine harness
-  // has no reason to carry. Run the REAL migrations rather than hand-copying a
-  // CREATE TABLE — a fixture that drifts from the shipped schema is a test that
-  // stops describing production (the harness's own rule, and it caught a missing
-  // column here on the first run).
-  for (const m of ["0009_agent_usage", "0010_agent_credits", "0011_agent_usage_log"])
-    db().exec(readFileSync(join(__dirname, "..", "..", "..", "db", "core", `${m}.sql`), "utf8"))
-  db().exec(`INSERT INTO agent_credits (team_id, balance) VALUES ('${IDS.team}', 100);`)
+  // The metering tables and the starting balance now come from the spine
+  // harness itself — it runs the REAL core migrations, for the reason this
+  // comment used to give here: a fixture that drifts from the shipped schema is
+  // a test that stops describing production. It moved when a THIRD suite needed
+  // them, because three copies is three chances to drift.
 })
 
 describe('a declined proposal is spent — "no" is durable', () => {
