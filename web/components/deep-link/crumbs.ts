@@ -155,6 +155,10 @@ export const RECORD_FACE: Record<
   // caught. No list either: `processes` is a contextual section, so its
   // collection is not among the ones a nested screen loads.
   processes: { idField: "id", resource: "processes", name: (r) => str(r, "name"), fallback: "Process" },
+  // A wave has no reference of its own — it is said out loud by its name, which
+  // is the only thing that tells two identical packages apart. No `list`: the
+  // trail resolver reads it by id through TEAM_RESOURCES.
+  waves: { idField: "id", resource: "waves", name: (r) => str(r, "name"), fallback: "Wave" },
 }
 
 /** DOES A LOADED LIST ALREADY HOLD THIS RECORD'S NAME — the question the crumb

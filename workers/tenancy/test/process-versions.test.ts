@@ -68,19 +68,19 @@ async function mapWithThreeSteps(): Promise<string> {
     processId,
     name: "Collect the documents",
     secondsPerRun: 1800,
-    runsPerMonth: 40,
+    runsPerPeriod: 40,
   })
   await addStep(cfg, guard, staff, actor, {
     processId,
     name: "Type them into the system",
     secondsPerRun: 900,
-    runsPerMonth: 40,
+    runsPerPeriod: 40,
   })
   await addStep(cfg, guard, staff, actor, {
     processId,
     name: "Set the renewal reminder",
     secondsPerRun: 300,
-    runsPerMonth: 40,
+    runsPerPeriod: 40,
   })
   return processId
 }
@@ -123,7 +123,7 @@ describe("the order steps happen in", () => {
       // can be what this assertion is reading.
       name: "Warn the client we need their papers",
       secondsPerRun: 120,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       position: 0,
     })
     const names = (await listProcessSteps(cfg, guard, staff, processId)).map((s) => s.name)
@@ -145,12 +145,12 @@ describe("opening an older version", () => {
     await updateStep(cfg, guard, staff, actor, byName("Collect the documents").id, {
       name: "Collect the documents",
       secondsPerRun: 300,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
     })
     await updateStep(cfg, guard, staff, actor, byName("Type them into the system").id, {
       name: "Type them into the system",
       secondsPerRun: 120,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
     })
     // The app now sets the reminder itself — the whole of that work is gone.
     await removeStep(cfg, guard, staff, actor, byName("Set the renewal reminder").id)
@@ -191,7 +191,7 @@ describe("opening an older version", () => {
       processId,
       name: "Send the welcome pack",
       secondsPerRun: 60,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
     })
     expect((await getProcess(cfg, guard, staff, processId, { versionId: v2 })).shownStepCount).toBe(4)
     expect((await getProcess(cfg, guard, staff, processId, { versionId: v1 })).shownStepCount).toBe(3)
@@ -258,7 +258,7 @@ describe("the map's own figure is the client's figure", () => {
     await updateStep(cfg, guard, staff, actor, byName("Collect the documents").id, {
       name: "Collect the documents",
       secondsPerRun: 300,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
     })
     await removeStep(cfg, guard, staff, actor, byName("Set the renewal reminder").id)
 

@@ -69,7 +69,7 @@ export const TOP_LEVEL_MODULES = [
   // away the warm in-memory cache the whole caching model is built on. The four
   // work-engine destinations join it here on the way in rather than after the
   // same bug is noticed again.
-  "knowledge", "apps", "sprints", "stories", "tasks", "time", "meetings",
+  "knowledge", "apps", "sprints", "waves", "stories", "tasks", "time", "meetings",
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
   "brand", "purposes",

@@ -98,7 +98,7 @@ describe("a step names who does it", () => {
       processId,
       name: "Take the call",
       secondsPerRun: 600,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: "ROLE_CLERK",
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
@@ -118,7 +118,7 @@ describe("a step names who does it", () => {
       processId,
       name: "Pay it",
       secondsPerRun: 300,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: "ROLE_NOCOST",
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
@@ -132,7 +132,7 @@ describe("a step names who does it", () => {
       processId,
       name: "Something nobody has assigned yet",
       secondsPerRun: 120,
-      runsPerMonth: 5,
+      runsPerPeriod: 5,
       roleId: null,
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
@@ -149,7 +149,7 @@ describe("a step names who does it", () => {
       processId,
       name: "Assess it",
       secondsPerRun: 900,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
     expect(step.roleName).toBe("Adjuster")
@@ -162,7 +162,7 @@ describe("a step names who does it", () => {
         processId,
         name: "Take the call",
         secondsPerRun: 600,
-        runsPerMonth: 40,
+        runsPerPeriod: 40,
         roleId: "ROLE_THEIRS",
       })
     ).rejects.toThrow(/live roles/)
@@ -174,7 +174,7 @@ describe("a step names who does it", () => {
       processId,
       name: "Take the call",
       secondsPerRun: 600,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: "ROLE_CLERK",
     })
     const [before] = await listProcessSteps(cfg, guard, staff, processId)
@@ -183,7 +183,7 @@ describe("a step names who does it", () => {
     await updateStep(cfg, guard, staff, actor, before.id, {
       name: before.name,
       secondsPerRun: 300,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
     })
     const [kept] = await listProcessSteps(cfg, guard, staff, processId)
     expect(kept.roleName).toBe("Dispatch clerk")
@@ -192,7 +192,7 @@ describe("a step names who does it", () => {
     await updateStep(cfg, guard, staff, actor, kept.id, {
       name: kept.name,
       secondsPerRun: 300,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: null,
     })
     const [cleared] = await listProcessSteps(cfg, guard, staff, processId)
@@ -200,62 +200,68 @@ describe("a step names who does it", () => {
   })
 })
 
-describe("a step names what it is done in", () => {
-  it("saves a set of tools and reads them back", async () => {
+describe("a step names what it is done in — exactly ONE", () => {
+  // BOTH RESPONDENTS RULED ONE, not several, and Aurora's reason is the better
+  // one: "if it's multiple tools, it's multiple steps". A step done in two
+  // systems has a handoff in the middle of it, and the handoff is the thing a
+  // process map exists to show. Migration 0053 built a joining table before
+  // anybody re-read the answers; 0054 put the tool back on the step.
+
+  it("saves the tool and reads it back", async () => {
     const processId = await aMap()
     await addStep(cfg, guard, staff, actor, {
       processId,
       name: "Type it up",
       secondsPerRun: 600,
-      runsPerMonth: 40,
-      toolIds: ["TOOL_SHEET", "TOOL_MAIL"],
+      runsPerPeriod: 40,
+      toolId: "TOOL_SHEET",
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
-    expect(step.tools.map((x) => x.name).sort()).toEqual(["Email", "The spreadsheet"])
+    expect(step.toolName).toBe("The spreadsheet")
   })
 
-  it("saving the WHOLE set replaces it — the same shape setAppStaff takes", async () => {
+  it("changing the tool replaces it", async () => {
     const processId = await aMap()
     await addStep(cfg, guard, staff, actor, {
       processId,
       name: "Type it up",
       secondsPerRun: 600,
-      runsPerMonth: 40,
-      toolIds: ["TOOL_SHEET", "TOOL_MAIL"],
+      runsPerPeriod: 40,
+      toolId: "TOOL_SHEET",
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
     await updateStep(cfg, guard, staff, actor, step.id, {
       name: step.name,
       secondsPerRun: 600,
-      runsPerMonth: 40,
-      toolIds: ["TOOL_MAIL"],
+      runsPerPeriod: 40,
+      toolId: "TOOL_MAIL",
     })
     const [after] = await listProcessSteps(cfg, guard, staff, processId)
-    expect(after.tools.map((x) => x.name)).toEqual(["Email"])
+    expect(after.toolName).toBe("Email")
   })
 
-  it("saving the same set twice is saving it once", async () => {
+  it("saving the same tool twice is saving it once", async () => {
     const processId = await aMap()
     await addStep(cfg, guard, staff, actor, {
       processId,
       name: "Type it up",
       secondsPerRun: 600,
-      runsPerMonth: 40,
-      toolIds: ["TOOL_SHEET"],
+      runsPerPeriod: 40,
+      toolId: "TOOL_SHEET",
     })
     const [step] = await listProcessSteps(cfg, guard, staff, processId)
     for (let i = 0; i < 3; i++)
       await updateStep(cfg, guard, staff, actor, step.id, {
         name: step.name,
         secondsPerRun: 600,
-        runsPerMonth: 40,
-        toolIds: ["TOOL_SHEET"],
+        runsPerPeriod: 40,
+        toolId: "TOOL_SHEET",
       })
     const [after] = await listProcessSteps(cfg, guard, staff, processId)
-    expect(after.tools).toHaveLength(1)
+    expect(after.toolName).toBe("The spreadsheet")
   })
 
-  it("REFUSES the whole set when one tool is another client's — never a partial save", async () => {
+  it("REFUSES another client's tool — and writes nothing on the way to the refusal", async () => {
     // A partial save is the worst answer available: the map would look finished
     // and be wrong, with three tools where the person named four.
     const processId = await aMap()
@@ -264,8 +270,8 @@ describe("a step names what it is done in", () => {
         processId,
         name: "Type it up",
         secondsPerRun: 600,
-        runsPerMonth: 40,
-        toolIds: ["TOOL_SHEET", "TOOL_THEIRS"],
+        runsPerPeriod: 40,
+        toolId: "TOOL_THEIRS",
       })
     ).rejects.toThrow(/live tools/)
     const steps = await listProcessSteps(cfg, guard, staff, processId)
@@ -281,9 +287,9 @@ describe("a version cut carries both forward", () => {
       processId,
       name: "Take the call",
       secondsPerRun: 600,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: "ROLE_CLERK",
-      toolIds: ["TOOL_SHEET", "TOOL_MAIL"],
+      toolId: "TOOL_SHEET",
     })
     const cut = await cutVersion(cfg, guard, staff, actor, { processId, label: "After" })
     expect(cut).toBeTruthy()
@@ -291,7 +297,7 @@ describe("a version cut carries both forward", () => {
     const [now] = await listProcessSteps(cfg, guard, staff, processId, cut?.versionId)
     expect(now.roleName).toBe("Dispatch clerk")
     expect(now.roleCentsPerHour).toBe(4200)
-    expect(now.tools.map((x) => x.name).sort()).toEqual(["Email", "The spreadsheet"])
+    expect(now.toolName).toBe("The spreadsheet")
   })
 
   it("…and the OLD version still says what IT was mapped with", async () => {
@@ -303,9 +309,9 @@ describe("a version cut carries both forward", () => {
       processId,
       name: "Take the call",
       secondsPerRun: 600,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: "ROLE_CLERK",
-      toolIds: ["TOOL_SHEET"],
+      toolId: "TOOL_SHEET",
     })
     const before = await listProcessSteps(cfg, guard, staff, processId)
     const baselineVersion = before[0].versionId
@@ -315,17 +321,17 @@ describe("a version cut carries both forward", () => {
     await updateStep(cfg, guard, staff, actor, current.id, {
       name: current.name,
       secondsPerRun: 60,
-      runsPerMonth: 40,
+      runsPerPeriod: 40,
       roleId: "ROLE_ADJ",
-      toolIds: ["TOOL_MAIL"],
+      toolId: "TOOL_MAIL",
     })
 
     const [baseline] = await listProcessSteps(cfg, guard, staff, processId, baselineVersion)
     expect(baseline.roleName).toBe("Dispatch clerk")
-    expect(baseline.tools.map((x) => x.name)).toEqual(["The spreadsheet"])
+    expect(baseline.toolName).toBe("The spreadsheet")
 
     const [after] = await listProcessSteps(cfg, guard, staff, processId, cut?.versionId)
     expect(after.roleName).toBe("Adjuster")
-    expect(after.tools.map((x) => x.name)).toEqual(["Email"])
+    expect(after.toolName).toBe("Email")
   })
 })

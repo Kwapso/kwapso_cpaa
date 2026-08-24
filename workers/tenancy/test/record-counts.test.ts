@@ -69,7 +69,10 @@ describe("the record-counts door (tenancy)", () => {
 
   it("counts the ways of working mapped inside one system", async () => {
     const body = await counts(IDS.staffUser, "apps", IDS.victimApp)
-    expect(body["processes-app"]).toBe(1)
+    // TWO maps on the victim's system — the invoice approval and the goods
+    // receipt. The second exists so the process-LINK door can be attacked with
+    // two real records rather than being refused for self-connection.
+    expect(body["processes-app"]).toBe(2)
     // A system nobody has mapped yet answers 0 rather than nothing — "we have
     // mapped none of this" is a fact, and the badge renders it as no badge.
     db()

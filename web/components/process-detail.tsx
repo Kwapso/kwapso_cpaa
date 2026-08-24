@@ -49,6 +49,12 @@ import * as React from "react"
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import { Field } from "@shared/web/field"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { InAppLink } from "@/components/in-app-link"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -64,7 +70,7 @@ import {
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
-import { GitBranch, ListOrdered, Pencil, Power } from "lucide-react"
+import { Ban, GitBranch, ListOrdered, Pencil, Plus, Power } from "lucide-react"
 
 import type {
   ClientRole,
@@ -72,6 +78,8 @@ import type {
   ProcessComment,
   ProcessDetail,
   ProcessStep,
+  Meeting,
+  ProcessSummary,
   ProcessVersion,
 } from "@shared/types"
 // The number and the words for it come from the file that computes it — never
@@ -80,6 +88,11 @@ import type {
 import { SAVINGS_CAPTION, hoursText, minutesText } from "@shared/workers/savings"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { StepFormDialog, type StepFormValues } from "@/components/step-form-dialog"
+import { frequencyText } from "@shared/web/frequency"
+import { moneyText } from "@shared/web/money"
+import { ProcessDateSlider } from "@/components/process-date-slider"
+import { ReadACall } from "@/components/read-a-call"
+import { ProcessFlowchart } from "@/components/process-flowchart"
 import { SavingStepLine } from "@/components/impact-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -97,6 +110,8 @@ import { formatCount } from "@shared/web/format-count"
 import {
   PROCESS_VERSION_SLICES,
   clientRolesKey,
+  listFetch,
+  meetingsKey,
   clientToolsKey,
   processCommentsKey,
   processKey,
@@ -146,6 +161,9 @@ export function ProcessDetailScreen({
   // cache's place, or the next screen to read `process:<id>` gets last year's
   // steps under today's heading.
   const [versionId, setVersionId] = React.useState<string | null>(null)
+  // WHICH DAY. Null is today's live map, which is one fewer read and the only
+  // position that stays correct as the day passes.
+  const [asOf, setAsOf] = React.useState<string | null>(null)
 
   // The record's own facts — its versions, its saving, its comment total — always
   // come from THIS read, whichever version is on screen. Only the steps and their
@@ -157,14 +175,28 @@ export function ProcessDetailScreen({
     versionId ? processVersionKey(processId, versionId) : null,
     () => tenancy.processDetail(processId, versionId ?? undefined)
   )
-  const shown = versionId ? olderQ : detailQ
+  // THE MAP ON AN OLDER DAY — its own cache key, for exactly the reason an older
+  // VERSION has one: a day in the past must not take the record cache's place,
+  // or the next screen to read `process:<id>` gets March's steps under today's
+  // heading. Null key = never fires, so parking the slider on "today" costs
+  // nothing at all.
+  const asOfQ = useCached<ProcessDetail>(
+    asOf ? `${processKey(processId)}:as-of:${asOf}` : null,
+    () => tenancy.processDetail(processId, undefined, asOf ?? undefined)
+  )
+  const shown = asOf ? asOfQ : versionId ? olderQ : detailQ
 
   // THE PICTURE OR THE LIST, and the version to compare the picture against.
   //
   // The list stays the default and stays exactly as it was: it is the thing you
   // edit, and the map writes nothing. The switch is a view over the same steps,
   // which is why nothing under it moves when you flip.
-  const [asMap, setAsMap] = React.useState(false)
+  // THREE VIEWS OF ONE READ, and each answers a different question. LIST is
+  // "what are the steps"; FLOW is "what shape is this process" (the branches and
+  // the loops, which a list cannot show); COMPARE is "what changed between two
+  // versions". None of them is a second source — flipping between them cannot
+  // show you something the others disagree with.
+  const [stepView, setStepView] = React.useState<"list" | "flow" | "compare">("list")
   const [againstId, setAgainstId] = React.useState<string | null>(null)
   const againstQ = useCached<ProcessDetail>(
     againstId ? processVersionKey(processId, againstId) : null,
@@ -175,6 +207,15 @@ export function ProcessDetailScreen({
     processCommentsKey(processId),
     () => tenancy.processComments(processId)
   )
+  // THE OTHER MAPS THIS ONE COULD CONNECT TO — the same bounded, cached read the
+  // processes screen makes, so opening this after browsing them costs nothing.
+  const peerProcessesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
+    listFetch.processes(teamId)
+  )
+  // THE MEETINGS "READ A CALL" CAN READ. The same bounded, cached list the
+  // Meetings section fills, narrowed to this map's client on screen — a call
+  // about somebody else has nothing to say about this process.
+  const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // WHO DOES THE WORK AND WHAT IN — the CLIENT's own organisation, read on the
   // same two cache keys the account's Organisation tab fills, so opening a map
   // after looking at the client costs nothing and a rename reaches both through
@@ -199,6 +240,8 @@ export function ProcessDetailScreen({
   const [editOpen, setEditOpen] = React.useState(false)
   const [stepOpen, setStepOpen] = React.useState(false)
   const [editingStep, setEditingStep] = React.useState<ProcessStep | null>(null)
+  const [auditOpen, setAuditOpen] = React.useState(false)
+  const [linkOpen, setLinkOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [busy, setBusy] = React.useState(false)
 
@@ -246,16 +289,55 @@ export function ProcessDetailScreen({
     toast.success(t("Process updated."))
   }
 
+  /** Take a connection away. A link is a signpost, not a record of work, so
+   * this really deletes — there is no history to keep, and a "removed
+   * connection" row on a screen would be noise. */
+  async function unlink(id: string) {
+    try {
+      await tenancy.unlinkProcesses({ id, processId })
+      refresh()
+      toast.success(t("Disconnected."))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't disconnect those."))
+    }
+  }
+
   async function saveStep(values: StepFormValues) {
+    // PICK-OR-CREATE. A role or a tool typed rather than picked is created FIRST,
+    // and its new id is what the step is saved with. It happens here rather than
+    // inside the step door because creating a client's role is a different
+    // permission and a different record — folding it into the step write would
+    // hide one behind the other.
+    let roleId = values.roleId
+    let toolId = values.toolId
+    if (values.newRoleName && process.accountId) {
+      const made = await tenancy.createClientRole({
+        accountId: process.accountId,
+        name: values.newRoleName,
+      })
+      roleId = made.id
+      invalidate(clientRolesKey(teamId))
+    }
+    if (values.newToolName && process.accountId) {
+      const made = await tenancy.createClientTool({
+        accountId: process.accountId,
+        name: values.newToolName,
+      })
+      toolId = made.id
+      invalidate(clientToolsKey(teamId))
+    }
     if (editingStep)
       await tenancy.updateStep({
         id: editingStep.id,
         name: values.name,
         description: values.description || null,
         secondsPerRun: values.secondsPerRun,
-        runsPerMonth: values.runsPerMonth,
-        roleId: values.roleId,
-        toolIds: values.toolIds,
+        runsPerPeriod: values.runsPerPeriod,
+        frequencyPeriod: values.frequencyPeriod,
+        roleId,
+        toolId,
+        branchLabel: values.branchLabel,
+        loopsBackTo: values.loopsBackTo,
       })
     else
       await tenancy.addStep({
@@ -263,9 +345,12 @@ export function ProcessDetailScreen({
         name: values.name,
         description: values.description || null,
         secondsPerRun: values.secondsPerRun,
-        runsPerMonth: values.runsPerMonth,
-        roleId: values.roleId,
-        toolIds: values.toolIds,
+        runsPerPeriod: values.runsPerPeriod,
+        frequencyPeriod: values.frequencyPeriod,
+        roleId,
+        toolId,
+        branchLabel: values.branchLabel,
+        loopsBackTo: values.loopsBackTo,
       })
     refresh()
     toast.success(editingStep ? t("Step updated.") : t("Step added."))
@@ -274,7 +359,8 @@ export function ProcessDetailScreen({
   if (detailQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the process.")}</p>
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
-  const { process, versions, commentsTotal, saving, savingsCaption } = detailQ.data
+  const { process, versions, commentsTotal, saving, savingsCaption, auditDate, revisionDates, links } =
+    detailQ.data
   // THIS MAP'S CLIENT'S roles and tools, and only the live ones. A retired role
   // stays readable on the steps that already name it (deactivate, never delete)
   // and is not offered for a new one — the same rule every picker in the app
@@ -468,6 +554,89 @@ export function ProcessDetailScreen({
                   </div>
                 )}
                 <OverviewList items={overviewItems} />
+
+                {/* THE DAY EVERY FIGURE IS MEASURED FROM, and the button that
+                    moves it. It is on the Overview rather than buried in the
+                    edit dialog because it is a FACT about the map that a reader
+                    needs in order to read the saving — "given back since when?"
+                    is the first question anybody asks of a number like that.
+                    Moving it WARNS first (Aurora's ruling): it changes every
+                    figure on every screen at once, including the one on the
+                    client's own portal. */}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Measured from")}</p>
+                    <p className="text-sm font-medium">{auditDate}</p>
+                  </div>
+                  {canEdit && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAuditOpen(true)}
+                    >
+                      <Pencil className="size-3.5" />
+                      {t("Change the date")}
+                    </Button>
+                  )}
+                </div>
+
+                {/* THE MAPS THIS ONE CONNECTS TO. The owner: "many times the
+                    last step of a process is the first step — or connected to —
+                    another process." LOOSE, by his ruling: naming a connection
+                    changes no duration, no frequency and no saving on either
+                    side. It is a signpost, and a signpost that altered the road
+                    would be worse than none — so this panel shows and removes,
+                    and never computes. */}
+                <div className="flex flex-col gap-3 rounded-xl border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{t("Connected processes")}</p>
+                    {canEdit && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
+                        <Plus className="size-3.5" />
+                        {t("Connect a process")}
+                      </Button>
+                    )}
+                  </div>
+                  {links.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      {t("Nothing connected. A process that hands its work to another can say so here.")}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col">
+                      {links.map((l) => (
+                        <div
+                          key={l.id}
+                          className="flex items-center justify-between gap-2 border-b py-2 last:border-b-0"
+                        >
+                          <div className="min-w-0">
+                            <InAppLink
+                              href={`/processes/${l.processId}`}
+                              className="truncate text-sm font-medium"
+                            >
+                              {l.name}
+                            </InAppLink>
+                            <p className="text-muted-foreground text-xs">
+                              {l.direction === "to" ? t("hands its work to") : t("hands its work here")}
+                              {l.note ? ` · ${l.note}` : ""}
+                            </p>
+                          </div>
+                          {canEdit && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void unlink(l.id)}
+                            >
+                              <Ban className="size-3.5" />
+                              <span className="sr-only sm:not-sr-only">{t("Disconnect")}</span>
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )
 
@@ -506,13 +675,29 @@ export function ProcessDetailScreen({
                         ...defaultTabsConfig,
                         tabs: [
                           { value: "list", label: t("List"), icon: "list", badge: "", badgeVariant: "" as const },
-                          { value: "map", label: t("Map"), icon: "git-branch", badge: "", badgeVariant: "" as const },
+                          { value: "flow", label: t("Flow"), icon: "git-branch", badge: "", badgeVariant: "" as const },
+                          { value: "compare", label: t("Compare"), icon: "arrows-left-right", badge: "", badgeVariant: "" as const },
                         ],
                       }}
-                      value={asMap ? "map" : "list"}
-                      onValueChange={(v) => setAsMap(v === "map")}
+                      value={stepView}
+                      onValueChange={(v) => setStepView(v as "list" | "flow" | "compare")}
                     />
                   </div>
+                  {/* READ A CALL — the other way steps get onto a map. It sits
+                      beside "Add step" because it answers the same question at a
+                      different speed: one is a person typing what they heard,
+                      the other is the app proposing it and the person going
+                      through the list. Neither writes anything the person has
+                      not agreed to. */}
+                  {canCreate && isCurrent && (
+                    <ReadACall
+                      processId={processId}
+                      meetings={(meetingsQ.data ?? [])
+                        .filter((m) => !process.accountId || m.accountId === process.accountId)
+                        .map((m) => ({ value: m.id, label: m.ref ?? m.title }))}
+                      onApplied={refresh}
+                    />
+                  )}
                   {canCreate && isCurrent && (
                     <AddButton
                       label={t("Add step")}
@@ -549,7 +734,29 @@ export function ProcessDetailScreen({
                   </div>
                 ) : shownSteps === undefined ? (
                   <Skeleton variant="list" lines={4} />
-                ) : asMap && shownSteps.length > 0 ? (
+                ) : stepView === "flow" ? (
+                  // THE PICTURE. Read-only and built from the form (Aurora's
+                  // ruling) — it draws the same rows the list draws, in the same
+                  // order, from the same read, so it has nothing to disagree
+                  // with. The slider above it moves the whole thing through
+                  // time.
+                  <div className="flex flex-col gap-5">
+                    <ProcessDateSlider
+                      dates={revisionDates}
+                      auditDate={auditDate}
+                      value={asOf}
+                      onChange={setAsOf}
+                    />
+                    <ProcessFlowchart
+                      steps={shownSteps}
+                      emptyMessage={
+                        asOf
+                          ? t("This map had no steps on that day.")
+                          : t("Nothing mapped yet.")
+                      }
+                    />
+                  </div>
+                ) : stepView === "compare" && shownSteps.length > 0 ? (
                   // THE PICTURE. Same steps, same read — it is a view, not a
                   // second source, so flipping the switch cannot show you
                   // something the list disagrees with.
@@ -619,23 +826,27 @@ export function ProcessDetailScreen({
                           </p>
                           <p className="text-muted-foreground text-xs">
                             {minutesText(step.secondsPerRun)} {t("each time")} ·{" "}
-                            {step.runsPerMonth.toLocaleString()}× {t("a month")} ·{" "}
+                            {frequencyText(step.runsPerPeriod, step.frequencyPeriod, t)} ·{" "}
                             {hoursText(stepSecondsPerMonth(step))} {t("a month")}
                           </p>
                           {/* WHO DOES IT AND WHAT IN, on their own line under the
                               times, because they are the OTHER half of what makes
-                              a saving a number: the minutes above are the amount
-                              of work, and the role is what an hour of it costs.
-                              Both are left out entirely when nobody has said —
-                              an empty "Who does it: —" would be a field to fill
-                              in rather than a fact, and this line is facts. */}
-                          {(step.roleName || step.tools.length > 0) && (
+                          {/* WHO DOES IT AND WHAT IN, under the times, because
+                              they are the OTHER half of what makes a saving a
+                              number: the minutes above are the amount of work,
+                              and the role is what an hour of it costs. Left out
+                              entirely when nobody has said — an empty "Who does
+                              it: —" would be a field to fill in rather than a
+                              fact, and this line is facts. */}
+                          {(step.roleName || step.toolName || step.branchLabel) && (
                             <p className="text-muted-foreground text-xs">
-                              {step.roleName ? step.roleName : null}
-                              {step.roleName && step.tools.length > 0 ? " · " : null}
-                              {step.tools.length > 0
-                                ? step.tools.map((x) => x.name).join(", ")
-                                : null}
+                              {[
+                                step.branchLabel ? `${t("only when")} ${step.branchLabel}` : null,
+                                step.roleName,
+                                step.toolName,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </p>
                           )}
                           {step.description && (
@@ -727,13 +938,53 @@ export function ProcessDetailScreen({
                 {saving && saving.steps.length > 0 && (
                   <div className="rounded-xl border p-4">
                     <p className="text-muted-foreground text-sm">
-                      {t("Time given back, every month,")}{" "}
-                      {baseline ? versionLabel(baseline) : t("the baseline")} {t("minus")}{" "}
-                      {current ? versionLabel(current) : t("today")}
+                      {t("Time given back, measured from")} {auditDate}
                     </p>
-                    <p className="text-2xl font-semibold tracking-tight">
-                      {hoursText(saving.savedSecondsPerMonth)}
-                    </p>
+                    {/* HOURS AND MONEY, SIDE BY SIDE, and BOTH periods — Aurora's
+                        two rulings, and they are the same ruling twice: a person
+                        selling this quotes a year and a person running it feels a
+                        month, and making either of them multiply in their head is
+                        how the two figures stop matching in a meeting. */}
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+                      <div>
+                        <p className="text-2xl font-semibold tracking-tight">
+                          {hoursText(saving.savedSecondsPerMonth)}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {t("a month")} · {hoursText(saving.savedSecondsPerMonth * 12)}{" "}
+                          {t("a year")}
+                        </p>
+                      </div>
+                      {/* THE MONEY IS SHOWN ONLY WHEN SOMETHING IS PRICED. A
+                          €0 beside real hours would read as "this work is
+                          free" — see savings.ts, where an unpriced step is
+                          null rather than zero for exactly this reason. */}
+                      {saving.pricedSteps > 0 && (
+                        <div>
+                          <p className="text-2xl font-semibold tracking-tight">
+                            {moneyText(saving.savedCentsPerMonth)}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {t("a month")} · {moneyText(saving.savedCentsPerMonth * 12)}{" "}
+                            {t("a year")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {/* WHEN THE MONEY IS INCOMPLETE, SAY SO. A figure built from
+                        four steps out of nine is not wrong, it is partial — and a
+                        screen that cannot tell the difference will let somebody
+                        quote it to a client as the whole picture. */}
+                    {saving.pricedSteps < saving.totalSteps && (
+                      <p className="text-muted-foreground mt-2 text-xs">
+                        {saving.pricedSteps === 0
+                          ? t("No money yet — none of these steps says what an hour of the person doing it costs.")
+                          : t("The money covers {priced} of {total} steps — the rest have no hourly cost yet.", {
+                              priced: saving.pricedSteps,
+                              total: saving.totalSteps,
+                            })}
+                      </p>
+                    )}
                     {/* R25 — the sentence that makes the number honest, from the
                         one place it is written. Never assembled here. */}
                     <p className="text-muted-foreground mt-2 text-xs">
@@ -849,20 +1100,56 @@ export function ProcessDetailScreen({
         versionLabel={currentLabel}
         roles={stepRoles}
         tools={stepTools}
+        hasClient={!!process.accountId}
+        peers={(shownSteps ?? [])
+          .filter((x) => x.stepKey !== editingStep?.stepKey)
+          .map((x) => ({ stepKey: x.stepKey, name: x.name }))}
         initial={
           editingStep
             ? {
                 name: editingStep.name,
                 description: editingStep.description ?? "",
                 secondsPerRun: editingStep.secondsPerRun,
-                runsPerMonth: editingStep.runsPerMonth,
+                runsPerPeriod: editingStep.runsPerPeriod,
+                frequencyPeriod: editingStep.frequencyPeriod,
                 roleId: editingStep.roleId,
-                toolIds: editingStep.tools.map((x) => x.id),
+                toolId: editingStep.toolId,
+                branchLabel: editingStep.branchLabel,
+                loopsBackTo: editingStep.loopsBackTo,
               }
             : undefined
         }
         draftKey={editingStep ? `step:edit:${editingStep.id}` : `step:add:${processId}`}
         onSubmit={saveStep}
+      />
+
+      {/* MOVING THE AUDIT DATE. It warns before it saves, which is Aurora's
+          ruling and the honest shape: this is the only control in the module
+          that changes a number the client is already looking at, without
+          changing a single minute on the map. */}
+      <AuditDateDialog
+        open={auditOpen}
+        onOpenChange={setAuditOpen}
+        current={auditDate}
+        stops={revisionDates}
+        onSubmit={async (day) => {
+          await tenancy.setAuditDate({ processId, auditDate: day })
+          refresh()
+          toast.success(t("Audit date moved."))
+        }}
+      />
+
+      <ConnectProcessDialog
+        open={linkOpen}
+        onOpenChange={setLinkOpen}
+        options={(peerProcessesQ.data ?? [])
+          .filter((x) => x.id !== processId && !links.some((l) => l.processId === x.id))
+          .map((x) => ({ value: x.id, label: x.name }))}
+        onSubmit={async (toProcessId, note) => {
+          await tenancy.linkProcesses({ fromProcessId: processId, toProcessId, note })
+          refresh()
+          toast.success(t("Connected."))
+        }}
       />
 
       <AlertDialog open={!!confirm} onOpenChange={(o) => !busy && !o && setConfirm(null)}>
@@ -896,5 +1183,164 @@ export function ProcessDetailScreen({
         }}
       />
     </RecordScreen>
+  )
+}
+
+/** MOVE THE DAY THE SAVING IS MEASURED FROM.
+ *
+ * It warns, in the sentence rather than in a tone: this is the only control in
+ * the module that changes a number a client is already looking at without
+ * changing a single minute on the map, and somebody who does not know that will
+ * move it to tidy something up.
+ *
+ * The stops it offers are the days the map actually changed, plus a free date —
+ * because the audit date is Alex's VISIT, which may be a day nothing was
+ * recorded on. */
+function AuditDateDialog({
+  open,
+  onOpenChange,
+  current,
+  stops,
+  onSubmit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  current: string
+  stops: string[]
+  onSubmit: (day: string) => Promise<void>
+}) {
+  const t = useT()
+  const [day, setDay] = React.useState(current)
+  const [busy, setBusy] = React.useState(false)
+  React.useEffect(() => {
+    if (open) setDay(current)
+  }, [open, current])
+
+  return (
+    <FormShellDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      onSubmit={async (e: React.FormEvent) => {
+        e.preventDefault()
+        setBusy(true)
+        try {
+          await onSubmit(day)
+          onOpenChange(false)
+        } catch (err) {
+          toast.error(err instanceof ApiFailure ? err.message : t("Couldn't move the date."))
+        } finally {
+          setBusy(false)
+        }
+      }}
+      title={<DialogTitle>{t("Change the audit date")}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {t("Every saving on this map is measured from this day, here and on the client's own portal. Moving it changes those figures without changing a single step.")}
+        </DialogDescription>
+      }
+      submit={{ busy, disabled: !day || day === current }}
+    >
+      <Field
+        config={{ ...defaultFieldConfig, label: "The day the audit happened", required: true }}
+        htmlFor="audit-date"
+        className={fieldSpacing}
+      >
+        <Input
+          id="audit-date"
+          type="date"
+          value={day}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDay(e.target.value)}
+          disabled={busy}
+        />
+      </Field>
+      {stops.length > 1 && (
+        <p className="text-muted-foreground text-xs">
+          {t("This map changed on")}: {stops.join(", ")}
+        </p>
+      )}
+    </FormShellDialog>
+  )
+}
+
+/** CONNECT ONE MAP TO ANOTHER. Loose, by the owner's ruling — the note says what
+ * the connection IS, and nothing about either map moves because of it. */
+function ConnectProcessDialog({
+  open,
+  onOpenChange,
+  options,
+  onSubmit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  options: { value: string; label: string }[]
+  onSubmit: (toProcessId: string, note: string) => Promise<void>
+}) {
+  const t = useT()
+  const [to, setTo] = React.useState("")
+  const [note, setNote] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+  React.useEffect(() => {
+    if (open) {
+      setTo("")
+      setNote("")
+    }
+  }, [open])
+
+  return (
+    <FormShellDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      onSubmit={async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!to) return
+        setBusy(true)
+        try {
+          await onSubmit(to, note.trim())
+          onOpenChange(false)
+        } catch (err) {
+          toast.error(err instanceof ApiFailure ? err.message : t("Couldn't connect those."))
+        } finally {
+          setBusy(false)
+        }
+      }}
+      title={<DialogTitle>{t("Connect a process")}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {t("A signpost, not a rule. Nothing about either map's times or savings changes because of it.")}
+        </DialogDescription>
+      }
+      submit={{ busy, disabled: !to }}
+    >
+      <Field
+        config={{ ...defaultFieldConfig, label: "It hands its work to", required: true }}
+        htmlFor="link-to"
+        className={fieldSpacing}
+      >
+        <RecordPicker
+          value={to}
+          onChange={setTo}
+          options={options}
+          placeholder={t("Pick a process")}
+          searchPlaceholder={t("Search processes…")}
+          emptyText={t("Nothing matched.")}
+          className="w-full"
+        />
+      </Field>
+      <Field
+        config={{ ...defaultFieldConfig, label: "What the connection is", required: false }}
+        htmlFor="link-note"
+        className={fieldSpacing}
+      >
+        <Input
+          id="link-note"
+          value={note}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNote(e.target.value)}
+          placeholder={t("e.g. the last step here is the first step there")}
+          disabled={busy}
+        />
+      </Field>
+    </FormShellDialog>
   )
 }

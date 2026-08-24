@@ -21,6 +21,7 @@ import {
   ScreenRenderer,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 
+import { WavesScreen } from "@/components/waves-screen"
 import { ProcessesScreen } from "@/components/processes-screen"
 import { AppsScreen } from "@/components/apps-screen"
 import { SprintsScreen } from "@/components/sprints-screen"
@@ -161,6 +162,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         <ScreenRenderer recipe={invitesRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
       </SectionWithCreate>
     )
+  }
+  if (module === "waves") {
+    // Host-composed for the same reason the maps screen is: a row pairs a
+    // DERIVED date range with a sprint count and an inline switch-off, and no
+    // engine block draws that. It reads its own list and its own total.
+    return <WavesScreen teamId={teamId as string} basePath={sectionPath} />
   }
   if (module === "processes") {
     // The whole screen is host-composed: the VALUE drill-down sits above the

@@ -15,6 +15,7 @@
 // ModuleContentCtx, so the split re-threaded nothing.
 
 import * as React from "react"
+import { WaveDetailScreen } from "@/components/wave-detail"
 
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import {
@@ -380,6 +381,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // detail is the recipe below with the housekeeping ones.
     if (module === "apps") {
       return <AppDetailScreen teamId={teamId as string} appId={recordId} basePath={sectionPath} />
+    }
+    if (module === "waves") {
+      return <WaveDetailScreen teamId={teamId as string} waveId={recordId} basePath={sectionPath} />
     }
     if (module === "sprints") {
       return (

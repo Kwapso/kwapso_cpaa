@@ -3446,6 +3446,205 @@ UPDATE process_steps
  WHERE client_role_id IS NULL;
 `,
   },
+  {
+    // THE AUDIT MODULE, FINISHED — every ruling from round two of the
+    // questionnaire, in one migration because they are one shape.
+    //
+    // ── ONE TOOL PER STEP, not several. 0053 built a joining table because both
+    // sides looked many. Both respondents had already answered otherwise, and
+    // Aurora's reason is better than the shape I chose: "if it's multiple tools —
+    // it's multiple steps". A step done in two systems has a handoff in the
+    // middle of it, and the handoff is the thing a process map exists to show. So
+    // the tool comes onto the step row. `process_step_tools` STAYS on disk with
+    // nothing reading it, which is this codebase's rule for a retired structure;
+    // its rows are carried across first so nothing is lost.
+    //
+    // ── HOW OFTEN, IN THE PERIOD THE PERSON SAYS IT IN. "Twice a day" and "forty
+    // times a month" are the same fact, and asking somebody to convert it in
+    // their head at the moment they are describing their own job is how a wrong
+    // number gets typed. Stored as the pair (count, period); everything downstream
+    // converts to months, which is where the arithmetic lives.
+    //
+    // ── THE COST IS FROZEN ONTO THE STEP. The owner, and this is the architecture
+    // half of the tie-breaker: "even if the cost changes, they have to be retained
+    // as they were at the time we recorded them". A saving computed from today's
+    // rate would silently rewrite last year's agreed figure the day somebody gave
+    // a payroll rise — the client's own number changing because of something the
+    // client did, with nothing on screen to say so. `role_cents_per_hour` is
+    // copied at write time and never recomputed.
+    //
+    // ── THE SHAPE OF A PROCESS, in three columns and no graph table. The owner's
+    // own proposal: two nodes at the SAME position are a fork, and the branches
+    // rejoin where a single node appears again. `branch_label` is the word on the
+    // fork ("if rejected"), and `loops_back_to` is the arrow home — "feedback
+    // loops are real. We need to find a way to include them." A graph table would
+    // hold the same three facts and cost a join on every read.
+    //
+    // ── THE AUDIT DATE is what a saving is measured FROM (Aurora's ruling): one
+    // date per map, Alex's visit, not "version 1". Versions stay, as NAMED
+    // BOOKMARKS on the timeline — "Version 2, After CONFIA" is a readable name for
+    // a moment — while the dated revisions below are what the arithmetic reads.
+    //
+    // ── REVISIONS. The map as it was on any day. One row per (step, date), so the
+    // map "as of D" is the newest revision on or before D for each step key. The
+    // existing versions are CONVERTED into revisions using each version's own
+    // date, which is exactly what the owner asked for; a map with no versions
+    // still gets one revision per step, dated at the map's own creation.
+    //
+    // ── LINKS. "Many times the last step of a process is the first step — or
+    // connected to — another process." Loose, by ruling: naming a link changes no
+    // duration, no frequency and no saving on either side.
+    //
+    // ── WAVES. What a client bought. No price column and no reference to our own
+    // rates, because the owner ruled the internal money out of this module's first
+    // version four separate times.
+    //
+    // ── DRAFTS. What the extraction produces and a person approves. It is NOT the
+    // record: "Nothing — the draft is not the record" was the comprehension check
+    // both respondents passed, and this table is why that sentence is true.
+    version: "0054_the_audit_module_finished",
+    sql: `
+-- ── one tool, on the step ────────────────────────────────────────────────────
+ALTER TABLE process_steps ADD COLUMN client_tool_id TEXT REFERENCES client_tools (id);
+CREATE INDEX idx_process_steps_tool ON process_steps (client_tool_id);
+UPDATE process_steps
+   SET client_tool_id = (
+     SELECT st.tool_id FROM process_step_tools st
+      WHERE st.version_id = process_steps.version_id
+        AND st.step_key = process_steps.step_key
+      ORDER BY st.created_at ASC LIMIT 1)
+ WHERE client_tool_id IS NULL;
+
+-- ── how often, in the period somebody actually says it in ────────────────────
+ALTER TABLE process_steps ADD COLUMN frequency_period TEXT NOT NULL DEFAULT 'month'
+  CHECK (frequency_period IN ('day', 'week', 'month', 'year'));
+
+-- ── what an hour of that role cost WHEN THIS WAS RECORDED ────────────────────
+ALTER TABLE process_steps ADD COLUMN role_cents_per_hour INTEGER
+  CHECK (role_cents_per_hour IS NULL OR role_cents_per_hour >= 0);
+UPDATE process_steps
+   SET role_cents_per_hour = (SELECT r.cents_per_hour FROM client_roles r WHERE r.id = process_steps.client_role_id)
+ WHERE client_role_id IS NOT NULL;
+
+-- ── the shape: forks, the words on them, and the way back ────────────────────
+ALTER TABLE process_steps ADD COLUMN branch_label TEXT;
+ALTER TABLE process_steps ADD COLUMN loops_back_to TEXT;
+
+-- ── the day the saving is measured from ──────────────────────────────────────
+ALTER TABLE processes ADD COLUMN audit_date TEXT;
+UPDATE processes SET audit_date = date(created_at) WHERE audit_date IS NULL;
+
+-- ── the map, on any day ──────────────────────────────────────────────────────
+CREATE TABLE process_step_revisions (
+  id TEXT PRIMARY KEY,
+  process_id TEXT NOT NULL REFERENCES processes (id),
+  account_id TEXT REFERENCES accounts (id),
+  -- THE SAME STEP ACROSS TIME. Not the step row's id, which is per version.
+  step_key TEXT NOT NULL,
+  -- The day this description of the step started being true.
+  effective_on TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  seconds_per_run INTEGER NOT NULL DEFAULT 0 CHECK (seconds_per_run >= 0),
+  runs_per_period INTEGER NOT NULL DEFAULT 0 CHECK (runs_per_period >= 0),
+  frequency_period TEXT NOT NULL DEFAULT 'month'
+    CHECK (frequency_period IN ('day', 'week', 'month', 'year')),
+  client_role_id TEXT REFERENCES client_roles (id),
+  -- Frozen. See the note above: a rate corrected in 2027 must not move a figure
+  -- a client agreed in 2026.
+  role_cents_per_hour INTEGER CHECK (role_cents_per_hour IS NULL OR role_cents_per_hour >= 0),
+  client_tool_id TEXT REFERENCES client_tools (id),
+  branch_label TEXT,
+  loops_back_to TEXT,
+  -- The work stopped happening on this date. Never a delete: a removed step is
+  -- the largest saving there is, and deleting it would report none.
+  removed INTEGER NOT NULL DEFAULT 0 CHECK (removed IN (0, 1)),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+-- One description of one step per day. Saying it twice on one day is a
+-- correction, not a second revision.
+CREATE UNIQUE INDEX idx_process_step_revisions_on
+  ON process_step_revisions (process_id, step_key, effective_on);
+CREATE INDEX idx_process_step_revisions_process ON process_step_revisions (process_id, effective_on);
+
+-- EVERY EXISTING VERSION BECOMES A DATED REVISION, using that version's own date
+-- — the owner's answer, word for word. A version cut on 3 March says what the
+-- map looked like from 3 March, which is what a version always meant; this only
+-- writes it down in the form the slider can read.
+INSERT INTO process_step_revisions
+  (id, process_id, account_id, step_key, effective_on, name, description, position,
+   seconds_per_run, runs_per_period, frequency_period, client_role_id, role_cents_per_hour,
+   client_tool_id, removed, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), s.process_id, s.account_id, s.step_key,
+       date(v.created_at), s.name, s.description, s.position,
+       s.seconds_per_run, s.runs_per_month, 'month', s.client_role_id, s.role_cents_per_hour,
+       s.client_tool_id, CASE WHEN s.removed_at IS NULL THEN 0 ELSE 1 END,
+       strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'Carried over'
+  FROM process_steps s
+  JOIN process_versions v ON v.id = s.version_id
+ WHERE NOT EXISTS (
+   SELECT 1 FROM process_step_revisions r
+    WHERE r.process_id = s.process_id AND r.step_key = s.step_key
+      AND r.effective_on = date(v.created_at)
+ );
+
+-- ── one map, connected to another ────────────────────────────────────────────
+CREATE TABLE process_links (
+  id TEXT PRIMARY KEY,
+  account_id TEXT REFERENCES accounts (id),
+  from_process_id TEXT NOT NULL REFERENCES processes (id),
+  to_process_id TEXT NOT NULL REFERENCES processes (id),
+  -- What the connection IS, in the team's own words ("hands over to").
+  note TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE UNIQUE INDEX idx_process_links_pair ON process_links (from_process_id, to_process_id);
+CREATE INDEX idx_process_links_to ON process_links (to_process_id);
+
+-- ── what a client bought ─────────────────────────────────────────────────────
+CREATE TABLE waves (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  goal TEXT,
+  -- Derived from the sprints in it, and STORED so a list does not recompute it
+  -- per row. Recalculated whenever a sprint is added, moved or removed.
+  starts_on TEXT,
+  ends_on TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_waves_account ON waves (account_id);
+CREATE UNIQUE INDEX idx_waves_name ON waves (account_id, name) WHERE deactivated_at IS NULL;
+ALTER TABLE sprints ADD COLUMN wave_id TEXT REFERENCES waves (id);
+CREATE INDEX idx_sprints_wave ON sprints (wave_id);
+
+-- ── what the extraction proposes, before anybody agrees to it ────────────────
+CREATE TABLE process_drafts (
+  id TEXT PRIMARY KEY,
+  account_id TEXT REFERENCES accounts (id),
+  app_id TEXT REFERENCES apps (id),
+  -- The map it revises, or null when it proposes a new one.
+  process_id TEXT REFERENCES processes (id),
+  -- Where the words came from: a meeting we hold, or text somebody pasted.
+  source_meeting_id TEXT,
+  source_text TEXT,
+  -- The proposal itself, as JSON. It is deliberately NOT normalised into the
+  -- real tables: a draft that lived in process_steps would be indistinguishable
+  -- from the record the moment anybody read it wrong, and "the draft is not the
+  -- record" is the sentence this whole table exists to keep true.
+  payload TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'proposed'
+    CHECK (status IN ('proposed', 'applied', 'discarded')),
+  applied_at TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE INDEX idx_process_drafts_process ON process_drafts (process_id, status);
+CREATE INDEX idx_process_drafts_account ON process_drafts (account_id, status);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

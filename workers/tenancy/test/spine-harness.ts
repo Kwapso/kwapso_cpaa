@@ -9,6 +9,8 @@
 // the shipped code, so a test that passes here is a statement about production.
 
 import { DatabaseSync } from "node:sqlite"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { buildTeamSeed, TEAM_MIGRATIONS } from "../src/team-schema"
 import type { Row } from "./d1-sqlite"
@@ -69,6 +71,13 @@ export const IDS = {
    * burglar who can read it knows what that business runs on. */
   victimModule: "AM_VICTIM",
   victimProcess: "PR_VICTIM",
+  /** A SECOND map of the victim's, so a burglar has something to CONNECT the
+   * first one to. A door that takes two record ids needs two real records to be
+   * attacked honestly — without it the positive control is refused for saying
+   * "a process can't be connected to itself", which proves nothing about the
+   * fence. */
+  victimProcessTwo: "PR_VICTIM_2",
+  victimVersionTwo: "PV_VICTIM_2",
   // The victim's own organisation: what an hour costs them, and what they pay
   // for the tool a step uses. Two of the most valuable rows here to a rival.
   victimDepartment: "CD_VICTIM",
@@ -78,6 +87,10 @@ export const IDS = {
   victimVersion: "PV_VICTIM",
   victimStep: "PS_VICTIM",
   victimComment: "PC_VICTIM",
+  /** A PROPOSAL sitting against the victim's map — what a call suggested, before
+   * anybody agreed to it. Seeded so the draft doors can be attacked with a real
+   * row: a burglary that 404s proves nothing about the fence. */
+  victimDraft: "PD_VICTIM",
   burglarAccount: "A_BURGLAR",
   burglarPerson: "A_BURGLAR_PERSON",
   burglarLink: "L_BURGLAR",
@@ -101,6 +114,7 @@ export const VICTIM_IDS = [
   IDS.victimApp,
   IDS.victimModule,
   IDS.victimProcess,
+  IDS.victimProcessTwo,
   IDS.victimDepartment,
   IDS.victimRole,
   IDS.victimTool,
@@ -108,6 +122,7 @@ export const VICTIM_IDS = [
   IDS.victimVersion,
   IDS.victimStep,
   IDS.victimComment,
+  IDS.victimDraft,
 ] as const
 
 /** A fresh team database: the real migrations, the real seed, then the two
@@ -187,7 +202,28 @@ export function buildSpineDb(): DatabaseSync {
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
               UNION ALL SELECT 'work' UNION ALL SELECT 'all_tasks'
-              UNION ALL SELECT 'todos' UNION ALL SELECT 'deliverables') m;`)
+              UNION ALL SELECT 'todos' UNION ALL SELECT 'deliverables'
+              -- AND the agent module, because one tenancy door now spends the AI
+              -- allowance (reading a call into a proposed process map) and gates
+              -- on it before it does. Without it the leak suite's POSITIVE
+              -- control fails for the wrong reason — refused for a missing
+              -- right rather than let through — which would quietly stop
+              -- proving anything about the fence.
+              UNION ALL SELECT 'agent') m;`)
+  // THE AI METER, which lives in the GLOBAL core database in production. A
+  // tenancy door now spends the allowance (reading a call into a proposed
+  // process map) and reaches the meter through the same binding this harness
+  // stands in for — so without these the door 500s, and a leak suite's POSITIVE
+  // control fails for a reason that has nothing to do with the fence.
+  //
+  // THE REAL MIGRATIONS, not a hand-copied CREATE TABLE. That is confirm-once's
+  // own rule and it earned it: "a fixture that drifts from the shipped schema is
+  // a test that stops describing production". It lives HERE rather than in each
+  // suite because three suites now need it, and three copies is three chances to
+  // drift.
+  for (const m of ["0009_agent_usage", "0010_agent_credits", "0011_agent_usage_log"])
+    db.exec(readFileSync(join(__dirname, "..", "..", "..", "db", "core", `${m}.sql`), "utf8"))
+  db.exec(`INSERT INTO agent_credits (team_id, balance) VALUES ('${IDS.team}', 100);`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 
@@ -247,10 +283,18 @@ export function buildSpineDb(): DatabaseSync {
       VALUES ('${IDS.victimProcess}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman invoice approval', 'How Bergman approves a supplier invoice', '2026-02-01', '${IDS.staffUser}');
     INSERT INTO process_versions (id, process_id, account_id, version_no, label, created_at, creator_id)
       VALUES ('${IDS.victimVersion}', '${IDS.victimProcess}', '${IDS.victimAccount}', 1, 'How it worked before', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO processes (id, app_id, account_id, name, description, created_at, creator_id)
+      VALUES ('${IDS.victimProcessTwo}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman goods receipt', 'What happens when the pallet arrives', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO process_versions (id, process_id, account_id, version_no, label, created_at, creator_id)
+      VALUES ('${IDS.victimVersionTwo}', '${IDS.victimProcessTwo}', '${IDS.victimAccount}', 1, 'How it worked before', '2026-02-01', '${IDS.staffUser}');
     INSERT INTO process_steps (id, process_id, version_id, account_id, step_key, name, position, seconds_per_run, runs_per_month, created_at, creator_id)
       VALUES ('${IDS.victimStep}', '${IDS.victimProcess}', '${IDS.victimVersion}', '${IDS.victimAccount}', 'SK_VICTIM', 'Check it against the order', 0, 2400, 20, '2026-02-01', '${IDS.staffUser}');
     INSERT INTO process_comments (id, process_id, account_id, body, is_staff, created_at, creator_id, creator_name)
       VALUES ('${IDS.victimComment}', '${IDS.victimProcess}', '${IDS.victimAccount}', 'Bergman asked whether the check can be skipped for repeat suppliers', 0, '2026-02-02', '${IDS.victimUser}', 'Marta Ruiz');
+    INSERT INTO process_drafts (id, account_id, app_id, process_id, source_text, payload, status, created_at, creator_id)
+      VALUES ('${IDS.victimDraft}', '${IDS.victimAccount}', '${IDS.victimApp}', '${IDS.victimProcess}',
+              'Marta walked us through how the invoice check actually happens',
+              '{"steps":[],"roles":[],"tools":[]}', 'proposed', '2026-02-03', '${IDS.staffUser}');
 
     -- THE VICTIM'S OWN ORGANISATION. A role carries what an hour costs Bergman
     -- and a tool carries what Bergman pays for it — two of the most valuable
@@ -295,6 +339,18 @@ export function makeEnv(get: () => DatabaseSync, userId: string): never {
     DB: makeCoreBinding(get),
     CF_ACCOUNT_ID: "acct",
     CF_D1_TOKEN: "token",
+    // A MODEL THAT SAYS NOTHING USEFUL, ON PURPOSE. One tenancy door reads a
+    // call into a proposed process map, and without a binding it refuses with a
+    // clean 503 — which is correct behaviour and useless to the leak suite,
+    // whose POSITIVE control has to see the door actually reached. This double
+    // returns an empty, well-formed proposal: enough for the door to run all the
+    // way through its fence, its gate and its meter, and not enough to assert
+    // anything about extraction (which has its own suite).
+    AI: {
+      run: async () => ({ response: '{"steps":[],"roles":[],"tools":[]}' }),
+    },
+    WORKERS_AI_MODEL: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    AGENT_FREE_DAILY: "50",
     AUTH: {
       fetch: async () =>
         new Response(

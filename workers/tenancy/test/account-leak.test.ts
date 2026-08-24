@@ -625,14 +625,14 @@ const BURGLARIES: Burglary[] = [
         processId: IDS.victimProcess,
         name: "Mole",
         secondsPerRun: 60,
-        runsPerMonth: 1,
+        runsPerPeriod: 1,
       }),
     honest: () =>
       req("POST /api/tenancy/processes/steps", {
         processId: IDS.victimProcess,
         name: "File the paperwork",
         secondsPerRun: 60,
-        runsPerMonth: 1,
+        runsPerPeriod: 1,
       }),
     expect: "refused",
   },
@@ -646,14 +646,14 @@ const BURGLARIES: Burglary[] = [
         id: IDS.victimStep,
         name: "Owned",
         secondsPerRun: 86_000,
-        runsPerMonth: 9_999,
+        runsPerPeriod: 9_999,
       }),
     honest: () =>
       req("POST /api/tenancy/processes/steps/update", {
         id: IDS.victimStep,
         name: "Check it against the order",
         secondsPerRun: 2400,
-        runsPerMonth: 20,
+        runsPerPeriod: 20,
       }),
     expect: "refused",
   },
@@ -662,6 +662,88 @@ const BURGLARIES: Burglary[] = [
     why: "record that the victim's step stopped happening, inventing a saving nobody made",
     attack: () => req("POST /api/tenancy/processes/steps/remove", { id: IDS.victimStep }),
     honest: () => req("POST /api/tenancy/processes/steps/remove", { id: IDS.victimStep }),
+    expect: "refused",
+  },
+  {
+    route: "GET /api/tenancy/processes/drafts",
+    why: "read the proposals sitting against another client's maps — what a call about them suggested, before anybody agreed to it",
+    attack: () => req("GET /api/tenancy/processes/drafts?processId=" + IDS.victimProcess),
+    honest: () => req("GET /api/tenancy/processes/drafts?processId=" + IDS.victimProcess),
+    expect: "refused",
+  },
+  {
+    route: "GET /api/tenancy/processes/drafts/detail",
+    why: "open one proposal about another client's process in full",
+    attack: () => req(`GET /api/tenancy/processes/drafts/detail?id=${IDS.victimDraft}`),
+    honest: () => req(`GET /api/tenancy/processes/drafts/detail?id=${IDS.victimDraft}`),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/drafts",
+    why: "spend the team's AI allowance reading a call onto another client's map",
+    attack: () =>
+      req("POST /api/tenancy/processes/drafts", {
+        processId: IDS.victimProcess,
+        sourceText: "we discussed the invoice approval",
+      }),
+    honest: () =>
+      req("POST /api/tenancy/processes/drafts", {
+        processId: IDS.victimProcess,
+        sourceText: "we discussed the invoice approval",
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/drafts/apply",
+    why: "write a machine's proposal onto another client's record, which is the one thing a review exists to stop",
+    attack: () => req("POST /api/tenancy/processes/drafts/apply", { id: IDS.victimDraft }),
+    honest: () => req("POST /api/tenancy/processes/drafts/apply", { id: IDS.victimDraft }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/drafts/discard",
+    why: "throw away a proposal sitting against another client's map",
+    attack: () => req("POST /api/tenancy/processes/drafts/discard", { id: IDS.victimDraft }),
+    honest: () => req("POST /api/tenancy/processes/drafts/discard", { id: IDS.victimDraft }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/audit-date",
+    why: "move the day another client's savings are measured from — every figure on their own portal moves with it, and not one minute of their work changed",
+    attack: () =>
+      req("POST /api/tenancy/processes/audit-date", {
+        processId: IDS.victimProcess,
+        auditDate: "2020-01-01",
+      }),
+    honest: () =>
+      req("POST /api/tenancy/processes/audit-date", {
+        processId: IDS.victimProcess,
+        auditDate: "2026-01-01",
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/link",
+    why: "wire another client's map to one of ours, putting their process into our picture",
+    attack: () =>
+      req("POST /api/tenancy/processes/link", {
+        fromProcessId: IDS.victimProcess,
+        toProcessId: IDS.victimProcess,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/processes/link", {
+        fromProcessId: IDS.victimProcess,
+        toProcessId: IDS.victimProcessTwo,
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/unlink",
+    why: "cut a connection on another client's map",
+    attack: () =>
+      req("POST /api/tenancy/processes/unlink", { id: "LNK_VICTIM", processId: IDS.victimProcess }),
+    honest: () =>
+      req("POST /api/tenancy/processes/unlink", { id: "LNK_VICTIM", processId: IDS.victimProcess }),
     expect: "refused",
   },
   {

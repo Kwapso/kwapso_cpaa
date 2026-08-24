@@ -1897,12 +1897,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_process",
     summary:
-      "One process map in full (by id): its versions newest-first, the steps of ONE version with their times and the order they happen in, the exact number of comments on it, and the saving it produces (baseline minus latest, step by step, with the caption that number must be quoted with). `versionId` reads an OLDER version, its steps exactly as they were agreed when it was cut; leave it off for the current one. Version 1 is always the baseline, how the work was done before us, and every saving is measured from it.",
+      "One process map in full (by id): its versions newest-first, the steps of ONE version with their times and the order they happen in, the exact number of comments on it, the other maps it is connected to, and the saving it produces (step by step, with the caption that number must be quoted with). `versionId` reads an OLDER version, its steps exactly as they were agreed when it was cut; leave it off for the current one. `asOf` is a day (YYYY-MM-DD) and reads the map as it was on that day, out of its dated history; the reply also lists every day it changed. `auditDate` is the day every saving on this map is measured FROM, which is Alex's visit rather than a version number.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes/detail",
-    schema: obj({ id: S, versionId: S }, ["id"]),
-    buildQuery: (i) =>
-      `?id=${encodeURIComponent(str(i, "id"))}` +
-      (opt(i, "versionId") ? `&versionId=${encodeURIComponent(str(i, "versionId"))}` : ""),
+    schema: obj({ id: S, versionId: S, asOf: S }, ["id"]),
+    buildQuery: (i) => {
+      const p = new URLSearchParams({ id: str(i, "id") })
+      if (str(i, "versionId")) p.set("versionId", str(i, "versionId"))
+      if (str(i, "asOf")) p.set("asOf", str(i, "asOf"))
+      return `?${p}`
+    },
     agent: { write: false, summarize: (i) => `Look up process map ${str(i, "id")}` },
   },
   // ── THE CLIENT'S OWN ORGANISATION ──────────────────────────────────────────
@@ -2138,42 +2141,48 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_process_step",
     summary:
-      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time and `runsPerMonth` how often it happens, both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolIds` is what the step is done in, from `list_client_tools`, and it is a whole set.",
+      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time; `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it: 2 a day, or 40 a month, and everything downstream converts to months once. Both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolId` is the ONE thing it is done in, from `list_client_tools`: a step done in two systems has a handoff in the middle of it, and that is two steps. `branchLabel` is the word on a fork, such as: if the claim is rejected, and `loopsBackTo` is the step key this one sends the work back to.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps",
     schema: obj(
-      { processId: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N, roleId: S, toolIds: { type: "array" } },
-      ["processId", "name", "secondsPerRun", "runsPerMonth"]
+      { processId: S, name: S, description: S, secondsPerRun: N, runsPerPeriod: N, frequencyPeriod: S, position: N, roleId: S, toolId: S, branchLabel: S, loopsBackTo: S },
+      ["processId", "name", "secondsPerRun", "runsPerPeriod"]
     ),
     buildBody: (i) => ({
       processId: str(i, "processId"),
       name: str(i, "name"),
       description: opt(i, "description"),
       secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
-      runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
+      runsPerPeriod: typeof i.runsPerPeriod === "number" ? i.runsPerPeriod : undefined,
+      frequencyPeriod: opt(i, "frequencyPeriod"),
       position: typeof i.position === "number" ? i.position : undefined,
       roleId: opt(i, "roleId"),
-      toolIds: Array.isArray(i.toolIds) ? i.toolIds : undefined,
+      toolId: opt(i, "toolId"),
+      branchLabel: opt(i, "branchLabel"),
+      loopsBackTo: opt(i, "loopsBackTo"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Add the step "${str(i, "name")}"` },
   },
   {
     name: "update_process_step",
     summary:
-      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolIds` is re-sent WHOLE, the set you name replaces the one the step has; leave it out to change nothing.",
+      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolId` is the ONE thing it is done in. `branchLabel` and `loopsBackTo` describe the shape — the word on a fork, and the step key this one sends work back to.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/update",
     schema: obj(
-      { id: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N, roleId: S, toolIds: { type: "array" } },
-      ["id", "name", "secondsPerRun", "runsPerMonth"]
+      { id: S, name: S, description: S, secondsPerRun: N, runsPerPeriod: N, frequencyPeriod: S, position: N, roleId: S, toolId: S, branchLabel: S, loopsBackTo: S },
+      ["id", "name", "secondsPerRun", "runsPerPeriod"]
     ),
     buildBody: (i) => ({
       id: str(i, "id"),
       name: str(i, "name"),
       description: sent(i, "description"),
       secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
-      runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
+      runsPerPeriod: typeof i.runsPerPeriod === "number" ? i.runsPerPeriod : undefined,
+      frequencyPeriod: opt(i, "frequencyPeriod"),
       position: typeof i.position === "number" ? i.position : undefined,
       roleId: sent(i, "roleId"),
-      toolIds: Array.isArray(i.toolIds) ? i.toolIds : undefined,
+      toolId: sent(i, "toolId"),
+      branchLabel: sent(i, "branchLabel"),
+      loopsBackTo: sent(i, "loopsBackTo"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the step "${str(i, "name")}"` },
   },
@@ -2185,6 +2194,102 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S }, ["id"]),
     buildBody: (i) => ({ id: str(i, "id") }),
     agent: { write: true, confirm: true, summarize: (i) => `Record that step ${str(i, "id")} stopped happening` },
+  },
+  // ── WAVES ────────────────────────────────────────────────────────────────
+  // What a client BOUGHT. On the machine surface because the owner ruled the
+  // assistant should be able to help PLAN one — "plan a blueprint wave for Keno
+  // Group should produce a draft you edit" — and a planner that cannot read what
+  // has already been sold plans the same thing twice.
+  {
+    name: "list_waves",
+    summary:
+      "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/waves",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List the packages clients bought" },
+  },
+  {
+    name: "get_wave",
+    summary:
+      "One wave in full (by `id`): what it is for, the sprints inside it, and any clash between their dates. A clash is reported and never refused — two sprints really can overlap, and a door that said no would be describing a rule nobody agreed to.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/waves/one",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `Look up wave ${str(i, "id")}` },
+  },
+  {
+    name: "create_wave",
+    summary:
+      "Sell a wave: `accountId` is whose it is, `name` is what it is called, `goal` is what it is for. It carries NO price — what a wave costs is deliberately out of this module's first version. Sprints are put in afterwards with `set_sprint_wave`, and the wave's dates follow them.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/waves",
+    schema: obj({ accountId: S, name: S, goal: S }, ["accountId", "name"]),
+    buildBody: (i) => ({ accountId: str(i, "accountId"), name: str(i, "name"), goal: opt(i, "goal") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Sell the wave "${str(i, "name")}"` },
+  },
+  {
+    name: "update_wave",
+    summary:
+      "Rename a wave (by `id`) or re-word what it is for. Never its dates: those are derived from the sprints in it, and a date somebody typed would disagree with the sprints the moment one moved.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/update",
+    schema: obj({ id: S, name: S, goal: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), goal: sent(i, "goal") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Rename the wave to "${str(i, "name")}"` },
+  },
+  {
+    name: "set_wave_active",
+    summary:
+      "Switch a wave off, or bring it back (by `id`). Never a delete: the sprints inside it keep their history, and a package a client paid for stays readable.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: { write: true, confirm: true, summarize: (i) => `${i.active === true ? "Bring back" : "Switch off"} a wave` },
+  },
+  {
+    name: "set_sprint_wave",
+    summary:
+      "Put a sprint into a wave, or take it out. `sprintId` is the sprint; `waveId` is the wave, or leave it empty to take the sprint out of whichever wave it is in. The wave's start and end dates are recalculated on both ends, so a sprint moving between waves re-dates the one it left as well as the one it joined.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/sprint",
+    schema: obj({ sprintId: S, waveId: S }, ["sprintId"]),
+    buildBody: (i) => ({ sprintId: str(i, "sprintId"), waveId: sent(i, "waveId") }),
+    agent: { write: true, confirm: false, summarize: () => "Move a sprint between waves" },
+  },
+  {
+    name: "set_audit_date",
+    summary:
+      "Move the day a process map's savings are measured FROM. `auditDate` is a day (YYYY-MM-DD) and it selects which agreed version counts as the before, so every figure on the map — and on the client's own portal — changes with it, without a single minute of their work changing. Setting it to the day it already holds does nothing and says so.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/audit-date",
+    schema: obj({ processId: S, auditDate: S }, ["processId", "auditDate"]),
+    buildBody: (i) => ({ processId: str(i, "processId"), auditDate: str(i, "auditDate") }),
+    agent: {
+      write: true,
+      // CONFIRM, because this is the one write in the module that moves a number
+      // a client is already looking at while changing nothing about their work.
+      confirm: true,
+      summarize: (i) => `Measure savings from ${str(i, "auditDate")}`,
+    },
+  },
+  {
+    name: "connect_processes",
+    summary:
+      "Say that one process map hands its work to another. LOOSE: it changes no duration, no frequency and no saving on either side — it is a signpost, and the last step of one process very often is the first step of another. `note` is what the connection is, in the team's own words. Connecting the same pair twice is the same sentence, so the second call answers `alreadyLinked` rather than failing.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/link",
+    schema: obj({ fromProcessId: S, toProcessId: S, note: S }, ["fromProcessId", "toProcessId"]),
+    buildBody: (i) => ({
+      fromProcessId: str(i, "fromProcessId"),
+      toProcessId: str(i, "toProcessId"),
+      note: opt(i, "note"),
+    }),
+    agent: { write: true, confirm: false, summarize: () => "Connect two process maps" },
+  },
+  {
+    name: "disconnect_processes",
+    summary:
+      "Take a connection between two process maps away. `id` is the connection, from `get_process`. Nothing about either map's times or savings changes, because nothing about them changed when it was made.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/unlink",
+    schema: obj({ id: S, processId: S }, ["id", "processId"]),
+    buildBody: (i) => ({ id: str(i, "id"), processId: str(i, "processId") }),
+    agent: { write: true, confirm: true, summarize: () => "Disconnect two process maps" },
   },
   {
     name: "cut_process_version",

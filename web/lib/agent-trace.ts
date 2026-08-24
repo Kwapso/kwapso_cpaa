@@ -198,18 +198,39 @@ export function traceFor(
       return { path: `${seg(teamId, "accounts")}/${str(input, "accountId")}`, highlight: "main" }
     case "create_process":
       return { path: seg(teamId, "processes"), highlight: "main" }
+    // ── WAVES ─────────────────────────────────────────────────────────────
+    // A new wave lands on the Waves list; an edit lands on the wave itself.
+    // `set_sprint_wave` names the SPRINT rather than a wave — it can take one
+    // OUT of a wave, in which case there is no wave to land on — so it goes to
+    // the list, where the moved sprint's effect on both waves' dates shows.
+    case "create_wave":
+      return { path: seg(teamId, "waves"), highlight: "main" }
+    case "update_wave":
+    case "set_wave_active":
+      return { path: `${seg(teamId, "waves")}/${str(input, "id")}`, highlight: "main" }
+    case "set_sprint_wave":
+      return { path: seg(teamId, "waves"), highlight: "main" }
     case "update_process":
     case "set_process_active":
       return { path: `${seg(teamId, "processes")}/${str(input, "id")}`, highlight: "main" }
     case "add_process_step":
     case "cut_process_version":
     case "comment_on_process":
+    // MOVING THE AUDIT DATE and CONNECTING TWO MAPS both land on the map itself:
+    // the audit date is on its Overview, and a connection is shown there too.
+    // Each names its map, so there is a record to land on.
+    case "set_audit_date":
+    case "connect_processes":
       return { path: `${seg(teamId, "processes")}/${str(input, "processId")}`, highlight: "main" }
     // A step write names the STEP, not its map, so there is no map id to land
     // on — the list is where the changed step's saving shows up either way.
     case "update_process_step":
     case "remove_process_step":
       return { path: seg(teamId, "processes"), highlight: "main" }
+    // Disconnecting names BOTH the connection and the map it was read from, so
+    // it lands on that map — where the connection has just stopped being listed.
+    case "disconnect_processes":
+      return { path: `${seg(teamId, "processes")}/${str(input, "processId")}`, highlight: "main" }
 
     /* -------------------------------- the money ----------------------------- */
     // Both rate cards are read on the account they belong to; the internal one is

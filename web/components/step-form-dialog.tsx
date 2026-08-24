@@ -1,27 +1,43 @@
 "use client"
 
-// Add-or-edit-a-step dialog — the two numbers every savings figure in the app is
-// built from, and the one form that collects them.
+// Add-or-edit-a-step dialog — everything a savings figure is built from, and the
+// one form that collects it.
 //
 // THEY ARE ASKED FOR IN MINUTES, and stored in whole seconds. Nobody says "a
 // step takes 2,400 seconds"; they say forty minutes. The conversion happens
-// here, once, on the way in and on the way out, so the person types what they
-// would say out loud and the arithmetic keeps the unit it can add up without
-// rounding drift.
+// here, once, on the way in and on the way out.
 //
-// The form says plainly what the number IS: an estimate the two of you agreed,
-// not a measurement. That is the same sentence the client reads under the
-// savings figure (R25), and it belongs on the form that produces it — a person
-// typing "40" should know it will be quoted back to a client.
+// AND HOW OFTEN, IN THE PERIOD THEY SAY IT IN. "Twice a day" and "sixty times a
+// month" are the same fact, and asking a person to convert it in their head at
+// the moment they are describing their own job is how a wrong number gets typed.
+// The pair is stored; the monthly figure is derived once, in the arithmetic.
+//
+// WHO DOES IT AND WHAT IN ARE PICK-OR-CREATE, and that is not a convenience.
+// They were plain pickers first, and the fields HID THEMSELVES when a client had
+// no roles recorded — which on 24 Aug 2026 was every client but one. The owner
+// opened the form and reported four fields where there should have been six:
+//
+//   "I don't think the map edit screen has the ability for us to capture who
+//    does it, like the rule."
+//
+// He was right, and hiding a control because its list is empty is the same
+// defect as an archive with no button: the feature is invisible and there is no
+// signpost to where you would create the thing. You map a process live in a room
+// while somebody says "then it goes to the dispatch clerk" — so you type that,
+// and it becomes a role there and then, with its cost filled in later.
+//
+// The form says plainly what the numbers ARE: estimates the two of you agreed,
+// not measurements. That is the same sentence the client reads under the savings
+// figure (R25), and it belongs on the form that produces it.
 //
 // FormShell (R4) + a per-session draft (R7), like every other write.
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import {
   Select,
   SelectContent,
@@ -29,37 +45,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+import { Plus } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
+import { periodLabel } from "@shared/web/frequency"
+import { PERIODS } from "@shared/workers/savings"
 
 export type StepFormValues = {
   name: string
   description: string
   /** whole seconds — converted from the minutes the form asks for */
   secondsPerRun: number
-  runsPerMonth: number
+  /** how many times, in the period below */
+  runsPerPeriod: number
+  frequencyPeriod: "day" | "week" | "month" | "year"
   /** WHO DOES IT — one of the client's own roles, or null for nobody named. */
   roleId: string | null
-  /** WHAT IT IS DONE IN — the whole set, every time (the door replaces it). */
-  toolIds: string[]
+  /** A ROLE THAT DOES NOT EXIST YET. The caller creates it and passes the new id
+   * back — pick-or-create, and the reason the field is never empty. */
+  newRoleName: string | null
+  /** WHAT IT IS DONE IN — exactly ONE (both respondents' ruling). */
+  toolId: string | null
+  newToolName: string | null
+  /** the word on a fork, when this step is one branch of a decision */
+  branchLabel: string | null
+  /** the step this one can send the work back to */
+  loopsBackTo: string | null
 }
 
-/** The client's own roles and tools, as this form needs them: a name, and
- * whether an hour of the role has a price on it yet. */
 export type StepRoleOption = { id: string; name: string; centsPerHour: number | null }
 export type StepToolOption = { id: string; name: string }
+export type StepPeerOption = { stepKey: string; name: string }
 
-/** NOBODY NAMED, as a value the picker can hold. A Select cannot carry `null`,
- * and an empty string is how it says "cleared" — so the sentinel is written once
- * rather than spelled differently at each end. */
-const NO_ROLE = "__none__"
+/** NOBODY NAMED, and ADD A NEW ONE, as values a picker can hold. A Select cannot
+ * carry `null`, so the two sentinels are written once here rather than spelled
+ * differently at each end. */
+const NONE = "__none__"
+const NEW = "__new__"
 
 const nameField = { ...defaultFieldConfig, label: "Step", required: true }
 const descField = { ...defaultFieldConfig, label: "What happens in it", required: false }
@@ -69,22 +97,26 @@ const minutesField = {
   required: true,
   hint: "The time you agreed with them, not a measurement.",
 }
-const runsField = {
-  ...defaultFieldConfig,
-  label: "Times a month it happens",
-  required: true,
-}
+const runsField = { ...defaultFieldConfig, label: "How often it happens", required: true }
 const roleField = {
   ...defaultFieldConfig,
   label: "Who does it",
   required: false,
   hint: "Their role, and what an hour of it costs them, is what turns these minutes into money.",
 }
-const toolsField = {
+const toolField = {
   ...defaultFieldConfig,
   label: "What it is done in",
   required: false,
+  hint: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
 }
+const branchField = {
+  ...defaultFieldConfig,
+  label: "Only when",
+  required: false,
+  hint: "Leave empty unless this step is one branch of a decision.",
+}
+const loopField = { ...defaultFieldConfig, label: "Sends the work back to", required: false }
 
 export function StepFormDialog({
   open,
@@ -93,6 +125,8 @@ export function StepFormDialog({
   initial,
   roles = [],
   tools = [],
+  peers = [],
+  hasClient = true,
   draftKey,
   onSubmit,
 }: {
@@ -104,14 +138,23 @@ export function StepFormDialog({
     name: string
     description: string
     secondsPerRun: number
-    runsPerMonth: number
+    runsPerPeriod: number
+    frequencyPeriod: StepFormValues["frequencyPeriod"]
     roleId: string | null
-    toolIds: string[]
+    toolId: string | null
+    branchLabel: string | null
+    loopsBackTo: string | null
   }
-  /** The client's live roles. Empty when the map has no client filed against it
-   * — the picker then says so rather than offering an empty list. */
+  /** The client's live roles and tools. EMPTY IS ORDINARY — the fields render
+   * anyway and offer to create one, which is the whole point of this rewrite. */
   roles?: StepRoleOption[]
   tools?: StepToolOption[]
+  /** the other steps on this map, for the loop-back picker */
+  peers?: StepPeerOption[]
+  /** A map with no client has nobody's roles and no tools to choose from, and
+   * the door refuses either. The form says so rather than offering an empty
+   * picker that fails on save. */
+  hasClient?: boolean
   draftKey?: string
   onSubmit: (values: StepFormValues) => Promise<void>
 }) {
@@ -123,22 +166,17 @@ export function StepFormDialog({
       name: initial?.name ?? "",
       description: initial?.description ?? "",
       minutes: initial ? String(Math.round(initial.secondsPerRun / 60)) : "",
-      runs: initial ? String(initial.runsPerMonth) : "",
-      roleId: initial?.roleId ?? NO_ROLE,
-      // Joined, because a draft is stored as flat strings — an array would come
-      // back from the draft store as "[object Object]" the first time somebody
-      // reopened a half-typed step.
-      toolIds: (initial?.toolIds ?? []).join(","),
+      runs: initial ? String(initial.runsPerPeriod) : "",
+      period: (initial?.frequencyPeriod ?? "month") as string,
+      roleId: initial?.roleId ?? NONE,
+      newRole: "",
+      toolId: initial?.toolId ?? NONE,
+      newTool: "",
+      branch: initial?.branchLabel ?? "",
+      loop: initial?.loopsBackTo ?? NONE,
     },
     open
   )
-  const chosenTools = values.toolIds ? values.toolIds.split(",").filter(Boolean) : []
-  const toggleTool = (id: string) =>
-    setValues((s) => {
-      const on = s.toolIds ? s.toolIds.split(",").filter(Boolean) : []
-      const next = on.includes(id) ? on.filter((x) => x !== id) : [...on, id]
-      return { ...s, toolIds: next.join(",") }
-    })
   const [busy, setBusy] = React.useState(false)
 
   /** A whole, non-negative number, or null. The door refuses anything else with
@@ -149,7 +187,14 @@ export function StepFormDialog({
   }
   const minutes = whole(values.minutes)
   const runs = whole(values.runs)
-  const ready = values.name.trim() !== "" && minutes !== null && runs !== null
+  const namingRole = values.roleId === NEW
+  const namingTool = values.toolId === NEW
+  const ready =
+    values.name.trim() !== "" &&
+    minutes !== null &&
+    runs !== null &&
+    (!namingRole || values.newRole.trim() !== "") &&
+    (!namingTool || values.newTool.trim() !== "")
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -160,9 +205,14 @@ export function StepFormDialog({
         name: values.name.trim(),
         description: richTextValue(values.description),
         secondsPerRun: minutes * 60,
-        runsPerMonth: runs,
-        roleId: values.roleId === NO_ROLE ? null : values.roleId,
-        toolIds: chosenTools,
+        runsPerPeriod: runs,
+        frequencyPeriod: values.period as StepFormValues["frequencyPeriod"],
+        roleId: namingRole ? null : values.roleId === NONE ? null : values.roleId,
+        newRoleName: namingRole ? values.newRole.trim() : null,
+        toolId: namingTool ? null : values.toolId === NONE ? null : values.toolId,
+        newToolName: namingTool ? values.newTool.trim() : null,
+        branchLabel: values.branch.trim() || null,
+        loopsBackTo: values.loop === NONE ? null : values.loop,
       })
       clearDraft()
       onOpenChange(false)
@@ -183,13 +233,10 @@ export function StepFormDialog({
       title={<DialogTitle>{editing ? t("Edit step") : t("Add a step")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          {t("It goes into")} {versionLabel}. Older versions stay exactly as they were agreed.
+          {t("It goes into")} {versionLabel}. {t("Older versions stay exactly as they were agreed.")}
         </DialogDescription>
       }
-      submit={{
-        busy: busy,
-        disabled: !ready,
-      }}
+      submit={{ busy: busy, disabled: !ready }}
     >
       <Field config={nameField} htmlFor="step-name" className={fieldSpacing}>
         <Input
@@ -222,72 +269,167 @@ export function StepFormDialog({
           disabled={busy}
         />
       </Field>
+      {/* HOW OFTEN, AS A PAIR. The number and the period sit on one line because
+          they are one sentence — "twice a day" — and splitting them across two
+          fields is how somebody reads back "twice" and forgets the "a day". */}
       <Field config={runsField} htmlFor="step-runs" className={fieldSpacing}>
+        <div className="flex items-center gap-2">
+          <Input
+            id="step-runs"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={values.runs}
+            onChange={(e) => setValues((s) => ({ ...s, runs: e.target.value }))}
+            placeholder="20"
+            disabled={busy}
+            className="w-28"
+          />
+          {/* THE OPTION IS THE PHRASE, NOT THE NOUN. "day" on its own is not a
+              sentence, no translator can place it, and R28 refuses it — see
+              shared/web/frequency.ts for the day that was caught. */}
+          <Select
+            value={values.period}
+            onValueChange={(v) => setValues((s) => ({ ...s, period: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {periodLabel(p, t)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </Field>
+
+      {/* WHO DOES IT. Always rendered, even with no roles recorded — see the note
+          at the top of this file for the day that mattered. */}
+      <Field config={roleField} htmlFor="step-role" className={fieldSpacing}>
+        {hasClient ? (
+          <div className="flex flex-col gap-2">
+            <Select
+              value={values.roleId}
+              onValueChange={(v) => setValues((s) => ({ ...s, roleId: v }))}
+              disabled={busy}
+            >
+              <SelectTrigger id="step-role">
+                <SelectValue placeholder={t("Nobody named yet")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>{t("Nobody named yet")}</SelectItem>
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.name}
+                    {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
+                  </SelectItem>
+                ))}
+                <SelectItem value={NEW}>{t("Add a role…")}</SelectItem>
+              </SelectContent>
+            </Select>
+            {namingRole && (
+              <Input
+                value={values.newRole}
+                onChange={(e) => setValues((s) => ({ ...s, newRole: e.target.value }))}
+                placeholder={t("e.g. Dispatch clerk")}
+                disabled={busy}
+                autoFocus
+              />
+            )}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            {t("File this map under a client and their roles can be named here.")}
+          </p>
+        )}
+      </Field>
+
+      {/* WHAT IT IS DONE IN — one, by ruling. */}
+      <Field config={toolField} htmlFor="step-tool" className={fieldSpacing}>
+        {hasClient ? (
+          <div className="flex flex-col gap-2">
+            <Select
+              value={values.toolId}
+              onValueChange={(v) => setValues((s) => ({ ...s, toolId: v }))}
+              disabled={busy}
+            >
+              <SelectTrigger id="step-tool">
+                <SelectValue placeholder={t("Nothing named yet")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>{t("Nothing named yet")}</SelectItem>
+                {tools.map((x) => (
+                  <SelectItem key={x.id} value={x.id}>
+                    {x.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value={NEW}>{t("Add a tool…")}</SelectItem>
+              </SelectContent>
+            </Select>
+            {namingTool && (
+              <Input
+                value={values.newTool}
+                onChange={(e) => setValues((s) => ({ ...s, newTool: e.target.value }))}
+                placeholder={t("e.g. The shared spreadsheet")}
+                disabled={busy}
+                autoFocus
+              />
+            )}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            {t("File this map under a client and their tools can be named here.")}
+          </p>
+        )}
+      </Field>
+
+      {/* THE SHAPE. Both empty on nearly every step, which is why they sit last:
+          a fork and a loop are real and uncommon, and a form that asked about
+          them first would make every ordinary step feel complicated. */}
+      <Field config={branchField} htmlFor="step-branch" className={fieldSpacing}>
         <Input
-          id="step-runs"
-          type="number"
-          min={0}
-          inputMode="numeric"
-          value={values.runs}
-          onChange={(e) => setValues((s) => ({ ...s, runs: e.target.value }))}
-          placeholder="20"
+          id="step-branch"
+          value={values.branch}
+          onChange={(e) => setValues((s) => ({ ...s, branch: e.target.value }))}
+          placeholder={t("e.g. if the claim is rejected")}
           disabled={busy}
         />
       </Field>
-      {/* WHO DOES IT. Optional on purpose: you map a process in the room, before
-          anybody has looked up who is on which desk, and a form that refused to
-          save without it would stop the session this whole module exists for. A
-          role with no hourly cost yet says so beside its name, so the person
-          typing knows why the money will read as incomplete. */}
-      {roles.length > 0 ? (
-        <Field config={roleField} htmlFor="step-role" className={fieldSpacing}>
+      {peers.length > 0 && (
+        <Field config={loopField} htmlFor="step-loop" className={fieldSpacing}>
           <Select
-            value={values.roleId}
-            onValueChange={(v) => setValues((s) => ({ ...s, roleId: v }))}
+            value={values.loop}
+            onValueChange={(v) => setValues((s) => ({ ...s, loop: v }))}
             disabled={busy}
           >
-            <SelectTrigger id="step-role">
-              <SelectValue placeholder={t("Nobody named yet")} />
+            <SelectTrigger id="step-loop">
+              <SelectValue placeholder={t("Nowhere — it carries on")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_ROLE}>{t("Nobody named yet")}</SelectItem>
-              {roles.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {r.name}
-                  {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
+              <SelectItem value={NONE}>{t("Nowhere — it carries on")}</SelectItem>
+              {peers.map((p) => (
+                <SelectItem key={p.stepKey} value={p.stepKey}>
+                  {p.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
-      ) : null}
-      {/* WHAT IT IS DONE IN — several, because a step usually is: open the
-          spreadsheet, copy it into the portal, send the email. Chips rather than
-          a multi-select, the same shape the client's own roles use one screen
-          over, so the set is readable without opening anything. */}
-      {tools.length > 0 ? (
-        <Field config={toolsField} htmlFor="step-tools" className={fieldSpacing}>
-          <div id="step-tools" className="flex flex-wrap items-center gap-1">
-            {tools.map((x) => {
-              const on = chosenTools.includes(x.id)
-              return (
-                <Button
-                  key={x.id}
-                  type="button"
-                  size="sm"
-                  variant={on ? "secondary" : "ghost"}
-                  disabled={busy}
-                  className="h-7 rounded-full px-3 text-xs"
-                  onClick={() => toggleTool(x.id)}
-                  aria-pressed={on}
-                >
-                  {x.name}
-                </Button>
-              )
-            })}
-          </div>
-        </Field>
-      ) : null}
+      )}
+      {/* The add-a-role and add-a-tool rows are the only place this form creates
+          anything of its own, and the icon says so (the house mapping: create =
+          Plus). It is a hint rather than a button because the Select above IS
+          the control — two ways to do one thing is how a form gets confusing. */}
+      {(namingRole || namingTool) && (
+        <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <Plus className="size-3.5" aria-hidden />
+          {t("It will be added to this client's organisation when you save.")}
+        </p>
+      )}
     </FormShellDialog>
   )
 }

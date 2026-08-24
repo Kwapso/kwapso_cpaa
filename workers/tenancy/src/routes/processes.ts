@@ -46,15 +46,18 @@ import {
   listApps,
   listProcessComments,
   listProcesses,
+  linkProcesses,
   listSavings,
   PROCESS_SORTS,
   removeStep,
   setAppActive,
+  setAuditDate,
   setAppStaff,
   setAppStakeholders,
   setProcessActive,
   updateApp,
   updateProcess,
+  unlinkProcesses,
   updateStep,
   createAppModule,
   listAppModules,
@@ -426,8 +429,82 @@ export async function getProcessDetail(request: Request, env: Env): Promise<Resp
   return json(
     await getProcess(cfg, guard, scope, id, {
       versionId: queryText(url.searchParams.get("versionId"), "Version"),
+      // THE SLIDER. A day, and the map is read out of its dated history at that
+      // day rather than off the live rows. Absent = today, which is what this
+      // door has always answered.
+      asOf: isoDayOrThrow(queryText(url.searchParams.get("asOf"), "Date")),
     })
   )
+}
+
+/** A DAY, OR NOTHING. `2026-03-01`, and nothing else.
+ *
+ * It is checked rather than trusted because it is compared as a STRING in SQL —
+ * every date in the revision history is ISO, where lexical order is chronological
+ * order, which is what makes the whole "as of" query one cheap comparison. A
+ * value that is not that shape would not error; it would silently select the
+ * wrong side of every step's history, and the screen would show a map that never
+ * existed. */
+function isoDayOrThrow(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
+    throw new GuardError(400, "invalid_input", "That date isn't a day we can read.")
+  return value
+}
+
+/** POST /api/tenancy/processes/audit-date — move the day the saving is measured
+ * from. AGENCY ONLY: it is the number a client is shown, and moving it moves
+ * every figure on every screen at once. The WARNING about that is the screen's
+ * job (Aurora's ruling: "editable, but moving it warns you what it will do to
+ * the numbers"); the door's job is to make the move honest, which it does by
+ * writing a line in the history saying what it became. */
+export async function postAuditDate(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const scope = await refusePortalCaller(cfg, guard)
+  const processId = requireText(body.processId, "Process", TEXT_LIMITS.short)
+  const auditDate = requireText(body.auditDate, "Date", TEXT_LIMITS.short)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(auditDate))
+    throw new GuardError(400, "invalid_input", "That date isn't a day we can read.")
+  await setAuditDate(cfg, guard, scope, actor, processId, auditDate)
+  await publishChange(env, guard.teamId, "processes", processId)
+  return json({ ok: true })
+}
+
+/** POST /api/tenancy/processes/link — connect one map to another. AGENCY ONLY.
+ *
+ * LOOSE, by the owner's ruling: it changes no duration, no frequency and no
+ * saving on either side. "Many times the last step of a process is the first
+ * step — or connected to — another process." Connecting the same pair twice is
+ * the same sentence, so the second call answers `alreadyLinked` rather than an
+ * error (R17, through the unique index). */
+export async function postLinkProcesses(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const scope = await refusePortalCaller(cfg, guard)
+  const fromProcessId = requireText(body.fromProcessId, "Process", TEXT_LIMITS.short)
+  const toProcessId = requireText(body.toProcessId, "Process", TEXT_LIMITS.short)
+  const id = await linkProcesses(cfg, guard, scope, actor, {
+    fromProcessId,
+    toProcessId,
+    note: optionalText(body.note, "Note", TEXT_LIMITS.short),
+  })
+  await publishChange(env, guard.teamId, "processes", fromProcessId)
+  await publishChange(env, guard.teamId, "processes", toProcessId)
+  return json(id ? { ok: true } : { alreadyLinked: true })
+}
+
+/** POST /api/tenancy/processes/unlink — take a connection away. AGENCY ONLY.
+ * The one real delete in this module: a link is a signpost, not a record of
+ * work, so there is no history to keep and a "removed connection" row on a
+ * screen would be noise. */
+export async function postUnlinkProcesses(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Link", TEXT_LIMITS.short)
+  const processId = requireText(body.processId, "Process", TEXT_LIMITS.short)
+  // R17: nothing removed = nothing to say and nothing to publish.
+  if (await unlinkProcesses(cfg, guard, scope, actor, id))
+    await publishChange(env, guard.teamId, "processes", processId)
+  return json({ ok: true })
 }
 
 /** POST /api/tenancy/processes — map a way of working, and its baseline with it.
@@ -495,15 +572,19 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     secondsPerRun: wholeNumber(Number(body.secondsPerRun), "Time per run", MAX_STEP_SECONDS),
-    runsPerMonth: wholeNumber(Number(body.runsPerMonth), "Times a month", MAX_RUNS_PER_MONTH),
+    // HOW OFTEN, IN THE PERIOD THE PERSON SAID IT IN. The pair is the fact; the
+    // monthly figure is derived once, in shared/workers/savings.ts.
+    runsPerPeriod: wholeNumber(Number(body.runsPerPeriod), "How often", MAX_RUNS_PER_MONTH),
+    frequencyPeriod: optionalText(body.frequencyPeriod, "Period", TEXT_LIMITS.short),
     position: body.position === undefined ? undefined : wholeNumber(Number(body.position), "Order", 10_000),
     // WHO DOES IT and WHAT IN. Left out entirely, the step inherits the map's
-    // role and gets no tools — which is what a quick add during a mapping session
+    // role and gets no tool — which is what a quick add during a mapping session
     // should do. Sent as null, the role is deliberately nobody.
     roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
-    toolIds: Array.isArray(body.toolIds)
-      ? body.toolIds.map((v) => requireText(v, "Tool", TEXT_LIMITS.short))
-      : undefined,
+    toolId: "toolId" in body ? (optionalText(body.toolId, "Tool", TEXT_LIMITS.short) ?? null) : undefined,
+    // THE SHAPE. A branch label is the word on a fork; a loop is the way back.
+    branchLabel: "branchLabel" in body ? (optionalText(body.branchLabel, "Branch", TEXT_LIMITS.short) ?? null) : undefined,
+    loopsBackTo: "loopsBackTo" in body ? (optionalText(body.loopsBackTo, "Loops back to", TEXT_LIMITS.short) ?? null) : undefined,
   })
   // The PROCESS is what a listener can act on: a step is only ever read on its
   // map, and the map's savings change the moment a duration does.
@@ -522,18 +603,17 @@ export async function postUpdateStep(request: Request, env: Env): Promise<Respon
         ? (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? null)
         : undefined,
     secondsPerRun: wholeNumber(Number(body.secondsPerRun), "Time per run", MAX_STEP_SECONDS),
-    runsPerMonth: wholeNumber(Number(body.runsPerMonth), "Times a month", MAX_RUNS_PER_MONTH),
+    runsPerPeriod: wholeNumber(Number(body.runsPerPeriod), "How often", MAX_RUNS_PER_MONTH),
+    frequencyPeriod: optionalText(body.frequencyPeriod, "Period", TEXT_LIMITS.short),
     position: body.position === undefined ? undefined : wholeNumber(Number(body.position), "Order", 10_000),
     // ABSENT LEAVES IT ALONE; null CLEARS it. The two are different answers and
     // the door keeps them different, which is why this is `"roleId" in body`
     // rather than a truthiness test — a form that saves a step's times without
     // touching who does it must not silently un-name the person.
     roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
-    // The WHOLE set, so saving twice is saving once (the same shape setAppStaff
-    // takes). Absent leaves the tools alone; an empty array clears them.
-    toolIds: Array.isArray(body.toolIds)
-      ? body.toolIds.map((v) => requireText(v, "Tool", TEXT_LIMITS.short))
-      : undefined,
+    toolId: "toolId" in body ? (optionalText(body.toolId, "Tool", TEXT_LIMITS.short) ?? null) : undefined,
+    branchLabel: "branchLabel" in body ? (optionalText(body.branchLabel, "Branch", TEXT_LIMITS.short) ?? null) : undefined,
+    loopsBackTo: "loopsBackTo" in body ? (optionalText(body.loopsBackTo, "Loops back to", TEXT_LIMITS.short) ?? null) : undefined,
   })
   await publishChange(env, guard.teamId, "processes", processId)
   return json({ ok: true })

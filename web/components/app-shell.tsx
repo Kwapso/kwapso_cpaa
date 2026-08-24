@@ -31,6 +31,7 @@ import {
   PanelLeftOpen,
   Timer,
   MoreHorizontal,
+  Layers,
 } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -82,6 +83,8 @@ const SECTION_ICONS: Record<string, typeof Home> = {
   processes: Route,
   stories: Hammer,
   sprints: CalendarRange,
+  // The package a client bought — several sprints arriving together.
+  waves: Layers,
   apps: AppWindow,
   tasks: ListTodo,
   time: Timer,

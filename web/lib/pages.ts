@@ -102,6 +102,7 @@ export type TeamSection = {
     | "tickets"
     | "knowledge"
     | "processes"
+    | "waves"
     // THE WORK ENGINE, as four destinations rather than one page with four
     // panels on it. The owner's ruling: apps, sprints, stories and tasks each
     // get a section of their own AND a tab on the record above them — both
@@ -266,6 +267,10 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // server total of the PROCESSES, keyed off the same `processes:<teamId>` cache
   // the list reads.
   { key: "processes", title: "Processes", module: "processes", segment: "processes", placement: "contextual", countCacheKey: "processes" },
+  // WAVES — what a client BOUGHT: a package of sprints. Its own destination
+  // beside Sprints rather than a tab on one, because the question it answers is
+  // "what did they buy?" and a sprint answers "what are we doing this fortnight?".
+  { key: "waves", title: "Waves", module: "work", segment: "waves", placement: "sidebar", countCacheKey: "waves", group: "occasional" },
   { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "occasional" },
   // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
   // right so a role without it never sees the destination at all. Its count is
@@ -329,6 +334,8 @@ export const CONCEPT_ICON = {
   // clock running on any of it.
   stories: "hammer",
   sprints: "calendar-range",
+  // The package a client bought — several sprints arriving together.
+  waves: "layers",
   apps: "app-window",
   // WHAT WE HAND OVER on a system: the parcel, because that is what a
   // deliverable is — the thing that leaves our hands and arrives in theirs.

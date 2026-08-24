@@ -145,9 +145,14 @@ describe("the sidebar sequence the owner fixed", () => {
     // for, and a rail that lists both the section and the page it lives on reads
     // as two ideas. None of the five lost a screen; three lost a module and two
     // lost only their line on the rail.
+    // SIX since 24 Aug 2026: WAVES joined, between Apps and Sprints, because it
+    // is the shelf ABOVE a sprint — what a client bought, which the sprints
+    // inside it deliver. A rail that put it after Sprints would read as a
+    // narrower thing than the sprints it contains.
     expect(composeLikeTheShell()[1]).toEqual([
       "meetings",
       "apps",
+      "waves",
       "sprints",
       "kwapso",
       "settings",

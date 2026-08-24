@@ -128,6 +128,8 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // app at the top of it.
   stories: "work",
   sprints: "work",
+  // …and a WAVE is the package those sprints were sold inside. Same permission.
+  waves: "work",
   tasks: "work",
   // …and TIME is the fourth noun on the same permission. A work log had no
   // destination at all: the only list of one was a panel at the foot of the
