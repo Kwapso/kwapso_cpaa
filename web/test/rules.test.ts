@@ -554,9 +554,30 @@ describe("RULES — the laws of the base", () => {
     // must therefore carry a badge OR be a reviewed exception. Reading the tabs
     // out of the source (not a hand-list) is what makes a NEW tab arrive already
     // held to the law.
+    // THE TRIPWIRE'S FLOOR IS R2'S FLOOR, WHICH IS TWO — not three.
+    //
+    // It read `toBeGreaterThan(2)` per component, i.e. "every bespoke record
+    // detail has at least three tabs". That is not a law anybody wrote: R2 says
+    // Overview + Activity, and a record with no collection hanging off it has
+    // exactly those two. It passed for a year because every bespoke detail so
+    // far happened to have a third tab, so the assertion looked like a blindness
+    // guard while quietly asserting something else — and the first record that
+    // obeyed R2 exactly (a dropdown value: a word, its group, and its history)
+    // turned the build red for having the minimum the law requires.
+    //
+    // The blindness it was written to catch is real, so it is kept and moved to
+    // where it belongs: per component the floor is two, because a regex that has
+    // stopped matching yields nought or one; and the AGGREGATE below is what
+    // catches a scan that degrades everywhere at once, the same shape the recipe
+    // half above already uses.
+    let scannedTabs = 0
     for (const c of recordDetailComponents()) {
       const tabs = [...c.source.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
-      expect(tabs.length, `${c.name}: the tab scan found no tabs — it has gone blind`).toBeGreaterThan(2)
+      expect(
+        tabs.length,
+        `${c.name}: the tab scan found fewer than two tabs — either it has gone blind, or this detail is missing Overview/Activity (R2)`
+      ).toBeGreaterThanOrEqual(2)
+      scannedTabs += tabs.length
       let counted = 0
       for (const [, value, badge] of tabs) {
         if (badge.trim() !== '""') {
@@ -575,6 +596,14 @@ describe("RULES — the laws of the base", () => {
           `${c.name} badges a tab → the number must come through the formatCount seam (R16)`
         ).toContain("format-count")
     }
+    // …and the aggregate tripwire. A regex that degrades across the board still
+    // clears the per-component floor of two on a file or two by luck; it cannot
+    // clear this. Anchored to the census's own size rather than a magic number,
+    // so adding a detail raises the bar with it.
+    expect(
+      scannedTabs,
+      "the bespoke tab scan found barely any tabs across every record detail — it has gone blind"
+    ).toBeGreaterThan(recordDetailComponents().length * 2)
   })
 
   // R5 — record activity is read through the ONE generic (table, id) path.

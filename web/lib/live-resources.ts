@@ -617,6 +617,21 @@ export function accountKey(accountId: string): string {
   return `account:${accountId}`
 }
 
+/** ONE DROPDOWN VALUE'S OWN CACHE — the opened record, read through the
+ * single-row door rather than found inside the vocabulary list.
+ *
+ * Keyed by TEAM as well as by row for the same reason `accountKey` is keyed by
+ * record: a ULID says which row and never which fence it was read under, so a
+ * team switch would otherwise hand the new team a row the old one's session
+ * fetched. It is a SECOND key beside `selectable:<teamId>` on purpose — the list
+ * door selects the vocabulary, the detail door also selects the audit block, so
+ * the two answers are genuinely different rows and neither can stand in for the
+ * other. R15 keeps both live: the `selectable_data` resource patches the list by
+ * id and names this key in its `deps`. */
+export function selectableOneKey(teamId: string, valueId: string): string {
+  return `selectable:one:${teamId}:${valueId}`
+}
+
 /** The knowledge-source list's cache key. */
 export function knowledgeKey(teamId: string): string {
   return `knowledge:${teamId}`
@@ -752,6 +767,12 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.selectableOne(id),
     fetchList: (t) => listFetch.selectable(t),
+    // R15 REACHES THE OPEN RECORD TOO, not just the list. The detail screen
+    // reads its own single-row key and its own activity feed, and neither is the
+    // list row the patch above replaces — so a teammate renaming a value while
+    // somebody has it open would leave that screen stale, which is the exact
+    // deafness this resource was written to fix one level up.
+    deps: (t, id) => [selectableOneKey(t, id), `activity:record:selectable_data:${id}`],
   },
   // THE CUSTOMER SPINE — three resources, one row-level target. `accounts` pings
   // carry the account id, and so do `account_links` / `portal_users`: a contact

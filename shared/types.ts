@@ -134,6 +134,15 @@ export type SelectableValue = {
   nameDe: string | null
   description: string | null
   standardDays: number | null
+  /** WHO WROTE THE WORD, AND WHEN — read by the SINGLE-ROW door only.
+   *
+   * Optional because the LIST door does not select them, and that is the
+   * decision rather than an oversight: the record footer is the one place that
+   * asks, so putting two more columns on the list would carry them for every
+   * value on every read to answer a question no row in a list is asking. A list
+   * row therefore has them absent; a row read through `selectableOne` has them. */
+  createdAt?: string | null
+  createdByName?: string | null
 }
 
 /** A role's permission matrix as the tenancy worker returns it: the module rows

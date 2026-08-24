@@ -34,10 +34,15 @@ import { AddButton } from "@/components/deep-link/screen-bits"
 export function SelectableScreen({
   teamId,
   onImport,
+  onOpen,
 }: {
   teamId: string
   /** Host-provided soft-nav to the import wizard (pre-targeted to dropdown values). */
   onImport?: () => void
+  /** Host-provided soft-nav to ONE value's record (Overview + Activity, Law R2).
+   * The host owns the URL shape, exactly as it does for the import wizard above —
+   * this screen knows a value has a record and not where the record lives. */
+  onOpen?: (id: string) => void
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
@@ -303,7 +308,29 @@ export function SelectableScreen({
                             {v.mark}
                           </span>
                         )}
-                        <span className="flex-1 text-sm">{v.value}</span>
+                        {/* THE WORD OPENS ITS RECORD. A real href so the row can
+                            be middle-clicked, copied and opened in a new tab,
+                            with the plain left click intercepted into the
+                            History-API move — the pattern app-tiles.tsx uses,
+                            and the reason it is a pattern rather than a bare
+                            anchor is that a bare anchor to an in-app path is a
+                            full page reload of the whole shell. */}
+                        {onOpen ? (
+                          <a
+                            href={`/t/${teamId}/dropdowns/${v.id}`}
+                            onClick={(e) => {
+                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+                                return
+                              e.preventDefault()
+                              onOpen(v.id)
+                            }}
+                            className="flex-1 text-sm underline-offset-2 hover:underline"
+                          >
+                            {v.value}
+                          </a>
+                        ) : (
+                          <span className="flex-1 text-sm">{v.value}</span>
+                        )}
                         {!v.active && (
                           <Badge variant="outline" className="shrink-0">
                             {t("Inactive")}

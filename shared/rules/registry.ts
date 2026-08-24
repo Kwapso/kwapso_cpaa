@@ -1201,6 +1201,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "role-detail.permissions":
     "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
   "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
+  "selectable-detail.overview":
+    "one dropdown value's own fields — its group, its word, whether it is active, whether it is one of the defaults, and the four enrichments (emoji, German label, description, standard days). One record, not a collection. It is the R2 MINIMUM on purpose: a dropdown value has no collection hanging off it at all, so Overview + Activity is the whole record and the second tab is the only one that can carry a number.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, and the paragraph about it. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
