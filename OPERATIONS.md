@@ -42,7 +42,7 @@ BOOTSTRAP.md stands the whole thing up from zero.
 
 ## Reset config
 
-The /reset-all skill reads this. DESTRUCTIVE, wipes data back to empty.
+The /clean_slate skill reads this. DESTRUCTIVE, wipes data back to empty.
 
 - reset_command: node scripts/reset-all.mjs <staging|production|both>
 - global_db_staging: kwapso-core-staging
@@ -53,7 +53,7 @@ The /reset-all skill reads this. DESTRUCTIVE, wipes data back to empty.
 
 ## Seed config, the staging sandbox
 
-The other half of reset-all: fill an empty staging back up with one believable,
+The other half of clean_slate: fill an empty staging back up with one believable,
 obviously fictional client world so there is something to click around.
 
 - seed_command: `TEST_LOGIN_KEY=… ADMIN_KEY=… node scripts/seed-staging.mjs staging`
