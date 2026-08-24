@@ -177,7 +177,13 @@ export function AppDetailScreen({
   // The URL PREFIX we are standing in — "" at the top level, "/t/<teamId>" inside
   // a team — so every cross-link off this record stays in the shape the person
   // arrived through. `basePath` ends in the section, which is one segment more.
-  const host = { base: basePath.replace(/\/apps$/, "") }
+    // NEST, DON'T REPLACE. This used to strip the collection segment off the path
+  // before the panels appended to it, so opening a related record from here
+  // threw away the record you opened it FROM — a story reached from a client
+  // landed on /stories/<id> with no way back to the client. The base is now this
+  // record's own address, so a related record lands INSIDE it and the trail is
+  // in the URL for the crumbs, the Back button and anybody you send it to.
+  const host = { base: `${basePath}/${appId}` }
 
   const refresh = React.useCallback(() => {
     invalidate(appsKey(teamId))

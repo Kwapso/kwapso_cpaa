@@ -105,3 +105,104 @@ describe("a nested address renders the innermost level and remembers the way in"
     expect(r.query).toBeTruthy()
   })
 })
+
+// ── THE TRAIL A PERSON READS ─────────────────────────────────────────────────
+//
+// The owner, 24 Aug 2026, answering which repair he meant and removing the cap:
+// "If I share a link where I've gone into an app, then into a sprint, and into a
+// ticket, and from that ticket I've gone to a team member, and I share that link
+// with someone, they should literally go in through the same nest. They should
+// be able to see the breadcrumbs. But the nesting must be unlimited."
+
+import { buildCrumbs } from "@/components/deep-link/crumbs"
+
+const NO_RECORDS = {
+  accounts: [{ id: "CONFIA", name: "Confia" }],
+  members: undefined,
+  roles: [],
+  invites: undefined,
+  knowledge: undefined,
+  apps: [{ id: "A1", name: "CONFIA" }],
+  sprints: [{ id: "S1", ref: "BERG-SP12", name: "Sprint 12" }],
+  stories: [{ id: "ST1", ref: "BERG-S0188", title: "The story" }],
+  tasks: undefined,
+  meetings: undefined,
+} as never
+
+const crumbs = (path: string) =>
+  buildCrumbs({
+    topLevel: true,
+    module: parseRoute(path, "").module,
+    recordId: parseRoute(path, "").recordId,
+    levels: parseRoute(path, "").levels,
+    teamName: "Kwapso",
+    teamPath: "/t/TEAM1",
+    sectionPath: "/" + parseRoute(path, "").module,
+    records: NO_RECORDS,
+    t: (s: string) => s,
+  })
+
+describe("the breadcrumb walks the whole way in, however deep", () => {
+  it("two levels read exactly as the owner described them", () => {
+    // "a story opened from Confia reads Confia › Stories › BERG-S0188"
+    expect(crumbs("/accounts/CONFIA/stories/ST1").map((c) => c.label)).toEqual([
+      "Confia",
+      "Stories",
+      "BERG-S0188",
+    ])
+  })
+
+  it("clicking the client goes back to the client", () => {
+    const [client] = crumbs("/accounts/CONFIA/stories/ST1")
+    expect(client.href, "the first crumb must land on the record it names").toBe("/accounts/CONFIA")
+  })
+
+  it("the page you are on is not a link", () => {
+    const trail = crumbs("/accounts/CONFIA/stories/ST1")
+    expect(trail[trail.length - 1].href, "you are already here").toBeUndefined()
+  })
+
+  it("FOUR levels — the owner's own example, uncapped", () => {
+    const trail = crumbs("/apps/A1/sprints/S1/stories/ST1/accounts/CONFIA")
+    expect(trail.map((c) => c.label)).toEqual([
+      "CONFIA",
+      "BERG-SP12",
+      "BERG-S0188",
+      "Accounts",
+      "Confia",
+    ])
+    // Every step above the last is a link that lands where it says.
+    expect(trail[0].href).toBe("/apps/A1")
+    expect(trail[1].href).toBe("/apps/A1/sprints/S1")
+    expect(trail[2].href).toBe("/apps/A1/sprints/S1/stories/ST1")
+  })
+
+  it("a shared link opened cold still shows an unbroken trail", () => {
+    // Nothing is loaded yet, so no record can be named. The trail must still
+    // have a rung for every level rather than gaps somebody cannot click.
+    const trail = buildCrumbs({
+      topLevel: true,
+      module: "stories",
+      recordId: "ST1",
+      levels: [
+        { module: "accounts", id: "CONFIA" },
+        { module: "stories", id: "ST1" },
+      ],
+      teamName: "Kwapso",
+      teamPath: "/t/TEAM1",
+      sectionPath: "/stories",
+      records: {
+        accounts: undefined, members: undefined, roles: [], invites: undefined,
+        knowledge: undefined, apps: undefined, sprints: undefined, stories: undefined,
+        tasks: undefined, meetings: undefined,
+      } as never,
+      t: (s: string) => s,
+    })
+    expect(trail.map((c) => c.label)).toEqual(["Account", "Stories", "Story"])
+    expect(trail[0].href).toBe("/accounts/CONFIA")
+  })
+
+  it("a flat address is untouched — one level still means what it meant", () => {
+    expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Stories", "BERG-S0188"])
+  })
+})

@@ -191,7 +191,13 @@ export function HelpDetailScreen({
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total badges the tab.
   const storiesTotal = useCachedValue<number | null>(totalKey("stories-ticket", helpId))
-  const host = { base: basePath.replace(/\/tickets$/, "") }
+    // NEST, DON'T REPLACE. This used to strip the collection segment off the path
+  // before the panels appended to it, so opening a related record from here
+  // threw away the record you opened it FROM — a story reached from a client
+  // landed on /stories/<id> with no way back to the client. The base is now this
+  // record's own address, so a related record lands INSIDE it and the trail is
+  // in the URL for the crumbs, the Back button and anybody you send it to.
+  const host = { base: `${basePath}/${helpId}` }
   // WHAT A STORY NEEDS TO BE WRITTEN AT ALL — the same four lists the backlog,
   // the sprint and the app hand this form. A hook, so it sits above the early
   // returns below; every list it reads is a cache another screen already holds.

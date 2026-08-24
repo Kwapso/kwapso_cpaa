@@ -78,10 +78,30 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
   return ""
 }
 
+/** THE PATH UP TO AND INCLUDING ONE LEVEL, so every crumb above the last is a
+ * link that lands exactly where it says.
+ *
+ * `/accounts/CONFIA/sprints/S1/tickets/T9` at level 1 is
+ * `/accounts/CONFIA/sprints/S1` — the sprint, still inside the client. Rebuilt
+ * from the trail rather than sliced off the current URL, so it cannot drift
+ * from what `parseRoute` would read back. */
+function pathTo(
+  levels: { module: string; id: string }[],
+  upto: number,
+  teamPath: string,
+  topLevel: boolean
+): string {
+  const parts = levels
+    .slice(0, upto + 1)
+    .flatMap((l, i) => (i === upto ? [l.module, l.id].filter(Boolean) : [l.module, l.id]))
+  return (topLevel ? "" : teamPath) + "/" + parts.filter(Boolean).join("/")
+}
+
 export function buildCrumbs({
   topLevel,
   module,
   recordId,
+  levels,
   teamName,
   teamPath,
   sectionPath,
@@ -91,6 +111,9 @@ export function buildCrumbs({
   topLevel: boolean
   module: string | null
   recordId: string | null
+  /** The whole trail, deepest last (route.ts). Empty or one level = the flat
+   * case this has always handled. */
+  levels?: { module: string; id: string }[]
   teamName: string
   teamPath: string
   sectionPath: string
@@ -102,6 +125,38 @@ export function buildCrumbs({
 }): Crumb[] {
   // STEP TWO — the record itself, the page you are on, so it carries no href.
   const here = recordId ? recordLabel(module, recordId, records) : ""
+
+  // A NESTED ADDRESS SHOWS THE WHOLE WAY IN (the owner, 24 Aug 2026, widening
+  // his own earlier two-step ruling, and asking for it explicitly without a
+  // depth limit): "If I share a link where I've gone into an app, then into a
+  // sprint, and into a ticket, and from that ticket I've gone to a team member…
+  // they should literally go in through the same nest."
+  //
+  // WHY THIS DOES NOT REOPEN THE THING HE OBJECTED TO. The ruling this widens
+  // was earned by "Settings › Bergman S.A. › Members › Aurora" on a page reached
+  // in one click — the whole ROUTE recited on a screen that sits inside none of
+  // it. A nested address is the opposite case: every step really is a record the
+  // one after it lives inside, and the crumb is the only way back out.
+  //
+  // ONE CRUMB PER ANCESTOR, then the last level's collection and its record —
+  // which is exactly the shape he described for the two-level case, "Confia ›
+  // Stories › BERG-S0188", and simply keeps going for deeper ones.
+  const trail = levels ?? []
+  if (trail.length > 1) {
+    const crumbs: Crumb[] = trail.slice(0, -1).map((l, i) => ({
+      // A record whose list is not loaded falls back to its section's name, so a
+      // shared link opened cold still shows an unbroken trail rather than gaps.
+      label: recordLabel(l.module, l.id, records) || t(sectionTitle(l.module)),
+      href: pathTo(trail, i, teamPath, topLevel),
+    }))
+    const last = trail[trail.length - 1]
+    crumbs.push({
+      label: t(sectionTitle(last.module)),
+      href: last.id ? pathTo(trail, trail.length - 1, teamPath, topLevel) : undefined,
+    })
+    if (last.id && here) crumbs.push({ label: here })
+    return crumbs
+  }
 
   // The team's own area. The team IS what these sit inside, so it is step one —
   // and on the team overview itself there is nothing above it, so it stands alone.

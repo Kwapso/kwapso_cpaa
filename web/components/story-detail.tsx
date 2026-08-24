@@ -92,7 +92,13 @@ export function StoryDetailScreen({
   const [reviewOpen, setReviewOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
-  const host = { base: basePath.replace(/\/stories$/, "") }
+    // NEST, DON'T REPLACE. This used to strip the collection segment off the path
+  // before the panels appended to it, so opening a related record from here
+  // threw away the record you opened it FROM — a story reached from a client
+  // landed on /stories/<id> with no way back to the client. The base is now this
+  // record's own address, so a related record lands INSIDE it and the trail is
+  // in the URL for the crumbs, the Back button and anybody you send it to.
+  const host = { base: `${basePath}/${storyId}` }
 
   const refresh = React.useCallback(() => {
     invalidate(`story:one:${storyId}`)

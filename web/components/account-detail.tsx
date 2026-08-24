@@ -719,7 +719,7 @@ export function AccountDetailScreen({
               <AppsPanel
                 accountId={accountId}
                 accountName={account.name}
-                host={{ base: basePath.replace(/\/accounts$/, "") }}
+                host={{ base: `${basePath}/${accountId}` }}
                 onNew={canWriteApps ? () => setAppOpen(true) : undefined}
               />
             )
@@ -730,7 +730,7 @@ export function AccountDetailScreen({
                 ownerKind="account"
                 ownerId={accountId}
                 filter={{ accountId }}
-                host={{ base: basePath.replace(/\/accounts$/, "") }}
+                host={{ base: `${basePath}/${accountId}` }}
                 onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
                 emptyText={`Nothing has been sold to ${account.name} yet.`}
               />

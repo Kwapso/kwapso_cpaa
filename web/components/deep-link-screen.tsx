@@ -79,7 +79,7 @@ export function DeepLinkScreen() {
     urlTeamId,
     router,
   })
-  const { perms, can } = usePermissions(enabled ? teamId : null)
+  const { perms, error: permsError, can } = usePermissions(enabled ? teamId : null)
 
   /* --------------------------------- the data -------------------------------- */
 
@@ -292,6 +292,7 @@ export function DeepLinkScreen() {
   })
 
   const crumbs = buildCrumbs({
+    levels: route.levels,
     t,
     topLevel,
     module,
@@ -351,7 +352,7 @@ export function DeepLinkScreen() {
             badged flag is per-permission (the strip may hide for this viewer). */}
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
           {renderModuleContent({
-            noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
+            noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
             brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
