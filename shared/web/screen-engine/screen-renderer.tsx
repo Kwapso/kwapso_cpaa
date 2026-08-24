@@ -45,7 +45,10 @@ import {
   SelectValue,
 } from "@shared/ui/controls/select/select"
 import { DatePicker } from "@shared/ui/controls/date-picker/date-picker"
-import { Field } from "@shared/ui/controls/field/field"
+// The FIELD comes through the app's seam, not the kit directly — the seam
+// translates a config's words on the way to the screen (R33), and its import
+// ban is what keeps every renderer honest, this one included.
+import { Field } from "@shared/web/field"
 import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
 import { Input } from "@shared/ui/controls/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
@@ -361,12 +364,12 @@ function ScreenForm({
         {fields.map((f) => (
           <Field
             key={f.column}
-            id={f.column}
-            label={f.field.label || undefined}
-            help={f.field.helpText || undefined}
-            required={f.field.required}
-            disabled={gateState(rights, f.gate) === "disabled" || f.field.disabled}
-            error={errors[f.column] || undefined}
+            config={{
+              ...f.field,
+              disabled: gateState(rights, f.gate) === "disabled" || f.field.disabled,
+            }}
+            htmlFor={f.column}
+            error={errors[f.column]}
           >
             {renderInput(f)}
           </Field>

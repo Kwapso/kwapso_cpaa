@@ -30,32 +30,32 @@ repository. Both front ends, `web/` and `web-portal/`, import from that one plac
 
 **One name, said once:** the library is **`shared/ui/`**, and every import path
 starts with **`@shared/ui/`**, the alias both front doors map to `shared/*` in their
-`tsconfig.json`. Upstream it is called Swift Struck UI (`@swift-struck/ui`), which is
-why the words "swift struck" appear in file headers all through the directory — that
-package still exists and other Swift Struck products still install it, but **this app
-installs nothing**. `@kwapso/ui` is gone from every `package.json`, from `node_modules`
-and from the lockfile, and an import from either name would not resolve here.
+`tsconfig.json`. It is the **kwapso design system** — `github.com/Kwapso/design`,
+vendored at the tag in `shared/ui/VERSION.json` by `scripts/sync-design.mjs` — and it
+is a PINNED DEPENDENCY, not this repo's screen code: `web/test/vendored-kit.test.ts`
+recomputes a content hash over every delivered byte on every check, so a hand-edit
+under `shared/ui/` turns the build red. A kit change is made upstream, tagged, and
+pulled (OPERATIONS.md § "The design system" is the three-command loop).
 
-**How it got here, because it matters when you read the older paragraphs in this
-file and in UI-GAPS.md.** Until 2026-08-22 the library was the npm package
-`@kwapso/ui`, installed from a separate GitHub repo that the owner built and released,
-and this section said in plain words that you could not edit it. It was **vendored**:
-copied, whole and unrewritten, into `shared/ui/`, and the package removed from every
-`package.json`, from `node_modules` and from the lockfile. The reason was the reskin.
-A theme is only most of a re-skin — a token remap repaints a button, it cannot change
-the button's SHAPE, and the kwapso kit's secondary button is a filled button with no
-border in any state. No arrangement of token values turns a bordered button into that,
-because the border is written into the component. The alternative was a growing pile of
-downstream overrides in `shared/web/library-overrides.css`, each one fighting a line in
-a file we could not edit; that file's own header is a post-mortem of what that costs.
+**How it got here.** Until 2026-08-22 the library was the npm package `@kwapso/ui`
+from a separate repo, and this section said you could not edit it. It was vendored
+for one day as an editable copy — a token remap repaints a button but cannot change
+its SHAPE — and on 2026-08-25 the copy was replaced wholesale by the design kit
+Aurora built to this repo's own commission (`design/DESIGN-SYSTEM-COMMISSION.md`).
+The old library's config-driven BEHAVIOUR survived the swap by moving app-side:
+`shared/web/screen-engine/` (screen renderer, collection frame, filter bar, the
+rules engine, the config-driven TabsView) plus the seams `shared/web/field.tsx`,
+`list-compat.tsx` and `notes-editor/`, all drawing through kit parts.
 
-The host imports them by their registry path:
+The host imports kit parts by tier — `controls/` (primitives), `structures/`
+(assemblies), `icons/`, and for future screens `compositions/`:
 
 ```ts
 // web/components/app-shell.tsx
-import { Breadcrumbs } from "@shared/ui/registry/primitives/breadcrumbs/breadcrumbs"
-import { ModeToggle }  from "@shared/ui/registry/primitives/mode-toggle/mode-toggle"
-import { toast }       from "@shared/ui/registry/primitives/sonner/sonner"
+import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
+import { ModeToggle }  from "@shared/ui/controls/mode-toggle/mode-toggle"
+import { toast }       from "@shared/ui/controls/sonner/sonner"
+import { Timer }       from "@shared/ui/icons"
 ```
 
 The theme itself is imported, not copied, `web/app/globals.css`:

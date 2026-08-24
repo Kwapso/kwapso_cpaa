@@ -151,7 +151,7 @@ describe("R33 · every extracted position asks for its translation", () => {
     // here or not.
     const SEAM = "shared/web/field.tsx"
     const offenders = appFiles()
-      .filter(({ path }: { path: string }) => readFileSync(path, "utf8").includes("primitives/field/field"))
+      .filter(({ path }: { path: string }) => readFileSync(path, "utf8").includes("controls/field/field"))
       .map(({ path }: { path: string }) => relative(ROOT, path))
       .filter((rel: string) => rel !== SEAM)
 

@@ -249,18 +249,6 @@ export function parseScreenPath(segments: string[]): ScreenLevel[] {
   return out
 }
 
-/** The inverse — build the path spine (no tenant prefix; the host prepends it).
- *  A level with id "" contributes just its module (a list). */
-export function buildScreenPath(levels: ScreenLevel[]): string {
-  const parts: string[] = []
-  for (const l of levels) {
-    if (!l.module) continue
-    parts.push(l.module)
-    if (l.id) parts.push(l.id)
-  }
-  return "/" + parts.join("/")
-}
-
 export interface ScreenQuery {
   panel?: "edit" | "add"
   /** the module for `panel=add`. */
@@ -310,37 +298,4 @@ export interface Crumb {
   href: string
   module: string
   id: string
-}
-
-/** Build the breadcrumb trail for a path. `labelFor` turns a level into a label
- *  (the host knows the record names); `prefix` is the tenant segment. */
-export function screenCrumbs(
-  levels: ScreenLevel[],
-  labelFor: (level: ScreenLevel, index: number) => string,
-  prefix = ""
-): Crumb[] {
-  return levels.map((level, i) => ({
-    label: labelFor(level, i),
-    module: level.module,
-    id: level.id,
-    href: prefix + buildScreenPath(levels.slice(0, i + 1)),
-  }))
-}
-
-/** Pure collapse math for the Breadcrumbs primitive: when the trail is longer
- *  than `collapseAfter`, keep the FIRST crumb + the LAST TWO and hide the middle
- *  (rendered as a dropdown), so the row never grows wide enough to scroll. */
-export function collapseCrumbs<T>(
-  items: T[],
-  collapseAfter = 3
-): { collapsed: boolean; lead: T[]; middle: T[]; tail: T[] } {
-  if (items.length <= collapseAfter) {
-    return { collapsed: false, lead: [], middle: [], tail: items }
-  }
-  return {
-    collapsed: true,
-    lead: items.slice(0, 1),
-    middle: items.slice(1, -2),
-    tail: items.slice(-2),
-  }
 }
