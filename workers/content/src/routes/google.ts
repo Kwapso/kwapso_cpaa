@@ -278,10 +278,16 @@ export async function postGoogleDisconnect(request: Request, env: Env): Promise<
   // whether our rows say so. They do now. See `disconnectAll`.
   const result = await disconnectAll(env, cfg, guard, actor)
   if (result.changed) await publishChange(env, guard.teamId, "google")
+  // These are independent reads — one wait, not 2. Named `after…` because
+  // `connections` is already bound above, as the disconnect's own input.
+  const [afterConnections, afterSources] = await Promise.all([
+    listConnections(cfg, guard),
+    listNamedSources(cfg, guard),
+  ])
   return json({
     ...result,
-    connections: await listConnections(cfg, guard),
-    sources: await listNamedSources(cfg, guard),
+    connections: afterConnections,
+    sources: afterSources,
   })
 }
 

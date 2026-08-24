@@ -334,6 +334,50 @@ export async function reconcile(
   }
 }
 
+/** ONE KEY, ONE REQUEST IN THE AIR.
+ *
+ * Measured on staging, 24 Aug 2026: a story detail made 27 requests on a cold
+ * mount and roughly a third of them were the SAME key, asked for again in the
+ * same tick by a second component that had no way to know the first was already
+ * asking. `useStoryFormOptions` alone fires six reads and is mounted by the
+ * stories collection, the story detail AND the ticket detail; the timer bar is
+ * mounted twice, one copy hidden by CSS. Every one of those duplicates cost a
+ * full round trip to a worker and back.
+ *
+ * The cache could not help, because a cache answers "what did we get?" and the
+ * question here is "is somebody already getting it?" — a gap of a few hundred
+ * milliseconds that the cache is empty for and every subscriber walks into.
+ *
+ * WHY A DELIBERATE REFRESH MUST NOT JOIN. `refresh()` is what a screen calls
+ * after it changed something, so joining a request that departed BEFORE that
+ * change would hand back the old row and look exactly like a lost write. Forced
+ * loads therefore always start their own, and REPLACE the shared one so anybody
+ * arriving afterwards joins the newer answer rather than the staler. That
+ * distinction is the whole safety of this: dedupe the question everyone is
+ * asking at once, never the one somebody asked because they know it changed. */
+const inFlight = new Map<string, Promise<unknown>>()
+
+function loadShared<T>(key: string, fetcher: () => Promise<T>, force: boolean): Promise<T> {
+  if (!force) {
+    const running = inFlight.get(key) as Promise<T> | undefined
+    if (running) return running
+  }
+  const p = fetcher().then((value) => {
+    // Stored by the ONE request, not once per joiner — so a patched row is not
+    // overwritten N times and `notify` fires against a settled cache.
+    store(key, value)
+    return value
+  })
+  inFlight.set(key, p)
+  // Every joiner awaits `p` inside its own try/catch, so a rejection is always
+  // handled — but if the last joiner unmounts first the runtime would still see
+  // an unobserved rejection and log it. This silences that and nothing else.
+  void p.catch(() => {}).finally(() => {
+    if (inFlight.get(key) === p) inFlight.delete(key)
+  })
+  return p
+}
+
 export function useCached<T>(
   key: string | null,
   fetcher: () => Promise<T>
@@ -348,20 +392,22 @@ export function useCached<T>(
   fetcherRef.current = fetcher
   const aliveRef = React.useRef(true)
 
-  const load = React.useCallback(async () => {
-    if (!key) return
-    try {
-      const value = await fetcherRef.current()
-      store(key, value)
-      if (!aliveRef.current) return
-      setData(value)
-      setError(null)
-    } catch (e) {
-      if (aliveRef.current) setError(e)
-    } finally {
-      if (aliveRef.current) setLoading(false)
-    }
-  }, [key])
+  const load = React.useCallback(
+    async (force = false) => {
+      if (!key) return
+      try {
+        const value = await loadShared(key, fetcherRef.current, force)
+        if (!aliveRef.current) return
+        setData(value)
+        setError(null)
+      } catch (e) {
+        if (aliveRef.current) setError(e)
+      } finally {
+        if (aliveRef.current) setLoading(false)
+      }
+    },
+    [key]
+  )
 
   // What a live ping (`notify`) does to a MOUNTED subscriber. If the cache still
   // holds the key, the new value was written by `patchRow` / `reconcile` /
@@ -419,6 +465,7 @@ export function useCached<T>(
     }
   }, [key, load, sync])
 
-  const refresh = React.useCallback(() => void load(), [load])
+  // FORCED — a refresh is somebody saying "I know this changed". See loadShared.
+  const refresh = React.useCallback(() => void load(true), [load])
   return { data, loading, error, refresh }
 }

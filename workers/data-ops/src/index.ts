@@ -18,6 +18,7 @@
 
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
+import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
@@ -109,7 +110,10 @@ export default {
       if (route === "GET /api/data-ops/health") return json({ ok: true })
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such data-ops action.")
-      return await def.handler(request, env)
+      // Measured on the way out — see timing.ts.
+      const res = await def.handler(request, env)
+      logIfSlow(request, route)
+      return withTiming(request, res)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("data-ops worker error:", e)

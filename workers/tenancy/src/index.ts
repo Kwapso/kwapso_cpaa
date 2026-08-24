@@ -91,6 +91,7 @@
 
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
+import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { sweepCoreRetention } from "@shared/workers/retention"
@@ -333,7 +334,12 @@ export default {
       if (route === "GET /api/tenancy/health") return json({ ok: true })
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such tenancy action.")
-      return await def.handler(request, env)
+      // Measured on the way out (timing.ts): the browser's network panel reads
+      // `Server-Timing` with no tooling, and a door slow for everybody prints a
+      // line nobody has to be watching for.
+      const res = await def.handler(request, env)
+      logIfSlow(request, route)
+      return withTiming(request, res)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("tenancy worker error:", e)

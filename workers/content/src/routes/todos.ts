@@ -52,10 +52,12 @@ export async function getTodos(request: Request, env: Env): Promise<Response> {
     accountId: queryText(url.searchParams.get("accountId"), "Client"),
     view: queryText(url.searchParams.get("view"), "View") === "all" ? ("all" as const) : ("open" as const),
   }
+  // These are independent reads — one wait, not 2.
+  const [todos, total] = await Promise.all([listTodos(cfg, guard, scope, filter), countTodos(cfg, guard, scope, filter)])
   return json({
-    todos: await listTodos(cfg, guard, scope, filter),
+    todos,
     // R16: the exact server count, over the same question the list asked.
-    total: await countTodos(cfg, guard, scope, filter),
+    total,
   })
 }
 
@@ -88,9 +90,11 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   // that triggered it. The row is already saved and already on their screen.
   await notifyTodoRaised(env, cfg, guard, created.id)
   const filter = { view: "open" as const }
+  // These are independent reads — one wait, not 2.
+  const [todos, total] = await Promise.all([listTodos(cfg, guard, scope, filter), countTodos(cfg, guard, scope, filter)])
   return json({
-    todos: await listTodos(cfg, guard, scope, filter),
-    total: await countTodos(cfg, guard, scope, filter),
+    todos,
+    total,
   })
 }
 
@@ -141,9 +145,11 @@ export async function postCancelTodo(request: Request, env: Env): Promise<Respon
   const { moved, accountId } = await cancelTodo(cfg, guard, actor, id)
   if (moved) await publishChange(env, guard.teamId, "todos", id, "edit", accountId ?? undefined)
   const filter = { view: "open" as const }
+  // These are independent reads — one wait, not 2.
+  const [todos, total] = await Promise.all([listTodos(cfg, guard, scope, filter), countTodos(cfg, guard, scope, filter)])
   return json({
-    todos: await listTodos(cfg, guard, scope, filter),
-    total: await countTodos(cfg, guard, scope, filter),
+    todos,
+    total,
   })
 }
 

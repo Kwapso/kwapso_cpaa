@@ -611,11 +611,13 @@ export async function getHelpAttachments(request: Request, env: Env): Promise<Re
   const scope = await callerScope(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  // These are independent reads — one wait, not 2.
+  const [attachments, total] = await Promise.all([listAttachments(cfg, guard, scope, id), countAttachments(cfg, guard, scope, id)])
   return json({
-    attachments: await listAttachments(cfg, guard, scope, id),
+    attachments,
     // R16: the tab badge shows the door's exact COUNT(*), never the (capped)
     // list's length.
-    total: await countAttachments(cfg, guard, scope, id),
+    total,
   })
 }
 

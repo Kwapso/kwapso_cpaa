@@ -10,6 +10,7 @@ import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { fail } from "./http"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
+import { beginD1Timing } from "./timing"
 import { requestId, traceHeaders } from "./trace"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
@@ -170,7 +171,11 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // users row) — no need for a second native-DB read for the same value.
   if (!user.currentTeamId) throw new GuardError(409, "no_team", "No active team.")
 
-  const cfg = d1ConfigFrom(env)
+  // The config carries this request's trip counter (timing.ts). Attached HERE
+  // because this is the one function every team-scoped door passes through
+  // exactly once — the same property that makes it the honest place for the
+  // per-caller ceiling above makes it the honest place to start the clock.
+  const cfg: D1Rest = { ...d1ConfigFrom(env), stats: beginD1Timing(request) }
   const guard = await requireMember(env, user.id, user.currentTeamId)
   return { user, actor: toActor(user), cfg, guard }
 }
