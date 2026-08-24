@@ -185,7 +185,7 @@ with its own fence. Not a flag on this one.
 The owner explicitly wants this on the external interface too. Every capability
 you build must be reachable by an outside tool through MCP, drawing on **the same
 gated code path** as the UI — same endpoint, same function, permission re-checked.
-That is what `interface_lessness_meter` measures, and the base currently scores 93
+That is what `interfacelessness_review` measures, and the base currently scores 93
 of 100 with 87 doors and zero silent ones.
 
 - One declaration, two projections: `shared/workers/tool-catalog.ts`.
@@ -232,7 +232,7 @@ of 100 with 87 doors and zero silent ones.
   inspection.
 - Both bulk flows run end to end and **confirm before writing**.
 - Google going down mid-sync loses nothing and recovers on its own.
-- The quality gates: `lean_mean_check` ≥ 94, `interface_lessness_meter` ≥ 94,
+- The quality gates: `lean_mean_check` ≥ 94, `interfacelessness_review` ≥ 94,
   `security_sentry` no critical or high.
 
 ## 9 · Report back with

@@ -83,3 +83,6 @@ glide/r2-manifest.json
 # The retrieval benchmark's corpus and its cached vectors — hundreds of MB,
 # rebuildable by scripts/knowledge-retrieval-bench.mjs.
 .kb-bench/
+
+# Claude Code skills live globally in ~/.claude/skills/ — never vendored here
+/skills/
