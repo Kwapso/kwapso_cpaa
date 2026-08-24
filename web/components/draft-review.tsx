@@ -394,7 +394,19 @@ function StepKind({
       ) : null}
       <span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         {step.revisesStepId ? <Badge variant="outline">{t("Changes a step you already have")}</Badge> : null}
-        <span>{step.secondsPerRun > 0 ? minutesText(step.secondsPerRun) : t("No time agreed")}</span>
+        {/* WHAT IT REPLACES, beside what it proposes. Without the old value this
+            row showed only the new one — and a revision that lowers a duration
+            RAISES the saving a client is shown, so it is the one proposal on
+            this screen that flatters us. Everything starts kept, which makes
+            "compare it against something" the reviewer's only defence. */}
+        {step.revisesStepId && typeof step.revisesSecondsPerRun === "number" ? (
+          <span>
+            {minutesText(step.revisesSecondsPerRun)} →{" "}
+            {step.secondsPerRun > 0 ? minutesText(step.secondsPerRun) : t("No time agreed")}
+          </span>
+        ) : (
+          <span>{step.secondsPerRun > 0 ? minutesText(step.secondsPerRun) : t("No time agreed")}</span>
+        )}
         <span>{howOften(t, step)}</span>
         {step.roleKey ? <span>{roleOf.get(step.roleKey)?.said ?? ""}</span> : null}
         {step.toolKey ? <span>{toolOf.get(step.toolKey)?.said ?? ""}</span> : null}

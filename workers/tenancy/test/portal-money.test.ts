@@ -29,7 +29,18 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
-import { addStep, createProcess, cutVersion, listSavings, updateStep } from "../src/lib/processes"
+import {
+  addStep,
+  createProcess,
+  cutVersion,
+  getProcess,
+  linkProcesses,
+  listProcessLinks,
+  listSavings,
+  mapAsOf,
+  updateStep,
+} from "../src/lib/processes"
+import { listRoles } from "../src/lib/client-org"
 import { buildSpineDb, IDS } from "./spine-harness"
 
 const cfg = { accountId: "a", apiToken: "t" } as never
@@ -154,5 +165,105 @@ describe("an hourly cost in the client portal", () => {
     expect(main.pricedSteps).toBe(1)
     expect(other.pricedSteps).toBe(0)
     expect(other.totalSteps).toBe(1)
+  })
+})
+
+describe("the same rule, at every door that carries the number", () => {
+  // THE FINDING THAT MADE THIS BLOCK EXIST, 25 Aug 2026. The rule shipped in
+  // `listSavings` alone. The SAME field rode `listProcessSteps` and `mapAsOf`,
+  // both reached through `GET /api/tenancy/processes/detail` — a door that
+  // FENCES a client login rather than refusing one, which is R21's whole
+  // premise. So one response carried the redaction and the leak together: the
+  // saving's steps had a null rate and the map's steps did not.
+  //
+  // A ruling enforced at one door is not enforced.
+
+  it("the MAP's steps withhold it, not just the saving's", async () => {
+    const processId = await aPricedMap()
+    makeMainStakeholder(IDS.victimPerson)
+    const d = await getProcess(cfg, guard, portal(IDS.victimContact), processId)
+    expect(d.saving?.steps[0].savedCentsPerMonth, "the saving was already right").toBeNull()
+    expect(
+      d.steps[0].roleCentsPerHour,
+      "…and the map's own steps, in the SAME payload, must be too"
+    ).toBeNull()
+  })
+
+  it("the DATE SLIDER withholds it — history is not a way around a fence", async () => {
+    const processId = await aPricedMap()
+    makeMainStakeholder(IDS.victimPerson)
+    const today = new Date().toISOString().slice(0, 10)
+    const then = await mapAsOf(
+      cfg,
+      guard,
+      portal(IDS.victimContact),
+      processId,
+      today,
+      new Set<string>(),
+      IDS.victimApp
+    )
+    expect(then[0]?.roleCentsPerHour ?? null).toBeNull()
+  })
+
+  it("…and the main stakeholder still gets it on both", async () => {
+    const processId = await aPricedMap()
+    makeMainStakeholder(IDS.victimPerson)
+    const d = await getProcess(cfg, guard, portal(IDS.victimPerson), processId)
+    expect(d.steps[0].roleCentsPerHour).toBe(6000)
+    expect(d.saving?.steps[0].savedCentsPerMonth).toBeGreaterThan(0)
+  })
+
+  it("the CLIENT-ROLES door withholds it from every contact", async () => {
+    // One hop away, gated on the same right, and it needs no process id at all:
+    // a contact could simply ask for their company's roles and read every rate.
+    await aPricedMap()
+    const staffRoles = await listRoles(cfg, guard, staff)
+    expect(staffRoles.find((r) => r.id === "ROLE_CLERK")?.centsPerHour).toBe(6000)
+    const theirs = await listRoles(cfg, guard, portal(IDS.victimPerson))
+    expect(
+      theirs.find((r) => r.id === "ROLE_CLERK")?.centsPerHour,
+      "a role is not attached to an app, so there is no stakeholder test to ask — no rate here at all"
+    ).toBeNull()
+  })
+})
+
+describe("a connection between two maps", () => {
+  it("REFUSES two different clients — reaching both is not the same as their belonging together", async () => {
+    const mine = await aPricedMap()
+    ;(holder.db as DatabaseSync).exec(`
+      INSERT INTO accounts (id, account_type, name, created_at)
+        VALUES ('A_OTHER', 'entity', 'Somebody else', '2026-01-01');
+      INSERT INTO apps (id, account_id, name, created_at)
+        VALUES ('AP_OTHER', 'A_OTHER', 'Their system', '2026-01-01');
+    `)
+    const theirs = await createProcess(cfg, guard, staff, actor, {
+      appId: "AP_OTHER",
+      name: "Their own way of working",
+    })
+    await expect(
+      linkProcesses(cfg, guard, staff, actor, { fromProcessId: mine, toProcessId: theirs })
+    ).rejects.toThrow(/different clients/)
+  })
+
+  it("and the READ fences the table it joins, so a historic cross-client row cannot leak a name", async () => {
+    // The write refuses one now. A row written before it did — or by any other
+    // path — must still not hand another client's process NAME back through a
+    // query that only fenced the link row.
+    const mine = await aPricedMap()
+    ;(holder.db as DatabaseSync).exec(`
+      INSERT INTO accounts (id, account_type, name, created_at)
+        VALUES ('A_OTHER', 'entity', 'Somebody else', '2026-01-01');
+      INSERT INTO apps (id, account_id, name, created_at)
+        VALUES ('AP_OTHER', 'A_OTHER', 'Their system', '2026-01-01');
+      INSERT INTO processes (id, app_id, account_id, name, created_at)
+        VALUES ('PR_OTHER', 'AP_OTHER', 'A_OTHER', 'Their secret way of working', '2026-01-01');
+      INSERT INTO process_links (id, account_id, from_process_id, to_process_id, created_at)
+        VALUES ('LNK_BAD', '${IDS.victimAccount}', '${mine}', 'PR_OTHER', '2026-02-01');
+    `)
+    const seen = await listProcessLinks(cfg, guard, portal(IDS.victimPerson), mine)
+    expect(
+      seen.map((l) => l.name),
+      "the other client's process name must not come back"
+    ).not.toContain("Their secret way of working")
   })
 })

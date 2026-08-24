@@ -591,6 +591,26 @@ export async function mainStakeholderOf(
   return rows[0]?.contact_id ?? null
 }
 
+/** IS AN HOURLY COST WITHHELD FROM THIS CALLER, ON THIS APP.
+ *
+ * `null` means no restriction — a staff caller, who sees everything. A SET means
+ * a portal caller, and the rate rides only on the apps they are the main
+ * stakeholder of.
+ *
+ * IT IS A FUNCTION AND NOT A LINE AT EACH READER because that is the mistake
+ * this exists to correct. The rule shipped on 24 Aug 2026 in `listSavings`
+ * alone, and the same field rode `listProcessSteps` and `mapAsOf` — both reached
+ * through `getProcessDetail`, which FENCES a client login rather than refusing
+ * one. So one response carried the redaction and the leak together: the saving's
+ * steps had a null rate and the map's steps did not.
+ *
+ * An unknown app id withholds. A caller whose app cannot be identified is not a
+ * caller whose rights can be proved. */
+function withheldRate(visibleOn: Set<string> | null | undefined, appId: string | undefined): boolean {
+  if (!visibleOn) return false
+  return !appId || !visibleOn.has(appId)
+}
+
 /** THE APPS THIS PORTAL CALLER IS THE MAIN STAKEHOLDER OF.
  *
  * The owner's ruling, 24 Aug 2026, settling his disagreement with Aurora about
@@ -609,7 +629,7 @@ export async function mainStakeholderOf(
  * would read the same as "restricted to nothing", and this is the kind of
  * boolean where the two must not be confused.
  */
-async function mainStakeholderApps(
+export async function mainStakeholderApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope
@@ -1279,9 +1299,14 @@ export async function getProcess(
   const summary = await processOrThrow(cfg, guard, scope, id)
   const auditDate = summary.auditDate ?? summary.createdAt.slice(0, 10)
   const shown = await versionOrThrow(cfg, guard, scope, id, opts.versionId)
+  // WHO MAY SEE AN HOURLY COST ON THIS MAP, resolved ONCE and handed to every
+  // reader on this screen. Resolving it per reader is what let the rule ship in
+  // `listSavings` alone while the same field rode two other readers in the same
+  // payload (25 Aug 2026).
+  const rateVisibleOn = await mainStakeholderApps(cfg, guard, scope)
   const [versions, liveSteps, shownStepCount, commentsTotal, savings, dates, links] = await Promise.all([
     listProcessVersions(cfg, guard, scope, id),
-    listProcessSteps(cfg, guard, scope, id, shown.id),
+    listProcessSteps(cfg, guard, scope, id, shown.id, rateVisibleOn, summary.appId),
     countVersionSteps(cfg, guard, scope, shown.id),
     countProcessComments(cfg, guard, scope, id),
     listSavings(cfg, guard, scope, { processId: id }),
@@ -1292,7 +1317,9 @@ export async function getProcess(
   // live rows — which is what makes moving it show the client's business as it
   // was rather than as it is. Without it the screen shows the live map, which is
   // the same thing as "as of today" and is worth one fewer read.
-  const steps = opts.asOf ? await mapAsOf(cfg, guard, scope, id, opts.asOf) : liveSteps
+  const steps = opts.asOf
+    ? await mapAsOf(cfg, guard, scope, id, opts.asOf, rateVisibleOn, summary.appId)
+    : liveSteps
   return {
     process: summary,
     versions,
@@ -1371,7 +1398,9 @@ export async function listProcessSteps(
   guard: MemberGuard,
   scope: AccountScope,
   processId: string,
-  versionId?: string
+  versionId?: string,
+  rateVisibleOn?: Set<string> | null,
+  appId?: string
 ): Promise<ProcessStep[]> {
   const fence = accountScopeClause(scope, "s.account_id")
   // WHICH VERSION, said once — the one asked for, or the newest.
@@ -1414,7 +1443,7 @@ export async function listProcessSteps(
             s.seconds_per_run, s.runs_per_month, s.frequency_period, s.removed_at,
             s.client_role_id, r.name AS role_name, s.role_cents_per_hour,
             s.client_tool_id, t.name AS tool_name, t.mark AS tool_mark,
-            s.branch_label, s.loops_back_to
+            s.branch_label, s.loops_back_to, s.account_id
        FROM process_steps s
        LEFT JOIN client_roles r ON r.id = s.client_role_id
        LEFT JOIN client_tools t ON t.id = s.client_tool_id
@@ -1443,7 +1472,7 @@ export async function listProcessSteps(
     roleId: r.client_role_id,
     roleName: r.role_name,
     // FROZEN, off the step. See the note on the column.
-    roleCentsPerHour: r.role_cents_per_hour,
+    roleCentsPerHour: withheldRate(rateVisibleOn, appId) ? null : r.role_cents_per_hour,
     toolId: r.client_tool_id,
     toolName: r.tool_name,
     toolMark: r.tool_mark,
@@ -1816,7 +1845,12 @@ export async function mapAsOf(
   guard: MemberGuard,
   scope: AccountScope,
   processId: string,
-  on: string
+  on: string,
+  /** WHICH APPS THIS CALLER MAY SEE AN HOURLY COST ON — `null` = no restriction
+   * (a staff caller). Threaded in rather than resolved here so ONE decision
+   * covers every reader on the screen; see getProcess. */
+  rateVisibleOn?: Set<string> | null,
+  appId?: string
 ): Promise<ProcessStep[]> {
   const fence = accountScopeClause(scope, "r.account_id")
   const rows = await d1Query<{
@@ -1880,7 +1914,7 @@ export async function mapAsOf(
     removed: r.removed === 1,
     roleId: r.client_role_id,
     roleName: r.role_name,
-    roleCentsPerHour: r.role_cents_per_hour,
+    roleCentsPerHour: withheldRate(rateVisibleOn, appId) ? null : r.role_cents_per_hour,
     toolId: r.client_tool_id,
     toolName: r.tool_name,
     toolMark: r.tool_mark,
@@ -2195,7 +2229,13 @@ export async function removeStep(
   // the timeline at all.
   await writeRevision(cfg, guard, actor, {
     processId: before.processId,
-    accountId: null,
+    // ITS OWNER, NOT NULL. A revision written without an account is invisible to
+    // the one person entitled to it: mapAsOf and revisionDates both fence on
+    // account_id, and `NULL IN (…)` is never true — so a client's slider went on
+    // showing a removed step running at its old duration for ever, and the day it
+    // stopped was not a stop on the slider. It fails closed, which is why nothing
+    // shouted; it is still a row hidden from its owner.
+    accountId: before.accountId,
     stepKey: before.stepKey,
     name: before.name,
     description: before.description,
@@ -2846,6 +2886,7 @@ async function stepOrThrow(
   toolId: string | null
   branchLabel: string | null
   loopsBackTo: string | null
+  accountId: string | null
 }> {
   const fence = accountScopeClause(scope, "s.account_id")
   const rows = await d1Query<{
@@ -2865,6 +2906,7 @@ async function stepOrThrow(
     client_tool_id: string | null
     branch_label: string | null
     loops_back_to: string | null
+    account_id: string | null
   }>(
     cfg,
     guard.databaseId,
@@ -2878,7 +2920,7 @@ async function stepOrThrow(
     `SELECT s.id, s.process_id, s.version_id, s.step_key, s.name, s.description, s.position,
             s.seconds_per_run, s.runs_per_month, s.frequency_period, s.client_role_id,
             r.name AS role_name, s.role_cents_per_hour, s.client_tool_id,
-            s.branch_label, s.loops_back_to
+            s.branch_label, s.loops_back_to, s.account_id
        FROM process_steps s
        LEFT JOIN client_roles r ON r.id = s.client_role_id
        ${where([fence.sql, "s.id = ?"])} LIMIT 1`,
@@ -2903,6 +2945,7 @@ async function stepOrThrow(
     toolId: r.client_tool_id,
     branchLabel: r.branch_label,
     loopsBackTo: r.loops_back_to,
+    accountId: r.account_id,
   }
 }
 
@@ -2962,6 +3005,7 @@ export async function listProcessLinks(
   processId: string
 ): Promise<{ id: string; processId: string; name: string; note: string | null; direction: "to" | "from" }[]> {
   const fence = accountScopeClause(scope, "l.account_id")
+  const joined = accountScopeClause(scope, "p.account_id")
   const rows = await d1Query<{
     id: string
     other_id: string
@@ -2972,15 +3016,20 @@ export async function listProcessLinks(
     cfg,
     guard.databaseId,
     // R14 hard cap — a map connects to a handful of others, not thousands.
+    // THE JOINED TABLE CARRIES THE FENCE TOO. Fencing `l.account_id` alone says
+    // nothing about the row the join reaches — and a link written across two
+    // clients (which the write now refuses, but historic rows may exist) would
+    // hand back the other client's process name through a query that looked
+    // fenced. A fence on the outer row is not a fence on the answer.
     `SELECT l.id, p.id AS other_id, p.name AS other_name, l.note, 'to' AS direction
        FROM process_links l JOIN processes p ON p.id = l.to_process_id
-      ${where([fence.sql, "l.from_process_id = ?", "p.deactivated_at IS NULL"])}
+      ${where([fence.sql, joined.sql, "l.from_process_id = ?", "p.deactivated_at IS NULL"])}
       UNION ALL
      SELECT l.id, p.id, p.name, l.note, 'from'
        FROM process_links l JOIN processes p ON p.id = l.from_process_id
-      ${where([fence.sql, "l.to_process_id = ?", "p.deactivated_at IS NULL"])}
+      ${where([fence.sql, joined.sql, "l.to_process_id = ?", "p.deactivated_at IS NULL"])}
       ORDER BY other_name ASC LIMIT ${LIST_HARD_CAP}`,
-    [...fence.params, processId, ...fence.params, processId]
+    [...fence.params, ...joined.params, processId, ...fence.params, ...joined.params, processId]
   )
   return rows.map((r) => ({
     id: r.id,
@@ -3004,6 +3053,19 @@ export async function linkProcesses(
     throw new GuardError(400, "same_process", "A process can't be connected to itself.")
   const from = await processOrThrow(cfg, guard, scope, input.fromProcessId)
   const to = await processOrThrow(cfg, guard, scope, input.toProcessId)
+  // BOTH ENDS MUST BE THE SAME CLIENT'S. `processOrThrow` proves each id is
+  // inside the CALLER's scope, which for a staff member is every client — so it
+  // never compared them to each other. Connecting client X's map to client Y's
+  // wrote a row owned by X, and a contact at X then read Y's process NAME out of
+  // their own map's links. The same check waves.ts makes on a sprint, and
+  // roleInScopeOrThrow makes on a role: reaching two rows is not the same as
+  // their belonging together.
+  if (from.accountId !== to.accountId)
+    throw new GuardError(
+      400,
+      "wrong_client",
+      "Those two process maps belong to different clients, so they can't be connected."
+    )
   const id = ulid()
   try {
     await insertRow(cfg, guard, "process_links", {
