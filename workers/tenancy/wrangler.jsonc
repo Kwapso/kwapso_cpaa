@@ -10,6 +10,17 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
+  // SMART PLACEMENT — run this worker NEAR THE DATABASE rather than near the
+  // caller. Measured on staging, 25 Aug 2026: one screen made eight team-database
+  // trips at about 150ms each, because the database is in APAC and the worker ran
+  // wherever the reader was. A native binding removes the API round trip; it does
+  // not remove the distance.
+  //
+  // It is safe HERE and would not be on a gateway: this worker is reached through
+  // a service binding and serves no assets, so nothing a person waits on is being
+  // moved away from them. The gateway stays at the edge and crosses the world
+  // ONCE, instead of once per read.
+  "placement": { "mode": "smart" },
   "d1_databases": [
     {
       "binding": "DB",
@@ -60,6 +71,17 @@
       "workers_dev": false,
       "preview_urls": false,
       "observability": { "enabled": true },
+      // SMART PLACEMENT — run this worker NEAR THE DATABASE rather than near the
+      // caller. Measured on staging, 25 Aug 2026: one screen made eight team-database
+      // trips at about 150ms each, because the database is in APAC and the worker ran
+      // wherever the reader was. A native binding removes the API round trip; it does
+      // not remove the distance.
+      //
+      // It is safe HERE and would not be on a gateway: this worker is reached through
+      // a service binding and serves no assets, so nothing a person waits on is being
+      // moved away from them. The gateway stays at the edge and crosses the world
+      // ONCE, instead of once per read.
+      "placement": { "mode": "smart" },
       "d1_databases": [
         {
           "binding": "DB",

@@ -43,6 +43,12 @@ export type D1Rest = {
    * handler had to change to be measured. Absent = nobody asked, and the door
    * pays nothing. */
   stats?: { op: string; ms: number }[]
+  /** WHERE A NEW TEAM DATABASE IS BORN — a Cloudflare primary-location hint.
+   * Set from `D1_LOCATION` where a deployment sets it; `weur` otherwise. It is
+   * on the config rather than passed at the one call site because a database
+   * that lands in the wrong region cannot be moved, and a default that lives
+   * beside the door is one nobody has to remember to pass. */
+  location?: string
 }
 
 type CfResponse<T> = {
@@ -162,12 +168,36 @@ async function cfRaw<T>(
   throw lastError
 }
 
-/** Create a brand-new D1 database; returns its database id. */
+/** WHERE A NEW TEAM'S DATABASE SHOULD LIVE.
+ *
+ * Measured on staging, 25 Aug 2026: the team database had been created with no
+ * hint and Cloudflare put it in APAC, while the workers and the core database
+ * are in WEUR. Every team read then crossed the planet — about 150ms a trip,
+ * NATIVE BINDING OR NOT, because a binding removes the API round trip and not
+ * the distance. Eight trips on one screen is the second the owner was feeling.
+ *
+ * So the region is ASKED FOR rather than left to chance. `weur` is the default
+ * because that is where this deployment's core database and its people are; a
+ * deployment elsewhere sets `D1_LOCATION` and every team it makes follows.
+ *
+ * It only decides where a database is BORN — D1 cannot be moved afterwards,
+ * which is exactly why getting it right at creation matters more than it looks. */
+const DEFAULT_D1_LOCATION = "weur"
+
+/** Create a brand-new D1 database; returns its database id.
+ *
+ * `location` is a Cloudflare primary-location hint (`weur`, `enam`, `apac`, …).
+ * Omitted, it takes the deployment's default rather than whatever colo the
+ * creating request happened to land in. */
 export async function d1CreateDatabase(
   cfg: D1Rest,
-  name: string
+  name: string,
+  location?: string
 ): Promise<string> {
-  const result = await cf<{ uuid: string }>(cfg, "/d1/database", { name })
+  const result = await cf<{ uuid: string }>(cfg, "/d1/database", {
+    name,
+    primary_location_hint: location || cfg.location || DEFAULT_D1_LOCATION,
+  })
   return result.uuid
 }
 
