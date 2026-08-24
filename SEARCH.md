@@ -232,10 +232,10 @@ and where that ordering is decided.
 
 | Where | What is drawn | Order decided by |
 | --- | --- | --- |
-| **Six paged list screens** — accounts, tickets, the knowledge base, process maps, the backlog, the diary | recipe → `CollectionFrame` (+ a table on the diary's *All*) | **the DOOR**, `<PagedFind sorts=…>` · five to six named orders each |
+| **Six paged list screens** — accounts, tickets, the knowledge base, process maps, the backlog, the meetings list | recipe → `CollectionFrame` (+ a table on the meetings list's *All*) | **the DOOR**, `<PagedFind sorts=…>` · five to six named orders each |
 | **Eight bounded list recipes** — members, roles, invites, sprints, apps, tasks, the brand library, meeting purposes | recipe → `CollectionFrame` | **the browser**, honestly: the whole collection is loaded. Options are DERIVED from the recipe's own first field + surviving facets (`frameSortOptions`), so a new column brings its own sort and a list with one sortable column gets no control at all |
-| **The two tables** — Tasks (all views but Calendar), the diary's *All* | recipe `display:"table"` → the host's `RecordTable` (`web/components/record-table.tsx`) | by **clicking a column header**, and *which side* decides follows the same split as the search box: Tasks is BOUNDED so the browser orders all of it; the diary PAGES so a header asks the DOOR, through the same `found.order` handle the picker above the table holds. A header REPLACES the door's default order (asc → desc → back to it). Two of the diary's six columns (App, Where) have no name in `MEETING_SORTS`, so they draw a plain header rather than a control that cannot work. **Corrected 2026-08-18** — see below |
-| **Three calendars** — sprints, tasks, the diary | `CalendarView` | **not sortable, and must not be**: a month grid is ordered by the calendar |
+| **The two tables** — Tasks (all views but Calendar), the meetings list's *All* | recipe `display:"table"` → the host's `RecordTable` (`web/components/record-table.tsx`) | by **clicking a column header**, and *which side* decides follows the same split as the search box: Tasks is BOUNDED so the browser orders all of it; the meetings list PAGES so a header asks the DOOR, through the same `found.order` handle the picker above the table holds. A header REPLACES the door's default order (asc → desc → back to it). Two of the meetings list's six columns (App, Where) have no name in `MEETING_SORTS`, so they draw a plain header rather than a control that cannot work. **Corrected 2026-08-18** — see below |
+| **Three calendars** — sprints, tasks, the meetings list | `CalendarView` | **not sortable, and must not be**: a month grid is ordered by the calendar |
 | **Activity feeds** (every record's Activity tab, the team feed, account activity, assistant usage) | `ActivityFeed` | **not sortable**: a chronological history whose order IS its meaning. The profile screen's own feed runs oldest-first deliberately |
 | **Conversations** — a ticket's thread, a process's comments, the assistant's chat | `TicketThread` / `Comments` / `AgentChat` | **not sortable**: reordering a conversation destroys it |
 | **Ordered things** — a process's steps and versions, an import plan's steps, the assistant's run steps and numbered flows, knowledge passages + citations, the ticket-stage bars | bespoke | **not sortable**: the sequence is the content. A process's step order IS the process; an import's table order is a dependency order; the stage bars are the lifecycle's order and never the tally's, so they stay readable week to week |
@@ -288,7 +288,7 @@ see the correction above.)
   both values are already numbers, so any column whose value is a *rendered* date
   sorted alphabetically — April before January, and 2019 between 2018 and 2020
   only by luck. Three columns did this: **Deadline** and **Closed** on Tasks, and
-  **When** on the diary's *All*. They now render through `formatDateSortable`
+  **When** on the meetings list's *All*. They now render through `formatDateSortable`
   ("2026-04-14"), which is the same trade `formatActivityWhen` already made in
   this app and for the same reason: the value being compared IS the value being
   shown, so the one whose job is to be compared is the one that gives.
@@ -300,7 +300,7 @@ see the correction above.)
   "4 · Do it now", so the leading digit makes lexical order equal numeric order.
   It works; it would stop working at ten levels.
 - **Correct all along**: every text column — Task, Who has it, App, Client,
-  Important, Urgent, and the diary's title/client/purpose/where/status/notes.
+  Important, Urgent, and the meetings list's title/client/purpose/where/status/notes.
 - **Not broken at all, and this is the one to be careful about**: on the Tasks
   *Overdue* tab, Priority reads "1 · Whenever" on every row, Department reads "—"
   on every row and Who-has-it reads "Nobody yet" on every row. Sorting a column
@@ -356,7 +356,7 @@ that looked like it had already been dealt with.
 - **Two facets were REMOVED rather than wired**, because an offered filter that
   cannot be honoured must not be shown. Tickets' Status select went: the sub-tab
   strip above it already narrows the same field at the door, and two controls on
-  one field is the clutter the accounts screen took away. The diary's
+  one field is the clutter the accounts screen took away. The meetings list's
   "Cancelled" went from its Status facet: cancelled is `active = 0` rather than a
   status, and the meetings door parses no such parameter.
 
@@ -370,7 +370,7 @@ parameters, which is where every one of them is answered from today.
 | --- | --- | --- |
 | **Accounts** | none, moved in August | `status` (the team's own words, from the loaded rows) · `archived` · the All / Companies / People strip as `type` |
 | **The knowledge base** | `kind` · `filed` · `state` | `kind` (all eighteen, a closed vocabulary the door allow-lists) · `compartment` · `active`, **NEW at the door** |
-| **The diary** | `client` · `purpose` · `state` | `accountId` · `purposeId` · `status`, two words rather than three, see below |
+| **The meetings list** | `client` · `purpose` · `state` | `accountId` · `purposeId` · `status`, two words rather than three, see below |
 | **Process maps** | `app` · `archived` | `appId` · `archived`, **NEW at the door** |
 | **The backlog** | `status` · `assignee` · `sprint` · `app` | `status` · `assigneeId` · `sprintId` · `appId`, all four already parsed and none asked |
 | **Tickets** | `status` | **none, and that is the fix**: the sub-tab strip already narrows stage and kind at the door |
@@ -400,7 +400,7 @@ of the five turns the build red.
   search/filters when a list is empty or a facet has no options). See
   UI-CONVENTIONS §6.
 - **Layer 2 (server-side query)**: SHIPPED 2026-08-17 for every PAGED collection,
-  accounts, tickets, the knowledge base, the backlog, the diary and the process
+  accounts, tickets, the knowledge base, the backlog, the meetings list and the process
   maps all search through their own door (`?q=`), and the accounts screen's three
   filters (type / status / archived) are door filters too, so the filtered count
   moves with them. Two doors learned `q` in the same change (tickets, stories);

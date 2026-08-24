@@ -69,6 +69,12 @@ export const IDS = {
    * burglar who can read it knows what that business runs on. */
   victimModule: "AM_VICTIM",
   victimProcess: "PR_VICTIM",
+  // The victim's own organisation: what an hour costs them, and what they pay
+  // for the tool a step uses. Two of the most valuable rows here to a rival.
+  victimDepartment: "CD_VICTIM",
+  victimRole: "CR_VICTIM",
+  victimTool: "CT_VICTIM",
+  victimToolPrice: "CTP_VICTIM",
   victimVersion: "PV_VICTIM",
   victimStep: "PS_VICTIM",
   victimComment: "PC_VICTIM",
@@ -95,6 +101,10 @@ export const VICTIM_IDS = [
   IDS.victimApp,
   IDS.victimModule,
   IDS.victimProcess,
+  IDS.victimDepartment,
+  IDS.victimRole,
+  IDS.victimTool,
+  IDS.victimToolPrice,
   IDS.victimVersion,
   IDS.victimStep,
   IDS.victimComment,
@@ -241,6 +251,23 @@ export function buildSpineDb(): DatabaseSync {
       VALUES ('${IDS.victimStep}', '${IDS.victimProcess}', '${IDS.victimVersion}', '${IDS.victimAccount}', 'SK_VICTIM', 'Check it against the order', 0, 2400, 20, '2026-02-01', '${IDS.staffUser}');
     INSERT INTO process_comments (id, process_id, account_id, body, is_staff, created_at, creator_id, creator_name)
       VALUES ('${IDS.victimComment}', '${IDS.victimProcess}', '${IDS.victimAccount}', 'Bergman asked whether the check can be skipped for repeat suppliers', 0, '2026-02-02', '${IDS.victimUser}', 'Marta Ruiz');
+
+    -- THE VICTIM'S OWN ORGANISATION. A role carries what an hour costs Bergman
+    -- and a tool carries what Bergman pays for it — two of the most valuable
+    -- things in this database to a competitor, which is exactly why the
+    -- burglaries below reach for them by id.
+    INSERT INTO client_departments (id, account_id, name, created_at, creator_id)
+      VALUES ('${IDS.victimDepartment}', '${IDS.victimAccount}', 'Bergman accounts payable', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO client_roles (id, account_id, name, cents_per_hour, created_at, creator_id)
+      VALUES ('${IDS.victimRole}', '${IDS.victimAccount}', 'Bergman dispatch clerk', 3800, '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO client_role_departments (id, role_id, department_id, created_at, creator_id)
+      VALUES ('RD_VICTIM', '${IDS.victimRole}', '${IDS.victimDepartment}', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO client_role_people (id, role_id, person_account_id, created_at, creator_id)
+      VALUES ('RP_VICTIM', '${IDS.victimRole}', '${IDS.victimPerson}', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO client_tools (id, account_id, name, mark, created_at, creator_id)
+      VALUES ('${IDS.victimTool}', '${IDS.victimAccount}', 'Bergman HubSpot', '🧲', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO client_tool_prices (id, tool_id, cents, billing_period, effective_on, created_at, creator_id)
+      VALUES ('${IDS.victimToolPrice}', '${IDS.victimTool}', 24000, 'month', '2026-01-01', '2026-02-01', '${IDS.staffUser}');
   `)
 
   // REAL HISTORY on the victim's world. Without it the activity burglaries pass

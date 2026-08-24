@@ -149,6 +149,25 @@ Today it covers:
     `list_process_comments`, `read_impact`, `list_account_rates`,
     `list_story_attachments`, `add_story_link`, `remove_story_attachment`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
+  - **the client's own organisation** — who does the work at a client, what an
+    hour of them costs, and what they run on. `list_client_departments`,
+    `create_client_department`, `update_client_department`,
+    `set_client_department_active`; `list_client_roles`, `create_client_role`,
+    `update_client_role`, `set_client_role_person`, `set_client_role_active`;
+    `list_client_tools`, `list_client_tool_prices`, `create_client_tool`,
+    `update_client_tool`, `set_client_tool_price`, `set_client_tool_active`.
+    They are on this surface because a saving is only MONEY once a step's
+    minutes meet a role's hourly cost — an assistant asked "what would
+    automating this save Bergman" has to be able to read and fill these.
+    Three things are worth knowing before you call them. A ROLE can sit in
+    SEVERAL departments, and `departmentIds` on `update_client_role` is the
+    WHOLE set rather than an addition — anything you leave out is removed. A
+    PERSON on a role is a contact you already have, never a new record. And a
+    TOOL's price is DATED: `set_client_tool_price` files an amount under the day
+    it started being true, `list_client_tools` takes `asOf` to read the price in
+    force on a given day, and `list_client_tool_prices` is the whole history —
+    which is what lets a map set to March cost March correctly instead of
+    rewriting it with today's number.
   - what we hand over on a system, `list_deliverables` (`appId` names the app
     whose handover shelf you want; `id` narrows to one row). The CLIENT's own
     view of the same shelf is a separate door on the portal and is deliberately
@@ -190,7 +209,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **235 doors, 188 with a tool, 47 with a written reason**, the
+  red build. Today: **250 doors, 203 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -209,7 +228,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 188, **164 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 203, **179 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
 
@@ -218,7 +237,7 @@ Today it covers:
   that WROTE to Google Calendar (create an event, change what it says and when,
   its guests, its location, call it off, push a sprint's dates, push a meeting's)
   and `POST /api/content/meetings/held`. The calendar is one-way now — kwapso
-  reads a diary and never writes one — and a meeting's own start time says
+  reads a calendar and never writes one — and a meeting's own start time says
   whether it has happened, so a status somebody had to tick was a second source
   of truth for a question the clock answers. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -392,7 +411,7 @@ Today it covers:
     both on `meetings:read`: the WORDS of a call, kept on the record so any
     colleague who may read meetings can read them, and which of the addresses on
     the invitation are our own members or contacts on our accounts.
-    `sync_calendar_series` reads the caller's Google Calendar INTO the diary, one
+    `sync_calendar_series` reads the caller's Google Calendar INTO Meetings, one
     way, always. Over a LIVE window reaching a fortnight back and four weeks
     forward: every entry with no record becomes one, repeating or not, past or
     future; every meeting in the window has its Google facts refreshed (the
@@ -434,7 +453,7 @@ Today it covers:
     slice at a time (call it while `caughtUp` is false); the 15-minute sweep does the
     same unattended. `sync_google_knowledge` does the same for the Google material
     the CALLER has already connected — their own Drive folders, the mail with a
-    known contact, their diary — acting as that person and gated `knowledge:create`
+    known contact, their calendar — acting as that person and gated `knowledge:create`
     **and** `google:read`. Read the Google paragraph below before you use it: it is
     the ONE tool on this surface that touches Google at all.
 
@@ -575,7 +594,7 @@ allowance while doing so.
 **The calendar is not on that list in either direction, because nothing writes to
 it any more.** Six calendar tools sat in the assistant's set and a seventh,
 `add_meeting_to_calendar`, was the one write tool on THIS surface. All seven went
-on 18 August 2026 with the doors under them: kwapso reads a diary and never writes
+on 18 August 2026 with the doors under them: kwapso reads a calendar and never writes
 one. The open question this section used to hold — whether pushing a meeting from
 a machine was right when pushing a sprint was assistant-only — is answered by
 neither being possible. `google_calendar_events` and `google_meeting_transcript`
@@ -587,7 +606,7 @@ belongs in front of you rather than in a catalogue you skim:
 
 - **`sync_google_knowledge`** does not browse Google, but it does READ it: gated
   `knowledge:create` **and** `google:read`, it sweeps the caller's own connected
-  Drive folders, the mail with a known contact and their diary into the knowledge
+  Drive folders, the mail with a known contact and their calendar into the knowledge
   base, from which `ask_knowledge`, also on this surface, hands the passages back.
   A leaked token therefore reaches its OWN owner's Google material by that route,
   which is narrower than the browse tools (nobody else's account, no send, no
@@ -605,7 +624,7 @@ named folder, a draft, an event. The event half is gone (the calendar is
 read-only); it can now also rewrite a file, make a folder,
 file a message or a whole conversation into Drive as a readable document, reply
 inside a thread, put a Gmail label on a message or take it off, list every Chat
-space the person can see, and reach a meeting's transcript from the diary entry
+space the person can see, and reach a meeting's transcript from the calendar event
 rather than by already knowing which document it is. It could once change an
 event's title, times, guests or location and call one off; it cannot, because the
 calendar is read-only in this product. Two of those tools exist only so the

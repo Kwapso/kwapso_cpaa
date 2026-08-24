@@ -35,9 +35,9 @@
 //
 // ── A HEADER REPLACES THE ORDER, IT DOES NOT REFINE IT ────────────────────────
 //
-// The doors order deliberately — tasks come back priority-first, the diary comes
-// back newest-first — and the question was whether a column header should sort
-// WITHIN that or instead of it. It replaces it, and the bug report is the
+// The doors order deliberately — tasks come back priority-first, the meetings
+// list comes back newest-first — and the question was whether a column header
+// should sort WITHIN that or instead of it. It replaces it, and the bug report is the
 // argument: what the owner was looking at when he said the sort was broken was
 // 80 tasks ascending by deadline with one priority-4 row pinned above them,
 // which is exactly what "sort within the door's order" looks like from a chair.
@@ -52,7 +52,7 @@
 //
 //   • BOUNDED (Tasks) — the whole collection is in the browser, so ordering it
 //     here is honest and free. Pass no `order` and this owns it.
-//   • PAGED (the diary's All) — the browser holds page one, so ordering it here
+//   • PAGED (the meetings list's All) — the browser holds page one, so ordering it here
 //     would arrange fifty of 254 rows and call the result sorted. Pass the
 //     `order` off `<PagedFind>` and a header click becomes a question for the
 //     DOOR, landing in its own cache key at page one like every other one.
@@ -195,7 +195,7 @@ export function RecordTable<T extends TableRowData>({
    * collection arrived in. Three presses, three different lists.
    *
    * Written as "away from the column's own default, then off" rather than
-   * "asc, desc, off" because of the diary: it opens ordered by When, newest
+   * "asc, desc, off" because of the meetings list: it opens ordered by When, newest
    * first, so a fixed asc→desc→off cycle would spend its third press putting the
    * screen back into the state it was already in. A dead press on a control that
    * just worked twice is how somebody decides it is unreliable. */

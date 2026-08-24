@@ -12,7 +12,7 @@
 // four are one suite because they are one fault repeated: A BOUNDED READ THAT
 // DOES NOT SAY IT IS BOUNDED, and its twin, A FIND THAT WAS NEVER CHECKED.
 //
-//   1. THE DIARY STOPPED AT FIFTY. `calendarList` asked for one page and never
+//   1. THE CALENDAR STOPPED AT FIFTY. `calendarList` asked for one page and never
 //      looked at `nextPageToken`. Unlike Drive, Gmail and Chat — which are read
 //      newest-first, so their tail is the material nobody wants — the calendar
 //      is ordered by START TIME. Its tail is TOMORROW. A fortnight with
@@ -60,7 +60,7 @@ function stubGoogle(reply: (url: string) => unknown) {
 
 const event = (id: string) => ({ id, summary: id, start: { dateTime: "2026-08-18T09:00:00Z" } })
 
-describe("the diary is read to the END of the window, not to the end of a page", () => {
+describe("the calendar is read to the END of the window, not to the end of a page", () => {
   it("walks Google's pages and returns every entry, not the first fifty", async () => {
     const { urls } = stubGoogle((url) =>
       url.includes("pageToken=P2")
@@ -106,7 +106,7 @@ describe("the diary is read to the END of the window, not to the end of a page",
     expect(window.events).toHaveLength(urls.length)
     expect(said.join(" ")).toContain("truncated")
     // AND IT SAYS SO TO THE CALLER, not only to the log. The backfill walk moves
-    // a cursor over years of diary; a truncated slice it could not see would be
+    // a cursor over years of calendar; a truncated slice it could not see would be
     // a hole that closes behind it for ever.
     expect(window.truncated).toBe(true)
   })

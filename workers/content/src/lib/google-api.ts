@@ -26,7 +26,7 @@
 //
 // One page is the ceiling for Drive, Gmail and Chat, where the order is "newest
 // first" and the tail is genuinely the material nobody is asking about. The
-// DIARY is the exception and it was found the hard way: it is ordered by start
+// CALENDAR is the exception and it was found the hard way: it is ordered by start
 // time, so its tail is TOMORROW, and a busy fortnight silently lost the far end
 // of the window. It walks up to CALENDAR_MAX_PAGES and says so in the tail when
 // it stops early — a bounded read that drops rows without saying so is exactly
@@ -1484,7 +1484,7 @@ export type EventGuest = {
 }
 
 /**
- * A FILE HANGING OFF A DIARY ENTRY — an agenda doc, a deck, and the one this
+ * A FILE HANGING OFF A CALENDAR EVENT — an agenda doc, a deck, and the one this
  * whole lane turns on: the transcript Google Meet files against the event once
  * the call is over.
  *
@@ -1545,7 +1545,7 @@ export type CalendarEvent = {
   status: string
   /** The Google Meet code on the entry (`abc-defg-hij`), or "". It is how a
    * meeting's own recordings and transcripts are named, so it is the thread from
-   * a diary entry to what was said in the room. */
+   * a calendar event to what was said in the room. */
   meetingCode: string
   /** THE SERIES THIS INSTANCE BELONGS TO, or "" for a one-off (CHECKLIST 9.7).
    *
@@ -1570,11 +1570,11 @@ export type CalendarEvent = {
  * read that stops at fifty is a bounded cost, whoever sent the invitation. It
  * used to do double duty as a WRITE ceiling too — the guest-list rewrite would
  * rather refuse than silently uninvite everybody past the cap — and that half
- * went with the writes: this product no longer changes anybody's diary. */
+ * went with the writes: this product no longer changes anybody's calendar. */
 const EVENT_ATTENDEE_CAP = 50
 
 /**
- * A WINDOW OF THE DIARY — AND THE ONLY WAY THIS PRODUCT TOUCHES A CALENDAR.
+ * A WINDOW OF THE CALENDAR — AND THE ONLY WAY THIS PRODUCT TOUCHES IT.
  *
  * ONE-WAY, ON PURPOSE AND BY THE OWNER'S INSTRUCTION (18 Aug 2026): "just
  * remember we want a one-way sync of whatever is in Google Calendar… anything in
@@ -1606,7 +1606,7 @@ const EVENT_ATTENDEE_CAP = 50
  *
  * `showDeleted` is off by default and ON for the re-sync (see syncCalendar in
  * lib/meetings.ts). With `singleEvents=true` a cancelled instance simply is not
- * in the window unless it is asked for, so a diary that never asks can never
+ * in the window unless it is asked for, so a calendar that never asks can never
  * learn that Tuesday's call was called off — it only ever sees the entry stop
  * being returned, which is indistinguishable from the window having moved.
  */
@@ -1632,12 +1632,12 @@ export async function calendarList(
   }
   // THE CAP WAS REACHED AND GOOGLE STILL HAS MORE. The one case this whole
   // function exists to stop being silent about — said in the tail, with the
-  // window rather than the query string, because a diary's contents are the
+  // window rather than the query string, because a calendar's contents are the
   // person's and the dates are ours.
   //
   // AND NOW IT IS SAID TO THE CALLER TOO, not only to the log. The backfill walk
   // in lib/meetings.ts advances a cursor over a window measured in YEARS, so a
-  // truncated slice it could not see would be a hole in the diary that closes
+  // truncated slice it could not see would be a hole in the calendar that closes
   // behind it for ever. `truncated` is what lets the walk stop at the last entry
   // it really read instead of at the date it hoped to reach.
   console.error(
@@ -1652,7 +1652,7 @@ export async function calendarList(
  * move a cursor past. */
 export type CalendarWindow = { events: CalendarEvent[]; truncated: boolean }
 
-/** HOW MANY PAGES OF ONE DIARY WINDOW THIS APP WILL WALK.
+/** HOW MANY PAGES OF ONE CALENDAR WINDOW THIS APP WILL WALK.
  *
  * R14, on the axis this file's header calls "the other one": a read that stops
  * at fifty is a bounded cost, and a read that stops at fifty WITHOUT SAYING SO
@@ -1662,7 +1662,7 @@ export type CalendarWindow = { events: CalendarEvent[]; truncated: boolean }
  * knows to look for.
  *
  * Five pages, so two hundred and fifty entries per window. The windows measured
- * on a real diary returned 43 and 21, so this is an order of magnitude of
+ * on a real calendar returned 43 and 21, so this is an order of magnitude of
  * headroom rather than a number anybody will meet; and the cost stays OURS
  * rather than being set by how busy somebody happens to be, which is the promise
  * the header makes on behalf of every list in this file. When it is met, the
@@ -1670,7 +1670,7 @@ export type CalendarWindow = { events: CalendarEvent[]; truncated: boolean }
 const CALENDAR_MAX_PAGES = 5
 
 /** ONE event, by its id — the read behind the transcript hunt, which starts at a
- * diary entry and needs that entry's own attachments. Nothing here writes: the
+ * calendar event and needs that entry's own attachments. Nothing here writes: the
  * calendar is READ-ONLY in this product (see the note above `calendarList`). */
 export async function calendarGet(token: string, eventId: string): Promise<CalendarEvent> {
   return toEvent(
@@ -2286,7 +2286,7 @@ const PRESENCE_PROBES: Record<
     goneWhen: (b) => (Array.isArray(b.labelIds) ? b.labelIds : []).includes("TRASH"),
   },
   // A cancelled event is the one of the three that is not deleted at all: Google
-  // keeps it and marks it off, which is exactly what `showDeleted` on the diary
+  // keeps it and marks it off, which is exactly what `showDeleted` on the calendar
   // sweep exists to see. Same fact, asked one event at a time.
   calendar: {
     url: (id) =>

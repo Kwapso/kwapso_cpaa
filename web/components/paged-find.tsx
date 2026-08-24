@@ -91,7 +91,7 @@ export type Found<T> = {
    * asked, so the screen falls back to its own list key. */
   listKey: string | null
   /** THE ORDER, and the handle that changes it — the DOOR's, so a control
-   * underneath this bar (a table's column headers, on the diary) changes the
+   * underneath this bar (a table's column headers, on the meetings list) changes the
    * same question the picker above does rather than arranging the page it can
    * see. Two controls, one state: neither can be showing an order the other one
    * moved away from. `set(null)` is "back to the order the door hands us", which

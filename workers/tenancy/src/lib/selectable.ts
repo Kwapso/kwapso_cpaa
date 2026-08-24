@@ -30,9 +30,24 @@ type Row = {
   name_de: string | null
   description: string | null
   standard_days: number | null
+  /** Selected by the single-row door only — `undefined` on a list row, which is
+   * how `toValue` tells the two apart (see DETAIL_COLUMNS). */
+  created_at?: string | null
+  creator_id?: string | null
+  creator_name?: string | null
 }
 
 const COLUMNS = "id, type, value, is_default, deactivated_at, mark, name_de, description, standard_days"
+
+/** THE SINGLE-ROW COLUMN LIST — `COLUMNS` plus the audit block the record footer
+ * shows. Deliberately not folded into `COLUMNS`: the list door answers a
+ * question about a VOCABULARY and nothing in a list of words asks who typed
+ * each one, so carrying two more columns for every value on every read (and on
+ * every mutation, which re-lists) would be paid by every screen to be spent by
+ * one. `creator_id` rides along because `creator_name` is a snapshot of the
+ * name at the time — a person who has since been renamed still reads correctly,
+ * and the id is what a future face would resolve through (R35). */
+const DETAIL_COLUMNS = `${COLUMNS}, created_at, creator_id, creator_name`
 
 function toValue(r: Row): SelectableValue {
   return {
@@ -45,6 +60,11 @@ function toValue(r: Row): SelectableValue {
     nameDe: r.name_de ?? null,
     description: r.description ?? null,
     standardDays: r.standard_days ?? null,
+    // Absent on a list row, present on a detail one — the two doors select
+    // different columns on purpose (see DETAIL_COLUMNS).
+    ...(r.created_at === undefined
+      ? {}
+      : { createdAt: r.created_at ?? null, createdByName: r.creator_name ?? null }),
   }
 }
 
@@ -83,7 +103,7 @@ export async function selectableOne(
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
-    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ? LIMIT 1`,
+    `SELECT ${DETAIL_COLUMNS} FROM selectable_data WHERE id = ? LIMIT 1`,
     [id]
   )
   return rows[0] ? toValue(rows[0]) : null

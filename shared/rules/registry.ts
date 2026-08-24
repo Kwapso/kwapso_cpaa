@@ -287,6 +287,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "offered-rights",
     status: "enforced",
   },
+  {
+    id: "R37",
+    dimension: "arch",
+    law: "A LINK INSIDE THE APP NEVER LEAVES THE SHELL. The whole post-auth app is ONE client-resolved shell that mounts once and never unmounts, so every move within it is a History-API push through the single soft-navigation bus (`softNavigate` / the host's `go()`) and nothing is fetched. A bare `<a href=\"/t/…\">` opts out of all of it: the browser discards the document, every module re-runs from nothing, the warm cache and any running agent are destroyed, and the boot mark plays again because the module-level session cache has reset to empty. So an in-app destination is written with `<InAppLink>` — a REAL anchor, so middle-click, copy-address and screen readers still work, with only the plain left click intercepted — or it carries that same interception inline. The check is a CENSUS OFF THE DISK of every component's anchors, classified by where the href points: inside the app, an `/api/` door, a pre-auth route, or elsewhere. Not a hand-list of files, and not one spelling of the mistake.",
+    why: "Earned three times, by one class of bug, under a green build each time. First the knowledge base, which was missing from `TOP_LEVEL_MODULES` so every tap on a sidebar page left the History API — the note is still in `deep-link/route.ts`. Then \"Manage dropdowns\", which the owner reported himself on 24 Aug 2026 in the words that name the mechanism exactly: \"I can see the app reload because I see the boot loading animation\" — and the boot mark's trigger is a module-level `sessionCache` that only a fresh document can reset. Then the internal rate card, whose own comment says it copied the dropdowns link, which is what turns a typo into a pattern. THE GUARD THAT EXISTED COULD NOT SEE TWO OF THE THREE: `shell-nav.test.ts` read SIX hand-listed files for ONE spelling (`router.push`), and a bare anchor in any of two hundred other components is a different spelling in a file nobody listed. That is R21's lesson arriving in a second module — enumerate by what NAVIGATES, never by what somebody remembered to write down — and it is why the seam is a component rather than a convention: a bare anchor is now a red build, and there is exactly one way to write the right thing.",
+    checkId: "in-app-anchors",
+    status: "enforced",
+  },
 ]
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back
@@ -411,6 +419,7 @@ export const GLOSSARY_SYNONYMS: { word: string; term: string; why: string }[] = 
   { word: "permissions", term: "permission", why: "the Roles screen headed a matrix \"Permissions\" while two other screens called the same thing an access right. The singular stays free: \"you don't have permission to\" is a sentence about an act, not a name for a record" },
   { word: "portal login", term: "portalAccess", why: "Portal access is the thing an admin grants and takes away; \"Portal login\" reads as the credential, which is not what the switch does" },
   { word: "cost card", term: "internalRate", why: "there are two rate cards in this product and neither is called a cost card — what our own hour costs us is the Internal rate, and what a client is charged is the Rate card (R24 keeps them apart in the code for the same reason)" },
+  { word: "diary", term: "meeting", why: "a conversation we have had or are about to have is a Meeting — the screen, the module and the glossary are all named after it; the same word was also standing in for Google's own calendar, a second and different thing this product only ever reads" },
   // ── …and the ones nobody has written yet, which is the cheaper half ───────
   { word: "user", term: "member", why: "the standard SaaS word for the person this app calls a Member. It has never appeared in either front door and this is what keeps it that way" },
   { word: "users", term: "member", why: "the plural of the above" },
@@ -849,6 +858,26 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
+  // THE CLIENT'S OWN ORGANISATION — departments, roles and tools. `null`, for
+  // the same reason as the six above and one of its own.
+  //
+  // The ROWS are theirs and the portal shows them (the owner ticked all four in
+  // round two: departments, the people against each role, their tools and what
+  // those cost). Their HISTORY is our record of OUR work on their company, and
+  // every line of it names a staff member — "Ana added the role Dispatch clerk",
+  // "Ana switched a tool off" — which is exactly the sentence SCOPE ch.06 says
+  // the portal never shows, and which the owner said again himself on 24 Aug
+  // 2026: "Never show our staff names to the customer! We are all kwapso."
+  //
+  // The one of its own: a role's history carries WHAT AN HOUR COSTS THEM, and
+  // those costs sit side by side across a company. Alaap's ruling on the rate
+  // being visible turned on precisely that — "everybody who is a stakeholder
+  // from the client side can see all the costs. They could just get to know each
+  // other's salary… so it's not advisable." A feed of rate changes is that
+  // disclosure with a timeline attached.
+  client_departments: { fence: null, why: "our record of shaping their org chart — every line names the staff member who typed it, and the departments themselves are readable in the portal" },
+  client_roles: { fence: null, why: "a role's history carries what an hour costs them, and those costs sit side by side across one company: a stakeholder reading the feed learns their colleagues' rates. The role and its people are shown; the trail of who set which number is not" },
+  client_tools: { fence: null, why: "a tool's price history is our working note about their spend — the tool and its current price are shown, the record of us revising it is ours" },
   // WHAT WE HANDED OVER. `null` — and THE DAY THIS LINE ANTICIPATED HAS COME, so
   // it is worth saying what changed and what did not.
   //
@@ -975,6 +1004,20 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_versions: "processes",
   process_steps: "processes",
   process_comments: "processes",
+  // THE CLIENT'S OWN ORGANISATION — who does the work, and what they use to do
+  // it. Same module as the map, because that is the only reason any of it
+  // exists: a role carries an hourly cost so a step's minutes can become money,
+  // and a tool carries a price so a step that replaces it can be subtracted. A
+  // person who may read a client's process map is exactly the person who may
+  // read "Ana added the role Dispatch clerk" — the sentence is about the map.
+  //
+  // THE COST ITSELF IS A DIFFERENT QUESTION and is answered elsewhere: what an
+  // hour costs the CLIENT is theirs and rides with the map; what an hour costs
+  // US is `internal_rates` above, on `commercials`, which a client login never
+  // holds (R24).
+  client_departments: "processes",
+  client_roles: "processes",
+  client_tools: "processes",
   // WHAT WE HANDED OVER on an app. Its OWN module and not `processes`, which is
   // the whole point of it being a module: "Ana handed over the Payroll API
   // reference" names a deliverable, and a role that may read the app but not its
@@ -1264,9 +1307,13 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "role-detail.permissions":
     "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
   "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
+  "selectable-detail.overview":
+    "one dropdown value's own fields — its group, its word, whether it is active, whether it is one of the defaults, and the four enrichments (emoji, German label, description, standard days). One record, not a collection. It is the R2 MINIMUM on purpose: a dropdown value has no collection hanging off it at all, so Overview + Activity is the whole record and the second tab is the only one that can carry a number.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, and the paragraph about it. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+  "account-detail.organisation":
+    "THREE collections on one tab — the client's departments, their roles and their tools — so there is no single number a badge could carry. R16 badges ONE collection's exact count, and a total across three would be an arithmetic nobody asked for: 'this client has 11 things' answers no question. Each list carries its own heading, and a role row carries its own department and holder chips, which is where the counting actually happens. The tab exists at all because a role is what turns a process map's minutes into money — see the panel's own note.",
   "account-detail.impact":
     "what this client's apps have given back: the hours, their step-by-step derivation, and the same hours in money. It is one ARITHMETIC, not a set of rows — the steps under it are the workings of a single figure, so a count on the tab would number the sum's terms rather than anything a person asked for. It sat at the bottom of Overview until 19 Aug 2026, under the cover, eight fields and the About, which is where the headline number of the whole product had been living.",
   "account-detail.knowledge":

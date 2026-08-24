@@ -222,10 +222,16 @@ export async function getHelpThread(request: Request, env: Env): Promise<Respons
   const scope = await callerScope(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
-  return json({
-    replies: await listReplies(cfg, guard, scope, id),
-    total: await countReplies(cfg, guard, scope, id),
-  })
+  // TWO AWAITS IN ONE OBJECT LITERAL ARE SEQUENTIAL, not concurrent — JavaScript
+  // evaluates properties in order, so this shape reads as though both go at once
+  // and queues them instead. Each is a separate HTTPS request to the D1 REST
+  // API, and neither needs the other's answer, so the second was pure waiting.
+  // On the single most common action in the app: opening a ticket.
+  const [replies, total] = await Promise.all([
+    listReplies(cfg, guard, scope, id),
+    countReplies(cfg, guard, scope, id),
+  ])
+  return json({ replies, total })
 }
 
 /** POST /api/content/help — raise a ticket (help:create).
@@ -439,10 +445,12 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     replyBody,
     tagged
   )
-  return json({
-    replies: await listReplies(cfg, guard, scope, helpId),
-    total: await countReplies(cfg, guard, scope, helpId),
-  })
+  // The same pair, on the other most common action: sending a reply.
+  const [replies, total] = await Promise.all([
+    listReplies(cfg, guard, scope, helpId),
+    countReplies(cfg, guard, scope, helpId),
+  ])
+  return json({ replies, total })
 }
 
 /** POST /api/content/help/resolve — COME BACK TO THE CLIENT (help:edit).
@@ -603,11 +611,13 @@ export async function getHelpAttachments(request: Request, env: Env): Promise<Re
   const scope = await callerScope(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  // These are independent reads — one wait, not 2.
+  const [attachments, total] = await Promise.all([listAttachments(cfg, guard, scope, id), countAttachments(cfg, guard, scope, id)])
   return json({
-    attachments: await listAttachments(cfg, guard, scope, id),
+    attachments,
     // R16: the tab badge shows the door's exact COUNT(*), never the (capped)
     // list's length.
-    total: await countAttachments(cfg, guard, scope, id),
+    total,
   })
 }
 

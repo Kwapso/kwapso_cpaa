@@ -1105,7 +1105,7 @@ export const INGEST_KINDS: IngestKind[] = [
         recordDate: r.starts_at,
         // A row this app owns — it belongs to the team, not to one person.
         ownerUserId: null,
-        // The transcript where it lives, or the diary entry. Either is somewhere
+        // The transcript where it lives, or the calendar event. Either is somewhere
         // a person can go and check what the assistant just quoted.
         sourceUrl: r.transcript_url ?? r.google_event_url,
         retired: r.deactivated_at !== null,

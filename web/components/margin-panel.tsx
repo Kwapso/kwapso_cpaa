@@ -33,6 +33,7 @@ import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
 import { Banknote } from "lucide-react"
 
 import { tenancy } from "@/lib/api"
+import { InAppLink } from "@/components/in-app-link"
 import { marginKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { moneyText } from "@shared/web/money"
@@ -139,13 +140,13 @@ export function MarginPanel({
             you to the screen that owns the number rather than explaining where
             it is. */}
         {can("commercials", "edit") && (
-          <a
+          <InAppLink
             href={`/t/${teamId}/internal-rates`}
             className="text-muted-foreground hover:text-foreground mt-2 inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
           >
             <Banknote className="size-3" aria-hidden />
             {t("Change what our hour costs")}
-          </a>
+          </InAppLink>
         )}
         {down && (
           <p className="text-destructive mt-2 text-xs">

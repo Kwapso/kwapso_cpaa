@@ -64,11 +64,11 @@
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
 //   POST /api/content/knowledge/sync-google -> …and MY OWN Google material, as me
-//   GET  /api/content/meetings            -> the diary (?id → one; account/app/purpose/view/q filters)
-//   POST /api/content/meetings            -> put a meeting in the diary
+//   GET  /api/content/meetings            -> the meetings list (?id → one; account/app/purpose/view/q filters)
+//   POST /api/content/meetings            -> put a meeting on the meetings list
 //   POST /api/content/meetings/update     -> correct it / write the notes up
 //   POST /api/content/meetings/active     -> cancel it / put it back
-//   POST /api/content/meetings/sync-calendar -> read Google's diary into ours (one way)
+//   POST /api/content/meetings/sync-calendar -> read Google's calendar into Meetings (one way)
 //   GET  /api/content/deliverables        -> what we handed over on an app (?appId=, ?id → one)
 //   POST /api/content/deliverables[/update|/active] -> file / correct / archive one
 //   POST /api/content/deliverables/visibility -> show one to the client, or hide it
@@ -83,6 +83,7 @@
 
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
+import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
@@ -457,7 +458,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // databases. See routes/meetings.ts for why neither belongs on the row.
   "GET /api/content/meetings/transcript": { handler: getMeetingTranscript, kind: "read" },
   "GET /api/content/meetings/people": { handler: getMeetingPeople, kind: "read" },
-  // The diary, brought into step ONE WAY — Google's diary into ours. Every entry
+  // The meetings list, brought into step ONE WAY — Google's calendar into Meetings. Every entry
   // in the live window becomes a record or has its Google facts refreshed, one
   // cancelled in Google is called off here, and a resumable cursor walks the
   // REST of the calendar a slice at a time, so "everything in my calendar" is
@@ -606,7 +607,10 @@ export default {
       if (route === "GET /api/content/health") return json({ ok: true })
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such content action.")
-      return await def.handler(request, env)
+      // Measured on the way out — see timing.ts.
+      const res = await def.handler(request, env)
+      logIfSlow(request, route)
+      return withTiming(request, res)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("content worker error:", e)

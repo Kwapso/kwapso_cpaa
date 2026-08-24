@@ -10,6 +10,7 @@ import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { fail } from "./http"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
+import { beginD1Timing } from "./timing"
 import { requestId, traceHeaders } from "./trace"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
@@ -50,14 +51,50 @@ export class GuardError extends Error {
   }
 }
 
-/** The Cloudflare D1 REST config from a worker env (team DBs are reached over the
- * REST door). Throws cloud_key_missing if the token isn't set yet. */
+/** WHICH TEAM DATABASES THIS DEPLOYMENT CAN REACH DIRECTLY.
+ *
+ * A worker env carries a binding under a fixed name (`TEAM_DB_0`) and, beside
+ * it, a plain var naming the database that binding points at (`TEAM_DB_0_ID`).
+ * Two halves, because a D1 binding cannot be asked its own id at runtime and the
+ * data door routes by id — the id is what `requireMember` puts on the guard.
+ *
+ * PAIRED OR IGNORED. A binding whose `_ID` var is missing is skipped in silence
+ * at runtime rather than guessed at, because guessing would mean pointing a
+ * query at a database nobody named. The pairing is not left to hope: the
+ * `native-team-databases` check reads every wrangler config off disk and fails
+ * the build when a binding and its var disagree, or when either is alone. The
+ * runtime skip is the seatbelt; the check is the brake.
+ *
+ * An env with none of this behaves exactly as the app did before bindings
+ * existed — every team over the REST door — which is what makes it safe to add
+ * to one environment at a time. */
+export function nativeTeamDatabases(env: GatingEnv): Record<string, D1Database> {
+  const out: Record<string, D1Database> = {}
+  for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
+    const n = /^TEAM_DB_(\d+)$/.exec(key)
+    if (!n) continue
+    const id = (env as Record<string, unknown>)[`TEAM_DB_${n[1]}_ID`]
+    if (typeof id !== "string" || !id) continue
+    out[id] = value as D1Database
+  }
+  return out
+}
+
+/** The data-door config from a worker env. Team databases are reached DIRECTLY
+ * where this deployment holds a binding for them and over the Cloudflare REST
+ * door where it does not (see `natives` in d1-rest.ts). Throws
+ * cloud_key_missing if the REST token isn't set yet — still required, because
+ * the fall-through path and every database-management call go through it. */
 export function d1ConfigFrom(env: GatingEnv): D1Rest {
   if (!env.CF_D1_TOKEN)
     throw new Error(
       "cloud_key_missing: the Cloudflare D1 token isn't set yet, so team databases can't be reached."
     )
-  return { accountId: env.CF_ACCOUNT_ID, apiToken: env.CF_D1_TOKEN }
+  return {
+    accountId: env.CF_ACCOUNT_ID,
+    apiToken: env.CF_D1_TOKEN,
+    natives: nativeTeamDatabases(env),
+  }
 }
 
 /** How long a worker waits for auth to say who somebody is before it gives up.
@@ -170,9 +207,70 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // users row) — no need for a second native-DB read for the same value.
   if (!user.currentTeamId) throw new GuardError(409, "no_team", "No active team.")
 
-  const cfg = d1ConfigFrom(env)
+  // The config carries this request's trip counter (timing.ts). Attached HERE
+  // because this is the one function every team-scoped door passes through
+  // exactly once — the same property that makes it the honest place for the
+  // per-caller ceiling above makes it the honest place to start the clock.
+  const cfg: D1Rest = { ...d1ConfigFrom(env), stats: beginD1Timing(request) }
   const guard = await requireMember(env, user.id, user.currentTeamId)
   return { user, actor: toActor(user), cfg, guard }
+}
+
+type RightsRow = {
+  can_read: number
+  can_create: number
+  can_edit: number
+  can_delete: number
+}
+
+/** ONE PERMISSION ROW PER MODULE PER REQUEST.
+ *
+ * The read already returns all FOUR rights for a module — it always did — and
+ * then threw three of them away, so a door checking `read` and a door checking
+ * `edit` on the same module paid twice for the same row. One record screen opens
+ * seven doors, and every one of them starts with a permission read: seven
+ * separate HTTPS requests to the D1 REST API to ask questions the first answer
+ * already contained.
+ *
+ * KEYED ON THE GUARD OBJECT, exactly as `accountScope` is, and for the same
+ * tenant-isolation reason: a Worker isolate serves many callers, so a cache
+ * keyed on `roleId` would outlive the request and could answer one caller with
+ * another's permissions. `requireMember` returns a fresh object literal per
+ * request, so the guard's identity is the request's identity and two requests
+ * can never share a key. The inner Map is keyed on the MODULE, which is always a
+ * code literal, never a request value.
+ *
+ * THE FRESHNESS BOUNDARY DOES NOT MOVE — it was "once per permission check",
+ * it is now "once per module per request". A role edited mid-request would
+ * previously have been half-applied across that request's own checks, which is
+ * worse than a consistent snapshot, not better. Across requests nothing changes:
+ * the next request reads the row again.
+ *
+ * A REJECTION IS NOT CACHED, so a failed read does not poison the rest of the
+ * request. */
+const rightsPerRequest = new WeakMap<MemberGuard, Map<string, Promise<RightsRow | null>>>()
+
+function moduleRights(cfg: D1Rest, guard: MemberGuard, module: string): Promise<RightsRow | null> {
+  let byModule = rightsPerRequest.get(guard)
+  if (!byModule) {
+    byModule = new Map()
+    rightsPerRequest.set(guard, byModule)
+  }
+  const memo = byModule.get(module)
+  if (memo) return memo
+  const fresh = d1Query<RightsRow>(
+    cfg,
+    guard.databaseId,
+    "SELECT can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? AND module = ?",
+    [guard.roleId, module]
+  )
+    .then((rows) => rows[0] ?? null)
+    .catch((err: unknown) => {
+      byModule.delete(module)
+      throw err
+    })
+  byModule.set(module, fresh)
+  return fresh
 }
 
 /** Does the member's role hold this right on this module? (tall-sheet read) */
@@ -182,19 +280,9 @@ export async function hasRight(
   module: string,
   right: Right
 ): Promise<boolean> {
-  const rows = await d1Query<{
-    can_read: number
-    can_create: number
-    can_edit: number
-    can_delete: number
-  }>(
-    cfg,
-    guard.databaseId,
-    "SELECT can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? AND module = ?",
-    [guard.roleId, module]
-  )
-  if (!rows[0]) return false
-  return rows[0][`can_${right}`] === 1
+  const row = await moduleRights(cfg, guard, module)
+  if (!row) return false
+  return row[`can_${right}`] === 1
 }
 
 /** hasRight, but throws a 403 GuardError — the one-liner for handlers. */

@@ -18,9 +18,17 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@shared/ui/registry/primitives/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/registry/primitives/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/registry/primitives/select/select"
 import { Notes } from "@shared/ui/registry/primitives/notes/notes"
 import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@shared/ui/lib/config"
@@ -37,7 +45,21 @@ export type StepFormValues = {
   /** whole seconds — converted from the minutes the form asks for */
   secondsPerRun: number
   runsPerMonth: number
+  /** WHO DOES IT — one of the client's own roles, or null for nobody named. */
+  roleId: string | null
+  /** WHAT IT IS DONE IN — the whole set, every time (the door replaces it). */
+  toolIds: string[]
 }
+
+/** The client's own roles and tools, as this form needs them: a name, and
+ * whether an hour of the role has a price on it yet. */
+export type StepRoleOption = { id: string; name: string; centsPerHour: number | null }
+export type StepToolOption = { id: string; name: string }
+
+/** NOBODY NAMED, as a value the picker can hold. A Select cannot carry `null`,
+ * and an empty string is how it says "cleared" — so the sentinel is written once
+ * rather than spelled differently at each end. */
+const NO_ROLE = "__none__"
 
 const nameField = { ...defaultFieldConfig, label: "Step", required: true }
 const descField = { ...defaultFieldConfig, label: "What happens in it", required: false }
@@ -52,12 +74,25 @@ const runsField = {
   label: "Times a month it happens",
   required: true,
 }
+const roleField = {
+  ...defaultFieldConfig,
+  label: "Who does it",
+  required: false,
+  hint: "Their role, and what an hour of it costs them, is what turns these minutes into money.",
+}
+const toolsField = {
+  ...defaultFieldConfig,
+  label: "What it is done in",
+  required: false,
+}
 
 export function StepFormDialog({
   open,
   onOpenChange,
   versionLabel,
   initial,
+  roles = [],
+  tools = [],
   draftKey,
   onSubmit,
 }: {
@@ -65,7 +100,18 @@ export function StepFormDialog({
   onOpenChange: (open: boolean) => void
   /** which version this lands in — a step is always added to the current one */
   versionLabel: string
-  initial?: { name: string; description: string; secondsPerRun: number; runsPerMonth: number }
+  initial?: {
+    name: string
+    description: string
+    secondsPerRun: number
+    runsPerMonth: number
+    roleId: string | null
+    toolIds: string[]
+  }
+  /** The client's live roles. Empty when the map has no client filed against it
+   * — the picker then says so rather than offering an empty list. */
+  roles?: StepRoleOption[]
+  tools?: StepToolOption[]
   draftKey?: string
   onSubmit: (values: StepFormValues) => Promise<void>
 }) {
@@ -78,9 +124,21 @@ export function StepFormDialog({
       description: initial?.description ?? "",
       minutes: initial ? String(Math.round(initial.secondsPerRun / 60)) : "",
       runs: initial ? String(initial.runsPerMonth) : "",
+      roleId: initial?.roleId ?? NO_ROLE,
+      // Joined, because a draft is stored as flat strings — an array would come
+      // back from the draft store as "[object Object]" the first time somebody
+      // reopened a half-typed step.
+      toolIds: (initial?.toolIds ?? []).join(","),
     },
     open
   )
+  const chosenTools = values.toolIds ? values.toolIds.split(",").filter(Boolean) : []
+  const toggleTool = (id: string) =>
+    setValues((s) => {
+      const on = s.toolIds ? s.toolIds.split(",").filter(Boolean) : []
+      const next = on.includes(id) ? on.filter((x) => x !== id) : [...on, id]
+      return { ...s, toolIds: next.join(",") }
+    })
   const [busy, setBusy] = React.useState(false)
 
   /** A whole, non-negative number, or null. The door refuses anything else with
@@ -103,6 +161,8 @@ export function StepFormDialog({
         description: richTextValue(values.description),
         secondsPerRun: minutes * 60,
         runsPerMonth: runs,
+        roleId: values.roleId === NO_ROLE ? null : values.roleId,
+        toolIds: chosenTools,
       })
       clearDraft()
       onOpenChange(false)
@@ -174,6 +234,60 @@ export function StepFormDialog({
           disabled={busy}
         />
       </Field>
+      {/* WHO DOES IT. Optional on purpose: you map a process in the room, before
+          anybody has looked up who is on which desk, and a form that refused to
+          save without it would stop the session this whole module exists for. A
+          role with no hourly cost yet says so beside its name, so the person
+          typing knows why the money will read as incomplete. */}
+      {roles.length > 0 ? (
+        <Field config={roleField} htmlFor="step-role" className={fieldSpacing}>
+          <Select
+            value={values.roleId}
+            onValueChange={(v) => setValues((s) => ({ ...s, roleId: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="step-role">
+              <SelectValue placeholder={t("Nobody named yet")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_ROLE}>{t("Nobody named yet")}</SelectItem>
+              {roles.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.name}
+                  {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
+      {/* WHAT IT IS DONE IN — several, because a step usually is: open the
+          spreadsheet, copy it into the portal, send the email. Chips rather than
+          a multi-select, the same shape the client's own roles use one screen
+          over, so the set is readable without opening anything. */}
+      {tools.length > 0 ? (
+        <Field config={toolsField} htmlFor="step-tools" className={fieldSpacing}>
+          <div id="step-tools" className="flex flex-wrap items-center gap-1">
+            {tools.map((x) => {
+              const on = chosenTools.includes(x.id)
+              return (
+                <Button
+                  key={x.id}
+                  type="button"
+                  size="sm"
+                  variant={on ? "secondary" : "ghost"}
+                  disabled={busy}
+                  className="h-7 rounded-full px-3 text-xs"
+                  onClick={() => toggleTool(x.id)}
+                  aria-pressed={on}
+                >
+                  {x.name}
+                </Button>
+              )
+            })}
+          </div>
+        </Field>
+      ) : null}
     </FormShellDialog>
   )
 }

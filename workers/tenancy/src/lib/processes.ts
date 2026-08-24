@@ -60,6 +60,7 @@ async function insertRow(
     | "app_modules"
     | "app_staff"
     | "app_stakeholders"
+    | "process_step_tools"
     | "processes"
     | "process_versions"
     | "process_steps"
@@ -106,7 +107,7 @@ async function insertRow(
 
 function appsWhere(
   scope: AccountScope,
-  opts: { accountId?: string }
+  opts: { accountId?: string; q?: string }
 ): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "account_id")
     // AND THE APP FENCE (SCOPE ch.03 "per-person restriction"). A client login
@@ -114,12 +115,37 @@ function appsWhere(
     // both get an empty clause, so this changes nothing for either. It is an AND
     // beside the account fence and never instead of it — see appScopeClause.
   const apps = appScopeClause(scope, "id")
-  return {
-    sql: where([fence.sql, apps.sql, opts.accountId ? "account_id = ?" : undefined]),
-    params: opts.accountId
-      ? [...fence.params, ...apps.params, opts.accountId]
-      : [...fence.params, ...apps.params],
+  const filters = [fence.sql, apps.sql]
+  const params = [...fence.params, ...apps.params]
+  if (opts.accountId) {
+    filters.push("account_id = ?")
+    params.push(opts.accountId)
   }
+  // THE SEARCH BOX (the owner, 24 Aug 2026: "I cannot search through any of my
+  // apps, which is a weird thing to begin with").
+  //
+  // OVER THE NAME, AND DELIBERATELY NOTHING ELSE. The obvious second column is
+  // `about`, and it is exactly the one that must not be here: `about`,
+  // `client_context`, `solution` and `key_actors` are the MATERIAL `canOpen`
+  // withholds from one of our own people who is not staffed on this app. A
+  // search that matched on them would answer "yes, something in here says that"
+  // about text the caller may not read — the same leak, spelled with a boolean
+  // instead of a string, and invisible because the withheld field never appears
+  // in the response. A filter is a read.
+  //
+  // `name` and `stage` ride to everyone who sees the row (8.11: everyone SEES
+  // every app), so the name is the whole safe surface — and it is what a person
+  // types anyway.
+  //
+  // ESCAPED, for the same two reasons the accounts search is: `%` and `_` are
+  // LIKE's own wildcards, so an unescaped needle answers a different question
+  // than the one typed, and a pattern of alternating `%` costs SQLite
+  // exponential time over the whole table for a handful of bytes.
+  if (opts.q) {
+    filters.push("name LIKE ? ESCAPE '\\'")
+    params.push(`%${likeLiteral(opts.q)}%`)
+  }
+  return { sql: where(filters), params }
 }
 
 /** R16: the exact server COUNT(*) an Apps badge shows, over the SAME fence and
@@ -143,7 +169,7 @@ export async function countApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string } = {}
+  opts: { accountId?: string; q?: string } = {}
 ): Promise<number> {
   const q = appsWhere(scope, opts)
   const rows = await d1Query<{ n: number }>(
@@ -162,7 +188,7 @@ export async function listApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string } = {}
+  opts: { accountId?: string; q?: string } = {}
 ): Promise<{ rows: AppRow[]; total: number }> {
   const { sql, params } = appsWhere(scope, opts)
   const [rows, counted] = await Promise.all([
@@ -1082,6 +1108,7 @@ type ProcessListRow = {
   name: string
   description: string | null
   role_name: string | null
+  role_id: string | null
   deactivated_at: string | null
   created_at: string
   version_count: number
@@ -1137,7 +1164,7 @@ export async function listProcesses(
     d1Query<ProcessListRow>(
       cfg,
       guard.databaseId,
-      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
+      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name, p.role_id,
               p.deactivated_at, p.created_at,
               (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
               (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -1165,6 +1192,7 @@ export async function listProcesses(
       name: r.name,
       description: r.description,
       roleName: r.role_name,
+      roleId: r.role_id,
       versionCount: r.version_count,
       stepCount: r.step_count,
       active: r.deactivated_at == null,
@@ -1236,14 +1264,13 @@ export async function listProcessVersions(
     id: string
     version_no: number
     label: string | null
-    cut_from_sprint_id: string | null
     created_at: string
     creator_name: string | null
   }>(
     cfg,
     guard.databaseId,
     // R14 hard cap — a version list is bounded by how many sprints have completed.
-    `SELECT id, version_no, label, cut_from_sprint_id, created_at, creator_name
+    `SELECT id, version_no, label, created_at, creator_name
        FROM process_versions${where([fence.sql, "process_id = ?"])}
       ORDER BY version_no DESC LIMIT ${LIST_HARD_CAP}`,
     [...fence.params, processId]
@@ -1256,7 +1283,6 @@ export async function listProcessVersions(
     // v1 IS the baseline, always — it is written with the process itself and the
     // unique index on (process_id, version_no) means there can never be a second.
     isBaseline: r.version_no === 1,
-    cutFromSprintId: scope.kind === "portal" ? null : r.cut_from_sprint_id,
     createdAt: r.created_at,
     createdByName: scope.kind === "portal" ? null : r.creator_name,
   }))
@@ -1286,34 +1312,72 @@ export async function listProcessSteps(
   versionId?: string
 ): Promise<ProcessStep[]> {
   const fence = accountScopeClause(scope, "s.account_id")
-  const rows = await d1Query<{
-    id: string
-    version_id: string
-    step_key: string
-    name: string
-    description: string | null
-    position: number
-    seconds_per_run: number
-    runs_per_month: number
-    removed_at: string | null
-  }>(
-    cfg,
-    guard.databaseId,
-    // R14 hard cap — the steps of ONE version of ONE process. A map a person can
-    // read is tens of steps; the cap is the honest refusal past that.
-    `SELECT s.id, s.version_id, s.step_key, s.name, s.description, s.position,
-            s.seconds_per_run, s.runs_per_month, s.removed_at
-       FROM process_steps s
-      ${where([
-        fence.sql,
-        "s.process_id = ?",
-        versionId
-          ? "s.version_id = ?"
-          : "s.version_id = (SELECT id FROM process_versions v WHERE v.process_id = ? ORDER BY v.version_no DESC LIMIT 1)",
-      ])}
-      ORDER BY s.position ASC, s.created_at ASC, s.id ASC LIMIT ${LIST_HARD_CAP}`,
-    [...fence.params, processId, versionId ?? processId]
-  )
+  // WHICH VERSION, said once. It is either the one asked for or the newest, and
+  // BOTH the steps and their tools have to agree about it — a tool list read for
+  // the current version beside version 1's steps is the same class of quietly
+  // wrong number `countVersionSteps` exists to prevent.
+  const versionSql = versionId
+    ? "?"
+    : "(SELECT id FROM process_versions v WHERE v.process_id = ? ORDER BY v.version_no DESC LIMIT 1)"
+  const versionParam = versionId ?? processId
+
+  const toolFence = accountScopeClause(scope, "t.account_id")
+  const [rows, toolRows] = await Promise.all([
+    d1Query<{
+      id: string
+      version_id: string
+      step_key: string
+      name: string
+      description: string | null
+      position: number
+      seconds_per_run: number
+      runs_per_month: number
+      removed_at: string | null
+      client_role_id: string | null
+      role_name: string | null
+      role_cents_per_hour: number | null
+    }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap — the steps of ONE version of ONE process. A map a person can
+      // read is tens of steps; the cap is the honest refusal past that.
+      //
+      // THE ROLE IS READ ALONG THE JOIN rather than looked up per step, and its
+      // COST comes with it: a step's minutes and the price of the person spending
+      // them arrive in one row, which is what makes step 4's arithmetic a
+      // multiplication rather than a second pass. A LEFT JOIN, because a step
+      // with no role named is ordinary and must still be listed.
+      `SELECT s.id, s.version_id, s.step_key, s.name, s.description, s.position,
+              s.seconds_per_run, s.runs_per_month, s.removed_at, s.client_role_id,
+              r.name AS role_name, r.cents_per_hour AS role_cents_per_hour
+         FROM process_steps s
+         LEFT JOIN client_roles r ON r.id = s.client_role_id
+        ${where([fence.sql, "s.process_id = ?", `s.version_id = ${versionSql}`])}
+        ORDER BY s.position ASC, s.created_at ASC, s.id ASC LIMIT ${LIST_HARD_CAP}`,
+      [...fence.params, processId, versionParam]
+    ),
+    // THE TOOLS OF EVERY STEP IN THIS VERSION, in ONE read rather than one per
+    // step. A map is tens of steps and each carries a handful of tools, so the
+    // cap is the same honest ceiling the steps themselves take.
+    d1Query<{ step_key: string; id: string; name: string; mark: string | null }>(
+      cfg,
+      guard.databaseId,
+      `SELECT st.step_key, t.id, t.name, t.mark
+         FROM process_step_tools st
+         JOIN client_tools t ON t.id = st.tool_id
+        ${where([toolFence.sql, `st.version_id = ${versionSql}`, "t.deactivated_at IS NULL"])}
+        ORDER BY t.name ASC LIMIT ${LIST_HARD_CAP}`,
+      [...toolFence.params, versionParam]
+    ),
+  ])
+
+  const toolsByStep = new Map<string, { id: string; name: string; mark: string | null }[]>()
+  for (const t of toolRows) {
+    const list = toolsByStep.get(t.step_key)
+    if (list) list.push({ id: t.id, name: t.name, mark: t.mark })
+    else toolsByStep.set(t.step_key, [{ id: t.id, name: t.name, mark: t.mark }])
+  }
+
   return rows.map((r) => ({
     id: r.id,
     processId,
@@ -1325,6 +1389,14 @@ export async function listProcessSteps(
     secondsPerRun: r.seconds_per_run,
     runsPerMonth: r.runs_per_month,
     removed: r.removed_at != null,
+    roleId: r.client_role_id,
+    roleName: r.role_name,
+    // NULL WHEN THE ROLE IS UNNAMED, AND NULL WHEN ITS COST IS NOT KNOWN — two
+    // different gaps that read the same here on purpose, because the arithmetic
+    // treats them the same way (hours, no money). `roleId` tells them apart for
+    // anything that needs to say WHICH is missing.
+    roleCentsPerHour: r.role_cents_per_hour,
+    tools: toolsByStep.get(r.step_key) ?? [],
   }))
 }
 
@@ -1401,7 +1473,6 @@ export async function createProcess(
     account_id: app.accountId,
     version_no: 1,
     label: input.baselineLabel ?? "How it worked before",
-    cut_from_sprint_id: null,
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,
@@ -1502,6 +1573,136 @@ export async function setProcessActive(
  * ones a person typed.) A tie is harmless — two concurrent adds may land on the
  * same number and the read's `created_at` tie-break settles them — so this needs
  * no lock; it is a display order, not an invariant. */
+/** A ROLE ON A STEP MUST BE THE SAME CLIENT'S ROLE.
+ *
+ * The account fence stops a caller reaching another client's rows; it does not
+ * stop them WRITING one client's role id onto another client's step, because
+ * both ends are inside the fence when the caller can see both clients — which
+ * every staff member can. That would price Bergman's work at Confia's rates and
+ * be invisible afterwards, since the map only ever displays the role's name.
+ *
+ * So the pairing is checked, not just the reach. A map with no client cannot
+ * carry a role at all: a role belongs to a client, and there is no client here
+ * to own one. */
+async function roleInScopeOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  roleId: string,
+  accountId: string | null
+): Promise<string> {
+  if (!accountId)
+    throw new GuardError(
+      400,
+      "no_client",
+      "This map isn't filed under a client yet, so it has nobody's roles to choose from."
+    )
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ name: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT name FROM client_roles
+      ${where([fence.sql, "id = ?", "account_id = ?", "deactivated_at IS NULL"])} LIMIT 1`,
+    [...fence.params, roleId, accountId]
+  )
+  if (!rows[0])
+    throw new GuardError(404, "role_not_found", "That role isn't one of this client's live roles.")
+  return rows[0].name
+}
+
+/** WHAT A STEP IS DONE IN — the WHOLE set, every time.
+ *
+ * It takes the complete list rather than an add and a remove, which is the same
+ * shape `setAppStaff` and `setRoleDepartments` take and for the same reason: a
+ * form shows a set of chips and saves what the set now IS. Two doors would make
+ * the screen responsible for computing a difference, and a difference computed
+ * from a stale read removes a tool somebody else added a second ago.
+ *
+ * Keyed on (version_id, step_key) so it travels with a version cut — see 0053.
+ * Every tool is checked against the client that owns the map, for exactly the
+ * reason the role above is.
+ */
+/** EVERY NAMED TOOL IS THIS CLIENT'S, OR NONE OF THEM IS SAVED — and it answers
+ * that question BEFORE anything is written.
+ *
+ * It is a separate function from the write for one reason, and the reason was a
+ * bug this codebase's own test caught: `addStep` inserted the step row and THEN
+ * saved its tools, so a caller naming one tool belonging to another client got a
+ * refusal AND a step, sitting on the map with no tools on it. A refusal that
+ * leaves a row behind is worse than either answer on its own — the map looks
+ * finished and is wrong, and nobody re-reads a step that saved.
+ *
+ * Returns the de-duplicated set, because naming a tool twice is the same
+ * sentence rather than two. */
+async function toolsInScopeOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  toolIds: string[],
+  accountId: string | null
+): Promise<string[]> {
+  const wanted = [...new Set(toolIds.filter(Boolean))]
+  if (!wanted.length) return wanted
+  if (!accountId)
+    throw new GuardError(
+      400,
+      "no_client",
+      "This map isn't filed under a client yet, so it has no tools to choose from."
+    )
+  const fence = accountScopeClause(scope, "account_id")
+  // ONE read for the whole set, and its COUNT is the check: a caller naming four
+  // tools of which one belongs to another client gets a refusal, not three tools
+  // saved and one silently dropped.
+  const live = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM client_tools
+      ${where([
+        fence.sql,
+        "account_id = ?",
+        `id IN (${wanted.map(() => "?").join(", ")})`,
+        "deactivated_at IS NULL",
+      ])} LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, accountId, ...wanted]
+  )
+  if (live.length !== wanted.length)
+    throw new GuardError(404, "tool_not_found", "One of those tools isn't one of this client's live tools.")
+  return wanted
+}
+
+async function setStepTools(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  input: { versionId: string; stepKey: string; accountId: string | null; toolIds: string[] }
+): Promise<void> {
+  const wanted = await toolsInScopeOrThrow(cfg, guard, scope, input.toolIds, input.accountId)
+  // Replace the set: clear, then write what was asked for. Both statements carry
+  // the fence, so a caller who cannot reach this step clears nothing.
+  const stepFence = accountScopeClause(scope, "account_id")
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `DELETE FROM process_step_tools
+      ${where([stepFence.sql, "version_id = ?", "step_key = ?"])}`,
+    [...stepFence.params, input.versionId, input.stepKey]
+  )
+  const now = new Date().toISOString()
+  for (const toolId of wanted)
+    await insertRow(cfg, guard, "process_step_tools", {
+      id: ulid(),
+      version_id: input.versionId,
+      step_key: input.stepKey,
+      tool_id: toolId,
+      account_id: input.accountId,
+      created_at: now,
+      creator_id: actor.id,
+      creator_email: actor.email,
+      creator_name: actor.name,
+    })
+}
+
 export async function addStep(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1514,17 +1715,34 @@ export async function addStep(
     secondsPerRun: number
     runsPerMonth: number
     position?: number
+    /** who does it — one of the CLIENT's own roles. Undefined inherits the map's. */
+    roleId?: string | null
+    /** what it is done in — the WHOLE set, so saving is idempotent. */
+    toolIds?: string[]
   }
 ): Promise<string> {
   const process = await processOrThrow(cfg, guard, scope, input.processId)
   const version = await latestVersionOrThrow(cfg, guard, scope, input.processId)
   const id = ulid()
+  const stepKey = ulid()
+  // THE MAP'S ROLE IS THE STARTING POINT, not a fallback read at display time.
+  // A new step on a map whose work is done by one person should not need the
+  // role picking again; a map handed between three should. Copying it in means
+  // an older version keeps saying what it was mapped with even after the map's
+  // default changes, which a fallback would quietly rewrite (0053).
+  const roleId = input.roleId === undefined ? (process.roleId ?? null) : input.roleId
+  // BOTH REFUSALS HAPPEN BEFORE THE ROW EXISTS. A step that saved without the
+  // tools the person named is a map that looks finished and is not — see
+  // toolsInScopeOrThrow for the day that was caught.
+  if (roleId) await roleInScopeOrThrow(cfg, guard, scope, roleId, process.accountId)
+  if (input.toolIds) await toolsInScopeOrThrow(cfg, guard, scope, input.toolIds, process.accountId)
   await insertRow(cfg, guard, "process_steps", {
     id,
     process_id: input.processId,
     version_id: version.id,
     account_id: process.accountId,
-    step_key: ulid(),
+    step_key: stepKey,
+    client_role_id: roleId,
     name: input.name,
     description: input.description ?? null,
     position: input.position ?? (await nextPosition(cfg, guard, version.id)),
@@ -1535,6 +1753,13 @@ export async function addStep(
     creator_email: actor.email,
     creator_name: actor.name,
   })
+  if (input.toolIds)
+    await setStepTools(cfg, guard, scope, actor, {
+      versionId: version.id,
+      stepKey,
+      accountId: process.accountId,
+      toolIds: input.toolIds,
+    })
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step added",
     description: `${actor.name} added the step "${input.name}" to ${process.name}`,
@@ -1554,16 +1779,38 @@ export async function updateStep(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  input: { name: string; description?: string | null; secondsPerRun: number; runsPerMonth: number; position?: number }
+  input: {
+    name: string
+    description?: string | null
+    secondsPerRun: number
+    runsPerMonth: number
+    position?: number
+    /** who does it. Undefined leaves it alone; null clears it. */
+    roleId?: string | null
+    /** what it is done in — the WHOLE set. Undefined leaves it alone. */
+    toolIds?: string[]
+  }
 ): Promise<string> {
   const before = await stepOrThrow(cfg, guard, scope, id)
+  const process = await processOrThrow(cfg, guard, scope, before.processId)
+  const nextRoleId = input.roleId === undefined ? before.roleId : input.roleId
+  const nextRoleName =
+    nextRoleId === before.roleId
+      ? before.roleName
+      : nextRoleId
+        ? await roleInScopeOrThrow(cfg, guard, scope, nextRoleId, process.accountId)
+        : null
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
   const changed = await d1Query<{ process_id: string }>(
     cfg,
     guard.databaseId,
+    // `client_role_id = COALESCE(?, client_role_id)` would be wrong: null is how a
+    // caller CLEARS the role, and coalesce cannot tell "clear it" from "leave it".
+    // So the decision is made above in JS, where undefined and null are still two
+    // different things, and one settled value arrives here.
     `UPDATE process_steps SET name = ?, description = ?, seconds_per_run = ?, runs_per_month = ?,
-       position = ?, ${audit.sql}
+       position = ?, client_role_id = ?, ${audit.sql}
      ${where([
        fence.sql,
        "id = ?",
@@ -1576,6 +1823,7 @@ export async function updateStep(
       input.secondsPerRun,
       input.runsPerMonth,
       input.position ?? before.position,
+      nextRoleId,
       ...audit.params,
       ...fence.params,
       id,
@@ -1587,10 +1835,22 @@ export async function updateStep(
       "not_latest",
       "That step belongs to an older version of the process. Only the current version can be edited."
     )
+  if (input.toolIds)
+    await setStepTools(cfg, guard, scope, actor, {
+      versionId: before.versionId,
+      stepKey: before.stepKey,
+      accountId: process.accountId,
+      toolIds: input.toolIds,
+    })
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
     { label: "Minutes per run", from: String(Math.round(before.secondsPerRun / 60)), to: String(Math.round(input.secondsPerRun / 60)) },
     { label: "Times a month", from: String(before.runsPerMonth), to: String(input.runsPerMonth) },
+    // WHO DOES IT is a change worth a history line, because it changes the MONEY
+    // the map reports without changing a single minute on it. The ids are what
+    // is compared and the names are what is said — a reader of the feed should
+    // not have to look up a ULID to know what happened.
+    { label: "Who does it", from: before.roleName ?? "", to: nextRoleName ?? "" },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step edited",
@@ -1669,23 +1929,24 @@ export async function removeStep(
  * `step_key`, so the next edit describes the new way of working and the old one
  * stays exactly as it was agreed.
  *
- * TWO CALLERS, ONE FUNCTION (SCOPE, confirmed by the owner): a sprint completing
- * cuts one automatically, and a person can cut one from the button. The only
- * difference is `sprintId`.
+ * ONE CALLER: a person, pressing the button (owner, 24 Aug 2026). An earlier
+ * plan had a completing sprint cut one too, and nothing was ever wired to do it
+ * — the parameter, the column and its index existed and only tests ever used
+ * them. The decision was purged rather than switched off (migration 0051).
  *
  * IDEMPOTENT (R17), and this is the one transition in the build where "the same
  * thing happened twice" is an INSERT rather than an UPDATE — so the predicate
- * cannot ride a WHERE. It rides the partial unique index on
- * (process_id, cut_from_sprint_id) instead: a sprint that completes twice — a
- * double click, a retried job, a replayed hook — is refused by the database, not
- * by a check a second request could slip past. `null` back means "already cut",
- * which is a 200 with no activity row and no ping, exactly like a zero-row move. */
+ * cannot ride a WHERE. It rides the unique index on (process_id, version_no)
+ * instead: two quick presses both read version N and both try to insert N+1, and
+ * the loser is refused by the database rather than by a check a second request
+ * could slip past. `null` back means "already cut", which is a 200 with no
+ * activity row and no ping, exactly like a zero-row move. */
 export async function cutVersion(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { processId: string; label?: string; sprintId?: string }
+  input: { processId: string; label?: string }
 ): Promise<{ versionId: string; versionNo: number } | null> {
   const process = await processOrThrow(cfg, guard, scope, input.processId)
   const current = await latestVersionOrThrow(cfg, guard, scope, input.processId)
@@ -1699,7 +1960,6 @@ export async function cutVersion(
       account_id: process.accountId,
       version_no: current.versionNo + 1,
       label: input.label ?? null,
-      cut_from_sprint_id: input.sprintId ?? null,
       created_at: now,
       creator_id: actor.id,
       creator_email: actor.email,
@@ -1717,24 +1977,43 @@ export async function cutVersion(
   // one version later" a subtraction rather than a name match. A removed step
   // travels too, with its frequency intact and zero seconds, so the work we took
   // away goes on being counted as a saving.
+  //
+  // AND SO DOES WHO DOES IT (0053). A cut that dropped the role would price the
+  // new version's hours at nothing while the old one still had a rate — which
+  // reads on the screen as the saving having grown, on a version where not one
+  // minute changed.
   await d1Query(
     cfg,
     guard.databaseId,
     `INSERT INTO process_steps
        (id, process_id, version_id, account_id, step_key, name, description, position,
-        seconds_per_run, runs_per_month, removed_at, created_at, creator_id, creator_email, creator_name)
+        seconds_per_run, runs_per_month, removed_at, client_role_id,
+        created_at, creator_id, creator_email, creator_name)
      SELECT lower(hex(randomblob(16))), s.process_id, ?, s.account_id, s.step_key, s.name, s.description,
-            s.position, s.seconds_per_run, s.runs_per_month, s.removed_at, ?, ?, ?, ?
+            s.position, s.seconds_per_run, s.runs_per_month, s.removed_at, s.client_role_id, ?, ?, ?, ?
        FROM process_steps s
       WHERE s.process_id = ? AND s.version_id = ?`,
     [versionId, now, actor.id, actor.email, actor.name, input.processId, current.id]
   )
+  // AND WHAT EACH STEP IS DONE IN. One statement, no id mapping, because the join
+  // hangs off (version_id, step_key) rather than the step's own id — which is
+  // precisely why 0053 chose that key. Version 1 keeps saying which tools version
+  // 1 used, so a tool the client stopped paying for does not vanish from the
+  // history of the map that used to need it.
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO process_step_tools
+       (id, version_id, step_key, tool_id, account_id, created_at, creator_id, creator_email, creator_name)
+     SELECT lower(hex(randomblob(16))), ?, st.step_key, st.tool_id, st.account_id, ?, ?, ?, ?
+       FROM process_step_tools st
+      WHERE st.version_id = ?`,
+    [versionId, now, actor.id, actor.email, actor.name, current.id]
+  )
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Version cut",
-    description: `${actor.name} cut version ${current.versionNo + 1} of ${process.name}${
-      input.sprintId ? " when a sprint completed" : ""
-    }`,
+    description: `${actor.name} cut version ${current.versionNo + 1} of ${process.name}`,
     relatedTable: "process_versions",
     relatedRowId: versionId,
   })
@@ -2063,6 +2342,7 @@ async function processOrThrow(
     name: string
     description: string | null
     role_name: string | null
+    role_id: string | null
     deactivated_at: string | null
     created_at: string
     version_count: number
@@ -2070,7 +2350,7 @@ async function processOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
+    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name, p.role_id,
             p.deactivated_at, p.created_at,
             (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
             (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -2089,6 +2369,7 @@ async function processOrThrow(
     name: r.name,
     description: r.description,
     roleName: r.role_name,
+    roleId: r.role_id,
     versionCount: r.version_count,
     stepCount: r.step_count,
     active: r.deactivated_at == null,
@@ -2187,29 +2468,57 @@ async function stepOrThrow(
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<{ id: string; name: string; description: string | null; position: number; secondsPerRun: number; runsPerMonth: number }> {
-  const fence = accountScopeClause(scope, "account_id")
+): Promise<{
+  id: string
+  processId: string
+  versionId: string
+  stepKey: string
+  name: string
+  description: string | null
+  position: number
+  secondsPerRun: number
+  runsPerMonth: number
+  roleId: string | null
+  roleName: string | null
+}> {
+  const fence = accountScopeClause(scope, "s.account_id")
   const rows = await d1Query<{
     id: string
+    process_id: string
+    version_id: string
+    step_key: string
     name: string
     description: string | null
     position: number
     seconds_per_run: number
     runs_per_month: number
+    client_role_id: string | null
+    role_name: string | null
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, name, description, position, seconds_per_run, runs_per_month
-       FROM process_steps${where([fence.sql, "id = ?"])} LIMIT 1`,
+    // The role's WORD travels with its id, so an edit can say "Who does it:
+    // Dispatch clerk → Adjuster" in the history rather than two ULIDs nobody can
+    // read. LEFT JOIN: a step with no role is ordinary.
+    `SELECT s.id, s.process_id, s.version_id, s.step_key, s.name, s.description, s.position,
+            s.seconds_per_run, s.runs_per_month, s.client_role_id, r.name AS role_name
+       FROM process_steps s
+       LEFT JOIN client_roles r ON r.id = s.client_role_id
+       ${where([fence.sql, "s.id = ?"])} LIMIT 1`,
     [...fence.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That step doesn't exist.")
   return {
     id: rows[0].id,
+    processId: rows[0].process_id,
+    versionId: rows[0].version_id,
+    stepKey: rows[0].step_key,
     name: rows[0].name,
     description: rows[0].description,
     position: rows[0].position,
     secondsPerRun: rows[0].seconds_per_run,
     runsPerMonth: rows[0].runs_per_month,
+    roleId: rows[0].client_role_id,
+    roleName: rows[0].role_name,
   }
 }

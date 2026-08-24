@@ -536,10 +536,10 @@ export function ProcessesPanel({
   )
 }
 
-/* ------------------------------- the diary -------------------------------- */
+/* --------------------------- the meetings list ----------------------------- */
 
 /** THE MEETINGS ABOUT ONE APP. Asked of the SERVER by `appId`, never narrowed in
- * the browser: the diary is paged, and "this app's meetings among the newest
+ * the browser: the meetings list is paged, and "this app's meetings among the newest
  * fifty" is an answer that looks like an answer. Paged (R14) for the same
  * reason — a two-year system accumulates meetings and the oldest is the one
  * somebody is digging for. `total` is the door's exact COUNT(*) over this same

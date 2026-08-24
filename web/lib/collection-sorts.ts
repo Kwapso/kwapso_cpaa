@@ -111,7 +111,7 @@ export function translatedSorts(key: string, t: (english: string) => string): So
 /** THE ORDER A COLLECTION IS IN, AND THE ONE HANDLE THAT CHANGES IT.
  *
  * Two controls can put a list in order — the picker beside the search box and a
- * column header on a table — and on the diary they sit on the same screen. They
+ * column header on a table — and on the meetings list they sit on the same screen. They
  * are one QUESTION, so they get one handle rather than a state each: whichever
  * is used, the same `set` runs, and neither can be showing an order the other
  * one moved away from.

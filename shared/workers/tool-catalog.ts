@@ -1119,7 +1119,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_meetings",
     summary:
-      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what has not started yet, by the clock); pass 'week' for the week we are in, past and upcoming both, or 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `month` narrows to one calendar month as `YYYY-MM` (what a calendar asks for), and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client' or 'added'. The order is the DOOR's, so it spans the whole diary rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what has not started yet, by the clock); pass 'week' for the week we are in, past and upcoming both, or 'all' for the whole meetings list including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `month` narrows to one calendar month as `YYYY-MM` (what a calendar asks for), and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client' or 'added'. The order is the DOOR's, so it spans the whole meetings list rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
     schema: obj({ id: S, accountId: S, appId: S, purposeId: S, view: S, month: S, q: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
@@ -1136,7 +1136,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_meeting",
     summary:
-      "Put a meeting in the diary. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: kwapso reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
+      "Put a meeting on the meetings list. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: kwapso reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings",
     schema: obj(
       { title: S, startsAt: S, endsAt: S, accountId: S, appId: S, purposeId: S, agenda: S, notes: S, location: S },
@@ -1221,7 +1221,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_calendar_series",
     summary:
-      "Read the caller's Google Calendar into the diary. ONE WAY, always: nothing in kwapso writes to a calendar. Every entry in the live window (a fortnight back, four weeks on) with no record yet becomes one, whether it repeats or not and whether it is past or future, and `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the description, the location, the guest list and what each person answered, the organiser, the join link, the attachments and the link back to the entry, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. Entries beyond the live horizon come back in `ahead` as read-only. It ALSO walks one slice of the caller's whole calendar, five years back to a year ahead, resuming from where the last call stopped: `swept` is the moment that walk has reached and `caughtUp` is true once it has reached the far end, so call it repeatedly to bring in a whole history. Safe to call twice: an entry that already has a record cannot get a second one, and one Google has not touched since the last call is skipped without a write.",
+      "Read the caller's Google Calendar into Meetings. ONE WAY, always: nothing in kwapso writes to a calendar. Every entry in the live window (a fortnight back, four weeks on) with no record yet becomes one, whether it repeats or not and whether it is past or future, and `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the description, the location, the guest list and what each person answered, the organiser, the join link, the attachments and the link back to the entry, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. Entries beyond the live horizon come back in `ahead` as read-only. It ALSO walks one slice of the caller's whole calendar, five years back to a year ahead, resuming from where the last call stopped: `swept` is the moment that walk has reached and `caughtUp` is true once it has reached the far end, so call it repeatedly to bring in a whole history. Safe to call twice: an entry that already has a record cannot get a second one, and one Google has not touched since the last call is skipped without a write.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
     schema: obj({}),
     buildBody: () => ({}),
@@ -1660,10 +1660,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_apps",
     summary:
-      "List the systems we have built, an App is the thing with its own address and its own stage (SCOPE ch.02). `accountId` narrows to one client's systems. Bounded: an agency has tens of apps, so there is no cursor here; the collection that grows underneath is process maps.",
+      "List the systems we have built, an App is the thing with its own address and its own stage (SCOPE ch.02). `accountId` narrows to one client's systems, and `q` searches an app's `name`. Bounded: an agency has tens of apps, so there is no cursor here; the collection that grows underneath is process maps.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/apps",
-    schema: obj({ accountId: S }),
-    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    schema: obj({ accountId: S, q: S }),
+    buildQuery: (i) => {
+      const p = new URLSearchParams()
+      if (str(i, "accountId")) p.set("accountId", str(i, "accountId"))
+      if (str(i, "q")) p.set("q", str(i, "q"))
+      return p.size ? `?${p}` : ""
+    },
     agent: { write: false, summarize: () => "List the apps we've built" },
   },
   {
@@ -1900,6 +1905,194 @@ export const SHARED_TOOLS: SharedTool[] = [
       (opt(i, "versionId") ? `&versionId=${encodeURIComponent(str(i, "versionId"))}` : ""),
     agent: { write: false, summarize: (i) => `Look up process map ${str(i, "id")}` },
   },
+  // ── THE CLIENT'S OWN ORGANISATION ──────────────────────────────────────────
+  // Who does the work at a client, what an hour of them costs, and what they run
+  // on. The reason it is on the machine surface at all: a saving is only MONEY
+  // once a step's minutes meet a role's hourly cost, so an assistant asked "what
+  // would automating this save Bergman" needs to be able to read and fill these.
+  {
+    name: "list_client_departments",
+    summary:
+      "The departments inside a client's own company. `accountId` narrows to one client; leave it off for every client you may see. Each carries `name`, whether it is `active`, and `roleCount` — how many roles sit in it. Answers `departments` and an exact `total`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/departments",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List the client's departments" },
+  },
+  {
+    name: "create_client_department",
+    summary:
+      "Add a department to a client's company. `accountId` is the client it belongs to and `name` is what they call it. Two live departments of one client cannot share a name.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments",
+    schema: obj({ accountId: S, name: S }, ["accountId", "name"]),
+    buildBody: (i) => ({ accountId: str(i, "accountId"), name: str(i, "name") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the department "${str(i, "name")}"` },
+  },
+  {
+    name: "update_client_department",
+    summary: "Rename a department. `id` is the department and `name` is the new word for it.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments/update",
+    schema: obj({ id: S, name: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Rename a department to "${str(i, "name")}"` },
+  },
+  {
+    name: "set_client_department_active",
+    summary:
+      "Switch a department off, or bring it back. `active` false retires it; true restores it. Nothing is deleted — a retired department is still the one an old map was drawn against.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.active === true ? "Bring a department back" : "Switch a department off"),
+    },
+  },
+  {
+    name: "list_client_roles",
+    summary:
+      "The roles inside a client's own company — the jobs their people do. `accountId` narrows to one client. Each carries `name`, `centsPerHour` (what an hour of that role costs THE CLIENT, null when nobody has said yet — which is not the same as free), whether it is `active`, the `departmentIds` it sits in (a role can be in several) and the `peopleIds` holding it. Answers `roles` and an exact `total`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/roles",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List the client's roles" },
+  },
+  {
+    name: "create_client_role",
+    summary:
+      "Add a role to a client's company. `accountId` is the client, `name` is the job. `centsPerHour` is what an hour of it costs them, in cents — leave it off if nobody knows yet, and a saving computed from it will read as incomplete rather than as zero. `departmentIds` is the list of departments it sits in, and it may be more than one.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles",
+    schema: obj(
+      { accountId: S, name: S, centsPerHour: N, departmentIds: { type: "array" } },
+      ["accountId", "name"]
+    ),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      name: str(i, "name"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      departmentIds: Array.isArray(i.departmentIds) ? i.departmentIds : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the role "${str(i, "name")}"` },
+  },
+  {
+    name: "update_client_role",
+    summary:
+      "Edit a role: its `name`, what an hour costs (`centsPerHour`, in cents), and the `departmentIds` it sits in. The departments are the WHOLE set, not an addition — send every department the role should be in, because anything left out is removed.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/update",
+    schema: obj({ id: S, name: S, centsPerHour: N, departmentIds: { type: "array" } }, ["id", "name"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      departmentIds: Array.isArray(i.departmentIds) ? i.departmentIds : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Update the role "${str(i, "name")}"` },
+  },
+  {
+    name: "set_client_role_person",
+    summary:
+      "Say that somebody holds a role, or that they no longer do. `id` is the role and `personAccountId` is a CONTACT you already have — there is no separate person record here on purpose. `attached` true links them, false unlinks. One person can hold several roles and one role can be held by several people.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/people",
+    schema: obj({ id: S, personAccountId: S, attached: B }, ["id", "personAccountId", "attached"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      personAccountId: str(i, "personAccountId"),
+      attached: i.attached === true,
+    }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.attached === true ? "Put somebody on a role" : "Take somebody off a role"),
+    },
+  },
+  {
+    name: "set_client_role_active",
+    summary:
+      "Switch a role off, or bring it back. Nothing is deleted: a retired role is still the one a two-year-old map was drawn against, and deleting it would quietly turn that map's saving into nothing.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.active === true ? "Bring a role back" : "Switch a role off"),
+    },
+  },
+  {
+    name: "list_client_tools",
+    summary:
+      "The tools a client runs on — anything a step uses, digital or physical. `accountId` narrows to one client. `asOf` (a day, like 2026-03-01) reads the price that was in force ON THAT DAY rather than today's, which is what lets a map set to March cost March correctly; leave it off for today. Each carries `name`, `mark`, whether it is `active`, and `cents` / `billingPeriod` / `effectiveOn` for the price that applied. Answers `tools` and an exact `total`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/tools",
+    schema: obj({ accountId: S, asOf: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["accountId", "asOf"])
+        if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "List the client's tools" },
+  },
+  {
+    name: "list_client_tool_prices",
+    summary:
+      "What one tool has cost over time, newest first. `id` is the tool. Each row carries `cents`, `billingPeriod` and the `effectiveOn` day it started being true — the record behind the single number a map shows.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/client/tools/prices",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: () => "Read a tool's price history" },
+  },
+  {
+    name: "create_client_tool",
+    summary:
+      "Add a tool to a client's estate. `accountId` is the client, `name` is the tool, `mark` is an optional icon. It is created with NO price — set one with set_client_tool_price, which files it under the day it started being true.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools",
+    schema: obj({ accountId: S, name: S, mark: S }, ["accountId", "name"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      name: str(i, "name"),
+      mark: opt(i, "mark"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the tool "${str(i, "name")}"` },
+  },
+  {
+    name: "update_client_tool",
+    summary:
+      "Rename a tool or change its `mark`. Its price is NOT here — a price belongs to a date, so it is set through set_client_tool_price and never overwritten in place.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/update",
+    schema: obj({ id: S, name: S, mark: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), mark: opt(i, "mark") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Update the tool "${str(i, "name")}"` },
+  },
+  {
+    name: "set_client_tool_price",
+    summary:
+      "Say what a tool costs, from a given day. `toolId` is the tool, `cents` the amount, `billingPeriod` either 'month' or 'year', and `effectiveOn` the day that price started being true (like 2026-03-01). Setting a price for a day that already has one REPLACES it — that is a correction. Any other day is a new row, which is what keeps the history a history.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/price",
+    schema: obj(
+      { toolId: S, cents: N, billingPeriod: S, effectiveOn: S },
+      ["toolId", "cents", "billingPeriod", "effectiveOn"]
+    ),
+    buildBody: (i) => ({
+      toolId: str(i, "toolId"),
+      cents: typeof i.cents === "number" ? i.cents : undefined,
+      billingPeriod: str(i, "billingPeriod"),
+      effectiveOn: str(i, "effectiveOn"),
+    }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => `Set a tool's price from ${str(i, "effectiveOn")}`,
+    },
+  },
+  {
+    name: "set_client_tool_active",
+    summary:
+      "Switch a tool off, or bring it back. Nothing is deleted — its price history is what an old map reads to cost itself.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => (i.active === true ? "Bring a tool back" : "Switch a tool off"),
+    },
+  },
   {
     name: "create_process",
     summary:
@@ -1945,10 +2138,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_process_step",
     summary:
-      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time and `runsPerMonth` how often it happens, both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask.",
+      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time and `runsPerMonth` how often it happens, both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolIds` is what the step is done in, from `list_client_tools`, and it is a whole set.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps",
     schema: obj(
-      { processId: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N },
+      { processId: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N, roleId: S, toolIds: { type: "array" } },
       ["processId", "name", "secondsPerRun", "runsPerMonth"]
     ),
     buildBody: (i) => ({
@@ -1958,16 +2151,18 @@ export const SHARED_TOOLS: SharedTool[] = [
       secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
       runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
       position: typeof i.position === "number" ? i.position : undefined,
+      roleId: opt(i, "roleId"),
+      toolIds: Array.isArray(i.toolIds) ? i.toolIds : undefined,
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Add the step "${str(i, "name")}"` },
   },
   {
     name: "update_process_step",
     summary:
-      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them.",
+      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolIds` is re-sent WHOLE, the set you name replaces the one the step has; leave it out to change nothing.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/update",
     schema: obj(
-      { id: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N },
+      { id: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N, roleId: S, toolIds: { type: "array" } },
       ["id", "name", "secondsPerRun", "runsPerMonth"]
     ),
     buildBody: (i) => ({
@@ -1977,6 +2172,8 @@ export const SHARED_TOOLS: SharedTool[] = [
       secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
       runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
       position: typeof i.position === "number" ? i.position : undefined,
+      roleId: sent(i, "roleId"),
+      toolIds: Array.isArray(i.toolIds) ? i.toolIds : undefined,
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the step "${str(i, "name")}"` },
   },
@@ -1992,13 +2189,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "cut_process_version",
     summary:
-      "Cut a new version of a process map: today's steps are copied forward and the current version is frozen exactly as it was agreed. `sprintId` marks the cut as the automatic one a completed sprint makes. Pass the same sprint twice and the second call answers `alreadyCut: true` rather than cutting again.",
+      "Cut a new version of a process map: today's steps are copied forward and the current version is frozen exactly as it was agreed. A version is only ever cut by hand. Press twice in quick succession and the second call answers `alreadyCut: true` rather than cutting a second one.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/versions",
-    schema: obj({ processId: S, label: S, sprintId: S }, ["processId"]),
+    schema: obj({ processId: S, label: S }, ["processId"]),
     buildBody: (i) => ({
       processId: str(i, "processId"),
       label: opt(i, "label"),
-      sprintId: opt(i, "sprintId"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Cut a new version of map ${str(i, "processId")}` },
   },

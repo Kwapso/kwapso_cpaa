@@ -369,7 +369,7 @@ if (driveSource && sentThreadId) {
 // Meet itself writes into a folder; the sweep cannot make Meet run a meeting, so
 // it stands a document of the same SHAPE in a shared folder — named after the
 // entry, ending "Transcript", exactly as Meet names them — and asks the door to
-// find it from the diary entry alone. What is being proved is the JOIN (event →
+// find it from the calendar event alone. What is being proved is the JOIN (event →
 // its transcript, without knowing the file), which is the whole capability.
 if (driveSource) {
   const title = `${tag} — call`

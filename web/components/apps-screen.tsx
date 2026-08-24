@@ -25,9 +25,11 @@
 
 import * as React from "react"
 
+import { Input } from "@shared/ui/registry/primitives/input/input"
 import { Skeleton } from "@shared/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@shared/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+import { Search } from "lucide-react"
 import type { ScreenActionContext, ScreenIntent } from "@shared/ui/registry/collections/screen-renderer/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/ui/lib/recipe"
 
@@ -135,6 +137,14 @@ export function AppsScreen({
   const members = useAssignableMembers(teamId)
   const [addOpen, setAddOpen] = React.useState(false)
   const [tab, setTab] = React.useState("active")
+  // THE SEARCH BOX (the owner, 24 Aug 2026: "I cannot search through any of my
+  // apps, which is a weird thing to begin with"). It narrows the LOADED set
+  // rather than asking the server, and that is the right shape here for the same
+  // reason the Active/Inactive split is: this collection is BOUNDED (R14), read
+  // whole, and twenty-eight rows are already in the browser. Typing is instant
+  // and costs nothing. The door takes a `q` as well, because the assistant and
+  // an outside tool cannot hold a list in a browser (R19).
+  const [query, setQuery] = React.useState("")
   // The engine recipe and its rights are still the contract this screen is
   // handed; the tiles below draw the rows themselves, and the row ACTIONS stay
   // the engine's so a permission change reaches them without a second edit.
@@ -147,8 +157,15 @@ export function AppsScreen({
   if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const names = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
-  const active = appsQ.data.filter(appIsActive)
-  const inactive = appsQ.data.filter((a) => !appIsActive(a))
+  // Searched FIRST, so the two tab badges count what the search left — a badge
+  // saying 28 over a list showing 3 is R16's exact complaint, and the fact that
+  // this split is counted in the browser does not excuse it from being honest.
+  const needle = query.trim().toLowerCase()
+  const matching = needle
+    ? appsQ.data.filter((a) => a.name.toLowerCase().includes(needle))
+    : appsQ.data
+  const active = matching.filter(appIsActive)
+  const inactive = matching.filter((a) => !appIsActive(a))
   const shown = tab === "inactive" ? inactive : active
 
   const activeBadge = formatCount(active.length)
@@ -175,11 +192,35 @@ export function AppsScreen({
         label={t("Record an app")}
         icon="plus"
         onCreate={() => setAddOpen(true)}
-        aboveCard={<TabsView config={tabsConfig} value={tab} onValueChange={setTab} />}
+        aboveCard={
+          <div className="flex flex-col gap-4">
+            <TabsView config={tabsConfig} value={tab} onValueChange={setTab} />
+            {/* Only once there is something to search. A box over an empty
+             * collection is a control that cannot do anything. */}
+            {appsQ.data.length > 0 && (
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search apps…")}
+                  className="pl-8"
+                />
+              </div>
+            )}
+          </div>
+        }
       >
         {shown.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            {tab === "inactive" ? t("Nothing is finished or put away yet.") : t("No apps yet.")}
+            {needle
+              ? t("No apps match that.")
+              : tab === "inactive"
+                ? t("Nothing is finished or put away yet.")
+                : t("No apps yet.")}
           </p>
         ) : (
           <div className="flex flex-col gap-12">

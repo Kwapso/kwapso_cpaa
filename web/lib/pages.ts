@@ -115,7 +115,7 @@ export type TeamSection = {
     | "stories"
     | "tasks"
     // MEETINGS — a section of its own, which is what the owner asked for. It sits
-    // in `daily` beside Stories and Tasks: a diary is something somebody opens
+    // in `daily` beside Stories and Tasks: a calendar is something somebody opens
     // before their first call, not an inventory they consult twice a year.
     | "meetings"
     // The agency's own housekeeping. The brand library is a sidebar page rather
@@ -182,7 +182,7 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // Two pages changed halves with it. KNOWLEDGE BASE moved up into the daily
   // set — it stopped being a library somebody consults and became the thing the
   // team asks first, which is a different habit and belongs above the fold.
-  // MEETINGS moved down out of it: the diary is read when there is a meeting,
+  // MEETINGS moved down out of it: the meetings list is read when there is a meeting,
   // not every morning.
   //
   // FOUR PAGES LEFT THE RAIL on 17 Aug 2026 and only one of them lost anything.

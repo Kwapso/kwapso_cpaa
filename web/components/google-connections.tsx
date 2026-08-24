@@ -76,7 +76,7 @@ const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
   // "so meetings and sprints can be read and added" for six weeks after the
   // last calendar write was deleted — a promise about what kwapso may do, left
   // describing a capability that no longer existed, on the one screen where
-  // somebody decides whether to hand over their diary.
+  // somebody decides whether to hand over their calendar.
   calendar: {
     label: "Calendar",
     scope: "Your own calendar, read only. kwapso never adds, changes or cancels anything in it.",

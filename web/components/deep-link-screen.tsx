@@ -34,9 +34,10 @@ import { type ScreenRights } from "@shared/ui/lib/recipe"
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { TeamSectionNav } from "@/components/team-section-nav"
 import { CountedTabs } from "@/components/counted-tabs"
-import { buildCrumbs } from "@/components/deep-link/crumbs"
+import { buildCrumbs, namedByList } from "@/components/deep-link/crumbs"
+import { useTrailNames } from "@/components/deep-link/trail-names"
 import { renderModuleContent } from "@/components/deep-link/module-content"
-import { ACCOUNT_MODULES, sectionFor, type SectionKey } from "@/components/deep-link/route"
+import { ACCOUNT_MODULES, sectionFor, trailPath, type SectionKey } from "@/components/deep-link/route"
 import { useHostNav, useUrlRoute } from "@/components/deep-link/use-host-nav"
 import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
@@ -79,7 +80,7 @@ export function DeepLinkScreen() {
     urlTeamId,
     router,
   })
-  const { perms, can } = usePermissions(enabled ? teamId : null)
+  const { perms, error: permsError, can } = usePermissions(enabled ? teamId : null)
 
   /* --------------------------------- the data -------------------------------- */
 
@@ -124,7 +125,18 @@ export function DeepLinkScreen() {
     activityQ,
     activityTotal,
     inviteAuditQ,
-  } = useScreenData({ teamId, enabled, module, recordId, helpScope, taskView })
+  } = useScreenData({
+    teamId,
+    enabled,
+    module,
+    recordId,
+    helpScope,
+    taskView,
+    // The records this one was opened INSIDE. Their lists back the breadcrumb's
+    // labels, so a nested address that does not ask for them shows the word
+    // "Account" above a screen already displaying the client's name.
+    ancestorModules: (route?.levels ?? []).slice(0, -1).map((l) => l.module),
+  })
 
   const roles = rolesQ.data ?? []
   const activeRoles = roles.filter((r) => r.active)
@@ -141,8 +153,63 @@ export function DeepLinkScreen() {
     : module && module !== "team"
       ? `/t/${teamId}/${module}`
       : teamPath
-  const sectionPath = moduleBase
-  const currentPath = recordId ? `${moduleBase}/${recordId}` : moduleBase
+  // ── THE ADDRESS OF THIS SCREEN, WITH EVERYTHING IT WAS OPENED INSIDE ────────
+  //
+  // THE OWNER, 24 Aug 2026, after going Accounts → Confia → Apps → CONFIA →
+  // Sprints → a sprint and landing on `/apps/…/sprints/…`: "that middle screen
+  // that I went to has just been erased. I spoke about nesting, not replacing."
+  //
+  // `moduleBase` above is built from the CURRENT MODULE alone, which is correct
+  // for a flat address and wrong for every nested one: at
+  // `/accounts/CONFIA/apps/A1` the module is `apps`, so the base came out
+  // `/apps` and the client was gone before a single link was built. The detail
+  // screen then handed its panels that truncated base, so the NEXT hop appended
+  // to a path that had already lost a level — one hop in, and the trail was one
+  // level long again. That is why nesting appeared to work and then quietly
+  // stopped: nothing was capping the depth, each screen was resetting it.
+  //
+  // Both are derived from the TRAIL now, through the same `trailPath` the
+  // breadcrumbs use, so the shell and the crumbs cannot disagree about where a
+  // nested record lives. `sectionPath` is the deepest level's COLLECTION IN
+  // CONTEXT (`/accounts/CONFIA/apps`) — a detail screen appends its own id to it
+  // and passes that down, so the level after it appends rather than restarts,
+  // for as many levels as somebody goes.
+  //
+  // A flat address is untouched: one level in, `trailPath` returns exactly what
+  // `moduleBase` did, which is why nothing else on this screen had to change.
+  const trail = route?.levels ?? []
+  const sectionPath = trail.length
+    ? trailPath(trail, teamPath, topLevel, { withRecord: false })
+    : moduleBase
+  const currentPath = trail.length ? trailPath(trail, teamPath, topLevel) : moduleBase
+
+  // ── THE NAMES THE TRAIL SAYS OUT LOUD ──────────────────────────────────────
+  //
+  // The lists a crumb can read a record's name out of, and then the levels NONE
+  // of them holds, read by id. Both live up here rather than beside buildCrumbs
+  // because the resolver is a hook and there are early returns below — and a
+  // crumb is one of the few things this screen still owes a person while it is
+  // deciding what else to render.
+  //
+  // A list is the FAST path, never the only one: every one of these is paged, so
+  // a client far enough down the collection is simply not in it, and the crumb
+  // used to fall back to the word "Account" above a screen already displaying
+  // the client's name. trail-names.ts carries the day that was caught.
+  const crumbRecords = {
+    accounts: accountsQ.data,
+    members: membersQ.data,
+    roles,
+    invites: invitesQ.data,
+    knowledge: knowledgeQ.data,
+    apps: appsQ.data,
+    sprints: sprintsQ.data,
+    stories: storiesQ.data,
+    // The ALL list, so a FINISHED task's breadcrumb still says its name rather
+    // than falling back to an id — it loads whenever a record is open.
+    tasks: tasksAllQ.data ?? tasksOpenQ.data,
+    meetings: meetingsQ.data,
+  }
+  const resolvedNames = useTrailNames(trail, (m, id) => !!namedByList(m, id, crumbRecords), enabled)
 
   const { go, replace, closePanel } = useHostNav({ router, setRoute, currentPath })
 
@@ -292,6 +359,7 @@ export function DeepLinkScreen() {
   })
 
   const crumbs = buildCrumbs({
+    levels: route.levels,
     t,
     topLevel,
     module,
@@ -299,20 +367,8 @@ export function DeepLinkScreen() {
     teamName,
     teamPath,
     sectionPath,
-    records: {
-      accounts: accountsQ.data,
-      members: membersQ.data,
-      roles,
-      invites: invitesQ.data,
-      knowledge: knowledgeQ.data,
-      apps: appsQ.data,
-      sprints: sprintsQ.data,
-      stories: storiesQ.data,
-      // The ALL list, so a FINISHED task's breadcrumb still says its name rather
-      // than falling back to an id — it loads whenever a record is open.
-      tasks: tasksAllQ.data ?? tasksOpenQ.data,
-      meetings: meetingsQ.data,
-    },
+    records: crumbRecords,
+    resolved: resolvedNames,
   })
 
   return (
@@ -351,7 +407,7 @@ export function DeepLinkScreen() {
             badged flag is per-permission (the strip may hide for this viewer). */}
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
           {renderModuleContent({
-            noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
+            noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
             brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,

@@ -123,7 +123,11 @@ const REFUSE_IMAGE = {
 
 // ── apps ─────────────────────────────────────────────────────────────────────
 
-/** GET /api/tenancy/apps[?accountId=] — the systems we have built.
+/** GET /api/tenancy/apps[?accountId=][&q=] — the systems we have built.
+ *
+ * `q` searches an app's NAME. It is a server filter rather than a box the screen
+ * narrows a loaded list with, for the reason R16 gives: `total` comes back over
+ * the same WHERE, so the count beside the rows is the count OF the rows.
  *
  * R21: fenced, not refused. An app IS the client's own system, and the portal's
  * value screen names it — so this resolves the caller's account set and the lib
@@ -131,8 +135,10 @@ const REFUSE_IMAGE = {
 export async function getApps(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "processes", "read")
   const scope = await accountScope(cfg, guard)
-  const accountId = queryText(new URL(request.url).searchParams.get("accountId"), "Account")
-  const { rows, total } = await listApps(cfg, guard, scope, { accountId })
+  const params = new URL(request.url).searchParams
+  const accountId = queryText(params.get("accountId"), "Account")
+  const q = queryText(params.get("q"), "Search")
+  const { rows, total } = await listApps(cfg, guard, scope, { accountId, q })
   return json({ apps: rows, total })
 }
 
@@ -491,6 +497,13 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
     secondsPerRun: wholeNumber(Number(body.secondsPerRun), "Time per run", MAX_STEP_SECONDS),
     runsPerMonth: wholeNumber(Number(body.runsPerMonth), "Times a month", MAX_RUNS_PER_MONTH),
     position: body.position === undefined ? undefined : wholeNumber(Number(body.position), "Order", 10_000),
+    // WHO DOES IT and WHAT IN. Left out entirely, the step inherits the map's
+    // role and gets no tools — which is what a quick add during a mapping session
+    // should do. Sent as null, the role is deliberately nobody.
+    roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
+    toolIds: Array.isArray(body.toolIds)
+      ? body.toolIds.map((v) => requireText(v, "Tool", TEXT_LIMITS.short))
+      : undefined,
   })
   // The PROCESS is what a listener can act on: a step is only ever read on its
   // map, and the map's savings change the moment a duration does.
@@ -511,6 +524,16 @@ export async function postUpdateStep(request: Request, env: Env): Promise<Respon
     secondsPerRun: wholeNumber(Number(body.secondsPerRun), "Time per run", MAX_STEP_SECONDS),
     runsPerMonth: wholeNumber(Number(body.runsPerMonth), "Times a month", MAX_RUNS_PER_MONTH),
     position: body.position === undefined ? undefined : wholeNumber(Number(body.position), "Order", 10_000),
+    // ABSENT LEAVES IT ALONE; null CLEARS it. The two are different answers and
+    // the door keeps them different, which is why this is `"roleId" in body`
+    // rather than a truthiness test — a form that saves a step's times without
+    // touching who does it must not silently un-name the person.
+    roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
+    // The WHOLE set, so saving twice is saving once (the same shape setAppStaff
+    // takes). Absent leaves the tools alone; an empty array clears them.
+    toolIds: Array.isArray(body.toolIds)
+      ? body.toolIds.map((v) => requireText(v, "Tool", TEXT_LIMITS.short))
+      : undefined,
   })
   await publishChange(env, guard.teamId, "processes", processId)
   return json({ ok: true })
@@ -533,13 +556,15 @@ export async function postRemoveStep(request: Request, env: Env): Promise<Respon
 
 /** POST /api/tenancy/processes/versions — cut a new version.
  *
- * ONE DOOR, TWO CALLERS (the owner confirmed both): a person pressing the button
- * sends no `sprintId`; the work engine, when a sprint completes, sends the
- * sprint's id. That id is what makes the automatic cut idempotent — the partial
- * unique index refuses a second version for the same sprint, so a completion
- * that fires twice cuts once (R17), and the door answers 200 with
- * `alreadyCut: true` rather than an error, because nothing is wrong: the version
- * it asked for exists. */
+ * ONE DOOR, ONE CALLER: a person pressing the button (owner, 24 Aug 2026). It
+ * used to take a `sprintId` as well, for an automatic cut on sprint completion
+ * that nothing was ever wired to perform — that decision is purged, not switched
+ * off (migration 0051).
+ *
+ * R17 rides the unique index on (process_id, version_no): two quick presses both
+ * read version N and both try to insert N+1, the loser is refused by the
+ * database, and the door answers 200 with `alreadyCut: true` rather than an
+ * error — because nothing is wrong, the version it asked for exists. */
 export async function postCutVersion(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
   const scope = await refusePortalCaller(cfg, guard)
@@ -547,7 +572,6 @@ export async function postCutVersion(request: Request, env: Env): Promise<Respon
   const cut = await cutVersion(cfg, guard, scope, actor, {
     processId,
     label: optionalText(body.label, "Name", TEXT_LIMITS.short),
-    sprintId: optionalText(body.sprintId, "Sprint", TEXT_LIMITS.short),
   })
   if (!cut) return json({ alreadyCut: true })
   await publishChange(env, guard.teamId, "processes", processId)

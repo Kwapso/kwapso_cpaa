@@ -86,7 +86,7 @@ describe("paged-search (R14, the search half): a paged list searches the whole c
   // rows it got back — "1 meetings match". If the screen then narrows those rows
   // in the browser, the number and the list are answering two different
   // questions, and the screen says "1 meetings match" over "Nothing matched."
-  // That is what the diary shipped: it asked for the whole diary (`view: "all"`,
+  // That is what the meetings list shipped: it asked for the whole meetings list (`view: "all"`,
   // correctly) and then kept only this week's rows out of the answer.
   //
   // Derived from the binding, not from a list of screens: every find-bar screen

@@ -220,7 +220,7 @@ export function RecordCalendar({
    *
    * The calendar owns the month — a person moves it with the arrows, and that is
    * the right place for it. But a screen over a PAGED collection cannot answer
-   * for a month it was never given: the diary pages newest-first, so the rows in
+   * for a month it was never given: the meetings list pages newest-first, so the rows in
    * hand are the furthest-out future and the month being drawn is usually not
    * among them. Without this, the grid renders whatever happened to be loaded and
    * calls the rest an empty month. So the calendar says what it is showing, and

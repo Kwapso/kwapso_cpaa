@@ -38,6 +38,7 @@ import { ImportScreen } from "@/components/import-screen"
 import { InternalRateCardScreen } from "@/components/internal-rate-card"
 import { StaffPanel } from "@/components/staff-panel"
 import { SelectableScreen } from "@/components/selectable-screen"
+import { SelectableDetailScreen } from "@/components/selectable-detail"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { tenancy } from "@/lib/api"
@@ -81,6 +82,13 @@ export type ModuleContentCtx = Pick<
   noAccess: boolean
   enabled: boolean
   perms: ReturnType<typeof usePermissions>["perms"]
+  /** WHY THE ERROR TRAVELS WITH THE RIGHTS. The line below used to ask only
+   * whether `perms` was still `undefined` — which is true while the answer is
+   * coming AND for ever after it failed. One unlucky rights fetch therefore
+   * froze navigation into EVERY record type in the app behind a loading
+   * skeleton until a hard reload, because this is the first gate every detail
+   * screen passes through. */
+  permsError: unknown
   can: ReturnType<typeof usePermissions>["can"]
   module: string | null
   recordId: string | null
@@ -168,6 +176,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     noAccess,
     enabled,
     perms,
+    permsError,
     module,
     recordId,
     teamId,
@@ -194,6 +203,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
 
     if (noAccess) return <NoAccess />
     if (!enabled) return <Skeleton variant="list" lines={4} />
+    // "It went wrong" and "it has not arrived" are different sentences, and only
+    // one of them is worth waiting through.
+    if (permsError)
+      return (
+        <p className="text-destructive text-sm">
+          {t("We couldn't check what you're allowed to see. Refresh the page, and tell us if it keeps happening.")}
+        </p>
+      )
     if (perms === undefined) return <Skeleton variant="list" lines={4} />
 
     // Import — no permission KEY of its own (gated per-target). Handle it before
@@ -205,10 +222,16 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
 
     if (module === "dropdowns") {
       if (!can("selectable_data", "read")) return <NoAccess />
+      // THE LIST/DETAIL SPLIT, by hand, because this module is handled above the
+      // generic one (it has no recipe — the vocabulary screen is host-composed).
+      // Same shape the engine applies below: an id in the path is a record.
+      if (recordId)
+        return <SelectableDetailScreen teamId={teamId as string} valueId={recordId} />
       return (
         <SelectableScreen
           teamId={teamId as string}
           onImport={() => go(`/t/${teamId}/import/selectable_data`)}
+          onOpen={(id) => go(`/t/${teamId}/dropdowns/${id}`)}
         />
       )
     }

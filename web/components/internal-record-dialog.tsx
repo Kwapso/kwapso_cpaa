@@ -284,6 +284,46 @@ export const moduleFields = (): InternalField[] => [
   { key: "benefit", label: "What it gives them", kind: "prose", placeholder: "Time saved, and one place to look." },
 ]
 
+/** THE CLIENT'S OWN ORGANISATION — three small forms, and what each one leaves
+ * OUT is the part worth reading.
+ *
+ * A ROLE's departments are not here: a role can sit in several (the owner's
+ * ruling), and this dialog has no multi-select. They are toggled on the row
+ * instead, where seeing "Operations, Finance" beside the name is the answer to
+ * the question anyway. Same for who holds the role.
+ *
+ * A TOOL's price is not here either, and that is the deeper one: a price belongs
+ * to a DAY. Putting it on the tool form would make it a field somebody
+ * overwrites, and overwriting it is exactly what stops a map set to March
+ * reading March's price. It has its own small form, with the day on it. */
+export const clientDepartmentFields = (): InternalField[] => [
+  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Operations" },
+]
+
+export const clientRoleFields = (): InternalField[] => [
+  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Dispatch clerk" },
+  {
+    key: "costPerHour",
+    label: "Cost an hour",
+    kind: "number",
+    // Left empty on purpose when nobody knows yet. A zero would read as "this
+    // person is free" and the saving would come out as nothing, with nothing to
+    // say a number was missing.
+    placeholder: "38",
+  },
+]
+
+export const clientToolFields = (): InternalField[] => [
+  { key: "name", label: "Name", kind: "text", required: true, placeholder: "HubSpot" },
+  { key: "mark", label: "Emoji", kind: "text", placeholder: "🧲" },
+]
+
+export const clientToolPriceFields = (): InternalField[] => [
+  { key: "amount", label: "Cost", kind: "number", required: true, placeholder: "300" },
+  { key: "billingPeriod", label: "Every", kind: "text", options: ["month", "year"], required: true },
+  { key: "effectiveOn", label: "From", kind: "date", required: true },
+]
+
 export const purposeFields = (departments: string[]): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Sprint review" },
   { key: "department", label: "Department", kind: "text", options: departments, placeholder: "Delivery, Sales…" },

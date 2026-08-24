@@ -1,5 +1,5 @@
 // GOOGLE MATERIAL, AS KNOWLEDGE SOURCES — the four kinds that make a named Drive
-// folder, a named Chat space, scoped mail and the diary answerable.
+// folder, a named Chat space, scoped mail and the calendar answerable.
 //
 // ══════════════════════════════════════════════════════════════════════════════
 // WHY THIS IS A SECOND LIST OF KINDS AND NOT FOUR MORE LINES IN INGEST_KINDS

@@ -5,9 +5,44 @@
 // ONE file — which is also where sharding routing plugs in (see
 // workers/tenancy/src/lib/sharding.ts for the routing + mover machinery).
 
+import type { D1Database } from "@cloudflare/workers-types"
+
 export type D1Rest = {
   accountId: string
   apiToken: string
+  /** TEAM DATABASES THIS DEPLOYMENT CAN REACH DIRECTLY, by database id.
+   *
+   * The REST door above is a call to Cloudflare's MANAGEMENT API — the interface
+   * for creating and listing databases, which we use to run queries because a
+   * database made at runtime cannot be named in a config file that shipped
+   * before it existed. Measured on staging, 24 Aug 2026: ~400ms per statement,
+   * for SQL the database itself reports finishing in 0.95ms.
+   *
+   * A native binding is the same database over the data plane, in single-digit
+   * milliseconds. It has to be named in wrangler config, so it can only ever
+   * cover databases that exist at deploy time — which is why this is a MAP with
+   * a fall-through rather than a replacement. A team here goes direct; a team
+   * created after the last deploy keeps working over REST, exactly as before,
+   * until somebody adds its binding. Nothing has to be migrated and nothing
+   * breaks if this is empty.
+   *
+   * WHY THIS CANNOT BE POINTED SOMEWHERE IT SHOULD NOT GO. The key is a database
+   * id, and the only database id that reaches this door is `guard.databaseId` —
+   * read by `requireMember` out of the `teams` row for the team the caller is a
+   * member of, over the core database, on this request. There is no route, body
+   * or query string anywhere in the codebase that supplies one. So the native
+   * path is reachable exactly where the REST path was reachable, for exactly the
+   * same caller, and a wrong or hostile id finds no entry and falls through to a
+   * REST call that is itself scoped to that same id. The pipe changed; nothing
+   * about who may put something in it did. */
+  natives?: Record<string, D1Database>
+  /** WHERE THIS REQUEST'S TRIPS ARE COUNTED (timing.ts), when somebody is
+   * counting. Every statement here is a separate HTTPS request to Cloudflare, so
+   * the COUNT is the cost model — and it rides on the config because the config
+   * is the one thing already threaded to every call site in the codebase. No
+   * handler had to change to be measured. Absent = nobody asked, and the door
+   * pays nothing. */
+  stats?: { op: string; ms: number }[]
 }
 
 type CfResponse<T> = {
@@ -17,11 +52,36 @@ type CfResponse<T> = {
 }
 
 import { D1_LIST_PAGE_CAP } from "./limits"
+import { labelFor } from "./timing"
 
 const API = "https://api.cloudflare.com/client/v4"
 const RETRIES = 2 // total attempts = 1 + RETRIES — 5xx, network blips, and CF's 7500-in-a-200
 
+/** THE MEASURED DOOR. Everything below goes through `cfTimed`, so a trip cannot
+ * be made without being counted — the alternative (asking each call site to
+ * report itself) is the shape that always ends with the expensive path being the
+ * one nobody instrumented. Retries are counted INSIDE the trip they belong to,
+ * because a statement that needed three attempts genuinely cost three attempts
+ * and reporting it as one would flatter the number. */
 async function cf<T>(
+  cfg: D1Rest,
+  path: string,
+  body?: unknown,
+  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST"
+): Promise<T> {
+  if (!cfg.stats) return cfRaw<T>(cfg, path, body, method)
+  const started = Date.now()
+  const sql = (body as { sql?: string } | undefined)?.sql
+  try {
+    return await cfRaw<T>(cfg, path, body, method)
+  } finally {
+    // In a `finally`, so a statement that THREW is still counted. A failing
+    // query is usually the slow one, and leaving it out would hide it.
+    cfg.stats.push({ op: sql ? labelFor(sql) : method, ms: Date.now() - started })
+  }
+}
+
+async function cfRaw<T>(
   cfg: D1Rest,
   path: string,
   body?: unknown,
@@ -141,19 +201,54 @@ export async function d1ListDatabases(
   return all
 }
 
-/** Run ONE parameterized statement; returns its rows. */
+/** Run ONE parameterized statement; returns its rows.
+ *
+ * Direct if this deployment holds a binding for the database, over the REST door
+ * if it does not — see `natives` above. Both paths bind the SAME parameters the
+ * same way: a native statement is `.bind(...params)`, which is D1's own
+ * placeholder binding, so nothing about how untrusted text is kept out of SQL
+ * changes with the route it takes. */
 export async function d1Query<Row = Record<string, unknown>>(
   cfg: D1Rest,
   databaseId: string,
   sql: string,
   params: (string | number | null)[] = []
 ): Promise<Row[]> {
+  const native = cfg.natives?.[databaseId]
+  if (native) return nativeQuery<Row>(cfg, native, sql, params)
   const result = await cf<{ results: Row[] }[]>(
     cfg,
     `/d1/database/${databaseId}/query`,
     { sql, params }
   )
   return result[0]?.results ?? []
+}
+
+/** The direct path, counted by the same seam as the REST one so a door's trip
+ * report stays comparable across the two — that is how the change is PROVED
+ * rather than asserted, and how a team still on REST is visible as such. */
+async function nativeQuery<Row>(
+  cfg: D1Rest,
+  db: D1Database,
+  sql: string,
+  params: (string | number | null)[]
+): Promise<Row[]> {
+  if (!cfg.stats) return runNative<Row>(db, sql, params)
+  const started = Date.now()
+  try {
+    return await runNative<Row>(db, sql, params)
+  } finally {
+    cfg.stats.push({ op: labelFor(sql), ms: Date.now() - started })
+  }
+}
+
+async function runNative<Row>(
+  db: D1Database,
+  sql: string,
+  params: (string | number | null)[]
+): Promise<Row[]> {
+  const out = await db.prepare(sql).bind(...params).all<Row>()
+  return out.results ?? []
 }
 
 /** Statement shapes a CONCATENATION of per-shard answers cannot honestly give.
@@ -232,12 +327,27 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
   return settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []))
 }
 
-/** Run a multi-statement script (schema/seeds — no params allowed). */
+/** Run a multi-statement script (schema/seeds — no params allowed).
+ *
+ * Direct where the deployment holds a binding. `.exec` is D1's own
+ * multi-statement entry point, which is what this always asked the REST door
+ * for — so migrations, seeds and the copy path behave identically, they just
+ * stop paying for a management-API call each. */
 export async function d1ExecScript(
   cfg: D1Rest,
   databaseId: string,
   script: string
 ): Promise<void> {
+  const native = cfg.natives?.[databaseId]
+  if (native) {
+    const started = Date.now()
+    try {
+      await native.exec(script)
+    } finally {
+      cfg.stats?.push({ op: "EXEC script", ms: Date.now() - started })
+    }
+    return
+  }
   await cf(cfg, `/d1/database/${databaseId}/query`, { sql: script })
 }
 

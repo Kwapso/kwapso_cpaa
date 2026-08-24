@@ -91,6 +91,7 @@
 
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
+import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { sweepCoreRetention } from "@shared/workers/retention"
@@ -174,6 +175,23 @@ import {
   postUpdateAppModule,
   postAppModuleActive,
 } from "./routes/processes"
+import {
+  getDepartments,
+  getClientRoles,
+  getToolPrices,
+  getTools,
+  postCreateDepartment,
+  postCreateClientRole,
+  postCreateTool,
+  postDepartmentActive,
+  postClientRoleActive,
+  postClientRolePerson,
+  postToolActive,
+  postToolPrice,
+  postUpdateDepartment,
+  postUpdateClientRole,
+  postUpdateTool,
+} from "./routes/client-org"
 import {
   getAccountRates,
   getInternalRates,
@@ -288,6 +306,26 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/processes/versions": { handler: postCutVersion, kind: "mutation" },
   "GET /api/tenancy/processes/comments": { handler: getProcessComments, kind: "read" },
   "POST /api/tenancy/processes/comments": { handler: postProcessComment, kind: "mutation" },
+  // THE CLIENT'S OWN ORGANISATION — who does the work, and what they use to do
+  // it. Same module as the map (`processes`), because a role exists to carry an
+  // hourly cost so a step's minutes can become money. Every door resolves the
+  // account fence rather than refusing a client login: the owner ticked all four
+  // of these for the portal in round two.
+  "GET /api/tenancy/client/departments": { handler: getDepartments, kind: "read" },
+  "POST /api/tenancy/client/departments": { handler: postCreateDepartment, kind: "mutation" },
+  "POST /api/tenancy/client/departments/update": { handler: postUpdateDepartment, kind: "mutation" },
+  "POST /api/tenancy/client/departments/active": { handler: postDepartmentActive, kind: "mutation" },
+  "GET /api/tenancy/client/roles": { handler: getClientRoles, kind: "read" },
+  "POST /api/tenancy/client/roles": { handler: postCreateClientRole, kind: "mutation" },
+  "POST /api/tenancy/client/roles/update": { handler: postUpdateClientRole, kind: "mutation" },
+  "POST /api/tenancy/client/roles/people": { handler: postClientRolePerson, kind: "mutation" },
+  "POST /api/tenancy/client/roles/active": { handler: postClientRoleActive, kind: "mutation" },
+  "GET /api/tenancy/client/tools": { handler: getTools, kind: "read" },
+  "GET /api/tenancy/client/tools/prices": { handler: getToolPrices, kind: "read" },
+  "POST /api/tenancy/client/tools": { handler: postCreateTool, kind: "mutation" },
+  "POST /api/tenancy/client/tools/update": { handler: postUpdateTool, kind: "mutation" },
+  "POST /api/tenancy/client/tools/price": { handler: postToolPrice, kind: "mutation" },
+  "POST /api/tenancy/client/tools/active": { handler: postToolActive, kind: "mutation" },
   "GET /api/tenancy/impact": { handler: getImpact, kind: "read" },
   // THE BADGES ON A RECORD'S TABS, answered when the record OPENS rather than
   // when the tab is clicked — the counts are eager, the rows stay lazy. It
@@ -333,7 +371,12 @@ export default {
       if (route === "GET /api/tenancy/health") return json({ ok: true })
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such tenancy action.")
-      return await def.handler(request, env)
+      // Measured on the way out (timing.ts): the browser's network panel reads
+      // `Server-Timing` with no tooling, and a door slow for everybody prints a
+      // line nobody has to be watching for.
+      const res = await def.handler(request, env)
+      logIfSlow(request, route)
+      return withTiming(request, res)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("tenancy worker error:", e)

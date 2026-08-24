@@ -797,7 +797,7 @@ either way. (inferred: adopting the old app's numbered form; both satisfy R14.)
 One word, every form, both front doors. This replaces 30 distinct labels currently in
 use, including "Save changes" (13 sites), "Add it" (7), "Save" (4), "Create role",
 "Add value", "Add source", "Add file", "Add contact", "Add account",
-"Add step", "Record it", "Map it", "Start it", "Log it", "Put it in the diary",
+"Add step", "Record it", "Map it", "Start it", "Log it",
 "Share it", "Send it", "Send it from kwapso", "Send and resolve", "Send invite",
 "Ask and email", "Raise ticket", "Give access", "Save profile", "Email me a code",
 "Continue", "Start my own team".

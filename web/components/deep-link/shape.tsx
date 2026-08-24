@@ -278,13 +278,13 @@ export function shapeKnowledgeList(
 /* -------------------------------- meetings -------------------------------- */
 
 /** One meeting, as a row: when it was, who it was with and why. The date leads
- * because a diary is scanned by date — the title is what you read once you have
+ * because a calendar is scanned by date — the title is what you read once you have
  * found the day. */
 export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
   return {
     rows: meetings.map((m) => ({
       id: m.id,
-      // WHO IT WAS WITH, as a picture. A diary scanned by date still wants to
+      // WHO IT WAS WITH, as a picture. A calendar scanned by date still wants to
       // say at a glance whose call it was (R35).
       mark: <RecordMark name={m.accountName ?? m.title} />,
       // A CANCELLED meeting stays in the list (deactivate-not-delete) and says
@@ -295,7 +295,7 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // is where a person compares meetings on it (K2).
       detail: [formatDate(m.startsAt), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
       // TABLE COLUMNS, not facets. `client` and `state` are two of the six the
-      // "All" view draws, and the diary's filters are the DOOR's now
+      // "All" view draws, and the meetings list's filters are the DOOR's now
       // (web/lib/collection-filters.ts) — so these are read by the table and by
       // nothing else. `purpose` went with the facet that was its only reader.
       client: m.accountName ?? "Ours",

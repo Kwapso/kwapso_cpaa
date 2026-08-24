@@ -13,6 +13,10 @@
 
 import { ApiFailure } from "@shared/web/api"
 import type {
+  ClientDepartment,
+  ClientRole,
+  ClientTool,
+  ClientToolPrice,
   AppModule,
   Account,
   AccountDetail,
@@ -168,6 +172,72 @@ export const tenancy = {
     api<{ modules: AppModule[] }>(`/api/tenancy/app-modules?id=${encodeURIComponent(id)}`).then(
       (r) => r.modules[0] ?? null
     ),
+  // ── THE CLIENT'S OWN ORGANISATION ──────────────────────────────────────────
+  // Who does the work at a client, what an hour of them costs, and what they run
+  // on. Every read takes the client; every write names either the client (create)
+  // or the row (everything else).
+  clientDepartments: (accountId?: string) =>
+    api<{ departments: ClientDepartment[]; total: number }>(
+      `/api/tenancy/client/departments${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`
+    ),
+  createClientDepartment: (input: { accountId: string; name: string }) =>
+    api<{ id: string }>("/api/tenancy/client/departments", { method: "POST", body: JSON.stringify(input) }),
+  updateClientDepartment: (input: { id: string; name: string }) =>
+    api<{ ok: true }>("/api/tenancy/client/departments/update", { method: "POST", body: JSON.stringify(input) }),
+  setClientDepartmentActive: (id: string, active: boolean) =>
+    api<{ ok: true; moved: boolean }>("/api/tenancy/client/departments/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
+    }),
+  clientRoles: (accountId?: string) =>
+    api<{ roles: ClientRole[]; total: number }>(
+      `/api/tenancy/client/roles${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`
+    ),
+  createClientRole: (input: {
+    accountId: string
+    name: string
+    centsPerHour?: number | null
+    departmentIds?: string[]
+  }) => api<{ id: string }>("/api/tenancy/client/roles", { method: "POST", body: JSON.stringify(input) }),
+  updateClientRole: (input: {
+    id: string
+    name: string
+    centsPerHour?: number | null
+    departmentIds?: string[]
+  }) => api<{ ok: true }>("/api/tenancy/client/roles/update", { method: "POST", body: JSON.stringify(input) }),
+  setClientRolePerson: (input: { id: string; personAccountId: string; attached: boolean }) =>
+    api<{ ok: true }>("/api/tenancy/client/roles/people", { method: "POST", body: JSON.stringify(input) }),
+  setClientRoleActive: (id: string, active: boolean) =>
+    api<{ ok: true; moved: boolean }>("/api/tenancy/client/roles/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
+    }),
+  clientTools: (accountId?: string, asOf?: string) => {
+    const q = new URLSearchParams()
+    if (accountId) q.set("accountId", accountId)
+    if (asOf) q.set("asOf", asOf)
+    return api<{ tools: ClientTool[]; total: number }>(
+      `/api/tenancy/client/tools${q.toString() ? `?${q}` : ""}`
+    )
+  },
+  clientToolPrices: (id: string) =>
+    api<{ prices: ClientToolPrice[] }>(`/api/tenancy/client/tools/prices?id=${encodeURIComponent(id)}`),
+  createClientTool: (input: { accountId: string; name: string; mark?: string }) =>
+    api<{ id: string }>("/api/tenancy/client/tools", { method: "POST", body: JSON.stringify(input) }),
+  updateClientTool: (input: { id: string; name: string; mark?: string }) =>
+    api<{ ok: true }>("/api/tenancy/client/tools/update", { method: "POST", body: JSON.stringify(input) }),
+  setClientToolPrice: (input: {
+    toolId: string
+    cents: number
+    billingPeriod: "month" | "year"
+    effectiveOn: string
+  }) => api<{ ok: true }>("/api/tenancy/client/tools/price", { method: "POST", body: JSON.stringify(input) }),
+  setClientToolActive: (id: string, active: boolean) =>
+    api<{ ok: true; moved: boolean }>("/api/tenancy/client/tools/active", {
+      method: "POST",
+      body: JSON.stringify({ id, active }),
+    }),
+
   createAppModule: (input: { appId: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
     api<{ id: string }>("/api/tenancy/app-modules", { method: "POST", body: JSON.stringify(input) }),
   updateAppModule: (input: { id: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
@@ -393,10 +463,15 @@ export const tenancy = {
   /* ---- process maps: App -> Process -> Step, and the value drilled through ---- */
 
   /** The systems we've built. Bounded (an agency has tens of apps, not thousands)
-   * — the collection that grows underneath is `processes`, which pages. */
-  apps: (accountId?: string) =>
+   * — the collection that grows underneath is `processes`, which pages.
+   *
+   * `q` searches the app's NAME on the SERVER, so the `total` that comes back is
+   * the total of what matched (R16) rather than of everything. Narrowing a
+   * loaded list in the browser would have left the heading counting rows the
+   * screen was no longer showing. */
+  apps: (accountId?: string, q?: string) =>
     api<{ apps: AppRow[]; total: number }>(
-      `/api/tenancy/apps${accountId ? `?accountId=${enc(accountId)}` : ""}`
+      `/api/tenancy/apps${listQuery({ accountId, q })}`
     ),
   createApp: (input: Record<string, unknown>) => api<{ id: string }>("/api/tenancy/apps", post(input)),
   updateApp: (input: Record<string, unknown> & { id: string }) =>

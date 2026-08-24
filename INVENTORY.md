@@ -66,7 +66,7 @@ in walk past a mailbox consent screen.
 | Client | Used by | Scopes | Google review |
 |---|---|---|---|
 | **`kwapso-signin`** | `workers/auth`, the sign-in button | basic profile only | none needed |
-| **`kwapso sync`** | `workers/content`, per-person Drive / Gmail / Calendar / Chat connections | `drive.readonly`, `drive.file`, `gmail.readonly`, `gmail.compose`, `gmail.send`, `gmail.modify`, `calendar.readonly`, `chat.messages`, `chat.spaces.readonly`, plus `openid email` on each | **yes**, these are sensitive scopes and the client goes through verification. The calendar ask is READ-ONLY as of 19 Aug 2026: the app has only read a diary since 18 Aug, and the grant now says so too. It cost every connected person a reconnect, because a grant at Google is additive per OAuth client and a narrower ask alone changes nothing; OPERATIONS.md holds the whole procedure |
+| **`kwapso sync`** | `workers/content`, per-person Drive / Gmail / Calendar / Chat connections | `drive.readonly`, `drive.file`, `gmail.readonly`, `gmail.compose`, `gmail.send`, `gmail.modify`, `calendar.readonly`, `chat.messages`, `chat.spaces.readonly`, plus `openid email` on each | **yes**, these are sensitive scopes and the client goes through verification. The calendar ask is READ-ONLY as of 19 Aug 2026: the app has only read a calendar since 18 Aug, and the grant now says so too. It cost every connected person a reconnect, because a grant at Google is additive per OAuth client and a narrower ask alone changes nothing; OPERATIONS.md holds the whole procedure |
 
 Rebuilding these from nothing means: create a Google Cloud project, configure the
 OAuth consent screen (External), create each client as a Web application, register

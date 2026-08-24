@@ -11,6 +11,8 @@
 
 import * as React from "react"
 
+import { teamLiveSince } from "@shared/web/realtime"
+
 // ── THE CACHE IS BOUNDED, AND IT HAS A MAXIMUM AGE ───────────────────────────
 // This was a plain `Map` that only ever grew. Nothing evicted, nothing expired,
 // and nothing cleared it when the person or the team changed — so the power user
@@ -108,6 +110,45 @@ function fresh(key: string): Entry | undefined {
   if (Date.now() - entry.at <= MAX_CACHE_AGE_MS) return entry
   cache.delete(key)
   return undefined
+}
+
+/** WHICH KEYS THE LIVE LAYER ACTUALLY KEEPS FRESH.
+ *
+ * Time alone cannot answer "may I skip this refetch?". A socket carries a `sub=`
+ * list and only hears the resources it names, and R15 allows reasoned
+ * `DEAF_EXEMPT` entries — so there are keys nothing pings. Skipping a refetch on
+ * one of those would paint a value that nothing will ever correct, which is the
+ * worst failure the live layer has: not a broken screen, just a quietly wrong
+ * one.
+ *
+ * The registry that knows this lives in each front door (`web/lib/live-resources`
+ * and the portal's own), and this file is shared by both, so the host registers
+ * the predicate the same way it registers `go()` for navigation — no import
+ * cycle, no context provider, and a host that has not registered one gets the
+ * old behaviour (always revalidate), which is the safe default. */
+let liveCoverage: ((key: string) => boolean) | null = null
+
+export function registerLiveCoverage(fn: (key: string) => boolean): () => void {
+  liveCoverage = fn
+  return () => {
+    if (liveCoverage === fn) liveCoverage = null
+  }
+}
+
+/** May this key be painted from cache WITHOUT re-asking the server?
+ *
+ * Three things must all hold, and the entry's own age (MAX_CACHE_AGE_MS, applied
+ * by `fresh`) is a fourth on top:
+ *   1. a host has said which keys the live layer moves, and this is one of them;
+ *   2. the team socket is connected right now;
+ *   3. it has been connected continuously since this entry was written — so no
+ *      ping about it can have been raised into a gap.
+ * Any doubt falls through to a refetch, which is exactly what the app did for
+ * every key before this existed. */
+function liveHasWatchedSince(key: string, writtenAt: number): boolean {
+  if (!liveCoverage?.(key)) return false
+  const since = teamLiveSince()
+  return since != null && writtenAt >= since
 }
 
 /** Drop a cached entry and tell anyone showing it to refetch (live refresh). */
@@ -293,6 +334,50 @@ export async function reconcile(
   }
 }
 
+/** ONE KEY, ONE REQUEST IN THE AIR.
+ *
+ * Measured on staging, 24 Aug 2026: a story detail made 27 requests on a cold
+ * mount and roughly a third of them were the SAME key, asked for again in the
+ * same tick by a second component that had no way to know the first was already
+ * asking. `useStoryFormOptions` alone fires six reads and is mounted by the
+ * stories collection, the story detail AND the ticket detail; the timer bar is
+ * mounted twice, one copy hidden by CSS. Every one of those duplicates cost a
+ * full round trip to a worker and back.
+ *
+ * The cache could not help, because a cache answers "what did we get?" and the
+ * question here is "is somebody already getting it?" — a gap of a few hundred
+ * milliseconds that the cache is empty for and every subscriber walks into.
+ *
+ * WHY A DELIBERATE REFRESH MUST NOT JOIN. `refresh()` is what a screen calls
+ * after it changed something, so joining a request that departed BEFORE that
+ * change would hand back the old row and look exactly like a lost write. Forced
+ * loads therefore always start their own, and REPLACE the shared one so anybody
+ * arriving afterwards joins the newer answer rather than the staler. That
+ * distinction is the whole safety of this: dedupe the question everyone is
+ * asking at once, never the one somebody asked because they know it changed. */
+const inFlight = new Map<string, Promise<unknown>>()
+
+function loadShared<T>(key: string, fetcher: () => Promise<T>, force: boolean): Promise<T> {
+  if (!force) {
+    const running = inFlight.get(key) as Promise<T> | undefined
+    if (running) return running
+  }
+  const p = fetcher().then((value) => {
+    // Stored by the ONE request, not once per joiner — so a patched row is not
+    // overwritten N times and `notify` fires against a settled cache.
+    store(key, value)
+    return value
+  })
+  inFlight.set(key, p)
+  // Every joiner awaits `p` inside its own try/catch, so a rejection is always
+  // handled — but if the last joiner unmounts first the runtime would still see
+  // an unobserved rejection and log it. This silences that and nothing else.
+  void p.catch(() => {}).finally(() => {
+    if (inFlight.get(key) === p) inFlight.delete(key)
+  })
+  return p
+}
+
 export function useCached<T>(
   key: string | null,
   fetcher: () => Promise<T>
@@ -307,20 +392,22 @@ export function useCached<T>(
   fetcherRef.current = fetcher
   const aliveRef = React.useRef(true)
 
-  const load = React.useCallback(async () => {
-    if (!key) return
-    try {
-      const value = await fetcherRef.current()
-      store(key, value)
-      if (!aliveRef.current) return
-      setData(value)
-      setError(null)
-    } catch (e) {
-      if (aliveRef.current) setError(e)
-    } finally {
-      if (aliveRef.current) setLoading(false)
-    }
-  }, [key])
+  const load = React.useCallback(
+    async (force = false) => {
+      if (!key) return
+      try {
+        const value = await loadShared(key, fetcherRef.current, force)
+        if (!aliveRef.current) return
+        setData(value)
+        setError(null)
+      } catch (e) {
+        if (aliveRef.current) setError(e)
+      } finally {
+        if (aliveRef.current) setLoading(false)
+      }
+    },
+    [key]
+  )
 
   // What a live ping (`notify`) does to a MOUNTED subscriber. If the cache still
   // holds the key, the new value was written by `patchRow` / `reconcile` /
@@ -347,14 +434,27 @@ export function useCached<T>(
     if (!key) return
     const entry = fresh(key)
     if (entry) {
-      // Cached and inside MAX_CACHE_AGE_MS → show instantly, revalidate quietly.
+      // Cached and inside MAX_CACHE_AGE_MS → show instantly.
       setData(entry.value as T)
       setLoading(false)
     } else {
       setData(undefined)
       setLoading(true)
     }
-    void load() // revalidate-on-mount (first load / navigation / team switch)
+    // REVALIDATE ON MOUNT — UNLESS THE SOCKET HAS BEEN WATCHING THIS ALL ALONG.
+    //
+    // This used to be unconditional, and it is why a screen the app already had
+    // in memory still waited on the network: moving from tickets to stories and
+    // back re-fetched both collections, every time, while the live channel sat
+    // there having reported every change to both. The cache was doing the work
+    // the durable object exists to make unnecessary.
+    //
+    // The skip is not "trust the cache" — it is the much narrower claim that no
+    // ping about this key can have been MISSED: the key is one the listener
+    // registry moves, the socket is up, and it has been up continuously since
+    // this value was written (shared/web/realtime.ts explains why a reconnect
+    // resets that window). Anything less and we fetch, exactly as before.
+    if (!entry || !liveHasWatchedSince(key, entry.at)) void load()
 
     const subs = subscribers.get(key) ?? new Set<() => void>()
     subs.add(sync)
@@ -365,6 +465,7 @@ export function useCached<T>(
     }
   }, [key, load, sync])
 
-  const refresh = React.useCallback(() => void load(), [load])
+  // FORCED — a refresh is somebody saying "I know this changed". See loadShared.
+  const refresh = React.useCallback(() => void load(true), [load])
   return { data, loading, error, refresh }
 }

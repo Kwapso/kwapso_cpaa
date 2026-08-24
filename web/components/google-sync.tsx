@@ -9,7 +9,7 @@
 //
 // Before this there were two, and they did two different things. Settings had
 // "Bring it in", which sweeps a person's Google material into the knowledge
-// base; Meetings had a calendar sync, which brings diary entries into the diary.
+// base; Meetings had a calendar sync, which brings calendar events into Meetings.
 // Every other screen showing Google material — the knowledge base's own sources,
 // a client's meetings tab — had nothing at all, so the only way to know whether
 // what you were reading was current was to go to another page and press
@@ -71,9 +71,9 @@ type SyncRow = { kind: string; lastRunAt: string | null; lastOkAt: string | null
 /**
  * WHAT THIS SCREEN'S MATERIAL COMES FROM, and therefore what the button does.
  *
- *   • `knowledge` — the sweep that makes a person's Drive, mail, diary and Chat
+ *   • `knowledge` — the sweep that makes a person's Drive, mail, calendar and Chat
  *     answerable. Settings and the knowledge base.
- *   • `calendar` — the diary sweep, which is a different act on different rows:
+ *   • `calendar` — the calendar sweep, which is a different act on different rows:
  *     it makes calendar entries into MEETING RECORDS and brings the ones that
  *     exist up to date.
  *   • `both` — a screen showing both, which presses both in order.

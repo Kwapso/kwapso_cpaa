@@ -177,9 +177,11 @@ export async function getStaffCertificates(request: Request, env: Env): Promise<
   // shows one person's certificates, and filtering a capped list after the fact
   // would disagree with the count beside it (R16).
   const userId = queryText(new URL(request.url).searchParams.get("userId"), "Member")
+  // These are independent reads — one wait, not 2.
+  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard, userId), countStaffCertificates(cfg, guard, userId)])
   return json({
-    certificates: await listStaffCertificates(cfg, guard, userId),
-    total: await countStaffCertificates(cfg, guard, userId),
+    certificates,
+    total,
   })
 }
 
@@ -208,9 +210,11 @@ export async function postCreateStaffCertificate(request: Request, env: Env): Pr
   requireText(body.title, "Title", TEXT_LIMITS.short)
   const id = await createStaffCertificate(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "staff_certificates", id, "add")
+  // These are independent reads — one wait, not 2.
+  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
   return json({
-    certificates: await listStaffCertificates(cfg, guard),
-    total: await countStaffCertificates(cfg, guard),
+    certificates,
+    total,
   })
 }
 
@@ -223,9 +227,11 @@ export async function postUpdateStaffCertificate(request: Request, env: Env): Pr
   requireText(body.title, "Title", TEXT_LIMITS.short)
   await updateStaffCertificate(cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "staff_certificates", id)
+  // These are independent reads — one wait, not 2.
+  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
   return json({
-    certificates: await listStaffCertificates(cfg, guard),
-    total: await countStaffCertificates(cfg, guard),
+    certificates,
+    total,
   })
 }
 
@@ -240,8 +246,10 @@ export async function postSetStaffCertificateActive(request: Request, env: Env):
   // R17: a no-op repeat moves zero rows → no ping, no duplicate history.
   const changed = await setStaffCertificateActive(cfg, guard, actor, id, body.active)
   if (changed) await publishChange(env, guard.teamId, "staff_certificates", id)
+  // These are independent reads — one wait, not 2.
+  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
   return json({
-    certificates: await listStaffCertificates(cfg, guard),
-    total: await countStaffCertificates(cfg, guard),
+    certificates,
+    total,
   })
 }

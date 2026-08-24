@@ -307,9 +307,11 @@ export async function postCreateSprint(request: Request, env: Env): Promise<Resp
   const { id, accountId } = await createSprint(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "sprints", id, "add", accountId ?? undefined)
   const listFilter = { accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short) ?? null }
+  // These are independent reads — one wait, not 2.
+  const [sprints, total] = await Promise.all([listSprints(cfg, guard, listFilter), countSprints(cfg, guard, listFilter)])
   return json({
-    sprints: await listSprints(cfg, guard, listFilter),
-    total: await countSprints(cfg, guard, listFilter),
+    sprints,
+    total,
   })
 }
 
@@ -333,9 +335,11 @@ export async function postUpdateSprint(request: Request, env: Env): Promise<Resp
   const { accountId } = await updateSprint(cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "sprints", id, "edit", accountId ?? undefined)
   const filter = sprintFilterFrom(new URL(request.url))
+  // These are independent reads — one wait, not 2.
+  const [sprints, total] = await Promise.all([listSprints(cfg, guard, filter), countSprints(cfg, guard, filter)])
   return json({
-    sprints: await listSprints(cfg, guard, filter),
-    total: await countSprints(cfg, guard, filter),
+    sprints,
+    total,
   })
 }
 
@@ -357,9 +361,11 @@ export async function postSprintComplete(request: Request, env: Env): Promise<Re
     return fail(400, "invalid_input", "complete must be true or false.")
   const { moved, accountId } = await setSprintComplete(cfg, guard, actor, id, body.complete)
   if (moved) await publishChange(env, guard.teamId, "sprints", id, "edit", accountId ?? undefined)
+  // These are independent reads — one wait, not 2.
+  const [sprints, total] = await Promise.all([listSprints(cfg, guard, {}), countSprints(cfg, guard, {})])
   return json({
-    sprints: await listSprints(cfg, guard, {}),
-    total: await countSprints(cfg, guard, {}),
+    sprints,
+    total,
   })
 }
 

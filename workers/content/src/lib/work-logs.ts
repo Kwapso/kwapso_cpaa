@@ -56,7 +56,7 @@ export const WORK_LOG_TARGETS: Record<string, { label: string; account: string; 
   // is the difference between a task and a to-do, which is never.
   tasks: { label: "title", account: "account_id", noun: "task" },
   // A MEETING IS TIME SOMEBODY SPENT (CHECKLIST 9.2). It was left off this list
-  // when the diary shipped, on the reasoning that a meeting is a conversation
+  // when Meetings shipped, on the reasoning that a meeting is a conversation
   // rather than a piece of work — which is true and is beside the point: an hour
   // in a call is an hour off the day, and until it was loggable the margin
   // counted the delivery and missed the meetings that produced it.

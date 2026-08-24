@@ -1015,10 +1015,10 @@ can answer *"what did we agree in March"*.
   here, so "didn't we have a call in March?" is answerable either way.
 - **`google_event_id` is how the sweep recognises an entry it already has.** It is
   UNIQUE (partial, so the majority of rows with no entry are not competing for one
-  NULL), which is what stops one diary entry becoming two meetings however many
+  NULL), which is what stops one calendar event becoming two meetings however many
   times the sweep runs. It was invented for a "put it in my calendar" button that
   no longer exists; the idempotence outlived the write it was invented for.
-- **The `google_*` columns are a MIRROR of the diary entry** (team migration
+- **The `google_*` columns are a MIRROR of the calendar event** (team migration
   `0035_calendar_depth_and_file_shares`): the join link, the organiser, the guest
   list and what each person answered (`google_attendees_json`), whatever is
   attached (`google_attachments_json`), the status, the zone, the repeat rule, and
@@ -1027,11 +1027,11 @@ can answer *"what did we agree in March"*.
   whose connection pushed it, live, one call per meeting — a record of a
   conversation with the conversation left out. **Nothing writes to Google, from
   here or from anywhere**: the four calendar write doors that used to are gone
-  (18 Aug 2026), so Google's diary is the source and every one of these columns is
+  (18 Aug 2026), so Google's calendar is the source and every one of these columns is
   a copy of it.
 - **`from_calendar` decides what a re-sync may overwrite.** Two kinds of meeting
   carry an event id and they are not the same record: one was typed here, the other
-  was read IN off somebody's diary. Google owns the words of a row it authored,
+  was read IN off somebody's calendar. Google owns the words of a row it authored,
   kwapso owns the words of a row it authored, and `notes` is never touched by any
   sync — it is the one column in this module that only a person writes.
 - **`google_connections.calendar_swept_through` is how far the whole-calendar walk
@@ -1040,7 +1040,7 @@ can answer *"what did we agree in March"*.
   of the wider window — five years back to a year ahead — resuming from this
   moment. Forward-only, so it cannot leave a gap behind it, and it stops at the
   last entry actually read when a slice holds more than one bounded read will walk.
-  It sits on the CONNECTION because the walk is one person's own diary read with
+  It sits on the CONNECTION because the walk is one person's own calendar read with
   one person's own token. NULL means "never walked", read as the floor.
 - **`transcript_text` is what was SAID, kept here rather than fetched.** That is
   what makes it readable by every colleague whose role can read meetings instead
@@ -1223,7 +1223,7 @@ both are reached only through rows here, so the unnamed rest is out of reach by
 construction rather than by a filter somebody has to remember to write. Gmail and
 Calendar have no rows here because there is nothing to name, mail is narrowed to
 a **known contact** (an address on one of the team's `accounts`) and the calendar
-is the person's own diary.
+is the person's own calendar.
 
 - **`kind`** (`folder` / `file` / `space`, migration
   `0035_calendar_depth_and_file_shares`) splits what used to be one word. Sharing

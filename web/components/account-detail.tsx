@@ -54,6 +54,8 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs/tabs"
+
+import { ClientOrgPanel } from "@/components/client-org-panel"
 import { Pencil, Power } from "lucide-react"
 
 import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
@@ -489,6 +491,20 @@ export function AccountDetailScreen({
               badge: "",
               badgeVariant: "" as const,
             },
+            // THEIR OWN ORGANISATION — who does the work there, what an hour of
+            // them costs, and what they run on. Behind `canSeeApps` for the same
+            // reason Impact is: a role exists to carry the cost that turns a
+            // process map's minutes into money, so whoever may read the maps may
+            // read the cast list. No badge — the tab holds THREE collections,
+            // and a single number over three lists would say nothing (R16 badges
+            // one collection's exact count, or none).
+            {
+              value: "organisation",
+              label: t("Organisation"),
+              icon: CONCEPT_ICON.members,
+              badge: "",
+              badgeVariant: "" as const,
+            },
           ]
         : []),
       ...(canSeeWork
@@ -672,6 +688,13 @@ export function AccountDetailScreen({
           // question a client asks first and the one the whole product is for.
           // The panel carries the caption that makes the number honest (R25); it
           // is never assembled here.
+          // THE CLIENT'S OWN ORGANISATION. `links` is handed down rather than
+          // re-fetched: the record screen already holds this company's contacts
+          // for the Contacts tab, and they are exactly the pool a role's holder
+          // comes from.
+          if (tabItem.value === "organisation")
+            return <ClientOrgPanel teamId={teamId} accountId={accountId} contacts={links} />
+
           if (tabItem.value === "impact")
             return (
               <div className="flex flex-col gap-4">
@@ -719,7 +742,7 @@ export function AccountDetailScreen({
               <AppsPanel
                 accountId={accountId}
                 accountName={account.name}
-                host={{ base: basePath.replace(/\/accounts$/, "") }}
+                host={{ base: `${basePath}/${accountId}` }}
                 onNew={canWriteApps ? () => setAppOpen(true) : undefined}
               />
             )
@@ -730,7 +753,7 @@ export function AccountDetailScreen({
                 ownerKind="account"
                 ownerId={accountId}
                 filter={{ accountId }}
-                host={{ base: basePath.replace(/\/accounts$/, "") }}
+                host={{ base: `${basePath}/${accountId}` }}
                 onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
                 emptyText={`Nothing has been sold to ${account.name} yet.`}
               />

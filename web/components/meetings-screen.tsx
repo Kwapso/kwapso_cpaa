@@ -1,6 +1,6 @@
 "use client"
 
-// THE DIARY — every conversation we have had or are about to have, newest first.
+// THE MEETINGS LIST — every conversation we have had or are about to have, newest first.
 //
 // ONE COLLECTION, PAGED (R14). A meeting is an event: the rows accumulate with
 // ordinary use and none is ever curated away, because a cancelled call in March
@@ -15,7 +15,7 @@
 // AND IT IS WHERE MEETING PURPOSES ARE REACHED FROM. The taxonomy of why we meet
 // used to sit under the Delivery method page; that page went on 17 Aug 2026 with
 // its programmes folded onto the sprint type, and a purpose belongs beside the
-// diary rather than on a rail of its own — it is the vocabulary behind this
+// meetings list rather than on a rail of its own — it is the vocabulary behind this
 // screen, not a second destination.
 
 import * as React from "react"
@@ -95,7 +95,7 @@ const ALL_COLUMNS = [
 
 /** WHAT THE DOOR CALLS EACH OF THOSE COLUMNS.
  *
- * The diary PAGES, so a column header orders it at the door or it does not order
+ * The meetings list PAGES, so a column header orders it at the door or it does not order
  * it at all — arranging the fifty rows in the browser under a badge counting 254
  * is the lie `<PagedFind>` exists to stop, one control along (SEARCH.md § *The
  * third question*). So a header sends a NAME out of `MEETING_SORTS`, and the two
@@ -173,9 +173,9 @@ export function MeetingsScreen({
   const [view, setView] = React.useState<"week" | "calendar" | "all">("week")
   const weekTotal = useCachedValue<number>(totalKey("meetings-week", teamId))
   // THIS WEEK IS ITS OWN READ (19 Aug 2026) — the door's week, not a browser
-  // filter over the diary's newest page. The comment that used to sit on that
+  // filter over the meetings list's newest page. The comment that used to sit on that
   // filter argued the week was inside page one for any agency that had not held
-  // fifty meetings since Monday; the diary is ordered by start time DESCENDING,
+  // fifty meetings since Monday; the meetings list is ordered by start time DESCENDING,
   // so page one is the furthest-out FUTURE, and once repeating calendar entries
   // were swept in it ran from June 2027 to August 2027 with nothing of this week
   // in it. Badge 11, list empty. A client-side filter underneath a server
@@ -183,8 +183,8 @@ export function MeetingsScreen({
   // very screen had already been moved to the door for that reason.
   //
   // It costs one extra read while this tab is showing, and there is no way round
-  // it: the week's rows are genuinely not in the page the diary hands back.
-  // Only while it is showing — the other two views read the diary itself.
+  // it: the week's rows are genuinely not in the page the meetings list hands back.
+  // Only while it is showing — the other two views read the meetings list itself.
   //
   // WHICH LIST THE RESTING SCREEN IS STANDING ON, as an argument rather than as
   // a second name for the key: `meetingsKey(teamId, weekView)` is written out at
@@ -197,9 +197,9 @@ export function MeetingsScreen({
   // THE MONTH THE CALENDAR IS DRAWING, and its own read.
   //
   // The grid told nobody which month it was on, so it drew whatever the paged
-  // list happened to hold — and the diary pages newest-first, which on 19 Aug
+  // list happened to hold — and the meetings list pages newest-first, which on 19 Aug
   // 2026 meant June-to-August 2027 while the month on screen was August 2026
-  // with 61 meetings in it. Grid and agenda both said "nothing in the diary this
+  // with 61 meetings in it. Grid and agenda both said "nothing in Meetings this
   // month" over a badge reading 436. The week view had the identical fault, was
   // fixed on its own, and this one reads the same page it was fixed away from.
   //
@@ -259,7 +259,7 @@ export function MeetingsScreen({
               r.cancelled ? `${r.cancelled} called off` : "",
             ]
               .filter(Boolean)
-              .join(", ") + " in the diary.") + more
+              .join(", ") + " in Meetings.") + more
       )
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your calendar."))
@@ -282,7 +282,7 @@ export function MeetingsScreen({
     })
     invalidate(meetingsKey(teamId))
     invalidate(meetingsKey(teamId, "week"))
-    toast.success(t("It's in the diary."))
+    toast.success(t("It's in Meetings."))
   }
 
   // EITHER READ FAILING IS THE SAME SENTENCE — whichever list this tab is
@@ -333,9 +333,9 @@ export function MeetingsScreen({
         onValueChange={(v) => setView(v as "week" | "calendar" | "all")}
       />
 
-      {/* R14's other half: the diary pages, and the meeting somebody digs for is
+      {/* R14's other half: the meetings list pages, and the meeting somebody digs for is
           the OLD one — so the search box is answered by the door, over the whole
-          diary rather than the page in the browser. */}
+          meetings list rather than the page in the browser. */}
       <PagedFind<Meeting>
         listKey={meetingsKey(teamId, weekView)}
         placeholder={t("Search meetings…")}
@@ -346,7 +346,7 @@ export function MeetingsScreen({
         }}
         sorts={translatedSorts("meetings", t)}
         defaultSort={COLLECTION_SORTS.meetings.defaultSort}
-        // THE DIARY'S FILTERS, asked of the door. They were the frame's until
+        // THE MEETINGS LIST'S FILTERS, asked of the door. They were the frame's until
         // 18 Aug 2026 — so "who we met" narrowed the fifty most recent meetings
         // and said nothing about the two years behind them, which is the exact
         // objection the comment above makes about the search box.
@@ -364,7 +364,7 @@ export function MeetingsScreen({
         fetchPage={(query, cursor) =>
           contentApi
             .meetings({
-              // The whole diary is what a find searches; the week and the
+              // The whole meetings list is what a find searches; the week and the
               // calendar are views on top of it. Here rather than in `fixed`,
               // because `fixed` makes a find ACTIVE and the resting screen would
               // then read a `find:` cache key the live registry does not patch
@@ -379,9 +379,9 @@ export function MeetingsScreen({
         }
       >
         {(found) => {
-          // WHICH ROWS THIS TAB IS SHOWING. A find answers over the whole diary
+          // WHICH ROWS THIS TAB IS SHOWING. A find answers over the whole meetings list
           // and outranks the tab; otherwise the week reads the week's own list
-          // and the other two read the diary. `undefined` is "not back yet",
+          // and the other two read the meetings list. `undefined` is "not back yet",
           // which the line below draws as the skeleton rather than as "none".
           const rows = found.active ? found.rows : view === "week" ? (weekRows ?? null) : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
@@ -444,15 +444,15 @@ export function MeetingsScreen({
                     emptyText={
                       monthQ.data === undefined
                         ? t("Reading this month…")
-                        : t("Nothing in the diary this month.")
+                        : t("Nothing in Meetings this month.")
                     }
                     onMonthChange={setCalendarMonth}
                   />
                 ) : view === "all" ? (
-                  // THE DIARY PAGES, so its headers ask the DOOR — `found.order`
+                  // THE MEETINGS LIST PAGES, so its headers ask the DOOR — `found.order`
                   // is the same handle the picker above the table holds, so the
                   // two controls are one question and the answer spans the whole
-                  // diary instead of the fifty rows in the browser. The picker
+                  // meetings list instead of the fifty rows in the browser. The picker
                   // stays because it names orders that are not columns ("Recently
                   // added"); the headers cover the ones that are.
                   <RecordTable
@@ -476,7 +476,7 @@ export function MeetingsScreen({
                 )}
               </SectionWithCreate>
 
-              {/* R14: the heading counts the WHOLE diary, so the list under it has to be
+              {/* R14: the heading counts the WHOLE meetings list, so the list under it has to be
                   able to reach all of it — page one, then Load more.
                   NOT ON THE CALENDAR, because the calendar carries its own: the
                   grid knows which month you are reading and can offer the button

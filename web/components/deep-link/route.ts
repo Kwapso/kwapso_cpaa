@@ -33,6 +33,23 @@ export type Route = {
   module: string
   /** "" = the list / overview level (no record selected) */
   recordId: string
+  /** THE WHOLE TRAIL, deepest last — `[{accounts, BERG}, {stories, S12}]` for
+   * `/accounts/BERG/stories/S12`.
+   *
+   * The URL grammar has always supported this: `parseScreenPath` returns an
+   * array of levels and always has. What was missing is that `parseRoute` read
+   * `levels[0]` and dropped everything after it, so a nested address parsed
+   * correctly and then rendered the OUTERMOST screen — and the panels, at the
+   * other end, stripped the collection segment off the path before appending
+   * (`basePath.replace(/\/accounts$/, "")`) so a nested address was never built
+   * in the first place. Half a feature at each end, which is why opening a story
+   * from a client lost the client.
+   *
+   * `module` and `recordId` are the DEEPEST level, which is what a screen
+   * renders — so every existing consumer keeps working unchanged and a nested
+   * URL simply shows the right thing. The trail is here for the crumbs and for
+   * anything else that needs to know what a record was opened inside. */
+  levels: { module: string; id: string }[]
   query: ScreenQuery
   /** true when reached via a clean top-level module URL (/tickets, /accounts) rather
    * than /t/<teamId>/… — the host resolves the team from the active context, like
@@ -69,23 +86,62 @@ export function parseRoute(pathname: string, search: string): Route {
   const query = parseScreenQuery(new URLSearchParams(search))
   if (segs[0] === "t") {
     const levels = parseScreenPath(segs.slice(2)) // [{module,id}, …]
-    return {
-      teamId: segs[1] ?? "",
-      module: levels[0]?.module || "team",
-      recordId: levels[0]?.id || "",
-      query,
-      topLevel: false,
-    }
+    return { teamId: segs[1] ?? "", ...deepest(levels), levels, query, topLevel: false }
   }
-  // Top-level module URL: /tickets, /tickets/<id>, /accounts, /accounts/<id>.
+  // Top-level module URL: /tickets, /tickets/<id>, /accounts, /accounts/<id>,
+  // and now /accounts/<id>/stories/<id> — the nested form the grammar always
+  // allowed and the router used to throw away.
   const levels = parseScreenPath(segs)
-  return {
-    teamId: "",
-    module: levels[0]?.module || "team",
-    recordId: levels[0]?.id || "",
-    query,
-    topLevel: true,
-  }
+  return { teamId: "", ...deepest(levels), levels, query, topLevel: true }
+}
+
+/** WHAT A NESTED ADDRESS RENDERS: the innermost level.
+ *
+ * `/accounts/BERG/stories/S12` shows the STORY — you asked for the story, and
+ * the client it sits in is context rather than the destination. Reading
+ * `levels[0]` instead (which is what this did) showed the account and ignored
+ * everything the person had actually clicked.
+ *
+ * An empty path is the team overview, which is what "" has always meant here. */
+function deepest(levels: { module: string; id: string }[]): { module: string; recordId: string } {
+  const last = levels[levels.length - 1]
+  return { module: last?.module || "team", recordId: last?.id || "" }
+}
+
+/** THE ADDRESS OF A SCREEN, BUILT FROM THE TRAIL IT WAS OPENED THROUGH.
+ *
+ * THE OWNER, 24 Aug 2026, going Accounts → Confia → Apps → CONFIA → Sprints →
+ * a sprint, and landing on `/apps/…/sprints/…`:
+ *
+ *   "that middle screen that I went to has just been erased. I spoke about
+ *    nesting, not replacing."
+ *
+ * He was reading the symptom of one line. Every screen used to rebuild its own
+ * address out of its CURRENT MODULE — `/${module}` — so at
+ * `/accounts/CONFIA/apps/A1` the module is `apps` and the base became `/apps`.
+ * The account was gone before a single link was built, and every link the screen
+ * then handed to its panels was already missing it. One hop in, and the trail
+ * was one level long again — which is why it looked like nesting worked and then
+ * quietly stopped.
+ *
+ * So the address is DERIVED FROM THE TRAIL, in the one place both the shell and
+ * the crumbs read it from. `withRecord: false` gives the COLLECTION the deepest
+ * level belongs to, in its context — `/accounts/CONFIA/apps` — which is what a
+ * detail screen hands its panels as their base, so the next hop appends rather
+ * than restarts. Nothing caps how deep that goes, which was the point. */
+export function trailPath(
+  levels: { module: string; id: string }[],
+  teamPath: string,
+  topLevel: boolean,
+  opts: { upto?: number; withRecord?: boolean } = {}
+): string {
+  const upto = opts.upto ?? levels.length - 1
+  const withRecord = opts.withRecord ?? true
+  const parts = levels
+    .slice(0, upto + 1)
+    .flatMap((l, i) => (i === upto && !withRecord ? [l.module] : [l.module, l.id]))
+    .filter(Boolean)
+  return (topLevel ? "" : teamPath) + "/" + parts.join("/")
 }
 
 /** The friendly title for a module segment (for breadcrumbs). */

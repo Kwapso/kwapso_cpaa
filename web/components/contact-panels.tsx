@@ -164,7 +164,7 @@ export function ContactTicketsPanel({
   )
 }
 
-/** THE MEETINGS THIS PERSON WAS IN — the diary, narrowed to their record. Same
+/** THE MEETINGS THIS PERSON WAS IN — the meetings list, narrowed to their record. Same
  * shape as the tickets above, and the same reason for page one only. */
 export function ContactMeetingsPanel({
   accountId,

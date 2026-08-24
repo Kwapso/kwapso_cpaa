@@ -23,7 +23,7 @@
 // reason, exactly like every other deny-list in this codebase.
 
 import { describe, expect, it } from "vitest"
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 const ROOT = join(__dirname, "..", "..")
@@ -65,10 +65,31 @@ const PLANS = readdirSync(join(ROOT, ".plans"))
   .filter((f) => f.endsWith(".md"))
   .map((f) => join(".plans", f))
 
+/** The fork-standing skills, DERIVED — because they are the one entry here that
+ * can legitimately leave the repository, and on 2026-08-24 they did: the vendored
+ * copies moved to `~/.claude/skills` and this list still named two files by hand,
+ * so every doc claim in the codebase went unchecked behind four ENOENTs. A
+ * hand-written path is a claim that a file exists, which is exactly the kind of
+ * claim this file exists to stop anyone making. Present → still checked; gone →
+ * nothing to check, and the other docs are read as normal. */
+function skillDocs(): string[] {
+  const dir = join(ROOT, "skills")
+  if (!existsSync(dir)) return []
+  const out: string[] = []
+  const walk = (rel: string) => {
+    for (const entry of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
+      const next = join(rel, entry.name)
+      if (entry.isDirectory()) walk(next)
+      else if (entry.name.endsWith(".md")) out.push(next)
+    }
+  }
+  walk("skills")
+  return out
+}
+
 const DOCS = [
   ...readdirSync(ROOT).filter((f) => f.endsWith(".md")),
-  join("skills", "README.md"),
-  join("skills", "new-app", "SKILL.md"),
+  ...skillDocs(),
   join("web", "e2e", "README.md"),
   ...PLANS,
 ]

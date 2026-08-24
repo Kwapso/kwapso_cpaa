@@ -66,7 +66,14 @@ import { TabsView, defaultTabsConfig } from "@shared/ui/registry/primitives/tabs
 import { Comments } from "@shared/ui/registry/collections/comments/comments"
 import { GitBranch, ListOrdered, Pencil, Power } from "lucide-react"
 
-import type { ProcessComment, ProcessDetail, ProcessStep, ProcessVersion } from "@shared/types"
+import type {
+  ClientRole,
+  ClientTool,
+  ProcessComment,
+  ProcessDetail,
+  ProcessStep,
+  ProcessVersion,
+} from "@shared/types"
 // The number and the words for it come from the file that computes it — never
 // spelled again here. `SAVINGS_CAPTION` is R25's sentence, rendered word for word
 // wherever a saving appears.
@@ -89,6 +96,8 @@ import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import {
   PROCESS_VERSION_SLICES,
+  clientRolesKey,
+  clientToolsKey,
   processCommentsKey,
   processKey,
   processVersionKey,
@@ -166,6 +175,17 @@ export function ProcessDetailScreen({
     processCommentsKey(processId),
     () => tenancy.processComments(processId)
   )
+  // WHO DOES THE WORK AND WHAT IN — the CLIENT's own organisation, read on the
+  // same two cache keys the account's Organisation tab fills, so opening a map
+  // after looking at the client costs nothing and a rename reaches both through
+  // the ordinary live path. Both are bounded lists of a client's own roles and
+  // tools; the step form narrows them to this map's client below.
+  const clientRolesQ = useCached<ClientRole[]>(clientRolesKey(teamId), () =>
+    tenancy.clientRoles().then((r) => r.roles)
+  )
+  const clientToolsQ = useCached<ClientTool[]>(clientToolsKey(teamId), () =>
+    tenancy.clientTools().then((r) => r.tools)
+  )
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends.
   const activity = useRecordActivity("processes", processId)
@@ -234,6 +254,8 @@ export function ProcessDetailScreen({
         description: values.description || null,
         secondsPerRun: values.secondsPerRun,
         runsPerMonth: values.runsPerMonth,
+        roleId: values.roleId,
+        toolIds: values.toolIds,
       })
     else
       await tenancy.addStep({
@@ -242,6 +264,8 @@ export function ProcessDetailScreen({
         description: values.description || null,
         secondsPerRun: values.secondsPerRun,
         runsPerMonth: values.runsPerMonth,
+        roleId: values.roleId,
+        toolIds: values.toolIds,
       })
     refresh()
     toast.success(editingStep ? t("Step updated.") : t("Step added."))
@@ -251,6 +275,17 @@ export function ProcessDetailScreen({
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   const { process, versions, commentsTotal, saving, savingsCaption } = detailQ.data
+  // THIS MAP'S CLIENT'S roles and tools, and only the live ones. A retired role
+  // stays readable on the steps that already name it (deactivate, never delete)
+  // and is not offered for a new one — the same rule every picker in the app
+  // follows. A map with no client gets neither list, and the form leaves both
+  // fields out rather than showing an empty picker.
+  const stepRoles = (clientRolesQ.data ?? [])
+    .filter((r) => r.active && r.accountId === process.accountId)
+    .map((r) => ({ id: r.id, name: r.name, centsPerHour: r.centsPerHour }))
+  const stepTools = (clientToolsQ.data ?? [])
+    .filter((x) => x.active && x.accountId === process.accountId)
+    .map((x) => ({ id: x.id, name: x.name }))
   // Versions come back newest-first, so [0] is today's and the last is version 1.
   const current = versions[0] ?? null
   const baseline = versions.find((v) => v.isBaseline) ?? null
@@ -587,6 +622,22 @@ export function ProcessDetailScreen({
                             {step.runsPerMonth.toLocaleString()}× {t("a month")} ·{" "}
                             {hoursText(stepSecondsPerMonth(step))} {t("a month")}
                           </p>
+                          {/* WHO DOES IT AND WHAT IN, on their own line under the
+                              times, because they are the OTHER half of what makes
+                              a saving a number: the minutes above are the amount
+                              of work, and the role is what an hour of it costs.
+                              Both are left out entirely when nobody has said —
+                              an empty "Who does it: —" would be a field to fill
+                              in rather than a fact, and this line is facts. */}
+                          {(step.roleName || step.tools.length > 0) && (
+                            <p className="text-muted-foreground text-xs">
+                              {step.roleName ? step.roleName : null}
+                              {step.roleName && step.tools.length > 0 ? " · " : null}
+                              {step.tools.length > 0
+                                ? step.tools.map((x) => x.name).join(", ")
+                                : null}
+                            </p>
+                          )}
                           {step.description && (
                             <RichText
                               html={step.description}
@@ -743,7 +794,6 @@ export function ProcessDetailScreen({
                         </span>
                         <span className="text-muted-foreground block text-xs">
                           {new Date(v.createdAt).toLocaleDateString()}
-                          {v.cutFromSprintId ? ` · ${t("cut when a sprint completed")}` : ""}
                           {v.createdByName ? ` · ${v.createdByName}` : ""}
                         </span>
                       </span>
@@ -797,6 +847,8 @@ export function ProcessDetailScreen({
         open={stepOpen}
         onOpenChange={setStepOpen}
         versionLabel={currentLabel}
+        roles={stepRoles}
+        tools={stepTools}
         initial={
           editingStep
             ? {
@@ -804,6 +856,8 @@ export function ProcessDetailScreen({
                 description: editingStep.description ?? "",
                 secondsPerRun: editingStep.secondsPerRun,
                 runsPerMonth: editingStep.runsPerMonth,
+                roleId: editingStep.roleId,
+                toolIds: editingStep.tools.map((x) => x.id),
               }
             : undefined
         }
