@@ -246,6 +246,24 @@ export async function getDraft(
   const row = await draftOrThrow(cfg, guard, scope, id)
   const process = row.process_id ? await processNameOf(cfg, guard, scope, row.process_id) : null
   const payload = readPayload(row.payload)
+  // WHAT EACH REVISION REPLACES, resolved here so the review can show
+  // `25 min → 1 min` rather than `1 min`.
+  //
+  // A revision is the one row on that screen a person cannot check: everything
+  // starts kept, and lowering a duration RAISES the saving the client is shown —
+  // so a proposal that flatters us is exactly the one a reviewer needs something
+  // to compare against. A transcript is untrusted text, and this is where the
+  // person, not the model, gets the last word.
+  const revising = payload.steps.filter((x) => x.revisesStepId)
+  if (revising.length && row.process_id) {
+    const current = await listProcessSteps(cfg, guard, scope, row.process_id)
+    const byId = new Map(current.map((x) => [x.id, x]))
+    for (const step of revising) {
+      const before = byId.get(step.revisesStepId as string)
+      step.revisesName = before?.name ?? null
+      step.revisesSecondsPerRun = before?.secondsPerRun ?? null
+    }
+  }
   return {
     draft: toSummary(row, payload, process),
     payload,

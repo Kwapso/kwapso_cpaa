@@ -31,7 +31,9 @@ import {
 } from "@shared/types"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_FACET_CAP } from "@shared/workers/limits"
+import {
+  BULK_CONCURRENCY, BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_FACET_CAP
+} from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
@@ -1402,18 +1404,44 @@ export async function bulkSetStatus(
 ): Promise<{ changed: { id: string; accountId: string | null }[]; skipped: number }> {
   const changed: { id: string; accountId: string | null }[] = []
   let skipped = 0
-  for (const id of ids) {
-    try {
-      const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, status)
-      if (moved) changed.push({ id, accountId })
-      else skipped++ // already at the target status — a no-op, not an event
-    } catch (e) {
-      // A missing ticket is skipped, not fatal — the rest of the batch still applies.
-      if (e instanceof GuardError && e.status === 404) {
-        skipped++
-        continue
-      }
-      throw e
+  // IN WAVES, NOT ONE AT A TIME. This was a plain `for` loop, which is fine when
+  // the database is next door and ruinous when it is not: measured 25 Aug 2026,
+  // one team-database trip cost ~150ms because the database was in APAC and the
+  // workers in WEUR. At BULK_IDS_LIMIT (512) rows and a few trips each, the loop
+  // was several MINUTES — so the Worker was killed, and the person saw a spinner
+  // and then an error with their tickets half moved.
+  //
+  // A WAVE IS AWAITED BEFORE THE NEXT STARTS, deliberately. It bounds how many
+  // statements are in flight (D1 has its own per-invocation ceiling, and meeting
+  // it fails in a way that looks like a database fault), and it keeps a failure
+  // inside one wave rather than scattered across the whole batch.
+  //
+  // ORDER DOES NOT MATTER HERE and that is why this is safe: each row is an
+  // independent UPDATE with its own R17 predicate riding it, and the activity
+  // rows carry their own timestamps. Two rows moving at once cannot interfere —
+  // the same reason the sequential version needed no lock.
+  for (let i = 0; i < ids.length; i += BULK_CONCURRENCY) {
+    const wave = ids.slice(i, i + BULK_CONCURRENCY)
+    const results = await Promise.all(
+      wave.map(async (id) => {
+        try {
+          const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, status)
+          // `moved: false` = already at the target status. A no-op, not an event
+          // (R17: a re-run writes no duplicate history and pings nothing).
+          return moved ? { id, accountId } : null
+        } catch (e) {
+          // A missing ticket is skipped, not fatal — the rest of the batch still
+          // applies. Anything else is rethrown untouched: a swallowed database
+          // error is exactly what a bulk job must not become, because the count
+          // it reports would then be a lie.
+          if (e instanceof GuardError && e.status === 404) return null
+          throw e
+        }
+      })
+    )
+    for (const r of results) {
+      if (r) changed.push(r)
+      else skipped++
     }
   }
   return { changed, skipped }

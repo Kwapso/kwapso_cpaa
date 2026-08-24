@@ -313,6 +313,30 @@ export async function listRoles(
   }
   const deptMap = byRole(depts, (d) => d.department_id)
   const peopleMap = byRole(people, (p) => p.person_account_id)
+  // WHAT AN HOUR OF A ROLE COSTS IS NOT EVERY CONTACT'S TO READ.
+  //
+  // The owner's ruling, 24 Aug 2026: our own people see it in full; at the
+  // client, only the app's MAIN STAKEHOLDER does. His reason is the whole point
+  // — "they could just get to know each other's salary, given that we are having
+  // cost per hour on roles".
+  //
+  // It shipped on the SAVINGS reader alone, and this door was one hop away and
+  // gated on the same right: any contact could ask for their company's roles and
+  // read every rate, without needing a process id at all. A ruling enforced at
+  // one door is not enforced.
+  //
+  // NO STAKEHOLDER TEST HERE, deliberately: a role is not attached to an app, so
+  // there is no app to be the main stakeholder OF. A portal caller therefore gets
+  // no rate from this door at all, and reads the money where it is actually
+  // useful — the savings drill-down, which is scoped to an app and where the
+  // stakeholder test can be asked honestly.
+  //
+  // IT IS BLANKED ON THE ROW rather than inside the mapper below, which is the
+  // house rule (a redaction you have to remember is one somebody forgets) and
+  // also what keeps `centsPerHour` a field R27 can still DERIVE from the mapping
+  // — a condition folded into the mapper made the identifier invisible to the
+  // law, which is its own small warning about where redactions belong.
+  if (scope.kind === "portal") for (const r of roles) r.cents_per_hour = null
   return roles.map((r) => ({
     id: r.id,
     accountId: r.account_id,

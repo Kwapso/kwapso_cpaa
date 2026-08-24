@@ -71,6 +71,19 @@ export type DraftStep = {
    * revision the way every other edit does — never a duplicate step, and never a
    * second map (ruling 5). Null proposes a NEW step. */
   revisesStepId: string | null
+  /** WHAT THAT STEP SAYS TODAY — its name and its current duration in seconds.
+   *
+   * Carried so the review can show `25 min → 1 min` rather than `1 min`. Without
+   * it the screen said only "Changes a step you already have" and the NEW value,
+   * which is the one row on that screen a person cannot check: everything starts
+   * kept, and a revision lowering a duration RAISES the saving the client is
+   * shown. A proposal that flatters us is exactly the one a reviewer must be
+   * able to compare against something.
+   *
+   * Null when the draft proposes a new step, or when the step it named has since
+   * been removed. */
+  revisesName?: string | null
+  revisesSecondsPerRun?: number | null
   /** WHAT THE CALL DID NOT SAY, in the extraction's own words — the sentence a
    * reviewer is meant to go and ask about. Empty when nothing is missing. */
   askAbout: string | null

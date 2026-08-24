@@ -591,3 +591,26 @@ export function numberVar(raw: string | undefined, fallback: number): number {
   const n = Number(raw)
   return Number.isFinite(n) ? n : fallback
 }
+
+/** HOW MANY DATABASE TRIPS A BULK JOB MAY HAVE IN FLIGHT AT ONCE.
+ *
+ * A bulk write used to be a plain `for` loop: one row at a time, each row a few
+ * trips, each trip a round to the database. That is fine when the database is
+ * next door and ruinous when it is not — and on 25 Aug 2026 it was not. The
+ * per-request timing header put one team-database trip at ~150ms, because the
+ * database was in APAC while the workers ran in WEUR (a native binding removes
+ * the API round trip, not the distance).
+ *
+ * At that price, `BULK_IDS_LIMIT` rows × a few trips each is several MINUTES of
+ * wall clock, and a Worker is killed long before it finishes. The person sees a
+ * spinner and then an error, having half-moved their tickets.
+ *
+ * TWELVE, and the number is a compromise between two real ceilings rather than a
+ * round guess. Too low and the job is still serial; too high and a burst of
+ * concurrent statements meets D1's own per-invocation limits — which fails in a
+ * way that looks like a database fault rather than a batch that was too eager.
+ * It is a WAVE SIZE, not a queue: each wave is awaited before the next starts,
+ * so a failure is confined to its wave and the count a person is shown stays
+ * true.
+ */
+export const BULK_CONCURRENCY = 12

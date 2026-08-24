@@ -284,6 +284,18 @@ export async function postDiscardProcessDraft(request: Request, env: Env): Promi
  * yet has nothing to read, and the door above says so in words rather than
  * proposing a map out of silence. */
 async function meetingWords(cfg: D1Rest, guard: MemberGuard, meetingId: string): Promise<string> {
+  // A TRANSCRIPT IS THE `meetings` MODULE'S TO GIVE, and this door gates on
+  // `processes` and `agent`. R18's sentence — a cross-module read carries the
+  // caller's rights — applied to a read path rather than to the activity feed.
+  //
+  // Without it, a staff role with `processes:create` and `agent:create` but
+  // `meetings` deliberately unticked could name any meeting id and get a
+  // proposal built out of what was said in that room, in the speakers' own
+  // vocabulary, returned inline. The words never come back verbatim, which is
+  // why this is a gate rather than a leak — but "what was said in the room is a
+  // different question to ask a role about" is why `meetings` is a module at
+  // all, and the content worker's own transcript door gates on exactly this.
+  await requireRight(cfg, guard, "meetings", "read")
   const rows = await d1Query<{ transcript_text: string | null; notes: string | null }>(
     cfg,
     guard.databaseId,
