@@ -463,10 +463,15 @@ export const tenancy = {
   /* ---- process maps: App -> Process -> Step, and the value drilled through ---- */
 
   /** The systems we've built. Bounded (an agency has tens of apps, not thousands)
-   * — the collection that grows underneath is `processes`, which pages. */
-  apps: (accountId?: string) =>
+   * — the collection that grows underneath is `processes`, which pages.
+   *
+   * `q` searches the app's NAME on the SERVER, so the `total` that comes back is
+   * the total of what matched (R16) rather than of everything. Narrowing a
+   * loaded list in the browser would have left the heading counting rows the
+   * screen was no longer showing. */
+  apps: (accountId?: string, q?: string) =>
     api<{ apps: AppRow[]; total: number }>(
-      `/api/tenancy/apps${accountId ? `?accountId=${enc(accountId)}` : ""}`
+      `/api/tenancy/apps${listQuery({ accountId, q })}`
     ),
   createApp: (input: Record<string, unknown>) => api<{ id: string }>("/api/tenancy/apps", post(input)),
   updateApp: (input: Record<string, unknown> & { id: string }) =>

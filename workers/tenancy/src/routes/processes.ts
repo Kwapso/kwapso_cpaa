@@ -123,7 +123,11 @@ const REFUSE_IMAGE = {
 
 // ── apps ─────────────────────────────────────────────────────────────────────
 
-/** GET /api/tenancy/apps[?accountId=] — the systems we have built.
+/** GET /api/tenancy/apps[?accountId=][&q=] — the systems we have built.
+ *
+ * `q` searches an app's NAME. It is a server filter rather than a box the screen
+ * narrows a loaded list with, for the reason R16 gives: `total` comes back over
+ * the same WHERE, so the count beside the rows is the count OF the rows.
  *
  * R21: fenced, not refused. An app IS the client's own system, and the portal's
  * value screen names it — so this resolves the caller's account set and the lib
@@ -131,8 +135,10 @@ const REFUSE_IMAGE = {
 export async function getApps(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "processes", "read")
   const scope = await accountScope(cfg, guard)
-  const accountId = queryText(new URL(request.url).searchParams.get("accountId"), "Account")
-  const { rows, total } = await listApps(cfg, guard, scope, { accountId })
+  const params = new URL(request.url).searchParams
+  const accountId = queryText(params.get("accountId"), "Account")
+  const q = queryText(params.get("q"), "Search")
+  const { rows, total } = await listApps(cfg, guard, scope, { accountId, q })
   return json({ apps: rows, total })
 }
 

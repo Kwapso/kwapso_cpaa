@@ -1660,10 +1660,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_apps",
     summary:
-      "List the systems we have built, an App is the thing with its own address and its own stage (SCOPE ch.02). `accountId` narrows to one client's systems. Bounded: an agency has tens of apps, so there is no cursor here; the collection that grows underneath is process maps.",
+      "List the systems we have built, an App is the thing with its own address and its own stage (SCOPE ch.02). `accountId` narrows to one client's systems, and `q` searches an app's `name`. Bounded: an agency has tens of apps, so there is no cursor here; the collection that grows underneath is process maps.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/apps",
-    schema: obj({ accountId: S }),
-    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    schema: obj({ accountId: S, q: S }),
+    buildQuery: (i) => {
+      const p = new URLSearchParams()
+      if (str(i, "accountId")) p.set("accountId", str(i, "accountId"))
+      if (str(i, "q")) p.set("q", str(i, "q"))
+      return p.size ? `?${p}` : ""
+    },
     agent: { write: false, summarize: () => "List the apps we've built" },
   },
   {

@@ -106,7 +106,7 @@ async function insertRow(
 
 function appsWhere(
   scope: AccountScope,
-  opts: { accountId?: string }
+  opts: { accountId?: string; q?: string }
 ): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "account_id")
     // AND THE APP FENCE (SCOPE ch.03 "per-person restriction"). A client login
@@ -114,12 +114,37 @@ function appsWhere(
     // both get an empty clause, so this changes nothing for either. It is an AND
     // beside the account fence and never instead of it — see appScopeClause.
   const apps = appScopeClause(scope, "id")
-  return {
-    sql: where([fence.sql, apps.sql, opts.accountId ? "account_id = ?" : undefined]),
-    params: opts.accountId
-      ? [...fence.params, ...apps.params, opts.accountId]
-      : [...fence.params, ...apps.params],
+  const filters = [fence.sql, apps.sql]
+  const params = [...fence.params, ...apps.params]
+  if (opts.accountId) {
+    filters.push("account_id = ?")
+    params.push(opts.accountId)
   }
+  // THE SEARCH BOX (the owner, 24 Aug 2026: "I cannot search through any of my
+  // apps, which is a weird thing to begin with").
+  //
+  // OVER THE NAME, AND DELIBERATELY NOTHING ELSE. The obvious second column is
+  // `about`, and it is exactly the one that must not be here: `about`,
+  // `client_context`, `solution` and `key_actors` are the MATERIAL `canOpen`
+  // withholds from one of our own people who is not staffed on this app. A
+  // search that matched on them would answer "yes, something in here says that"
+  // about text the caller may not read — the same leak, spelled with a boolean
+  // instead of a string, and invisible because the withheld field never appears
+  // in the response. A filter is a read.
+  //
+  // `name` and `stage` ride to everyone who sees the row (8.11: everyone SEES
+  // every app), so the name is the whole safe surface — and it is what a person
+  // types anyway.
+  //
+  // ESCAPED, for the same two reasons the accounts search is: `%` and `_` are
+  // LIKE's own wildcards, so an unescaped needle answers a different question
+  // than the one typed, and a pattern of alternating `%` costs SQLite
+  // exponential time over the whole table for a handful of bytes.
+  if (opts.q) {
+    filters.push("name LIKE ? ESCAPE '\\'")
+    params.push(`%${likeLiteral(opts.q)}%`)
+  }
+  return { sql: where(filters), params }
 }
 
 /** R16: the exact server COUNT(*) an Apps badge shows, over the SAME fence and
@@ -143,7 +168,7 @@ export async function countApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string } = {}
+  opts: { accountId?: string; q?: string } = {}
 ): Promise<number> {
   const q = appsWhere(scope, opts)
   const rows = await d1Query<{ n: number }>(
@@ -162,7 +187,7 @@ export async function listApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string } = {}
+  opts: { accountId?: string; q?: string } = {}
 ): Promise<{ rows: AppRow[]; total: number }> {
   const { sql, params } = appsWhere(scope, opts)
   const [rows, counted] = await Promise.all([

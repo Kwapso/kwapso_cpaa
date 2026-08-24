@@ -34,7 +34,8 @@ import { type ScreenRights } from "@kwapso/ui/lib/recipe"
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { TeamSectionNav } from "@/components/team-section-nav"
 import { CountedTabs } from "@/components/counted-tabs"
-import { buildCrumbs } from "@/components/deep-link/crumbs"
+import { buildCrumbs, namedByList } from "@/components/deep-link/crumbs"
+import { useTrailNames } from "@/components/deep-link/trail-names"
 import { renderModuleContent } from "@/components/deep-link/module-content"
 import { ACCOUNT_MODULES, sectionFor, trailPath, type SectionKey } from "@/components/deep-link/route"
 import { useHostNav, useUrlRoute } from "@/components/deep-link/use-host-nav"
@@ -181,6 +182,34 @@ export function DeepLinkScreen() {
     ? trailPath(trail, teamPath, topLevel, { withRecord: false })
     : moduleBase
   const currentPath = trail.length ? trailPath(trail, teamPath, topLevel) : moduleBase
+
+  // ── THE NAMES THE TRAIL SAYS OUT LOUD ──────────────────────────────────────
+  //
+  // The lists a crumb can read a record's name out of, and then the levels NONE
+  // of them holds, read by id. Both live up here rather than beside buildCrumbs
+  // because the resolver is a hook and there are early returns below — and a
+  // crumb is one of the few things this screen still owes a person while it is
+  // deciding what else to render.
+  //
+  // A list is the FAST path, never the only one: every one of these is paged, so
+  // a client far enough down the collection is simply not in it, and the crumb
+  // used to fall back to the word "Account" above a screen already displaying
+  // the client's name. trail-names.ts carries the day that was caught.
+  const crumbRecords = {
+    accounts: accountsQ.data,
+    members: membersQ.data,
+    roles,
+    invites: invitesQ.data,
+    knowledge: knowledgeQ.data,
+    apps: appsQ.data,
+    sprints: sprintsQ.data,
+    stories: storiesQ.data,
+    // The ALL list, so a FINISHED task's breadcrumb still says its name rather
+    // than falling back to an id — it loads whenever a record is open.
+    tasks: tasksAllQ.data ?? tasksOpenQ.data,
+    meetings: meetingsQ.data,
+  }
+  const resolvedNames = useTrailNames(trail, (m, id) => !!namedByList(m, id, crumbRecords), enabled)
 
   const { go, replace, closePanel } = useHostNav({ router, setRoute, currentPath })
 
@@ -338,20 +367,8 @@ export function DeepLinkScreen() {
     teamName,
     teamPath,
     sectionPath,
-    records: {
-      accounts: accountsQ.data,
-      members: membersQ.data,
-      roles,
-      invites: invitesQ.data,
-      knowledge: knowledgeQ.data,
-      apps: appsQ.data,
-      sprints: sprintsQ.data,
-      stories: storiesQ.data,
-      // The ALL list, so a FINISHED task's breadcrumb still says its name rather
-      // than falling back to an id — it loads whenever a record is open.
-      tasks: tasksAllQ.data ?? tasksOpenQ.data,
-      meetings: meetingsQ.data,
-    },
+    records: crumbRecords,
+    resolved: resolvedNames,
   })
 
   return (
