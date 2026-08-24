@@ -392,7 +392,7 @@ export function AppShell({
       <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
         {/* Mobile top bar, an explicit height, because `--shell-top` above is a
             promise about it. */}
-        <header className="glass sticky top-0 z-20 flex h-[3.75rem] items-center justify-between gap-2 border-b px-4 md:hidden">
+        <header className="bg-card sticky top-0 z-20 flex h-[3.75rem] items-center justify-between gap-2 border-b px-4 md:hidden">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
           <div className="flex items-center gap-1">
             {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
@@ -455,7 +455,7 @@ export function AppShell({
          * are more sections than slots the fifth becomes More. The rail beside
          * this is `hidden md:flex`, so this bar is the ONLY way through the app
          * on a phone or a tablet: anything it cannot reach cannot be reached. */}
-        <nav className="glass fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t px-2 py-1.5 md:hidden">
+        <nav className="bg-card fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t px-2 py-1.5 md:hidden">
           {bottomNav.map((item) => {
             const Icon = item.Icon
             const activeNav = isNavActive(item.path, here)

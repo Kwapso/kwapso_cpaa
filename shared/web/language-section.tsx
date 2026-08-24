@@ -88,7 +88,7 @@ export function LanguageSection({
   const currentPercent = percent(current.code)
 
   return (
-    <section className={className ?? "animate-rise flex flex-col gap-4"}>
+    <section className={className ?? "motion-panel-in flex flex-col gap-4"}>
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
         {t("Language")}
       </h2>

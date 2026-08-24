@@ -51,7 +51,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
   const googleError = useSignInError()
 
   return (
-    <div className="animate-rise w-full max-w-sm">
+    <div className="motion-panel-in w-full max-w-sm">
       <div className="flex flex-col items-center text-center">
         <BrandMark className="mb-1" />
         <h1 className="text-2xl font-medium tracking-tight">

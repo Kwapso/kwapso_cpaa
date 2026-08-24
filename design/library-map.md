@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-08-25.** This was the swap key for RE-TOKENING the old
+> library in place. The swap went further: the library itself was replaced by
+> the design kit (`shared/ui/` = Kwapso/design, pinned in VERSION.json), so
+> there are no library tokens left to map onto. Kept as the record of the four
+> collisions and how they were resolved — the reasoning still holds.
+
 # library-map.md — the swap key, filled
 
 **Status: FILLED.** Aurora shipped this file as a deliberate stub with the right

@@ -131,7 +131,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
   }
 
   return (
-    <section className="animate-rise flex flex-col gap-4">
+    <section className="motion-panel-in flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           {t("Access tokens")}

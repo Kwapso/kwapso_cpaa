@@ -268,7 +268,7 @@ export function PulseBand({ teamId }: { teamId: string }) {
   if (stats.length === 0) return null
 
   return (
-    <div className="animate-rise flex flex-col gap-4">
+    <div className="motion-panel-in flex flex-col gap-4">
       {/* The delta line stays off: these are today's numbers and nothing on
           the door claims to know last week's, so an arrow beside them would be
           an assertion nobody made (the rule the assistant's metric block

@@ -234,7 +234,7 @@ function ScreenLayer({
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className={cn(
-            "glass fixed z-50 flex flex-col gap-4 overflow-y-auto border p-6 shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0",
+            "bg-card fixed z-50 flex flex-col gap-4 overflow-y-auto border p-6 shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0",
             layerContent[presentation]
           )}
         >

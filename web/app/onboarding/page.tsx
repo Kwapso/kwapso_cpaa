@@ -169,7 +169,7 @@ export default function OnboardingPage() {
         <div className="fixed right-4 top-4 z-30">
           <ModeToggle />
         </div>
-        <div className="animate-rise w-full max-w-sm text-center">
+        <div className="motion-panel-in w-full max-w-sm text-center">
           <BrandMark className="mb-1" />
           <h1 className="mt-2 text-2xl font-medium tracking-tight">{t("You're in the right place")}</h1>
           {/* The worker's own sentence, not a second copy written here. */}
@@ -189,7 +189,7 @@ export default function OnboardingPage() {
       <div className="fixed right-4 top-4 z-30">
         <ModeToggle />
       </div>
-      <div className="animate-rise w-full max-w-sm">
+      <div className="motion-panel-in w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           <BrandMark className="mb-1" />
           <h1 className="text-2xl font-medium tracking-tight">
