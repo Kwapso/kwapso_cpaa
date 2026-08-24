@@ -613,7 +613,30 @@ function markLoopBody(): string {
     'ctr(rimg,vx,vy);op(rimg,cl(sm/120,0,1)*.16*nr*ex);' +
     'ctr(hair,vx,vy);op(hair,L*cl((w-2600)/3000,0,1)*.05*ex)}}' +
     'var live=1,id=0,' +
-    'base=(W.performance&&performance.now?performance.now():Date.now());' +
+    // THE CLOCK BELONGS TO THE PAGE LOAD, NOT TO THE HOST ELEMENT.
+    //
+    // THE OWNER, 24 Aug 2026: "every time I reload my app, the bootloader
+    // animation, for a split second, runs and then, in that same split second,
+    // runs again. I can see it… restart and then run again properly."
+    //
+    // He was watching the mark start over. Reloading the bare domain paints
+    // `/`'s loader, the bootstrap starts a run on THAT element, and then
+    // `RootRedirect` replaces the route with /home — so React unmounts that host
+    // and mounts a fresh one for the next screen's loader. The guard above
+    // (`host.__ksRun`) is a property on the ELEMENT, so the new element has no
+    // run, gets a new `base`, and the animation begins again from frame nought
+    // a few hundred milliseconds in. Every reload, because `/` is the PWA's
+    // start_url.
+    //
+    // Anchoring `base` to the DOCUMENT fixes the whole class rather than that
+    // one route: a real page load makes a new window and therefore a new clock,
+    // which is exactly when the mark SHOULD start over, while any number of
+    // host swaps inside one load — the /roles and /members hops, a bounce
+    // through /onboarding, a stop-then-start on one node — pick the animation up
+    // where the last host left it. The alternative was deleting the redirect,
+    // which would have left the same restart waiting on three other paths.
+    'base=(W.__ksMarkBase||(W.__ksMarkBase=' +
+    '(W.performance&&performance.now?performance.now():Date.now())));' +
     'var stop=function(){live=0;host.__ksRun=null;if(id)W.cancelAnimationFrame(id)};' +
     'function tick(now){if(!live)return;' +
     // The host was unmounted and nobody stopped us. Nothing is on screen, so

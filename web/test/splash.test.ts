@@ -437,6 +437,10 @@ describe("the mark is moving before the bundle arrives", () => {
     }) as typeof window.requestAnimationFrame
     window.cancelAnimationFrame = (() => {}) as typeof window.cancelAnimationFrame
     delete (window as { __ksMark?: unknown }).__ksMark
+    // A FRESH PAGE LOAD, which is what this stands for. The mark's clock now lives
+    // on the DOCUMENT (splash.ts) so it survives a host being replaced mid-load;
+    // leaving it behind here would carry one test's elapsed time into the next.
+    delete (window as { __ksMarkBase?: unknown }).__ksMarkBase
 
     if (parsing) Object.defineProperty(document, "readyState", { value: "loading", configurable: true })
 
@@ -750,6 +754,10 @@ describe("the animator, run", () => {
     window.cancelAnimationFrame = (() => {}) as typeof window.cancelAnimationFrame
 
     delete (window as { __ksMark?: unknown }).__ksMark
+    // A FRESH PAGE LOAD, which is what this stands for. The mark's clock now lives
+    // on the DOCUMENT (splash.ts) so it survives a host being replaced mid-load;
+    // leaving it behind here would carry one test's elapsed time into the next.
+    delete (window as { __ksMarkBase?: unknown }).__ksMarkBase
     // eslint-disable-next-line no-new-func -- the point of this test is to parse and run the shipped text
     new Function(markLoopScript())()
 
@@ -1126,6 +1134,54 @@ describe("the animator, run", () => {
     ).toBe(0)
     m.restore()
   })
+
+  // ── THE RESTART THE OWNER COULD SEE ────────────────────────────────────────
+  //
+  // 24 Aug 2026: "every time I reload my app, the bootloader animation, for a
+  // split second, runs and then, in that same split second, runs again. I can
+  // see it… restart and then run again properly."
+  //
+  // Reloading the bare domain paints `/`'s loader and starts a run on THAT
+  // element; `RootRedirect` then replaces the route with /home, React unmounts
+  // that host and mounts a fresh one for the next screen's loader. The guard
+  // that stops a second run is a property on the ELEMENT, so the new element had
+  // no run, took a new clock, and began again from frame nought a few hundred
+  // milliseconds in. The test above already covered the orphaned run STOPPING;
+  // nothing covered the replacement CONTINUING, which is the half he could see.
+  it("a replacement host picks the animation up where the last one left it", () => {
+    const m = mount({ loop: true })
+    m.step(900) // most of the way through the 1.3s fly-in
+    const partWayIn = exposure(m.host)
+
+    // React swaps the host: the old one leaves, a new one takes its place, and
+    // the animator is asked to run on it — all inside ONE page load.
+    const clockBefore = (window as { __ksMarkBase?: number }).__ksMarkBase
+    m.host.remove()
+    const next = document.createElement("div")
+    next.innerHTML = splashInner({ kind: "mark" })
+    document.body.appendChild(next)
+    window.__ksMark!(next, { loop: true })
+
+    expect(
+      (window as { __ksMarkBase?: number }).__ksMarkBase,
+      "the replacement took a new clock — which is the restart, exactly as reported"
+    ).toBe(clockBefore)
+
+    // And it shows: one frame later the new host is where the old one had got
+    // to, not back at the beginning.
+    m.step(920)
+    expect(
+      exposure(next),
+      "the new host is drawing the opening frame again instead of continuing"
+    ).toBeGreaterThan(partWayIn * 0.5)
+    next.remove()
+    m.restore()
+  })
+
+  // The other side of the rule needs no test: `__ksMarkBase` lives on `window`,
+  // and a real page load makes a new one. That a reload starts the mark over is
+  // a property of the browser, not of this code — and `mount()` deletes the key
+  // for the same reason, so each test here stands for its own load.
 
   it("leaves the resting mark exactly as it is for anyone who asked for less motion", () => {
     const real = window.matchMedia
