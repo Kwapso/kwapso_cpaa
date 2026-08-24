@@ -51,14 +51,50 @@ export class GuardError extends Error {
   }
 }
 
-/** The Cloudflare D1 REST config from a worker env (team DBs are reached over the
- * REST door). Throws cloud_key_missing if the token isn't set yet. */
+/** WHICH TEAM DATABASES THIS DEPLOYMENT CAN REACH DIRECTLY.
+ *
+ * A worker env carries a binding under a fixed name (`TEAM_DB_0`) and, beside
+ * it, a plain var naming the database that binding points at (`TEAM_DB_0_ID`).
+ * Two halves, because a D1 binding cannot be asked its own id at runtime and the
+ * data door routes by id — the id is what `requireMember` puts on the guard.
+ *
+ * PAIRED OR IGNORED. A binding whose `_ID` var is missing is skipped in silence
+ * at runtime rather than guessed at, because guessing would mean pointing a
+ * query at a database nobody named. The pairing is not left to hope: the
+ * `native-team-databases` check reads every wrangler config off disk and fails
+ * the build when a binding and its var disagree, or when either is alone. The
+ * runtime skip is the seatbelt; the check is the brake.
+ *
+ * An env with none of this behaves exactly as the app did before bindings
+ * existed — every team over the REST door — which is what makes it safe to add
+ * to one environment at a time. */
+export function nativeTeamDatabases(env: GatingEnv): Record<string, D1Database> {
+  const out: Record<string, D1Database> = {}
+  for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
+    const n = /^TEAM_DB_(\d+)$/.exec(key)
+    if (!n) continue
+    const id = (env as Record<string, unknown>)[`TEAM_DB_${n[1]}_ID`]
+    if (typeof id !== "string" || !id) continue
+    out[id] = value as D1Database
+  }
+  return out
+}
+
+/** The data-door config from a worker env. Team databases are reached DIRECTLY
+ * where this deployment holds a binding for them and over the Cloudflare REST
+ * door where it does not (see `natives` in d1-rest.ts). Throws
+ * cloud_key_missing if the REST token isn't set yet — still required, because
+ * the fall-through path and every database-management call go through it. */
 export function d1ConfigFrom(env: GatingEnv): D1Rest {
   if (!env.CF_D1_TOKEN)
     throw new Error(
       "cloud_key_missing: the Cloudflare D1 token isn't set yet, so team databases can't be reached."
     )
-  return { accountId: env.CF_ACCOUNT_ID, apiToken: env.CF_D1_TOKEN }
+  return {
+    accountId: env.CF_ACCOUNT_ID,
+    apiToken: env.CF_D1_TOKEN,
+    natives: nativeTeamDatabases(env),
+  }
 }
 
 /** How long a worker waits for auth to say who somebody is before it gives up.
