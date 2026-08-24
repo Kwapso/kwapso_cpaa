@@ -3220,6 +3220,168 @@ DELETE FROM role_permissions WHERE module IN ('learning', 'marketing', 'screens'
 DROP INDEX IF EXISTS idx_process_versions_sprint;
 `,
   },
+  {
+    // WHO DOES THE WORK, AND WHAT IT COSTS THEM — the client's own organisation,
+    // which is the half of a process map that has never been written down.
+    //
+    // A step already knows what it IS and how long it takes. It has never known
+    // WHO does it, beyond \`processes.role_name\`: one free-typed word on the
+    // whole map, so "Dispatch clerk" and "dispatch clerk" were two roles, a role
+    // could not span two maps, and nothing could say what an hour of it costs.
+    // That last one is why this matters — the savings figure is minutes saved
+    // TIMES the cost of the person who was spending them, and without a cost per
+    // role there is no money in it at all, only hours.
+    //
+    // THEIRS, NOT OURS, AND THE DISTINCTION IS THE WHOLE POINT (R24). The agency
+    // already has three things that look like a rate: what our hour costs us
+    // (\`internal_rates\`), what one of OUR roles costs us (\`internal_role_rates\`)
+    // and what we charge a client (\`account_rates\`). None of them is this. This
+    // is what a CLIENT'S OWN staff member costs the CLIENT, it belongs to that
+    // client, and it is the only one of the four a client may ever read — which
+    // is exactly why it gets its own tables rather than a flag on an existing
+    // one. BUILD-3 says it in one line: two things that both look like "a rate"
+    // are kept apart in the schema, not just in the UI.
+    //
+    // A PERSON IS A CONTACT YOU ALREADY HAVE. There is no new person table here
+    // and there must not be: the customer spine already holds every company and
+    // every person as an \`accounts\` row, linked through \`account_links\`. A new
+    // one would be a second address book to keep in step with the first. So
+    // \`client_role_people\` joins a role to the person's own account row.
+    //
+    // FOUR JOINS, BECAUSE BOTH SIDES ARE MANY (owner + Aurora, round two): one
+    // role can sit in several departments — a smaller company runs that way —
+    // and one person can hold several roles.
+    //
+    // A ROLE MAY HAVE NO COST YET (Aurora's answer, round two). You map a process
+    // in the room with the client, before anybody has looked up what anyone is
+    // paid; refusing to save the role would stop the session that the whole
+    // module exists to support. \`cents_per_hour\` is NULL until somebody knows,
+    // and the saving reads as incomplete rather than as zero.
+    version: "0052_the_client_organisation",
+    sql: `
+CREATE TABLE client_departments (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_client_departments_account ON client_departments (account_id);
+-- One name per client, while it is live. Retiring and re-adding is allowed.
+CREATE UNIQUE INDEX idx_client_departments_name
+  ON client_departments (account_id, name) WHERE deactivated_at IS NULL;
+
+CREATE TABLE client_roles (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  -- What an hour of this role costs the CLIENT. NULL = not known yet, which is a
+  -- real answer and not a zero: a saving computed from it reads as incomplete.
+  cents_per_hour INTEGER CHECK (cents_per_hour IS NULL OR cents_per_hour >= 0),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_client_roles_account ON client_roles (account_id);
+CREATE UNIQUE INDEX idx_client_roles_name
+  ON client_roles (account_id, name) WHERE deactivated_at IS NULL;
+
+CREATE TABLE client_role_departments (
+  id TEXT PRIMARY KEY,
+  role_id TEXT NOT NULL REFERENCES client_roles (id),
+  department_id TEXT NOT NULL REFERENCES client_departments (id),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE UNIQUE INDEX idx_client_role_departments_pair
+  ON client_role_departments (role_id, department_id);
+CREATE INDEX idx_client_role_departments_dept ON client_role_departments (department_id);
+
+CREATE TABLE client_role_people (
+  id TEXT PRIMARY KEY,
+  role_id TEXT NOT NULL REFERENCES client_roles (id),
+  -- The person's OWN accounts row, the same one the contacts list shows.
+  person_account_id TEXT NOT NULL REFERENCES accounts (id),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE UNIQUE INDEX idx_client_role_people_pair
+  ON client_role_people (role_id, person_account_id);
+CREATE INDEX idx_client_role_people_person ON client_role_people (person_account_id);
+
+-- A TOOL is anything a step uses, digital or physical, with an optional cost
+-- (SCOPE ch.02). Four fields and no more — Aurora's ruling in round two, and
+-- Alaap deferred to it: "keep it to name, cost, billing period and icon; the
+-- rest is clutter on the form".
+--
+-- ITS PRICE IS DATED, like a role's cost and unlike the first draft of this.
+-- \`client_tool_prices\` is what a map set to March reads, so a tool that cost
+-- EUR 240 then and EUR 300 now does not rewrite March's arithmetic. The tool row
+-- carries no price at all, which is what stops the two ever disagreeing.
+CREATE TABLE client_tools (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  mark TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_client_tools_account ON client_tools (account_id);
+CREATE UNIQUE INDEX idx_client_tools_name
+  ON client_tools (account_id, name) WHERE deactivated_at IS NULL;
+
+CREATE TABLE client_tool_prices (
+  id TEXT PRIMARY KEY,
+  tool_id TEXT NOT NULL REFERENCES client_tools (id),
+  cents INTEGER NOT NULL CHECK (cents >= 0),
+  billing_period TEXT NOT NULL CHECK (billing_period IN ('month', 'year')),
+  -- The day this price started being true. A map set to a date reads the newest
+  -- row on or before it.
+  effective_on TEXT NOT NULL,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE UNIQUE INDEX idx_client_tool_prices_on
+  ON client_tool_prices (tool_id, effective_on);
+
+-- EVERY ROLE SOMEBODY ALREADY TYPED becomes a record, with no department yet
+-- (the owner, 24 Aug 2026: "make them real records"). The word is kept exactly
+-- as it was written, minus surrounding space, so nothing is lost and nobody has
+-- to remember what a map used to say. Cost unknown, because it always was.
+--
+-- Only maps that HAVE an account: a role belongs to a client, and a map with no
+-- client has nobody to own one. Those keep their typed word until somebody files
+-- the map under a client.
+INSERT INTO client_roles (id, account_id, name, cents_per_hour, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), p.account_id, p.role_name, NULL,
+       strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'Carried over'
+  FROM (
+        -- DISTINCT ON THE TRIMMED WORD, and this is the whole correctness of it.
+        -- Distincting on the raw column makes "Dispatch clerk" and
+        -- "  Dispatch clerk  " two rows, which then TRIM to the same name and
+        -- collide on the unique index -- and because both are inserted by ONE
+        -- statement, the NOT EXISTS below cannot see the first while writing the
+        -- second. The whole migration would throw and roll back, on real data,
+        -- the first time anybody had ever left a stray space in that box.
+        SELECT DISTINCT account_id, TRIM(role_name) AS role_name FROM processes
+         WHERE role_name IS NOT NULL AND TRIM(role_name) <> '' AND account_id IS NOT NULL
+       ) p
+ WHERE NOT EXISTS (
+   SELECT 1 FROM client_roles r
+    WHERE r.account_id = p.account_id AND r.name = p.role_name
+ );
+
+-- …and the map points at the record instead of repeating the word. The old
+-- column stays and stops being read, for the reason every other retired column
+-- stays: this codebase does not drop them.
+ALTER TABLE processes ADD COLUMN role_id TEXT REFERENCES client_roles (id);
+UPDATE processes
+   SET role_id = (SELECT r.id FROM client_roles r
+                   WHERE r.account_id = processes.account_id
+                     AND r.name = TRIM(processes.role_name))
+ WHERE role_name IS NOT NULL AND TRIM(role_name) <> '' AND account_id IS NOT NULL;
+CREATE INDEX idx_processes_role ON processes (role_id);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

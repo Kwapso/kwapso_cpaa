@@ -33,7 +33,7 @@ type Row = {
   /** Selected by the single-row door only — `undefined` on a list row, which is
    * how `toValue` tells the two apart (see DETAIL_COLUMNS). */
   created_at?: string | null
-  created_by?: string | null
+  creator_id?: string | null
   creator_name?: string | null
 }
 
@@ -44,10 +44,10 @@ const COLUMNS = "id, type, value, is_default, deactivated_at, mark, name_de, des
  * question about a VOCABULARY and nothing in a list of words asks who typed
  * each one, so carrying two more columns for every value on every read (and on
  * every mutation, which re-lists) would be paid by every screen to be spent by
- * one. `created_by` rides along because `creator_name` is a snapshot of the
+ * one. `creator_id` rides along because `creator_name` is a snapshot of the
  * name at the time — a person who has since been renamed still reads correctly,
  * and the id is what a future face would resolve through (R35). */
-const DETAIL_COLUMNS = `${COLUMNS}, created_at, created_by, creator_name`
+const DETAIL_COLUMNS = `${COLUMNS}, created_at, creator_id, creator_name`
 
 function toValue(r: Row): SelectableValue {
   return {
