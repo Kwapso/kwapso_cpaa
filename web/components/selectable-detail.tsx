@@ -51,6 +51,19 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
   const [tab, setTab] = React.useState("overview")
 
   const value = valueQ.data ?? null
+  // A FAILED READ SAYS SO. `data` stays undefined when the fetch REJECTS as well
+  // as when it has not answered yet, so a screen that only checks `undefined`
+  // shows its loading skeleton for ever on any error — which is exactly what
+  // shipped: one wrong column name in the door's SQL, a 500 on every call, and a
+  // screen that span quietly instead of reporting it. The error is checked
+  // FIRST, because "we asked and it went wrong" is a different sentence from
+  // "we are still asking".
+  if (valueQ.error)
+    return (
+      <p className="text-destructive text-sm">
+        {t("That didn't load. Refresh the page, and tell us if it keeps happening.")}
+      </p>
+    )
   if (valueQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!value) return <p className="text-muted-foreground text-sm">{t("That record no longer exists.")}</p>
 
