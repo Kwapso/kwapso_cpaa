@@ -150,11 +150,27 @@ export function buildCrumbs({
       href: pathTo(trail, i, teamPath, topLevel),
     }))
     const last = trail[trail.length - 1]
-    crumbs.push({
-      label: t(sectionTitle(last.module)),
-      href: last.id ? pathTo(trail, trail.length - 1, teamPath, topLevel) : undefined,
-    })
-    if (last.id && here) crumbs.push({ label: here })
+    // NO GENERIC RUNG ABOVE A NESTED RECORD. It used to push the last level's
+    // SECTION name — "Confia › Sprints › CONFIA-SPR0020" — and the owner caught
+    // both things wrong with it on 24 Aug 2026:
+    //
+    //   "it is behaving and showing me the word 'story' like I went to the
+    //    stories page and then did it… whenever I click on story, it has no
+    //    response, no output."
+    //
+    // He is right twice. He never visited the Sprints page — he opened a client
+    // and went in from there — so a rung saying he did is a route he did not
+    // walk, which is the exact thing the two-step ruling was made to stop. And
+    // the rung was DEAD: `pathTo` at the last index includes that level's id, so
+    // the link pointed at the page already open. Clicking it navigated to where
+    // he was, which is indistinguishable from a broken link.
+    //
+    // A nested COLLECTION is the one case where this level is a destination
+    // rather than a description — `/accounts/CONFIA/sprints` IS the sprints of
+    // that client — so there it stays, and it is the page you are on, so it
+    // carries no href either.
+    if (!last.id) crumbs.push({ label: t(sectionTitle(last.module)) })
+    else if (here) crumbs.push({ label: here })
     return crumbs
   }
 

@@ -124,7 +124,18 @@ export function DeepLinkScreen() {
     activityQ,
     activityTotal,
     inviteAuditQ,
-  } = useScreenData({ teamId, enabled, module, recordId, helpScope, taskView })
+  } = useScreenData({
+    teamId,
+    enabled,
+    module,
+    recordId,
+    helpScope,
+    taskView,
+    // The records this one was opened INSIDE. Their lists back the breadcrumb's
+    // labels, so a nested address that does not ask for them shows the word
+    // "Account" above a screen already displaying the client's name.
+    ancestorModules: (route?.levels ?? []).slice(0, -1).map((l) => l.module),
+  })
 
   const roles = rolesQ.data ?? []
   const activeRoles = roles.filter((r) => r.active)

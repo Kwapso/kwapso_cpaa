@@ -143,13 +143,30 @@ const crumbs = (path: string) =>
   })
 
 describe("the breadcrumb walks the whole way in, however deep", () => {
-  it("two levels read exactly as the owner described them", () => {
-    // "a story opened from Confia reads Confia › Stories › BERG-S0188"
+  it("two levels name the ancestor and the record — and nothing in between", () => {
+    // The owner, 24 Aug 2026, on the rung that used to sit here: "it is behaving
+    // and showing me the word 'story' like I went to the stories page and then
+    // did it". He did not. He opened a client and went in from there, so a rung
+    // saying otherwise recites a route nobody walked.
     expect(crumbs("/accounts/CONFIA/stories/ST1").map((c) => c.label)).toEqual([
       "Confia",
-      "Stories",
       "BERG-S0188",
     ])
+  })
+
+  it("no crumb above the record points at the record's OWN page", () => {
+    // The same rung was also dead: it linked to the address already open, so
+    // clicking it "has no response, no output". Any crumb whose href equals the
+    // current path is that bug returning under another name.
+    const here = "/accounts/CONFIA/stories/ST1"
+    for (const crumb of crumbs(here))
+      expect(crumb.href, `${crumb.label} links to the page it is already on`).not.toBe(here)
+  })
+
+  it("a nested COLLECTION keeps its name, because there it is the destination", () => {
+    // "/accounts/CONFIA/stories" really is this client's stories — the level is
+    // a place rather than a description of the record below it.
+    expect(crumbs("/accounts/CONFIA/stories").map((c) => c.label)).toEqual(["Confia", "Stories"])
   })
 
   it("clicking the client goes back to the client", () => {
@@ -168,7 +185,6 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
       "CONFIA",
       "BERG-SP12",
       "BERG-S0188",
-      "Accounts",
       "Confia",
     ])
     // Every step above the last is a link that lands where it says.
@@ -198,7 +214,7 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
       } as never,
       t: (s: string) => s,
     })
-    expect(trail.map((c) => c.label)).toEqual(["Account", "Stories", "Story"])
+    expect(trail.map((c) => c.label)).toEqual(["Account", "Story"])
     expect(trail[0].href).toBe("/accounts/CONFIA")
   })
 

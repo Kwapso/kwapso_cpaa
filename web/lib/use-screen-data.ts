@@ -40,6 +40,17 @@ export type ScreenDataInput = {
   enabled: boolean
   module: string | null
   recordId: string | null
+  /** THE MODULES THIS RECORD WAS OPENED INSIDE — the trail's ancestors, deepest
+   * last, without the level being rendered.
+   *
+   * A list is loaded when its module is the one on screen, which was the whole
+   * truth until an address could nest. On `/accounts/CONFIA/sprints/S1` the
+   * module is `sprints`, so accounts never loaded, so the breadcrumb had no name
+   * to show and said the word "Account" — with the client's name sitting on the
+   * screen underneath it (the owner, 24 Aug 2026). An ancestor needs its list
+   * for exactly the same reason the current module does: something on screen
+   * says its name. */
+  ancestorModules?: string[]
   /** which ticket set the Tickets screen is showing — a SERVER scope (R14/R16). */
   helpScope?: HelpScope
   /** which pile of our own admin the Tasks screen is showing — a SERVER view,
@@ -68,13 +79,18 @@ export function useScreenData({
   recordId,
   helpScope = "all",
   taskView = "open",
+  ancestorModules = [],
 }: ScreenDataInput) {
+  /** Is this module ON SCREEN — as the level being rendered, or as one of the
+   * records above it in the trail? The one question every `module === "x"` read
+   * below was really asking, back when a URL could only hold one level. */
+  const onScreen = (name: string) => module === name || ancestorModules.includes(name)
   // Per-team screen-recipe overrides (config store) — load across the team area.
   const overridesQ = useCached(enabled ? `screens:${teamId}` : null, () =>
     tenancy.screenOverrides().then((r) => r.screens)
   )
   const membersQ = useCached(
-    enabled && module === "members" ? `members:${teamId}` : null,
+    enabled && onScreen("members") ? `members:${teamId}` : null,
     () => tenancy.members().then((r) => r.members)
   )
   // Roles back the roles list, the breadcrumb label, the change-role picker and
@@ -108,14 +124,14 @@ export function useScreenData({
   // the list is a PAGE — page one lands here, its next cursor in the sidecar
   // <LoadMore> reads. Row-level live: a change patches the one account in place.
   const accountsQ = useCached(
-    enabled && module === "accounts" ? accountsKey(teamId as string) : null,
+    enabled && onScreen("accounts") ? accountsKey(teamId as string) : null,
     () => listFetch.accounts(teamId as string)
   )
   // The knowledge base backs its list, the breadcrumb label and one source's
   // screen. R14: PAGED, like accounts and tickets — page one lands here and its
   // next cursor in the sidecar. Row-level live: a change patches one source.
   const knowledgeQ = useCached(
-    enabled && module === "knowledge" ? knowledgeKey(teamId as string) : null,
+    enabled && onScreen("knowledge") ? knowledgeKey(teamId as string) : null,
     () => listFetch.knowledge(teamId as string)
   )
   // ── THE WORK ENGINE'S FOUR ───────────────────────────────────────────────
@@ -125,13 +141,13 @@ export function useScreenData({
   // list already holds — which is why they are keyed by team here rather than by
   // record, and why a slice narrowed to one record gets a key of its own instead
   // (see sliceKey in components/work-panels.tsx).
-  const storiesQ = useCached(enabled && module === "stories" ? storiesKey(teamId as string) : null, () =>
+  const storiesQ = useCached(enabled && onScreen("stories") ? storiesKey(teamId as string) : null, () =>
     listFetch.stories(teamId as string)
   )
-  const sprintsQ = useCached(enabled && module === "sprints" ? sprintsKey(teamId as string) : null, () =>
+  const sprintsQ = useCached(enabled && onScreen("sprints") ? sprintsKey(teamId as string) : null, () =>
     listFetch.sprints(teamId as string)
   )
-  const appsQ = useCached(enabled && module === "apps" ? appsKey(teamId as string) : null, () =>
+  const appsQ = useCached(enabled && onScreen("apps") ? appsKey(teamId as string) : null, () =>
     listFetch.apps(teamId as string)
   )
   // OUR OWN ADMIN, in SIX SERVER views — overdue, the everyday list, the
@@ -149,7 +165,7 @@ export function useScreenData({
   // list, so a detail screen sourced from that collection would answer "that
   // record no longer exists" the moment you used the button on it.
   const tasksOpenQ = useCached(
-    enabled && module === "tasks" ? tasksKey(teamId as string, "open") : null,
+    enabled && onScreen("tasks") ? tasksKey(teamId as string, "open") : null,
     () => listFetch.tasks(teamId as string, "open")
   )
   const tasksAllQ = useCached(
@@ -170,7 +186,7 @@ export function useScreenData({
   // PAGED like tickets and sources — page one lands here and its next cursor in
   // the sidecar <LoadMore> reads. The RECORD screen reads through this same key
   // and falls back to a by-id read when the loaded prefix doesn't reach it.
-  const meetingsQ = useCached(enabled && module === "meetings" ? meetingsKey(teamId as string) : null, () =>
+  const meetingsQ = useCached(enabled && onScreen("meetings") ? meetingsKey(teamId as string) : null, () =>
     listFetch.meetings(teamId as string)
   )
   // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
