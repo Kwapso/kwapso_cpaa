@@ -85,9 +85,11 @@ export async function getDeliverables(request: Request, env: Env): Promise<Respo
     appId: queryText(url.searchParams.get("appId"), "App"),
     id: queryText(url.searchParams.get("id"), "Id"),
   }
+  // These are independent reads — one wait, not 2.
+  const [deliverables, total] = await Promise.all([listDeliverables(cfg, guard, filter), countDeliverables(cfg, guard, filter)])
   return json({
-    deliverables: await listDeliverables(cfg, guard, filter),
-    total: await countDeliverables(cfg, guard, filter),
+    deliverables,
+    total,
   })
 }
 
@@ -108,9 +110,11 @@ export async function postCreateDeliverable(request: Request, env: Env): Promise
   // NULL and the client's read cannot see it — sharing is its own act, below.
   const wrote = await createDeliverable(cfg, guard, actor, appId, body)
   await publishChange(env, guard.teamId, "deliverables", appId, "add", wrote.accountId ?? undefined)
+  // These are independent reads — one wait, not 2.
+  const [deliverables, total] = await Promise.all([listDeliverables(cfg, guard, { appId }), countDeliverables(cfg, guard, { appId })])
   return json({
-    deliverables: await listDeliverables(cfg, guard, { appId }),
-    total: await countDeliverables(cfg, guard, { appId }),
+    deliverables,
+    total,
   })
 }
 
@@ -126,9 +130,11 @@ export async function postUpdateDeliverable(request: Request, env: Env): Promise
   requireText(body.title, "Title", TEXT_LIMITS.short)
   const wrote = await updateDeliverable(cfg, guard, actor, id, appId, body)
   await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
+  // These are independent reads — one wait, not 2.
+  const [deliverables, total] = await Promise.all([listDeliverables(cfg, guard, { appId }), countDeliverables(cfg, guard, { appId })])
   return json({
-    deliverables: await listDeliverables(cfg, guard, { appId }),
-    total: await countDeliverables(cfg, guard, { appId }),
+    deliverables,
+    total,
   })
 }
 
@@ -146,9 +152,11 @@ export async function postSetDeliverableActive(request: Request, env: Env): Prom
   const wrote = await setDeliverableActive(cfg, guard, actor, id, appId, body.active)
   if (wrote.changed)
     await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
+  // These are independent reads — one wait, not 2.
+  const [deliverables, total] = await Promise.all([listDeliverables(cfg, guard, { appId }), countDeliverables(cfg, guard, { appId })])
   return json({
-    deliverables: await listDeliverables(cfg, guard, { appId }),
-    total: await countDeliverables(cfg, guard, { appId }),
+    deliverables,
+    total,
   })
 }
 
@@ -187,9 +195,11 @@ export async function postSetDeliverableVisibility(request: Request, env: Env): 
   const wrote = await setDeliverableClientVisibility(cfg, guard, actor, id, appId, body.visible)
   if (wrote.changed)
     await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
+  // These are independent reads — one wait, not 2.
+  const [deliverables, total] = await Promise.all([listDeliverables(cfg, guard, { appId }), countDeliverables(cfg, guard, { appId })])
   return json({
-    deliverables: await listDeliverables(cfg, guard, { appId }),
-    total: await countDeliverables(cfg, guard, { appId }),
+    deliverables,
+    total,
   })
 }
 
@@ -217,9 +227,11 @@ export async function postSetDeliverableVisibility(request: Request, env: Env): 
 export async function getClientDeliverables(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "deliverables", "read")
   const scope = await accountScope(cfg, guard)
+  // These are independent reads — one wait, not 2.
+  const [deliverables, total] = await Promise.all([listClientDeliverables(cfg, guard, scope), countClientDeliverables(cfg, guard, scope)])
   return json({
-    deliverables: await listClientDeliverables(cfg, guard, scope),
-    total: await countClientDeliverables(cfg, guard, scope),
+    deliverables,
+    total,
   })
 }
 

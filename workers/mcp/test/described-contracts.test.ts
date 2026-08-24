@@ -71,8 +71,11 @@ const DESCRIPTION_VOCABULARY: Record<string, string> = {
   awaiting_validation:
     "the stage a ticket OPENS in when its kind is one that waits for the client (CHECKLIST 5.13). It is a VALUE of the `status` column, not a field: `createTicket` computes it and no door reads it off a body, so neither the schema census nor the response-key derivation can see it. The list it belongs to is HELP_STATUSES in shared/types.ts.",
   new: "the other stage `createTicket` may open a ticket in — the same HELP_STATUSES value, and named beside its sibling for the same reason: a description that said one and not the other would describe half a decision.",
-  yours:
-    "the triage door's answer to 'is this caller the one on duty?' (CHECKLIST 5.11). It is a real key on the response and it is written as a SHORTHAND property (`json({ onDuty, yours, … })`), which the json-literal derivation reads as a variable rather than a field name. Named here rather than spelled out longhand at the door, because the shorthand is what a reader of that handler should see.",
+  // `yours` was here, apologising for a blind spot instead of removing it: the
+  // shorthand pattern in `literalKeys` used to EAT the comma it matched, so only
+  // every other shorthand property was seen. The lookbehind fixed that and this
+  // entry became derivable — which the rot-check said, unprompted, the moment the
+  // derivation improved. That is the exemption list working the way it should.
   export_too_large:
     "the refusal code a too-big export answers with, thrown by the one CSV seam (shared/workers/csv.ts) — R14's posture applied to files: the export is whole or it is an error, never a silently short CSV. An error VALUE rather than a response key, so no door's own source names it.",
   memberUserId:
@@ -147,12 +150,23 @@ function callTexts(src: string, callee: string): string[] {
 
 /** Object keys (`total:`) and shorthand properties (`{ emailSent,`) in a slice.
  * Comments go first — a comment between two keys would otherwise break the
- * adjacency both patterns stand on (the seam's own `message:` sits under one). */
+ * adjacency both patterns stand on (the seam's own `message:` sits under one).
+ *
+ * THE DELIMITER IS MATCHED BUT NOT CONSUMED, and that is the whole correctness of
+ * this. It used to be `[{,]\s*(\w+)\s*[,}]`, which EATS the comma it matched — so
+ * in `json({ onDuty, yours, total })` the comma that ends `onDuty` is gone before
+ * `yours` is looked for, and only every OTHER shorthand property was ever found.
+ * The symptom was a real response field the check could not see, and the repair
+ * at the time was a hand-written vocabulary entry apologising for the blind spot
+ * rather than removing it — so the next handler written in shorthand hit the same
+ * wall (`total`, 24 Aug 2026, when a sequential pair became a `Promise.all` and
+ * its keys became shorthand). A lookbehind leaves the delimiter in place for the
+ * next match, and the exemption it needed is gone. */
 function literalKeys(src: string): string[] {
   const clean = stripComments(src)
   return [
-    ...[...clean.matchAll(/[{,]\s*(\w+)\s*:/g)].map((m) => m[1]),
-    ...[...clean.matchAll(/[{,]\s*(\w+)\s*[,}]/g)].map((m) => m[1]),
+    ...[...clean.matchAll(/(?<=[{,])\s*(\w+)\s*(?=:)/g)].map((m) => m[1]),
+    ...[...clean.matchAll(/(?<=[{,])\s*(\w+)\s*(?=[,}])/g)].map((m) => m[1]),
   ]
 }
 

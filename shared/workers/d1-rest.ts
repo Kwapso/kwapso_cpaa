@@ -8,6 +8,13 @@
 export type D1Rest = {
   accountId: string
   apiToken: string
+  /** WHERE THIS REQUEST'S TRIPS ARE COUNTED (timing.ts), when somebody is
+   * counting. Every statement here is a separate HTTPS request to Cloudflare, so
+   * the COUNT is the cost model — and it rides on the config because the config
+   * is the one thing already threaded to every call site in the codebase. No
+   * handler had to change to be measured. Absent = nobody asked, and the door
+   * pays nothing. */
+  stats?: { op: string; ms: number }[]
 }
 
 type CfResponse<T> = {
@@ -17,11 +24,36 @@ type CfResponse<T> = {
 }
 
 import { D1_LIST_PAGE_CAP } from "./limits"
+import { labelFor } from "./timing"
 
 const API = "https://api.cloudflare.com/client/v4"
 const RETRIES = 2 // total attempts = 1 + RETRIES — 5xx, network blips, and CF's 7500-in-a-200
 
+/** THE MEASURED DOOR. Everything below goes through `cfTimed`, so a trip cannot
+ * be made without being counted — the alternative (asking each call site to
+ * report itself) is the shape that always ends with the expensive path being the
+ * one nobody instrumented. Retries are counted INSIDE the trip they belong to,
+ * because a statement that needed three attempts genuinely cost three attempts
+ * and reporting it as one would flatter the number. */
 async function cf<T>(
+  cfg: D1Rest,
+  path: string,
+  body?: unknown,
+  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST"
+): Promise<T> {
+  if (!cfg.stats) return cfRaw<T>(cfg, path, body, method)
+  const started = Date.now()
+  const sql = (body as { sql?: string } | undefined)?.sql
+  try {
+    return await cfRaw<T>(cfg, path, body, method)
+  } finally {
+    // In a `finally`, so a statement that THREW is still counted. A failing
+    // query is usually the slow one, and leaving it out would hide it.
+    cfg.stats.push({ op: sql ? labelFor(sql) : method, ms: Date.now() - started })
+  }
+}
+
+async function cfRaw<T>(
   cfg: D1Rest,
   path: string,
   body?: unknown,
