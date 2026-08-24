@@ -419,6 +419,7 @@ export const GLOSSARY_SYNONYMS: { word: string; term: string; why: string }[] = 
   { word: "permissions", term: "permission", why: "the Roles screen headed a matrix \"Permissions\" while two other screens called the same thing an access right. The singular stays free: \"you don't have permission to\" is a sentence about an act, not a name for a record" },
   { word: "portal login", term: "portalAccess", why: "Portal access is the thing an admin grants and takes away; \"Portal login\" reads as the credential, which is not what the switch does" },
   { word: "cost card", term: "internalRate", why: "there are two rate cards in this product and neither is called a cost card — what our own hour costs us is the Internal rate, and what a client is charged is the Rate card (R24 keeps them apart in the code for the same reason)" },
+  { word: "diary", term: "meeting", why: "a conversation we have had or are about to have is a Meeting — the screen, the module and the glossary are all named after it; the same word was also standing in for Google's own calendar, a second and different thing this product only ever reads" },
   // ── …and the ones nobody has written yet, which is the cheaper half ───────
   { word: "user", term: "member", why: "the standard SaaS word for the person this app calls a Member. It has never appeared in either front door and this is what keeps it that way" },
   { word: "users", term: "member", why: "the plural of the above" },

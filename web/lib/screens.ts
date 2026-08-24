@@ -470,7 +470,7 @@ const knowledgeListRecipe: ScreenRecipe = {
   ),
 }
 
-/** THE DIARY — every conversation we have had or are about to have, newest
+/** THE MEETINGS LIST — every conversation we have had or are about to have, newest
  * first. PAGED (R14): a meeting is an event, so the rows accumulate with
  * ordinary use and are never curated away — a cancelled call in March is still
  * the answer to "didn't we speak in March?". Glide's own two years are 350
@@ -492,7 +492,7 @@ const meetingsListRecipe: ScreenRecipe = {
   // recipe above): on a collection that PAGES, a facet in the frame narrows the
   // fifty rows the browser is holding. This screen's filters are the DOOR's now,
   // declared in web/lib/collection-filters.ts and asked from the host's find bar.
-  collection: listCollection("Nothing in the diary yet.", "Search meetings…", [], { paged: true, icon: "meetings" }),
+  collection: listCollection("Nothing in Meetings yet.", "Search meetings…", [], { paged: true, icon: "meetings" }),
 }
 
 /* ------------------------------ process maps ------------------------------ */
@@ -773,7 +773,7 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "sprints.list": sprintsListRecipe,
   "apps.list": appsListRecipe,
   "tasks.list": tasksListRecipe,
-  // The diary. Its DETAIL has no recipe: two of its three tabs are prose
+  // The meetings list. Its DETAIL has no recipe: two of its three tabs are prose
   // somebody wrote (the agenda, and the notes afterwards) and its header carries
   // the one button in this module that reaches outside the app — see
   // meeting-detail.tsx.

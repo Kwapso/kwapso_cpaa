@@ -653,14 +653,14 @@ describe("TEAM_MIGRATIONS — every version is claimed exactly once", () => {
 
 // 0041 — ONE SPELLING OF ONE INSTANT, so the TEXT order is the TIME order.
 //
-// `meetings.starts_at` is TEXT, SQLite compares TEXT byte by byte, and the diary
+// `meetings.starts_at` is TEXT, SQLite compares TEXT byte by byte, and the meetings list
 // is both ORDERED and PAGED by that column (the ORDER BY expression and the
 // keyset cursor are one value, which is what shared/workers/sorting.ts requires).
 // So the column is only chronological while every row is spelled the same way,
 // and sixty-three staging rows were not: the calendar sweep stored Google's own
 // offset — `2026-08-18T12:00:00+05:30` — beside every other row's `…Z`. A noon
 // meeting in Delhi is 06:30Z and sorted as though it were noon, so the day sheet
-// interleaved and page two of the diary began somewhere page one had not ended.
+// interleaved and page two of the meetings list began somewhere page one had not ended.
 //
 // DRIVEN AGAINST REAL SQLITE, because that is the only thing whose opinion
 // counts: the claim is about how a database orders bytes, and no amount of
@@ -700,7 +700,7 @@ describe("0041 — meeting moments are stored in UTC", () => {
   const migrate = (db: DatabaseSync) =>
     db.exec(TEAM_MIGRATIONS.find((m) => m.version === MIGRATION)!.sql)
 
-  /** The diary's own ordering expression, and the true instant beside it. */
+  /** The meetings list's own ordering expression, and the true instant beside it. */
   const byText = (db: DatabaseSync) =>
     db.prepare("SELECT id, starts_at FROM meetings ORDER BY starts_at, id").all() as {
       id: string

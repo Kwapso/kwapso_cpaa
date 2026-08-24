@@ -263,7 +263,7 @@ describe("the allow-lists are the check", () => {
     expect(() => asService(123)).toThrow(GuardError)
     expect(asNamedService("drive")).toBe("drive")
     // Gmail and Calendar have nothing to NAME — mail is fenced by known contact
-    // and a calendar is the person's own diary — so they are refused here.
+    // and a calendar is the person's own — so they are refused here.
     expect(() => asNamedService("gmail")).toThrow(GuardError)
     expect(() => asNamedService("calendar")).toThrow(GuardError)
   })

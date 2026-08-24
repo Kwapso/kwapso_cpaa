@@ -8,7 +8,7 @@
 //     role says — their role here holds every meeting right on purpose;
 //   • a repeat is silent (R17): cancelling a cancelled meeting moves zero rows
 //     and writes no second line of history;
-//   • the diary PAGES (R14) and its badge is the exact server count (R16);
+//   • the meetings list PAGES (R14) and its badge is the exact server count (R16);
 //   • THE CALENDAR IS READ-ONLY. Not one door in this app writes to Google's
 //     calendar, and the suite asserts that by asking the seven that used to and
 //     getting nothing back;
@@ -23,8 +23,8 @@ import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
-/** What Google's diary holds, per test — see "everything on the calendar" below. */
-const diary = vi.hoisted(() => ({ events: [] as Record<string, unknown>[] }))
+/** What Google's calendar holds, per test — see "everything on the calendar" below. */
+const googleCalendar = vi.hoisted(() => ({ events: [] as Record<string, unknown>[] }))
 /** What the transcript hunt finds, per test, and how many times it was asked. */
 const transcript = vi.hoisted(() => ({ found: null as Record<string, unknown> | null, hunts: 0 }))
 
@@ -49,7 +49,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
     // that answered them all with the same entry would hand the same event to
     // the loop four times and test a collision rather than the rule.
     calendarList: async (_t: string, range: { from?: string; to?: string }) => ({
-      events: diary.events.filter((e) => {
+      events: googleCalendar.events.filter((e) => {
         const at = Date.parse(e.start as string)
         return (!range.from || at >= Date.parse(range.from)) && (!range.to || at < Date.parse(range.to))
       }),
@@ -57,7 +57,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
     }),
     // The transcript capture reads the entry before hunting for its transcript.
     calendarGet: async (_t: string, eventId: string) =>
-      diary.events.find((e) => e.id === eventId) ?? { id: eventId, attendees: [] },
+      googleCalendar.events.find((e) => e.id === eventId) ?? { id: eventId, attendees: [] },
     // NOTHING ELSE IS MOCKED, AND THAT IS THE POINT: there is no `calendarCreate`
     // here because there is no `calendarCreate` in the module any more. The
     // read-only suite below asks the seven doors that used to write and asserts
@@ -127,7 +127,7 @@ const historyCount = (id: string) =>
 
 beforeEach(() => {
   published = []
-  diary.events = []
+  googleCalendar.events = []
   transcript.found = null
   transcript.hunts = 0
   holder.db = buildSpineDb()
@@ -148,7 +148,7 @@ beforeEach(() => {
   expect(granted.n, "the client role must hold every meeting right for this suite to mean anything").toBe(1)
 })
 
-describe("R21 — a client login cannot reach the diary at all", () => {
+describe("R21 — a client login cannot reach the meetings list at all", () => {
   const DOORS: [string, unknown, string][] = [
     ["GET /api/content/meetings", undefined, ""],
     ["POST /api/content/meetings", { title: "Theirs now", startsAt: "2026-09-14T10:00:00.000Z" }, ""],
@@ -229,7 +229,7 @@ describe("R17 — a repeat is silent", () => {
   })
 })
 
-describe("the diary itself", () => {
+describe("the meetings list itself", () => {
   it("keeps the agenda and the notes — the two fields a work log had nowhere to put", async () => {
     const m = await arrange({
       agenda: "What shipped, what is next, and the dispatch complaints.",
@@ -263,7 +263,7 @@ describe("the diary itself", () => {
       hasMore: boolean
       nextCursor: string | null
     }
-    expect(page1.total, "the badge counts the WHOLE diary, not the page").toBe(55)
+    expect(page1.total, "the badge counts the WHOLE meetings list, not the page").toBe(55)
     expect(page1.meetings.length).toBe(50)
     expect(page1.hasMore).toBe(true)
     expect(page1.nextCursor).toBeTruthy()
@@ -341,7 +341,7 @@ describe("nothing in this app writes to a calendar", () => {
 })
 
 describe("R1 — every write publishes", () => {
-  it("a create, an edit and a cancel each ping the diary", async () => {
+  it("a create, an edit and a cancel each ping the meetings list", async () => {
     const m = await arrange({ title: "Review" })
     expect(published.map((p) => p.resource)).toContain("meetings")
     published = []
@@ -357,9 +357,9 @@ describe("R1 — every write publishes", () => {
   })
 })
 
-// ── EVERYTHING ON THE CALENDAR REACHES THE DIARY ─────────────────────────────
+// ── EVERYTHING ON THE CALENDAR REACHES THE MEETINGS LIST ─────────────────────
 //
-// THE OWNER'S BUG, in his own diary. He asked why "FluClinic: Client selectable
+// THE OWNER'S BUG, in his own calendar. He asked why "FluClinic: Client selectable
 // data" — a real meeting on 18 August, organised by a colleague, him an accepted
 // guest, on his primary calendar, at the right hour — was not in kwapso. It read
 // back perfectly from Google every time anybody looked.
@@ -414,7 +414,7 @@ const connectCalendar = () =>
        '${new Date(Date.now() + 3_600_000).toISOString()}', 'plain-refresh', '2026-01-01', '${IDS.staffUser}');`
   )
 
-const diaryTitles = () =>
+const meetingTitles = () =>
   (db().prepare("SELECT title FROM meetings ORDER BY title").all() as { title: string }[]).map((r) => r.title)
 
 describe("the sweep brings in everything, not only the repeating entries", () => {
@@ -422,7 +422,7 @@ describe("the sweep brings in everything, not only the repeating entries", () =>
 
   it("a ONE-OFF meeting becomes a record — the entry he could not find", async () => {
     // No `recurringEventId` anywhere on it. This is the whole bug.
-    diary.events = [
+    googleCalendar.events = [
       entry({
         attendees: [
           { email: "ishita@kwapso.com", name: "Ishita", response: "accepted", organizer: true, optional: false },
@@ -434,38 +434,38 @@ describe("the sweep brings in everything, not only the repeating entries", () =>
 
     expect(res.status).toBe(200)
     expect((await res.json()) as { created: number }).toMatchObject({ created: 1 })
-    expect(diaryTitles()).toContain("FluClinic: Client selectable data")
+    expect(meetingTitles()).toContain("FluClinic: Client selectable data")
   })
 
   it("an entry with no guests at all comes in too — 'everything' was meant literally", async () => {
-    diary.events = [entry({ id: "E2", summary: "Write the deck" })]
+    googleCalendar.events = [entry({ id: "E2", summary: "Write the deck" })]
     await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
-    expect(diaryTitles()).toContain("Write the deck")
+    expect(meetingTitles()).toContain("Write the deck")
   })
 
   it("a repeating instance still comes in, so nothing that worked stopped working", async () => {
-    diary.events = [entry({ id: "E3", summary: "Monday stand-up", recurringEventId: "SERIES_1" })]
+    googleCalendar.events = [entry({ id: "E3", summary: "Monday stand-up", recurringEventId: "SERIES_1" })]
     await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
-    expect(diaryTitles()).toContain("Monday stand-up")
+    expect(meetingTitles()).toContain("Monday stand-up")
   })
 
   it("an entry already called off is NOT created just to be cancelled", async () => {
-    diary.events = [entry({ id: "E4", summary: "Abandoned call", status: "cancelled" })]
+    googleCalendar.events = [entry({ id: "E4", summary: "Abandoned call", status: "cancelled" })]
     const res = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
     expect((await res.json()) as { created: number }).toMatchObject({ created: 0 })
-    expect(diaryTitles()).toHaveLength(0)
+    expect(meetingTitles()).toHaveLength(0)
   })
 
   it("an entry with no title gets words rather than a blank, and sweeping twice writes once (R17)", async () => {
-    diary.events = [entry({ id: "E5", summary: "" })]
+    googleCalendar.events = [entry({ id: "E5", summary: "" })]
     await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
-    expect(diaryTitles()).toEqual(["A meeting with no title"])
+    expect(meetingTitles()).toEqual(["A meeting with no title"])
 
     // IDEMPOTENT. Google's `updated` has not moved, so the second sweep must
     // touch nothing at all — no second row, no second activity line, no ping.
     const again = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
     expect((await again.json()) as { created: number; updated: number }).toMatchObject({ created: 0, updated: 0 })
-    expect(diaryTitles()).toHaveLength(1)
+    expect(meetingTitles()).toHaveLength(1)
   })
 
   // ── THE WALK THAT MAKES "EVERYTHING" TRUE ──────────────────────────────────
@@ -476,7 +476,7 @@ describe("the sweep brings in everything, not only the repeating entries", () =>
   // ninety-day slice per call. Bounded per call (R14), complete by repetition.
   it("a meeting from years ago is reached by walking, one slice per call", async () => {
     const longAgo = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000)
-    diary.events = [entry({ id: "OLD", summary: "The first kickoff", start: longAgo.toISOString(),
+    googleCalendar.events = [entry({ id: "OLD", summary: "The first kickoff", start: longAgo.toISOString(),
       end: new Date(longAgo.getTime() + 3_600_000).toISOString() })]
 
     // The first call starts at the FLOOR, five years back, so it cannot possibly
@@ -487,19 +487,19 @@ describe("the sweep brings in everything, not only the repeating entries", () =>
     ).json()) as { created: number; swept: string; caughtUp: boolean }
     expect(first.created).toBe(0)
     expect(first.caughtUp, "five years is not one slice").toBe(false)
-    expect(diaryTitles()).toHaveLength(0)
+    expect(meetingTitles()).toHaveLength(0)
 
     // Keep calling. Each one advances the cursor by a slice, and the meeting
     // arrives when the walk reaches the quarter it is in.
     let swept = first.swept
-    for (let i = 0; i < 30 && !diaryTitles().length; i++) {
+    for (let i = 0; i < 30 && !meetingTitles().length; i++) {
       const r = (await (
         await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
       ).json()) as { swept: string }
       expect(Date.parse(r.swept), "the cursor only ever moves forward").toBeGreaterThan(Date.parse(swept))
       swept = r.swept
     }
-    expect(diaryTitles()).toEqual(["The first kickoff"])
+    expect(meetingTitles()).toEqual(["The first kickoff"])
   })
 
   it("the cursor is kept on the caller's own calendar connection, so it survives the request", async () => {
@@ -541,7 +541,7 @@ describe("the transcript import is idempotent", () => {
     // A past entry with one of OUR OWN people on it — the intersection with the
     // team's membership is what decides whose hour is a cost.
     const ranAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-    diary.events = [
+    googleCalendar.events = [
       entry({
         id: "PAST_1",
         summary: "Quarterly review",
@@ -573,7 +573,7 @@ describe("the transcript import is idempotent", () => {
 // THE OTHER HALF OF MIGRATION 0039. That migration converted the rows already
 // stored; this is what keeps the next sweep from writing the same mixture back.
 //
-// `starts_at` is TEXT and the diary is ordered and PAGED by it, so the column is
+// `starts_at` is TEXT and the meetings list is ordered and PAGED by it, so the column is
 // only chronological while every writer spells a moment the same way. The app's
 // own forms always did — `requireMoment` returns `new Date(ms).toISOString()` —
 // and the calendar sweep, the other door into the same column, stored whatever
@@ -618,7 +618,7 @@ describe("a moment from Google is stored in UTC, like every other moment", () =>
     for (const raw of ["sqlString(event.start)", "sqlString(event.end || null)"])
       expect(
         src.includes(raw),
-        `the calendar sweep writes ${raw} straight into SQL — wrap it in utcMoment(), or the diary sorts strings instead of times`
+        `the calendar sweep writes ${raw} straight into SQL — wrap it in utcMoment(), or the meetings list sorts strings instead of times`
       ).toBe(false)
     expect(src).toContain("sqlString(utcMoment(event.start))")
     expect(src).toContain("sqlString(utcMoment(event.end || null))")

@@ -123,7 +123,7 @@ From the briefing, all selected:
 
 | Source | What it must do |
 |---|---|
-| **Calendar** | ~~Sprints and to-dos as events — **two-way**~~. **REVERSED BY THE OWNER, 18 August 2026**: *"just remember we want a one-way sync of whatever is in Google Calendar… anything in my calendar should be up to date here. That's all."* Kwapso now reads a diary and never writes one, and the write half that was built to satisfy the original instruction has been removed. The instruction this row recorded — *"it must be a two way sync.. changes in app affect google calendar and vice versa"* — is history, kept because it is why the write half existed at all. |
+| **Calendar** | ~~Sprints and to-dos as events — **two-way**~~. **REVERSED BY THE OWNER, 18 August 2026**: *"just remember we want a one-way sync of whatever is in Google Calendar… anything in my calendar should be up to date here. That's all."* Kwapso now reads a calendar and never writes one, and the write half that was built to satisfy the original instruction has been removed. The instruction this row recorded — *"it must be a two way sync.. changes in app affect google calendar and vice versa"* — is history, kept because it is why the write half existed at all. |
 | **Drive** | A folder per account, auto-created |
 | **Drive files** | Searchable in the app |
 | **Gmail threads** | Searchable |

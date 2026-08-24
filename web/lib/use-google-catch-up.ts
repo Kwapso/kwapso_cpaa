@@ -8,7 +8,7 @@
 // handler has no caller and builds a guard no connection belongs to
 // (lib/knowledge-google.ts's header says why that separation is load-bearing
 // security). Until 14.12 the consequence was a BUTTON: somebody's Drive and
-// diary were as current as the last time they remembered to press it in
+// calendar were as current as the last time they remembered to press it in
 // Settings.
 //
 // 14.12 made it fire once, when the shell mounts. This is the gap the owner

@@ -149,7 +149,7 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     //
     // `google` is the newest, and the only member so far where the material on
     // the far side of the door is not even ours: it is one colleague's own Drive,
-    // mailbox, diary and chat spaces. Clients get no assistant and no Google
+    // mailbox, calendar and chat spaces. Clients get no assistant and no Google
     // surface at all, so every door on it refuses rather than fences. Its SWITCH
     // module — `google_mail` — is deliberately absent from this set and that is
     // the derivation working, not a gap: it gates no read door at all (nothing
@@ -159,7 +159,7 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // was a second switch, `google_events`; it went with the calendar's write
     // half on 18 August 2026.)
     //
-    // `meetings` joined the day the diary shipped, and it is the member whose
+    // `meetings` joined the day Meetings shipped, and it is the member whose
     // exclusion would have been most tempting after `work`: a meeting is WITH a
     // client, so a fence looks plausible. It is refused instead, because of what
     // the row SAYS rather than who was in the room — the notes are our own record

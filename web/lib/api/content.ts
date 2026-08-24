@@ -667,7 +667,7 @@ export const content = {
       total: number
     }>("/api/content/knowledge/sync", post({})),
   /** The PERSONAL half of the sweep: my own Drive folders, spaces, mail and
-   * diary, read through MY connection. Empty results mean I have connected
+   * calendar, read through MY connection. Empty results mean I have connected
    * nothing yet — the consent screen is a browser round-trip nobody can do for
    * me. */
   /** `onlyIfStale` is what the app-open catch-up sends (14.12): don't ask Google
@@ -690,28 +690,28 @@ export const content = {
    * count the heading shows. `view` is 'upcoming' by default. */
   meetings: (
     /** ONE flat object, spread into the query string (`listQuery`), so a filter
-     * cannot be lost on the way to the door — the diary pages, and every one of
+     * cannot be lost on the way to the door — the meetings list pages, and every one of
      * these narrows the whole of it rather than the page in hand. */
     opts: {
-      /** which slice of the diary the screen is standing on */
+      /** which slice of the meetings list the screen is standing on */
       view?: "upcoming" | "week" | "all"
-      /** the diary's search box, answered by the DOOR — the list pages, and the
+      /** the meetings list's search box, answered by the DOOR — the list pages, and the
        * meeting somebody digs for is the OLD one. */
       q?: string
-      /** one client's diary */
+      /** one client's meetings list */
       accountId?: string
-      /** ONE SYSTEM'S diary, for the app record's own Meetings tab. */
+      /** ONE SYSTEM'S meetings list, for the app record's own Meetings tab. */
       appId?: string
       /** why we met — the meeting purpose's own id */
       purposeId?: string
       /** ONE CALENDAR MONTH, `YYYY-MM` — what a calendar grid is actually asking.
-       * Not a narrowing of the loaded page: the diary pages newest-first, so the
+       * Not a narrowing of the loaded page: the meetings list pages newest-first, so the
        * month on screen is very often not in the page in hand at all. */
       month?: string
       /** where it stands: scheduled, held, or called off */
       status?: string
       /** WHAT ORDER — a name out of the door's own MEETING_SORTS, with `dir`
-       * flipping it. Omit both for the diary's own order, most recent first. */
+       * flipping it. Omit both for the meetings list's own order, most recent first. */
       sort?: string
       dir?: string
       cursor?: string | null
@@ -720,7 +720,7 @@ export const content = {
     api<PagedResponse<{ meetings: Meeting[]; weekTotal: number }>>(
       `/api/content/meetings${listQuery(opts)}`
     ),
-  /** READ GOOGLE'S DIARY INTO OURS. ONE WAY — nothing in kwapso writes to a
+  /** READ GOOGLE'S CALENDAR INTO OURS. ONE WAY — nothing in kwapso writes to a
    * calendar.
    *
    * Three counts, because the sweep does three things over a live window that
@@ -743,7 +743,7 @@ export const content = {
     }>("/api/content/meetings/sync-calendar", post({})),
   /** WHAT WAS SAID, in full — read off the meeting row rather than from Google,
    * so any colleague who may read meetings can read it. Its own call because of
-   * its size: a page of the diary is fifty meetings and a transcript is up to a
+   * its size: a page of meetings is fifty and a transcript is up to a
    * megabyte. */
   meetingTranscript: (id: string) =>
     api<{
@@ -982,7 +982,7 @@ export const content = {
     threadId?: string
   }) => api<{ sent: { messageId: string; threadId: string } }>("/api/content/google/gmail/send", post(input)),
 
-  /** SOMEBODY'S OWN DIARY, IN A WINDOW — the only calendar call there is.
+  /** SOMEBODY'S OWN CALENDAR, IN A WINDOW — the only calendar call there is.
    * `truncated` is true when the window held more entries than one read walks,
    * which is a HALF answer and says so rather than looking whole.
    *

@@ -226,7 +226,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "meetings",
     displayName: "Meetings",
     description:
-      "Bring the diary in in bulk, one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
+      "Bring Meetings in in bulk, one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
     columns: [
       { key: "title", label: "Title", required: true },
       { key: "startsAt", label: "When", required: true },

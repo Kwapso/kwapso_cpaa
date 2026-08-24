@@ -101,7 +101,7 @@ describe("the owner's switch is demanded where the act happens", () => {
       .map(([name]) => name)
     expect(
       writers,
-      `the calendar is one-way: kwapso reads a diary and never writes one (owner, 18 Aug 2026). These handlers write: ${writers.join(", ")}`
+      `the calendar is one-way: kwapso reads a calendar and never writes one (owner, 18 Aug 2026). These handlers write: ${writers.join(", ")}`
     ).toEqual([])
   })
 
@@ -148,8 +148,8 @@ describe("the owner's switch is demanded where the act happens", () => {
     expect(confirmOf("google_send_mail"), "mail ALWAYS asks").toBe(true)
     expect(confirmOf("google_chat_post"), "a colleague reads it the moment it lands").toBe(true)
     expect(confirmOf("google_draft_reply"), "a draft is a sentence somebody can still change").toBe(false)
-    // The rule's other half used to be "calendar entries do not ask, a diary
-    // entry is one click from gone". There is no calendar-write tool left for it
+    // The rule's other half used to be "calendar entries do not ask, a calendar
+    // event is one click from gone". There is no calendar-write tool left for it
     // to govern, and this asserts that rather than leaving the sentence hanging.
     for (const gone of [
       "google_create_event",

@@ -203,7 +203,7 @@ const guest = (email: string, organizer = false) => ({
   resource: false,
 })
 
-/** The diary entry the meeting is made from. `attachments` is the one thing the
+/** The calendar event the meeting is made from. `attachments` is the one thing the
  * three cases differ on. */
 const pastEntry = (attachments: Record<string, unknown>[] = []) => ({
   id: "EV_QR",
@@ -256,8 +256,8 @@ const nameAFolder = () =>
        'folder', '2026-01-01', '${IDS.staffUser}');`
   )
 
-/** Bring the diary in, and hand back the meeting the sweep made. */
-async function sweepTheDiary(): Promise<string> {
+/** Bring the calendar in, and hand back the meeting the sweep made. */
+async function sweepCalendar(): Promise<string> {
   const res = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
   expect(res.status, "the calendar sweep").toBe(200)
   const row = db().prepare("SELECT id FROM meetings WHERE google_event_id = 'EV_QR'").get() as
@@ -364,7 +364,7 @@ describe("18.3 · every route reaches the write path under its own power", () =>
     world.files.set("ATT_DOC", driveFile("ATT_DOC"))
     world.text.set("ATT_DOC", WHAT_WAS_SAID)
 
-    const id = await sweepTheDiary()
+    const id = await sweepCalendar()
     const out = await readTranscript(id)
 
     expect(out.captured).toBe(true)
@@ -381,7 +381,7 @@ describe("18.3 · every route reaches the write path under its own power", () =>
     world.folderHits = [driveFile("SHORTCUT_1", TRANSCRIPT_NAME, "REAL_DOC")]
     world.text.set("REAL_DOC", WHAT_WAS_SAID)
 
-    const id = await sweepTheDiary()
+    const id = await sweepCalendar()
     const out = await readTranscript(id)
 
     expect(out.captured).toBe(true)
@@ -402,7 +402,7 @@ describe("18.3 · every route reaches the write path under its own power", () =>
     world.files.set("QUARTERLYREVIEWDOC1", driveFile("QUARTERLYREVIEWDOC1"))
     world.text.set("QUARTERLYREVIEWDOC1", WHAT_WAS_SAID)
 
-    const out = await readTranscript(await sweepTheDiary())
+    const out = await readTranscript(await sweepCalendar())
 
     expect(out.captured).toBe(true)
     expect(out.meeting.transcriptFoundBy).toBe("mail")
@@ -413,7 +413,7 @@ describe("18.3 · every route reaches the write path under its own power", () =>
     // The honest empty answer — the half that WAS proved before this suite, kept
     // here because it is the other side of the same decision and because a
     // meeting wrongly stamped "read" is a search that ends for ever.
-    const id = await sweepTheDiary()
+    const id = await sweepCalendar()
     const out = await readTranscript(id)
 
     expect(out.captured).toBe(false)
@@ -436,7 +436,7 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
   })
 
   it("writes ONE log, for the member in the room — the client in it is not a cost", async () => {
-    const id = await sweepTheDiary()
+    const id = await sweepCalendar()
     // THE TRIPWIRE FIRST. "No client on the timesheet" is a sentence that passes
     // loudly over a room with no client in it, which is how a narrowing check
     // goes blind without anything turning red. So the guest list is asserted
@@ -466,7 +466,7 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
   })
 
   it("marks it as meeting time, for the meeting's own hour (9.3)", async () => {
-    await readTranscript(await sweepTheDiary())
+    await readTranscript(await sweepCalendar())
 
     const [log] = meetingLogs()
     // 9.3: the kind is what lets any figure be shown with meeting time, without
@@ -474,7 +474,7 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
     // would be indistinguishable from delivery work.
     expect(log.kind).toBe(MEETING_LOG_KIND)
     expect(log.billable).toBe(1)
-    // The DIARY's hour, not an invented one: inventing a finer figure out of a
+    // The MEETING's hour, not an invented one: inventing a finer figure out of a
     // transcript's timestamps would be inventing a fact.
     expect(log.seconds).toBe(3600)
     expect(log.started_at).toBe(RAN_AT.toISOString())
@@ -483,7 +483,7 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
   })
 
   it("R1 — the meeting and the week both ping, and only when something changed", async () => {
-    const id = await sweepTheDiary()
+    const id = await sweepCalendar()
     published = []
     await readTranscript(id)
     expect(published.map((p) => p.resource)).toEqual(
@@ -536,7 +536,7 @@ describe("18.4 · what was said is answerable, with a citation back to the call"
       "https://docs.google.com/document/d/QUARTERLYREVIEWDOC1/edit?usp=sharing"
     world.files.set("QUARTERLYREVIEWDOC1", driveFile("QUARTERLYREVIEWDOC1"))
     world.text.set("QUARTERLYREVIEWDOC1", WHAT_WAS_SAID)
-    const out = await readTranscript(await sweepTheDiary())
+    const out = await readTranscript(await sweepCalendar())
     expect(out.captured, "the fixture must actually capture before we sweep").toBe(true)
     await sweepKnowledge()
   })
@@ -574,7 +574,7 @@ describe("18.4 · what was said is answerable, with a citation back to the call"
     world.notices = []
     world.files = new Map()
     world.text = new Map()
-    await sweepTheDiary()
+    await sweepCalendar()
     await sweepKnowledge()
 
     const answer = await ask("When does the dispatch desk stop using the shared spreadsheet?")

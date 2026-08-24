@@ -78,7 +78,7 @@ with it.
 meeting's own start time already says whether it has happened. A status column
 was a second source of truth for a question the clock answers, and the two
 disagreed in both directions. The `upcoming` view, the account rollup's "we last
-met", the diary's state column and the meeting summary all key on `starts_at`
+met", Meetings' state column and the meeting summary all key on `starts_at`
 now; the notes are always editable, because nothing could ever know the
 writing-up was finished. The columns stay, because what people ticked while the
 idea existed is still history. The transcript import's idempotence never rode the

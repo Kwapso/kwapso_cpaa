@@ -173,7 +173,7 @@ const AGENT_ONLY: AgentTool[] = [
   // THE CONFIRM RULE. Anything that lands in somebody ELSE's inbox pauses for a
   // yes/no panel — `google_send_mail`, `google_reply_mail`, `google_chat_post` —
   // because a sent message cannot be recalled. The rule used to have a second
-  // half about calendar entries running straight away (a diary entry is one click
+  // half about calendar entries running straight away (a calendar event is one click
   // from gone); there are no calendar writes left for it to govern.
   //
   // WHAT THE ASSISTANT DELIBERATELY CANNOT DO: connect an account, disconnect
@@ -349,7 +349,7 @@ const AGENT_ONLY: AgentTool[] = [
   // and `google_sprint_to_calendar` stood here, and four more further down
   // (change an entry, its guests, its location, call it off). All six went with
   // their doors on 18 August 2026, when the owner asked for the calendar to be
-  // one-way. If somebody asks the assistant to put something in their diary, the
+  // one-way. If somebody asks the assistant to put something in their calendar, the
   // honest answer is that kwapso reads calendars and does not write them.
   {
     name: "google_chat_messages",
@@ -397,12 +397,12 @@ const AGENT_ONLY: AgentTool[] = [
   // always asks, because a sent message is in somebody else's inbox forever. So
   // `google_reply_mail` asks (it sends). `google_label_mail` does not: a label is
   // filing, nobody else can see it, and taking it off again costs one call. The
-  // rule's other half used to be "calendar entries do not ask, because a diary
+  // rule's other half used to be "calendar entries do not ask, because a calendar
   // entry is one click from gone" — there are no calendar writes left for it to
   // govern.
   //
   // AND ONE JOIN NOBODY COULD MAKE BEFORE: `google_meeting_transcript` starts at
-  // the diary entry, which is where a person starts ("what did we agree in
+  // the calendar event, which is where a person starts ("what did we agree in
   // Tuesday's call?"), and finds what Meet filed in the folders they shared.
   {
     name: "google_drive_update",
@@ -551,7 +551,7 @@ const AGENT_ONLY: AgentTool[] = [
   // FOUR CALENDAR WRITES STOOD HERE — change what an entry says and when, invite
   // and uninvite guests, set where it is, call it off. All four are gone with
   // their doors (18 August 2026): the calendar is read-only, so the assistant
-  // can tell somebody what is in their diary and never change it.
+  // can tell somebody what is in their calendar and never change it.
   {
     name: "google_meeting_transcript",
     description:

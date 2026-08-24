@@ -135,7 +135,7 @@ export function AppDetailScreen({
   // there is no tab at all, rather than a tab that refuses.
   const canReadDeliverables = can("deliverables", "read")
   // THE RIGHT ON THE CHILD, NEVER THE PARENT. Raising a request about this
-  // system is `help:create` and putting a meeting in the diary is
+  // system is `help:create` and putting a meeting on the meetings list is
   // `meetings:create` — the rights those two doors gate on. `processes:edit`,
   // which is what lets somebody edit the app record itself, says nothing about
   // either. The door decides (R10); these only decide whether we draw a button
@@ -664,7 +664,7 @@ export function AppDetailScreen({
           })
           invalidate(sliceKey("meetings-app", appId))
           invalidate(meetingsKey(teamId))
-          toast.success(t("It's in the diary."))
+          toast.success(t("It's in Meetings."))
         }}
       />
 

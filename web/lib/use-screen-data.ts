@@ -166,7 +166,7 @@ export function useScreenData({
     enabled && module === "time" ? workLogsKey(teamId as string) : null,
     () => listFetch.workLogs(teamId as string)
   )
-  // THE DIARY. Loaded only on its own section, cache-first + row-level live. R14:
+  // THE MEETINGS LIST. Loaded only on its own section, cache-first + row-level live. R14:
   // PAGED like tickets and sources — page one lands here and its next cursor in
   // the sidecar <LoadMore> reads. The RECORD screen reads through this same key
   // and falls back to a by-id read when the loaded prefix doesn't reach it.

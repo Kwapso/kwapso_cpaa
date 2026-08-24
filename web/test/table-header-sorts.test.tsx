@@ -280,15 +280,15 @@ describe("the rest of the collection's chrome survived the swap", () => {
   })
 })
 
-/* ───────────────────────────── the diary's table ──────────────────────────── */
+/* ───────────────────────────── the meetings list's table ──────────────────── */
 
 type Row = { id: string; name: string; when: string }
 
-/** The diary PAGES, so its headers must ask the DOOR — the same handle the
+/** The meetings list PAGES, so its headers must ask the DOOR — the same handle the
  * picker beside the search box holds. This is the screen's composition, minus
- * the screen: a `<PagedFind>` with the diary's own sort menu, and the table
+ * the screen: a `<PagedFind>` with the meetings list's own sort menu, and the table
  * underneath it taking `found.order`. */
-function renderDiary() {
+function renderMeetingsTable() {
   const asked: { query: Record<string, string>; cursor: string | null }[] = []
   const listKey = `meetings:team-${++team}`
   render(
@@ -328,9 +328,9 @@ function renderDiary() {
   return asked
 }
 
-describe("the diary: a header asks the door, because the browser only holds page one", () => {
-  it("does not ask for the order the diary already arrived in", async () => {
-    const asked = renderDiary()
+describe("the meetings list: a header asks the door, because the browser only holds page one", () => {
+  it("does not ask for the order the meetings list already arrived in", async () => {
+    const asked = renderMeetingsTable()
     await new Promise((r) => setTimeout(r, 20))
     expect(asked, "an untouched screen sends nothing").toEqual([])
     // …and it says which order that is, rather than showing three neutral arrows
@@ -339,7 +339,7 @@ describe("the diary: a header asks the door, because the browser only holds page
   })
 
   it("clicking a column asks the DOOR for it, from page one", async () => {
-    const asked = renderDiary()
+    const asked = renderMeetingsTable()
     fireEvent.click(header("Meeting"))
     await waitFor(() => expect(asked.length).toBe(1))
     expect(asked[0].query.sort, "the door's own name for that column").toBe("title")
@@ -348,14 +348,14 @@ describe("the diary: a header asks the door, because the browser only holds page
   })
 
   it("…and the rows on screen become the door's answer", async () => {
-    renderDiary()
+    renderMeetingsTable()
     expect(rowOrder()[0]).toContain("The one we loaded")
     fireEvent.click(header("Meeting"))
     await waitFor(() => expect(rowOrder()[0]).toContain("From the door"))
   })
 
   it("the column the door cannot order draws no control at all", () => {
-    renderDiary()
+    renderMeetingsTable()
     expect(
       screen.queryByRole("button", { name: /^Where/ }),
       "a header that cannot sort must not look like one that can"
@@ -363,8 +363,8 @@ describe("the diary: a header asks the door, because the browser only holds page
     expect(screen.getByText("Where"), "…it is still a column heading").toBeTruthy()
   })
 
-  it("the third press on a column gives the diary's own order back, asking nothing", async () => {
-    const asked = renderDiary()
+  it("the third press on a column gives the meetings list's own order back, asking nothing", async () => {
+    const asked = renderMeetingsTable()
     fireEvent.click(header("Meeting")) // title asc
     await waitFor(() => expect(asked.length).toBe(1))
     fireEvent.click(header("Meeting")) // title desc

@@ -14,7 +14,7 @@
 // next sweep with its guests, its join link and its attachments. Reading the
 // transcript is the one action left that talks to Google, and it only reads.
 //
-// AND THERE IS A FOURTH TAB: the diary entry itself. The owner asked for the
+// AND THERE IS A FOURTH TAB: the calendar event itself. The owner asked for the
 // link that opens the meeting in Google Calendar and for "location, stakeholders,
 // or any other calendar data or metadata… pulled in and organised correctly", and
 // this is where organised correctly lands. It is a TAB rather than more rows on
@@ -243,7 +243,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     try {
       const { meeting } = await content.setMeetingActive(meetingId, active)
       patchLists(meeting)
-      toast.success(active ? t("Back in the diary.") : t("Cancelled, the record and its notes are kept."))
+      toast.success(active ? t("Back in Meetings.") : t("Cancelled, the record and its notes are kept."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
     } finally {
@@ -300,7 +300,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         : []),
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // WORK LOGS, wherever time is tracked (CHECKLIST 6.8). The transcript import
-      // has written a row of time against every meeting it read since the diary
+      // has written a row of time against every meeting it read since Meetings
       // shipped, and nothing on the meeting itself showed it.
       ...(canSeeTime
         ? [
@@ -486,8 +486,8 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   because that is the order the three were written in and the
                   order a person reads them: what we meant to cover, what we took
                   down, and then the record of the whole thing.
-                  It is a SEPARATE READ (a transcript is up to a megabyte and the
-                  diary list is fifty meetings), and it is scrollable rather than
+                  It is a SEPARATE READ (a transcript is up to a megabyte and
+                  a page of meetings is fifty), and it is scrollable rather than
                   laid out down the page: an hour of talking is a very long
                   column, and a record whose other tabs are a scroll away is a
                   record nobody uses. */}
@@ -588,7 +588,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   )
 }
 
-/* ─────────────────────── THE DIARY ENTRY, ORGANISED ────────────────────────
+/* ───────────────────── THE CALENDAR EVENT, ORGANISED ────────────────────────
  *
  * Everything below is Google's fact about this meeting, mirrored onto the row by
  * the calendar sweep. It is a tab of its own rather than more lines on Overview
