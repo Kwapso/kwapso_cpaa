@@ -56,7 +56,7 @@ export type SubmitConfig = {
 /** EVERY FORM'S BUTTON SAYS "SUBMIT" (UI-RULEBOOK F1, CHECKLIST 2.9).
  *
  * There were 31 different words for one act across 37 forms — "Save changes"
- * thirteen times, "Add it" seven, and then "Put it in the diary", "Map it",
+ * thirteen times, "Add it" seven, and then "Map it",
  * "Log it", "Start it", "Ask and email". They are not synonyms a person can
  * learn; they are 31 things to read before pressing the only button on the
  * screen.

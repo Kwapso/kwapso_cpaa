@@ -70,7 +70,7 @@ export async function loadMore<T>(
 /** List fetchers that prime their collection's `total:` sidecar as they load —
  * shared by the screen reads (use-screen-data) and reconnect catch-up below, so
  * a total can never go stale while its list is fresh. */
-/** HOW MANY PAGES ONE MONTH OF THE DIARY MAY COST. Five, which at the door's
+/** HOW MANY PAGES ONE MONTH OF THE MEETINGS LIST MAY COST. Five, which at the door's
  * page size is far past any real month — August 2026, the busiest in the test
  * data, is 61 meetings and fits in two. It exists so a runaway import cannot
  * turn one calendar square into a hundred requests. */
@@ -230,7 +230,7 @@ export const listFetch = {
         // THE WEEK ASKED OF THE DOOR, as its own read (19 Aug 2026). It used to
         // be the newest page filtered in the browser, on the stated assumption
         // that "the week sits inside the newest page for any agency that has not
-        // held fifty meetings since Monday". The diary is ordered by START TIME,
+        // held fifty meetings since Monday". The meetings list is ordered by START TIME,
         // DESCENDING, so the newest page is the furthest-out FUTURE — and once
         // the calendar sweep brought in repeating entries, page one ran from
         // June 2027 to August 2027 and not one of its fifty rows was in this
@@ -244,7 +244,7 @@ export const listFetch = {
       }
       primeCache(totalKey("meetings", teamId), r.total)
       // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1). The badge on a
-      // tab nobody has opened still has to be exact, so the whole diary's read
+      // tab nobody has opened still has to be exact, so the whole meetings list's read
       // carries the week's count beside its own (R16).
       primeCache(totalKey("meetings-week", teamId), r.weekTotal)
       primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
@@ -254,7 +254,7 @@ export const listFetch = {
    *
    * The door pages, and a month can exceed one page (August 2026 holds 61), so
    * this follows the cursor until the month is complete. Bounded at
-   * CALENDAR_MONTH_PAGES: a month past that is not a diary, it is an import
+   * CALENDAR_MONTH_PAGES: a month past that is not a calendar, it is an import
    * gone wrong, and drawing 500 chips in a grid would help nobody. What it
    * cannot show it does not pretend to — the count above the calendar is the
    * door's own and stays honest either way. */
@@ -350,12 +350,12 @@ export function tasksKey(teamId: string, view: TaskView = "open"): string {
   return view === "open" ? `tasks:${teamId}` : `tasks-${view}:${teamId}`
 }
 
-/** WHICH SLICE OF THE DIARY A KEY NAMES. The whole diary, or the week the reader
- * is standing in — the one view whose rows the whole diary's newest page cannot
+/** WHICH SLICE OF THE MEETINGS LIST A KEY NAMES. The whole meetings list, or the week the reader
+ * is standing in — the one view whose rows the whole meetings list's newest page cannot
  * be trusted to contain (see `listFetch.meetings`). */
 export type MeetingListView = "week"
 
-/** The diary's cache key (the paged meetings list). The WHOLE diary keeps the
+/** The meetings list's cache key (the paged meetings list). The WHOLE meetings list keeps the
  * bare key it has always had, so every listener, sidecar, prewarm and detail
  * screen that names `meetings:<team>` still lands on it — the same arrangement
  * `tasksKey` makes for its everyday pile. The week's own list sits under
@@ -365,13 +365,13 @@ export function meetingsKey(teamId: string, view?: MeetingListView): string {
   return view === "week" ? `meetings-week:${teamId}` : `meetings:${teamId}`
 }
 
-/** ONE MONTH OF THE DIARY, for the calendar grid and its agenda.
+/** ONE MONTH OF THE MEETINGS LIST, for the calendar grid and its agenda.
  *
  * Its own key, under the `meetings-` prefix the registry already slices on, so a
  * meeting that moves patches the month a person is looking at without anything
  * new being registered (R15).
  *
- * WHY A MONTH IS ITS OWN READ. The diary is ordered by start time DESCENDING and
+ * WHY A MONTH IS ITS OWN READ. The meetings list is ordered by start time DESCENDING and
  * it PAGES, so "the newest fifty" is the furthest-out FUTURE. On 19 Aug 2026 that
  * page ran from June 2027 to August 2027, while the month the calendar was
  * DRAWING — August 2026 — held 61 meetings it had never asked for. The grid and
@@ -392,7 +392,7 @@ export function meetingPeopleKey(id: string): string {
 }
 
 /** ONE MEETING'S TRANSCRIPT — its own key because it is its own read, and that
- * is a size decision: a page of the diary is fifty meetings and a transcript is
+ * is a size decision: a page of meetings is fifty and a transcript is
  * up to a megabyte. */
 export function meetingTranscriptKey(id: string): string {
   return `meeting:transcript:${id}`
@@ -617,6 +617,21 @@ export function accountKey(accountId: string): string {
   return `account:${accountId}`
 }
 
+/** ONE DROPDOWN VALUE'S OWN CACHE — the opened record, read through the
+ * single-row door rather than found inside the vocabulary list.
+ *
+ * Keyed by TEAM as well as by row for the same reason `accountKey` is keyed by
+ * record: a ULID says which row and never which fence it was read under, so a
+ * team switch would otherwise hand the new team a row the old one's session
+ * fetched. It is a SECOND key beside `selectable:<teamId>` on purpose — the list
+ * door selects the vocabulary, the detail door also selects the audit block, so
+ * the two answers are genuinely different rows and neither can stand in for the
+ * other. R15 keeps both live: the `selectable_data` resource patches the list by
+ * id and names this key in its `deps`. */
+export function selectableOneKey(teamId: string, valueId: string): string {
+  return `selectable:one:${teamId}:${valueId}`
+}
+
 /** The knowledge-source list's cache key. */
 export function knowledgeKey(teamId: string): string {
   return `knowledge:${teamId}`
@@ -752,6 +767,12 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.selectableOne(id),
     fetchList: (t) => listFetch.selectable(t),
+    // R15 REACHES THE OPEN RECORD TOO, not just the list. The detail screen
+    // reads its own single-row key and its own activity feed, and neither is the
+    // list row the patch above replaces — so a teammate renaming a value while
+    // somebody has it open would leave that screen stale, which is the exact
+    // deafness this resource was written to fix one level up.
+    deps: (t, id) => [selectableOneKey(t, id), `activity:record:selectable_data:${id}`],
   },
   // THE CUSTOMER SPINE — three resources, one row-level target. `accounts` pings
   // carry the account id, and so do `account_links` / `portal_users`: a contact
@@ -956,7 +977,7 @@ export const TEAM_RESOURCES: Record<
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
   // cursor in a sidecar, so the same registry keeps it live (R15's own words).
-  // The calendar push moves this row too, which is why "it is in your diary"
+  // The calendar push moves this row too, which is why "it is in Meetings"
   // appears without a reload on the screen that asked for it.
   meetings: {
     key: (t) => meetingsKey(t),
@@ -965,20 +986,20 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.meetings(t),
     // THE THREE READS A MEETING'S DETAIL SCREEN MAKES BESIDE THE ROW. Its
     // activity feed, who on the invitation we know, and what was said. All three
-    // hang off the meeting rather than being fetched with it — a page of the
-    // diary is fifty meetings and a transcript is up to a megabyte — so a ping
+    // hang off the meeting rather than being fetched with it — a page of
+    // meetings is fifty and a transcript is up to a megabyte — so a ping
     // about this row has to drop them too, or a re-synced guest list would sit
     // stale behind a record that had visibly just changed (R15).
     //
-    // …and the team's own pulse, which counts THIS WEEK'S meetings: a diary
-    // entry that appears or is cancelled moves a number on Home, and a stale
+    // …and the team's own pulse, which counts THIS WEEK'S meetings: a meeting
+    // that appears or is cancelled moves a number on Home, and a stale
     // headline beside a list that just changed is the same fault one line up.
     //
     // …and the Meetings badge on whichever app or contact record is open, for
     // the same reason one line up: the badge is answered when the record opens,
     // so nothing else would ever re-read it (R15).
     // …AND THE MEETING'S OWN SCREEN, when it is reading one. `meeting-detail.tsx`
-    // takes its row from the diary's page when the meeting is on it and falls
+    // takes its row from the meetings list's page when the meeting is on it and falls
     // back to `meeting:one:<id>` when it is not — so the row patch above covered
     // the meetings somebody browses to and missed every one they deep-link into.
     // The same fault as the story timer, in a branch, which is why the census
@@ -991,7 +1012,7 @@ export const TEAM_RESOURCES: Record<
       meetingTranscriptKey(id),
       insightsKey(t),
     ],
-    // THE PER-OWNER SLICES OF THE DIARY — a contact's Meetings tab
+    // THE PER-OWNER SLICES OF THE MEETINGS LIST — a contact's Meetings tab
     // (`meetings-account-of:`) and an app's (`meetings-app-of:`). One prefix
     // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and
     // both kinds start with the module's own name. It cannot reach the list key
@@ -1091,6 +1112,36 @@ export const TEAM_RESOURCES: Record<
 
 /** Coarse listeners for resources with no row-shaped cache: the ping just drops
  * these keys (cache-first refetch on next read). Part of the R15 listener set. */
+/** THE KEYS THE LIVE LAYER DEMONSTRABLY MOVES, for this team.
+ *
+ * `useCached` uses this to decide whether it may paint from cache without
+ * re-asking the server (shared/web/store.ts `registerLiveCoverage`). The whole
+ * point of the socket is that it tells us when something changed; revalidating
+ * on every mount anyway is asking a question we are already being sent the
+ * answer to, and it is why moving between two screens the app already had in
+ * memory still waited on the network.
+ *
+ * IT IS DELIBERATELY CONSERVATIVE, and under-claiming is the safe direction. It
+ * names the COLLECTION keys — every `TEAM_RESOURCES` entry's own key, every
+ * `SIMPLE_INVALIDATIONS` target, and the team feed that any change refreshes —
+ * and it does NOT try to name the record-scoped `deps` or `slicePrefix` keys,
+ * which are parameterised by a row id this function does not have. Those simply
+ * keep revalidating exactly as they did before, which costs a request and can
+ * never be wrong. A key that is not here is not a bug; a key that is here
+ * wrongly is a screen that goes quietly stale, so the list is derived from the
+ * registry itself and never hand-written.
+ *
+ * Derived, not listed, for the same reason R15 makes the registry the one
+ * source: a resource added tomorrow is covered without anybody remembering
+ * this function exists. */
+export function liveCoveredKeys(teamId: string): Set<string> {
+  const keys = new Set<string>([`activity:team:${teamId}`])
+  for (const r of Object.values(TEAM_RESOURCES)) keys.add(r.key(teamId))
+  for (const simple of Object.values(SIMPLE_INVALIDATIONS))
+    for (const k of simple(teamId)) keys.add(k)
+  return keys
+}
+
 export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> = {
   // Team name/logo — the shell also refreshes the active context (see app-shell).
   team: (t) => [`team-meta:${t}`],

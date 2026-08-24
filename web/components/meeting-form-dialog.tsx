@@ -3,7 +3,7 @@
 // MEETING FORM — arrange a conversation, or write it up afterwards.
 //
 // THE TWO LONG FIELDS ARE THE POINT. Everything above them (who with, when, why,
-// where) is the kind of thing every diary holds; the agenda and the notes are
+// where) is the kind of thing every calendar holds; the agenda and the notes are
 // what the previous system had nowhere to put, so it folded 350 meetings into
 // work logs and kept only the hours. The form asks for them in the order they
 // happen: the agenda before, the notes after.
@@ -158,7 +158,7 @@ export function MeetingFormDialog({
             : /* IT SAID "You can add it to your own calendar afterwards." AND THAT
                  STOPPED BEING TRUE. Every calendar WRITE was removed from this
                  product (workers/content/src/lib/google-api.ts, above
-                 `calendarList`): kwapso reads a person's diary and cannot change
+                 `calendarList`): kwapso reads a person's calendar and cannot change
                  it, from the screen, from the assistant or from a job. A form
                  that promises an action the app refuses to take is worse than a
                  form that says nothing, so it now says what actually happens. */

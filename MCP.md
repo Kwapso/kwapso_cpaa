@@ -218,7 +218,7 @@ Today it covers:
   that WROTE to Google Calendar (create an event, change what it says and when,
   its guests, its location, call it off, push a sprint's dates, push a meeting's)
   and `POST /api/content/meetings/held`. The calendar is one-way now — kwapso
-  reads a diary and never writes one — and a meeting's own start time says
+  reads a calendar and never writes one — and a meeting's own start time says
   whether it has happened, so a status somebody had to tick was a second source
   of truth for a question the clock answers. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -392,7 +392,7 @@ Today it covers:
     both on `meetings:read`: the WORDS of a call, kept on the record so any
     colleague who may read meetings can read them, and which of the addresses on
     the invitation are our own members or contacts on our accounts.
-    `sync_calendar_series` reads the caller's Google Calendar INTO the diary, one
+    `sync_calendar_series` reads the caller's Google Calendar INTO Meetings, one
     way, always. Over a LIVE window reaching a fortnight back and four weeks
     forward: every entry with no record becomes one, repeating or not, past or
     future; every meeting in the window has its Google facts refreshed (the
@@ -434,7 +434,7 @@ Today it covers:
     slice at a time (call it while `caughtUp` is false); the 15-minute sweep does the
     same unattended. `sync_google_knowledge` does the same for the Google material
     the CALLER has already connected — their own Drive folders, the mail with a
-    known contact, their diary — acting as that person and gated `knowledge:create`
+    known contact, their calendar — acting as that person and gated `knowledge:create`
     **and** `google:read`. Read the Google paragraph below before you use it: it is
     the ONE tool on this surface that touches Google at all.
 
@@ -575,7 +575,7 @@ allowance while doing so.
 **The calendar is not on that list in either direction, because nothing writes to
 it any more.** Six calendar tools sat in the assistant's set and a seventh,
 `add_meeting_to_calendar`, was the one write tool on THIS surface. All seven went
-on 18 August 2026 with the doors under them: kwapso reads a diary and never writes
+on 18 August 2026 with the doors under them: kwapso reads a calendar and never writes
 one. The open question this section used to hold — whether pushing a meeting from
 a machine was right when pushing a sprint was assistant-only — is answered by
 neither being possible. `google_calendar_events` and `google_meeting_transcript`
@@ -587,7 +587,7 @@ belongs in front of you rather than in a catalogue you skim:
 
 - **`sync_google_knowledge`** does not browse Google, but it does READ it: gated
   `knowledge:create` **and** `google:read`, it sweeps the caller's own connected
-  Drive folders, the mail with a known contact and their diary into the knowledge
+  Drive folders, the mail with a known contact and their calendar into the knowledge
   base, from which `ask_knowledge`, also on this surface, hands the passages back.
   A leaked token therefore reaches its OWN owner's Google material by that route,
   which is narrower than the browse tools (nobody else's account, no send, no
@@ -605,7 +605,7 @@ named folder, a draft, an event. The event half is gone (the calendar is
 read-only); it can now also rewrite a file, make a folder,
 file a message or a whole conversation into Drive as a readable document, reply
 inside a thread, put a Gmail label on a message or take it off, list every Chat
-space the person can see, and reach a meeting's transcript from the diary entry
+space the person can see, and reach a meeting's transcript from the calendar event
 rather than by already knowing which document it is. It could once change an
 event's title, times, guests or location and call one off; it cannot, because the
 calendar is read-only in this product. Two of those tools exist only so the

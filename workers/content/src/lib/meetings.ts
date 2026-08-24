@@ -31,7 +31,7 @@ import { MEETING_LOG_KIND } from "./work-logs"
 import type { Env } from "../env"
 
 /** How long a meeting with no finish time is assumed to run. An hour is what a
- * diary assumes and what a person will correct if it is wrong; the alternative —
+ * calendar assumes and what a person will correct if it is wrong; the alternative —
  * writing no time at all for a call whose end nobody recorded — would lose the
  * hours of exactly the meetings people arrange in a hurry. */
 const DEFAULT_MEETING_MS = 60 * 60 * 1000
@@ -113,7 +113,7 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
   (SELECT ap.name FROM apps ap WHERE ap.id = m.app_id) AS app_name,
   (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name`
 
-/** The sort a meeting list is keyed by: when it is / was, newest first. A diary
+/** The sort a meeting list is keyed by: when it is / was, newest first. A calendar
  * read backwards is what somebody wants — the thing that just happened is the
  * thing they are looking for — and the future sits at the top where it belongs.
  *
@@ -122,7 +122,7 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
  * every row is written the same way. Sixty-three rows were not: Google gives an
  * hour in the event's OWN offset (`2026-08-18T12:00:00+05:30`) and the sweep
  * stored that string as it arrived, beside every other row's `…Z`. A meeting at
- * 12:00+05:30 is 06:30Z and sorted as though it were noon — so the diary
+ * 12:00+05:30 is 06:30Z and sorted as though it were noon — so the meetings list
  * interleaved, and the keyset paging on top of it was walking that same wrong
  * order. Fixed at the source rather than in the ORDER BY: `utcMoment` below
  * writes UTC, migration 0041 converted the rows already stored, and the ORDER BY
@@ -152,7 +152,7 @@ export function utcMoment(value: string | null): string | null {
   return Number.isFinite(ms) ? new Date(ms).toISOString() : value
 }
 
-/** WHAT THE DIARY MAY BE ORDERED BY (shared/workers/sorting.ts). `when` is the
+/** WHAT THE MEETINGS LIST MAY BE ORDERED BY (shared/workers/sorting.ts). `when` is the
  * fallback and is the order above; the rest are the columns the "All" view
  * already shows in a table, which is the view a person reads across rather than
  * scans — and therefore the one they want ordered by client, or by when it was
@@ -178,7 +178,7 @@ export const MEETING_SORTS: SortMenu<Meeting> = {
  * already know how to say "we haven't read that from Google yet".
  *
  * The alternative — trusting the parse — turns one malformed row into a 500 on
- * the diary, which is the collection somebody opens to find out what today
+ * the meetings list, which is the collection somebody opens to find out what today
  * holds. */
 function readJsonList<T>(raw: string | null): T[] {
   if (!raw) return []
@@ -242,7 +242,7 @@ export type MeetingFilter = {
   accountId?: string
   /** WHICH SYSTEM IT WAS ABOUT. The app record's own Meetings tab asks the
    * SERVER by this rather than narrowing a loaded page in the browser — the
-   * diary is paged, and "this app's meetings among the newest fifty" is an
+   * meetings list is paged, and "this app's meetings among the newest fifty" is an
    * answer that looks like an answer. */
   appId?: string
   purposeId?: string
@@ -251,7 +251,7 @@ export type MeetingFilter = {
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
    * 'all' shows the lot, cancelled ones included. */
   view?: string
-  /** ONE CALENDAR MONTH, `YYYY-MM`. The diary is ordered by start time DESCENDING
+  /** ONE CALENDAR MONTH, `YYYY-MM`. The meetings list is ordered by start time DESCENDING
    * and it PAGES, so "the month on screen" is not a question the loaded page can
    * answer: on 19 Aug 2026 page one ran from June 2027 to August 2027 while the
    * month being drawn — August 2026 — held 61 meetings nobody had asked for. The
@@ -500,7 +500,7 @@ async function requireReferences(
   }
 }
 
-/** Put a meeting in the diary. Returns its id and the account it names, because
+/** Put a meeting on the meetings list. Returns its id and the account it names, because
  * the door needs the second one for the live ping's fence. */
 export async function createMeeting(
   cfg: D1Rest,
@@ -529,7 +529,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(v.accountId)}, ${sqlStr
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting arranged",
-    description: `${actor.name} put "${v.title}" in the diary for ${v.startsAt.slice(0, 10)}`,
+    description: `${actor.name} put "${v.title}" in Meetings for ${v.startsAt.slice(0, 10)}`,
     relatedTable: "meetings",
     relatedRowId: id,
   })
@@ -640,7 +640,7 @@ export async function setMeetingActive(
   if (!changed[0]) return { moved: false, accountId: before.accountId }
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Meeting reinstated" : "Meeting cancelled",
-    description: `${actor.name} ${active ? "put" : "took"} "${before.title}" ${active ? "back in" : "out of"} the diary`,
+    description: `${actor.name} ${active ? "put" : "took"} "${before.title}" ${active ? "back in" : "out of"} Meetings`,
     relatedTable: "meetings",
     relatedRowId: id,
   })
@@ -655,7 +655,7 @@ export async function setMeetingActive(
  *
  * `google_event_id` and its unique partial index are untouched and still doing
  * the work that matters — they are how the sweep recognises an entry it has
- * already made a record of, which is what stops one diary entry becoming two
+ * already made a record of, which is what stops one calendar event becoming two
  * meetings. The idempotence outlived the write it was invented for.
  */
 
@@ -812,7 +812,7 @@ export async function captureTranscript(
   if (!claimed[0]) return nothing("The transcript for this meeting has already been read.")
 
   // A WORK LOG PER PARTICIPANT — ours only (9.2), marked as meeting time (9.3).
-  // The duration is the meeting's own: an hour in the diary is an hour off the
+  // The duration is the meeting's own: an hour on the meeting is an hour off the
   // day, and inventing a finer figure out of a transcript's timestamps would be
   // inventing a fact. A meeting with no end runs the default hour.
   const staff = await ourStaffAmong(env, guard.teamId, event.attendees.map((a) => a.email))
@@ -848,7 +848,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
   }
 }
 
-/* ------------- the calendar, read into the diary. ONE WAY -------------------- */
+/* ------------- the calendar, read into Meetings. ONE WAY -------------------- */
 //
 // THE DIRECTION IS THE DESIGN, and the owner settled it on 18 August 2026:
 //
@@ -858,7 +858,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 //    future and past events all the time. Anything in my calendar should be up
 //    to date here. That's all."
 //
-// So Google's diary is the source and this database is the copy. Nothing below
+// So Google's calendar is the source and this database is the copy. Nothing below
 // writes to a calendar and there is no function left in lib/google-api.ts that
 // could. The sweep does three things:
 //
@@ -869,7 +869,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 //     not a narrower rule, it is the absence of one. (It used to be `if
 //     (!event.recurringEventId) continue`, which on his own calendar meant 21
 //     recurring rows and 0 one-offs, so a real client meeting read back
-//     perfectly from Google and never appeared in the diary.)
+//     perfectly from Google and never appeared in the meetings list.)
 //   • REFRESHES — every meeting whose entry is in the window has its `google_*`
 //     mirror rewritten: the description, the location, the guest list and what
 //     each person answered, the organiser, the join link, the attachments (which
@@ -885,7 +885,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 // Two windows, and they are two different jobs.
 //
 // THE LIVE WINDOW is swept on EVERY call: a fortnight back to four weeks on. It
-// is what makes the diary current, and the backward half is why transcripts land
+// is what makes the meetings list current, and the backward half is why transcripts land
 // at all — everything interesting about a meeting arrives AFTER it (the
 // transcript, the recording, the notes doc somebody attaches walking back to
 // their desk), so a sweep that only looked forward saw each meeting exactly once,
@@ -903,11 +903,11 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 // That is R14 honoured rather than dodged: every call is bounded, and "the whole
 // calendar" is reached by repetition rather than by one enormous read. A five-
 // year history is about twenty-four slices, so a person who opens Meetings a few
-// times has their whole diary; and once the cursor reaches the ceiling it simply
+// times has their whole meetings list; and once the cursor reaches the ceiling it simply
 // keeps pace with it, a slice at a time, for ever.
 //
 // WHOSE WORDS WIN. A meeting typed in kwapso keeps kwapso's title, times and
-// place; a meeting read IN off a diary takes Google's. That is `from_calendar`,
+// place; a meeting read IN off a calendar takes Google's. That is `from_calendar`,
 // decided once at insert. `notes` is never touched by any sync — it is the one
 // column here that only a person writes.
 //
@@ -947,12 +947,12 @@ const CATCH_UP_DAYS = 14
 /** HOW FAR BACK "EVERYTHING IN MY CALENDAR" REACHES. Five years, chosen against
  * the thing being read rather than against a round number: kwapso's own history
  * before this app is two years of Glide (glide/RECONCILIATION.md), and an agency
- * diary older than five years is not a record anybody is going to ask a question
+ * calendar older than five years is not a record anybody is going to ask a question
  * about. It is a FLOOR, not a promise about Google — a calendar that starts three
  * years ago simply runs out of entries and the walk finishes early. */
 const BACKFILL_YEARS_BACK = 5
 
-/** …AND HOW FAR FORWARD. A year, because that is where a real diary stops: an
+/** …AND HOW FAR FORWARD. A year, because that is where a real calendar stops: an
  * annual review booked next spring is a real appointment, and a weekly stand-up
  * repeating for ever would otherwise hand back an infinite series. */
 const BACKFILL_DAYS_AHEAD = 365
@@ -1053,7 +1053,7 @@ export async function syncCalendar(
   // The obvious shape is ONE read from `since` to `horizon`, straddling today.
   // It is wrong, and silently: every Google list here asks for one page of
   // GOOGLE_PAGE_SIZE entries ordered by start time, so a six-week window over a
-  // busy diary returns the OLDEST fifty and stops. On a real calendar read while
+  // busy calendar returns the OLDEST fifty and stops. On a real calendar read while
   // building this — ten entries in two days — fifty events is about a week, so
   // the single-window version would have spent its whole page on the past and
   // never reached tomorrow. Repeating meetings would quietly stop being created,
@@ -1131,9 +1131,9 @@ export async function syncCalendar(
     const row = known.get(event.id)
 
     if (!row) {
-      // Everything the diary holds becomes a record — see the essay above for
+      // Everything the calendar holds becomes a record — see the essay above for
       // why there is no second test here any more — except an entry that was
-      // already called off, which would be a meeting put in the diary purely in
+      // already called off, which would be a meeting put in Meetings purely in
       // order to cancel it.
       if (event.status === "cancelled") continue
       const id = ulid()

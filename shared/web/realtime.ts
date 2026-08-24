@@ -14,6 +14,40 @@ import * as React from "react"
 
 export type RealtimeEvent = { resource: string; id?: string; op?: string }
 
+/** WHEN THE CURRENT UNBROKEN TEAM CONNECTION BEGAN — the one fact that lets the
+ * cache stop re-asking for things it is already being told about.
+ *
+ * The whole caching model is "read once, then let the socket keep it fresh"
+ * (CACHING.md), and the socket does exactly that. But `useCached` revalidated on
+ * EVERY mount regardless, so moving between two screens re-fetched collections
+ * the live layer had been guarding the entire time — the reason a screen the app
+ * already had in memory still waited on the network. The owner's question was
+ * the right one: if the durable object tells us about every change, why ask
+ * again?
+ *
+ * The honest answer is "you may skip it, but only for as long as you have not
+ * missed a ping." So the promise is deliberately narrow and time-bounded:
+ *
+ *   • It is set at OPEN and re-set at every RE-open. A reconnect means there was
+ *     a gap, and a ping raised during that gap reached nobody — so everything
+ *     cached BEFORE the reconnect is suspect again, and only what was written
+ *     after it is covered.
+ *   • It is cleared on close and on unmount, so a disconnected tab revalidates
+ *     normally, as it did before any of this.
+ *   • It says nothing about WHICH resources are covered. A socket carries a
+ *     `sub=` list and only hears what it names, so the store pairs this with a
+ *     host-registered predicate (`registerLiveCoverage` in store.ts) that knows
+ *     which cache keys the listener registry actually moves. Time alone is not
+ *     enough; a key nothing listens for must still be re-read.
+ *
+ * MAX_CACHE_AGE_MS still applies on top of all of it, so nothing is painted
+ * indefinitely on the strength of a socket that believes it is well. */
+let teamConnectedAt: number | null = null
+
+export function teamLiveSince(): number | null {
+  return teamConnectedAt
+}
+
 /** Open one live socket to `path` (e.g. "team=<id>" / "user=<id>"), reconnecting
  * with backoff. `onReconnect` is called only on a RE-connect after a drop. */
 function useLiveChannel(
@@ -34,6 +68,9 @@ function useLiveChannel(
     let everConnected = false
     let timer: ReturnType<typeof setTimeout> | undefined
     let closed = false
+    // Only the TEAM channel's uptime can vouch for team data; the user channel
+    // carries identity events and knows nothing about a collection.
+    const isTeamChannel = query.startsWith("team=")
 
     const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/realtime?${query}`
 
@@ -46,6 +83,9 @@ function useLiveChannel(
         if (everConnected) reconnectRef.current?.()
         everConnected = true
         retry = 0
+        // The coverage window starts NOW, and starts again on every re-open:
+        // anything cached before this moment may have missed a ping in the gap.
+        if (isTeamChannel) teamConnectedAt = Date.now()
       }
       socket.onmessage = (e) => {
         try {
@@ -55,6 +95,9 @@ function useLiveChannel(
         }
       }
       socket.onclose = () => {
+        // The window shuts the moment the link does, whether or not we are
+        // going to retry — a disconnected tab must revalidate normally.
+        if (isTeamChannel) teamConnectedAt = null
         if (closed) return
         // Backoff: 1s, 2s, 4s … capped at 15s, until we reconnect.
         const delay = Math.min(15000, 1000 * 2 ** retry)
@@ -68,6 +111,9 @@ function useLiveChannel(
     return () => {
       closed = true
       if (timer) clearTimeout(timer)
+      // Unmount, a team switch, or a fence that moved: the identity of the
+      // socket changed, so nothing cached under the old one is vouched for.
+      if (isTeamChannel) teamConnectedAt = null
       socket?.close()
     }
   }, [query])

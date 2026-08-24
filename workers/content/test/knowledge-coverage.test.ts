@@ -588,7 +588,25 @@ describe("changing what a kind SAYS really does re-index what is already there",
     // to use it. Each kind's own source is hashed and pinned here: edit a reader
     // without bumping its `textVersion` and this fails, naming the kind and both
     // numbers. That is the difference between a rule and a habit.
-    const sweep = readFileSync(INGEST_FILE, "utf8")
+    //
+    // COMMENTS ARE STRIPPED FIRST, and that is the whole correctness of the
+    // measurement rather than a tidiness. What this law protects is what a
+    // reader SAYS — the words that go into the index and that a re-index would
+    // rewrite. A comment says nothing to the index. Hashing it anyway means an
+    // edit that changes no shipped text still demands a `textVersion` bump, and
+    // a bump re-reads and re-embeds every row of that kind in the base: real AI
+    // spend, to change nothing.
+    //
+    // THIRD TIME. It fired on 20 Aug 2026 for a slice that ran past the table's
+    // end (see the `task` note in READER_DIGESTS, re-pinned at the SAME version
+    // for exactly this reason), and again on 24 Aug 2026 when a one-word comment
+    // fix inside the meeting reader — "the calendar event" for a retired synonym
+    // — asked for every meeting in the base to be re-indexed. A check that asks
+    // for the wrong repair is worse than one that stays quiet, because the wrong
+    // repair gets done. The sibling scan above already reads this file through
+    // `stripComments`; now both do, and the digests below are re-pinned at their
+    // CURRENT versions because the measurement moved and no reader did.
+    const sweep = stripComments(readFileSync(INGEST_FILE, "utf8"))
     const declared = new Map(INGEST_KINDS.map((k) => [k.kind, k.textVersion]))
     expect(declared.size).toBeGreaterThan(9)
 
@@ -663,27 +681,27 @@ function digest(text: string): string {
  * message above, deliberately — the point is that a text change cannot be made
  * without somebody deciding whether the rows already indexed need re-writing. */
 const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
-  ticket: { version: 1, digest: "f16d0fb1e2054e9f" },
+  ticket: { version: 1, digest: "6e4ce9bc6f3df27b" },
   // v2: "when we last spoke" is keyed on the CLOCK rather than on a retired
   // `held` status, so a client we saw in April no longer reads as last seen in
   // March. Every account already indexed says the old date until it is re-written.
-  account: { version: 2, digest: "45471c7b5a7589b7" },
-  contact: { version: 1, digest: "baf7a93fca7c32e4" },
-  app: { version: 1, digest: "6ad4572782893ad8" },
-  process: { version: 1, digest: "1d86124a19fa7058" },
-  sprint: { version: 1, digest: "778b4d9b3c3cdce8" },
-  story: { version: 1, digest: "a590a6c8703de3ee" },
+  account: { version: 2, digest: "74d4aabd9f470931" },
+  contact: { version: 1, digest: "797da075c7f5ddaa" },
+  app: { version: 1, digest: "6b67fb58910c7241" },
+  process: { version: 1, digest: "ddbb403661a7013c" },
+  sprint: { version: 1, digest: "3421ad8399adb0a1" },
+  story: { version: 1, digest: "0809d2076e8ddfab" },
   // v2: the summary says "already happened" / "still to come" from the start
   // time, where it used to quote the retired status column.
-  meeting: { version: 2, digest: "65d8cfae5e392220" },
-  todo: { version: 1, digest: "a9dcdb8d5676cf63" },
+  meeting: { version: 2, digest: "28f85e3e9586ea4d" },
+  todo: { version: 1, digest: "e00d2b0c6bb86edb" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
   // the file and its digest covered every helper below the table. Bounding the
   // slice at the table's own closing bracket changed the MEASUREMENT, not the
   // reader — the task builder is byte for byte what it was — so nothing needs
   // re-indexing and the version must not move.
-  task: { version: 1, digest: "53b2e7fbb8e5c384" },
+  task: { version: 1, digest: "be0ca1175f2e2618" },
 }
 
 /** Everything in the sweep that is NOT inside a kind: the shared helpers each
@@ -693,4 +711,4 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // order, because the Drive lane grew long enough to starve the ones behind it
 // (document had run 194 times to message's 180, and the gap widened every tick).
 // Which lane goes first is not something any kind SAYS, so no textVersion moves.
-const SHARED_DIGEST = "4c4971b3d67c16d3"
+const SHARED_DIGEST = "9abb1170387dedc9"

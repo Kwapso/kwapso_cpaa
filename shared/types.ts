@@ -134,6 +134,15 @@ export type SelectableValue = {
   nameDe: string | null
   description: string | null
   standardDays: number | null
+  /** WHO WROTE THE WORD, AND WHEN — read by the SINGLE-ROW door only.
+   *
+   * Optional because the LIST door does not select them, and that is the
+   * decision rather than an oversight: the record footer is the one place that
+   * asks, so putting two more columns on the list would carry them for every
+   * value on every read to answer a question no row in a list is asking. A list
+   * row therefore has them absent; a row read through `selectableOne` has them. */
+  createdAt?: string | null
+  createdByName?: string | null
 }
 
 /** A role's permission matrix as the tenancy worker returns it: the module rows
@@ -1141,9 +1150,6 @@ export type ProcessVersion = {
   versionNo: number
   label: string | null
   isBaseline: boolean
-  /** the sprint whose completion cut it; null = the manual button. `null` on the
-   * way out to a client login — which sprint we ran is the agency's own record. */
-  cutFromSprintId: string | null
   createdAt: string
   createdByName: string | null
 }
@@ -1332,8 +1338,9 @@ export type Sprint = {
   endsOn: string | null
   soldPriceCents: number
   currency: string | null
-  /** the MOMENT it completed, not a status word — the version cut on the money
-   * side keys off exactly that (process_versions.cut_from_sprint_id). */
+  /** the MOMENT it completed, not a status word. It used to be what an automatic
+   * version cut keyed off; that decision was purged on 24 Aug 2026 (a version is
+   * cut by hand), and the moment is still the honest way to ask "is it done?". */
   completedAt: string | null
   active: boolean
   /** exact server counts of the work inside it (R16) — never a loaded length. */
@@ -1513,7 +1520,7 @@ export type TeamPulse = {
     weeks: PulseWeek[]
   } | null
   meetings: {
-    /** this week's diary, Monday to Sunday, decided by the server. */
+    /** this week's meetings, Monday to Sunday, decided by the server. */
     thisWeek: number
   } | null
 }
@@ -1570,7 +1577,7 @@ export type WorkLogSummary = {
  * never one of the words anyway — it is the module's `delete`, and the row
  * survives it (`active`). */
 
-/** ONE PERSON ON A DIARY ENTRY — the "stakeholders" a meeting record carries.
+/** ONE PERSON ON A CALENDAR EVENT — the "stakeholders" a meeting record carries.
  *
  * As Google states them and nothing more: this is the MIRROR of the invitation,
  * so it says who was asked and what they answered, and it deliberately does not
@@ -1589,7 +1596,7 @@ export type MeetingGuest = {
   resource: boolean
 }
 
-/** A file hanging off a diary entry: an agenda, a deck, or the transcript Google
+/** A file hanging off a calendar event: an agenda, a deck, or the transcript Google
  * Meet files against the event once the call is over. */
 export type MeetingAttachment = {
   fileId: string
@@ -1647,18 +1654,18 @@ export type Meeting = {
   endsAt: string | null
   /** the Google Calendar entry this meeting mirrors, and the link that opens it
    * in Google's own web app. Set by the sweep — nothing in this product puts an
-   * entry in a calendar — and unique on the row, so one diary entry can never
+   * entry in a calendar — and unique on the row, so one calendar event can never
    * become two meetings. */
   googleEventId: string | null
   googleEventUrl: string | null
-  /* ── THE REST OF THE DIARY ENTRY, MIRRORED ────────────────────────────────
+  /* ── THE REST OF THE CALENDAR EVENT, MIRRORED ────────────────────────────────
    * Everything below is Google's fact about the same entry, copied onto the row
    * by the calendar sweep so that a meeting can SAY who was in the room, where
    * to join and what was attached — without every reader holding a connection
    * and every list costing fifty calls to Google.
    *
    * The direction is one-way, and now it is one-way in BOTH senses: nothing in
-   * this product writes to a calendar at all, so Google's diary is the source
+   * this product writes to a calendar at all, so Google's calendar is the source
    * and every column below is a copy of it. `googleSyncedAt` says when that copy
    * was last true, which is the honest thing a mirror can offer. */
   /** the join link — Meet, or whatever conferencing system is on the entry. */
@@ -1675,7 +1682,7 @@ export type Meeting = {
   googleAttachments: MeetingAttachment[]
   /** when the mirror above was last brought into step with Google. */
   googleSyncedAt: string | null
-  /** TRUE when this row was read IN off somebody's diary rather than typed here
+  /** TRUE when this row was read IN off somebody's calendar rather than typed here
    * and pushed out. It decides what a re-sync may overwrite: Google owns the
    * words of a row it authored, kwapso owns the words of a row it authored, and
    * the notes belong to a person either way. */
@@ -1701,8 +1708,8 @@ export type Meeting = {
    * meeting HAS its transcript and asking the knowledge base about it still
    * finds nothing. That gap was invisible on every screen. */
   knowledgeIndexedAt: string | null
-  /* THE WORDS THEMSELVES ARE NOT HERE, and that is deliberate. A page of the
-   * diary is fifty meetings; a transcript is up to a megabyte. Putting one on
+  /* THE WORDS THEMSELVES ARE NOT HERE, and that is deliberate. A page of
+   * meetings is fifty; a transcript is up to a megabyte. Putting one on
    * the other would make the list read the heaviest response in the app to show
    * a column nobody scrolls. The text has its own door
    * (`GET /api/content/meetings/transcript`), read once, by the one screen that
@@ -1813,7 +1820,7 @@ export type GoogleService = (typeof GOOGLE_SERVICES)[number]
 
 /** The two services whose material is reached through NAMED sources rather than
  * wholesale — Drive folders and Chat spaces. Gmail is narrowed by known contact
- * and Calendar is the person's own diary, so neither has anything to name. */
+ * and Calendar is the person's own already, so neither has anything to name. */
 export const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
 export type GoogleNamedService = (typeof GOOGLE_NAMED_SERVICES)[number]
 

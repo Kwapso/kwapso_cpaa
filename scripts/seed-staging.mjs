@@ -178,7 +178,7 @@ const TASK_LIMIT = full ? 900 : 250
  * time screens and a margin with real hours behind it. */
 const WORK_LOG_LIMIT = cut(400)
 
-/** The diary. 350 meetings; the 150 most recent cover the last few months. */
+/** The meetings list. 350 meetings; the 150 most recent cover the last few months. */
 const MEETING_LIMIT = cut(150)
 
 // ── the client logins ────────────────────────────────────────────────────────
@@ -1512,7 +1512,7 @@ const purposeIdFor = new Map()
   }
 }
 
-step("The diary")
+step("Meetings")
 {
   // Title alone is not a key — "Weekly" happened 40 times. The moment is what
   // makes a meeting that meeting.
@@ -1538,7 +1538,7 @@ step("The diary")
         },
         staff.cookie
       ),
-      `putting ${m.title} in the diary`
+      `putting ${m.title} in Meetings`
     )
     say("created", m.title, "meetings")
   }
@@ -1740,7 +1740,7 @@ for (const [what, path] of [
   ["the sprint list", "/api/content/sprints"],
   ["everybody's logged time", "/api/content/work-logs"],
   ["our own internal admin", "/api/content/tasks"],
-  ["the diary", "/api/content/meetings"],
+  ["the meetings list", "/api/content/meetings"],
   ["what our own hour costs us", "/api/tenancy/internal-rates"],
   ["what this account leaves us", `/api/tenancy/margin?accountId=${aHome}`],
 ]) {
@@ -1759,7 +1759,7 @@ for (const [what, path] of [
   ["the sprint list", "/api/content/sprints"],
   ["logged time", "/api/content/work-logs"],
   ["our own admin", "/api/content/tasks"],
-  ["the diary", "/api/content/meetings"],
+  ["the meetings list", "/api/content/meetings"],
   ["our internal rate card", "/api/tenancy/internal-rates"],
   ["the margin on a client", `/api/tenancy/margin?accountId=${aHome}`],
 ]) {

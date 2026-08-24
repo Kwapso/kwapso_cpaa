@@ -221,9 +221,50 @@ export const FENCED_ROW_OWNERS: Record<string, string> = {
   help: "account_id",
 }
 
+/** THE FENCE, RESOLVED ONCE PER REQUEST.
+ *
+ * `accountScope` is a pure function of the caller, and one screen open asks for
+ * it seven times — every door calls it, and `refusePortalCaller` calls it again
+ * inside doors that also call it directly (`record-counts.ts` did exactly that:
+ * two identical `portal_users` reads, back to back, on the one door that runs on
+ * every record open). Each of those is a fresh HTTPS request to the D1 REST API,
+ * so the repeat is not free the way a repeated function call normally is.
+ *
+ * WHY A WeakMap KEYED ON THE GUARD IS SAFE, AND A MAP KEYED ON THE USER IS NOT.
+ * A Worker isolate serves many requests from many tenants, so anything keyed on
+ * a STRING (`userId`, `teamId`) is a cache that outlives the request and can
+ * hand one caller another caller's fence — a tenant-isolation bug, not a
+ * performance win. `requireMember` (shared/workers/gating.ts) builds and returns
+ * a fresh object literal for every request, so the guard's identity IS the
+ * request's identity: two requests can never collide on this key, and the entry
+ * becomes collectable the moment the request's guard does.
+ *
+ * THE PROMISE IS MEMOISED, NOT THE VALUE, so two callers racing inside one
+ * request share the one in-flight read rather than starting a second.
+ *
+ * A REJECTION IS NOT CACHED. A failed read is dropped from the map so the next
+ * caller in the same request retries rather than inheriting a thrown error that
+ * had nothing to do with them.
+ *
+ * The freshness boundary is UNCHANGED: it was "once per door", it is now "once
+ * per request", and a request is already the unit over which every other
+ * permission answer is held constant. */
+const scopePerRequest = new WeakMap<MemberGuard, Promise<AccountScope>>()
+
+export function accountScope(cfg: D1Rest, guard: MemberGuard): Promise<AccountScope> {
+  const memo = scopePerRequest.get(guard)
+  if (memo) return memo
+  const fresh = resolveAccountScope(cfg, guard).catch((err: unknown) => {
+    scopePerRequest.delete(guard)
+    throw err
+  })
+  scopePerRequest.set(guard, fresh)
+  return fresh
+}
+
 /** Resolve the caller's account set — the ONE place it is decided. Costs one
  * read for staff (the portal_users miss) and three for a portal caller. */
-export async function accountScope(cfg: D1Rest, guard: MemberGuard): Promise<AccountScope> {
+async function resolveAccountScope(cfg: D1Rest, guard: MemberGuard): Promise<AccountScope> {
   // Active grant first: a person re-granted access after a revoke has both rows,
   // and the live one is the one that speaks.
   const rows = await d1Query<{

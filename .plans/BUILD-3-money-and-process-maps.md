@@ -13,7 +13,7 @@ engine lane has not landed it yet, build your side and say so.
 
 ## 0 · The rules
 
-- `CLAUDE.md` holds the Laws of the Base, **R1–R36**, machine-checked.
+- `CLAUDE.md` holds the Laws of the Base, **R1–R37**, machine-checked.
 - **`npm run check` must exit 0**, captured unpiped: `npm run check > /tmp/x.log 2>&1; echo $?`. A piped run reports the pipe's status and has read green over a failing build in this repo.
 - **Every test proven to bite**: break the thing, watch it go RED, restore, quote the red output. Watch the specific trap this codebase keeps hitting: `expect(indexOf(x)).toBeLessThan(indexOf(y))` passes LOUDEST when `x` is absent, because `indexOf` returns −1. Assert presence first — `workers/tenancy/test/grant-ceiling.test.ts` has the helper that does it right.
 - **`@kwapso/ui` is a separate repo.** Never edit it from here.
@@ -39,8 +39,11 @@ stage). A Process is a way of working inside it. A Step is one part of that.
 they worked before we touched anything. Every later version is what we changed
 it to.
 
-**A new version is cut automatically when a sprint completes, plus a manual
-button** (the owner confirmed both).
+**A new version is cut BY HAND, and only by hand** (the owner, 24 Aug 2026,
+settling round two of the audit-module questions). An earlier draft of this
+document said a completing sprint cut one automatically and called it confirmed;
+nothing was ever wired to do it, and the decision is purged rather than switched
+off — see team migration 0051.
 
 **A story must name the step it changes, or explicitly say it changes none, and
 it cannot close without doing so.** That is the hook everything here hangs on.

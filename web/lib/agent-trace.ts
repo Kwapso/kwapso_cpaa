@@ -267,10 +267,10 @@ export function traceFor(
     case "update_task":
     case "set_task_done":
       return { path: `${seg(teamId, "tasks")}/${str(input, "id")}`, highlight: "main" }
-    // MEETINGS. A create lands on the diary, an edit on the meeting itself.
+    // MEETINGS. A create lands on the meetings list, an edit on the meeting itself.
     case "create_meeting":
     // Reading the calendar in makes many records and no one of them is the
-    // change, so it lands on the diary rather than on a record.
+    // change, so it lands on the meetings list rather than on a record.
     case "sync_calendar_series":
       return { path: seg(teamId, "meetings"), highlight: "main" }
     case "update_meeting":
@@ -353,7 +353,7 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "set_staff_certificate_active",
   "set_staff_profile_active",
   // EVERY GOOGLE WRITE. All of them change something in GOOGLE — a file in a
-  // Drive folder, a draft or a label in a mailbox, an event in a diary, a message
+  // Drive folder, a draft or a label in a mailbox, an event in a calendar, a message
   // in a space — and kwapso has no screen showing any of those, deliberately: a
   // card that re-implemented Gmail beside Gmail would be the wrong kind of
   // ambitious, and driving somebody to a page that shows nothing they just did is

@@ -787,12 +787,16 @@ CREATE INDEX idx_processes_account ON processes (account_id);
 -- process with no baseline can never produce a saving and would quietly report
 -- zero forever.
 --
--- \`cut_from_sprint_id\` is the work engine's sprint whose completion cut this
--- version; NULL is the manual button. The partial unique index below is R17 for
--- a write that is an INSERT rather than an UPDATE: a sprint that completes twice
--- (a double click, a retried job, a replayed hook) cannot cut two versions,
--- because the second INSERT is refused by the index rather than by a check
--- somebody could race past.
+-- A VERSION IS CUT BY HAND, AND ONLY BY HAND (owner, 24 Aug 2026). An earlier
+-- plan had a completing sprint cut one automatically; nothing was ever wired to
+-- do it, and the decision was purged rather than switched off (migration 0051).
+-- \`cut_from_sprint_id\` is what is left of it: nothing reads it, nothing writes
+-- it, and it stays only because this codebase does not drop columns.
+--
+-- R17 for a write that is an INSERT rather than an UPDATE lives on the unique
+-- index below: two quick presses both read version N and both try to insert
+-- N+1, and the loser is refused by the database rather than by a check somebody
+-- could race past. \`cutVersion\` reads that refusal as "already cut".
 CREATE TABLE process_versions (
   id TEXT PRIMARY KEY,
   process_id TEXT NOT NULL REFERENCES processes (id),
@@ -803,8 +807,6 @@ CREATE TABLE process_versions (
   created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
 );
 CREATE UNIQUE INDEX idx_process_versions_no ON process_versions (process_id, version_no);
-CREATE UNIQUE INDEX idx_process_versions_sprint
-  ON process_versions (process_id, cut_from_sprint_id) WHERE cut_from_sprint_id IS NOT NULL;
 
 -- A STEP is one part of a process, in ONE version. Two identifiers, and the
 -- difference between them is the whole savings calculation:
@@ -1467,7 +1469,7 @@ CREATE INDEX idx_google_connections_user ON google_connections (user_id);
 -- unnamed rest of a person's Drive is out of reach by construction rather than
 -- by a filter somebody has to remember to write. Gmail and Calendar have no rows
 -- here because there is nothing to name — mail is narrowed to known contacts and
--- the calendar is the person's own diary.
+-- the calendar is the person's own.
 --
 -- \`shelf\` is the answer to the question the design round said we must answer at
 -- the moment of sharing: who will be able to read this? 'private' means this
@@ -2138,7 +2140,7 @@ SELECT lower(hex(randomblob(16))), 'Ticket type', ${sqlString(v)}, 1, datetime('
     //
     // WHICH APP A MEETING WAS ABOUT. Nullable: plenty of meetings are about the
     // account rather than one of its systems, and NOT NULL here would make the
-    // diary refuse the first kickoff call.
+    // meetings list refuse the first kickoff call.
     version: "0029_app_record",
     sql: `
 ALTER TABLE apps ADD COLUMN about TEXT;
@@ -2254,7 +2256,7 @@ ALTER TABLE processes ADD COLUMN role_name TEXT;
 `,
   },
   {
-    // THE DIARY LEARNS THREE THINGS (CHECKLIST 9.2, 9.4 and 9.7).
+    // MEETINGS LEARNS THREE THINGS (CHECKLIST 9.2, 9.4 and 9.7).
     //
     // \`transcript_file_id\` + \`transcript_captured_at\` — WHICH transcript was
     // read off Drive and WHEN. Two columns rather than one because they answer
@@ -2385,7 +2387,7 @@ UPDATE selectable_data SET mark = '🔀' WHERE type = 'Story type' AND value = '
     // ── WHY THE MIRROR COLUMNS ────────────────────────────────────────────────
     // The owner: "All the other information, like location, stakeholders, or any
     // other calendar data or metadata, should be pulled in and organised
-    // correctly." Until now a meeting kept two facts about its diary entry — the
+    // correctly." Until now a meeting kept two facts about its calendar event — the
     // id and the link — and every other fact (who was invited, who accepted, who
     // called it, where to join, what was attached) was reachable only by asking
     // Google again, live, with the reader's own token.
@@ -2412,9 +2414,9 @@ UPDATE selectable_data SET mark = '🔀' WHERE type = 'Story type' AND value = '
     // ── \`from_calendar\`, AND WHY IT DECIDES WHAT A RE-SYNC MAY OVERWRITE ──────
     // Two kinds of meeting carry a \`google_event_id\` and they are NOT the same
     // record. One was typed in kwapso and pushed out; the other was read IN off
-    // somebody's diary. A re-sync that rewrote the title of both would quietly
+    // somebody's calendar. A re-sync that rewrote the title of both would quietly
     // undo a person's own words the moment Google's copy differed — which it
-    // will, because the push writes "BERG-M0007 · Kickoff" and the diary says
+    // will, because the push writes "BERG-M0007 · Kickoff" and the calendar says
     // "Kickoff".
     //
     // So the flag records WHERE THE ROW CAME FROM, once, at insert. Google owns
@@ -2601,10 +2603,10 @@ ALTER TABLE apps ADD COLUMN logo_url TEXT;
     // ── \`calendar_swept_through\` ─────────────────────────────────────────────
     // ONE column, holding ONE moment: how far a forward-only walk over the whole
     // calendar has read. The live window (a fortnight back, four weeks on) is
-    // swept on every call and keeps the diary current; this cursor is what lets a
+    // swept on every call and keeps the meetings list current; this cursor is what lets a
     // FIVE-YEAR window be read a ninety-day slice at a time without any single
     // request being unbounded (R14). It sits on the CONNECTION because the walk
-    // is one person's own diary read with one person's own token — a team-level
+    // is one person's own calendar read with one person's own token — a team-level
     // cursor would mean one colleague's progress deciding another's.
     //
     // NULL means "never walked", which the reader turns into the floor. There is
@@ -2724,7 +2726,7 @@ ALTER TABLE deliverables ADD COLUMN visible_to_client_at TEXT;
     // ONE SPELLING OF ONE INSTANT — so the text order IS the time order.
     //
     // `meetings.starts_at` is TEXT, SQLite compares TEXT byte by byte, and the
-    // diary is ordered and PAGED by that column (MEETING_ORDER, and the keyset
+    // meetings list is ordered and PAGED by that column (MEETING_ORDER, and the keyset
     // cursor minted from the same value). That is only chronological while every
     // row is written the same way, and sixty-three were not: Google gives an
     // hour in the event's own offset — `2026-08-18T12:00:00+05:30` — and the
@@ -2732,7 +2734,7 @@ ALTER TABLE deliverables ADD COLUMN visible_to_client_at TEXT;
     // row's `…Z`. `+05:30` sorts as though the meeting were at noon when it is
     // at 06:30Z, so the day sheet interleaved: on staging a 15:30 review sorted
     // below everything after it. Not a display bug — the ORDER BY is wrong, so
-    // page two of the diary starts somewhere page one did not stop.
+    // page two of the meetings list starts somewhere page one did not stop.
     //
     // WHY THE DATA AND NOT THE QUERY. The alternative is to order by
     // `datetime(starts_at)` instead, and it is the wrong fix twice.
@@ -2964,7 +2966,7 @@ SELECT lower(hex(randomblob(16))), s.id, 'link',
     // Two lanes write knowledge sources about the same conversation and neither
     // knew about the other. The meetings sweep files a meeting — title, purpose,
     // who was there, the transcript when there is one, averaging 431 characters.
-    // The calendar sweep files the same Google event straight off the diary: a
+    // The calendar sweep files the same Google event straight off the calendar: a
     // title and a date, averaging THIRTY-FOUR.
     //
     // Measured on the owner's staging base on 20 Aug 2026: 251 calendar entries
@@ -3183,6 +3185,39 @@ CREATE TABLE chat_people (
     version: "0050_no_permission_without_a_door",
     sql: `
 DELETE FROM role_permissions WHERE module IN ('learning', 'marketing', 'screens');
+`,
+  },
+  {
+    // A VERSION IS CUT BY HAND, AND ONLY BY HAND (owner, 24 Aug 2026).
+    //
+    // The plan said a completing sprint cut one automatically and called it
+    // confirmed. Round two of the audit-module questions settled the opposite —
+    // hand editing only — and the owner ruled the older decision purged rather
+    // than switched off.
+    //
+    // IT WAS NEVER SWITCHED ON. `cutVersion` took an optional `sprintId`, the
+    // route parsed one, the column held one and the index enforced it, and not a
+    // single caller in the app ever sent one: the only code that did was tests.
+    // So nobody has ever had a version cut for them, and this removes a promise
+    // rather than a behaviour.
+    //
+    // R17 IS UNAFFECTED, and it is worth being exact about why rather than
+    // assuming. The sprint index was described as the idempotence guard for a
+    // write that is an INSERT rather than an UPDATE. It was never the only one:
+    // `idx_process_versions_no` on (process_id, version_no) has sat beside it
+    // since the table was written, and THAT is the one that actually stops a
+    // double press. Two quick presses both read version N and both try to insert
+    // N+1; the loser hits that constraint, and `cutVersion` already reads a
+    // duplicate as "already cut" — a 200, no activity row, no ping.
+    //
+    // So this drops a promise and a dead index, and takes no protection with it.
+    //
+    // THE COLUMN STAYS, inert. This codebase has never dropped one, and the first
+    // time it does should be a decision of its own rather than a side effect of
+    // tidying. Nothing reads it and nothing writes it any more.
+    version: "0051_a_version_is_cut_by_hand",
+    sql: `
+DROP INDEX IF EXISTS idx_process_versions_sprint;
 `,
   },
 ]

@@ -5,7 +5,7 @@
 // THE FAULT THIS SUITE EXISTS FOR, in one sentence: on 18 August 2026 this
 // product deleted every function that could write to a calendar, wrote it down
 // in four documents, and went on asking Google for permission to write to a
-// calendar. Nothing was broken. Every test passed. The owner's diary was one
+// calendar. Nothing was broken. Every test passed. The owner's calendar was one
 // forgotten line of code away from being writable by an app that had promised in
 // writing that it never would be, and no check anywhere could have noticed —
 // because every check read our code, and the power lives at Google.

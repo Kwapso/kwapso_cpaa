@@ -225,7 +225,7 @@ export async function getKnowledgeSync(request: Request, env: Env): Promise<Resp
 
 /**
  * POST /api/content/knowledge/sync-google — bring MY OWN Google material into
- * step: the folders and spaces I named, the mail with a known contact, my diary.
+ * step: the folders and spaces I named, the mail with a known contact, my calendar.
  *
  * A SECOND DOOR RATHER THAN A FLAG ON THE FIRST, for two reasons that point the
  * same way. It needs a right the other one does not (`google:read` — reading
@@ -244,7 +244,7 @@ export async function getKnowledgeSync(request: Request, env: Env): Promise<Resp
  * row is the change — the same shape the shared sync door already has.
  *
  * IT FIRES BY ITSELF NOW (14.12). The app calls this once on open, in the
- * background, so somebody's Drive and diary are in step without anybody pressing
+ * background, so somebody's Drive and calendar are in step without anybody pressing
  * anything — and THAT caller sends `onlyIfStale`, which is what the door's
  * five-minute floor hangs on (`sweepGoogle` says why the floor is opt-in rather
  * than universal: a button somebody presses is a deliberate act with an expected

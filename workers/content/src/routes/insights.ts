@@ -53,7 +53,7 @@ export async function getInsights(request: Request, env: Env): Promise<Response>
   const [tickets, work, meetings] = await Promise.all([
     canTickets ? ticketPulse(cfg, guard, scope) : null,
     canWork ? workPulse(cfg, guard) : null,
-    // The SAME "week" the diary's own badge counts — its door owns that
+    // The SAME "week" the meetings list's own badge counts — its door owns that
     // boundary, and asking it here rather than rebuilding it is what keeps the
     // two numbers one number.
     canMeetings ? countMeetings(cfg, guard, { view: "week" }).then((n) => ({ thisWeek: n })) : null,

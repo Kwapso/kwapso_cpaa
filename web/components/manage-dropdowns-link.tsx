@@ -10,6 +10,7 @@
 import { Settings2 } from "lucide-react"
 
 import { usePermissions } from "@/lib/perms"
+import { InAppLink } from "@/components/in-app-link"
 import { useT } from "@shared/web/language"
 
 export function ManageDropdownsLink({ teamId }: { teamId: string | null }) {
@@ -18,12 +19,12 @@ export function ManageDropdownsLink({ teamId }: { teamId: string | null }) {
   const allowed = !!teamId && (can("selectable_data", "create") || can("selectable_data", "edit"))
   if (!allowed) return null
   return (
-    <a
+    <InAppLink
       href={`/t/${teamId}/dropdowns`}
       className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
     >
       <Settings2 className="size-3" aria-hidden />
       {t("Manage dropdowns")}
-    </a>
+    </InAppLink>
   )
 }

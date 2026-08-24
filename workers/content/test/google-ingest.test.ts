@@ -313,7 +313,7 @@ describe("the shelf is the fence", () => {
     expect(mine?.owner_user_id, "a private folder's contents belong to the person alone").toBe(IDS.staffUser)
   })
 
-  it("a mailbox and a diary are always private, because nobody ever declared them shared", async () => {
+  it("a mailbox and a calendar are always private, because nobody ever declared them shared", async () => {
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
     for (const title of ["Re: the dispatch screen", "Quarterly review"])
       expect(byTitle(title)?.owner_user_id, `${title} must stay its owner's`).toBe(IDS.staffUser)
@@ -373,7 +373,7 @@ describe("the compartment is decided, not guessed", () => {
     expect(byTitle("My own reading list")?.account_id).toBeNull()
   })
 
-  it("mail and a diary entry are filed under the CLIENT the known contact belongs to, not the contact", async () => {
+  it("mail and a calendar event are filed under the CLIENT the known contact belongs to, not the contact", async () => {
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
     // Luis Vera is a person account UNDER Bergman. A conversation with him is
     // Bergman's material — filing it under Luis would put it in a slice no

@@ -180,7 +180,7 @@ export type GoogleReadRequest = {
  * is the largest single reason found.
  *
  * THE MEETING WINS, always, and it is not close — it is the same event with the
- * work written on it. An event NOT in this set is a diary entry nobody made a
+ * work written on it. An event NOT in this set is one nobody made a
  * meeting for, which is exactly the case the calendar lane is for, and it still
  * files normally.
  */
@@ -188,7 +188,7 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
   const rows = await d1Query<{ google_event_id: string }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap — a diary is bounded by how many conversations a team has had,
+    // R14 hard cap — the meetings list is bounded by how many conversations a team has had,
     // and this reads one column of it.
     `SELECT google_event_id FROM meetings
       WHERE google_event_id IS NOT NULL AND google_event_id <> '' AND deactivated_at IS NULL

@@ -175,6 +175,63 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   return { user, actor: toActor(user), cfg, guard }
 }
 
+type RightsRow = {
+  can_read: number
+  can_create: number
+  can_edit: number
+  can_delete: number
+}
+
+/** ONE PERMISSION ROW PER MODULE PER REQUEST.
+ *
+ * The read already returns all FOUR rights for a module — it always did — and
+ * then threw three of them away, so a door checking `read` and a door checking
+ * `edit` on the same module paid twice for the same row. One record screen opens
+ * seven doors, and every one of them starts with a permission read: seven
+ * separate HTTPS requests to the D1 REST API to ask questions the first answer
+ * already contained.
+ *
+ * KEYED ON THE GUARD OBJECT, exactly as `accountScope` is, and for the same
+ * tenant-isolation reason: a Worker isolate serves many callers, so a cache
+ * keyed on `roleId` would outlive the request and could answer one caller with
+ * another's permissions. `requireMember` returns a fresh object literal per
+ * request, so the guard's identity is the request's identity and two requests
+ * can never share a key. The inner Map is keyed on the MODULE, which is always a
+ * code literal, never a request value.
+ *
+ * THE FRESHNESS BOUNDARY DOES NOT MOVE — it was "once per permission check",
+ * it is now "once per module per request". A role edited mid-request would
+ * previously have been half-applied across that request's own checks, which is
+ * worse than a consistent snapshot, not better. Across requests nothing changes:
+ * the next request reads the row again.
+ *
+ * A REJECTION IS NOT CACHED, so a failed read does not poison the rest of the
+ * request. */
+const rightsPerRequest = new WeakMap<MemberGuard, Map<string, Promise<RightsRow | null>>>()
+
+function moduleRights(cfg: D1Rest, guard: MemberGuard, module: string): Promise<RightsRow | null> {
+  let byModule = rightsPerRequest.get(guard)
+  if (!byModule) {
+    byModule = new Map()
+    rightsPerRequest.set(guard, byModule)
+  }
+  const memo = byModule.get(module)
+  if (memo) return memo
+  const fresh = d1Query<RightsRow>(
+    cfg,
+    guard.databaseId,
+    "SELECT can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? AND module = ?",
+    [guard.roleId, module]
+  )
+    .then((rows) => rows[0] ?? null)
+    .catch((err: unknown) => {
+      byModule.delete(module)
+      throw err
+    })
+  byModule.set(module, fresh)
+  return fresh
+}
+
 /** Does the member's role hold this right on this module? (tall-sheet read) */
 export async function hasRight(
   cfg: D1Rest,
@@ -182,19 +239,9 @@ export async function hasRight(
   module: string,
   right: Right
 ): Promise<boolean> {
-  const rows = await d1Query<{
-    can_read: number
-    can_create: number
-    can_edit: number
-    can_delete: number
-  }>(
-    cfg,
-    guard.databaseId,
-    "SELECT can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? AND module = ?",
-    [guard.roleId, module]
-  )
-  if (!rows[0]) return false
-  return rows[0][`can_${right}`] === 1
+  const row = await moduleRights(cfg, guard, module)
+  if (!row) return false
+  return row[`can_${right}`] === 1
 }
 
 /** hasRight, but throws a 403 GuardError — the one-liner for handlers. */

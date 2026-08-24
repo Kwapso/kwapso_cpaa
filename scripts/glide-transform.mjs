@@ -975,7 +975,7 @@ for (const r of src.worklog) {
   wlCnt.mapped()
 }
 
-// ── purposes + meetings → the diary ──────────────────────────────────────────
+// ── purposes + meetings → Meetings ──────────────────────────────────────────
 
 const purCnt = counter("purposes", src.purposes.length)
 const meetingPurposes = []

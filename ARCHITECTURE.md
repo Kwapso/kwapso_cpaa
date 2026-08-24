@@ -198,9 +198,9 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/content/google/gmail/messages · /gmail/message | content | mail to/from a KNOWN CONTACT only · one message |
 | POST /api/content/google/gmail/draft | content | leave a reply in my own Gmail drafts + hand back its link (`google:edit`) |
 | POST /api/content/google/gmail/send | content | actually send it, `google:edit` **plus** the `google_mail` switch |
-| GET /api/content/google/calendar/events | content | my own diary, in a window. The ONLY calendar door besides the transcript read — the sync is one-way and nothing here writes to a calendar |
-| GET /api/content/google/calendar/event/transcript | content | what was SAID in a meeting, reached from its diary entry |
-| POST /api/content/meetings/sync-calendar | content | read Google's diary INTO the diary: the live window every call, plus one resumable slice of the whole calendar |
+| GET /api/content/google/calendar/events | content | my own calendar, in a window. The ONLY calendar door besides the transcript read — the sync is one-way and nothing here writes to a calendar |
+| GET /api/content/google/calendar/event/transcript | content | what was SAID in a meeting, reached from its calendar event |
+| POST /api/content/meetings/sync-calendar | content | read Google's calendar INTO Meetings: the live window every call, plus one resumable slice of the whole calendar |
 | GET /api/content/google/chat/messages · POST (same path) | content | one NAMED space's messages · post in it (`google:edit`) |
 | GET /media/* | gateway | serve uploaded files from R2 |
 | (WebSocket) /api/realtime?team= | realtime | join a team's live channel; receive row-level `{resource,id,op}` pings (gated by active membership of THAT team) |
@@ -320,7 +320,7 @@ on top follows [CACHING.md](CACHING.md).
   - **What each connection can see is narrowed at Google, not by our filter.** Drive is the FOLDERS
     the person named (`google_sources`), Chat is the SPACES they named, Gmail is only mail to or
     from an address on one of the team's accounts (the query is built from `accounts.email` and the
-    caller's words are ANDed inside it), Calendar is their own diary. Every empty case answers with
+    caller's words are ANDed inside it), Calendar is their own. Every empty case answers with
     NOTHING rather than everything — the three fences are run, not read, in
     `workers/content/test/google-fences.test.ts`.
   - **Every source declares its SHELF at the moment it is shared**, `private` (this person alone)
@@ -333,7 +333,7 @@ on top follows [CACHING.md](CACHING.md).
     somebody the assistant does not grant the assistant their outbox. The act switch is demanded of
     a person pressing "send it from kwapso" exactly as it is of the assistant: same act, same
     mailbox, same permission.
-  - **THE CALENDAR IS READ-ONLY (LOCKED 2026-08-18).** kwapso reads a diary and never writes one.
+  - **THE CALENDAR IS READ-ONLY (LOCKED 2026-08-18).** kwapso reads a calendar and never writes one.
     The owner: *"disable the ability to create, edit, or delete anything in the calendar from the
     frontend… just make it one-way so we only grab and update the information."* Seven doors, five
     library functions, eight tools and a third permission switch (`google_events`, "Calendar on your

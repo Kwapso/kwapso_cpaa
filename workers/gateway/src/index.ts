@@ -41,7 +41,7 @@ export const SHELL_MODULES = [
   // row of time is only ever read in a list of its neighbours), but it is
   // forwarded like the rest so the shell survives a reload at any depth.
   "time",
-  // The diary. A sidebar page with records of its own, so it needs the shell
+  // Meetings. A sidebar page with records of its own, so it needs the shell
   // at every depth for the same reason the four above it do.
   "meetings",
   // The agency's own housekeeping. `purposes` is here even though it is a

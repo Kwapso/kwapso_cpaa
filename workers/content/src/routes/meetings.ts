@@ -1,4 +1,4 @@
-// MEETING routes — the diary, its agenda and its notes.
+// MEETING routes — Meetings, its agenda and its notes.
 //
 // EVERY DOOR HERE REFUSES A CLIENT LOGIN, AT THE DOOR (R21). A meeting's notes
 // are OUR record of a conversation — written for us, often about the client
@@ -65,7 +65,7 @@ function monthOrNone(raw: string | null): string | undefined {
   return mo >= 1 && mo <= 12 ? raw : undefined
 }
 
-/** GET /api/content/meetings — the diary, newest first (?id → just that one).
+/** GET /api/content/meetings — the meetings list, newest first (?id → just that one).
  * R14: meetings GROW with ordinary use (an event is never curated away), so the
  * door PAGES by key — the opaque cursor comes straight back from the previous
  * response. */
@@ -90,7 +90,7 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
       guard,
       filter,
       queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
-      // WHAT ORDER — asked of the door, because the diary PAGES (R14). The "All"
+      // WHAT ORDER — asked of the door, because the meetings list PAGES (R14). The "All"
       // view draws a TABLE with nine columns, and a column header that sorted
       // the loaded page would order the newest fifty meetings under a badge
       // counting every one the agency has ever held.
@@ -113,7 +113,7 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
   return pagedJson("meetings", { ...page, total }, { weekTotal })
 }
 
-/** POST /api/content/meetings — put one in the diary. Gated on the meetings
+/** POST /api/content/meetings — put one on the meetings list. Gated on the meetings
  * module's `create` right. */
 export async function postCreateMeeting(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<MeetingInput>(request, env, "meetings", "create")
@@ -154,7 +154,7 @@ export async function postUpdateMeeting(request: Request, env: Env): Promise<Res
 
 /** POST /api/content/meetings/active — cancel it, or put it back. Gated on the
  * `delete` right, because cancelling IS this module's delete: the row survives,
- * the diary entry does not. R17: a repeat moves zero rows. */
+ * the entry on the meetings list does not. R17: a repeat moves zero rows. */
 export async function postSetMeetingActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; active?: unknown }>(
     request,
@@ -209,7 +209,7 @@ export async function postMeetingTranscript(request: Request, env: Env): Promise
   })
 }
 
-/** POST /api/content/meetings/sync-calendar — read Google's diary into ours.
+/** POST /api/content/meetings/sync-calendar — read Google's calendar into Meetings.
  * ONE WAY, and the only direction there is: nothing in this product writes to a
  * calendar (the owner, 18 August 2026, "just make it one-way so we only grab and
  * update the information").
@@ -243,7 +243,7 @@ export async function postSyncCalendar(request: Request, env: Env): Promise<Resp
   await refusePortalCaller(cfg, guard)
   await requireRight(cfg, guard, "google", "read")
   const result = await syncCalendar(env, cfg, guard, actor)
-  // R1 — only when something actually moved in the diary. All three verbs count:
+  // R1 — only when something actually moved in the meetings list. All three verbs count:
   // a refreshed guest list and a cancelled entry are changes a screen is looking
   // at exactly as a new record is.
   if (result.created + result.updated + result.cancelled > 0)
@@ -264,7 +264,7 @@ export async function postSyncCalendar(request: Request, env: Env): Promise<Resp
 /**
  * GET /api/content/meetings/transcript?id= — what was SAID, in full.
  *
- * ITS OWN DOOR because of its size. A page of the diary is fifty meetings and a
+ * ITS OWN DOOR because of its size. A page of meetings is fifty and a
  * transcript is up to a megabyte; carrying one on the other would make the list
  * read the heaviest response in the app in order to show a column nobody
  * scrolls. So the meeting row says a transcript EXISTS, where it came from and

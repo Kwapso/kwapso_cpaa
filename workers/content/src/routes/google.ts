@@ -28,7 +28,7 @@
 //
 // THERE WAS A THIRD, `google_events:create` — "kwapso may put an EVENT in your
 // calendar" — and it went with the doors it guarded. The calendar is READ-ONLY
-// here now: this file reads a diary and never writes one. See the note where the
+// here now: this file reads a calendar and never writes one. See the note where the
 // six write doors used to be, below the events read.
 
 import { fail, json } from "@shared/workers/http"
@@ -1028,7 +1028,7 @@ const MAIL_BIN_SCOPE: Record<GoogleMailBinKind, string> = {
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
 
-/** GET /api/content/google/calendar/events?from=&to= — my own diary, in a window. */
+/** GET /api/content/google/calendar/events?from=&to= — my own calendar, in a window. */
 export async function getGoogleEvents(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "read")
   await refusePortalCaller(cfg, guard)
@@ -1046,7 +1046,7 @@ export async function getGoogleEvents(request: Request, env: Env): Promise<Respo
 
 /* THE CALENDAR IS READ-ONLY, AND THAT IS THE WHOLE OF IT.
  *
- * Six doors stood here — put an event in the diary, change what it says and
+ * Six doors stood here — put an event in the calendar, change what it says and
  * when, invite and uninvite guests, set where it is, call it off, and push a
  * sprint's dates in — plus the meeting push below them. Every one is gone, by
  * the owner's instruction on 18 August 2026: "disable the ability to create,
@@ -1077,7 +1077,7 @@ export async function getGoogleEvents(request: Request, env: Env): Promise<Respo
  * ordinary Google Doc, named after the meeting, in the organiser's Drive — so
  * until now the only way to read one was to already know which document it was.
  * Nobody thinks that way. They think "what did we agree in Tuesday's call", and
- * Tuesday's call is a diary entry. This door starts where the person starts.
+ * Tuesday's call is a calendar event. This door starts where the person starts.
  *
  * THREE HUNTS, IN AN ORDER OF PROOF — the file Google itself attached to this
  * entry, then a document in a folder this person NAMED, then Google's own notice
