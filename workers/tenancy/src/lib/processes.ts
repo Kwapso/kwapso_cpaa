@@ -591,6 +591,43 @@ export async function mainStakeholderOf(
   return rows[0]?.contact_id ?? null
 }
 
+/** THE APPS THIS PORTAL CALLER IS THE MAIN STAKEHOLDER OF.
+ *
+ * The owner's ruling, 24 Aug 2026, settling his disagreement with Aurora about
+ * whether a client sees what their own people cost per hour:
+ *
+ *   "everybody from the Kwapso system can see this, but from the client portal
+ *    site, the main stakeholder of that app could see it."
+ *
+ * Aurora said every contact; he said none. This is the answer that respects
+ * both: the person who signed the contract can check our arithmetic, and nobody
+ * else at their company learns a colleague's salary from a screen we built. His
+ * own objection, in his words: "they could just get to know each other's salary,
+ * given that we are having cost per hour on roles, so it's not advisable."
+ *
+ * A staff caller gets `null`, meaning "no restriction" — a wave of `undefined`
+ * would read the same as "restricted to nothing", and this is the kind of
+ * boolean where the two must not be confused.
+ */
+async function mainStakeholderApps(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope
+): Promise<Set<string> | null> {
+  if (scope.kind !== "portal") return null
+  const rows = await d1Query<{ app_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — the apps of one client, and only the ones this contact is
+    // named the main stakeholder of.
+    `SELECT app_id FROM app_stakeholders
+      WHERE contact_id = ? AND is_main = 1 AND deactivated_at IS NULL
+      LIMIT ${LIST_HARD_CAP}`,
+    [scope.personAccountId]
+  )
+  return new Set(rows.map((r) => r.app_id))
+}
+
 export async function createApp(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -2437,6 +2474,9 @@ export async function listSavings(
     ).map((r) => r.explains_step_key)
   )
 
+  // WHO MAY SEE AN HOURLY COST, decided once and applied on the row.
+  const mainOf = await mainStakeholderApps(cfg, guard, scope)
+
   const rows = await d1Query<{
     app_id: string
     app_name: string
@@ -2567,8 +2607,17 @@ export async function listSavings(
       latestSecondsPerRun: r.latest_seconds ?? 0,
       // CONVERTED ONCE, in the one place a period becomes a month.
       runsPerMonth: runsPerMonthFrom(r.runs_per_period ?? 0, r.frequency_period ?? "month"),
-      // THE RATE THE STEP WAS RECORDED WITH, never today's. See savings.ts.
-      roleCentsPerHour: r.role_cents_per_hour,
+      // THE RATE THE STEP WAS RECORDED WITH, never today's (savings.ts) — AND
+      // WITHHELD HERE, on the row, from a portal caller who is not this app's
+      // main stakeholder.
+      //
+      // It is withheld at the row rather than at the three screens for the
+      // reason R24 gives about the internal figures one table over: a redaction
+      // you have to remember is one somebody forgets, and a number that never
+      // crosses the wire cannot be read out of the network tab. Withholding it
+      // takes the MONEY with it — `savedCentsPerMonth` comes out null — which is
+      // the honest result rather than a zero pretending the work is free.
+      roleCentsPerHour: mainOf && !mainOf.has(r.app_id) ? null : r.role_cents_per_hour,
       removed: r.removed === 1,
       explained: explained.has(r.step_key),
     })
