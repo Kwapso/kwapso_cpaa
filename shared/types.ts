@@ -1190,6 +1190,11 @@ export type ProcessSummary = {
    * until somebody says, and an app's money figure then reports this process's
    * hours with no price beside them rather than inventing one. */
   roleName: string | null
+  /** WHICH of the client's roles that word now names — migration 0052 turned
+   * every typed word into a record, and this is the pointer. It is the DEFAULT a
+   * new step starts from (0053); a step's own role is what the money is actually
+   * computed against. `roleName` stays as the word the map was mapped with. */
+  roleId: string | null
   /** how many versions have been cut (1 = the baseline alone) */
   versionCount: number
   /** steps in the CURRENT version */
@@ -1223,6 +1228,20 @@ export type ProcessStep = {
   runsPerMonth: number
   /** true once the work stopped happening (kept, at zero seconds — never deleted) */
   removed: boolean
+  /** WHO DOES THIS STEP — one of the client's own roles. Null until somebody
+   * says, which is a real answer: the step's minutes then report with no money
+   * beside them rather than at a price nobody agreed. */
+  roleId: string | null
+  /** the role's own name, read alongside so a step can be read without a second
+   * lookup — and so an older version still says the word it was mapped with */
+  roleName: string | null
+  /** WHAT AN HOUR OF THAT ROLE COSTS THE CLIENT, in cents. Null when the role is
+   * unnamed OR when its cost has not been looked up yet — two different reasons
+   * for the same honest gap, told apart by whether `roleId` is set. */
+  roleCentsPerHour: number | null
+  /** WHAT IT IS DONE IN. Several, because a step is: open the spreadsheet, copy
+   * it into the portal, send the email. Empty is ordinary, not missing. */
+  tools: { id: string; name: string; mark: string | null }[]
 }
 
 /** One process opened: its versions, the steps of ONE of them, the exact totals

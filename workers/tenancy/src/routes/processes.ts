@@ -497,6 +497,13 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
     secondsPerRun: wholeNumber(Number(body.secondsPerRun), "Time per run", MAX_STEP_SECONDS),
     runsPerMonth: wholeNumber(Number(body.runsPerMonth), "Times a month", MAX_RUNS_PER_MONTH),
     position: body.position === undefined ? undefined : wholeNumber(Number(body.position), "Order", 10_000),
+    // WHO DOES IT and WHAT IN. Left out entirely, the step inherits the map's
+    // role and gets no tools — which is what a quick add during a mapping session
+    // should do. Sent as null, the role is deliberately nobody.
+    roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
+    toolIds: Array.isArray(body.toolIds)
+      ? body.toolIds.map((v) => requireText(v, "Tool", TEXT_LIMITS.short))
+      : undefined,
   })
   // The PROCESS is what a listener can act on: a step is only ever read on its
   // map, and the map's savings change the moment a duration does.
@@ -517,6 +524,16 @@ export async function postUpdateStep(request: Request, env: Env): Promise<Respon
     secondsPerRun: wholeNumber(Number(body.secondsPerRun), "Time per run", MAX_STEP_SECONDS),
     runsPerMonth: wholeNumber(Number(body.runsPerMonth), "Times a month", MAX_RUNS_PER_MONTH),
     position: body.position === undefined ? undefined : wholeNumber(Number(body.position), "Order", 10_000),
+    // ABSENT LEAVES IT ALONE; null CLEARS it. The two are different answers and
+    // the door keeps them different, which is why this is `"roleId" in body`
+    // rather than a truthiness test — a form that saves a step's times without
+    // touching who does it must not silently un-name the person.
+    roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
+    // The WHOLE set, so saving twice is saving once (the same shape setAppStaff
+    // takes). Absent leaves the tools alone; an empty array clears them.
+    toolIds: Array.isArray(body.toolIds)
+      ? body.toolIds.map((v) => requireText(v, "Tool", TEXT_LIMITS.short))
+      : undefined,
   })
   await publishChange(env, guard.teamId, "processes", processId)
   return json({ ok: true })

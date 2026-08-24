@@ -3382,6 +3382,70 @@ UPDATE processes
 CREATE INDEX idx_processes_role ON processes (role_id);
 `,
   },
+  {
+    // WHERE MINUTES MEET AN HOURLY COST — a STEP names who does it and what they
+    // do it in.
+    //
+    // 0052 gave a whole MAP one role. That was already an improvement on a
+    // free-typed word, and it is still the wrong altitude: a real process is
+    // handed between people. "Recording a damage case" is a clerk taking the
+    // call, an adjuster assessing it and a bookkeeper paying it — three roles at
+    // three different hourly costs inside one map. Priced at the map's single
+    // role, the saving is wrong by whatever the mix is, and wrong in a direction
+    // nobody can see. So the role moves onto the step, which is the row that
+    // already carries the minutes.
+    //
+    // \`processes.role_id\` STAYS, and is not now redundant: it is the DEFAULT a
+    // new step starts from, and the answer for a map nobody has broken down yet.
+    // The step's own role wins when it has one.
+    //
+    // ONE ROLE, MANY TOOLS, and the asymmetry is the real shape rather than an
+    // omission. A step is done BY somebody — one person's hour is what the
+    // arithmetic multiplies, and two would mean two steps. A step is done IN
+    // whatever it takes: open the spreadsheet, copy it into the portal, send the
+    // email. Both sides of that second one are many, which is the same test
+    // 0052's four joins were built on.
+    //
+    // THE JOIN HANGS OFF (version_id, step_key), NOT off the step's id, and that
+    // is load-bearing. Cutting a version copies every step forward as a NEW row
+    // with a new id and the SAME key — the key is what makes "this step, one
+    // version later" a subtraction rather than a name match (see cutVersion). A
+    // join keyed on the id would need every new id mapped back to the old one to
+    // travel; keyed on the pair, it travels in one INSERT … SELECT, and version 1
+    // goes on saying which tools version 1 used.
+    version: "0053_a_step_names_its_role_and_its_tools",
+    sql: `
+ALTER TABLE process_steps ADD COLUMN client_role_id TEXT REFERENCES client_roles (id);
+CREATE INDEX idx_process_steps_role ON process_steps (client_role_id);
+
+CREATE TABLE process_step_tools (
+  id TEXT PRIMARY KEY,
+  -- The step, by the pair that survives a cut. There is no FK on the pair
+  -- because SQLite wants a composite one and the unique index it would point at
+  -- is already there; the fence and the reads both join through it.
+  version_id TEXT NOT NULL REFERENCES process_versions (id),
+  step_key TEXT NOT NULL,
+  tool_id TEXT NOT NULL REFERENCES client_tools (id),
+  -- Carried so the account fence can be applied to THIS row rather than only to
+  -- the step it hangs off, the same reason process_steps carries one.
+  account_id TEXT REFERENCES accounts (id),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+-- A tool is on a step once. Naming it twice is the same sentence, not two.
+CREATE UNIQUE INDEX idx_process_step_tools_triple
+  ON process_step_tools (version_id, step_key, tool_id);
+CREATE INDEX idx_process_step_tools_tool ON process_step_tools (tool_id);
+CREATE INDEX idx_process_step_tools_step ON process_step_tools (version_id, step_key);
+
+-- EVERY EXISTING STEP INHERITS ITS MAP'S ROLE, so nothing that already had an
+-- answer loses it. A map with no role leaves its steps NULL, which reads as "not
+-- said yet" and prices as hours with no money beside them — the same honest
+-- incompleteness 0052 chose for a role with no cost.
+UPDATE process_steps
+   SET client_role_id = (SELECT p.role_id FROM processes p WHERE p.id = process_steps.process_id)
+ WHERE client_role_id IS NULL;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

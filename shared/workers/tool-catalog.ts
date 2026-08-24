@@ -2138,10 +2138,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_process_step",
     summary:
-      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time and `runsPerMonth` how often it happens, both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask.",
+      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time and `runsPerMonth` how often it happens, both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolIds` is what the step is done in, from `list_client_tools`, and it is a whole set.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps",
     schema: obj(
-      { processId: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N },
+      { processId: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N, roleId: S, toolIds: { type: "array" } },
       ["processId", "name", "secondsPerRun", "runsPerMonth"]
     ),
     buildBody: (i) => ({
@@ -2151,16 +2151,18 @@ export const SHARED_TOOLS: SharedTool[] = [
       secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
       runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
       position: typeof i.position === "number" ? i.position : undefined,
+      roleId: opt(i, "roleId"),
+      toolIds: Array.isArray(i.toolIds) ? i.toolIds : undefined,
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Add the step "${str(i, "name")}"` },
   },
   {
     name: "update_process_step",
     summary:
-      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them.",
+      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolIds` is re-sent WHOLE, the set you name replaces the one the step has; leave it out to change nothing.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/update",
     schema: obj(
-      { id: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N },
+      { id: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N, roleId: S, toolIds: { type: "array" } },
       ["id", "name", "secondsPerRun", "runsPerMonth"]
     ),
     buildBody: (i) => ({
@@ -2170,6 +2172,8 @@ export const SHARED_TOOLS: SharedTool[] = [
       secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
       runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
       position: typeof i.position === "number" ? i.position : undefined,
+      roleId: sent(i, "roleId"),
+      toolIds: Array.isArray(i.toolIds) ? i.toolIds : undefined,
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the step "${str(i, "name")}"` },
   },
