@@ -29,6 +29,7 @@ import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join, dirname, relative } from "node:path"
 import { fileURLToPath } from "node:url"
+import { substitute } from "./icon-art.mjs"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const TARGET = join(ROOT, "shared", "ui")
@@ -64,7 +65,7 @@ export function contentHash(dir) {
   return h.digest("hex")
 }
 
-const main = () => {
+const main = async () => {
   const pinned = existsSync(join(TARGET, "VERSION.json"))
     ? JSON.parse(readFileSync(join(TARGET, "VERSION.json"), "utf8")).tag
     : null
@@ -88,10 +89,34 @@ const main = () => {
     for (const entry of DELIVERED)
       cpSync(join(tmp, "kit", entry), join(TARGET, entry), { recursive: true })
 
+    /* THE ART STAGE. The kit ships icon NAMES; at v1.0.0 it ships no icon
+       ART, and its own ICON-LANGUAGE.md says so. This stands lucide's glyphs
+       in front of any name still carrying the placeholder, using the kit's
+       own documented swap procedure, and it runs BEFORE the hash so the guard
+       covers the result and a real hand-edit still goes red. It is keyed on
+       the placeholder's signature, so the day the art is drawn it substitutes
+       nothing and `iconArt.substituted` lands at 0. See scripts/icon-art.mjs. */
+    const art = await substitute()
+    if (art.substituted.length)
+      execSync(`node ${join(TARGET, "icons", "generate-icons.mjs")}`, { stdio: "inherit" })
+    if (art.missing.length)
+      console.warn(`sync-design: ${art.missing.length} placeholder icons have no stand-in (${art.missing.join(", ")})`)
+
     const hash = contentHash(TARGET)
     writeFileSync(
       join(TARGET, "VERSION.json"),
-      JSON.stringify({ repo: "Kwapso/design", tag, sha, hash, syncedAt: new Date().toISOString().slice(0, 10) }, null, 2) + "\n"
+      JSON.stringify(
+        {
+          repo: "Kwapso/design",
+          tag,
+          sha,
+          hash,
+          syncedAt: new Date().toISOString().slice(0, 10),
+          iconArt: { stoodIn: art.substituted.length + art.stoodIn.length, drawn: art.drawn.length, source: "lucide-react" },
+        },
+        null,
+        2
+      ) + "\n"
     )
     console.log(`sync-design: shared/ui is now ${tag} (${sha.slice(0, 9)}), hash ${hash.slice(0, 12)}…`)
     console.log("sync-design: now run `node scripts/design-imports.mjs`, then `npm run check`.")

@@ -337,9 +337,17 @@ export function AppShell({
        * left the screen the instant the rows arrived. h-[100svh] + sticky keeps
        * the rail exactly one window tall whatever the main column does, and
        * overflow-y-auto lets the nav scroll inside itself as modules are added
-       * rather than pushing the bottom row off again. */}
+       * rather than pushing the bottom row off again.
+       *
+       * AND `overflow-x-clip` BESIDE IT, for the reason spelled out over <main>
+       * below: CSS says an element with one axis scrollable and the other
+       * `visible` computes the visible one to `auto`, so `overflow-y` alone gave
+       * the RAIL a horizontal scrollbar the moment any child was wider than
+       * w-60 — which the kit's three-way mode toggle made the bottom row. Clip
+       * removes the scrollbar; the wrap on that row removes the overflow that
+       * caused it. */}
       <aside
-        className={`hidden shrink-0 flex-col border-r md:sticky md:top-0 md:flex md:h-[100svh] md:overflow-y-auto ${collapsed ? "w-16 items-center" : "w-60"}`}
+        className={`hidden shrink-0 flex-col border-r md:sticky md:top-0 md:flex md:h-[100svh] md:overflow-y-auto md:overflow-x-clip ${collapsed ? "w-16 items-center" : "w-60"}`}
       >
         <div className={collapsed ? "py-3" : "p-3"}>
           <TeamSwitcher
@@ -359,7 +367,7 @@ export function AppShell({
           ))}
         </nav>
         <div
-          className={`mt-auto flex items-center gap-2 p-3 ${collapsed ? "flex-col" : "justify-between"}`}
+          className={`mt-auto flex min-w-0 flex-wrap items-center gap-2 p-3 ${collapsed ? "flex-col" : "justify-between"}`}
         >
           <ProfileMenu active={active} />
           {!collapsed && <ModeToggle />}

@@ -1872,4 +1872,12 @@ export const SEED: Catalogue = {
   "General": { de: "Allgemein", es: "General", ca: "General" },
   "Attach a file to import": { de: "Datei zum Import anhängen", es: "Adjuntar un archivo para importar", ca: "Adjuntar un fitxer per importar" },
   "Remove attachment": { de: "Anhang entfernen", es: "Quitar el adjunto", ca: "Treure l'adjunt" },
+  // The flowchart's own line on a step that sends the work back. `{n}` is the
+  // step NUMBER a reader can see on the box above, so the hole stays a hole in
+  // every language and the sentence reorders around it.
+  "sends it back to step {n}": {
+    de: "geht zurück zu Schritt {n}",
+    es: "lo devuelve al paso {n}",
+    ca: "el retorna al pas {n}",
+  },
 }
