@@ -155,6 +155,7 @@ export function SectionWithCreate({
   secondary,
   download,
   aboveCard,
+  folderTabs,
   children,
 }: {
   show: boolean
@@ -171,6 +172,21 @@ export function SectionWithCreate({
   /** Content shown between the create row and the boxed collection, OUTSIDE the
    * card — e.g. the Tickets My/All raiser strip (it scopes the list, not part of it). */
   aboveCard?: React.ReactNode
+  /** A FOLDER tab strip, drawn flush against the top of the collection card.
+   *
+   * It is a slot of its own rather than more `aboveCard`, and the reason is one
+   * number. The kit's folder strip already pulls itself down by
+   * `--folder-tab-overlap` (17.02) so the panel below covers the tabs' cut
+   * feet — chapter 14's join, and the whole of why the active tab reads as
+   * attached. `aboveCard` sits in a `gap-4` column, and 16 - 17.02 leaves ONE
+   * pixel of overlap where seventeen were meant: the tabs float, their feet
+   * show, and the shape reads as broken rather than as a folder. So this slot
+   * renders in a column of its own with no gap at all, and the decision lives
+   * here once instead of as a negative margin at every call site.
+   *
+   * Only a `variant: "folder"` strip belongs here. A `line` strip has no feet
+   * to hide and wants the gap. */
+  folderTabs?: React.ReactNode
   children: React.ReactNode
 }) {
   const Icon = icon === "plus" ? Plus : Mail
@@ -209,7 +225,11 @@ export function SectionWithCreate({
         </div>
       )}
       {aboveCard}
-      <CollectionCard>{children}</CollectionCard>
+      {/* No gap: the folder strip's own negative margin IS the join. */}
+      <div className="flex flex-col">
+        {folderTabs}
+        <CollectionCard>{children}</CollectionCard>
+      </div>
     </div>
   )
 }

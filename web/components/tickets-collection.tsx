@@ -207,6 +207,16 @@ export function TicketsCollection({
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
         <CollectionHeading sectionKey="tickets" total={shownTotal} />
+        {/* BOTH STRIPS STAY `line`, and that is a decision rather than an
+            oversight. The kit's folder tab is drawn to be ATTACHED: it pulls
+            itself down under the panel below so the panel's edge covers its cut
+            feet, which is the whole of why the active one reads as a folder in
+            a drawer. On this screen a search box and the create row sit between
+            these strips and the list's card, so there is nothing for them to
+            attach to — a folder tab hanging in mid-air with its feet showing is
+            worse than the line tab it replaced. Tasks, Sprints, Apps and
+            Accounts introduce their card directly and take the shape; this one
+            takes it the day its search moves above the strips. */}
         <div className="flex flex-col gap-2">
           <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
           <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />

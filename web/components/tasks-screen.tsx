@@ -332,28 +332,30 @@ export function TasksScreen({
         label={t("New task")}
         icon="plus"
         onCreate={() => setTaskOpen(true)}
-        // The progress bar and the six-view strip, above the boxed list — they
-        // scope (and summarise) what the collection card shows, so neither is
-        // part of that unit.
-        aboveCard={
-          <div className="flex flex-col gap-4">
-            {progressBar}
-            <TabsView
-              config={{
-                ...defaultTabsConfig,
-                variant: "line",
-                tabs: TASK_TABS.map((tab) => ({
-                  value: tab.value,
-                  label: t(tab.label),
-                  icon: tab.icon,
-                  badge: badges[tab.value],
-                  badgeVariant: "" as const,
-                })),
-              }}
-              value={view}
-              onValueChange={(v) => onViewChange(v as TaskView)}
-            />
-          </div>
+        // The progress bar SUMMARISES the collection, so it sits above the card
+        // and outside it.
+        aboveCard={progressBar}
+        // The six views are the card's own FOLDER tabs: six filters on one kind
+        // of record, which is the kit's own test for the shape ("if the tab
+        // shows the same kind of record with a filter on it, it is a folder
+        // tab"). They draw flush against the card, so the tabs read as attached
+        // to the list they scope rather than floating above it.
+        folderTabs={
+          <TabsView
+            config={{
+              ...defaultTabsConfig,
+              variant: "folder",
+              tabs: TASK_TABS.map((tab) => ({
+                value: tab.value,
+                label: t(tab.label),
+                icon: tab.icon,
+                badge: badges[tab.value],
+                badgeVariant: "" as const,
+              })),
+            }}
+            value={view}
+            onValueChange={(v) => onViewChange(v as TaskView)}
+          />
         }
       >
         {view === "calendar" ? (

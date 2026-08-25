@@ -301,6 +301,10 @@ export function MeetingsScreen({
           number twice. */}
       <CollectionHeading sectionKey="meetings" total={total} />
 
+      {/* `line`, not the folder shape, for the reason spelled out in
+          tickets-collection.tsx: the kit's folder tab is drawn to be attached
+          to the card below it, and the search box sits between this strip and
+          the list. */}
       <TabsView
         config={{
           ...defaultTabsConfig,

@@ -456,13 +456,16 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                     href: `/api/tenancy/accounts/export${found.queryString}`,
                   }}
                   onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
-                  // The strip sits ABOVE the boxed list — it scopes which accounts
-                  // the collection card shows, so it is not part of that unit. It
-                  // is URL-driven (?tab=) so Back works and a link to "the
-                  // contacts" is a link somebody can send.
-                  aboveCard={
+                  // The strip scopes which accounts the collection card shows, so
+                  // it is the card's own FOLDER tabs — the kit's rule, verbatim:
+                  // "if the tab shows the same kind of record with a filter on
+                  // it, it is a folder tab and it belongs to a collection's main
+                  // screen". A company and a contact are both accounts. It is
+                  // URL-driven (?tab=) so Back works and a link to "the contacts"
+                  // is a link somebody can send.
+                  folderTabs={
                     <TabsView
-                      config={{ ...defaultTabsConfig, variant: "line", tabs: accountTabs }}
+                      config={{ ...defaultTabsConfig, variant: "folder", tabs: accountTabs }}
                       value={accountTab}
                       // Companies is the bare URL now, so `?tab=` names only the
                       // two you have to ask for.
