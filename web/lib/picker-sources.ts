@@ -77,7 +77,7 @@ export async function searchTickets(
 
 /** STORIES — the stories door (`q`). Done work is left out for the same reason
  * resolved tickets are. */
-export async function searchStories(
+async function searchStories(
   term: string,
   opts: { appId?: string; marks?: Map<string, string> } = {}
 ): Promise<PickerOption[]> {

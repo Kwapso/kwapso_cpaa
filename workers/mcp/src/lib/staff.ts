@@ -41,11 +41,16 @@ import type { Env } from "../env"
  * tenancy that could not answer. A door that assumed "staff" whenever the check
  * itself broke would hand the surface back to exactly the caller it excludes,
  * on exactly the day something is wrong. */
-export async function requireStaff(env: Env, cookie: string): Promise<void> {
+export async function requireStaff(env: Env, cookie: string, traceId: string): Promise<void> {
   const res = await forwardToDoor(env.TENANCY, {
     path: "/api/tenancy/portal/context",
     method: "GET",
     cookie,
+    traceId,
+    // One identity read; if tenancy cannot answer inside the ordinary door
+    // deadline the refusal below fires anyway — better a clean 502 than a hang
+    // on the one check every tool call waits behind.
+    timeoutMs: 30_000,
   })
   if (!res.ok)
     throw new GuardError(502, "standing_unknown", "Couldn't check your access right now. Try again.")

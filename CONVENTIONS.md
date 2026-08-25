@@ -352,15 +352,11 @@ const recent = await env.DB.prepare(
   bare, strings via `sqlString`, `null` → `NULL`).
 
 - **Numbers still need coercing.** A field the route *types* as a number but doesn't
-  validate at runtime goes through the shared helper before it's interpolated. Never
-  trust the `as` cast:
-
-  ```ts
-  // shared/workers/validate.ts — a rank, a sequence, a count: typed number, arrives untrusted
-  export function intOr(value: unknown, fallback: number): number {
-    const n = Number(value); return Number.isFinite(n) ? Math.trunc(n) : fallback
-  }
-  ```
+  validate at runtime is checked before it's interpolated — `Number()` plus a
+  `Number.isFinite` guard at the boundary, or `sqlValue` at the statement seam.
+  Never trust the `as` cast. (An `intOr` helper shipped for this and sat uncalled
+  for months while every real site checked inline; the helper was deleted rather
+  than left advertising a seam nothing used.)
 
 - **`ulid()`** (`shared/workers/id.ts`) mints every row id. **Every row everywhere gets
   a ULID**, globally unique *and* time-sortable, so rows can move between databases

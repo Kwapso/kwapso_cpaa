@@ -70,7 +70,7 @@ export function isScale(value: unknown): boolean {
 
 /** The step a stored value means, falling back to comfortable. A bad value costs
  * a person their preferred size; it can never cost them a screen. */
-export function toScale(value: string | null | undefined): ScaleStep {
+function toScale(value: string | null | undefined): ScaleStep {
   return SCALE_STEPS.find((s) => s.value === value) ?? SCALE_STEPS[1]
 }
 

@@ -67,7 +67,7 @@ function evictExpired(now: number): void {
 }
 
 /** The Cookie header for acting AS this token's owner IN the token's team. */
-export async function sessionCookieFor(env: Env, token: McpTokenRow): Promise<string> {
+export async function sessionCookieFor(env: Env, token: McpTokenRow, traceId: string): Promise<string> {
   const hit = cache.get(token.id)
   if (hit && hit.expires > Date.now()) return hit.cookie
   // A miss means we are about to write, so this is the moment to drop what the
@@ -117,7 +117,7 @@ export async function sessionCookieFor(env: Env, token: McpTokenRow): Promise<st
   // per-tool check is a list, and a list is a thing you can be missing from.
   // Nothing is cached until it passes, so a refused token pays the question
   // again on its next call instead of holding a cookie it may not use.
-  await requireStaff(env, cookie)
+  await requireStaff(env, cookie, traceId)
   cache.set(token.id, { cookie, expires: Date.now() + CACHE_MS })
   return cookie
 }

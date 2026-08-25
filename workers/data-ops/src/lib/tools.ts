@@ -22,7 +22,9 @@
 //     instructions; the system prompt reinforces it.
 
 import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
+import { brand } from "@shared/brand"
 import { forwardToDoor } from "@shared/workers/http"
+import { requestId } from "@shared/workers/trace"
 import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
@@ -206,7 +208,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_drive_files",
     description:
-      "List files in the Drive FOLDERS this person has shared with kwapso, never their whole Drive. " +
+      "List files in the Drive FOLDERS this person has shared with " + brand.name + ", never their whole Drive. " +
       "`q` narrows by name INSIDE those folders. A person who has shared no folders gets an empty list, " +
       "which means 'nothing shared', not 'nothing there'.",
     schema: obj({ q: S }),
@@ -407,10 +409,10 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_drive_update",
     description:
-      "Rewrite a Drive file kwapso can write to, `text` replaces the WHOLE contents, it is not " +
+      "Rewrite a Drive file " + brand.name + " can write to, `text` replaces the WHOLE contents, it is not " +
       "appended. `fileId` comes from google_drive_files or from google_drive_upload. Pass `name` to " +
       "rename it in the same breath. Google refuses a file this app did not create, and that refusal " +
-      "is the fence: you cannot rewrite something the person only ever let kwapso read.",
+      "is the fence: you cannot rewrite something the person only ever let " + brand.name + " read.",
     schema: obj({ fileId: S, text: S, name: S, mimeType: S }, ["fileId", "text"]),
     binding: "CONTENT",
     method: "POST",
@@ -472,7 +474,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_drive_trash",
     description:
       "Put a Drive file in the bin, never a permanent delete. It keeps its name and its sharing for " +
-      "thirty days and the person can restore it in one click. Use it to undo a file kwapso wrote. " +
+      "thirty days and the person can restore it in one click. Use it to undo a file " + brand.name + " wrote. " +
       "`fileId` comes from google_drive_upload or google_drive_files; the answer says whether anything " +
       "moved (`changed` is false when the file was already in the bin).",
     schema: obj({ fileId: S }, ["fileId"]),
@@ -529,9 +531,9 @@ const AGENT_ONLY: AgentTool[] = [
       "Put mail in the Gmail bin, never a permanent delete: it sits in Trash for thirty days and the " +
       "person restores it in one click. `kind` says what to bin, a draft, a message, or a thread " +
       "(the whole exchange), and `id` is that thing's id, a draft id from google_draft_reply, a " +
-      "message id or a thread id from google_mail_search. Use it to take back a draft kwapso wrote. " +
+      "message id or a thread id from google_mail_search. Use it to take back a draft " + brand.name + " wrote. " +
       "The answer's `changed` is false when it was already in the bin, so a second call is safe. " +
-      "kwapso cannot delete mail permanently and never will, that needs a scope this app does not ask " +
+      "" + brand.name + " cannot delete mail permanently and never will, that needs a scope this app does not ask " +
       "for.",
     schema: obj({ kind: S, id: S }, ["kind", "id"]),
     binding: "CONTENT",
@@ -577,7 +579,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_chat_spaces",
     description:
       "List every Google Chat space this person can see, and which of them are already shared with " +
-      "kwapso. Each one carries `shared` and, where it is, the `sourceId` google_chat_messages needs. " +
+      "" + brand.name + ". Each one carries `shared` and, where it is, the `sourceId` google_chat_messages needs. " +
       "Call this when somebody names a space you have no id for, reading the LIST is not reading what " +
       "is in them, and an unshared space still cannot be read.",
     schema: obj({}),
@@ -591,9 +593,9 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_chat_delete",
     description:
-      "Take back a message kwapso posted in a shared space. `messageName` is the id google_chat_post " +
+      "Take back a message " + brand.name + " posted in a shared space. `messageName` is the id google_chat_post " +
       "gave back, and `sourceId` is the space it went into. Google refuses a message this app did not " +
-      "send, so this can only ever undo kwapso's own posts.",
+      "send, so this can only ever undo " + brand.name + "'s own posts.",
     schema: obj({ sourceId: S, messageName: S }, ["sourceId", "messageName"]),
     binding: "CONTENT",
     method: "POST",
@@ -697,8 +699,14 @@ export async function executeTool(
     path: tool.path,
     method: tool.method,
     cookie: request.headers.get("Cookie") ?? "",
+    traceId: requestId(request),
     query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
     body: tool.buildBody ? tool.buildBody(input) : {},
+    // The agent's act-as-user hop was the ONE cross-worker call with no
+    // deadline (mcp's twin has carried one from its first commit). Two minutes
+    // is the long-door ceiling the machine surface already uses; an import step
+    // that needs longer needs a smaller step, not a longer wait.
+    timeoutMs: 120_000,
   })
   const text = await res.text()
   let data: unknown = text

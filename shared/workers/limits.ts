@@ -222,6 +222,13 @@ export const TRANSCRIPT_SWEEP_PER_PERSON = 3
  * is still there for the one somebody actually wants. */
 export const TRANSCRIPT_HORIZON_DAYS = 14
 
+/** THROWN tries per meeting before the sweep stops selecting it. A quiet
+ * "nothing there yet" does not count and retries free until the horizon; this
+ * cap is only for a meeting Google actively refuses every tick — eight thrown
+ * tries is two hours of refusals, which is a stuck meeting, not a slow one.
+ * The manual capture button ignores the counter, so a person can always try. */
+export const TRANSCRIPT_ATTEMPT_CAP = 8
+
 /** @mentions one help reply may carry. Each mention becomes a row in an `IN (...)`
  * lookup AND an email, so an uncapped list is both an unbounded statement and an
  * unbounded send from a trusted sender. */

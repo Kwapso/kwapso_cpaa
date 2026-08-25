@@ -23,13 +23,13 @@ const tool = getMcpTool("export_accounts_csv")!
 
 describe("one tools/call answer is whole, or it is an error", () => {
   it("an over-sized result is an ERROR, never a successful half-answer", async () => {
-    const out = await forwardTool(doorReturning(500_000), tool, {}, "c")
+    const out = await forwardTool(doorReturning(500_000), tool, {}, "c", "trace-test")
     expect(out.ok, "the call must not report success").toBe(false)
     expect(out.text).not.toContain("truncated")
   })
 
   it("…and what comes back is parseable, and says how to get the data instead", async () => {
-    const out = await forwardTool(doorReturning(500_000), tool, {}, "c")
+    const out = await forwardTool(doorReturning(500_000), tool, {}, "c", "trace-test")
     const body = JSON.parse(out.text) as { error: string; message: string; limit: number; size: number }
     expect(body.error).toBe("result_too_large")
     expect(body.size).toBeGreaterThan(body.limit)
@@ -37,7 +37,7 @@ describe("one tools/call answer is whole, or it is an error", () => {
   })
 
   it("a normal-sized result comes back byte-for-byte, still ok", async () => {
-    const out = await forwardTool(doorReturning(100), tool, {}, "c")
+    const out = await forwardTool(doorReturning(100), tool, {}, "c", "trace-test")
     expect(out.ok).toBe(true)
     expect(JSON.parse(out.text)).toEqual({ rows: "x".repeat(100) })
   })
@@ -51,7 +51,7 @@ describe("one tools/call answer is whole, or it is an error", () => {
           }),
       },
     } as never
-    const out = await forwardTool(denied, tool, {}, "c")
+    const out = await forwardTool(denied, tool, {}, "c", "trace-test")
     expect(out.ok).toBe(false)
     expect(out.text).toContain("You don't have access to that.")
   })

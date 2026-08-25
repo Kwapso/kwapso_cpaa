@@ -379,7 +379,7 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
  * that a `;` inside a value is not a statement boundary — `sqlString` escapes a
  * quote by doubling it, so the scanner has to read the same grammar back.
  */
-export function splitStatements(script: string): string[] {
+function splitStatements(script: string): string[] {
   const out: string[] = []
   let start = 0
   let inString = false

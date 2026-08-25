@@ -239,7 +239,7 @@ export async function getWave(
 
 /** The sprints in one wave. Fenced by the WAVE, which the caller has already
  * been proved to be allowed to read — a sprint's own account is the same one. */
-export async function listWaveSprints(
+async function listWaveSprints(
   cfg: D1Rest,
   guard: MemberGuard,
   waveId: string
@@ -279,7 +279,7 @@ export async function listWaveSprints(
  * `b.id > a.id` is what makes it a pair rather than the same clash said twice —
  * and a sprint missing either date cannot clash with anything, because "we have
  * not dated it yet" is not an overlap. */
-export async function waveOverlaps(
+async function waveOverlaps(
   cfg: D1Rest,
   guard: MemberGuard,
   waveId: string

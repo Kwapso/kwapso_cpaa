@@ -3,6 +3,7 @@
 
 import type { ApiError } from "../types"
 import { isCapped } from "./count"
+import { traceHeaders } from "./trace"
 
 export const json = (
   data: unknown,
@@ -59,6 +60,13 @@ export async function forwardToDoor(
     path: string
     method: string
     cookie: string
+    /** THE HOP KEEPS THE NAME (shared/workers/trace.ts). Required, not optional:
+     * the calls that come through here — MCP tools, the agent's act-as-user
+     * executor — are the hardest requests to reproduce by hand, and they were
+     * exactly the ones landing in error_logs unjoinable to their origin,
+     * because this seam dropped the id every other internal hop carries. A
+     * required field is the by-construction version of "remember to". */
+    traceId: string
     query?: string
     body?: unknown
     /** Give up after this long. Optional because a service binding is
@@ -68,7 +76,10 @@ export async function forwardToDoor(
     timeoutMs?: number
   }
 ): Promise<Response> {
-  const init: RequestInit = { method: opts.method, headers: { Cookie: opts.cookie } }
+  const init: RequestInit = {
+    method: opts.method,
+    headers: { Cookie: opts.cookie, ...traceHeaders(opts.traceId) },
+  }
   if (opts.method === "POST") {
     ;(init.headers as Record<string, string>)["Content-Type"] = "application/json"
     init.body = JSON.stringify(opts.body ?? {})

@@ -95,8 +95,9 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
       const tool = getMcpTool(name)
       if (!tool) return rpcError(id, -32602, `No such tool: ${name}.`)
       const input = (rpc.params?.arguments ?? {}) as Record<string, unknown>
-      const cookie = await sessionCookieFor(env, token)
-      const out = await forwardTool(env, tool, input, cookie)
+      const trace = requestId(request)
+      const cookie = await sessionCookieFor(env, token, trace)
+      const out = await forwardTool(env, tool, input, cookie, trace)
       return rpcResult(id, {
         content: [{ type: "text", text: out.text }],
         isError: !out.ok,
@@ -142,7 +143,7 @@ async function postToken(request: Request, env: Env): Promise<Response> {
   // A CLIENT LOGIN MINTS NOTHING. They are a team member by construction, so
   // "signed in" was never the question — see lib/staff.ts. Asked with the
   // caller's OWN cookie, before the label is even read.
-  await requireStaff(env, request.headers.get("Cookie") ?? "")
+  await requireStaff(env, request.headers.get("Cookie") ?? "", requestId(request))
   const body = (await request.json().catch(() => ({}))) as { label?: unknown }
   const label = requireText(body.label, "Name", TEXT_LIMITS.short)
   const { row, secret } = await createToken(env, user.id, user.currentTeamId, label)

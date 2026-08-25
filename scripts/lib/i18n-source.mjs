@@ -21,13 +21,13 @@ export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 /** WHERE THE WALK STARTS — the two front doors, and the three folders in each
  * that hold screens. These are ROOTS, not the whole set: `appFiles()` follows
  * their imports out from here. See its note for why the set is derived. */
-export const APP_ROOTS = ["web", "web-portal"]
+const APP_ROOTS = ["web", "web-portal"]
   .flatMap((app) => ["app", "components", "lib"].map((dir) => join(ROOT, app, dir)))
   .sort()
 
 /** The props whose value a person reads. Deliberately a closed list: widening it
  * is how a cache key or a column name ends up in the catalogue. */
-export const VISIBLE_PROPS = new Set([
+const VISIBLE_PROPS = new Set([
   "placeholder",
   "title",
   "label",
@@ -71,10 +71,10 @@ export const VISIBLE_PROPS = new Set([
  * WRITTEN does, here, because the prose is a property of a copy table and the
  * union member is a JSX attribute. So the attribute set stays closed and narrow
  * and the property set carries the one extra. */
-export const VISIBLE_PROPERTIES = new Set([...VISIBLE_PROPS, "scope"])
+const VISIBLE_PROPERTIES = new Set([...VISIBLE_PROPS, "scope"])
 
 /** The toast calls whose first argument is the sentence a person sees. */
-export const TOAST_METHODS = new Set(["success", "error", "info"])
+const TOAST_METHODS = new Set(["success", "error", "info"])
 
 /** JSX decodes HTML entities; a JavaScript string does not. So `&apos;` in
  * `<p>it&apos;s here</p>` is an apostrophe on screen, and moving that text into
@@ -95,7 +95,7 @@ const ENTITIES = {
   "&amp;": "&",
 }
 
-export function decodeEntities(text) {
+function decodeEntities(text) {
   // `&amp;` last would double-decode `&amp;apos;`; one pass, longest first.
   return text.replace(/&(?:apos|rsquo|lsquo|quot|ldquo|rdquo|mdash|ndash|hellip|nbsp|amp);/g,
     (hit) => ENTITIES[hit] ?? hit)
@@ -159,7 +159,7 @@ export function isUserVisible(text) {
  * the catalogue. `||` and `??` can render either side, so both are taken. No
  * other operator is descended, which is why `===` inside a condition is never
  * reached at all. */
-export function literalTexts(node, out = []) {
+function literalTexts(node, out = []) {
   if (!node) return out
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
     out.push(node.text)

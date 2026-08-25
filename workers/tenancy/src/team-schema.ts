@@ -3664,6 +3664,21 @@ CREATE INDEX idx_process_drafts_process ON process_drafts (process_id, status);
 CREATE INDEX idx_process_drafts_account ON process_drafts (account_id, status);
 `,
   },
+  {
+    // A TRANSCRIPT TRY THAT THROWS IS NOT A TRANSCRIPT THAT ISN'T THERE YET.
+    // The autopilot retries a meeting every fifteen minutes until its horizon —
+    // free when Google quietly has nothing, but a meeting Google REFUSES
+    // (google_refused, forbidden) threw on every tick for as long as the
+    // horizon runs: twelve stuck meetings put ~550 identical rows in the error
+    // log in twelve hours. The counter records thrown attempts only; the sweep
+    // stops selecting a meeting once it crosses the cap, and the manual button
+    // on the meeting keeps working (it never reads the counter).
+    version: "0055_transcript_gives_up",
+    sql: `
+ALTER TABLE meetings ADD COLUMN transcript_attempts INTEGER NOT NULL DEFAULT 0
+  CHECK (transcript_attempts >= 0);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

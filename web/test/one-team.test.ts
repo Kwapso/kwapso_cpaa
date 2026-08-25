@@ -24,6 +24,22 @@ describe("one team: the UI offers no way to make another", () => {
     expect(TEAM_CREATION_CLOSED).toBe(true)
   })
 
+  // The teamless onboarding screen is the third surface — it offered "Start my
+  // own team" against a server that refuses the creation, so pressing it looped
+  // back silently for ever. The guard is positive there (show the closed-product
+  // sentence INSTEAD of the form), so it is asserted separately below.
+  it("the teamless onboarding screen withdraws the form under the flag", () => {
+    const src = readFileSync(join(WEB, "app", "onboarding", "page.tsx"), "utf8")
+    expect(
+      src.includes("teamless && TEAM_CREATION_CLOSED"),
+      "onboarding's teamless branch must hide the create form under TEAM_CREATION_CLOSED"
+    ).toBe(true)
+    expect(
+      src.includes("Start my own team"),
+      "the dead promise is back — the button's label returned"
+    ).toBe(false)
+  })
+
   for (const [file, what] of [
     ["team-switcher.tsx", "the sidebar's Create team item"],
     ["app-shell.tsx", "the create-team dialog"],

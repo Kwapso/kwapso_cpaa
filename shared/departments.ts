@@ -50,7 +50,7 @@ export const TASK_DEPARTMENTS: DepartmentStyle[] = [
 ]
 
 /** The mark and colour for a department, or null for one a team invented. */
-export function departmentMark(name: string | null | undefined): DepartmentStyle | null {
+function departmentMark(name: string | null | undefined): DepartmentStyle | null {
   if (!name) return null
   return TASK_DEPARTMENTS.find((d) => d.name === name) ?? null
 }

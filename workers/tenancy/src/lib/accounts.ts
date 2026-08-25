@@ -971,7 +971,7 @@ export async function listPersonCompanies(
  * SAME fence, so a contact's Companies tab badges the number its own list can
  * reach. Never `companies.length`: that is a capped read's ceiling wearing a
  * total's clothes. */
-export async function countPersonCompanies(
+async function countPersonCompanies(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,

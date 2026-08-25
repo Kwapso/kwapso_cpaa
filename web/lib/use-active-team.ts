@@ -97,12 +97,15 @@ export function useActiveTeam(): ActiveTeam {
     let alive = true
     async function load() {
       try {
-        const me = await auth.me()
+        // ONE wait, not two — the identity read and the team read are
+        // independent doors, and this runs on every page load. The sibling
+        // refresh() below has always paired them; the boot path serialising
+        // the same two calls was paying one full round trip for nothing.
+        const [me, ctx] = await Promise.all([auth.me(), tenancy.active()])
         if (!me.user.onboardingComplete) {
           router.replace("/onboarding")
           return
         }
-        const ctx = await tenancy.active()
         if (sendToOnboardingIfTeamless(ctx)) return
         const next: Session = { user: me.user, ctx }
         setSessionCache(next)

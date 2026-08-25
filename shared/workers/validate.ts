@@ -179,23 +179,6 @@ export function optionalMoment(value: unknown, field: string): string | undefine
   return new Date(ms).toISOString()
 }
 
-/** An untrusted JSON value → a SAFE integer, before it is interpolated into SQL.
- *
- * A route can TYPE a field as a number without checking it at runtime, and
- * `sequence` is the field that keeps proving it: it arrives declared as a number
- * and is not one until something says so. `Number.isFinite` refuses NaN and both
- * infinities; `Math.trunc` refuses a float where a row order is expected.
- *
- * It lives in the seam rather than beside a module because it was written twice,
- * in two modules that have both since been retired, and the second one's comment
- * said as much ("the same guard the other carries, and for the same reason"). A
- * guard that has to be remembered twice is a guard the third module ships
- * without. */
-export function intOr(value: unknown, fallback: number): number {
-  const n = Number(value)
-  return Number.isFinite(n) ? Math.trunc(n) : fallback
-}
-
 /** A stored JSON array cell → a string array, or an empty one.
  *
  * The column is written by this app, which is exactly why it is parsed

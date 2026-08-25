@@ -80,7 +80,7 @@ function toTodo(r: TodoRow): Todo {
  * `scope` is REQUIRED rather than defaulted, for the reason written over
  * `ticketFence`: a fence that defaults to "not a client" is a fence that fails
  * open the day somebody writes a new reader. */
-export function todoFence(scope: AccountScope): { sql: string; params: string[] } {
+function todoFence(scope: AccountScope): { sql: string; params: string[] } {
   return accountScopeClause(scope, "t.account_id")
 }
 

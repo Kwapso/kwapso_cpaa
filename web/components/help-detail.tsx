@@ -41,7 +41,7 @@ import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { mergePage, invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -266,7 +266,9 @@ export function HelpDetailScreen({
       appId: input.appId,
       raisedByContactId: input.raisedByContactId,
     })
-    primeCache(`help:${teamId}`, tickets)
+    // Merge, don't replace: priming the whole key with this first page threw
+    // away rows scrolled in past it (same seam-fix as the collection's edit).
+    mergePage(`help:${teamId}`, "id", tickets as unknown as Record<string, unknown>[])
     invalidate(recordActivityKey("help", helpId))
     toast.success(t("Ticket updated."))
   }

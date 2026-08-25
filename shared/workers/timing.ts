@@ -70,11 +70,6 @@ export function beginD1Timing(request: Request): D1Stat[] {
   return stats
 }
 
-/** What this request spent, if anything collected it. */
-export function d1TimingFor(request: Request): D1Stat[] | undefined {
-  return perRequest.get(request)
-}
-
 /** The `Server-Timing` value for a finished request — the browser's own network
  * panel understands this format, so the number lands where somebody debugging a
  * slow screen is already looking, with no tooling to install.
@@ -87,7 +82,7 @@ export function d1TimingFor(request: Request): D1Stat[] | undefined {
  *
  * Empty when nothing was collected, so an ungated or static route pays nothing
  * and says nothing. */
-export function timingHeaders(request: Request): Record<string, string> {
+function timingHeaders(request: Request): Record<string, string> {
   const stats = perRequest.get(request)
   if (!stats?.length) return {}
   const total = stats.reduce((sum, s) => sum + s.ms, 0)

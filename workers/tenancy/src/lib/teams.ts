@@ -82,6 +82,31 @@ async function stampInviteAccepted(
   }
 }
 
+/** THE MEMBERSHIP STARTING is team history, and for a year it was the one step
+ * of the invite story the feed never told: "Invite sent" and "Invite revoked"
+ * both logged, and the moment between them — the person actually joining —
+ * wrote nothing. Best-effort like the stamp above (joining must never fail on
+ * its own history line), and in the ACCEPTER's name, because they are the one
+ * who acted. */
+async function logMemberJoined(env: Env, teamId: string, actor: Actor): Promise<void> {
+  try {
+    const row = await env.DB.prepare("SELECT database_id FROM teams WHERE id = ?")
+      .bind(teamId)
+      .first<{ database_id: string | null }>()
+    if (!row?.database_id) return
+    await logActivity(d1Config(env), row.database_id, actor, {
+      type: "Member joined",
+      description: `${actor.name} accepted their invitation and joined the team`,
+      // "users", like every member entry in lib/members.ts — R18 resolves this
+      // table to the team_members gate, so a client login cannot read it.
+      relatedTable: "users",
+      relatedRowId: actor.id,
+    })
+  } catch (e) {
+    console.error("member-joined activity failed (audit only):", e)
+  }
+}
+
 /**
  * Create a personal team for a fresh user: global team row → its own D1
  * database → schema → seeds (Admin/Viewer + dropdown defaults) → membership
@@ -432,6 +457,7 @@ export async function acceptInvite(
     .run()
 
   await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now)
+  await logMemberJoined(env, invite.team_id, actor)
 
   // Row-level: the joiner becomes a member (added) and the invite flips to
   // 'accepted' in place — carry both ids so open lists patch just those rows.

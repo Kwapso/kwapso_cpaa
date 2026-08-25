@@ -50,6 +50,7 @@ import type { Actor } from "@shared/workers/activity"
 import type { MemberGuard } from "@shared/workers/gating"
 import {
   GOOGLE_SWEEP_PEOPLE_PER_TICK,
+  TRANSCRIPT_ATTEMPT_CAP,
   TRANSCRIPT_HORIZON_DAYS,
   TRANSCRIPT_SWEEP_PER_PERSON,
 } from "@shared/workers/limits"
@@ -106,6 +107,7 @@ async function meetingsToTry(cfg: D1Rest, guard: MemberGuard, now: Date): Promis
     `SELECT id FROM meetings
       WHERE google_event_id IS NOT NULL AND google_event_id <> ''
         AND transcript_captured_at IS NULL
+        AND transcript_attempts < ${TRANSCRIPT_ATTEMPT_CAP}
         AND starts_at >= ? AND starts_at <= ?
         AND deactivated_at IS NULL
       ORDER BY starts_at DESC
@@ -169,6 +171,16 @@ export async function googleAutopilot(
           // cannot open is the ordinary case, not an incident — they are simply
           // not the one who can fetch it, and somebody else's tick will.
           errors.push({ userId, where: `transcript ${meetingId}`, message: String(e) })
+          // A THROWN try counts against the meeting's cap (a quiet "nothing
+          // there yet" never reaches this catch and stays free to retry). Best
+          // effort: if the counter itself cannot be written, the error above is
+          // already recorded and the next tick simply tries once more.
+          await d1Query(
+            cfg,
+            guard.databaseId,
+            "UPDATE meetings SET transcript_attempts = transcript_attempts + 1 WHERE id = ?",
+            [meetingId]
+          ).catch(() => {})
         }
       }
     } catch (e) {

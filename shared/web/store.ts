@@ -334,6 +334,37 @@ export async function reconcile(
   }
 }
 
+/** Merge ONE PAGE into a PAGED collection's cache, keeping the tail.
+ *
+ * `reconcile` above REPLACES — right for a whole bounded list, where a row the
+ * fetch lacks is a row that stopped existing. A paged list is different: the
+ * fetch is only the freshest window, and replacing threw away every row past
+ * page one that the person had scrolled into. Here the fresh window leads, a
+ * row that moved into it is deduped by id, and rows beyond it stay in the
+ * order they had — a merge must never know LESS than the screen already does.
+ * A row deleted server-side lingers in the tail until the next real load,
+ * which is the cheaper wrong. No-op when the key isn't loaded (cache-first). */
+export function mergePage(
+  key: string,
+  idField: string,
+  rows: Record<string, unknown>[]
+): void {
+  const prev = fresh(key)?.value as Record<string, unknown>[] | undefined
+  if (prev === undefined) {
+    store(key, rows)
+    notify(key)
+    return
+  }
+  const prevById = new Map(prev.map((r) => [r[idField], r]))
+  const fetched = rows.map((row) => {
+    const old = prevById.get(row[idField])
+    return old && shallowEqualRow(old, row) ? old : row // reuse identity if unchanged
+  })
+  const fetchedIds = new Set(fetched.map((r) => r[idField]))
+  store(key, [...fetched, ...prev.filter((r) => !fetchedIds.has(r[idField]))])
+  notify(key)
+}
+
 /** ONE KEY, ONE REQUEST IN THE AIR.
  *
  * Measured on staging, 24 Aug 2026: a story detail made 27 requests on a cold

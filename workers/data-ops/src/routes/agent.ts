@@ -44,6 +44,7 @@ import { confirmAndRun, runChat, type Emit } from "../lib/agent"
 import { listMessages, listThreads } from "../lib/threads"
 import type { ChatOutcome, StreamEvent } from "@shared/types"
 import type { Env } from "../env"
+import { requestId } from "@shared/workers/trace"
 
 /** One SSE frame: `data: <json>\n\n` on a text/event-stream body. The whole wire format
  * lives here so both sides agree on it; exported for the unit test. */
@@ -287,6 +288,7 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
     path: "/api/content/help",
     method: "GET",
     cookie,
+    traceId: requestId(request),
     query: `?id=${encodeURIComponent(id)}`,
   })
   if (!read.ok) return fail(read.status, "help_not_found", "That ticket doesn't exist.")
@@ -329,6 +331,7 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
     path: "/api/content/help/update",
     method: "POST",
     cookie,
+    traceId: requestId(request),
     body: {
       id,
       description: ticket.description,
@@ -510,7 +513,7 @@ export async function postTranslateText(request: Request, env: Env): Promise<Res
  * is the SHAPE — how long, did it look like an array at all, how many raw
  * control characters were in it — which is everything needed to tell the fault
  * classes apart and nothing that identifies anybody. */
-export function describeUnreadable(answer: string): string {
+function describeUnreadable(answer: string): string {
   const trimmed = answer.trim()
   const start = trimmed.indexOf("[")
   const end = trimmed.lastIndexOf("]")

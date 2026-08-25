@@ -23,7 +23,7 @@
 import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
 import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
-import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { APP_MODULE_CAP, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
@@ -53,6 +53,13 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
     sql: "updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?",
     params: [now, actor.id, actor.email, actor.name],
   }
+}
+
+/** The same audit set-clause as an inline literal, for the two set-replace
+ * writes that batch through d1ExecScript (the script door takes no params;
+ * every value goes through sqlString instead). */
+function auditSetLiteral(actor: Actor, now: string): string {
+  return `updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)}`
 }
 
 /** A parameterised INSERT — the table name is a code literal, every value bound.
@@ -357,7 +364,7 @@ async function isAdmin(cfg: D1Rest, guard: MemberGuard): Promise<boolean> {
 
 /** EVERY APP THE CALLER IS STAFFED TO. Read whole rather than per app: the set is
  * one person's assignments, which is bounded by how many systems exist. */
-export async function staffedAppIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
+async function staffedAppIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
   const rows = await d1Query<{ app_id: string }>(
     cfg,
     guard.databaseId,
@@ -449,28 +456,22 @@ export async function setAppStaff(
       }`,
     [now, actor.id, actor.email, actor.name, ...editedBy(actor, now).params, appId, ...wanted]
   )
-  for (const userId of wanted) {
-    const rowId = known.get(userId)
-    if (rowId)
-      await d1Query(
-        cfg,
-        guard.databaseId,
-        `UPDATE app_staff SET is_lead = 0, deactivated_at = NULL, deactivator_id = NULL,
-            deactivator_email = NULL, deactivator_name = NULL, ${editedBy(actor, now).sql}
-          WHERE id = ?`,
-        [...editedBy(actor, now).params, rowId]
-      )
-    else
-      await insertRow(cfg, guard, "app_staff", {
-        id: ulid(),
-        app_id: appId,
-        user_id: userId,
-        is_lead: 0,
-        created_at: now,
-        creator_id: actor.id,
-        creator_email: actor.email,
-        creator_name: actor.name,
-      })
+  // ONE script for the whole set, not one REST round trip per person — an
+  // eight-person save was ~12 sequential ~400ms hops (~5s of held-open door)
+  // for what is one write. Same seam and same literal discipline as
+  // setRolePermissions (roles.ts), every value through sqlString.
+  if (wanted.length) {
+    const auditSet = auditSetLiteral(actor, now)
+    const statements = wanted.map((userId) => {
+      const rowId = known.get(userId)
+      if (rowId)
+        return `UPDATE app_staff SET is_lead = 0, deactivated_at = NULL, deactivator_id = NULL,
+            deactivator_email = NULL, deactivator_name = NULL, ${auditSet}
+          WHERE id = ${sqlString(rowId)};`
+      return `INSERT INTO app_staff (id, app_id, user_id, is_lead, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(ulid())}, ${sqlString(appId)}, ${sqlString(userId)}, 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    })
+    await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
   }
   if (leadUserId)
     await d1Query(
@@ -531,28 +532,20 @@ export async function setAppStakeholders(
       }`,
     [now, actor.id, actor.email, actor.name, ...editedBy(actor, now).params, appId, ...wanted]
   )
-  for (const contactId of wanted) {
-    const rowId = known.get(contactId)
-    if (rowId)
-      await d1Query(
-        cfg,
-        guard.databaseId,
-        `UPDATE app_stakeholders SET is_main = 0, deactivated_at = NULL, deactivator_id = NULL,
-            deactivator_email = NULL, deactivator_name = NULL, ${editedBy(actor, now).sql}
-          WHERE id = ?`,
-        [...editedBy(actor, now).params, rowId]
-      )
-    else
-      await insertRow(cfg, guard, "app_stakeholders", {
-        id: ulid(),
-        app_id: appId,
-        contact_id: contactId,
-        is_main: 0,
-        created_at: now,
-        creator_id: actor.id,
-        creator_email: actor.email,
-        creator_name: actor.name,
-      })
+  // ONE script for the whole set (see setAppStaff above — same reason, same
+  // literal discipline).
+  if (wanted.length) {
+    const auditSet = auditSetLiteral(actor, now)
+    const statements = wanted.map((contactId) => {
+      const rowId = known.get(contactId)
+      if (rowId)
+        return `UPDATE app_stakeholders SET is_main = 0, deactivated_at = NULL, deactivator_id = NULL,
+            deactivator_email = NULL, deactivator_name = NULL, ${auditSet}
+          WHERE id = ${sqlString(rowId)};`
+      return `INSERT INTO app_stakeholders (id, app_id, contact_id, is_main, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(ulid())}, ${sqlString(appId)}, ${sqlString(contactId)}, 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    })
+    await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
   }
   if (mainContactId)
     await d1Query(
@@ -570,25 +563,6 @@ export async function setAppStakeholders(
     relatedTable: "apps",
     relatedRowId: appId,
   })
-}
-
-/** THE APP'S MAIN STAKEHOLDER, or nothing (8.5 → 5.7). One row, read by the
- * ticket resolution email so the person told is the person who owns THAT system
- * rather than whoever the account named years ago. */
-export async function mainStakeholderOf(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  appId: string
-): Promise<string | null> {
-  const rows = await d1Query<{ contact_id: string }>(
-    cfg,
-    guard.databaseId,
-    // R14: at most one row can be live, by the partial unique index.
-    `SELECT contact_id FROM app_stakeholders
-      WHERE app_id = ? AND is_main = 1 AND deactivated_at IS NULL LIMIT 1`,
-    [appId]
-  )
-  return rows[0]?.contact_id ?? null
 }
 
 /** IS AN HOURLY COST WITHHELD FROM THIS CALLER, ON THIS APP.
@@ -629,7 +603,7 @@ function withheldRate(visibleOn: Set<string> | null | undefined, appId: string |
  * would read the same as "restricted to nothing", and this is the kind of
  * boolean where the two must not be confused.
  */
-export async function mainStakeholderApps(
+async function mainStakeholderApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope
@@ -1493,7 +1467,7 @@ export async function listProcessSteps(
  * ceiling and wrapping one "would be ceremony". The steps of ONE version of ONE
  * map are bounded by what a person can read — the same reason `listProcessSteps`
  * above takes a hard cap rather than a cursor. */
-export async function countVersionSteps(
+async function countVersionSteps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,

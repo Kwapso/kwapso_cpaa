@@ -1293,7 +1293,7 @@ export type MailLabel = { id: string; name: string }
 /** Every label on the mailbox — the person's own, and Gmail's built-in ones.
  * R14's spirit: one page, and a mailbox with more labels than this has a
  * filing problem no list length will fix. */
-export async function gmailLabels(token: string): Promise<MailLabel[]> {
+async function gmailLabels(token: string): Promise<MailLabel[]> {
   const data = (await googleFetch("https://gmail.googleapis.com/gmail/v1/users/me/labels", token)) as {
     labels?: unknown
   }

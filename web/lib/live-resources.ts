@@ -892,6 +892,13 @@ export const TEAM_RESOURCES: Record<
     deps: (t, id) => [
       `activity:record:help:${id}`,
       `help-stakeholders:${id}`,
+      // THE OPEN CONVERSATION. A reply pings help_threads (deaf on this door —
+      // its id is the REPLY's) and the parent help row (this ping, whose id IS
+      // the ticket) — so the thread cache drops here, and somebody watching the
+      // conversation sees the answer land without reopening the tab. Earned the
+      // day the composer was fixed and the thread still only moved on reload.
+      `help-thread:${id}`,
+      `total:help-thread:${id}`,
       `help-mine:${t}`,
       insightsKey(t),
       ...recordCountDeps("help"),

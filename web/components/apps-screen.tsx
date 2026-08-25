@@ -84,7 +84,7 @@ export async function createAppFrom(
  * stage last under one honest heading. The grouping is a pure function of the
  * rows so the two tabs and the app record can never disagree about which stage a
  * system is in. */
-export function groupByStage(apps: AppRow[]): { stage: string; apps: AppRow[] }[] {
+function groupByStage(apps: AppRow[]): { stage: string; apps: AppRow[] }[] {
   const groups = new Map<string, AppRow[]>()
   for (const app of apps) {
     const key = app.stage?.trim() || NO_STAGE
@@ -105,7 +105,7 @@ export function groupByStage(apps: AppRow[]): { stage: string; apps: AppRow[] }[
 /** Is this app still being worked on? An ARCHIVED row is inactive whatever its
  * stage says, and a stage the code has never met counts as active — the harm of
  * the wrong guess is asymmetric, and an app nobody can find is the worse half. */
-export function appIsActive(app: AppRow): boolean {
+function appIsActive(app: AppRow): boolean {
   return app.active && appStageIsActive(app.stage)
 }
 

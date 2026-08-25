@@ -318,7 +318,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
  * turns it off. There is no edit dialog because there is nothing to edit that is not the
  * two fields already on the screen.
  */
-export function RoleRateCard({ teamId }: { teamId: string }) {
+function RoleRateCard({ teamId }: { teamId: string }) {
   const t = useT()
   const ratesQ = useCached<RoleRate[]>(roleRatesKey(teamId), () =>
     tenancy.roleRates().then((r) => {

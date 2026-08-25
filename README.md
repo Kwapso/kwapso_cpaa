@@ -1,6 +1,9 @@
 # Brimba
 
-**The multi-tenant SaaS base by Swift Struck.** Not an app for one industry,
+**The multi-tenant SaaS base by Swift Struck.** (Two names, one repo: **Brimba**
+is the reusable BASE this document describes; **kwapso** is the product built on
+it that this checkout ships — hence `package.json` says kwapso and every
+hostname below is kwapso's. A fork keeps the base and replaces the brand.) Not an app for one industry,
 the reusable foundation every future app (ERP, CRM, portal…) is built on: login
 (an email code or Google), teams, Member roles (module key `member_roles`), invites,
 tickets, dropdown management, CSV data import, and an in-app **AI
@@ -99,10 +102,11 @@ they may be written down at all.
 **[BOOTSTRAP.md](BOOTSTRAP.md)**, the day-zero, command-by-command runbook that takes
 a fresh Cloudflare account to a live staging + production Brimba. It is the concrete
 answer to "with only these docs and the repo, could I recreate the base?", yes: run
-that list. For the **one-command** version, the base ships its own build skill in
-**[skills/new-app/](skills/new-app/SKILL.md)**, install it (`cp -R skills/new-app
-~/.claude/skills/new-app`) and tell Claude Code "new app" to stand up a fresh, branded,
-deployed fork automatically (see [skills/README.md](skills/README.md)).
+that list. For the **one-command** version, the `new-app` build skill lives in the operator's
+global skills (`~/.claude/skills/new-app/` — deliberately not vendored here, so a
+fork does not carry its own factory): tell Claude Code "new app" and it stands up
+a fresh, branded, deployed fork automatically. If that skill is missing on this
+machine, BOOTSTRAP.md is the same journey by hand.
 
 **The rulebook, what governs the base (read before you change it).** Every rule for
 modifying, recreating, or building on Brimba lives in one of these, and each is

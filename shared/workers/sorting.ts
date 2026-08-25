@@ -142,8 +142,3 @@ export function orderBy<Row>(ordering: Ordering<Row>, idExpr = "id"): string {
   return `ORDER BY ${ordering.expr} ${d}, ${idExpr} ${d}`
 }
 
-/** The names a door offers, for the tool schema and for the screen's control.
- * Derived from the menu so the three can never list different things. */
-export function sortNames<Row>(menu: SortMenu<Row>): string[] {
-  return Object.keys(menu)
-}

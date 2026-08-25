@@ -15,7 +15,7 @@
 // handful of tickets; dropping the key and re-reading is simpler code, one
 // round-trip, and indistinguishable to the person watching.
 
-import { invalidate } from "@shared/web/store"
+import { invalidatePrefix, invalidate } from "@shared/web/store"
 
 /** The portal's cache keys, named in one place so a listener and a screen can
  * never disagree about which string they mean. */
@@ -66,7 +66,11 @@ export const cacheKeys = {
 export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) => string[]> = {
   // A reply or a status move on one of their tickets.
   help: () => [cacheKeys.tickets, cacheKeys.ticketsTotal],
-  help_threads: () => [cacheKeys.tickets],
+  // …and the OPEN conversation itself. The thread cache is keyed per ticket and
+  // a ping names only the reply, so the drop is the documented coarse one: a
+  // trailing-colon entry is a PREFIX (applyLivePing below), and cache-first
+  // means only a thread actually on screen pays the re-read.
+  help_threads: () => [cacheKeys.tickets, "portal:thread:"],
   // Their company's own record, its people, or a login on it.
   accounts: (a) => (a ? [cacheKeys.company(a)] : []),
   account_links: (a) => (a ? [cacheKeys.company(a)] : []),
@@ -118,7 +122,12 @@ export const PORTAL_SUBSCRIPTIONS = Object.keys(PORTAL_LISTENERS)
  * every module the agency uses, and most of them are none of the portal's
  * business. */
 export function applyLivePing(resource: string, currentAccountId: string | null): void {
-  for (const key of PORTAL_LISTENERS[resource]?.(currentAccountId) ?? []) invalidate(key)
+  for (const key of PORTAL_LISTENERS[resource]?.(currentAccountId) ?? [])
+    // A trailing colon marks a PREFIX: a per-record slice family whose ids a
+    // ping cannot name (the open ticket's thread). Cache-first, so the family
+    // is normally one loaded key — the one on screen.
+    if (key.endsWith(":")) invalidatePrefix(key)
+    else invalidate(key)
 }
 
 /** A dropped-and-recovered socket: re-read everything the screens are showing,

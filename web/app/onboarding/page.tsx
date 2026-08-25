@@ -30,6 +30,7 @@ import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
 import { useT } from "@shared/web/language"
 import { MarkLoader } from "@shared/web/mark-loader"
+import { TEAM_CREATION_CLOSED } from "@shared/product"
 
 const firstNameField = { ...defaultFieldConfig, label: "First name", required: true }
 const lastNameField = { ...defaultFieldConfig, label: "Last name", required: true }
@@ -197,10 +198,17 @@ export default function OnboardingPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
-              ? t("An admin can invite you back, or you can start a team of your own below.")
+              ? t("An admin can invite you back — ask them to send a new invite to this email address.")
               : t("Tell us who you are, your team gets created right after.")}
           </p>
         </div>
+        {/* NO FORM FOR THE TEAMLESS under a closed product. The button used to
+            promise a team of their own while TEAM_CREATION_CLOSED made the server
+            refuse the creation — so pressing it looped back to this screen,
+            silently, for ever. A promise the product forbids is not softened
+            by keeping the button; it is withdrawn (same rule as the
+            team-switcher's hidden Create item, web/test/one-team.test.ts). */}
+        {teamless && TEAM_CREATION_CLOSED ? null : (
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
             <div className="flex flex-col items-center gap-4">
               <Avatar className="size-20">
@@ -239,9 +247,10 @@ export default function OnboardingPage() {
               {/* The button says what pressing it DOES. For a removed member
                   "Continue" hides the consequence — they'd end up owning a new
                   team they never asked for. */}
-              {busy ? t("Creating your team…") : teamless ? t("Start my own team") : t("Continue")}
+              {busy ? t("Creating your team…") : t("Continue")}
             </Button>
           </form>
+        )}
       </div>
     </main>
   )

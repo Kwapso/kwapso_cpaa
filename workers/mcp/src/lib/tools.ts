@@ -36,11 +36,21 @@ export type McpTool = {
  * description, under the MCP's own name (`mcpName`) where it historically differs. */
 function toMcpTool(s: SharedTool): McpTool {
   const gate = TOOL_GATES[s.name]
+  // THE PAUSE TRAVELS AS WORDS. In the app, agent.confirm is a yes/no panel a
+  // person clicks; on this surface there is no panel — the connecting client
+  // owns the confirming UI, and its model reads nothing but this description.
+  // So a tool the app would stop for SAYS SO, in the same breath as its gate
+  // hint: an auto-approving client that ignores the sentence was going to
+  // ignore a flag too, but a well-behaved one now has the signal it needs.
+  // (No backticked names in the sentence on purpose — R27 reads those.)
+  const pause = s.agent.confirm
+    ? " Destructive or access-widening: confirm with a person before calling this."
+    : ""
   return {
     name: s.mcpName ?? s.name,
     // Restore the developer permission hint external MCP clients relied on ("… Needs
     // member_roles:create."); the door still enforces it regardless.
-    description: gate ? `${s.summary} Needs ${gate}.` : s.summary,
+    description: (gate ? `${s.summary} Needs ${gate}.` : s.summary) + pause,
     inputSchema: s.schema,
     binding: s.binding,
     method: s.method,
@@ -314,7 +324,8 @@ export async function forwardTool(
   env: Env,
   tool: McpTool,
   input: Record<string, unknown>,
-  cookie: string
+  cookie: string,
+  traceId: string
 ): Promise<{ ok: boolean; text: string }> {
   // A wrong-typed argument is refused before any builder sees it: a JSON-RPC client
   // can send `{"name":{}}`, and coercing that would create a record actually called
@@ -327,6 +338,7 @@ export async function forwardTool(
       path: tool.path,
       method: tool.method,
       cookie,
+      traceId,
       query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
       body: tool.buildBody ? tool.buildBody(input) : {},
       timeoutMs,

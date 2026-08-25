@@ -370,12 +370,21 @@ export async function postBulkHelpStatus(request: Request, env: Env): Promise<Re
   const { changed, skipped } = await bulkSetStatus(
     cfg, guard, await callerScope(cfg, guard), actor, ids, body.status as HelpStatus
   )
-  // Row-level live-sync: one ping per changed ticket (same row shape the single
-  // endpoint patches) — no list refetch.
-  // Each ping carries its own account, so a batch spanning two clients reaches
-  // each of them with only their own row.
-  for (const row of changed)
-    await publishChange(env, guard.teamId, "help", row.id, undefined, row.accountId ?? undefined)
+  // ONE coarse list-ping for the whole set — the same shape as the by-filter
+  // sibling above, for the same reason. This used to ping per changed row,
+  // which reads as the row-level ideal but is one sequential HTTP hop to the
+  // realtime worker PER TICKET: a full 512-id batch held the door open for
+  // hundreds of serial round trips after the write itself was already one
+  // statement. A set-shaped move gets a set-shaped ping; the single-ticket
+  // door keeps its row-level patch.
+  if (changed.length > 0) {
+    await publishChange(env, guard.teamId, "help")
+    // And one per WORLD the set touched (usually one, never more than the
+    // batch), so a client login hears about their own tickets moving.
+    const accounts = new Set(changed.map((r) => r.accountId).filter((a): a is string => !!a))
+    for (const account of accounts)
+      await publishChange(env, guard.teamId, "help", undefined, undefined, account)
+  }
   return json({ updated: changed.length, skipped })
 }
 

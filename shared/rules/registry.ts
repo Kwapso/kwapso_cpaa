@@ -1232,7 +1232,7 @@ export const GROWING_COLLECTIONS: Record<
 
 export const DEAF_EXEMPT: Record<string, string> = {
   help_threads:
-    "a reply pings the parent help row too (op edit), whose row-level patch refreshes the open ticket's deps; the thread list itself re-pulls when the detail (re)opens",
+    "a reply pings the parent help row too (op edit), whose deps now name the open conversation itself (`help-thread:<id>` + its total, web/lib/live-resources.ts) and whose portal listener drops the `portal:thread:` slice — so the thread updates live through the parent's ping, and this resource's own ping (whose id is the REPLY, which no cache is keyed by) stays deaf on purpose",
   agent_usage:
     "the quota badge rides every chat response and the usage dialog fetches on open — there is no standing cache a ping could refresh",
 }
@@ -1296,11 +1296,6 @@ export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
  * components opens with its own comment saying why it is host-composed rather than
  * a recipe, which is where a reader looks for it. */
 export const RECORD_DETAIL_NOT: Record<string, string> = {}
-
-/** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
- * (Empty today: role-detail — the last exception — grew its Permissions/Overview/
- * Activity tabs on 2026-07-06. Every record detail now carries the tabs.) */
-export const RECORD_DETAIL_EXCEPTIONS: Record<string, string> = {}
 
 /** R8 — reviewed bypasses: placement:"tab" sections that DON'T lead with a
  * collection, so they carry no count badge (and thus no countCacheKey). Each MUST
@@ -1411,7 +1406,9 @@ export const FORM_DIALOGS = [
   "selectable-form-dialog",
   "account-form-dialog",
   "contact-link-dialog",
-  "portal-access-dialog",
+  // portal-access-dialog left this list on 26 Aug 2026: superseded by
+  // PortalAccessPanel (account-detail-panels.tsx) in the panel pivot and then
+  // sat unmounted for weeks — a finished 121-line dialog no screen opened.
   "knowledge-form-dialog",
   // The third way into the knowledge base. Its draft is the interesting one:
   // what it persists is the TITLE and the FILING, never the file — a File cannot

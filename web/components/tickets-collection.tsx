@@ -70,7 +70,8 @@ import {
 import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { formatRelative } from "@shared/web/format"
-import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate,
+  mergePage, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { HelpTicket, SelectableValue } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
@@ -409,9 +410,12 @@ function TriageQueue({
     raisedByContactId?: string
   }) {
     if (!editing) return
-    await contentApi.updateHelp({ id: editing.id, ...input })
+    const { tickets } = await contentApi.updateHelp({ id: editing.id, ...input })
     invalidate(triageKey(teamId))
-    invalidate(helpKey(teamId, "all"))
+    // The door's response IS the fresh first page — this used to be thrown
+    // away and the same ~1s five-read rebuild fetched again one frame later.
+    // Merged by id so rows scrolled in past page one survive the patch.
+    mergePage(helpKey(teamId, "all"), "id", tickets as unknown as Record<string, unknown>[])
     toast.success(t("Ticket updated."))
   }
 
@@ -420,7 +424,9 @@ function TriageQueue({
   async function sendReply(body: string) {
     if (!replying) return
     await contentApi.replyHelp(replying.id, body)
-    invalidate(helpKey(teamId, "all"))
+    // A reply re-sorts one ticket to the top; the row-level live ping the door
+    // publishes patches that. The full-list refetch here paid the whole
+    // five-read rebuild to move one row.
     toast.success(t("Reply sent."))
   }
 

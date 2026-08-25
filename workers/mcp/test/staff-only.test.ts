@@ -128,7 +128,7 @@ describe("acting with a token: staff only, on every session it mints", () => {
     }) as never
 
   it("refuses to bridge a session for a client-portal login", async () => {
-    await expect(sessionCookieFor(bridgeEnv("portal"), token("TK_PORTAL") as never)).rejects.toMatchObject({
+    await expect(sessionCookieFor(bridgeEnv("portal"), token("TK_PORTAL") as never, "trace-test")).rejects.toMatchObject({
       status: 403,
       code: "portal_login",
     })
@@ -136,12 +136,12 @@ describe("acting with a token: staff only, on every session it mints", () => {
 
   it("caches nothing on a refusal — the next call asks again rather than holding a cookie it may not use", async () => {
     const refused = bridgeEnv("portal")
-    await expect(sessionCookieFor(refused, token("TK_TWICE") as never)).rejects.toMatchObject({ code: "portal_login" })
-    await expect(sessionCookieFor(refused, token("TK_TWICE") as never)).rejects.toMatchObject({ code: "portal_login" })
+    await expect(sessionCookieFor(refused, token("TK_TWICE") as never, "trace-test")).rejects.toMatchObject({ code: "portal_login" })
+    await expect(sessionCookieFor(refused, token("TK_TWICE") as never, "trace-test")).rejects.toMatchObject({ code: "portal_login" })
   })
 
   it("staff get their bridged cookie", async () => {
-    await expect(sessionCookieFor(bridgeEnv("staff"), token("TK_STAFF") as never)).resolves.toBe(
+    await expect(sessionCookieFor(bridgeEnv("staff"), token("TK_STAFF") as never, "trace-test")).resolves.toBe(
       "kwapso_session=sess"
     )
   })
@@ -218,7 +218,7 @@ describe("the cached staff verdict has no transition to miss", () => {
 
 describe("requireStaff fails closed", () => {
   it("refuses when tenancy can't answer — never assumes staff", async () => {
-    await expect(requireStaff(env("staff", false).env, "kwapso_session=x")).rejects.toMatchObject({
+    await expect(requireStaff(env("staff", false).env, "kwapso_session=x", "trace-test")).rejects.toMatchObject({
       status: 502,
       code: "standing_unknown",
     })
@@ -226,10 +226,10 @@ describe("requireStaff fails closed", () => {
 
   it("refuses an answer with no `kind` at all (an older door, a proxy, a truncated body)", async () => {
     const e = { TENANCY: { fetch: async () => new Response(JSON.stringify({ accounts: [], currentAccountId: null })) } }
-    await expect(requireStaff(e as never, "kwapso_session=x")).rejects.toMatchObject({ code: "portal_login" })
+    await expect(requireStaff(e as never, "kwapso_session=x", "trace-test")).rejects.toMatchObject({ code: "portal_login" })
   })
 
   it("lets staff through", async () => {
-    await expect(requireStaff(env("staff").env, "kwapso_session=x")).resolves.toBeUndefined()
+    await expect(requireStaff(env("staff").env, "kwapso_session=x", "trace-test")).resolves.toBeUndefined()
   })
 })
