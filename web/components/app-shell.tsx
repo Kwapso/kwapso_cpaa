@@ -480,12 +480,16 @@ export function AppShell({
                 type="button"
                 onClick={() => navigate(item.path)}
                 aria-current={activeNav ? "page" : undefined}
-                className={`motion-hover flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
+                /* `min-w-0` + a box for the label: this bar is up to six
+                   `flex-1` slots on 375px, so a label like "Knowledge base"
+                   has ~59px and overflows it. The portal's bar carries the
+                   measured numbers for the same defect. */
+                className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
                   activeNav ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                <Icon className="size-5" />
-                {item.title}
+                <Icon className="size-5 shrink-0" />
+                <span className="w-full text-center leading-tight">{item.title}</span>
               </button>
             )
           })}
@@ -501,14 +505,14 @@ export function AppShell({
               aria-current={
                 overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
               }
-              className={`motion-hover flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
+              className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
                 overflowNav.some((i) => isNavActive(i.path, here))
                   ? "text-foreground"
                   : "text-muted-foreground"
               }`}
             >
-              <MoreHorizontal className="size-5" />
-              {t("More")}
+              <MoreHorizontal className="size-5 shrink-0" />
+              <span className="w-full text-center leading-tight">{t("More")}</span>
             </button>
           )}
         </nav>

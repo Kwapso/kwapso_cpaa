@@ -18,6 +18,7 @@
 import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { Badge } from "@shared/ui/controls/badge/badge"
+import { List } from "@shared/ui/structures/list/list"
 
 import type { AccountDetail } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
@@ -88,26 +89,30 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
       <section>
         {/* R16: the door's exact server total, not the number of rows on screen. */}
         <CollectionHeading label={t("Contacts")} total={linksTotal} />
-        {contacts.length === 0 ? (
-          <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
-            {t("Just you, for now.")}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-4">
-            {contacts.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl border p-4">
-                <span className="min-w-0 flex-1 basis-[12rem] truncate">{c.personName}</span>
-                {c.isMainStakeholder ? <Badge variant="secondary">{t("Main contact")}</Badge> : null}
-                {/* Staff often type the relationship as "Main contact" too, and then
-                    the row says it twice. Say it once — the badge is the stronger
-                    of the two. */}
-                {c.relationship && c.relationship.trim().toLowerCase() !== "main contact" ? (
-                  <span className="text-muted-foreground text-sm">{c.relationship}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
+        {/* THE KIT'S ROW, not our own. `variant="rows"` is the standalone
+            rounded row this screen was drawing by hand — same shape, and it
+            brings the hover, the 56px floor and the empty register with it. The
+            agency app's rows have gone through this component since the engine
+            was built; the portal's had not, which is most of what made the two
+            look like different products. */}
+        <List
+          variant="rows"
+          label={t("Contacts")}
+          state={contacts.length === 0 ? "empty" : "ready"}
+          emptyTitle={t("Just you, for now.")}
+          rows={contacts.map((c) => ({
+            id: c.id,
+            title: c.personName,
+            /* Staff often type the relationship as "Main contact" too, and then
+               the row says it twice. Say it once — the badge is the stronger
+               of the two. */
+            description:
+              c.relationship && c.relationship.trim().toLowerCase() !== "main contact"
+                ? c.relationship
+                : undefined,
+            action: c.isMainStakeholder ? <Badge variant="secondary">{t("Main contact")}</Badge> : undefined,
+          }))}
+        />
       </section>
     </div>
   )

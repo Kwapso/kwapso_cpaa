@@ -278,7 +278,28 @@ function SelectScrollDownButton() {
 }
 
 const selectContentClasses = [
-  "relative z-50 overflow-hidden",
+  /* z-70, WITH THE OTHER THREE ANCHORED SURFACES, and 50 was not a smaller
+     number — it was a broken control.
+     ------------------------------------------------------------------
+     This list is PORTALLED (see `SelectContent` below): it renders at the
+     document root, so its z-index competes with every other overlay in the
+     app rather than with the form it belongs to. The system's layers are
+     sheet 55, dialog and alert-dialog 60, then popover, dropdown-menu,
+     tooltip and hover-card at 70 — the four anchored surfaces that have to
+     open OVER a dialog, because a dialog is where a form lives and a form is
+     where you pick things.
+
+     Select was the only portalled surface left under that line. Inside a
+     dialog it opened BEHIND the dialog it was opened from: the list was
+     painted, the options were there, and every click landed on the dialog in
+     front of it. On a phone, where the list fills most of the screen, the
+     effect is a form whose pickers simply do not work — reported from a
+     handset with three dead pickers on one form.
+
+     It is not a taste call and it has no downside: 70 is the layer the kit
+     already assigns to "anchored to a control, must clear a dialog", and a
+     Select is exactly that. */
+  "relative z-[70] overflow-hidden",
 
   // Chapter 12's floating surface: raised paper at 24 under the overlay
   // shadow, padded `--space-2h`. No blur, no border, no arrow.

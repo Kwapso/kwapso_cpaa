@@ -17,6 +17,7 @@
 // attached.
 
 import { Badge } from "@shared/ui/controls/badge/badge"
+import { List } from "@shared/ui/structures/list/list"
 
 import { useCached } from "@shared/web/store"
 import { delivery } from "@/lib/api"
@@ -45,24 +46,26 @@ export function DeliveryBlock() {
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-lg font-medium">{t("What you bought")}</h2>
-      <ul className="flex flex-col gap-2">
-        {sprints.map((s) => (
-          <li key={`${s.ref ?? s.name}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
-            <div className="min-w-0">
-              <p className="font-medium">
-                {s.name}
-                {s.completedAt && (
-                  <Badge variant="success" className="ml-2 align-middle">
-                    {t("Finished")}
-                  </Badge>
-                )}
-              </p>
-              <p className="text-muted-foreground text-sm">
-                {[s.sprintType, dates(s)].filter(Boolean).join(" · ")}
-              </p>
-            </div>
-            {s.storyCount > 0 && (
-              <span className="text-muted-foreground shrink-0 text-sm">
+      {/* The kit's row — see the note in company-screen.tsx. */}
+      <List
+        variant="rows"
+        label={t("What you bought")}
+        rows={sprints.map((s) => ({
+          id: `${s.ref ?? s.name}`,
+          title: (
+            <span>
+              {s.name}
+              {s.completedAt && (
+                <Badge variant="success" className="ml-2 align-middle">
+                  {t("Finished")}
+                </Badge>
+              )}
+            </span>
+          ),
+          description: [s.sprintType, dates(s)].filter(Boolean).join(" · "),
+          meta:
+            s.storyCount > 0 ? (
+              <span>
                 {/* ONE ENTRY WITH TWO HOLES (R28), the same one the ticket rows
                     and the agency's sprint list use. It read `{n} of {m}
                     {t("done")}`: `of` was a bare JSX text node the extractor
@@ -75,10 +78,9 @@ export function DeliveryBlock() {
                   total: s.storyCount,
                 })}
               </span>
-            )}
-          </li>
-        ))}
-      </ul>
+            ) : undefined,
+        }))}
+      />
     </section>
   )
 }

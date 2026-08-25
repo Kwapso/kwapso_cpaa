@@ -63,6 +63,18 @@ export function WaitingOnYou() {
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-lg font-medium">{t("We're waiting on you")}</h2>
+      {/* THIS ONE STAYS HAND-ROLLED, and the kit's `List` was tried and reverted.
+       *
+       * A `ListRow` is a title, a quiet line, and ONE action pinned to the
+       * inline end of a row that does not wrap. This row has two full-width
+       * actions ("Send a file" and "Done") plus a rich-text detail, and at 375
+       * the pinned pair leaves the words 55px — measured, in the walk, which is
+       * why this is written down rather than remembered. `flex-wrap` here puts
+       * the buttons on their own line instead, which is the only arrangement
+       * that fits.
+       *
+       * Company contacts and the delivery block DID move to `List`: one action,
+       * short meta, no wrap needed. */}
       <ul className="flex flex-col gap-2">
         {open.map((todo) => (
           <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
