@@ -277,7 +277,6 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "notes", label: t("Agenda & notes"), icon: "notebook-pen", badge: "", badgeVariant: "" as const },
       // ONLY WHEN THERE IS ONE. A meeting nobody put in a calendar has nothing

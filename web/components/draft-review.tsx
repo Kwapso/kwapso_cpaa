@@ -128,7 +128,6 @@ export function DraftReviewDialog({
   // collection where it is currently harmless.
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       {
         value: "steps",

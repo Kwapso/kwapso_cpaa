@@ -300,7 +300,6 @@ export function AppDetailScreen({
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {

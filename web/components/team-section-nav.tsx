@@ -42,7 +42,6 @@ export function TeamSectionNav({
     <TabsView
       config={{
         ...defaultTabsConfig,
-        variant: "line",
         tabs: visible.map((s) => {
           const count = counts[s.key]
           return {

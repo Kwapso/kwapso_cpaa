@@ -387,7 +387,6 @@ export function HelpDetailScreen({
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       {
         value: "conversation",

@@ -434,7 +434,6 @@ export function AccountDetailScreen({
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // THE ADDRESS BOOK, behind its own right. A role without `contacts:read`

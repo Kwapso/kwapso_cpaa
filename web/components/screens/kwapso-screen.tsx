@@ -55,7 +55,6 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "details", label: t("Details"), icon: CONCEPT_ICON.kwapso, badge: "", badgeVariant: "" as const },
       { value: "team", label: t("The team"), icon: CONCEPT_ICON.members, badge: "", badgeVariant: "" as const },

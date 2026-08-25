@@ -275,7 +275,6 @@ export function ContactDetailScreen({
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // WHICH COMPANIES THEY BELONG TO — the same link table the company screen

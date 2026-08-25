@@ -171,7 +171,11 @@ export function TicketsCollection({
   // different screen rather than a narrower list.
   const innerTabs = {
     ...defaultTabsConfig,
-    variant: "pill" as const,
+    // A LINE, not the folder. This strip filters WITHIN the collection the outer
+    // folder already chose, and a folder tab is drawn to sit attached to a card —
+    // there is no second card under this one to attach to. (`pill` used to be
+    // spelled here; the kit has no pill tab and drew it as a line anyway.)
+    variant: "line" as const,
     tabs: [
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until

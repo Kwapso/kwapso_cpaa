@@ -105,7 +105,6 @@ export function TaskDetailScreen({
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // WORK LOGS, wherever time is tracked (CHECKLIST 6.8). Forty minutes on the

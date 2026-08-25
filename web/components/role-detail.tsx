@@ -177,7 +177,6 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
     tabs: [
       { value: "permissions", label: t("Access rights"), icon: "shield-check", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },

@@ -2445,3 +2445,55 @@ describe("closing a form is not a decision to discard it", () => {
     expect(src, "…and spread it under the saved values").toContain("{ ...shape, ...saved }")
   })
 })
+
+// THE TAB SHAPE IS ONE DECISION, NOT SIXTEEN.
+//
+// The owner, seeing the folder on three screens and the old flat strip on the
+// rest: "if we change tabs in one central place… it should have changed
+// everywhere. If this is not done then the entire way we have built our design
+// system is incorrect."
+//
+// The architecture was fine — one TabsView, one kit Tabs control, one `variant`.
+// What was wrong is that sixteen screens had hard-coded `variant: "line"` before
+// the folder existed, so the central value governed nothing. It is the DEFAULT
+// now, and a screen that wants a line has to be one of the two that genuinely
+// do: a strip filtering WITHIN a collection, which has no card to attach to.
+describe("a tab strip's shape is decided in one place", () => {
+  it("tab-shape: the default is the folder", () => {
+    const src = stripComments(read(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx")))
+    const decl = src.slice(src.indexOf("defaultTabsConfig: TabsConfig"))
+    expect(decl.slice(0, decl.indexOf("}") + 1), "the one default must be the folder").toContain('variant: "folder"')
+  })
+
+  it("tab-shape: only the two inner filter strips override it", () => {
+    const allowed = new Set(["web/components/tickets-collection.tsx", "web/components/meetings-screen.tsx"])
+    const offenders: string[] = []
+    let scanned = 0
+    const files = [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+    ]
+    for (const f of files) {
+      const rel = f.path.replace(ROOT + "/", "")
+      if (!/variant:\s*"line"/.test(read(f.path))) continue
+      scanned++
+      if (!allowed.has(rel)) offenders.push(rel)
+    }
+    expect(scanned, "the override census found nothing — it has stopped matching").toBeGreaterThan(1)
+    expect(
+      offenders,
+      `these screens opt out of the one tab shape. A record's tabs and a collection's ` +
+        `tabs are the folder; only a strip filtering INSIDE a collection is a line: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("tab-shape: nothing asks for a `pill`, which the kit does not draw", () => {
+    const offenders = [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+    ]
+      .filter((f) => /variant:\s*"pill"/.test(read(f.path)))
+      .map((f) => f.path.replace(ROOT + "/", ""))
+    expect(offenders, `\`pill\` is accepted and silently drawn as a line — say what you mean`).toEqual([])
+  })
+})

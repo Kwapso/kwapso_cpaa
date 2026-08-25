@@ -56,7 +56,24 @@ export interface TabsConfig extends BaseConfig {
 export const defaultTabsConfig: TabsConfig = {
   ...defaultBaseConfig,
   tabs: [],
-  variant: "line",
+  /**
+   * FOLDER, and it is the DEFAULT rather than a per-screen choice.
+   *
+   * The kit draws the brand's own folder silhouette for a tab strip — chapter
+   * 24.3 for tabs and 24.6 for record chrome — so a record's tabs and a
+   * collection's tabs are both that shape. This value used to be `line`,
+   * written before the folder existed, and sixteen screens then hard-coded
+   * `line` on top of it. The result was the folder appearing on three screens
+   * and nowhere else, which reads as a design system that does not propagate.
+   * It propagated fine; the decision had simply been made sixteen times.
+   *
+   * THE RULE, so the next strip does not have to guess: a strip that switches
+   * between RECORDS or between COLLECTIONS takes the folder and says nothing
+   * here. A strip that filters WITHIN one collection is not a folder — it has
+   * no card of its own to be attached to — and says `variant: "line"` with a
+   * reason beside it. There are two of those, and they are the only two.
+   */
+  variant: "folder",
   fullWidth: false,
 }
 
