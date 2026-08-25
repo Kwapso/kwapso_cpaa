@@ -213,9 +213,30 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
 
       {/* The nav sits at the BOTTOM on a phone, where a thumb is — and it is the
        * same three items on every screen, always in the same order, always
-       * showing where you are. Nothing collapses, nothing hides in a menu. */}
+       * showing where you are. Nothing collapses, nothing hides in a menu.
+       *
+       * THE LABELS WRAP, AND THAT IS NOT A STYLE CHOICE. Five `flex-1` slots on
+       * a 375px screen give each label 75px. Measured in this bar's own font
+       * (Saans 12.75/500), the last one needs:
+       *
+       *     en  "My company"        76px   ✗ over by 1
+       *     de  "Mein Unternehmen" 112px   ✗ over by 37
+       *     ca  "La meva empresa"  102px   ✗ over by 27
+       *     es  "Mi empresa"        70px   ✓
+       *
+       * A bare text node in a `flex-col items-center` is not stretched, so it
+       * takes its max-content width and OVERFLOWS the slot — and since
+       * `overflow-x: clip` went on the page, that overflow is now cut in
+       * silence instead of scrolling. The bar looks finished in English and
+       * loses the end of a word in German and Catalan, which is the shape of
+       * bug nobody reports because nobody sees it happen.
+       *
+       * So the label gets a box (`w-full`) it is allowed to wrap inside, and
+       * the slot gets `min-w-0` so it can actually be that narrow. A second
+       * line costs about 16px of bar height, in the two languages that need
+       * one. Nothing is truncated and no word had to be shortened. */}
       <nav className="bg-background sticky bottom-0 border-t">
-        <div className="mx-auto flex w-full max-w-3xl">
+        <div className="mx-auto flex w-full max-w-3xl px-1">
           {DESTINATIONS.map(({ href, label, icon: Icon }) => {
             const here = pathname === href || pathname.startsWith(`${href}/`)
             return (
@@ -223,12 +244,16 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
                 key={href}
                 href={href}
                 aria-current={here ? "page" : undefined}
-                className={`flex flex-1 flex-col items-center gap-1 py-3 text-xs ${
+                /* `min-w-0`, and the label in a box of its own — see the note
+                   above the bar. Without both, a five-slot `flex-1` row gives
+                   every label exactly a fifth of the screen and a longer word
+                   simply overflows it. */
+                className={`flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-xs ${
                   here ? "text-foreground font-medium" : "text-muted-foreground"
                 }`}
               >
-                <Icon className="size-5" />
-                {t(label)}
+                <Icon className="size-5 shrink-0" />
+                <span className="w-full text-center leading-tight">{t(label)}</span>
               </Link>
             )
           })}
