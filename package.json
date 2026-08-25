@@ -29,7 +29,8 @@
     "deploy:production": "npm run lang:check && npm run check:built && npm run deploy:production --workspace=kwapso-realtime && npm run deploy:production --workspace=kwapso-auth && npm run deploy:production --workspace=kwapso-tenancy && npm run deploy:production --workspace=kwapso-content && npm run deploy:production --workspace=kwapso-data-ops && npm run deploy:production --workspace=kwapso-mcp && npm run deploy:production --workspace=kwapso-gateway && npm run deploy:production --workspace=kwapso-portal-gateway",
     "smoke:staging": "node scripts/smoke-staging.mjs",
     "smoke:portal": "node scripts/smoke-portal.mjs",
-    "smoke:mcp": "node scripts/smoke-mcp.mjs"
+    "smoke:mcp": "node scripts/smoke-mcp.mjs",
+    "walk:mobile": "node scripts/walk-mobile.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260101.0",
