@@ -94,7 +94,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/tenancy/teams":
     "creating a team is closed product-wide (TEAM_CREATION_CLOSED refuses a person, the agent and a token alike), and a new team would be a team this token is not pinned to.",
   "POST /api/tenancy/switch-team":
-    "moves the session to another team — the one door that literally widens the pin, which is the thing the pin exists to prevent (MCP.md §3.2). A token that needs another team's data is another token, made in that team.",
+    "moves the session to another team — the one door that literally widens the pin, which is the thing the pin exists to prevent (MCP.md §3 (Every door, and its tool)). A token that needs another team's data is another token, made in that team.",
   "GET /api/tenancy/invitations":
     "invites this person has RECEIVED from OTHER teams. Outside the pin by construction, and unanswerable in the team this token is pinned to.",
   "POST /api/tenancy/invitations/accept":

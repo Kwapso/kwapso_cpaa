@@ -1136,7 +1136,8 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
  * WHAT THIS DOOR WILL NOT MOVE, deliberately: the CLIENT and the APP. Both are
  * load-bearing rather than descriptive. The reference a client quotes was minted
  * against the account (`nextRef`, counted per account), and completing this
- * sprint cuts a version of every process map inside its app — so re-pointing
+ * sprint used to cut a version of every process map inside its app (purged in
+ * 0051 — versions are cut by hand now) — and re-pointing
  * either after the fact rewrites what an already-published number means. Same
  * ruling as a ticket's account, and for the same reason: if we ever want to move
  * one it is a deliberate feature with a confirm panel, not a quiet field on an

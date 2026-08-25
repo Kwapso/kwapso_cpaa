@@ -102,8 +102,21 @@ export async function recordWorkerError(
   source: string,
   place: string,
   e: unknown,
-  requestId?: string
+  requestId?: string,
+  /** the resolved caller, when the request got that far — identityFor(request)
+   * from the gating seam. 0 of 200 live rows carried either column before this
+   * argument existed, which made the hardest rows (whose? which tenant?) the
+   * least answerable ones. */
+  who?: { teamId?: string; userId?: string }
 ): Promise<void> {
   const err = e instanceof Error ? e : new Error(String(e))
-  await logError(db, { source, place, message: err.message, stack: err.stack, requestId })
+  await logError(db, {
+    source,
+    place,
+    message: err.message,
+    stack: err.stack,
+    requestId,
+    teamId: who?.teamId,
+    userId: who?.userId,
+  })
 }

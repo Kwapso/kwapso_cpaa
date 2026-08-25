@@ -50,6 +50,9 @@ export const GLOSSARY = {
   todo: { term: "To-do", def: "Something we're waiting on a client for. It sits in their portal with a due date." },
   task: { term: "Task", def: "Our own internal admin, something for us, not for an account's delivery." },
   sprint: { term: "Sprint", def: "A block of delivery work sold to one account, with a start, an end and a price." },
+  // The one nav section whose noun the glossary did not define — found by the
+  // round-one docs review. The definition is the owner's own (waves.ts header).
+  wave: { term: "Wave", def: "A package of sprints sold to one account. Told apart by its name and its dates, nothing else." },
   app: { term: "App", def: "A system we build for an account, the thing with its own address. One goal can need two." },
   workLog: { term: "Work log", def: "One row of time: who, what they worked on, and how long, in whole seconds." },
   timer: { term: "Timer", def: "A work log still running. Start it in one click; it waits in the header until you stop it." },

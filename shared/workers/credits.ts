@@ -1,6 +1,6 @@
 // The AI quota gate (owner's credit-based model). Each team gets a FREE daily
 // allowance of AI requests; beyond that it spends from a purchasable credit balance;
-// out of both, the app warns then hard-stops for the day. A caller consumes ONE
+// out of both, the app hard-stops for the day. A caller consumes ONE
 // unit per AI request (the real cost driver) at this single shared gate. Lives over
 // the global core DB (agent_usage = the daily-free counter; agent_credits = the
 // balance) so it works without opening a team database.
@@ -98,8 +98,9 @@ export async function getQuota(env: Env, teamId: string): Promise<AgentQuota> {
 export type ConsumeResult = {
   ok: boolean
   source: "free" | "credit" | "none"
-  /** true when the team just ran out (free + credits both 0) or is nearly out. */
-  warn: boolean
+  // A `warn` boolean (nearly-out) used to ride here. Nothing anywhere read
+  // it — the client derives every badge state from the quota numbers below —
+  // so it was deleted rather than left promising a signal nobody sends.
   quota: AgentQuota
 }
 
@@ -130,7 +131,7 @@ export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeRe
     .run()
   if ((claimed.meta.changes ?? 0) > 0) {
     const quota = await getQuota(env, teamId)
-    return { ok: true, source: "free", warn: quota.remaining === 0, quota }
+    return { ok: true, source: "free", quota }
   }
 
   const res = await env.DB.prepare(
@@ -139,10 +140,10 @@ export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeRe
     .bind(now, teamId)
     .run()
   if ((res.meta.changes ?? 0) === 0) {
-    return { ok: false, source: "none", warn: true, quota: await getQuota(env, teamId) }
+    return { ok: false, source: "none", quota: await getQuota(env, teamId) }
   }
   const quota = await getQuota(env, teamId)
-  return { ok: true, source: "credit", warn: quota.creditBalance <= 3, quota }
+  return { ok: true, source: "credit", quota }
 }
 
 /** Give back AI units a turn metered but that accomplished NOTHING the user wanted — a

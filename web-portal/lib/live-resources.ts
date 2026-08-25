@@ -111,7 +111,9 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
  * every module the agency uses and most of them are none of the portal's business.
  * Until now the portal RECEIVED all of them and threw most away — work paid for
  * inside a single-threaded Durable Object, per socket, per ping, on behalf of a
- * listener that was never going to use it. Nine resources instead of everything.
+ * listener that was never going to use it. A handful of resources instead of
+ * everything — the exact number is PORTAL_SUBSCRIPTIONS.length below, derived,
+ * because a count written here in prose drifted the day the map grew.
  *
  * Derived so it cannot drift: adding a line to PORTAL_LISTENERS subscribes to it in
  * the same edit. A resource this app handles but forgot to ask for would be a screen

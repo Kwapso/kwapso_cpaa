@@ -239,15 +239,19 @@ export async function setDepartmentActive(
   const set = input.active
     ? "deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL"
     : `deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}`
-  const rows = await d1Query<{ n: number }>(
+  // RETURNING, not `; SELECT changes()`: one statement, so the day this
+  // database moves onto a native binding (prepare() takes exactly one) the
+  // idempotent predicate keeps working unchanged. Same R17 answer either way:
+  // zero rows back = already like that.
+  const rows = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     `UPDATE client_departments SET ${set}
       WHERE id = ${sqlString(input.id)}
-        AND deactivated_at IS ${input.active ? "NOT NULL" : "NULL"};
-     SELECT changes() AS n`
+        AND deactivated_at IS ${input.active ? "NOT NULL" : "NULL"}
+      RETURNING id`
   )
-  const moved = Number(rows[0]?.n) > 0
+  const moved = rows.length > 0
   if (moved)
     await logActivity(cfg, guard.databaseId, actor, {
     type: input.active ? "reactivated" : "deactivated",
@@ -484,15 +488,19 @@ export async function setRoleActive(
   const set = input.active
     ? "deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL"
     : `deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}`
-  const rows = await d1Query<{ n: number }>(
+  // RETURNING, not `; SELECT changes()`: one statement, so the day this
+  // database moves onto a native binding (prepare() takes exactly one) the
+  // idempotent predicate keeps working unchanged. Same R17 answer either way:
+  // zero rows back = already like that.
+  const rows = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     `UPDATE client_roles SET ${set}
       WHERE id = ${sqlString(input.id)}
-        AND deactivated_at IS ${input.active ? "NOT NULL" : "NULL"};
-     SELECT changes() AS n`
+        AND deactivated_at IS ${input.active ? "NOT NULL" : "NULL"}
+      RETURNING id`
   )
-  const moved = Number(rows[0]?.n) > 0
+  const moved = rows.length > 0
   if (moved)
     await logActivity(cfg, guard.databaseId, actor, {
     type: input.active ? "reactivated" : "deactivated",
@@ -754,15 +762,19 @@ export async function setToolActive(
   const set = input.active
     ? "deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL"
     : `deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}`
-  const rows = await d1Query<{ n: number }>(
+  // RETURNING, not `; SELECT changes()`: one statement, so the day this
+  // database moves onto a native binding (prepare() takes exactly one) the
+  // idempotent predicate keeps working unchanged. Same R17 answer either way:
+  // zero rows back = already like that.
+  const rows = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     `UPDATE client_tools SET ${set}
       WHERE id = ${sqlString(input.id)}
-        AND deactivated_at IS ${input.active ? "NOT NULL" : "NULL"};
-     SELECT changes() AS n`
+        AND deactivated_at IS ${input.active ? "NOT NULL" : "NULL"}
+      RETURNING id`
   )
-  const moved = Number(rows[0]?.n) > 0
+  const moved = rows.length > 0
   if (moved)
     await logActivity(cfg, guard.databaseId, actor, {
     type: input.active ? "reactivated" : "deactivated",

@@ -1052,7 +1052,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_sprint",
     summary:
-      "Edit a sprint by id, its name, kind, goal, dates and the flat price it was sold for. `soldPriceCents` is WHOLE CENTS, like `create_sprint`, and it is the field this door exists for: a sprint's price is the revenue half of every margin, and it was previously settable only at the moment the sprint was started. The CLIENT and the APP are NOT on this door and cannot be changed: the reference a client quotes was minted against the account, and completing the sprint cuts a version of every process map inside its app, so re-pointing either would rewrite what an already-published figure means. Omitted fields are CLEARED, not kept: send the whole sprint as it should end up.",
+      "Edit a sprint by id, its name, kind, goal, dates and the flat price it was sold for. `soldPriceCents` is WHOLE CENTS, like `create_sprint`, and it is the field this door exists for: a sprint's price is the revenue half of every margin, and it was previously settable only at the moment the sprint was started. The CLIENT and the APP are NOT on this door and cannot be changed: the reference a client quotes was minted against the account, and the sprint's figures feed that account's margin, so re-pointing either would rewrite what an already-published number means. (Process-map versions are cut by hand on the map itself, not by completing a sprint — that automatic cut was purged in migration 0051.) Omitted fields are CLEARED, not kept: send the whole sprint as it should end up.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints/update",
     schema: obj(
       { id: S, name: S, goal: S, sprintType: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },

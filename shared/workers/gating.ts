@@ -218,7 +218,24 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // per-caller ceiling above makes it the honest place to start the clock.
   const cfg: D1Rest = { ...d1ConfigFrom(env), stats: beginD1Timing(request) }
   const guard = await requireMember(env, user.id, user.currentTeamId)
+  // WHO WAS ASKING, for the central catch. error_logs has carried team_id and
+  // user_id columns since core 0019 and 0 of 200 live rows held either,
+  // because the catch sits outside the handler and never met the guard. Keyed
+  // on the REQUEST (the same reasoning as the scope cache: a string key is a
+  // cross-tenant bug, a request key dies with the request), written here
+  // because this is the one function every team-scoped door passes exactly
+  // once — the property the two paragraphs above already lean on twice.
+  errorIdentity.set(request, { teamId: guard.teamId, userId: guard.userId })
   return { user, actor: toActor(user), cfg, guard }
+}
+
+const errorIdentity = new WeakMap<Request, { teamId: string; userId: string }>()
+
+/** The identity the central catch may attach to an error row — the resolved
+ * caller when the request got that far, and honestly nothing when it did not
+ * (a 401, a pre-team door, a cron). */
+export function identityFor(request: Request): { teamId?: string; userId?: string } {
+  return errorIdentity.get(request) ?? {}
 }
 
 type RightsRow = {

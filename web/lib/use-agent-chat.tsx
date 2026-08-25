@@ -29,6 +29,7 @@ import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { traceFor } from "@/lib/agent-trace"
 import { emitTrace } from "@/lib/screen-trace"
 import { AgentMarkdown } from "@/components/agent-markdown"
+import { reportError } from "@shared/web/log"
 
 let nextId = 0
 const newId = () => `m${++nextId}`
@@ -349,6 +350,11 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     try {
       await consume((onEvent) => dataOps.agentChatStream({ message: text, threadId, files }, onEvent), assistantId)
     } catch (err) {
+      // The person sees the failure in the bubble; the error store must see it
+      // too — a chat drop was the one user-facing crash that left no row
+      // anywhere (round-one error_log review: the agent UI swallowed
+      // everything it caught).
+      reportError("agent-chat/send", err)
       if (!(await resyncAfterDrop())) {
         const msg = err instanceof ApiFailure ? err.message : "The connection dropped. Reopen the chat to see what happened."
         setItems((prev) => prev.map((it) => (it.id === assistantId ? { ...it, content: msg } : it)))

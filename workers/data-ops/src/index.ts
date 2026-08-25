@@ -19,7 +19,7 @@
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
 import { logIfSlow, withTiming } from "@shared/workers/timing"
-import { GuardError } from "@shared/workers/gating"
+import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import type { Env } from "./env"
@@ -119,7 +119,7 @@ export default {
       console.error("data-ops worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "data-ops", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
+      await recordWorkerError(env.DB, "data-ops", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, imports are paused.`)

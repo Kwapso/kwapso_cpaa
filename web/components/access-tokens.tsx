@@ -76,7 +76,7 @@ If your tool runs MCP servers locally over stdio (e.g. Claude Desktop), add this
 
 Then call tools/list to see what I can do. You act as me, in one team, capped by my role —
 reads, exports and imports are free; only the assistant tools (agent_chat, agent_confirm,
-plan_import) use the team's assistant credits.`
+plan_import — and ask_knowledge when it composes an answer) use the team's assistant credits.`
 }
 
 function copyInstructions(token: string, t: (english: string) => string) {
