@@ -602,7 +602,7 @@ export function ProcessDetailScreen({
                           <div className="min-w-0">
                             <InAppLink
                               href={`/processes/${l.processId}`}
-                              className="truncate text-sm font-medium"
+                              className="block truncate text-sm font-medium"
                             >
                               {l.name}
                             </InAppLink>
@@ -818,7 +818,7 @@ export function ProcessDetailScreen({
                         className="flex items-start justify-between gap-2 border-b p-3 last:border-b-0"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
+                          <p className="block truncate text-sm font-medium">
                             {i + 1}. {step.name}
                             {step.removed && (
                               <Badge variant="secondary" className="ml-2 text-badge">

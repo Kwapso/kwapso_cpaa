@@ -131,6 +131,18 @@ export interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {
   /**
+   * This drawer is an INPUT SURFACE opened from inside a dialog — a picker's
+   * search sheet — not a page drawer. Both the scrim and the panel take the
+   * 70 layer ("anchored to a control, must clear a dialog"), because a page
+   * surface under a dialog is correct and a picker under the very form asking
+   * for it is the bug: reported from a handset on 25 Aug 2026, a client
+   * picker whose sheet opened BEHIND the Sell-a-wave dialog — options
+   * visible in a sliver at the screen's foot, nothing tappable. Radix already
+   * routes dismissal to the topmost layer; this prop fixes the PAINT order,
+   * which was the broken half.
+   */
+  overDialog?: boolean;
+  /**
    * Draw the built-in close chip. Default `true` — the kit's drawer head has
    * one, and a drawer with no visible exit on a phone is a trap.
    */
@@ -201,17 +213,21 @@ const SheetContent = React.forwardRef<
   SheetContentProps
 >(
   (
-    { className, children, side = "right", showClose = true, closeLabel = "Close", ...props },
+    { className, children, side = "right", overDialog = false, showClose = true, closeLabel = "Close", ...props },
     ref,
   ) => (
     <SheetPrimitive.Portal>
-      <SheetPrimitive.Overlay data-slot="sheet-overlay" className={cn(SCRIM)} />
+      <SheetPrimitive.Overlay
+        data-slot="sheet-overlay"
+        className={cn(SCRIM, overDialog && "z-[70]")}
+      />
       <SheetPrimitive.Content
         ref={ref}
         data-slot="sheet-content"
         /* `.motion-sheet` selects on this. Radix sets data-state itself. */
         data-side={side}
-        className={cn(sheetVariants({ side }), className)}
+        data-over-dialog={overDialog || undefined}
+        className={cn(sheetVariants({ side }), overDialog && "z-[70]", className)}
         {...props}
       >
         {children}

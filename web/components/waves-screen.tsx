@@ -190,7 +190,7 @@ export function WaveCollection({
                     picture of its own, so this is its initial. */}
                 <RecordMark name={w.name} />
                 <div className="min-w-0 flex-1 basis-[12rem]">
-                  <InAppLink href={`${basePath}/${w.id}`} className="truncate text-sm font-medium">
+                  <InAppLink href={`${basePath}/${w.id}`} className="block truncate text-sm font-medium">
                     {w.name}
                   </InAppLink>
                   <p className="text-muted-foreground truncate text-xs">

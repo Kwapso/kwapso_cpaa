@@ -924,8 +924,16 @@ function Composer({
       className={cn(
         /* The comment thread's own composer is drawn at `gap: 12px`. (The
            chapter's OTHER composer, the one carrying an attach glyph, draws
-           8 — that one is `ticket-thread`'s.) */
+           8 — that one is `ticket-thread`'s.)
+
+           THE HAIRLINE IS LOAD-BEARING, measured on a phone in the dark
+           palette (25 Aug 2026): `--surface-raised` there sits one step off
+           the panel, so the pill vanished and the reader saw a bare
+           placeholder floating over a dead Send — "the conversation section
+           is completely broken". The field is real; nothing said so. The 20%
+           ring is the same tier the thread's own dividers use. */
         "flex min-w-0 flex-col gap-3 rounded-[var(--radius)] bg-surface-raised p-2",
+        "shadow-[var(--hairline-strong)]",
         "sm:flex-row sm:items-center sm:rounded-pill sm:ps-4 sm:pe-2 sm:py-2",
         frozen && "bg-hair-faint",
       )}

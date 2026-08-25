@@ -347,6 +347,11 @@ export function RecordPicker({
                 address bar is the difference between "pinned" and "off screen". */}
             <SheetContent
               side="bottom"
+              /* A picker is an INPUT SURFACE, wherever it opens — and half its
+                 openings are inside a dialog (every form with a record field),
+                 where a page-layer sheet paints BEHIND the form asking for it.
+                 `overDialog` is the kit's word for exactly this (v1.0.5). */
+              overDialog
               className="flex h-[85dvh] flex-col gap-0 rounded-t-xl p-0"
             >
               <SheetTitle className="sr-only">{searchPlaceholder}</SheetTitle>

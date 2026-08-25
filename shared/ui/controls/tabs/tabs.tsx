@@ -201,6 +201,9 @@ const TRIGGER_BASE = [
 
 const TRIGGER_SKIN: Record<TabsVariant, string> = {
   line: cn(
+    // The same measured rule as `folder` below: the strip scrolls, a tab never
+    // shrinks under its own words.
+    "shrink-0",
     // `.kw-tab`: 12 block padding, **16 inline padding**, and the 2px mark's
     // own room held open at the block end. The kit drew that room as a
     // transparent 2px border; a border is a border, so the room is padding
@@ -224,7 +227,14 @@ const TRIGGER_SKIN: Record<TabsVariant, string> = {
   folder: cn(
     // One height for every tab, active or not — ch14's rule, verbatim: "a tab
     // never shrinks to say it is unselected".
-    "h-[var(--folder-tab-height)] min-w-[var(--folder-tab-min-width)]",
+    //
+    // `shrink-0` is that rule's OTHER axis, measured on a real phone
+    // (25 Aug 2026): in the scrolling strip the triggers are flex children,
+    // and flex shrinks them to `min-width` BEFORE the strip overflows — so
+    // every tab clamped to 144, the icon overflowed the start padding to x=0
+    // and the count ran into the shoulder curve. A tab takes its content's
+    // width and the STRIP scrolls; a tab never shrinks, full stop.
+    "shrink-0 h-[var(--folder-tab-height)] min-w-[var(--folder-tab-min-width)]",
     // "The label is centred in the lip, never across the join." The foot below
     // the lip is padding, so the base's `items-center` centres against the lip
     // and not against the whole box; the inline-end padding clears the

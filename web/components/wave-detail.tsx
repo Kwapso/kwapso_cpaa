@@ -319,7 +319,7 @@ export function WaveDetailScreen({
                           <button
                             type="button"
                             onClick={() => softNavigate(`${basePath}/${waveId}/sprints/${s.id}`)}
-                            className="hover:text-foreground truncate text-left text-sm font-medium underline-offset-2 hover:underline"
+                            className="hover:text-foreground block max-w-full truncate text-left text-sm font-medium underline-offset-2 hover:underline"
                           >
                             {s.name}
                           </button>

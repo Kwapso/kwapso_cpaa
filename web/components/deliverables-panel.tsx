@@ -202,7 +202,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                       href={href}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                      className="block truncate text-sm font-medium underline-offset-2 hover:underline"
                     >
                       {d.title}
                     </a>

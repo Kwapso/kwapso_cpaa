@@ -64,11 +64,20 @@ const top = (source: string) => Math.max(0, ...layers(source))
 describe("a portalled surface clears the dialog it opens from", () => {
   const controls = sourceFiles(CONTROLS, { extensions: [".tsx"], skipTests: true, relativeTo: ROOT })
 
-  /** THE OVERLAY LINE, derived: the highest layer any full-screen overlay
-   * claims. Today that is dialog and alert-dialog at 60, over sheet at 55. */
+  /** THE OVERLAY LINE, derived: the highest layer a DIALOG claims — the
+   * surface a form lives in, which is what everything anchored must clear.
+   *
+   * Sheet left this derivation on 25 Aug 2026: it now holds TWO layers — 55
+   * as a page drawer (correctly under a dialog) and an opt-in 70 when it is
+   * an input surface opened from inside one (`overDialog`, kit v1.0.5) — so
+   * "the file's max z" stopped meaning "the page overlay layer" for it. It
+   * stays in the STACK set below (it is still not an anchored control), and
+   * its elevated branch gets its own assertion at the end. */
   const OVERLAY_FILES = ["dialog/dialog.tsx", "alert-dialog/alert-dialog.tsx", "sheet/sheet.tsx"]
   const overlayLine = Math.max(
-    ...OVERLAY_FILES.map((rel) => top(readFileSync(join(CONTROLS, rel), "utf8"))),
+    ...["dialog/dialog.tsx", "alert-dialog/alert-dialog.tsx"].map((rel) =>
+      top(readFileSync(join(CONTROLS, rel), "utf8")),
+    ),
   )
 
   it("the overlay line is a real, single number", () => {
@@ -107,5 +116,15 @@ describe("a portalled surface clears the dialog it opens from", () => {
     const select = readFileSync(join(CONTROLS, "select/select.tsx"), "utf8")
     expect(/\.Portal\b/.test(select), "Select still portals").toBe(true)
     expect(top(select)).toBeGreaterThan(overlayLine)
+  })
+
+  it("a sheet asked to open over a dialog clears it (overDialog, kit v1.0.5)", () => {
+    // The second handset report: the client picker's SEARCH SHEET painted
+    // behind the Sell-a-wave dialog — a page drawer under a dialog is right,
+    // an input surface under the form asking for it is not. The elevated
+    // branch must exist and must clear the line.
+    const sheet = readFileSync(join(CONTROLS, "sheet/sheet.tsx"), "utf8")
+    expect(/overDialog/.test(sheet), "the overDialog branch went missing from the kit's sheet").toBe(true)
+    expect(top(sheet)).toBeGreaterThan(overlayLine)
   })
 })

@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.0.5 — 2026-08-25
+
+A patch off `v1.0.4`; still none of the *Unreleased* restructure.
+
+### Added — `overDialog` on `SheetContent`
+
+The layer model is right: a page drawer (55) sits under a dialog (60). But a
+picker that opens a SEARCH SHEET from inside a dialog is not a page drawer —
+it is an input surface anchored to a control, which is the 70 layer's whole
+definition. Without a way to say so, a client picker's sheet opened BEHIND
+the form asking for it on every phone: options visible in a sliver at the
+screen's foot, nothing tappable (25 Aug 2026 — the same handset report that
+found the Select, one surface later). `overDialog` lifts the scrim and the
+panel to 70; dismissal already belonged to the topmost Radix layer.
+
+## v1.0.4 — 2026-08-25
+
+A patch off `v1.0.3`. Two measured fixes from a phone at 375, and like the
+three before it this does NOT carry the restructure under *Unreleased*.
+
+### Fixed — a tab never shrinks under its own words
+
+In the scrolling strip the triggers are flex children, and flex shrinks them
+to `min-width` BEFORE the strip overflows: every folder tab clamped to 144,
+the icon overflowed the start padding to x=0 and the count ran into the
+shoulder curve — read from the screen as "icons spilling out and badge
+numbers cut off". `shrink-0` on both variants: a tab takes its content's
+width, the STRIP scrolls.
+
+### Fixed — the comment composer's pill has a boundary
+
+`--surface-raised` in the dark palette sits one step off the panel, so the
+inline composer's pill vanished: a reader saw a bare placeholder floating
+over a dead Send and called the thread broken. The field was real; nothing
+said so. The pill now carries the 20% hairline ring, the tier the thread's
+own dividers already use.
+
 ## v1.0.3 — 2026-08-25
 
 A patch off `v1.0.2`. Two changes to one structure, and like the two before it
