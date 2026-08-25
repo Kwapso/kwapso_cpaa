@@ -481,7 +481,23 @@ Two rules travel together and appear on **every** write (ARCHITECTURE §4).
 
 Records are *retired*, never removed. A `deactivated_at` timestamp (NULL = active)
 marks the row while its data and history survive. There is no `DELETE` statement for a
-user-facing record anywhere in the base.
+MASTER record anywhere in the base — and since 25 Aug 2026 that sentence has one
+reviewed carve-out, for a CHILD row, which is exactly the case ARCHITECTURE §4's
+lock reserved the delete right for. A process STEP added by mistake can be
+hard-deleted through `POST /api/tenancy/processes/steps/delete` (gated
+`processes:delete`; the owner's explicit decision). The door refuses three things
+by name — a step in an older version, a step any agreed version holds ("versions
+stay exactly as they were agreed"), and a step a live step loops back to — and the
+DELETE re-checks all three as predicates riding the statement itself, inside the
+account fence. The step's revisions are deleted with it, an activity row ("Step
+deleted") is written, and a portal caller is refused at the door. A step that was
+ever part of an agreed version can only be switched off, never deleted, so the
+saving it represents is never erased. (`workers/tenancy/src/lib/processes.ts`,
+`deleteStep`; the smaller sibling deletes, all child rows too, are a
+`process_links` row when two maps are disconnected — the connection is a
+statement, not a record — a corrected day's replaced price row in
+`client_tool_prices`, and the join rows a whole-set write reconciles in
+`client_role_departments` / `client_role_people`.)
 
 **Deactivate must stay reversible. Never a dead end.** A management LIST must still
 RETURN deactivated rows (active first, each carrying an `active` flag) so the screen can

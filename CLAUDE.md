@@ -169,6 +169,15 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   fifteen of eighty-eight boxes turned out to decide nothing, one whole module
   (`screens`) had four boxes and no door, and two purged modules still held rows
   six weeks on. (`offered-rights`)
+- **A link inside the app never leaves the shell (R37).** The whole post-auth app
+  is ONE client-resolved shell that mounts once; a bare `<a href="/t/…">` throws
+  the document away, re-runs every module and replays the boot mark. So an
+  in-app destination is written with `<InAppLink>` (a real anchor — middle-click,
+  copy-address and screen readers all still work; only the plain left click is
+  intercepted into the soft-navigation bus) or carries that interception inline.
+  Checked as a census OFF THE DISK of every component's anchors, classified by
+  where each href points. Earned three times by one class of bug, green each
+  time. (`in-app-anchors`)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 
@@ -185,7 +194,7 @@ Answer these seven, in order, *before* you write code. It's the thinking that ke
 
 ## Build style, how code here is written
 
-- **Workers (8):** six private brains, auth; tenancy (teams, members, Member roles + permissions, invites, the screen-recipe store, **the customer spine**, accounts, contact links, portal logins, **process maps** and **the money**: the two rate cards + margin); realtime; content (tickets + **the WORK ENGINE**, stories, sprints, work logs, to-dos, tasks, triage and meetings, + **the knowledge base**, with a 15-minute sweep and a morning digest, + the per-person Google connections + the agency's own housekeeping); data-ops (import + AI agent); mcp (the external machine surface: personal access tokens → team-pinned sessions → MCP tools over the same gated doors; reached only through the agency gateway at `/mcp` + `/api/mcp/*`), under **two public doors**: `gateway` (the agency app, `web/`, routes `/api/*` by prefix) and `portal-gateway` (the client portal, `web-portal/`, forwards a named allow-list only). **Only those two are public**; every other worker sets `workers_dev:false` + `preview_urls:false`, so no public route can reach `/internal/*`, the agent, or the act-as-user surface. Per-team D1 databases reached over the REST door (`CF_D1_TOKEN`); the global core DB via the native `env.DB` binding. Shared worker code lives in `shared/workers/` (gating, http, validate, …).
+- **Workers (8):** six private brains, auth; tenancy (teams, members, Member roles + permissions, invites, the screen-recipe store, **the customer spine**, accounts, contact links, portal logins, **process maps** and **the money**: the three rate cards + margin — what a client is charged, what our own hour costs, and the per-role cost card); realtime; content (tickets + **the WORK ENGINE**, stories, sprints, work logs, to-dos, tasks, triage and meetings, + **the knowledge base**, with a 15-minute sweep and a morning digest, + the per-person Google connections + the agency's own housekeeping); data-ops (import + AI agent); mcp (the external machine surface: personal access tokens → team-pinned sessions → MCP tools over the same gated doors; reached only through the agency gateway at `/mcp` + `/api/mcp/*`), under **two public doors**: `gateway` (the agency app, `web/`, routes `/api/*` by prefix) and `portal-gateway` (the client portal, `web-portal/`, forwards a named allow-list only). **Only those two are public**; every other worker sets `workers_dev:false` + `preview_urls:false`, so no public route can reach `/internal/*`, the agent, or the act-as-user surface. Per-team D1 databases reached over the REST door (`CF_D1_TOKEN`); the global core DB via the native `env.DB` binding. Shared worker code lives in `shared/workers/` (gating, http, validate, …).
 - **Worker handler shape:** a declarative `ROUTES` table (each route tagged read / mutation / housekeeping) → gate with `requireRight` from `shared/workers/gating` → team-DB CRUD via `d1Query` / `d1ExecScript` + `sqlString` + `ulid` → `publishChange` → return. Throw `GuardError(status, code, msg)`; the central catch maps it to a response.
 - **Deactivate, never delete** (data + audit survive). Keep an audit block (actor + timestamp) on every write.
 - **Permissions are the spine.** The AI agent **acts AS the signed-in user through the same gated endpoints** and never exceeds their rights. There is no separate agent role.

@@ -30,7 +30,7 @@ service-binding calls (never a public hop).
 | Worker | Cloudflare name | Owns | Why it's its own worker |
 |---|---|---|---|
 | **auth** | `kwapso-auth` | Sign-in, a 6-digit email code via Resend or Google (no Clerk), sessions, the email-change flow, profile, `/api/auth/me`, and `/internal/send-email` | Identity is the one thing every other worker trusts. It's the single session authority: everyone else asks it "who is this?" (`whoAmI`) rather than parsing cookies themselves. |
-| **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, the team-DB migration/sharding admin endpoints, **and the three subsystems that hang off the same spine:** the **customer spine** (accounts, contact links, portal logins + the one account-fence corridor), **process maps** (App → Process → Step and the savings cut from them), and **the money** (the two rate cards + margin, split across two files because R24 forbids the internal one reaching the portal) | This is the multi-tenancy engine, it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here, and so does the *second* fence the product needs: which **accounts** a caller may see. Both are decisions about who may read what, so they belong to one worker. |
+| **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, the team-DB migration/sharding admin endpoints, **and the three subsystems that hang off the same spine:** the **customer spine** (accounts, contact links, portal logins + the one account-fence corridor), **process maps** (App → Process → Step and the savings cut from them), and **the money** (the three rate cards + margin — `account_rates`, what a client is charged; `internal_rates`, what our own hour costs; `internal_role_rates`, the per-role cost card — split across two files because R24 forbids the internal two reaching the portal) | This is the multi-tenancy engine, it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here, and so does the *second* fence the product needs: which **accounts** a caller may see. Both are decisions about who may read what, so they belong to one worker. |
 | **realtime** | `kwapso-realtime` | The live switchboard, one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data**, the databases stay the source of truth, so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
 | **content** | `kwapso-content` | **Tickets** (tickets + threaded replies, one module, no help section; the key, tables and path stay `help`, DATA-MODEL.md says why), **the work engine** (stories, sprints, work logs, to-dos, tasks, triage duty, meetings), **the knowledge base** (sources → chunks → terms → the Vectorize index, plus the 15-minute sweep and the 07:00 digest), **the per-person Google connections**, and **the agency's own housekeeping** (brand assets, meeting purposes, staff profiles) | Everything a team AUTHORS lives here. They're grouped because they share one shape, team-DB CRUD gated on a permission module, deactivate-not-delete, an audit block, R2 media, and none is big enough to deserve its own worker. It is the only domain worker besides tenancy with a cron, and both of its crons record failures to the error store (R12). |
 | **data-ops** | `kwapso-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content, they orchestrate. |
@@ -107,17 +107,20 @@ worker reads and writes team data through that one layer. Never ad-hoc.
 `web/` is a Next.js app exported to **static** assets, served by the gateway
 alongside `/api/*` on the same origin. It is "lego assembled from a library": all
 UI primitives and collections come from `shared/ui/`, imported as
-`@shared/ui/registry/primitives/button/button`; `web/` only composes *recipes*
+`@shared/ui/controls/button/button` (primitives are `controls/`, assemblies are
+`structures/`); `web/` only composes *recipes*
 from them. The library was the npm package `@kwapso/ui`, installed from a
 separate repo, until it was **vendored into this repo on 2026-08-22**, because
-the re-theme needs to change what a component IS and not only what colour it is.
+the re-theme needs to change what a component IS and not only what colour it is —
+and since **2026-08-25 the vendored copy is PINNED**: `github.com/Kwapso/design`
+at the tag in `shared/ui/VERSION.json`, with a hand-edit under `shared/ui/`
+turning the build red (`web/test/vendored-kit.test.ts`).
 **The two layers did not merge, only the address changed:** a primitive is
 generic, app-agnostic lego, and a control that only makes sense in this product
-still belongs in `web/components/`. If a primitive needs changing, change it in
-`shared/ui/` — that is now this repo's own code (UI-GAPS.md is the list of what
-it still cannot do). The one thing you must never do is edit the UPSTREAM
-library, which other Swift Struck products depend on; `shared/ui/README.md` says
-why in full. Screens are one client-resolved shell
+still belongs in `web/components/`. If a primitive needs changing, change it
+upstream in `Kwapso/design`, tag it, and pull it with `scripts/sync-design.mjs`
+(UI-GAPS.md is the list of what the kit still cannot do); `shared/ui/README.md`
+says why in full. Screens are one client-resolved shell
 (`web/components/deep-link-screen.tsx`) rendering recipes from `web/lib/screens.ts`
 at `/t/<teamId>/<module>/<id>` URLs.
 
@@ -470,9 +473,11 @@ for some products and wrong for others.
    portal where tenants share a team.
 
 **What a new product must NOT do.** Don't hand-roll a second copy of a component that
-`shared/ui/` already ships (fix the one in `shared/ui/`, which this repo owns since
-2026-08-22), don't push a change of yours back to the UPSTREAM `swift-struck-ui` repo
-(other Swift Struck products depend on it), don't add a public worker (only the two
+`shared/ui/` already ships, and don't hand-edit the one in `shared/ui/` either —
+`shared/ui/` is a PINNED dependency of `github.com/Kwapso/design` (the tag is in
+`shared/ui/VERSION.json`), a hand-edit turns the build red
+(`web/test/vendored-kit.test.ts`), and a kit change is made upstream, tagged, and
+pulled with `scripts/sync-design.mjs`. Don't add a public worker (only the two
 gateways are public, a third
 public address is a third door onto `/internal/*`, the agent and the act-as-user
 surface), don't add

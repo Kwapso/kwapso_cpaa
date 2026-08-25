@@ -7,7 +7,8 @@ OPEN questions. This is the canonical data-model reference. Keep it accurate.
 
 ## What's in here
 
-Nine and a half thousand words is too many to scroll, so: the two tiers, in order.
+Sixteen and a half thousand words (recounted 26 Aug 2026) is far too many to
+scroll, so: the two tiers, in order.
 
 **Preamble**, [Glide patterns that are NOT persisted data](#glide-patterns-that-are-not-persisted-data-dropped-everywhere) · [The audit block](#the-audit-block-standard-every-table)
 
@@ -22,17 +23,18 @@ Nine and a half thousand words is too many to scroll, so: the two tiers, in orde
 | Subsystem | Tables |
 |---|---|
 | Permissions + vocabulary | `member_roles` + `role_permissions` · `selectable_data` |
-| Content | `help` + `help_threads` (**Tickets**) · `ref_counters` |
+| Content | `help` + `help_threads` (**Tickets**) · `help_stakeholders` · `ref_counters` |
 | History + invites | `activity` · `invite_logs` |
 | Import | `data_import_sessions` · `data_import_batches` |
 | The assistant | `agent_threads` + `agent_messages` |
 | The customer spine | `accounts` + `account_links` + `portal_users` (+ `current_account_id`) |
 | The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
-| Process maps + the money | `apps` + `processes` + `process_versions` + `process_steps` + `process_comments` · `account_rates` + `internal_rates` |
+| Process maps + the money | `apps` (+ `app_staff` + `app_stakeholders` + `app_modules`) + `processes` + `process_versions` + `process_steps` (+ `process_step_tools` + `process_step_revisions`) + `process_comments` · `process_links` · `process_drafts` · `account_rates` + `internal_rates` + `internal_role_rates` |
+| The client's own organisation | `client_departments` · `client_roles` (+ `client_role_departments` + `client_role_people`) · `client_tools` + `client_tool_prices` |
 | What we hand over | `deliverables` |
-| The work engine | `stories` + `sprints` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
+| The work engine | `stories` (+ `story_attachments` + `story_processes`) + `sprints` · `waves` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
 | The agency's own housekeeping | `brand_assets` · `meeting_purposes` · `staff_profiles` · `staff_certificates` |
-| One person's own Google | `google_connections` + `google_sources` |
+| One person's own Google | `google_connections` + `google_sources` · `chat_people` |
 
 **Closing**, [Status: what's built vs. to build](#status-whats-built-vs-to-build) · *Resolutions (2026-06-13), cross-cutting model LOCKED*
 
@@ -481,6 +483,17 @@ describes; there is no second ticket beside it, and there never will be.
   788 of the tickets arriving from Glide exist only in German, so a translation
   SETS the empty one and never overwrites the original.
 
+### help_stakeholders. KEEP (BUILT, per-team, team migration `0005_help_stakeholders`). WHO ELSE IS WATCHING A TICKET
+
+The extra STAFF people on one ticket, beside whoever raised and whoever answers
+it: one row per (`help_id`, `user_id`), with a UNIQUE pair so adding the same
+person twice is a no-op rather than a duplicate (R17 as a constraint). A
+stakeholder is a colleague who should see the ticket move — they are read by
+`list_help_stakeholders` and added through `add_help_stakeholder`, and the
+notify path reads this table for who to tell. Creator block only: a stakeholder
+row is a statement, and taking somebody off it is the row going, not a
+deactivation ceremony on a join row.
+
 ### ref_counters. BUILT (per-team, team migration `0011_ticket_work_engine`)
 One row per (`account_id`, `kind`) holding `next_no`. The reference numbers SCOPE
 ch.02 describes are sequential **per account**, and allocation is a SINGLE
@@ -828,11 +841,15 @@ how long it takes each time, and how often it happens.
 **Version 1 is the pre-kwapso baseline**, how the work was done before we touched
 anything, and it is written WITH the process, because a process with no baseline
 can never produce a saving and would report zero for ever while looking healthy.
-Later versions are cut automatically when a sprint completes (`cut_from_sprint_id`)
-or from a button (null). The partial unique index on
-`(process_id, cut_from_sprint_id)` is **R17 for a transition that is an INSERT**:
-the predicate cannot ride a WHERE, so the database refuses a second cut for the
-same sprint rather than a check a retry could slip past.
+Later versions are cut **by hand, from the button, and only there** (owner,
+24 Aug 2026; migration `0051_a_version_is_cut_by_hand`). An earlier design had a
+completing sprint cut one automatically (`cut_from_sprint_id`), and nothing was
+ever wired to do it — the parameter, the column and its index existed and only
+tests used them, so the decision was purged rather than switched off. The R17
+shape survives the purge: a version cut is a transition that is an INSERT, the
+predicate cannot ride a WHERE, so the unique index on `(process_id, version_no)`
+is what refuses the second of two quick presses, and the door answers the loser
+`alreadyCut: true` rather than an error.
 
 **`process_steps.step_key` is the identity that makes a saving a SUBTRACTION**
 rather than a name match: the row id belongs to one version, the key is the same
@@ -882,11 +899,91 @@ duration and cuts no version. A STAFF comment carrying `explains_step_key` is th
 explanation attached to a step that got slower; the client's own screen shows the
 regression either way (no filter hides one) and shows our explanation beside it.
 
-### account_rates + internal_rates. KEEP (BUILT 2026-08-11, same migration). THE TWO RATE CARDS
+### app_staff + app_stakeholders. KEEP (BUILT 2026-08-17, team migration `0030_app_staff_and_stakeholders`). WHO IS ON AN APP
 
-**Two tables, never one with a `kind` column, and that is the security control.**
-One is what an ACCOUNT IS CHARGED per hour; the other is what an hour of OUR OWN
-work COSTS US. They are the same shape, a label and a rate, which is exactly the
+The two answers an app tile could not give: who runs it on OUR side and who owns
+it on THEIRS. `app_staff` is our people — `user_id` plus `is_lead`, so "who do I
+ask" has one name — and `app_stakeholders` is the client's people, `contact_id`
+pointing at the person's own `accounts` row (a stakeholder is a contact you
+already have, never a new record) plus `is_main`, the one whose confirmation a
+ticket's `awaiting_validation` stage waits on. Both carry the full audit block
+and deactivate rather than delete, so "who USED to run this" stays answerable.
+
+### app_modules. KEEP (BUILT 2026-08-20, team migration `0048_app_modules`). THE SECTIONS OF A BUILT SYSTEM
+
+What a ticket says it is ABOUT: an app's own divisions (Settings, Documents,
+Tasks), so tickets group by the part of the software they concern. `app_id` names
+the system, `account_id` is copied on for the fence, and the row carries `name`,
+a `mark` (the glyph shown beside it), `name_de`, a `description` and a `benefit`.
+It is deliberately NOT a process: a process is a way of WORKING and belongs to
+the account's world; a module is a division of the software we built. A ticket's
+`module_id` must belong to the app its `app_id` names, and the door checks it.
+
+### process_step_tools + the six step columns. KEEP (BUILT 2026-08-24, team migrations `0053_a_step_names_its_role_and_its_tools` + `0054_the_audit_module_finished`). WHAT A STEP IS MADE OF
+
+The audit round's answer to "a step is a name and two numbers, and a saving
+needs more than that". `0053` gives a step its ROLE — `client_role_id`, who at
+the client does this work — and a join table, `process_step_tools`, for the
+tools it touches, keyed `(version_id, step_key)` so the pair survives a version
+cut, with `account_id` carried so the fence applies to this row and not only to
+the step it hangs off. `0054` then adds five more columns to `process_steps`:
+`client_tool_id` (the ONE tool on the step, backfilled from the join table's
+oldest row), `frequency_period` (day / week / month / year — how often, in the
+period somebody actually says it in, which is what lets a savings sum normalise
+honestly), `role_cents_per_hour` (what an hour of that role cost WHEN THIS WAS
+RECORDED — frozen, because a rate corrected in 2027 must not move a figure a
+client agreed in 2026), and `branch_label` + `loops_back_to` (forks, the words
+on them, and the way back). The same migration puts `audit_date` on `processes`,
+the day a map's savings are measured FROM.
+
+### process_step_revisions. KEEP (BUILT 2026-08-24, team migration `0054_the_audit_module_finished`). THE MAP, ON ANY DAY
+
+The step across TIME: keyed by `step_key` (the identity a version cut copies
+forward, not the per-version row id) plus `effective_on`, the day this
+description of the step started being true. One description of one step per day
+— saying it twice on one day is a correction, not a second truth. Each row
+freezes the step's whole shape (name, position, the two numbers,
+`frequency_period`, role, frozen `role_cents_per_hour`, tool, branch, loop) and
+a `removed` flag meaning the work stopped happening on that date — never a
+delete, because a removed step is the largest saving there is and deleting it
+would report none. This is what lets a map be read AS OF a date and cost that
+date correctly. Deleted only when a mistaken step is deleted with them (the one
+hard-delete door, see `apps + processes` above and CONVENTIONS.md).
+
+### process_links. KEEP (BUILT 2026-08-24, team migration `0054_the_audit_module_finished`). ONE MAP, CONNECTED TO ANOTHER
+
+The last step of one map is very often the first step of another, and this row
+says so: `from_process_id` → `to_process_id`, unique per pair, with a `note` in
+the team's own words ("hands over to"). LOOSE by ruling — connecting two maps
+alters no duration and no saving on either side, so the door does not gate it
+like an edit to the numbers. Creator block only, and DISCONNECTING deletes the
+row: the connection is a statement, not a record.
+
+### process_drafts. KEEP (BUILT 2026-08-24, team migration `0054_the_audit_module_finished`). WHAT THE EXTRACTION PROPOSES, BEFORE ANYBODY AGREES
+
+A call we held (`source_meeting_id`) or text somebody pasted (`source_text`),
+read by a model into a proposed map or a proposed revision of one
+(`process_id` null = a new map). The proposal itself is a JSON `payload`,
+deliberately NOT normalised into the real tables: a draft that lived in
+`process_steps` would be indistinguishable from the record the moment anybody
+read it wrong, and "the draft is not the record" is the sentence this table
+exists to keep true. `status` walks proposed → applied / discarded, and applying
+one is a PERSON reviewing and confirming — always, no exception, which is also
+why the draft doors are deliberately off the machine surface (MCP.md's
+`TOOLLESS_DOORS` carries the reasoning).
+
+### account_rates + internal_rates + internal_role_rates. KEEP (BUILT 2026-08-11 + 2026-08-17, migrations `0013` + `0031_role_rate_card`). THE THREE RATE CARDS
+
+**Separate tables, never one with a `kind` column, and that is the security
+control.** One is what an ACCOUNT IS CHARGED per hour; the other two are OURS:
+what an hour of our own work costs us (`internal_rates`), and what an hour of a
+named ROLE is worth (`internal_role_rates`, migration `0031_role_rate_card` —
+`role_name` + `cents_per_hour` + the audit block, written by the one
+`set_role_rate` door, where the role name is the key so add, re-price and retire
+are one act). The role card is the number an app's money figure is computed
+from, and its own comment in `internal-money.ts` says the load-bearing part: it
+is a THIRD rate card and it belongs in that file, which is the whole of R24's
+defence. They are the same shape, a label and a rate, which is exactly the
 danger: one table would put both numbers a single forgotten predicate apart, and
 the wrong one of them is the one figure SCOPE says a client must never see under
 any flag, ever. A door that reads `account_rates` cannot return an internal rate,
@@ -902,6 +999,34 @@ margin applies to logged time whose kind of work is not yet named. Tool costs ar
 a COLUMN on the app (`tool_cost_cents_per_month`) rather than a table: what a
 system costs us to keep running is one number about one system, and the margin is
 the only thing that reads it.
+
+### client_departments + client_roles + client_role_departments + client_role_people + client_tools + client_tool_prices. KEEP (BUILT 2026-08-24, team migration `0052_the_client_organisation`). THE CLIENT'S OWN ORGANISATION
+
+Who does the work AT A CLIENT, what an hour of them costs, and what they run on
+— the other side of the money from the internal cards above, and the side a
+saving actually multiplies. Six tables, every one fenced by `account_id`:
+
+- **`client_departments`**, the named parts of their business.
+- **`client_roles`**, who does the work. `cents_per_hour` is what an hour of
+  this role costs the CLIENT, and NULL is a real answer rather than a zero — a
+  saving computed from it reads as incomplete instead of as nothing.
+- **`client_role_departments`**, the join: a role can sit in SEVERAL
+  departments, and the write is the WHOLE set — anything left out is removed
+  (which is why the door's tool says so in as many words).
+- **`client_role_people`**, who holds the role: `person_account_id` points at
+  the person's own `accounts` row. A person on a role is a contact you already
+  have, never a new record.
+- **`client_tools`**, what they run on — a name and a `mark`.
+- **`client_tool_prices`**, the DATED price history: `cents`, a
+  `billing_period` of month or year, and `effective_on`, the day this price
+  started being true. A map set to a date reads the newest row on or before it,
+  which is what lets a map set to March cost March correctly; setting a price
+  for a day that already has one REPLACES it (a correction means "this is what
+  it was", not a second truth about the same morning), and that replace is one
+  of the few genuine child-row deletes in the base (CONVENTIONS.md).
+
+The join tables carry creator blocks only; the four record tables carry the full
+audit block and deactivate, never delete.
 
 ---
 
@@ -932,6 +1057,33 @@ this build and the money lane (`workers/tenancy/src/lib/work-engine.ts` used to
 probe `sqlite_master` for which of two spellings had shipped). `completed_at` is
 a MOMENT rather than a status word, because the version cut on the money side
 keys off exactly that.
+
+### story_attachments + story_processes. KEEP (BUILT 2026-08-19 + 2026-08-17, team migrations `0045_a_story_shows_its_work` + `0028_ticket_and_story_facts`). WHAT A STORY CARRIES
+
+Two small tables that hang off a story. **`story_attachments`** is its files and
+links — `kind` is `file` or `link`, with a `label`, the `url`, and
+`content_type` + `size_bytes` when there are bytes behind it; a screenshot of
+the work is the ordinary row. Deactivated, never deleted, so "what was attached
+when we agreed this" survives (`add_story_link` is the machine half; the FILE
+half is a screen action, the same bytes-not-prose ruling as everywhere else on
+the machine surface). **`story_processes`** is the join saying which process
+maps a piece of work touches — creator block only, a statement rather than a
+record, which is what lets the impact screen walk from the work done to the maps
+it changed.
+
+### waves. KEEP (BUILT 2026-08-24, team migration `0054_the_audit_module_finished`). WHAT A CLIENT BOUGHT
+
+A **wave** is several sprints sold together — the package, where a sprint is the
+block inside it. It carries a `name` (unique per account among active rows), a
+`goal`, and NO price: what a wave costs is deliberately out of this module's
+first version. `starts_on` / `ends_on` are DERIVED from the sprints inside it
+and STORED so a list does not recompute them per row — recalculated whenever a
+sprint is added, moved or removed. The join is one column the same migration
+puts on the sprint, `sprints.wave_id`, written by the one `set_sprint_wave` door
+(tenancy's single-column write on a content-owned table — the ownership split is
+recorded in RESILIENCE.md §2). Two sprints whose dates overlap are REPORTED and
+never refused: the overlap is real, and a door that said no would be enforcing a
+rule nobody agreed to.
 
 ### work_logs + work_prefs. KEEP (BUILT 2026-08-12, team migration `0015_work_logs`). THE ROW OF TIME
 
@@ -965,7 +1117,7 @@ silently stopped your other work would be discovered by losing an hour.
 ### todos + tasks. KEEP (BUILT 2026-08-12, team migration `0016_todos_and_tasks`). THE OTHER TWO NOUNS
 
 **Two tables, not one with a `kind` column**, and the reason is the one that split
-the two rate cards: they are the same SHAPE and opposite AUDIENCES. A **to-do**
+the rate cards: they are the same SHAPE and opposite AUDIENCES. A **to-do**
 is aimed at the client and appears in their portal; a **task** is our own admin
 and must never leave the building. One table with a flag would put both a
 forgotten `WHERE` clause apart, and the wrong one of them is a list of the
@@ -1052,6 +1204,14 @@ can answer *"what did we agree in March"*.
   knowledge file uses. `transcript_found_by` records which of the three hunts
   found it — the calendar entry's own attachment, a shared Drive folder, or a
   notice from Google in the mail — because the three do not prove the same thing.
+- **`transcript_attempts` (`0055_transcript_gives_up`, 26 Aug 2026)** is the
+  autopilot's give-up counter. A hunt that THROWS increments it; a quiet
+  "nothing there yet" stays free to retry until the horizon passes. Past
+  `TRANSCRIPT_ATTEMPT_CAP` (8, `shared/workers/limits.ts`) the sweep stops
+  selecting the meeting, so one meeting Google keeps refusing cannot eat the
+  tick's budget every quarter hour forever — the cap is the SWEEP's selection
+  rule, not a refusal on the door, so a person pressing the read button can
+  still try.
 
 **Why it is its own permission module and not four more rights on `delivery`.**
 `meeting_purposes` is a TAXONOMY of why we meet, a settled list somebody curates
@@ -1268,6 +1428,19 @@ The switch module has no rows at all.
 Google surface; every handler opens with `refusePortalCaller` and both tables are
 `fence: null` in `PORTAL_ACTIVITY_FENCE`.
 
+### chat_people. KEEP (BUILT 2026-08-20, team migration `0049_chat_people`). THE NAMES CHAT ARRIVES WITHOUT
+
+Google Chat names a message's sender `users/<number>` and offers no scope that
+turns the number into a person — the roster comes back nameless, and the People
+API answers only for the caller's own contacts. The ONE route to a name is the
+conversation itself: when somebody writes an @mention, Google attaches an
+annotation carrying the display name. This table remembers what was learned
+(`user_id` → `display_name`, with `learned_at` and `learned_from`), so a
+message filed into the knowledge base reads "a person said this" rather than a
+number, and a name survives the request it was learned in. Four columns, no
+audit ceremony: it grows with PEOPLE, not with messages, and a row is a cached
+fact, not a record anybody curates.
+
 ---
 
 ## Status: what's built vs. to build
@@ -1312,11 +1485,13 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
   themselves, so a database built from the file today never has them, `0025`
   drops them `IF EXISTS`, for the teams that ran the old versions.
 - **The per-team migration list is `TEAM_MIGRATIONS` in
-  `workers/tenancy/src/team-schema.ts`**, **twenty-seven today, `0001_team_base`
-  through `0027_task_admin`** (this line said "eleven, through
-  `0011_ticket_work_engine`" while the sections above it documented `0012` to
-  `0020`; a count in prose beside the list it counts is a copy that only ever
-  drifts one way). A new team's database runs all of them at creation; existing
+  `workers/tenancy/src/team-schema.ts`**, **fifty-five today (26 Aug 2026),
+  `0001_team_base` through `0055_transcript_gives_up`** (this line has now
+  drifted twice — it said "eleven, through `0011_ticket_work_engine`" while the
+  sections above documented `0012` to `0020`, then "twenty-seven, through
+  `0027_task_admin`" for another twenty-eight; a count in prose beside the list
+  it counts is a copy that only ever drifts one way, so trust the file's own
+  count over this sentence). A new team's database runs all of them at creation; existing
   teams get the gap rolled to them by `POST /api/tenancy/admin/migrate-teams`.
   **That file is the source; any list written down elsewhere, here, OPERATIONS,
   BOOTSTRAP, EDGE-CASES, is a copy of it, and the copy is the one to distrust.**

@@ -100,8 +100,10 @@ What makes it read pink is two files fighting:
 3. `web/app/globals.css:32-56` paints three blurred mango pools (`#fecc6d`) behind
    everything, drifting on 47s and 61s loops (`kw-drift-a`, `kw-drift-b`).
 
-`Card` carries `glass` in its base class
-(`shared/ui/registry/primitives/card/card.tsx:27`), so **every card,
+`Card` carried `glass` in its base class
+(then `registry/primitives/card/card.tsx`; the kit's paths are `controls/…` since
+2026-08-24, and the `glass` default is gone from the vendored kit — the fix is the
+first **Done.** row in "The seven files that carry most of it"), so at the time **every card,
 dialog, popover, dropdown menu and sheet in the agency app is six per cent see-through
 onto a slowly moving orange field.** Warm beige plus a mango bleed reads as pink, and
 because the field drifts, the card colour changes while you look at it. That is both the
@@ -818,7 +820,7 @@ The busy label is "Submitting…" everywhere, replacing "Saving…", "Sending…
 
 Implement by giving `FormShell` a footer it renders itself rather than by editing 37 call
 sites one at a time. The library's own `Form` collection already defaults
-`submitLabel: "Submit"` (`shared/ui/registry/collections/form/form.tsx:40`),
+`submitLabel: "Submit"` (`shared/ui/structures/form/form.tsx`),
 so this aligns the host with the library rather than diverging from it.
 
 Evidence: `P-4.10.31` and `P-4.10.36`, the portal's New Ticket form. The button says
@@ -1605,7 +1607,7 @@ questions in order.
 
 | Options | Mutually exclusive | Changes the view | Sets a value |
 |---|---|---|---|
-| 2 to 6 | yes | **tabs** (`TabsView`, [R3](#r3-no-hand-rolled-toggles)) | **chips** ([F7](#f7-a-short-enumerated-choice-is-a-row-of-chips-not-a-select)), or **radio** when each option needs a sentence of explanation |
+| 2 to 6 | yes | **tabs** (`TabsView`, [R3](RULES.md)) | **chips** ([F7](#f7-a-short-enumerated-choice-is-a-row-of-chips-not-a-select)), or **radio** when each option needs a sentence of explanation |
 | 7 or more | yes | **a dropdown** that reads as a view switch, with the current view on the trigger | **a `Select`** |
 | any | no | **a filter facet** in the collection toolbar ([K7](#k7-the-collection-toolbar-is-one-row-heading-search-filter-add)) | **checkboxes**, up to 5, all visible; a multi-select popover above that |
 
@@ -1651,7 +1653,7 @@ Here is what is achievable today without touching the library, and what is not.
   Every destination has one; keep it that way, and add the concept there before the screen.
 - A tab strip already takes an icon per tab: `TabsView` is given `icon` on every team
   section (`web/components/team-section-nav.tsx:42-59`), and
-  [R3](#r3-no-hand-rolled-toggles) is written around "icon + count badge". Any strip that
+  [R3](RULES.md) is written around "icon + count badge". Any strip that
   is missing icons can have them today.
 - A **collection heading** may carry its concept glyph beside the title.
   `CollectionHeading` is the host's own component
@@ -1660,7 +1662,7 @@ Here is what is achievable today without touching the library, and what is not.
   already does it (`web/components/sprints-screen.tsx`), and so does the header band
   (`TypeMark` in `web/components/record-chrome.tsx`).
 - Any **host-composed** row may carry a mark, because the library `List` has the slot:
-  `item.leading` (`registry/collections/list/list.tsx:19,94`). Home and Settings use it
+  `item.leading` (`shared/ui/structures/list/list.tsx`). Home and Settings use it
   today.
 
 **Not achievable, and do not work around it:** a **recipe-driven** collection row cannot
@@ -1747,14 +1749,15 @@ bottom of a scrolling sheet. This app has 31 different words for the same act. S
 ## Do not do
 
 1. **Do not change a component in `shared/ui/` to satisfy a rule in this document.**
-   Not because you can't — the library was vendored into this repo on 2026-08-22 and it
-   is ours to edit — but because this is a *rearrangement* rule book, and every rule in
+   Two reasons now, where this book was written with one. The kit is a PINNED
+   dependency since 2026-08-25 — a hand-edit under `shared/ui/` turns the build red
+   (`web/test/vendored-kit.test.ts`), and a component change is made upstream in
+   `github.com/Kwapso/design`, tagged, and pulled — and, the original reason, this
+   is a *rearrangement* rule book: every rule in
    it is implementable from `web/`, `web-portal/` and `shared/` without touching a
    component. If you reach a rule you cannot express that way, stop: either the rule is
    wrong or it belongs in the reskin's own work, and UI-CONVENTIONS.md §1 is where a
-   real component change gets decided. **And never edit UPSTREAM** (`swift-struck-ui`),
-   which other Swift Struck products still depend on — nothing here is ever pushed,
-   PR'd or synced back to it.
+   real component change gets decided.
 2. **Do not re-implement a library primitive locally** because a prop is missing. Eleven
    library components ship unused already (`Title`, `Headline`, `Text`, `Hint`,
    `Container`, `Spacer`, `Clamp`, `ActionRow`, `RecordDetail`, `DetailView`,
@@ -1855,16 +1858,17 @@ implemented. Kept as the record of what landed and where:
 
 ### The seven files that carry the density round
 
-Section 12's turn. If you implement nothing else from it, these seven edits deliver the
-majority of the change. Every one is ordered, with its exact diff, in
-`.session-notes/ui-rearrangement-plan.md`.
+Section 12's turn — and, like the table above it, now history: the round landed, and
+several of its edits have since hardened into law (R29 holds the width caps out,
+R32 the ramp). Every one was ordered, with its exact diff, in
+`.session-notes/ui-rearrangement-plan.md`. Marked as of 26 Aug 2026:
 
-| File | Rules | What changes |
+| File | Rules | What changed |
 |---|---|---|
-| `web/components/screens/*.tsx` (5 files) + `app-shell.tsx:489` | N8 | Delete six `max-w-2xl` / `max-w-3xl` caps. Six screens go from 60% span to 100%, and the cold-load width jump stops. |
-| `shared/web/language-section.tsx` | N1, N10 | 29 pills become one dropdown showing the flag and the native name. Removes the single worst band in either front door. |
-| `web/components/time-panel.tsx` | N1, N4 | The 8-fact work-log row becomes a title plus a three-fact meta line. |
-| `web/components/process-detail.tsx` | N1, N4, N6 | The 8-fact step row, and three nested bordered containers, become one. |
-| `web/components/meetings-screen.tsx` | N1 | The 9-column all-view table drops to six columns. |
-| `web/components/tickets-collection.tsx` | N2, N10 | Six blocks before the first ticket become three; the derived type strip becomes a facet. |
-| `web/components/import-screen.tsx` | N5, N6 | The only file in either app using a banned Tailwind ramp, and the heaviest border user (9). |
+| `web/components/screens/*.tsx` (5 files) + `app-shell.tsx:489` | N8 | Delete six `max-w-2xl` / `max-w-3xl` caps. Six screens go from 60% span to 100%, and the cold-load width jump stops. **Done** — and held by R29 (`SCREEN_WIDTH_EXEMPT` is down to one reasoned entry). |
+| `shared/web/language-section.tsx` | N1, N10 | 29 pills become one dropdown showing the flag and the native name. Removes the single worst band in either front door. **Done** — it is the library `Select`, and `LANGUAGES` is four. |
+| `web/components/time-panel.tsx` | N1, N4 | The 8-fact work-log row becomes a title plus a three-fact meta line. **Done.** |
+| `web/components/process-detail.tsx` | N1, N4, N6 | The 8-fact step row, and three nested bordered containers, become one. **Done.** |
+| `web/components/meetings-screen.tsx` | N1 | The 9-column all-view table drops to six columns. **Done.** |
+| `web/components/tickets-collection.tsx` | N2, N10 | Six blocks before the first ticket become three; the derived type strip becomes a facet. **Done.** |
+| `web/components/import-screen.tsx` | N5, N6 | The only file in either app using a banned Tailwind ramp, and the heaviest border user (9). **Done** — and held by R32. |

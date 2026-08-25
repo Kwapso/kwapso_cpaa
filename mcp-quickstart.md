@@ -1,9 +1,9 @@
-# Connect to Brimba over MCP, quickstart
+# Connect to Kwapso over MCP, quickstart
 
 Hand this one file to a developer. It's the short version of [MCP.md](MCP.md).
 
 A machine (an AI agent, a script, an automation) can do the same things you can do in
-Brimba, over the **Model Context Protocol (MCP)**. It acts **as you, in one team,
+Kwapso, over the **Model Context Protocol (MCP)**. It acts **as you, in one team,
 capped by your role**. Never more. There's no separate "API key with god powers."
 
 ---
@@ -48,7 +48,7 @@ capped by your role**. Never more. There's no separate "API key with god powers.
 any AI" button gives you this with your host + token already filled in):
 
 ```
-Connect to my Brimba workspace over MCP (Model Context Protocol).
+Connect to my Kwapso workspace over MCP (Model Context Protocol).
 
 Endpoint: https://agency.kwapso.app/mcp
 Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
@@ -56,7 +56,8 @@ Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
 
 Then call tools/list to see what I can do. You act as me, in one team, capped by my
 role — reads, exports and imports are free; only the assistant tools (agent_chat,
-agent_confirm, plan_import) use the team's AI quota.
+agent_confirm, plan_import), and ask_knowledge when you set compose, use the team's
+AI quota.
 ```
 
 **Test with curl:**
@@ -71,9 +72,11 @@ curl -s https://agency.kwapso.app/mcp \
 ## 4 · What it costs
 
 Reads, CSV exports, and imports are **free**, just endpoint calls. Only the assistant
-tools (`agent_chat`, `agent_confirm`, and the `plan_import` step) use the **team's AI
-quota**, and only if your role has the AI-agent right. A role without it can't spend any
-AI budget, reads/exports still work.
+tools (`agent_chat`, `agent_confirm`, the `plan_import` step — and `ask_knowledge`
+when you set `compose`, which asks the app to write the answer for you) use the
+**team's AI quota**, and only if your role has the AI-agent right. A role without it
+can't spend any AI budget, reads/exports still work, and `ask_knowledge` without
+`compose` stays free.
 
 ## 5 · Good to know
 

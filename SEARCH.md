@@ -16,8 +16,10 @@ the engine picks the right layer automatically.
   database itself. (The exact library build is tracked in [UI-GAPS.md](UI-GAPS.md)
   #7; the ready-to-paste prompt for the library session lives with that work.)
 - **App / workers** own the *data*: which fields are searchable/filterable per
-  recipe, the query endpoints (`?q=` + filter params), and the per-team
-  **FTS5** index for record-level "search anything."
+  recipe and the query endpoints (`?q=` + filter params). Today every `?q=`
+  is a bounded LIKE scan; the per-team **FTS5** index for record-level
+  "search anything" is DESIGNED below (§ Layer 3) and not yet built — no
+  team-schema migration creates one.
 
 > **Scope. Read this before you conclude the app has no full-text search.** This
 > document owns **record search**: finding rows in a collection you are looking at.

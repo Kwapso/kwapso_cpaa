@@ -1,8 +1,14 @@
 # Durable Objects, the live layer and the one lock (LOCKED 2026-06-15; ROW-LEVEL 2026-06-22)
 
-Brimba uses exactly one Durable Object class today. `TeamChannel`, the live
-"switchboard" inside the **realtime** worker. This doc explains what it is, how
-its code is versioned and deployed, the end-to-end live-sync flow (a write →
+Brimba uses two Durable Object classes today, both inside the **realtime**
+worker (fact updated 26 Aug 2026: this sentence said "exactly one" from the day
+it was locked until `TeamInterest` shipped in August 2026). `TeamChannel` is the
+live "switchboard"; `TeamInterest` is the per-team interest registry beside it —
+one small instance per team that remembers which shards hold a listener for
+which resource, so the publish door fans a ping out only to the shards that
+asked (a stale or unknown answer says yes, so the failure costs an extra send,
+never a missed one). This doc explains what they are, how
+their code is versioned and deployed, the end-to-end live-sync flow (a write →
 `publishChange` → the DO → the client patches **one** row), and the separate
 question of when a Durable Object is the right tool for a **contended write** (a
 lock) versus when a plain D1 row is enough.
@@ -26,7 +32,7 @@ an instance and points here for what an instance IS.
 | Thing | What it is | How many | Grows with teams? |
 |---|---|---|---|
 | **Worker** | Deployed code (auth, tenancy, realtime, content, data-ops, mcp, gateway, portal-gateway) | 8 built | No |
-| **DO class** | A class *inside* a worker (`TeamChannel` in realtime) | 1 today | No |
+| **DO class** | A class *inside* a worker (`TeamChannel` + `TeamInterest`, both in realtime) | 2 today (26 Aug 2026) | No |
 | **DO instance** | A *runtime* entity addressed by name (`team:<id>`, `user:<id>`) | Unlimited | Yes, one per team **and** one per signed-in user |
 
 An instance is **not** a worker. Addressing one by name conjures it; idle ones
@@ -286,9 +292,15 @@ From `workers/realtime/wrangler.jsonc`:
 
 ```jsonc
 "durable_objects": {
-  "bindings": [{ "name": "CHANNELS", "class_name": "TeamChannel" }]
+  "bindings": [
+    { "name": "CHANNELS", "class_name": "TeamChannel" },
+    { "name": "INTEREST", "class_name": "TeamInterest" }
+  ]
 },
-"migrations": [{ "tag": "v1", "new_sqlite_classes": ["TeamChannel"] }],
+"migrations": [
+  { "tag": "v1", "new_sqlite_classes": ["TeamChannel"] },
+  { "tag": "v2", "new_sqlite_classes": ["TeamInterest"] }
+],
 ```
 
 - **`bindings`** exposes the class to the worker as `env.CHANNELS`, a
@@ -296,11 +308,13 @@ From `workers/realtime/wrangler.jsonc`:
   `env.CHANNELS.getByName("team:…")`.
 - **`migrations`** is the DO *class* lifecycle, not a D1 table migration. `v1`
   with `new_sqlite_classes: ["TeamChannel"]` registers the class on first
-  deploy. `new_sqlite_classes` (rather than `new_classes`) gives each instance a
+  deploy; `v2` did the same for `TeamInterest` when it landed in August 2026.
+  `new_sqlite_classes` (rather than `new_classes`) gives each instance a
   SQLite-backed storage tier; `TeamChannel` never writes to it (it holds no
   data), but the base is registered SQLite-backed so a future stateful DO uses
-  the same tier without a class rename. You only add another migration entry
-  (`v2`, …) when you **rename**, **delete**, or **transfer** a DO class, not for
+  the same tier without a class rename. You add another migration entry
+  (`v3`, …) when you **introduce**, **rename**, **delete**, or **transfer** a DO
+  class — `v2` is what introducing one looks like — not for
   ordinary code edits, which ship as a normal worker version.
 - **Staging repeats everything.** Wrangler envs don't inherit, so the
   `env.staging` block repeats the DO binding, the migration, its own `DB`, and
@@ -594,8 +608,9 @@ To add the live layer to a new app on this base:
    sockets via `this.ctx.acceptWebSocket` (Hibernation) and a `broadcast` that
    loops `getWebSockets()`. Holds no data. (`workers/realtime/src/index.ts`.)
 2. **The wrangler binding + migration**, `durable_objects.bindings`
-   (`CHANNELS` → `TeamChannel`) and `migrations` (`new_sqlite_classes:
-   ["TeamChannel"]`); repeat the block under `env.staging`.
+   (`CHANNELS` → `TeamChannel`; add `INTEREST` → `TeamInterest` if you take the
+   interest registry too) and `migrations` (`new_sqlite_classes`, one tag per
+   class); repeat the block under `env.staging`.
 3. **The gate**, `whoAmI` via the auth service binding, then `isActiveMember`
    for `team:` / own-id for `user:` before handing the request to the instance.
 4. **The publish seam**, `shared/workers/realtime.ts`

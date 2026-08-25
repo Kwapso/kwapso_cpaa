@@ -32,19 +32,25 @@ them and never hand-roll a second copy of a library component locally. If a prim
 needs changing, flag the gap (the app's UI-GAPS list) and fix it in the library, once,
 rather than working around it on each screen that hits it.
 
-**Where the library lives is a per-app decision, and it changed here.** The default is
+**Where the library lives is a per-app decision, and it changed here — twice.** The
+default is
 the shared package, `github.com/alaap-swift-struck/swift-struck-ui`, installed from npm,
 so a fix lands once and every product inherits it. This app took the other road on
 2026-08-22 and **vendored** its copy into the repo at `shared/ui/` (imported as
 `@shared/ui/…`), because it is being re-themed to a design kit that changes what a
 component IS, not only what colour it is — and a token remap cannot turn a bordered
-button into a borderless one. That is a deliberate, one-way fork: this app now owns and
-edits its components in place, and gives up inheriting upstream's fixes.
+button into a borderless one. On 2026-08-25 the fork settled into its final shape:
+`shared/ui/` is a **pinned** copy of the kwapso design kit,
+`github.com/Kwapso/design`, at the tag in `shared/ui/VERSION.json`, pulled by
+`scripts/sync-design.mjs`, with a hand-edit under it turning the build red
+(`web/test/vendored-kit.test.ts`). So this app does NOT edit its components in
+place: a kit change is made upstream in `Kwapso/design`, tagged, and pulled — a
+new upstream, chosen deliberately, not the old package regained.
 
-**The rule that holds in both arrangements: never edit upstream from a fork.** Other
-Swift Struck products are live on that package. A vendored copy is a copy — no pushes,
-no PRs, no "syncing back" from the app that forked it. If you find a genuine upstream
-bug, report it there in its own words, and fix your copy separately.
+**The rule that holds in every arrangement: a vendored copy is never pushed back.**
+Other Swift Struck products are live on the old package, and nothing here is
+PR'd or "synced back" to it. If you find a genuine bug from that lineage, report
+it there in its own words; kwapso's own fix goes through `Kwapso/design`.
 
 ## The ship pipeline
 Local → GitHub → staging (deploy ends with an automated smoke that must pass) →

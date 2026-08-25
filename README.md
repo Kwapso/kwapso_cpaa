@@ -20,7 +20,9 @@ sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's model is
 swappable: Claude when `ANTHROPIC_API_KEY` is set, else Cloudflare Workers AI
 (both do full tool use); it confirms on destructive + bulk actions and is metered
 by a credit quota, **the app's own daily allowance** (the `AGENT_FREE_DAILY` var:
-code default 25, but both environments ship **50**) plus a purchasable balance.
+code default 25, both environments ship **50**, and staging's
+`AGENT_NO_DAILY_CAP` props the refusal door open so the 50 is enforced on
+production only — OPERATIONS.md has both vars) plus a purchasable balance.
 
 The team area (Overview, Members, Member roles, Invites) lives at `/t/<teamId>/…`
 deep-link URLs, rendered by the screen engine, not under Settings; top-level
@@ -199,13 +201,16 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     is work we owe the library; NEEDS-A-SPEC is work the kit owes the app, and
     everything on it is wearing the new tokens with its old shape untouched,
     because the kit's own rule is to log rather than improvise.
-11. The UI comes ONLY from the component library, which lives **in this repo** at
-    `shared/ui/` and is imported as `@shared/ui/…`. It was the npm package
-    `@kwapso/ui`, installed from a separate repo, until it was vendored on
-    2026-08-22 so the reskin could change component shape and not only colour.
-    Missing a component? Build it in `shared/ui/` — never one-off UI in `web/`.
-    Never edit the upstream `swift-struck-ui` repo, which other products depend
-    on; `shared/ui/README.md` has the whole rationale.
+11. The UI comes ONLY from the component library, which is vendored **in this
+    repo** at `shared/ui/` and imported as `@shared/ui/…` — and it is a PINNED
+    dependency: `github.com/Kwapso/design` at the tag in `shared/ui/VERSION.json`,
+    pulled by `scripts/sync-design.mjs`. A hand-edit under `shared/ui/` turns the
+    build red (`web/test/vendored-kit.test.ts` recomputes the content hash), so a
+    kit change is made upstream in `Kwapso/design`, tagged, and pulled. (It was
+    the npm package `@kwapso/ui` until 2026-08-22, then an editable copy for three
+    days, then pinned on 2026-08-25.) Missing a component? Close the gap upstream —
+    never one-off UI in `web/`, and never a hand-build under `shared/ui/`;
+    `shared/ui/README.md` has the whole rationale.
 
 ### The manual, build on it, understand it, rebuild it from zero
 

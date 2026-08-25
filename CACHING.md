@@ -23,7 +23,7 @@ is that place.**
 
 ```ts
 publishChange(env, teamId, resource, id, op, scope)  // → the TEAM channel
-publishUserChange(env, userId, resource)             // → one person's devices
+publishUserChange(env, userId, resource, id?, op?)   // → one person's devices
 publishSignOut(env, userId)                          // → forced sign-out
 ```
 

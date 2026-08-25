@@ -20,6 +20,85 @@ and costs one command each.
 
 ---
 
+## The first review round pays out, 25–26 Aug 2026
+
+The three review skills ran against the finished audit-module build and the
+fixes landed in two commits the same night. The security half (`e36b254`):
+**sixteen doors that served the agency's own machinery to any client login**
+— members with their email addresses, the whole permission matrix, pending
+invites, and the two contact-link writes — now refuse a portal caller at the
+door, and R21's walk derives reachability from what the matrix can GRANT
+rather than from the rights the seed happened to hold, the third recurrence
+of enumerate-by-reach. From the same sweep: the ticket-attachment removal
+door gates on `help:edit` rather than `help:read`, `google_drive_update`
+confirms (replacing a file's whole contents is destructive), two R2 writes
+moved behind the ownership fence they used to precede, and **both front
+doors send HSTS** (30 days, deliberately without `includeSubDomains` while
+`portal.kwapso.app` is a third party's host). The operations half
+(`3e1d5be`): a meeting Google keeps refusing stops being retried after eight
+thrown tries (migration `0055` — twelve stuck transcripts had been writing
+~550 identical error rows per half-day, for ever), the bulk-ticket door
+pings once per set instead of once per ticket, every forwarded door call
+carries its trace id by construction, MCP tool descriptions now SAY which
+tools the app itself would pause on, and the ticket conversation updates
+live on both front doors.
+
+## The kit becomes a pinned dependency, and the phone round, 25 Aug 2026
+
+The design-kit swap (`82a575f`) replaced the editable vendored library end
+to end: `shared/ui/` is now `github.com/Kwapso/design` at the tag in
+`shared/ui/VERSION.json`, pulled by `scripts/sync-design.mjs`, and
+`web/test/vendored-kit.test.ts` recomputes a content hash so a hand-edit
+turns the build red — three days after the vendoring made editing-in-place
+possible, the pin took it away again, on purpose: a kit change is made
+upstream, tagged, and pulled. The same day closed the
+**mobile-and-portal rectification round** (`a94d78b`): the sideways scroll
+gone from both front doors, selects opening in front of the dialogs that
+contain them, one tab shape decided once instead of sixteen times, the
+portal's rows drawn by the kit's rows, and a form closed by accident keeping
+what was typed.
+
+## The processes round: a step you can delete, a split you can draw, 25 Aug 2026
+
+The round-seven sweep (`954dded`, with `d79e1fa` and `e6582bd` beside it)
+gave the process editor the three things the audit work kept reaching for: a
+step added by mistake can be **hard-deleted** — the base's one reviewed
+carve-out from deactivate-never-delete, with three named refusals and the
+predicates riding the DELETE (ARCHITECTURE §4, CONVENTIONS.md) — a fork in a
+map can be drawn and edited (branch labels, and the way back via
+`loops_back_to`), an unpriced step can become a priced one, and the money
+arithmetic normalises every step to one period before it sums.
+
+## The client's organisation, and the audit module finished, 24 Aug 2026
+
+Team migrations `0052`–`0054` in one day. **`0052`** is the client's own
+organisation: their departments, their roles (with what an hour of each
+costs THEM — the number a saving actually multiplies), who holds each role,
+their tools, and dated tool prices, so a map set to March costs March.
+**`0053`** puts the role and the tools ON the step. **`0054`** finishes the
+audit module: five more step columns (the one tool, the stated frequency
+period, the FROZEN role rate, forks and loops), `audit_date` on the process,
+`process_step_revisions` (the map on any day), `process_links` (one map
+handing over to another), `waves` (what a client bought: sprints sold
+together), and `process_drafts` (what a call reader proposes, before a
+person agrees). A version is cut BY HAND (`0051`) — the never-wired
+automatic cut was purged rather than switched off. The perf round beside it
+wired the direct database path (`TEAM_DB_*` native bindings) and moved new
+databases next to their workers.
+
+## Four languages somebody can check, 20 Aug 2026
+
+The language list was cut from twenty-nine to four — English, German,
+Spanish and Catalan (`c46775c`) — because twenty-nine translations nobody
+could read is worse than four somebody can. R28 grew its fourth failure the
+same day: a translation on disk for a language the app no longer speaks
+turns the build red, because the one array in `shared/i18n.ts` decided the
+list for everything DERIVED from it and never for the two files that
+accumulate. The same stretch gave an app its modules back (`0048`, so a
+ticket can say which section it is about), taught Chat to remember a name
+once learned (`0049`), and made the permission matrix honest — no switch
+that decides nothing (R36).
+
 ## The grant catches up with the code, 19 Aug 2026
 The day after the calendar became one-way, the owner closed the gap the previous
 entry left open: *"the app must hold only a READ-ONLY Google Calendar grant."*

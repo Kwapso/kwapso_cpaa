@@ -16,8 +16,10 @@ end with a live base you can sign into and build on.
 > core D1 database** (`kwapso-core`), reached by the native `env.DB` binding. Every
 > *team* gets its **own D1 database**, created at runtime and reached over the **D1
 > REST API** (a scoped token, `CF_D1_TOKEN`). Uploaded files live in **R2**. Live
-> updates fan out through **one Durable Object** (`TeamChannel`) in the realtime
-> worker. Each front end is a **Next.js static export** served by its own gateway.
+> updates fan out through the realtime worker's **two Durable Object classes**:
+> `TeamChannel` (the switchboard) and `TeamInterest` (the per-team registry that
+> narrows a ping's fan-out to the shards holding a listener; fact updated
+> 26 Aug 2026 — this line used to say one). Each front end is a **Next.js static export** served by its own gateway.
 > Read BASE-MANUAL.md for the *why*; this file is the *how to stand it up*.
 
 ---
@@ -385,9 +387,11 @@ npm run deploy:production   # same order, production names (run only after stagi
 (`npm run build` alone builds both front ends; `npm run build:portal` builds the
 client portal on its own.)
 
-The realtime worker defines the `TeamChannel` Durable Object via a one-time
-`migrations` tag in its `wrangler.jsonc`, no data migration, the DO holds no app
-data. Durable Objects require the Workers Paid plan.
+The realtime worker defines two Durable Object classes, `TeamChannel` and
+`TeamInterest`, via the `migrations` tags (`v1` and `v2`) in its
+`wrangler.jsonc`, no data migration, and `TeamChannel` holds no app data
+(`TeamInterest` holds only which shards are listening for what, rebuilt on its
+own as listeners come and go). Durable Objects require the Workers Paid plan.
 
 ---
 

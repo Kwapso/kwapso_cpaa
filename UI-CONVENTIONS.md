@@ -81,24 +81,30 @@ forking anything by editing a component now, you are editing this app's own code
 1. **Decide which layer it belongs to first.** A generic, app-agnostic control is a
    library change. A control that only makes sense in kwapso is a host component, and
    putting it in `shared/ui/` is the mistake this section exists to prevent.
-2. **Change the component, in place, and delete the workaround it replaces.** A
-   host-side override that stands in for a component fix is now debt with an owner,
+2. **Change the component upstream, and delete the workaround it replaces.** The kit
+   is a pinned dependency — a hand-edit under `shared/ui/` turns the build red
+   (`web/test/vendored-kit.test.ts`) — so the fix is made in `Kwapso/design`,
+   tagged, and pulled with `scripts/sync-design.mjs`; the workaround dies here in
+   the same commit as the pull. A
+   host-side override that stands in for a component fix is debt with an owner,
    not a permanent arrangement.
 3. **Write the gap down if you cannot do it today.** UI-GAPS.md is still the list, and
    a host-side workaround must still be a small, *documented* seam that names the
    library change it stands in for, so somebody can find it and remove it. It used to
-   be a request to another repo; it is now a to-do in this one. The two workarounds
+   be a request to another repo, then briefly a to-do in this one; since 25 Aug it is
+   a to-do in the kit repo, driven from here. The two workarounds
    this section used to hold up as examples — a `.glass` opacity override and the
    engine list's double-nested card — are both gone, and how the first one ended is
    the argument for fixing components rather than overriding them: it outlived the
    library fix it was standing in for and tinted every card in both apps for nine days.
    The whole story is in the header of `shared/web/library-overrides.css`, which is
    now empty of component overrides on purpose.
-4. **Never touch upstream.** `swift-struck-ui` is a live dependency of other Swift
-   Struck products. Do not push there, do not open a PR from here, do not "sync back"
-   a fix. If something in `shared/ui/` turns out to be a genuine upstream bug, report
-   it there in its own words, and then fix it here anyway — the two files are no longer
-   the same file. `shared/ui/README.md` is the full statement of this.
+4. **The upstream is `github.com/Kwapso/design`, and it is WHERE a fix goes.**
+   Patch off the tag in `shared/ui/VERSION.json`, tag the fix, and pull it —
+   never "fix it here anyway", because here is a pinned copy the hash guard
+   protects. (The retired lineage, `@swift-struck/ui` → `@kwapso/ui`, is a
+   different repo other products still stand on; nothing is pushed back to it.)
+   `shared/ui/README.md` is the full statement of this.
 
 A library gap is still a *tracked note*, never a silent second copy of a component.
 
@@ -690,24 +696,25 @@ Every screen renders over the library's **`AmbientBackground`**, mounted once in
 
 ```tsx
 // web/app/layout.tsx
-import { AmbientBackground } from "@shared/ui/registry/primitives/ambient-background/ambient-background"
+import { AmbientBackground } from "@shared/ui/controls/ambient-background/ambient-background"
 // …
 <AmbientBackground />
 ```
 
-Surfaces that float over it (dialogs, sheets, the mobile bars) use the frosted
-**`.glass`** class. Because the living background shows through, floating surfaces have
-to be readable over a moving field — and that is settled **in the component** now, not
+Because the living background shows through, floating surfaces have
+to be readable over a moving field — and that is settled **in the component**, not
 by a host override: all eight floating surfaces (`dialog`, `sheet`, `alert-dialog`,
 `popover`, `dropdown-menu`, `hover-card`, `select`, `command`) carry an opaque
-`bg-card` or `bg-popover` in `shared/ui/registry/primitives/`. The host override that
-used to stand in for this is gone; §1 and the header of
+`bg-card` or `bg-popover` in `shared/ui/controls/` (the kit's own rule is paper,
+not glass — the frosted `.glass` this paragraph used to describe is gone from kit
+and host alike). The host override that
+used to stand in for this is gone too; §1 and the header of
 `shared/web/library-overrides.css` explain why it had to go rather than be re-tuned.
 **One caveat worth knowing:** upstream guarded that with a census test that fails if a
-ninth floating surface ships without an opaque fill, and the vendoring copied only
-`registry/`, `lib/` and `styles.css` — not the library's own test suite. So today that
+ninth floating surface ships without an opaque fill, and the vendored copy carries the
+kit's delivered source, never its test suite. So here that
 rule is held by the eight components themselves and by whoever reads this paragraph. If
-you add a floating surface, give it an opaque fill by hand.
+a floating surface is added upstream, it gets its opaque fill there.
 
 ### Immovable, contentless pages
 

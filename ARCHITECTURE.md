@@ -267,9 +267,23 @@ on top follows [CACHING.md](CACHING.md).
 
 - Every table carries the audit block: created/edited/deactivated timestamps +
   actor id/email/name snapshots (exactly like Base v3).
-- **Master records are NEVER hard-deleted**, deactivate/activate only
-  (the words are "deactivate"/"activate", not archive). The delete right stays
-  in the grid for future child-table cases; base modules don't expose it.
+- **Master records are NEVER hard-deleted**, deactivate/activate only.
+  The delete right stays in the grid for future child-table cases.
+  *(Fact updated 26 Aug 2026, twice.)* **First: the anticipated child-table case
+  arrived.** A process STEP added by mistake can be hard-deleted (owner's explicit
+  decision, 25 Aug 2026) through `POST /api/tenancy/processes/steps/delete`, gated
+  `processes:delete` — so "base modules don't expose it" is no longer absolute.
+  The door is as careful as the rule it narrows: three named refusals (a step in
+  an older version, a step any agreed version holds, a step a live step loops back
+  to), each re-checked as a predicate riding the DELETE itself; the step's
+  revisions go with it; an activity row ("Step deleted") is written; and a portal
+  caller is refused at the door. Master records — the process, the app, the
+  account — still deactivate, never delete. **Second, the words:** this line used
+  to add "not archive", and the glossary has since (2026-08-19) defined
+  **Archive** as its own term, deliberately distinct from deactivate ("put a
+  record away without losing it"), which tickets and apps now ship. Whether this
+  lock's word-ban stands narrowed or falls is an owner decision still to be made;
+  both facts are recorded here rather than one silently deleted.
 - **Activity log records meaningful changes**, created, edited, role changed,
   invite sent/revoked, member removed (deletes don't happen). One reusable writer
   (`shared/workers/activity.ts`) writes to each team's own `activity` table; each
@@ -403,9 +417,12 @@ on top follows [CACHING.md](CACHING.md).
   beside its twin (action-button rows never clip). It is written down HERE as a
   locked decision and THERE as the convention you apply; it is not in the
   library's own rule-book, which governs the library, not this app.
-- **UI comes ONLY from the component library, and the library now lives IN this
-  repo (CHANGED 2026-08-22).** It is `shared/ui/`, imported as `@shared/ui/…`.
-  Until that date it was the npm package `@kwapso/ui`, installed from a separate
+- **UI comes ONLY from the component library, and the library is a PINNED
+  dependency vendored IN this repo (CHANGED 2026-08-22; updated 26 Aug 2026: the
+  kit became a pinned dependency on 25 Aug).** It is `shared/ui/`, imported as
+  `@shared/ui/…` — `github.com/Kwapso/design` at the tag in
+  `shared/ui/VERSION.json`, pulled by `scripts/sync-design.mjs`.
+  Until 2026-08-22 it was the npm package `@kwapso/ui`, installed from a separate
   repository the owner deployed, and this line read "gaps go INTO the library
   first". It was vendored because the app is being re-themed to the kwapso
   design kit, and a theme is only most of a re-skin: a token remap repaints a
@@ -413,12 +430,13 @@ on top follows [CACHING.md](CACHING.md).
   a filled button with no border in any state. **The decision itself is
   unchanged** — screens are assembled from library lego, never from one-off
   components invented in `web/`, and a control that is specific to this app
-  still belongs in `web/components/`. What changed is who closes a gap: it used
-  to be a written request to another repo on somebody else's release schedule
-  (UI-GAPS.md is that list, and it still names the open ones), and it is now
-  work this repo can do in the same commit. The one thing still forbidden is
-  editing the UPSTREAM library, which other Swift Struck products depend on.
-  See `shared/ui/README.md` for the rationale in full.
+  still belongs in `web/components/`. What changed twice is who closes a gap: it
+  used to be a written request to another repo on somebody else's release schedule
+  (UI-GAPS.md is that list, and it still names the open ones); for three days it
+  was work this repo could do in the same commit; and since 25 Aug a kit change is
+  made upstream in `Kwapso/design`, tagged, and pulled — a hand-edit under
+  `shared/ui/` turns the build red (`web/test/vendored-kit.test.ts` recomputes the
+  content hash). See `shared/ui/README.md` for the rationale in full.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
   recode; keep every piece small enough for an agent to reason about.
 
@@ -443,8 +461,9 @@ where it ended up and what is still true.
   devices land together and a reconnect returns to the same object.
 - **Subscriptions narrow the sends.** The socket URL carries `?sub=`, the DO keeps it
   on the attachment beside the fence, and a broadcast skips a socket that did not ask
-  for that resource. The client portal now asks for **nine** resources instead of
-  everything, derived from `PORTAL_LISTENERS` so the two cannot drift.
+  for that resource. The client portal now asks for **ten** resources instead of
+  everything (`PORTAL_SUBSCRIPTIONS.length`, counted 26 Aug 2026), derived from
+  `PORTAL_LISTENERS` so the two cannot drift.
 - **The two filters fail in OPPOSITE directions, on purpose.** The fence decides what a
   listener MAY hear: resolved from their session, never read off the URL, fails
   **closed**. The subscription decides what it WANTS to hear: declared by the client,
@@ -460,7 +479,11 @@ where it ended up and what is still true.
 **WHERE THE CEILING NOW SITS, and the arithmetic, because the honest answer is not
 "solved".** Wall-clock per broadcast falls by the shard count, so the per-object
 listener ceiling goes from ~3,000–5,000 to roughly **12,000–20,000 per team**. But the
-work is `publishes/second × sockets × per-socket cost`, and sharding divides only by N:
+work is `publishes/second × sockets × per-socket cost`, and sharding divides only by N
+*(fact updated 26 Aug 2026: the table below assumes every ping reaches every shard,
+which stopped being true when interest-routing shipped in August 2026 — see the
+paragraph after it. The rows stand as the worst case, not the live arithmetic; they
+have not been recomputed here)*:
 
 | shards | sockets/shard at 25,000 | CPU-seconds per second, per shard |
 |---|---|---|
@@ -473,8 +496,14 @@ So at a base yardstick of 250,000 people in ONE tenant (~174 publishes/second),
 **sharding alone does not get there and cannot**: it would take ~128 shards, at which
 point every ping costs 128 object calls and the cost has simply moved. Reaching that
 scale needs a different shape, routing a ping only to shards holding interested
-listeners, instead of broadcasting every ping to every shard. That is not built and is
-not planned; it is the thing to design if a tenant ever approaches the yardstick.
+listeners, instead of broadcasting every ping to every shard. *(Fact updated
+26 Aug 2026: that shape WAS built, in August 2026 — the lever this section said
+would wait for yardstick scale was pulled early. `TeamInterest`, a second Durable
+Object class in the realtime worker, keeps a per-team registry of which shards hold
+a listener for which resource, and the publish door asks it before fanning out; a
+stale or unknown answer says yes, so a wrong entry costs an extra send, never a
+missed one. DURABLE-OBJECTS.md describes it. The remaining lever is
+`REALTIME_SHARDS`.)*
 
 **What it means for kwapso: comfortably solved, with four times the margin it had.**
 The estate ([glide/RECONCILIATION.md](glide/RECONCILIATION.md) §3, confirmed with the
@@ -498,8 +527,9 @@ sockets, so do not go looking for that metric. These three are real:
 **When one fires, in order:** raise `REALTIME_SHARDS` (one line, and the client and the
 fan-out read the same constant so they cannot disagree); then narrow the agency's
 subscription, which needs the activity feed to listen for something narrower than
-"anything"; then, and only at genuine yardstick scale, route pings to interested shards
-rather than to all of them.
+"anything". The third step this list used to end with — route pings to interested
+shards rather than to all of them — was built in August 2026 (`TeamInterest`; fact
+updated 26 Aug 2026), so it is already working before either alarm has fired.
 
 **THIS IS ABOUT THIS DEPLOYMENT, NOT ABOUT THE BASE.** Brimba is reusable and the audit
 scored it against a base's yardstick. A fork whose one tenant is a company rather than

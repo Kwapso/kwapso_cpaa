@@ -51,9 +51,9 @@ agent-editable screens. Lean *within* a robust design.
 
 | Piece | Where | What it does |
 |---|---|---|
-| **Recipe schema** | the library's `lib/recipe.ts` (`ScreenRecipe`), today `shared/ui/lib/recipe.ts` | Typed, serializable shapes for a screen: type, presentation, data binding, fields, layout, actions, permission gates. The contract both the worker and the engine speak. The LIBRARY owns it (see §10), so the app + engine import the same type. _(Written when the library was the npm package `@kwapso/ui`; it was vendored into this repo on 2026-08-22, so the path is now `@shared/ui/lib/recipe`. Who owns the contract is unchanged.)_ |
+| **Recipe schema** | the library's `lib/recipe.ts` (`ScreenRecipe`), today `shared/web/screen-engine/recipe.ts` | Typed, serializable shapes for a screen: type, presentation, data binding, fields, layout, actions, permission gates. The contract both the worker and the engine speak. The LIBRARY owns it (see §10), so the app + engine import the same type. _(Written when the library was the npm package `@kwapso/ui`; it was vendored on 2026-08-22, and when the kit was pinned on 2026-08-25 the engine behaviour moved app-side, so the path is now `@shared/web/screen-engine/recipe`. The layering is unchanged.)_ |
 | **Config / recipe store** | ~~`workers/config` (new)~~ → **UPDATED 2026-06-21: the TENANCY worker**, `GET/POST /api/tenancy/config/screens` (there is NO separate `workers/config`; it was folded into tenancy) | Stores + serves recipes. Merges GLOBAL base recipes (the shipped defaults) with a team's own custom screens/overrides. CRUD actions are agent-callable (an agent can author a screen). |
-| **Screen engine** | library `registry/collections/screen-*` | React components that fetch a recipe + data and render the right library pieces, permission-aware. |
+| **Screen engine** | `shared/web/screen-engine/` (drawing through the kit's `structures/`; was the library's `registry/collections/screen-*`) | React components that fetch a recipe + data and render the right library pieces, permission-aware. |
 | **Tenancy actions** | `workers/tenancy` | Members / roles / invites read+write + the guard rules. |
 | **App shell** | `web/` | Top bar + team switcher + bottom tabs (mobile); renders module screens through the engine. |
 
@@ -171,11 +171,15 @@ Decided with the user; do not relitigate without them.
   recipe schema) and the `screen-renderer` collection live in the library
   (`lib/recipe.ts` + `registry/collections/screen-renderer`), so EVERY app on
   the base inherits them. _UPDATED 2026-08-22: the library was the npm package
-  `@kwapso/ui` when this was decided and is now vendored into this repo at
-  `shared/ui/`, so those two paths are `shared/ui/lib/recipe.ts` and
-  `shared/ui/registry/collections/screen-renderer`. The layering the decision is
+  `@kwapso/ui` when this was decided and was vendored into this repo at
+  `shared/ui/`. UPDATED AGAIN 2026-08-25, when the vendored kit became a pinned
+  copy of `Kwapso/design`: the config-driven engine BEHAVIOUR now lives
+  app-side in `shared/web/screen-engine/` (`recipe.ts` + `screen-renderer.tsx`),
+  drawing through the kit's parts (`shared/ui/structures/screen-renderer`), so
+  the app's engine work happens in `shared/web/screen-engine/` and a kit-part
+  change goes upstream. The layering the decision is
   actually about — the engine renders, the host fetches and gates — is
-  unchanged; what this fork gives up is inheriting upstream's engine work._ The
+  unchanged._ The
   engine **renders** a recipe + speaks the URL
   grammar; it does NOT fetch data, call APIs, store recipes, or own the router,
   those are the host app's job (a recipe store + the app's

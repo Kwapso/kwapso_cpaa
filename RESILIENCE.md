@@ -75,12 +75,14 @@ a clean split that nothing had written down until now.
 | `users` (core) | **auth** | tenancy | auth owns IDENTITY, the row itself, `email`, and the profile fields. tenancy writes exactly one column, `current_team_id`, because "which team is this person looking at" is a tenancy fact that happens to live on an auth-owned row. Pinned by `workers/tenancy/test/ownership.test.ts`. |
 | `selectable_data` (team) | **tenancy** | content | tenancy owns the vocabulary, the Dropdown values screen creates, edits and deactivates. content only ever INSERTs a value that is absent, through the one pick-or-create seam (`ensureSelectableValue`), and never updates or deactivates one. A retired value stays retired. |
 | `error_logs` (core) | **shared seam** | data-ops | `logError` is the only thing that ever INSERTs. data-ops' admin door only ever UPDATEs the resolution columns (`status`, `resolved_at`, `resolution_note`). Disjoint columns: the appender and the resolver cannot contradict each other. |
+| `sprints` (team) | **content** | tenancy | content owns the sprint — created, priced, completed through the work engine. tenancy's waves module writes exactly one column, `wave_id` (`setSprintWave` in `workers/tenancy/src/lib/waves.ts`), because "which wave holds this sprint" is a fact about what the client bought, which is tenancy's spine — the same one-column shape as `users.current_team_id` above. The predicate rides the UPDATE (R17), and the wave's own derived dates are recalculated in `waves`, never written onto the sprint. |
 
 Everything else the probes flag is a false positive worth knowing about: the
-`help`, `knowledge_*` and `sprints` writes attributed to tenancy are
+`help` and `knowledge_*` writes attributed to tenancy are
 `TEAM_MIGRATIONS` SQL in `workers/tenancy/src/team-schema.ts`. Tenancy owns
 rolling team schema forward; that IS its job, and a migration is not a runtime
-writer.
+writer. (`sprints` used to be on that false-positive list too; the waves module
+made it a REAL second writer on 24 Aug 2026, which is what the row above records.)
 
 **If you add a second writer to a table, add a row above.** A split nobody wrote
 down is a split the next person will not preserve.
