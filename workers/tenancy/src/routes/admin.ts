@@ -6,7 +6,7 @@ import { fail, json } from "@shared/workers/http"
 import { d1Query } from "@shared/workers/d1-rest"
 import { checkDatabaseSizes, daysUntilFull, moveModuleToOwnDatabase } from "../lib/sharding"
 import { applyMigration, createTeam, d1Config } from "../lib/teams"
-import { CRON_GROWTH_CAP } from "@shared/workers/limits"
+import { CRON_GROWTH_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { adminGuard } from "../context"
 import { TEAM_MIGRATIONS } from "../team-schema"
@@ -59,8 +59,11 @@ export async function dbSizes(request: Request, env: Env): Promise<Response> {
   if (denied) return denied
 
   const result = await checkDatabaseSizes(env, d1Config(env))
+  // Bounded (R14) — one alert per database, but the cap is stated rather than
+  // assumed. (This read used to sit uncapped under the next query's "Bounded"
+  // comment, which is worse than plainly uncapped: it READ as checked.)
   const open = await env.DB.prepare(
-    "SELECT database_name, size_bytes, created_at FROM db_alerts WHERE resolved_at IS NULL"
+    `SELECT database_name, size_bytes, created_at FROM db_alerts WHERE resolved_at IS NULL LIMIT ${LIST_HARD_CAP}`
   ).all()
   // Bounded (R14), and by the thing that makes a row worth reading: the fastest
   // fillers first, so the answer is a shortlist rather than the whole estate.

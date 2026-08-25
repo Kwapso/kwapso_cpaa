@@ -163,7 +163,11 @@ async function targetOrThrow(
   table: string,
   id: string
 ): Promise<{ accountId: string | null }> {
-  const def = WORK_LOG_TARGETS[table]
+  // hasOwnProperty, not bare bracket access: `?targetTable=__proto__` finds
+  // Object.prototype, reads as truthy, and turns a clean 400 into a 500.
+  const def = Object.prototype.hasOwnProperty.call(WORK_LOG_TARGETS, table)
+    ? WORK_LOG_TARGETS[table]
+    : undefined
   if (!def)
     throw new GuardError(
       400,

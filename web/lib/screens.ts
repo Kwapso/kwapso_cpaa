@@ -161,11 +161,18 @@ export const MODULE_PERMISSION: Record<string, string> = {
 /* --------------------------------- team --------------------------------- */
 
 /** Team overview — the team's metadata (Overview) + its activity feed, the
- * landing screen at /t/<teamId>. Edit team is gated by teams:edit. */
+ * landing screen at /t/<teamId>. Edit team is gated by teams:edit.
+ *
+ * NO SCREEN GATE, on purpose. Reading a team is `whoAmI`, not a right — the
+ * matrix offers no `teams:read` box (MODULE_OFFERED_RIGHTS says why), so a
+ * role built from scratch cannot hold the right, and gating the LANDING
+ * screen on it locked such a role out of the app's front page. Same rule as
+ * the company page in pages.ts: every member may see the team's face; what is
+ * inside is gated piece by piece (the Edit action on `teams:edit`, the
+ * activity feed by R18's per-module subtraction at its own door). */
 const teamDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "team" },
-  gate: { module: "teams", right: "read" },
   fields: [],
   actions: [
     {

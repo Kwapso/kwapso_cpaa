@@ -8,12 +8,18 @@
 # Security headers on EVERY response (different header names from the Cache-Control
 # rules below, so they layer, not conflict): the app is never meant to be iframed
 # (anti-clickjacking), browsers must not MIME-sniff, and referrers stay origin-only.
-# A full Content-Security-Policy is deliberately omitted — it needs per-app testing
-# against the SPA's inline + CDN needs; these three are safe blanket defaults.
+# HSTS pins the browser to https for 30 days — DELIBERATELY without
+# includeSubDomains and without preload: portal.kwapso.app is a third party's
+# host (the legacy Glide portal) and a subdomain-wide pin is a promise about
+# hosts this app does not control. Widen it only when every *.kwapso.app host
+# is ours and speaks https. A full Content-Security-Policy is deliberately
+# omitted — it needs per-app testing
+# against the SPA's inline + CDN needs; the rest are safe blanket defaults.
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=2592000
 
 # Content-hashed files under /_next/static/** can never change under the same name,
 # so cache them forever — the browser never re-validates them on repeat loads.

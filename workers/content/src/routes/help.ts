@@ -692,14 +692,16 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
 }
 
 /** POST /api/content/help/attachments/remove — take a file or a link off
- * (help:read, the right that put it there). Deactivate, never delete: the row
+ * (help:EDIT — taking something off a ticket is a write, and gating a write on
+ * the read right let any reader strip attachments staff had added; the story
+ * sibling has always demanded work:edit). Deactivate, never delete: the row
  * keeps its audit block and the object stays in the bucket. */
 export async function postRemoveHelpAttachment(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; attachmentId?: unknown }>(
     request,
     env,
     "help",
-    "read"
+    "edit"
   )
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)

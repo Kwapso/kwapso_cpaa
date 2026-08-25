@@ -2238,7 +2238,10 @@ async function crossCheck(
   const checkedAt = new Date().toISOString()
   await Promise.all(
     [...byTable.entries()].map(async ([table, wanted]) => {
-      const def = LIVE_STATUS[table]
+      // Own-row values, but the lookup form is the hardened one anyway — a
+      // prototype name in a stored row must skip, not crash.
+      const def = Object.prototype.hasOwnProperty.call(LIVE_STATUS, table) ? LIVE_STATUS[table] : undefined
+      if (!def) return
       const live = await d1Query<{ id: string; status: string | null }>(
         cfg,
         guard.databaseId,

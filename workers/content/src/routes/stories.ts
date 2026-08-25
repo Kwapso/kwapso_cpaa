@@ -34,6 +34,7 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { STORY_STATUSES, type StoryStatus } from "@shared/types"
 import {
+  storyOrThrow,
   countSprints,
   countStories,
   createSprint,
@@ -404,6 +405,11 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
   if (body.kind !== "file" && body.kind !== "link")
     return fail(400, "invalid_input", "kind must be file or link.")
   const label = requireText(body.label, "Name", TEXT_LIMITS.short)
+  // The story must exist BEFORE anything is written. The bucket write below is
+  // a capability URL served with no session, and the attachment INSERT has no
+  // foreign key behind it — a mistyped id used to leave both an orphaned
+  // object and a row pointing at a story that never existed.
+  await storyOrThrow(cfg, guard, id)
 
   let url: string
   let contentType: string | null = null

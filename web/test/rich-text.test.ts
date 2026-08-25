@@ -187,9 +187,22 @@ const WEB = join(HERE, "..")
  * one component every record's picture on either door goes through, which is
  * exactly the file this census should be reading first. */
 function screenFiles(): string[] {
-  return sourceFiles([join(WEB, "components"), join(WEB, "app"), join(WEB, "..", "shared", "web")], {
-    extensions: [".tsx"],
-  }).map((f) => f.path)
+  // BOTH front doors. The portal had an injection census but no URL census, so
+  // a portal component could bind a data-derived href with a local regex while
+  // its agency twin used the seam — and did, until the round-one security
+  // sweep read the two side by side.
+  return sourceFiles(
+    [
+      join(WEB, "components"),
+      join(WEB, "app"),
+      join(WEB, "..", "shared", "web"),
+      join(WEB, "..", "web-portal", "components"),
+      join(WEB, "..", "web-portal", "app"),
+    ],
+    {
+      extensions: [".tsx"],
+    }
+  ).map((f) => f.path)
 }
 
 /** The `{...}` immediately after `at`, brace-balanced (JSX expressions nest). */
@@ -235,6 +248,9 @@ const NOT_USER_TYPED: Record<string, string> = {
   // an inline ternary would hide the interesting half of it in a test message.
   logoPreview: "the file just picked in this session, else the stored path through safeSrc",
   coverPreview: "the file just picked in this session, else the stored path through safeSrc",
+  // The portal's bottom nav — five route literals declared in the same file,
+  // nothing a user or a row ever supplies.
+  "dest.href": "the portal shell's own DESTINATIONS table of route literals",
 }
 
 describe("no screen binds an unchecked URL to an attribute", () => {

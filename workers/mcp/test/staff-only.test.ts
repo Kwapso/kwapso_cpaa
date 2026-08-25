@@ -147,30 +147,56 @@ describe("acting with a token: staff only, on every session it mints", () => {
   })
 })
 
-// WHAT MAKES THE CACHED VERDICT SAFE — read off the other worker's source, not
+// WHAT MAKES THE CACHED VERDICT SAFE — read off the fence's own source, not
 // taken on trust.
 //
 // The bridge caches a PASSED staff check for a minute, so for that minute the
 // question "is this caller staff or a client?" is answered from memory. That is
 // only sound while the app cannot produce the transition it would miss: a token
-// holder who becomes a client. It cannot — and the reason lives in tenancy, one
-// worker away, where nothing about the cache would ever remind anyone. So the
-// reason is asserted here, beside the cache it protects: relax that refusal and
-// this suite goes red, which is the moment the cache has to go rather than
-// quietly become the hole.
+// holder who becomes a client. It cannot — and the property that carries it is
+// PRESENCE: portal-ness is decided by the existence of ANY `portal_users` row,
+// live or revoked, and a revoke keeps the row, so once anyone reads as a client
+// they read as one for ever and could never have minted a token at all. (This
+// paragraph used to cite the grant door's `is_staff` refusal as the carrier;
+// that refusal became CONDITIONAL when re-grants for prior clients shipped, and
+// the assertion below survived the change while asserting the wrong intent — a
+// green test on a stale premise. Presence is asserted first now, because it is
+// the load-bearing half.)
 describe("the cached staff verdict has no transition to miss", () => {
   const grantDoor = readFileSync(join(__dirname, "../../tenancy/src/routes/accounts.ts"), "utf8")
   const handler = grantDoor.slice(grantDoor.indexOf("export async function postGrantPortalAccess"))
 
-  it("the ONE door that makes a client login refuses an active team member", () => {
+  it("portal-ness is PRESENCE: the fence reads the row with no liveness filter", () => {
+    // The one place the caller's kind is decided (shared/workers/account-scope):
+    // any portal_users row for this user — revoked included — answers `portal`.
+    const fence = readFileSync(join(__dirname, "../../../shared/workers/account-scope.ts"), "utf8")
+    const at = fence.indexOf("FROM portal_users")
+    expect(at, "the fence no longer reads portal_users — re-read this check").toBeGreaterThan(-1)
+    const where = fence.slice(at, fence.indexOf("[guard.userId]", at))
+    expect(where).toMatch(/WHERE user_id = \?/)
+    // A liveness condition in the WHERE would turn presence into liveness and
+    // reopen the transition (revoke → reads as staff → mints a token). The
+    // deactivated column may be SELECTed and ORDERed on — never filtered on.
+    expect(
+      /WHERE[^;]*deactivated_at IS NULL(?![\s\S]*ORDER)/.test(where.split("ORDER BY")[0].split("WHERE")[1] ?? ""),
+      "portal_users must be matched by PRESENCE — no deactivated_at filter in the WHERE"
+    ).toBe(false)
+    // And the bridge's own gatekeeper refuses anything that is not cleanly staff.
+    const staff = readFileSync(join(__dirname, "../src/lib/staff.ts"), "utf8")
+    expect(staff).toContain('kind !== "staff"')
+  })
+
+  it("the first grant still refuses an active team member (the courtesy half)", () => {
     const body = handler.slice(0, handler.indexOf("\n}\n"))
     // It asks whether the person is a live member of this team…
     expect(body).toMatch(/FROM team_members WHERE team_id = \? AND user_id = \? AND deactivated_at IS NULL/)
-    // …and refuses when they are, rather than fencing a colleague out.
-    expect(body).toMatch(/if \(staff\)\s*\n?\s*return fail\(/)
+    // …and refuses a first grant for them, rather than fencing a colleague out.
+    // (CONDITIONAL since re-grants shipped: a prior client's row already decides
+    // their kind, so the staff check is skipped for them — presence, above, is
+    // what the cache actually rests on.)
     expect(body).toContain('"is_staff"')
     // The refusal comes BEFORE the row is written — a grant that landed and then
-    // apologised would be exactly the transition this argument denies.
+    // apologised would still be the wrong order even for a courtesy.
     expect(body.indexOf('"is_staff"')).toBeLessThan(body.indexOf("grantPortalAccess("))
   })
 

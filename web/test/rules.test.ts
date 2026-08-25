@@ -1568,15 +1568,33 @@ describe("RULES — the laws of the base", () => {
   //
   // So this check enumerates the only way that cannot go stale: DERIVED, from
   // four sources that are each already the truth about themselves —
-  //   • the CLIENT ROLE's rights, read out of the seed;
+  //   • every right the permission matrix can GRANT, read out of the module
+  //     catalog + MODULE_OFFERED_RIGHTS (R36's own data);
   //   • every route, read out of each worker's own ROUTES table;
   //   • the gate each one opens with, read out of the handler (and the
   //     route-local helpers it calls — a refusal one frame down still counts);
   //   • the portal's own surface, read out of PORTAL_DOORS.
-  // A door a Client-role caller can pass, that the portal does not open, must
+  // A door a client login COULD pass, that the portal does not open, must
   // refuse them or fence them. Add a door tomorrow and it is judged today.
+  //
+  // GRANTABLE, not granted — the third recurrence taught that. This walk used
+  // to read the CLIENT ROLE's rights out of the seed, so a door gated on a
+  // right the seed happened not to hold was a door the law never walked. The
+  // members, roles and invites doors sat exactly there: one owner tick of
+  // `team_members:read` on a cloned Viewer role and a client login was reading
+  // the staff directory, with email addresses, at the agency origin. A client
+  // login is an ordinary member holding an ordinary role, and an owner can
+  // build any role the matrix offers — so the reachable set is what the matrix
+  // OFFERS, and the seed is kept below only as a subset guard on this
+  // derivation, never as the walk itself.
   it("client-reachable-doors: every agency door a client login can pass refuses or fences them", () => {
-    // ── 1. what the Client role may do (derived from the seed, never retyped) ──
+    // ── 1. every right an owner could put on a client's role (R36's data) ─────
+    const grantable = new Set<string>()
+    for (const { key } of TEAM_MODULE_CATALOG)
+      for (const right of offeredRights(key)) grantable.add(`${key}:${right}`)
+    expect(grantable.size, "the offered-rights derivation went blind").toBeGreaterThan(20)
+
+    // ── 1b. the seed's Client role must be a SUBSET of grantable (guard) ──────
     const seed = read(join(ROOT, "scripts", "seed-staging.mjs"))
     const rightsAt = seed.indexOf("rights: {", seed.indexOf("const CLIENT_ROLE"))
     expect(rightsAt, "the seed no longer declares CLIENT_ROLE.rights — re-read this check").toBeGreaterThan(-1)
@@ -1603,6 +1621,21 @@ describe("RULES — the laws of the base", () => {
       "`rights` is the container, not a module — the scan started outside the brace"
     ).toEqual([])
     expect(clientRights.size, "the Client role's rights did not parse").toBeGreaterThan(4)
+    // Every right the seed grants must be one the matrix can grant — the two
+    // derivations cross-check each other, so neither can go quietly blind. One
+    // storage rule rides along: any write on a module auto-flips `read` on
+    // (normalizeRights in lib/roles.ts), so a stored `read` is legitimate
+    // wherever some write on that module is offered, even when the matrix
+    // draws no read box (`teams` is exactly that).
+    const storable = (r: string) => {
+      if (grantable.has(r)) return true
+      const [mod, right] = r.split(":")
+      return right === "read" && ["create", "edit", "delete"].some((w) => grantable.has(`${mod}:${w}`))
+    }
+    expect(
+      [...clientRights].filter((r) => !storable(r)),
+      "the seed grants a right the matrix cannot — one of the two derivations is wrong"
+    ).toEqual([])
 
     // ── 2. the portal's own surface ──────────────────────────────────────────
     const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
@@ -1659,8 +1692,8 @@ describe("RULES — the laws of the base", () => {
           ...body.matchAll(/\bgated(?:Body)?(?:<[^>]*>)?\s*\(\s*request,\s*env,\s*"(\w+)",\s*"(\w+)"/g),
           ...body.matchAll(/\brequireRight\s*\(\s*\w+,\s*\w+,\s*"(\w+)",\s*"(\w+)"/g),
         ].map((m) => `${m[1]}:${m[2]}`)
-        const passable = gates.length === 0 || gates.some((g) => clientRights.has(g))
-        if (!passable) continue // their role stops them before the door has to
+        const passable = gates.length === 0 || gates.some((g) => grantable.has(g))
+        if (!passable) continue // no role the matrix can build ever passes this door
 
         // Reachable. So the door must have made a decision about client logins,
         // and there are only two that count.

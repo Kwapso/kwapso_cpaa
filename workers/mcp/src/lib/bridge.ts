@@ -23,15 +23,21 @@ const SESSION_COOKIE = "kwapso_session" // auth's cookie name (sessions.ts)
  *
  *   • to hold a working token you must be an ACTIVE member of the pinned team
  *     (auth's /internal/mcp-session refuses anyone else, on every mint);
- *   • to read as a CLIENT you must have a `portal_users` row, and the only door
- *     that writes one refuses an active team member outright — a 409 `is_staff`,
- *     because a client login would fence a colleague out of the agency app.
+ *   • to read as a CLIENT you must have a `portal_users` row — and portal-ness
+ *     is decided by the PRESENCE of that row, live or revoked (the fence reads
+ *     `WHERE user_id = ?` with no liveness filter). Presence is permanent:
+ *     revoking a grant keeps the row, so anyone who has EVER been a client
+ *     reads as `portal` and `requireStaff` refuses them — which means they
+ *     could never have minted a token in the first place. (The grant door's
+ *     `is_staff` refusal still guards the FIRST grant against fencing a
+ *     colleague out; since re-grants were allowed for prior clients it is a
+ *     courtesy, not the carrier — presence is the carrier.)
  *
  * The two are mutually exclusive at every instant, so "staff at mint, client a
  * moment later" is not a state this app can reach. That refutation is not a
- * paragraph to be taken on trust: `test/staff-only.test.ts` reads tenancy's own
- * source and fails if that refusal ever relaxes, at which point this cache has
- * to go rather than quietly become the hole.
+ * paragraph to be taken on trust: `test/staff-only.test.ts` reads the fence's
+ * own source and fails if the presence rule ever relaxes, at which point this
+ * cache has to go rather than quietly become the hole.
  *
  * It was ten minutes, on the reasoning that anything inside the 60-minute
  * pinned-session TTL is safe. "Safe" was the wrong measure — the right one is

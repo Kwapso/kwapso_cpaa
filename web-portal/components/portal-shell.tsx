@@ -237,12 +237,13 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
        * one. Nothing is truncated and no word had to be shortened. */}
       <nav className="bg-background sticky bottom-0 border-t">
         <div className="mx-auto flex w-full max-w-3xl px-1">
-          {DESTINATIONS.map(({ href, label, icon: Icon }) => {
-            const here = pathname === href || pathname.startsWith(`${href}/`)
+          {DESTINATIONS.map((dest) => {
+            const { label, icon: Icon } = dest
+            const here = pathname === dest.href || pathname.startsWith(`${dest.href}/`)
             return (
               <Link
-                key={href}
-                href={href}
+                key={dest.href}
+                href={dest.href}
                 aria-current={here ? "page" : undefined}
                 /* `min-w-0`, and the label in a box of its own — see the note
                    above the bar. Without both, a five-slot `flex-1` row gives

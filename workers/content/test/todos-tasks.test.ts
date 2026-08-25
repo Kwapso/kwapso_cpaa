@@ -202,6 +202,26 @@ describe("the fence rides the WRITE, not only the read in front of it", () => {
     ).toBe(true)
     expect(/fence\.params/.test(stmt), "…and bind its parameters").toBe(true)
   })
+
+  // THE BUCKET IS A WRITE TOO, and it is the one a 404 does not undo. /media/*
+  // keys are capability URLs served with no session by both gateways, so an
+  // object stored before the fence is PUBLISHED even when the row write then
+  // refuses — a portal contact naming a foreign to-do id was storing 10 MB of
+  // attacker-chosen bytes on the company's own domain, orphaned, for ever.
+  // Source order is the invariant: the fenced read comes before the put.
+  it("no /media object is stored before the record it hangs on is fenced", () => {
+    for (const [file, fencedRead] of [
+      ["todos.ts", "todoOrThrow"],
+      ["stories.ts", "storyOrThrow"],
+    ] as const) {
+      const src = readFileSync(join(__dirname, "..", "src", "routes", file), "utf8")
+      const put = src.indexOf("env.MEDIA.put")
+      expect(put, `${file} no longer uploads — re-read this check`).toBeGreaterThan(-1)
+      const fence = src.indexOf(`await ${fencedRead}(`)
+      expect(fence, `${file} must resolve ${fencedRead} before it writes the bucket`).toBeGreaterThan(-1)
+      expect(fence, `${file}: the ${fencedRead} read must come BEFORE env.MEDIA.put`).toBeLessThan(put)
+    }
+  })
 })
 
 describe("who sees everyone else's tasks is a permission (4.9)", () => {

@@ -416,9 +416,12 @@ const AGENT_ONLY: AgentTool[] = [
     method: "POST",
     path: "/api/content/google/drive/update",
     write: true,
-    // Constructive in the same sense the upload is, and reversible: the previous
-    // version stays in Drive's own file history.
-    confirm: false,
+    // CONFIRMS. Its own description says `text` replaces the WHOLE contents —
+    // that is the destructive shape every other Google write that destroys
+    // (send, reply, trash, chat delete) puts behind the panel, and this was the
+    // one whose call was made by a comment instead. Drive's file history is a
+    // recovery path, not a reason to skip the question.
+    confirm: true,
     buildBody: (i) => ({
       fileId: str(i, "fileId"),
       text: str(i, "text"),

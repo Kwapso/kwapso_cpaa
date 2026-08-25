@@ -195,10 +195,18 @@ describe("a module refuses a client login on both halves, or on neither", () => 
       "google",
       "knowledge",
       "meetings",
+      "member_roles",
       "selectable_data",
       "staff_profiles",
+      "team_members",
       "work",
     ])
+    //
+    // `member_roles` and `team_members` joined on 26 Aug 2026 — the staff
+    // directory (names, EMAIL addresses, role titles), the permission matrix
+    // and the invite list are the agency's own access machinery, and for six
+    // weeks they were "protected" only by the seed's Client role not holding
+    // the right. One owner tick away is not protected (R21's third recurrence).
     //
     // `commercials` joined the set the day the money shipped, and it is the
     // clearest member of it: BOTH rate cards and the margin are the agency's own

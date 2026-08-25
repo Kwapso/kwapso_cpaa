@@ -92,6 +92,8 @@ export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
 
 /** The groups whose words a rename has to rewrite, and where. */
 export function storedWordColumns(group: string): { table: string; column: string }[] {
-  const home = VOCABULARY_HOMES[group]
+  // hasOwnProperty: a prototype name ("__proto__", "constructor") must read
+  // as unknown, not as a truthy object with no columns.
+  const home = Object.prototype.hasOwnProperty.call(VOCABULARY_HOMES, group) ? VOCABULARY_HOMES[group] : undefined
   return home && home !== "labels" && home !== "unused" ? home.columns : []
 }

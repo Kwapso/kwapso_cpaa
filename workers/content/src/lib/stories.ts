@@ -306,7 +306,7 @@ export async function getStory(cfg: D1Rest, guard: MemberGuard, id: string): Pro
 }
 
 /** The raw row a write resolves first — a clean 404 rather than a 500 on a made-up id. */
-async function storyOrThrow(cfg: D1Rest, guard: MemberGuard, id: string): Promise<StoryRow> {
+export async function storyOrThrow(cfg: D1Rest, guard: MemberGuard, id: string): Promise<StoryRow> {
   const rows = await d1Query<StoryRow>(
     cfg,
     guard.databaseId,

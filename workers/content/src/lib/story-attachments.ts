@@ -20,7 +20,7 @@
 // caller outright instead, which is R21 at the door and the stronger statement.
 
 import { logActivity, type Actor } from "@shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, sqlString, sqlValue, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { STORY_ATTACHMENT_CAP } from "@shared/workers/limits"
@@ -121,7 +121,7 @@ export async function addStoryAttachment(
     cfg,
     guard.databaseId,
     `INSERT INTO story_attachments (id, story_id, kind, label, url, content_type, size_bytes, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(ulid())}, ${sqlString(storyId)}, ${sqlString(input.kind)}, ${sqlString(label)}, ${sqlString(input.url)}, ${sqlString(input.contentType ?? null)}, ${input.sizeBytes ?? "NULL"}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(ulid())}, ${sqlString(storyId)}, ${sqlString(input.kind)}, ${sqlString(label)}, ${sqlString(input.url)}, ${sqlString(input.contentType ?? null)}, ${sqlValue(input.sizeBytes ?? null)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: input.kind === "file" ? "Story file added" : "Story link added",

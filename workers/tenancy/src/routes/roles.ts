@@ -22,6 +22,7 @@ import {
   listAllRolePermissions,
   listRoleAudit,
 } from "../lib/roles"
+import { refusePortalCaller } from "@shared/workers/account-scope"
 import { teamContext } from "../context"
 import type { Env } from "../env"
 
@@ -34,6 +35,10 @@ export async function getMyPerms(request: Request, env: Env): Promise<Response> 
 export async function getRoles(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "read")
+  // R21: roles and the permission matrix are the agency's own access
+  // machinery — the portal withholds these doors, so this origin refuses a
+  // client login at the door rather than trusting how a role was built.
+  await refusePortalCaller(cfg, guard)
   const roles = await listRoles(env, cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one role
   // R16: every list response carries the exact server total — badges never use rows.length.
@@ -61,6 +66,7 @@ export async function getRoles(request: Request, env: Env): Promise<Response> {
 export async function getRolesExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "read")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const [roles, audit, perms, total] = await Promise.all([
     listRoles(env, cfg, guard),
     listRoleAudit(cfg, guard),
@@ -116,6 +122,7 @@ export async function getRolesExport(request: Request, env: Env): Promise<Respon
 export async function getRolePerms(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "read")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const roleId = queryText(new URL(request.url).searchParams.get("roleId"), "Role")
   if (!roleId) return fail(400, "invalid_input", "roleId is required.")
   return json(await getRolePermissions(cfg, guard, roleId))
@@ -124,6 +131,7 @@ export async function getRolePerms(request: Request, env: Env): Promise<Response
 export async function postRolePerms(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "edit")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const body = (await request.json().catch(() => ({}))) as {
     roleId?: string
     value?: PermissionValue
@@ -141,6 +149,7 @@ export async function postRolePerms(request: Request, env: Env): Promise<Respons
 export async function postCreateRole(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "create")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const body = (await request.json().catch(() => ({}))) as {
     title?: string
     description?: string
@@ -176,6 +185,7 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
 export async function postUpdateRole(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "edit")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const body = (await request.json().catch(() => ({}))) as {
     roleId?: string
     title?: string
@@ -193,6 +203,7 @@ export async function postUpdateRole(request: Request, env: Env): Promise<Respon
 export async function postSetRoleActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "delete")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const body = (await request.json().catch(() => ({}))) as {
     roleId?: string
     active?: boolean

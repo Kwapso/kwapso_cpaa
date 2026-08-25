@@ -552,6 +552,18 @@ export async function driveThumbnail(
   const meta = (await googleFetch(url.toString(), token)) as Record<string, unknown>
   const link = str(meta.thumbnailLink)
   if (!link) return null
+  // The ONE outbound call in this file whose URL the code did not construct —
+  // `thumbnailLink` is read out of Google's response body. Google mints it, so
+  // this is hardening rather than a live hole, but a bearer token follows the
+  // URL, and a credential follows only hosts we recognise as Google's own.
+  const host = (() => {
+    try {
+      return new URL(link).hostname
+    } catch {
+      return ""
+    }
+  })()
+  if (!/(^|\.)googleusercontent\.com$|(^|\.)google\.com$|(^|\.)googleapis\.com$/.test(host)) return null
   // R11 — the picture comes from a different host to every other call in this
   // file, so it carries its own timeout rather than inheriting one.
   const res = await fetch(link, {

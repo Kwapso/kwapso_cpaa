@@ -29,7 +29,7 @@
 // reason.
 
 import { logActivity, type Actor } from "@shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, sqlString, sqlValue, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import type { AccountScope } from "@shared/workers/account-scope"
@@ -155,7 +155,7 @@ export async function addAttachment(
     cfg,
     guard.databaseId,
     `INSERT INTO help_attachments (id, help_id, kind, label, url, content_type, size_bytes, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(ulid())}, ${sqlString(ticketId)}, ${sqlString(input.kind)}, ${sqlString(label)}, ${sqlString(input.url)}, ${sqlString(input.contentType ?? null)}, ${input.sizeBytes ?? "NULL"}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(ulid())}, ${sqlString(ticketId)}, ${sqlString(input.kind)}, ${sqlString(label)}, ${sqlString(input.url)}, ${sqlString(input.contentType ?? null)}, ${sqlValue(input.sizeBytes ?? null)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: input.kind === "file" ? "Ticket file added" : "Ticket link added",

@@ -60,6 +60,7 @@ import { ApiFailure, support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { AddLinkDialog } from "@/components/add-link-dialog"
 import { CollectionHeading } from "@/components/collection-heading"
+import { safeHref } from "@shared/web/rich-text"
 
 /** "2.4 MB", "812 KB". Only ever shown for a file — a link has no size, and a
  * "0 bytes" beside one would read as a broken upload. */
@@ -81,7 +82,11 @@ function fileSize(bytes: number | null): string | null {
  * Anything else still shows, in full, as plain text: refusing to draw it would
  * hide what somebody sent, and refusing to FOLLOW it costs one copy-and-paste. */
 function isFollowable(url: string): boolean {
-  return /^https?:\/\//i.test(url) || url.startsWith("/")
+  // The portal's own policy (plainly-the-web only, so no mailto:) AND the one
+  // shared seam every data-derived href goes through — safeHref adds the
+  // markup-character refusal and the canonical parse, so this file cannot
+  // drift from the agency twin's discipline.
+  return (/^https?:\/\//i.test(url) || url.startsWith("/")) && safeHref(url) !== undefined
 }
 
 export function TicketAttachments({ ticketId }: { ticketId: string }) {
@@ -181,7 +186,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
                 <div className="min-w-0 flex-1">
                   {isFollowable(a.url) ? (
                     <a
-                      href={a.url}
+                      href={safeHref(a.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block truncate underline-offset-4 hover:underline"

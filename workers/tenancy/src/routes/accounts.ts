@@ -17,7 +17,7 @@ import { EXPORT_HARD_CAP, idBatches } from "@shared/workers/limits"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
-import { accountScope, type AccountScope } from "@shared/workers/account-scope"
+import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { mediaKey, storeImageDataUrl } from "@shared/workers/image"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
@@ -408,7 +408,9 @@ export async function postLinkPerson(request: Request, env: Env): Promise<Respon
     "contacts",
     "create"
   )
-  const scope = await accountScope(cfg, guard)
+  // R21: the address book spans EVERY client company — agency material. The
+  // portal opens no link-editing door, so this origin refuses a client login.
+  const scope = await refusePortalCaller(cfg, guard)
   const accountId = requireText(body.accountId, "Account", TEXT_LIMITS.short)
   const id = await linkPerson(cfg, guard, scope, actor, {
     accountId,
@@ -428,7 +430,7 @@ export async function postLinkActive(request: Request, env: Env): Promise<Respon
     "contacts",
     "delete"
   )
-  const scope = await accountScope(cfg, guard)
+  const scope = await refusePortalCaller(cfg, guard) // R21: agency machinery
   const id = requireText(body.id, "Contact link", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Unlink or relink?")
   // R17: null = zero rows moved = already like that → no ping, no duplicate history.

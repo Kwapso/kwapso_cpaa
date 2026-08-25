@@ -12,12 +12,16 @@ import {
 } from "../lib/invites"
 import { acceptInvite, listReceivedInvites } from "../lib/teams"
 import { gated, gatedBody } from "@shared/workers/route"
+import { refusePortalCaller } from "@shared/workers/account-scope"
 import { queryText } from "@shared/workers/validate"
 import { toActor, whoAmI } from "../context"
 import type { Env } from "../env"
 
 export async function getInvites(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "team_members", "read")
+  // R21: invites carry invitees' email addresses — agency machinery the portal
+  // deliberately withholds, so the door refuses a client login here too.
+  await refusePortalCaller(cfg, guard)
   const invites = await listInvites(env, cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one invite
   // R16: the exact server total rides every list response (badges never use rows.length).
@@ -28,6 +32,7 @@ export async function postCreateInvite(request: Request, env: Env): Promise<Resp
   const { actor, cfg, guard, body } = await gatedBody<{ email?: string; roleId?: string }>(
     request, env, "team_members", "create"
   )
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   if (typeof body.email !== "string" || typeof body.roleId !== "string")
     return fail(400, "invalid_input", "email and roleId are required.")
   const { inviteId, emailSent } = await createInvite(
@@ -44,6 +49,7 @@ export async function postRevokeInvite(request: Request, env: Env): Promise<Resp
   const { actor, cfg, guard, body } = await gatedBody<{ inviteId?: string }>(
     request, env, "team_members", "delete"
   )
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   if (typeof body.inviteId !== "string") return fail(400, "invalid_input", "inviteId is required.")
   await revokeInvite(env, cfg, guard, actor, body.inviteId)
   // Revoke is an in-place edit (the row stays, status → 'revoked'), so re-pulling
@@ -56,6 +62,7 @@ export async function postRevokeInvite(request: Request, env: Env): Promise<Resp
  * acceptance + shelf life, for the invite detail. Gated by team_members:read. */
 export async function getInviteAudit(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "team_members", "read")
+  await refusePortalCaller(cfg, guard) // R21: agency machinery
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "id is required.")
   return json({ audit: await readInviteAudit(env, cfg, guard, id) })

@@ -129,8 +129,8 @@ export function DeliverablesScreen() {
                 </h3>
                 <ul className="flex flex-col gap-2">
                   {group.rows.map((d) => {
-                    const href = reachableHere(d.url) ? safeHref(d.url) : null
-                    const picture = reachableHere(d.imageUrl) ? safeSrc(d.imageUrl) : null
+                    const href = safeHref(reachableHere(d.url) ? d.url : undefined) ?? null
+                    const picture = safeSrc(reachableHere(d.imageUrl) ? d.imageUrl : undefined) ?? null
                     return (
                       <li
                         key={d.id}

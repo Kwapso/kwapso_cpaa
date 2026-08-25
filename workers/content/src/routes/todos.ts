@@ -18,7 +18,7 @@ import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
-import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos } from "../lib/todos"
+import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos, todoOrThrow } from "../lib/todos"
 import { countTasks, createTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
 import { TASK_VIEWS, type TaskViewName } from "@shared/types"
@@ -120,6 +120,13 @@ export async function postCompleteTodo(request: Request, env: Env): Promise<Resp
 
   let file: { url: string; name: string } | null = null
   if (body.fileDataUrl !== undefined && body.fileDataUrl !== null) {
+    // The fence runs BEFORE the bucket write, not just before the row write.
+    // `/media/*` keys are capability URLs served with no session by both
+    // gateways, so bytes stored against a to-do the caller may not touch are
+    // not "cleaned up by the 404" — they are published. A foreign id must die
+    // here, while the request is still only words. (completeTodo re-fences
+    // atomically on the UPDATE; this read is the one that guards the bucket.)
+    await todoOrThrow(cfg, guard, scope, id)
     const parsed = parseUploadDataUrl(body.fileDataUrl, MAX_TODO_FILE_BYTES)
     if (!parsed) return fail(400, "invalid_input", "That file isn't one we can take (max 10 MB).")
     const key = mediaKey("todo", guard.teamId)
