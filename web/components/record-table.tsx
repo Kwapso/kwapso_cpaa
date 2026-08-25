@@ -236,7 +236,7 @@ export function RecordTable<T extends TableRowData>({
                         <button
                           type="button"
                           onClick={() => toggle(c)}
-                          className="hover:text-foreground inline-flex items-center gap-1 transition-colors"
+                          className="hover:text-foreground motion-hover inline-flex items-center gap-1"
                         >
                           {c.label}
                           {active ? (

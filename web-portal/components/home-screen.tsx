@@ -63,8 +63,10 @@ function TimeGivenBack() {
   const t = useT()
   const { data } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   if (!data || data.apps.length === 0 || data.savedSecondsPerMonth <= 0) return null
+  // A card that is a link — one of the three things motion.css §13 allows to
+  // gain elevation on hover, and `motion-hover-lift` is how it is spelt.
   return (
-    <Link href="/impact" className="hover:bg-muted/40 rounded-xl border p-6 transition-colors">
+    <Link href="/impact" className="hover:bg-muted/40 motion-hover-lift rounded-xl border p-6">
       <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
       <p className="text-3xl font-medium tracking-tight">{hoursText(data.savedSecondsPerMonth)}</p>
       <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>

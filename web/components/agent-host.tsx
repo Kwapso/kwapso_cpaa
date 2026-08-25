@@ -42,7 +42,9 @@ export function AgentHost() {
         type="button"
         onClick={() => setAgentOpen(true)}
         aria-label={t("Open the assistant")}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 fixed right-4 bottom-20 z-30 flex size-12 items-center justify-center rounded-full shadow-lg transition-colors md:bottom-6"
+        // The copilot launcher — motion.css §13 names it, by that word, as one of
+        // the three things allowed to gain elevation on hover.
+        className="bg-primary text-primary-foreground hover:bg-primary/90 motion-hover-lift fixed right-4 bottom-20 z-30 flex size-12 items-center justify-center rounded-full shadow-lg md:bottom-6"
       >
         <Sparkles className="size-5" />
       </button>

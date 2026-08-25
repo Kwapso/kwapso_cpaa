@@ -1024,7 +1024,7 @@ export function ProcessDetailScreen({
                         setVersionId(v.id === current?.id ? null : v.id)
                         setTab("steps")
                       }}
-                      className="hover:bg-muted/50 flex w-full items-center justify-between gap-2 border-b p-3 text-left transition-colors last:border-b-0"
+                      className="hover:bg-muted/50 motion-hover flex w-full items-center justify-between gap-2 border-b p-3 text-left last:border-b-0"
                     >
                       <span className="min-w-0">
                         <span className="flex min-w-0 items-center gap-2 text-sm font-medium">

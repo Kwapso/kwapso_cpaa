@@ -83,7 +83,9 @@ export function AppTiles({
               e.preventDefault()
               softNavigate(href)
             }}
-            className="bg-card hover:bg-muted flex items-center gap-2 rounded-xl p-4 transition-colors duration-200"
+            // A card that is a link (motion.css §13). `duration-200` went with the
+            // hand-rolled transition: the kit owns the duration and the curve.
+            className="bg-card hover:bg-muted motion-hover-lift flex items-center gap-2 rounded-xl p-4"
           >
             {/* The mark is aria-hidden and the stage WORD is on the heading above
                 it, which is the pair UI-CONVENTIONS §5 requires of a type mark.

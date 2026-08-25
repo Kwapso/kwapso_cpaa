@@ -63,7 +63,7 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="hover:bg-accent/50 flex items-center gap-2 rounded-xl border p-4 transition-colors"
+      className="hover:bg-accent/50 motion-hover flex items-center gap-2 rounded-xl border p-4"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <p className="line-clamp-2">{richTextPlain(ticket.description)}</p>

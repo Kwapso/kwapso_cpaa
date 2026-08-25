@@ -157,7 +157,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       {phase === "upload" && (
         <div className="flex flex-col gap-4">
           <label
-            className="border-muted-foreground/25 hover:bg-muted/40 flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-colors"
+            className="border-muted-foreground/25 hover:bg-muted/40 flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-center motion-hover"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
