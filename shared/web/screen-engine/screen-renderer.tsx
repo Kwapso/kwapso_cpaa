@@ -247,7 +247,11 @@ function ScreenLayer({
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
               aria-label={t("Close")}
-              className="rounded-full opacity-70 transition-opacity hover:opacity-100"
+              /* motion.css §13, first line: "Hover is a fill swap and nothing
+                 else. Not an opacity" — an alpha of a token is a colour the
+                 palette does not contain. This faded the whole glyph from 70%
+                 to 100%; it moves the INK now, between two named tones. */
+              className="text-ink-secondary motion-hover hover:text-foreground rounded-full"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>
@@ -617,7 +621,15 @@ function renderList(
         display === "cards" ? (
           /* The kit's CardGrid is the LAYOUT; the cards are children. A card
              still opens its record exactly as a list row does — the whole
-             card is the press target, drawn from the kit's own Card. */
+             card is the press target, drawn from the kit's own Card.
+
+             `interactive` is the kit's own word for "this card is a target",
+             and it is what buys the `--accent` hover wash and motion.css's
+             `motion-hover-lift`. This used to say `className="cursor-pointer"`
+             instead: the cursor changed and nothing else did, so every card
+             collection in the app — accounts, apps, knowledge, the lot — was a
+             grid of boxes that did not react to being pointed at. The kit had
+             the prop the whole time. */
           <CardGrid>
             {page.map((row) => {
               const id = String(row.id ?? "")
@@ -626,7 +638,7 @@ function renderList(
                   key={id}
                   role="button"
                   tabIndex={0}
-                  className="cursor-pointer"
+                  interactive
                   onClick={() =>
                     onIntent?.({ kind: "open", module: recipe.binding.module, id })
                   }

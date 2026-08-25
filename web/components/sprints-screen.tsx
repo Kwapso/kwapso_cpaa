@@ -296,7 +296,7 @@ export function SprintsScreen({
   const badge = formatCount(total)
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
+    variant: "folder" as const,
     tabs: [
       {
         value: "overview",
@@ -430,7 +430,7 @@ export function SprintsScreen({
           onCreate={() => setAddOpen(true)}
           // The view strip scopes what the collection card shows, so it sits
           // above the card rather than inside it.
-          aboveCard={<TabsView config={tabsConfig} value={view} onValueChange={setView} />}
+          folderTabs={<TabsView config={tabsConfig} value={view} onValueChange={setView} />}
         >
           {view === "overview" ? (
             overview

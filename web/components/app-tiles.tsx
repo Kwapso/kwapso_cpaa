@@ -83,7 +83,15 @@ export function AppTiles({
               e.preventDefault()
               softNavigate(href)
             }}
-            className="bg-card hover:bg-muted flex items-center gap-2 rounded-xl p-4 transition-colors duration-200"
+            // `motion-hover`, NOT `motion-hover-lift`, and the difference is this
+            // file's own rule above: a tile is flat, and a grid of them lifting
+            // is the page of reacting boxes UI-RULEBOOK C2 exists to prevent.
+            // motion.css §13 would allow the lift — a tile IS a card that is a
+            // link — and the narrower rule wins on the narrower surface.
+            // `duration-200` went with the hand-rolled transition: the kit owns
+            // the duration and the curve, which is the "house curve" the comment
+            // at the top of this file was already asking for by hand.
+            className="bg-card hover:bg-muted motion-hover flex items-center gap-2 rounded-xl p-4"
           >
             {/* The mark is aria-hidden and the stage WORD is on the heading above
                 it, which is the pair UI-CONVENTIONS §5 requires of a type mark.

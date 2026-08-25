@@ -147,7 +147,7 @@ function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: (id: strin
       onClick={() => onOpen(entry.id)}
       title={entry.title}
       aria-label={t("Open {name}", { name: entry.title })}
-      className="bg-accent hover:bg-muted flex w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-left text-xs transition-colors"
+      className="bg-accent hover:bg-muted motion-hover flex w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-left text-xs"
     >
       {entry.accent ? (
         <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${accentClass(entry.accent)}`} />
@@ -366,7 +366,7 @@ export function RecordCalendar({
                     // to, so a rebrand now reaches the calendar like everything
                     // else. Mango is still never a border, which is the rule this
                     // square was drawn to obey.
-                    "flex min-h-20 flex-col gap-1 rounded-xl border p-1.5 transition-colors hover:border-foreground/30 hover:bg-accent",
+                    "motion-hover flex min-h-20 flex-col gap-1 rounded-xl border p-1.5 hover:border-foreground/30 hover:bg-accent",
                     d.getMonth() === month.getMonth() ? "" : "opacity-40",
                     key === today ? "bg-secondary" : "",
                   ].join(" ")}
@@ -387,7 +387,7 @@ export function RecordCalendar({
                       <button
                         type="button"
                         onClick={() => setOpenDay(key)}
-                        className="text-muted-foreground hover:text-foreground rounded px-1 text-left text-xs underline-offset-2 transition-colors hover:underline"
+                        className="text-muted-foreground hover:text-foreground motion-hover rounded px-1 text-left text-xs underline-offset-2 hover:underline"
                       >
                         {t("+{n} more", { n: hidden })}
                       </button>

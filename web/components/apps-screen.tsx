@@ -172,7 +172,7 @@ export function AppsScreen({
   const inactiveBadge = formatCount(inactive.length)
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "line" as const,
+    variant: "folder" as const,
     tabs: [
       { value: "active", label: t("Active"), icon: "app-window", badge: activeBadge, badgeVariant: "" as const },
       { value: "inactive", label: t("Inactive"), icon: "archive", badge: inactiveBadge, badgeVariant: "" as const },
@@ -192,27 +192,33 @@ export function AppsScreen({
         label={t("Record an app")}
         icon="plus"
         onCreate={() => setAddOpen(true)}
+        // THE SEARCH BOX IS ABOVE THE TABS, and that is the reading order the
+        // counting already had: the split is computed over what the search left
+        // ("searched FIRST" above), so the box narrows the collection and the
+        // tabs then divide what is left. It used to sit between the strip and
+        // the card, which said the opposite and left the folder tabs attached
+        // to nothing.
         aboveCard={
-          <div className="flex flex-col gap-4">
-            <TabsView config={tabsConfig} value={tab} onValueChange={setTab} />
-            {/* Only once there is something to search. A box over an empty
-             * collection is a control that cannot do anything. */}
-            {appsQ.data.length > 0 && (
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search apps…")}
-                  className="pl-8"
-                />
-              </div>
-            )}
-          </div>
+          /* Only once there is something to search. A box over an empty
+           * collection is a control that cannot do anything. */
+          appsQ.data.length > 0 ? (
+            <div className="relative w-full sm:w-56">
+              <Search
+                className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                aria-hidden
+              />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search apps…")}
+                className="pl-8"
+              />
+            </div>
+          ) : null
         }
+        // Active and Inactive are one kind of record with a filter on it, which
+        // is the kit's own test for the folder shape.
+        folderTabs={<TabsView config={tabsConfig} value={tab} onValueChange={setTab} />}
       >
         {shown.length === 0 ? (
           <p className="text-muted-foreground text-sm">

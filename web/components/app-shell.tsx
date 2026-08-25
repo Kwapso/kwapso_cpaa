@@ -195,7 +195,7 @@ export function AppShell({
         onClick={() => navigate(item.path)}
         aria-current={activeNav ? "page" : undefined}
         title={collapsed ? item.title : undefined}
-        className={`flex items-center rounded-xl text-sm font-medium transition-colors ${
+        className={`motion-hover flex items-center rounded-xl text-sm font-medium ${
           collapsed ? "justify-center p-2" : "gap-2 px-3 py-2"
         } ${
           activeNav
@@ -378,7 +378,7 @@ export function AppShell({
             onClick={toggleCollapsed}
             aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
             title={collapsed ? t("Expand") : t("Collapse")}
-            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-xl p-2 transition-colors"
+            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground motion-hover rounded-xl p-2"
           >
             {collapsed ? (
               <PanelLeftOpen className="size-4" />
@@ -475,7 +475,7 @@ export function AppShell({
                 type="button"
                 onClick={() => navigate(item.path)}
                 aria-current={activeNav ? "page" : undefined}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium transition-colors ${
+                className={`motion-hover flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
                   activeNav ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -496,7 +496,7 @@ export function AppShell({
               aria-current={
                 overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
               }
-              className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium transition-colors ${
+              className={`motion-hover flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
                 overflowNav.some((i) => isNavActive(i.path, here))
                   ? "text-foreground"
                   : "text-muted-foreground"
@@ -535,7 +535,7 @@ export function AppShell({
                           navigate(item.path)
                         }}
                         aria-current={activeNav ? "page" : undefined}
-                        className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                        className={`motion-hover flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ${
                           activeNav
                             ? "bg-muted text-foreground"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"

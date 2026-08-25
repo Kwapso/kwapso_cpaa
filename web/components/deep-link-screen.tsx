@@ -406,6 +406,19 @@ export function DeepLinkScreen() {
             stands down, so a screen can never show the same number twice. The
             badged flag is per-permission (the strip may hide for this viewer). */}
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
+          {/* THE ROUTE TRANSITION (motion.css §2). The 8px rise and fade, on the
+              route's OWN content and on nothing else — the sidebar, the header
+              band and the section strip above must not restage themselves when
+              the route under them changes, or every navigation reads as a full
+              page load. That is why this wrapper is inside the strip rather
+              than around it.
+
+              The key is the SCREEN's identity, not the URL: a `?tab=` inside one
+              screen swaps a panel, and `motion-panel-in` (the tight 4px rise) is
+              what a panel takes. Remounting on a query change would also throw
+              away the panel's own state to play an animation, which is the wrong
+              trade in both directions. */}
+          <div key={`${module}:${recordId ?? ""}`} className="motion-page-in flex flex-col gap-6">
           {renderModuleContent({
             noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
@@ -420,6 +433,7 @@ export function DeepLinkScreen() {
             helpTypeOptions,
             taskView, setTaskView, t,
           })}
+          </div>
         </CountedTabs>
       </div>
 

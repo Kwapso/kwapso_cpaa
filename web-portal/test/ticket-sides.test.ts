@@ -89,10 +89,13 @@ const { OTHER_SIDE, OWN_SIDE, TicketScreen, sideFor } = await import("@/componen
 
 describe("which side a message sits on", () => {
   it("puts YOUR OWN messages on the right — the WhatsApp convention, not the typed direction", () => {
-    // If this ever reads "items-start", the screen has been flipped back to the
-    // words rather than the app the owner named. Flip both, or neither.
-    expect(OWN_SIDE).toBe("items-end")
-    expect(OTHER_SIDE).toBe("items-start")
+    // The words are the KIT's now (`ThreadSide`), and the kit draws `mine` on
+    // the end and `theirs` on the start — so this still says "your own on the
+    // right", in the vocabulary the thread actually reads. If it ever reads the
+    // other way round, the screen has been flipped back to the sentence the
+    // owner typed rather than the app he named. Flip both, or neither.
+    expect(OWN_SIDE).toBe("mine")
+    expect(OTHER_SIDE).toBe("theirs")
   })
 
   it("everyone who is not you is on the other side", () => {
@@ -150,30 +153,39 @@ describe("the side never becomes a fingerprint", () => {
     root = null
   })
 
-  const rows = () => [...host.querySelectorAll("ol > li")]
+  /** The kit's thread marks each message `data-slot="thread-message"` and puts
+   * the side on `data-side` — which is a better handle than the old `ol > li`
+   * was, because it is the component's own contract rather than our markup. */
+  const rows = () => [...host.querySelectorAll('[data-slot="thread-message"]')]
 
   it("renders the whole thread (guards the walk)", () => {
     expect(rows()).toHaveLength(4)
   })
 
-  it("your message is on the right and wears the brand surface; theirs are not", () => {
+  it("your message is on the right and wears the inverse surface; theirs are not", () => {
     const [mine, colleague, staff] = rows()
-    expect(mine.className).toContain(OWN_SIDE)
-    expect(mine.querySelector("div")?.className).toContain("bg-primary")
+    expect(mine.getAttribute("data-side")).toBe(OWN_SIDE)
+    expect(mine.querySelector('[data-slot="thread-bubble"]')?.className).toContain(
+      "bg-surface-inverse",
+    )
     for (const other of [colleague, staff]) {
-      expect(other.className).toContain(OTHER_SIDE)
-      expect(other.querySelector("div")?.className).toContain("bg-muted")
+      expect(other.getAttribute("data-side")).toBe(OTHER_SIDE)
+      expect(other.querySelector('[data-slot="thread-bubble"]')?.className).toContain("bg-card")
     }
   })
 
   it("TWO DIFFERENT STAFF REPLIES ARE INDISTINGUISHABLE apart from what they say", () => {
     const [, , a, b] = rows()
-    // Same alignment, same surface, same attribution, same everything — strip
-    // the words and the two rows are the same row. The moment a side, a colour,
-    // an avatar seed or a grouping keys on the author, this diverges and a
-    // client can count the people behind "kwapso".
-    const shape = (li: Element) =>
-      li.outerHTML.replace("Looking into it now.", "…").replace("Fixed — can you confirm?", "…")
+    // Same side, same surface, same attribution, same everything — strip the
+    // words and the two rows are the same row. The moment a side, a colour, an
+    // avatar seed or a grouping keys on the author, this diverges and a client
+    // can count the people behind the agency's one name.
+    //
+    // The fixture hands these two DISTINCT author ids on purpose (see its own
+    // note): the wire strips them, so feeding nulls here would prove only that
+    // two identical inputs render identically.
+    const shape = (el: Element) =>
+      el.outerHTML.replace("Looking into it now.", "…").replace("Fixed — can you confirm?", "…")
     expect(shape(a)).toBe(shape(b))
   })
 

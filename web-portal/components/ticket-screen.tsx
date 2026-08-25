@@ -40,20 +40,35 @@
 // Which matters: the old version printed the agency's name for every author who
 // wasn't you, and would have introduced a client's own colleague as "kwapso".
 //
-// WHY THE CONVERSATION IS COMPOSED HERE INSTEAD OF USING THE LIBRARY'S
-// TicketThread (it used to). The owner asked for WhatsApp-style sides, and no
-// component in the library can express them on a NAMED thread:
-//   • TicketThread renders every reply in one left-aligned <li> — there is no
-//     per-reply side, and its <ol> is not ours to reach into.
-//   • Chat has the sides (and has them the right way round), but a ChatMessage
-//     carries no author, so a colleague and the agency would look identical —
-//     and it composes a single-line Input where a client needs to type a
-//     paragraph about a problem.
-// The library is a separate repo and is never edited from here, so the thread is
-// assembled from the primitives it does ship (Card, Badge, Textarea, Button) and
-// the bubbles reuse Chat's OWN token vocabulary — same corner radius, same
-// bg-primary / bg-muted pair — so the day the library ships a Bubble the swap is
-// mechanical rather than a redesign. The ask is written up in the report.
+// THE THREAD IS THE KIT'S, AND THIS PARAGRAPH USED TO SAY IT COULD NOT BE.
+//
+// The old note here explained that the conversation was hand-assembled because
+// "no component in the library can express [WhatsApp-style sides] on a NAMED
+// thread" — TicketThread had no per-reply side, and Chat had sides but no
+// author. Both were true of the OLD library. The kit ships
+// `structures/portal-conversation`, whose `ThreadMessage` carries `side`,
+// `author`, `authorMeta`, `time` and `attachments`, and which is drawn for
+// exactly this screen: "the client's thread on a record". The note outlived the
+// thing it described by one design system, which is how a hand-rolled copy
+// becomes permanent.
+//
+// So the bubbles, their sides, the 62% measure, the author headings, the
+// loading/empty/error registers and the internal-note PROHIBITION (ch27.10 —
+// a message marked internal is dropped before the thread sees it, which is a
+// safety property this screen should never have been carrying itself) are the
+// kit's now.
+//
+// TWO PARTS ARE STILL COMPOSED HERE, both deliberately:
+//   • THE COMPOSER. The kit's is a single-line pill (`<input type="text">`),
+//     which is right for a chat and wrong for a client describing what went
+//     wrong with their work. `composer={false}`, and the paragraph field below
+//     stays — built from the kit's own Card, Textarea and Button, so it is the
+//     kit's vocabulary either way.
+//   • THE APPROVAL BAND. `PortalApprovalBand` is exported on its own and is
+//     used, so the band is the kit's DRAWING — but it stays where this screen
+//     puts it (under the description, see the note there) rather than where the
+//     shape would put it (above the composer, at the bottom). A person is asked
+//     to approve a request after they have read it back, not before.
 
 import * as React from "react"
 import Link from "next/link"
@@ -62,10 +77,14 @@ import { Badge } from "@shared/ui/controls/badge/badge"
 import { Button } from "@shared/ui/controls/button/button"
 import { Card } from "@shared/ui/controls/card/card"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
 import { Textarea } from "@shared/ui/controls/textarea/textarea"
 import { toast } from "@shared/ui/controls/sonner/sonner"
-import { ArrowLeft, Check, Send } from "@shared/ui/icons"
+import {
+  PortalApprovalBand,
+  PortalConversation,
+  type PortalMessage,
+} from "@shared/ui/structures/portal-conversation/portal-conversation"
+import { ArrowLeft, Send } from "@shared/ui/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpMessage } from "@shared/types"
@@ -104,19 +123,11 @@ import { RichText } from "@shared/web/rich-text-view"
  * says why). So `null === me` is false and every agency reply lands on the same
  * side by the same route — this function must never become the second place that
  * decision is made. */
-export const OWN_SIDE = "items-end"
-export const OTHER_SIDE = "items-start"
-export function sideFor(authorId: string | null, meId: string): string {
+export const OWN_SIDE = "mine"
+export const OTHER_SIDE = "theirs"
+export function sideFor(authorId: string | null, meId: string): "mine" | "theirs" {
   return authorId === meId ? OWN_SIDE : OTHER_SIDE
 }
-
-/** The bubble, in the library's own vocabulary — the library's Chat uses exactly
- * these tokens for its me/them pair. Same radius, same surfaces, so the portal
- * and the library don't drift into two chat languages while we wait for a
- * primitive that can do both sides AND a name. */
-const BUBBLE = "max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words"
-const OWN_BUBBLE = `${BUBBLE} bg-primary text-primary-foreground`
-const OTHER_BUBBLE = `${BUBBLE} bg-muted text-foreground`
 
 export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId: string }) {
   const t = useT()
@@ -141,15 +152,19 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
   // the bubble surface both hang off `side`, so they cannot disagree — and the
   // author id does not survive this map, so nothing downstream can accidentally
   // key on it (see sideFor's note on fingerprints).
-  const messages = (threadQ.data ?? []).map((m) => {
+  const messages: (PortalMessage & { own: boolean })[] = (threadQ.data ?? []).map((m) => {
     const side = sideFor(m.authorId, me)
     return {
       id: m.id,
       side,
       own: side === OWN_SIDE,
-      author: m.authorId === me ? "You" : (m.authorName ?? brand.name),
+      // Your own side says only the time: the side IS the attribution, which is
+      // the whole point of having one.
+      author: side === OWN_SIDE ? undefined : (m.authorName ?? brand.name),
       time: formatRelative(m.createdAt, t),
-      body: m.body,
+      // A reply is typed, so its line breaks are the person's. The kit's bubble
+      // wraps and breaks a long word; preserving a paragraph is the call site's.
+      body: <span className="whitespace-pre-wrap">{m.body}</span>,
     }
   })
 
@@ -239,7 +254,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * badge, not two: the library's header showed its own English status
        * ("Open", "In progress") beside this one, so the same fact appeared twice
        * and half of it was the agency's vocabulary rather than the client's. */}
-      <Card className="hover-lift-none flex flex-col gap-4 p-4">
+      <Card className="flex flex-col gap-4 p-4">
         <Badge variant={status.variant} className="w-fit">
           {t(status.label)}
         </Badge>
@@ -260,23 +275,15 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * this is a band and not a permanent control — a client never gets a second
        * lifecycle button, on this screen or any other. */}
       {ticket.status === "awaiting_validation" ? (
-        <div className="bg-warning/10 text-warning-foreground flex flex-col gap-4 rounded-xl px-4 py-3 text-sm sm:flex-row sm:items-center">
-          <p className="flex-1">
-            {t(
-              "We've written this up the way we understood it. Say the word and we'll get started."
-            )}
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            className="shrink-0 self-start gap-1 sm:self-auto"
-            disabled={confirming}
-            onClick={() => void confirmIt()}
-          >
-            {confirming ? <Spinner /> : <Check className="size-3.5" />}
-            {t("Yes, go ahead")}
-          </Button>
-        </div>
+        <PortalApprovalBand
+          title={t(
+            "We've written this up the way we understood it. Say the word and we'll get started."
+          )}
+          note={t("Nothing starts until you say yes.")}
+          approveLabel={t("Yes, go ahead")}
+          submitting={confirming}
+          onApprove={() => void confirmIt()}
+        />
       ) : null}
 
       {/* SHOW US WHAT YOU MEAN (CHECKLIST 5.10) — above the conversation, because
@@ -285,24 +292,31 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * nothing here costs the person their place. */}
       <TicketAttachments ticketId={ticketId} />
 
-      <ol className="flex flex-col gap-4">
-        {messages.map((m) => (
-          <li key={m.id} className={`flex flex-col gap-1 ${m.side}`}>
-            {/* Who and when, above the bubble. Your own side says only the time —
-             * the side IS the attribution, which is the whole point. */}
-            <span className="text-muted-foreground px-1 text-xs">
-              {m.own ? m.time : `${m.author} · ${m.time}`}
-            </span>
-            <div className={m.own ? OWN_BUBBLE : OTHER_BUBBLE}>{m.body}</div>
-          </li>
-        ))}
-      </ol>
+      {/* THE KIT'S THREAD. `composer={false}` and `audience={null}` because both
+          are composed below — see the note at the top of this file for why the
+          paragraph field stays. `state` is the thread's own, not the screen's:
+          the ticket is already on screen above, so a thread still arriving is a
+          thread-shaped wait and not a page-shaped one. */}
+      <PortalConversation
+        messages={messages}
+        composer={false}
+        audience={null}
+        state={threadQ.data === undefined ? "loading" : messages.length === 0 ? "empty" : "ready"}
+        label={t("Conversation")}
+        loadingLabel={t("Loading…")}
+        copy={{
+          emptyTitle: t("No replies yet"),
+          emptyDescription: t("Write below and we'll see it."),
+          errorTitle: t("We can't show this right now"),
+          errorDescription: t("Try again in a moment."),
+        }}
+      />
 
       {/* No @mentions from this surface: a client has no business naming which
        * staff member picks their request up — so no mention hint in the
        * placeholder either, which the library's composer showed while the portal
        * passed it an empty member list and the "@" did nothing. */}
-      <Card className="hover-lift-none flex flex-col gap-2 p-3">
+      <Card className="flex flex-col gap-2 p-3">
         <Textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -312,16 +326,22 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           aria-label={t("Reply")}
           disabled={sending}
         />
-        <Button
-          type="button"
-          size="sm"
-          className="self-end"
-          disabled={!draft.trim() || sending}
-          onClick={() => void send()}
-        >
-          <Send className="size-3.5" />
-          {sending ? t("Sending…") : t("Reply")}
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          {/* WHO READS THIS, said on the composer — the kit's ch27.10 rule for
+           * the portal, in the agency's own name rather than a hardcoded one. */}
+          <span className="text-muted-foreground text-xs">
+            {t("{name} will see this", { name: brand.name })}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!draft.trim() || sending}
+            onClick={() => void send()}
+          >
+            <Send className="size-3.5" />
+            {sending ? t("Sending…") : t("Reply")}
+          </Button>
+        </div>
       </Card>
     </div>
   )

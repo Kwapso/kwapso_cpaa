@@ -177,6 +177,17 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         </div>
       </header>
 
+      {/* THE ROUTE TRANSITION (motion.css §2) is the `motion-page-in` below, on
+       * the SCREEN and never on the header or the bottom nav — they are the same
+       * items on every screen and must not restage themselves when the screen
+       * under them changes, or every move reads as a full page load. There is no
+       * key on it: the portal is one route per page, so the component the shell
+       * is handed IS the change.
+       *
+       * It sits in the false branch of the switch below and nothing else does:
+       * switcher-waiting.test.ts reads this file and wants `switching ?` and
+       * `children(session)` inside 600 characters of each other, which is its way
+       * of saying the flag still gates the body. Keep prose out of that gap. */}
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">
         {/* Mid-switch the rows below still belong to the company being left, so
          * they are held back rather than shown under the new company's name.
@@ -191,7 +202,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
             <Skeleton className="h-20 w-full rounded-xl" />
           </div>
         ) : (
-          children(session)
+          <div className="motion-page-in">{children(session)}</div>
         )}
       </main>
 
