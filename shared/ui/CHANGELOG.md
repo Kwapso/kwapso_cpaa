@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.0.7 — 2026-08-26
+
+A patch off `v1.0.6`. One fix, found by watching a real reply stream.
+
+### Fixed — the chat follows the words, not the flags
+
+v1.0.6's follow was keyed on the message count and the streaming flag — but a
+streaming reply GROWS its last message without changing either, so the effect
+fired once and then watched 1,700px of answer walk below the fold (measured
+live). A MutationObserver now follows growth, and only while the reader is
+already near the foot — scrolling up mid-stream to re-read is respected, a
+new turn still snaps down.
+
 ## v1.0.6 — 2026-08-26
 
 A patch off `v1.0.5`; still none of the *Unreleased* restructure.

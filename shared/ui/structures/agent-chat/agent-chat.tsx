@@ -630,16 +630,28 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
     const lastIndex = list.length - 1;
 
     /* KEEP THE FOOT IN VIEW. A thread that scrolls needs to follow its own
-       newest words: on a new turn, and while one is streaming, the region
-       pins to its bottom. Only when it CAN scroll — the standalone card has
-       no scrollHeight surplus and this is a no-op there. Deliberately simple
-       (no "user scrolled up" detection): the panel is a conversation, and the
-       newest words are the ones being read. */
+       newest words — and "newest words" is a MUTATION, not a prop: while a
+       reply streams, the last message grows without the message count or the
+       `streaming` flag changing, so an effect keyed on those fired once and
+       then watched 1,700px of answer walk below the fold (measured live,
+       26 Aug 2026). So: a new turn snaps to the foot, and a MutationObserver
+       follows growth — but only while the reader is already NEAR the foot,
+       which is what lets somebody scroll up mid-stream to re-read without
+       being dragged back down. Inert in the standalone auto-height card:
+       nothing to scroll, no surplus to follow. */
     const turnsRef = React.useRef<HTMLDivElement | null>(null);
     React.useEffect(() => {
       const el = turnsRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    }, [list.length, streaming]);
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      const follow = () => {
+        const nearFoot = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+        if (nearFoot) el.scrollTop = el.scrollHeight;
+      };
+      const observer = new MutationObserver(follow);
+      observer.observe(el, { childList: true, subtree: true, characterData: true });
+      return () => observer.disconnect();
+    }, [list.length]);
 
     return (
       <div
