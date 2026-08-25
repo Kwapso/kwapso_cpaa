@@ -1897,4 +1897,34 @@ export const SEED: Catalogue = {
     es: "lo devuelve al paso {n}",
     ca: "el retorna al pas {n}",
   },
+  /* ── The client's thread, on the kit's own conversation ────────────────
+   * Six sentences the portal's ticket screen gained when its hand-rolled
+   * thread was replaced by `structures/portal-conversation`: the shape's three
+   * registers, the approval band's note, and the composer's line saying who
+   * reads what you type (kit ch27.10). The agency's NAME is a hole, because
+   * this base is forked per product and a hardcoded "kwapso" would be wrong in
+   * the second one — and because a hole is the only shape a translator can
+   * reorder. */
+  "No replies yet": { de: "Noch keine Antworten", es: "Aún no hay respuestas", ca: "Encara no hi ha respostes" },
+  "Write below and we'll see it.": {
+    de: "Schreiben Sie unten, dann sehen wir es.",
+    es: "Escribe abajo y lo veremos.",
+    ca: "Escriu a sota i ho veurem.",
+  },
+  "We can't show this right now": {
+    de: "Das lässt sich gerade nicht anzeigen",
+    es: "Ahora mismo no podemos mostrar esto",
+    ca: "Ara mateix no podem mostrar això",
+  },
+  "Try again in a moment.": {
+    de: "Bitte in einem Moment erneut versuchen.",
+    es: "Inténtalo de nuevo en un momento.",
+    ca: "Torna-ho a provar d'aquí a un moment.",
+  },
+  "Nothing starts until you say yes.": {
+    de: "Es beginnt nichts, bevor Sie zustimmen.",
+    es: "No empieza nada hasta que digas que sí.",
+    ca: "No comença res fins que diguis que sí.",
+  },
+  "{name} will see this": { de: "{name} sieht das", es: "{name} lo verá", ca: "{name} ho veurà" },
 }

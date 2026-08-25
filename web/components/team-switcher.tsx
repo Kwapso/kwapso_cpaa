@@ -91,7 +91,7 @@ export function TeamSwitcher({
             </Avatar>
           </button>
         ) : (
-          <Button variant="ghost" className="hover-lift-none h-auto w-full justify-start gap-2 px-2 py-1.5">
+          <Button variant="ghost" className="h-auto w-full justify-start gap-2 px-2 py-1.5">
             <Avatar className="size-7">
               {ctx?.team?.logoUrl && <AvatarImage src={ctx.team.logoUrl} alt={ctx.team.name} />}
               <AvatarFallback className="text-xs">{letterMark(ctx?.team?.name)}</AvatarFallback>
