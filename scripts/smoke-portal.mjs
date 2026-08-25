@@ -57,7 +57,12 @@ import { fileURLToPath } from "node:url"
 import { makeApi, timedFetch } from "./lib/api.mjs"
 
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
-const PORTAL = process.env.SMOKE_PORTAL_BASE ?? "https://kwapso-portal-staging.kwapso.workers.dev"
+// The REAL hostname, not the workers.dev alias: the Google sign-in door
+// derives its redirect from the origin the caller stands at and requires it to
+// be one of the two configured front doors (an open-redirect defence), so at
+// the alias it answers 400 BY DESIGN — and this smoke's job is the door a
+// client actually uses.
+const PORTAL = process.env.SMOKE_PORTAL_BASE ?? "https://staging-client.kwapso.app"
 const REPO = fileURLToPath(new URL("..", import.meta.url))
 
 // Resend's test inbox: a real send path that always "delivers" and never
@@ -436,7 +441,13 @@ await agency("/api/tenancy/bootstrap", { method: "POST" }, clientAtAgency)
 // The grant that makes them a CLIENT rather than a colleague: the door looks the
 // person up by the email on their contact record, never by a typed-in id.
 {
-  const logins = await agency(`/api/tenancy/portal-users?accountId=${MINE}`, {}, staffCookie)
+  // The row stores the PERSON's account id (grantPortalAccess's own note: that
+  // is what the fence walks from), so the lookup asks by the CONTACT. Asking by
+  // the company came back empty every run, so every rerun re-granted — and the
+  // grant of an already-enrolled client then refused. The deploy chain wore
+  // green anyway whenever the runner piped its output (the pipe's exit code is
+  // tail's), which is how this sat unnoticed from 24 Aug to 25 Aug.
+  const logins = await agency(`/api/tenancy/portal-users?accountId=${CONTACT}`, {}, staffCookie)
   if (!(logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)) {
     const made = await agencyPost(
       "/api/tenancy/portal-users",
@@ -668,8 +679,29 @@ let MY_TICKET
       JSON.stringify((raised.body?.tickets ?? []).map((t) => t.ref)).slice(0, 200)
     )
     MY_TICKET = (await allTickets(client, portal)).find((t) => t.description === FIX.myTicket)
+  } else {
+    // FOUND, NOT CREATED — but the census below still deserves a live answer
+    // from the raise door, so knock it with an empty raise and require the
+    // clean refusal. Coverage without a growing pile of fixture tickets: from
+    // the second run on, this door was simply never called, and the census
+    // was red on every rerun while piped deploy logs wore green.
+    const refused = await portalPost("/api/content/help", {}, client)
+    ok("the raise door still answers a client, refusing an empty request", refused.status === 400, `status ${refused.status}`)
   }
   if (!MY_TICKET?.id) stop("the client has no request of their own to work with")
+
+  // The SECTIONS of their own app — on the allow-list for the raise form's
+  // "which part of the system" picker, and the one door no walk ever called:
+  // the census said 30/31 from the day it was written.
+  {
+    const mods = await portal(`/api/tenancy/app-modules?appId=${MY_APP}`, {}, client)
+    knocked.add("GET /api/tenancy/app-modules")
+    ok(
+      "their app's sections answer at the portal",
+      mods.ok && Array.isArray(mods.body?.modules),
+      `status ${mods.status} ${JSON.stringify(mods.body).slice(0, 120)}`
+    )
+  }
 
   const list = await portal("/api/content/help", {}, client)
   ok("their request list answers with an exact count", list.ok && typeof list.body?.total === "number", `status ${list.status}`)

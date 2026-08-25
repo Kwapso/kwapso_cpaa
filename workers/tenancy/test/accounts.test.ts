@@ -520,6 +520,58 @@ describe("granting a login: the person is picked off the account, never typed in
     expect(missing.text).toContain("hasn't signed in here yet")
   })
 
+  it("a client whose login was switched off can be granted a new one — enrolment on the client role is not staff", async () => {
+    // THE DEAD END THE PORTAL SMOKE FOUND (25 Aug 2026). A granted client
+    // ACCEPTS an invite and becomes a team member on the client role — that is
+    // R21's whole model. The staff refusal read "any live membership = staff",
+    // so once enrolled, a client whose login was later switched off could never
+    // be granted a new one: the door answered "that person is a member of your
+    // team" about the very person it had made a member. Who is a client is
+    // PRESENCE of a portal_users row, live or revoked (lib/members.ts's own
+    // doctrine), and the staff refusal now stands behind that presence.
+    const ana = await createAccount(cfg, guard, staff, actor, {
+      accountType: "individual",
+      name: "Enrolled Client",
+      email: "nadia@bergman.example",
+    })
+    await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
+    const first = await grant({ accountId: IDS.victimAccount, personAccountId: ana })
+    expect(first.status).toBe(200)
+    // …they accept the invite: a live membership on the client role.
+    db()
+      .prepare(
+        "INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('TM_CLIENT', ?, ?, 'R_CLIENT', '2026-08-24')"
+      )
+      .run(IDS.team, IDS.clientUser)
+    // …their login is switched off, as a pause.
+    db().prepare("UPDATE portal_users SET deactivated_at = '2026-08-25' WHERE user_id = ?").run(IDS.clientUser)
+    // The re-grant must not be told they are staff.
+    const again = await grant({ accountId: IDS.victimAccount, personAccountId: ana })
+    expect(again.status, again.text).toBe(200)
+    // …while a person with NO client history who IS a member still refuses.
+  })
+
+  it("a staff member with no client history is still refused, with the staff sentence", async () => {
+    const colleague = await createAccount(cfg, guard, staff, actor, {
+      accountType: "individual",
+      name: "A Colleague",
+      email: "staff2@kwapso.example",
+    })
+    await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: colleague })
+    // Their email resolves to a platform user who IS a live team member…
+    db()
+      .prepare("INSERT INTO users (id, email, first_name) VALUES ('U_COLLEAGUE', 'staff2@kwapso.example', 'Col')")
+      .run()
+    db()
+      .prepare(
+        "INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('TM_COL', ?, 'U_COLLEAGUE', ?, '2026-08-01')"
+      )
+      .run(IDS.team, IDS.adminRole)
+    const res = await grant({ accountId: IDS.victimAccount, personAccountId: colleague })
+    expect(res.status).toBe(409)
+    expect(res.text).toContain("member of your team")
+  })
+
   it("still cannot name a person outside the fence", async () => {
     // The resolution reads the person's email through the SAME fence, so a pinned
     // caller can't turn it into a lookup of somebody else's contact.

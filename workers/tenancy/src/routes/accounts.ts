@@ -20,7 +20,7 @@ import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, type AccountScope } from "@shared/workers/account-scope"
 import { mediaKey, storeImageDataUrl } from "@shared/workers/image"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
-import type { D1Rest } from "@shared/workers/d1-rest"
+import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
@@ -482,17 +482,33 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
   if (!userId) return fail(400, "invalid_input", "Pick the person this login is for.")
   // Staff are not clients. Granting a portal login to a team member would fence
   // them out of the agency side at the next request.
-  const staff = await env.DB.prepare(
-    "SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL"
+  //
+  // …but a CLIENT IS a team member: accepting the grant enrols them on the
+  // client role, so "any live membership = staff" made every re-grant
+  // impossible — a client whose login was switched off could never be handed a
+  // new one, refused with a sentence about being staff. The team's own
+  // doctrine for who is a client is PRESENCE of a portal_users row, live or
+  // revoked (lib/members.ts says why liveness would be wrong there too), so
+  // the same presence stands between this member and the staff refusal.
+  const priorClient = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT id FROM portal_users WHERE user_id = ? LIMIT 1",
+    [userId]
   )
-    .bind(guard.teamId, userId)
-    .first()
-  if (staff)
-    return fail(
-      409,
-      "is_staff",
-      "That person is a member of your team, a client login would lock them out of the agency app."
+  if (!priorClient[0]) {
+    const staff = await env.DB.prepare(
+      "SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL"
     )
+      .bind(guard.teamId, userId)
+      .first()
+    if (staff)
+      return fail(
+        409,
+        "is_staff",
+        "That person is a member of your team, a client login would lock them out of the agency app."
+      )
+  }
   const id = await grantPortalAccess(cfg, guard, scope, actor, {
     onAccountId: accountId,
     personAccountId,
