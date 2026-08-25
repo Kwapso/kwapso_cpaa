@@ -2269,3 +2269,64 @@ describe("required-ring: a group says it is a group", () => {
     ).toEqual([])
   })
 })
+
+// EVERY SIDEBAR SECTION HAS A COLLECTION SCREEN TO SHOW.
+//
+// renderCollection() resolves `<module>.list` from the recipe registry and
+// returns NotFound when there is none. A HOST-COMPOSED collection has no
+// recipe by definition, so it must be answered ABOVE that guard — and a file
+// comment has said so, in those words, since the first time it happened:
+//
+//   "a host-only collection placed among them resolves to NotFound: the
+//    section is in every registry, the rail links to it, and the page 404s.
+//    (It did, for one commit.)"
+//
+// It then happened a second time, to `waves`, and shipped: the rail linked to
+// it, /waves rendered "That screen doesn't exist", and every other check was
+// green — because nothing here reads a screen's ROUTE against its ability to
+// draw anything. Prose was the control, and prose is not a control.
+//
+// So the answer is derived, from three files that already exist: the sections
+// the rail offers (pages.ts), the recipes the registry holds (screens.ts), and
+// the branches sitting above the guard (collection-content.tsx). Nothing is
+// hand-listed, which is the point — a fourth host-composed collection is
+// caught by the same walk on the day it is added.
+describe("a sidebar section can draw its collection", () => {
+  const src = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
+  const GUARD = "const recipe = resolveRecipe(`${module}.list`"
+
+  it("collection-screens: the guard this rule is about still exists", () => {
+    // If the guard is ever renamed, everything below silently passes.
+    expect(src.indexOf(GUARD), "renderCollection must still resolve `<module>.list`").toBeGreaterThan(-1)
+    expect(src, "…and must still NotFound when there is none").toContain("if (!recipe) return <NotFound />")
+  })
+
+  it("collection-screens: every sidebar module has a recipe, or is answered above the guard", () => {
+    const above = src.slice(0, src.indexOf(GUARD))
+    const registry = read(join(WEB, "lib", "screens.ts"))
+    const pages = read(join(WEB, "lib", "pages.ts"))
+
+    // The rail's own sections, read off the table that draws it.
+    const sections = [...pages.matchAll(/\{\s*key:\s*"([a-z-]+)"[^}]*placement:\s*"sidebar"/g)].map((m) => m[1])
+    expect(sections.length, "the sidebar census found nothing — it has stopped matching").toBeGreaterThan(8)
+
+    // A section whose segment differs from its module key is named by segment
+    // in the router, which is what renderCollection switches on.
+    const segmentOf = (key: string) => {
+      const row = pages.match(new RegExp(`\\{\\s*key:\\s*"${key}"[^}]*\\}`))
+      return row?.[0].match(/segment:\s*"([a-z-]+)"/)?.[1] ?? key
+    }
+
+    const stranded = sections
+      .map(segmentOf)
+      .filter((m) => !registry.includes(`"${m}.list"`))
+      .filter((m) => !new RegExp(`module === "${m}"`).test(above))
+
+    expect(
+      stranded,
+      `${stranded.join(", ")} — the rail links to these and renderCollection cannot draw them. ` +
+        `Give each a \`<module>.list\` recipe, or move its branch ABOVE the recipe guard in ` +
+        `collection-content.tsx the way \`time\` and \`waves\` are.`
+    ).toEqual([])
+  })
+})

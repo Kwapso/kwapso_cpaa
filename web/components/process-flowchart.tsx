@@ -91,17 +91,26 @@ export function ProcessFlowchart({
       // WHO AND HOW OFTEN on the quiet line. A removed step says what happened
       // to it instead — the largest saving there is, and a picture that simply
       // dropped it would be describing a process that never existed.
-      role: s.removed
-        ? t("no longer done")
-        : [
-            [minutesText(s.secondsPerRun), frequencyText(s.runsPerPeriod, s.frequencyPeriod, t)].join(" · "),
-            [s.roleName, s.toolName].filter(Boolean).join(" · "),
-            s.loopsBackTo && numberOf.has(s.loopsBackTo)
-              ? t("sends it back to step {n}").replace("{n}", String(numberOf.get(s.loopsBackTo)))
-              : "",
-          ]
-            .filter(Boolean)
-            .join("\n"),
+      //
+      // THREE LINES, NOT ONE STRING WITH NEWLINES IN IT. HTML collapses "\n" to
+      // a space, so the joined version read "5 min · 2 times a day Verification
+      // clerk (probe)" as one run and the reader had to find the seam. Separate
+      // blocks are the only thing that actually breaks a line here.
+      role: s.removed ? (
+        t("no longer done")
+      ) : (
+        <>
+          {[minutesText(s.secondsPerRun), frequencyText(s.runsPerPeriod, s.frequencyPeriod, t)].join(" · ")}
+          {[s.roleName, s.toolName].filter(Boolean).length > 0 && (
+            <span className="block">{[s.roleName, s.toolName].filter(Boolean).join(" · ")}</span>
+          )}
+          {s.loopsBackTo && numberOf.has(s.loopsBackTo) && (
+            <span className="block">
+              {t("sends it back to step {n}").replace("{n}", String(numberOf.get(s.loopsBackTo)))}
+            </span>
+          )}
+        </>
+      ),
       tone: s.removed ? ("removed" as const) : isDecision(i) ? ("decision" as const) : ("pending" as const),
       // The word on a fork — "if the client is new". Only a branch draws it,
       // which is the only place it means "you get here when…" rather than

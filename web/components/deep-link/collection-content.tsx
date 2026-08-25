@@ -108,6 +108,21 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     )
   }
 
+  // WAVES — the second host-only collection, and it is answered up here for the
+  // reason the paragraph above gives, not for a new one. It shipped BELOW the
+  // guard: the rail linked to it, the section was in every registry, and
+  // /waves rendered "That screen doesn't exist." The prose warning was already
+  // written and it was not enough, so `web/test/rules.test.ts` now derives the
+  // answer instead — every sidebar section either resolves a `<module>.list`
+  // recipe or is handled above this line.
+  //
+  // Host-composed because a row pairs a DERIVED date range with a sprint count
+  // and an inline switch-off, and no engine block draws that. It reads its own
+  // list and its own total.
+  if (module === "waves") {
+    return <WavesScreen teamId={teamId as string} basePath={sectionPath} />
+  }
+
   const recipe = resolveRecipe(`${module}.list`, overridesQ.data, t)
   if (!recipe) return <NotFound />
   if (module === "members") {
@@ -162,12 +177,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         <ScreenRenderer recipe={invitesRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
       </SectionWithCreate>
     )
-  }
-  if (module === "waves") {
-    // Host-composed for the same reason the maps screen is: a row pairs a
-    // DERIVED date range with a sprint count and an inline switch-off, and no
-    // engine block draws that. It reads its own list and its own total.
-    return <WavesScreen teamId={teamId as string} basePath={sectionPath} />
   }
   if (module === "processes") {
     // The whole screen is host-composed: the VALUE drill-down sits above the
