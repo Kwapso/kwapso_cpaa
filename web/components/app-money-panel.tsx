@@ -3,35 +3,24 @@
 // WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth
 // (CHECKLIST 8.13, Aurora's ap3 over the owner's "client rate times hours").
 //
-// HER MODEL, SAID ONCE: each process names the ROLE that does it, each role has
-// a rate, and the figure is the hours that role no longer spends times that
-// rate. Before minus after. The hours half is the savings arithmetic every other
-// screen already shows; this adds the price and the name of whose hour it was.
+// THE MODEL MOVED ON 25 Aug 2026, and this header is the record. Aurora's ap3
+// priced a process by ONE role named on the process, against the internal rate
+// card — and then the step work landed: every STEP names a client role whose
+// rate is frozen onto it, and the ONE savings seam prices the subtraction
+// step by step. For six days both arithmetics ran, and on the owner's screen
+// they disagreed — €2,766.35 on the map, 0.00 here, "no role attached" about a
+// map with four priced steps. Two ways of computing one number is the defect;
+// the seam's way survives because it is the figure the client is shown.
 //
-// A CHAIN OF THREE LINKS, AND EACH ONE CAN BE MISSING. process → role → rate.
-// The money is only ever as complete as the weakest link, and when a link is
-// missing the arithmetic is not wrong — it is silent. The owner opened this tab
-// and reported "I was able to see hours, but I was not able to see money given
-// back": the figure was there, it said 0.00, and nothing on the screen said why
-// or what to do about it. A blank where a number should be is the bug, so this
-// panel now names the missing link per process and links to the screen that
-// closes it:
+// So the panel now reads the seam's money straight off the payload and names
+// the one link that can still be missing:
 //
-//   no role named      → open the map and say who does the work
-//   role, no rate      → put an hourly cost against that role on Internal rates
-//   rate of zero       → priced, deliberately, at nothing (the honest zero)
+//   no priced step   → open the map and say who does its steps
+//   some steps bare  → the coverage is said on the row ("4 of 9 steps priced")
 //
-// Every one of those is read off the `lines` the door already sends — `roleName`
-// and `centsPerHour` are in the payload and this screen simply never looked at
-// the second one. No new door, no new field.
-//
-// ITS OWN FILE, AND THAT IS R24 RATHER THAN TIDINESS. The money here is computed
-// from the ROLE RATE CARD, which is an internal number — so this component may
-// never sit in a file that also reads what a client is charged, the door it
-// calls refuses a portal caller, and nothing under web-portal/ may name it. The
-// client's own value screen shows the HOURS from a different door with no price
-// in it at all. That is also why the fixes below are LINKS INTO THIS APP and
-// never a rate typed here: pricing a role is the rate card's job.
+// STILL A STAFF DOOR. The door refuses a portal caller and nothing under
+// web-portal/ names it; the client's own value screen shows hours from its own
+// fenced door. Pricing lives where the roles live — the client's record.
 //
 // R25 rides the payload: `caption` comes back with the figure and is rendered
 // word for word. A savings number without the sentence that says what it is made
@@ -41,7 +30,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/controls/button/button"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Banknote, Route } from "@shared/ui/icons"
+import { Route } from "@shared/ui/icons"
 
 import { tenancy } from "@/lib/api"
 import { appMoneyKey } from "@/lib/live-resources"
@@ -52,25 +41,6 @@ import { SAVINGS_CAPTION, hoursText } from "@shared/workers/savings"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
-/** One process line's money, in the four states it can actually be in. Derived
- * from the two fields the door sends about the chain, so the screen and the
- * arithmetic can never disagree about which link is missing. */
-type Priced =
-  | { kind: "priced" }
-  /** Nobody has said whose hours this takes. */
-  | { kind: "no-role" }
-  /** A role is named and the rate card has no live price for it. */
-  | { kind: "no-rate"; roleName: string }
-  /** Priced, at nothing. Legal, and worth saying out loud rather than showing a
-   * zero that looks exactly like a broken one. */
-  | { kind: "free"; roleName: string }
-
-function priced(line: AppMoneyBack["lines"][number]): Priced {
-  if (!line.roleName) return { kind: "no-role" }
-  if (line.centsPerHour == null) return { kind: "no-rate", roleName: line.roleName }
-  if (line.centsPerHour === 0) return { kind: "free", roleName: line.roleName }
-  return { kind: "priced" }
-}
 
 export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: string } }) {
   const t = useT()
@@ -87,15 +57,10 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
       </p>
     )
 
-  const states = view.lines.map((line) => ({ line, state: priced(line) }))
-  const roleless = states.filter((s) => s.state.kind === "no-role")
-  const rateless = states.filter((s) => s.state.kind === "no-rate")
-  // The names, not the count: "Bookkeeper and Dispatcher have no rate" is a
-  // sentence somebody can act on; "2 processes are unpriced" is a sentence they
-  // have to go and investigate. Deduped — two maps often share one role.
-  const unpricedRoles = [
-    ...new Set(rateless.map((s) => (s.state as { roleName: string }).roleName)),
-  ]
+  /** The one link that can be missing now: a map none of whose steps carries a
+   * rate. Partial coverage is not in this box — it is said on the row, where
+   * the number it qualifies is. */
+  const unpriced = view.lines.filter((l) => l.moneyCentsPerMonth == null)
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,82 +82,61 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
       {/* THE MISSING LINK, NAMED, WITH THE DOOR TO IT. Said whether the total is
           zero or merely incomplete: a partial figure that does not say what it
           left out reads as the whole answer, which is the same bug quieter. */}
-      {(roleless.length > 0 || unpricedRoles.length > 0) && (
+      {unpriced.length > 0 && (
         <div className="border-border/60 bg-muted/40 flex flex-col gap-4 rounded-xl border p-4">
           <p className="text-sm font-medium">
             {view.moneyCentsPerMonth === 0
               ? t("There is no money figure yet, and here is what it is waiting on.")
               : t("Part of these hours has no price on it yet.")}
           </p>
-
-          {roleless.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-muted-foreground text-sm">
-                {roleless.length === 1
-                  ? t("One process has no role attached, so there is no rate to price it with.")
-                  : `${roleless.length} ${t("processes have no role attached, so there is no rate to price them with.")}`}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {roleless.map(({ line }) => (
-                  <Button
-                    key={line.processId}
-                    variant="secondary"
-                    size="sm"
-                    className="gap-1"
-                    onClick={() => softNavigate(`${host.base}/processes/${line.processId}`)}
-                  >
-                    <Route className="size-3.5" />
-                    {t("Say who does")} {line.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {unpricedRoles.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-muted-foreground text-sm">
-                {t("No hourly cost is set for:")} {unpricedRoles.join(", ")}
-              </p>
-              <div>
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground text-sm">
+              {unpriced.length === 1
+                ? t("One map has no role on any of its steps, so there is no rate to price it with.")
+                : `${unpriced.length} ${t("maps have no role on any of their steps, so there is no rate to price them with.")}`}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {unpriced.map((line) => (
                 <Button
+                  key={line.processId}
                   variant="secondary"
                   size="sm"
-                  className="gap-1"
-                  onClick={() => softNavigate(`${host.base}/internal-rates`)}
+                  className="min-w-0 max-w-full gap-1"
+                  onClick={() => softNavigate(`${host.base}/processes/${line.processId}`)}
                 >
-                  <Banknote className="size-3.5" />
-                  {t("Price a role")}
+                  <Route className="size-3.5 shrink-0" />
+                  <span className="truncate">
+                    {t("Say who does")} {line.name}
+                  </span>
                 </Button>
-              </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
       )}
 
       {/* WHERE IT COMES FROM, process by process — the same drill-down every
           other savings screen offers, with the role and its price added. */}
       <ul className="divide-border divide-y rounded-xl border">
-        {states.map(({ line, state }) => (
+        {view.lines.map((line) => (
           <li
             key={line.processId}
-            className="flex flex-wrap items-center gap-2 px-3 py-2"
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2"
           >
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{line.name}</span>
-            <span className="text-muted-foreground truncate text-xs">
-              {/* The role, or the reason there is no money on this row. Each one
-                  is a fact about a different link in the chain, so each gets its
-                  own words — "No role named" was the only one that had any. */}
-              {state.kind === "no-role"
-                ? t("No role named")
-                : state.kind === "no-rate"
-                  ? `${line.roleName} · ${t("no rate set")}`
-                  : state.kind === "free"
-                    ? `${line.roleName} · ${t("priced at nothing")}`
-                    : line.roleName}
+            <span className="min-w-0 flex-1 basis-40 truncate text-sm font-medium">{line.name}</span>
+            <span className="text-muted-foreground text-xs whitespace-nowrap">
+              {/* The money's own coverage, where the number it qualifies is. */}
+              {line.pricedSteps === 0
+                ? t("no step has a role yet")
+                : line.pricedSteps < line.totalSteps
+                  ? t("{priced} of {total} steps priced", {
+                      priced: String(line.pricedSteps),
+                      total: String(line.totalSteps),
+                    })
+                  : null}
             </span>
-            <span className="text-sm tabular-nums">{hoursText(line.savedSecondsPerMonth)}</span>
-            <span className="text-sm tabular-nums">
+            <span className="text-sm tabular-nums whitespace-nowrap">{hoursText(line.savedSecondsPerMonth)}</span>
+            <span className="text-sm tabular-nums whitespace-nowrap">
               {line.moneyCentsPerMonth == null ? "—" : moneyText(line.moneyCentsPerMonth, null)}
             </span>
           </li>

@@ -51,9 +51,9 @@ import {
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { InAppLink } from "@/components/in-app-link"
 import { WaveFormDialog } from "@/components/wave-form-dialog"
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, tenancy } from "@/lib/api"
 import { waves as wavesApi, wavesKey } from "@/lib/api/waves"
-import { accountsKey, listFetch, totalKey } from "@/lib/live-resources"
+import { companiesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
@@ -111,9 +111,14 @@ export function WaveCollection({
   const wavesQ = useCached<Wave[]>(wavesKey(teamId), () => fetchWaves(teamId))
   // The exact server total (R16) — never the loaded page's length.
   const total = useCachedValue<number>(totalKey("waves", teamId))
-  // The clients a wave can be sold to. The SAME cache the accounts screen holds,
-  // so opening this page adds no round trip for a team that has been there.
-  const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
+  // COMPANIES ONLY, and ALL of them. A wave is sold to a company, so the
+  // people on the spine do not belong in this picker — and the paged accounts
+  // list's page one cannot be trusted to hold every company (it is where
+  // Confia went missing, 25 Aug 2026). The door answers the narrow question
+  // itself, and the accounts registry entry keeps this key live.
+  const clientsQ = useCached<Account[]>(companiesKey(teamId), () =>
+    tenancy.accounts({ type: "entity" }).then((r) => r.accounts)
+  )
 
   const [query, setQuery] = React.useState<WaveQuery>(EMPTY_WAVE_QUERY)
   const [addOpen, setAddOpen] = React.useState(false)
@@ -140,7 +145,7 @@ export function WaveCollection({
   // client rather than about the team.
   const all = accountId ? wavesQ.data.filter((w) => w.accountId === accountId) : wavesQ.data
   const rows = selectWaves(all, query)
-  const clients = (accountsQ.data ?? []).filter((a) => a.active)
+  const clients = (clientsQ.data ?? []).filter((a) => a.active)
   const asking = waveQueryIsActive(query)
 
   return (

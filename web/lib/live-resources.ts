@@ -653,6 +653,17 @@ export function accountsKey(teamId: string): string {
   return `accounts:${teamId}`
 }
 
+/** EVERY COMPANY, for the pickers that sell to one (a wave's client). Its own
+ * key because the accounts list is PAGED and its page one is newest-first —
+ * which is how the wave form's client picker offered 107 contacts and could
+ * not find Confia (25 Aug 2026): the oldest companies were past the page and
+ * people flooded what remained. This read asks the door the narrow question
+ * (`type=entity`, 24 rows today, capped by the door) and stays live through
+ * the accounts registry entry's deps below. */
+export function companiesKey(teamId: string): string {
+  return `companies:${teamId}`
+}
+
 /** One account's own cache: the opened record, with its people, its logins and
  * their exact totals. Keyed by the ACCOUNT, so moving between records never
  * clobbers the one you came from. (There was a second key here — the accounts
@@ -829,7 +840,10 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
-    deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
+    // `companiesKey` rides as a dep rather than a second resource: a renamed or
+    // deactivated company must reach the client pickers too, and a coarse
+    // invalidate is honest for a 24-row list.
+    deps: (t, id) => [accountKey(id), `activity:record:accounts:${id}`, companiesKey(t)],
   },
   account_links: {
     key: (t) => accountsKey(t),

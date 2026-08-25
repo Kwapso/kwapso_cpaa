@@ -591,6 +591,9 @@ export const tenancy = {
   /** The work stopped happening — the step keeps its frequency and drops to zero
    * seconds, which is what makes the saving for work we removed come out right. */
   removeStep: (id: string) => api<{ ok: true }>("/api/tenancy/processes/steps/remove", post({ id })),
+  /** Hard delete, for a step added by mistake. The door refuses one that is
+   * part of an agreed version or that another step loops back to. */
+  deleteStep: (id: string) => api<{ ok: true }>("/api/tenancy/processes/steps/delete", post({ id })),
 
   /** Cut a new version. No `sprintId` = the manual button; the work engine passes
    * the completed sprint's id, and a second attempt answers `alreadyCut` (R17). */

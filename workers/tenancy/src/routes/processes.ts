@@ -50,6 +50,7 @@ import {
   listSavings,
   PROCESS_SORTS,
   removeStep,
+  deleteStep,
   setAppActive,
   setAuditDate,
   setAppStaff,
@@ -628,6 +629,19 @@ export async function postRemoveStep(request: Request, env: Env): Promise<Respon
   const id = requireText(body.id, "Step", TEXT_LIMITS.short)
   // R17: null = zero rows moved = already removed → no ping, no duplicate history.
   const processId = await removeStep(cfg, guard, scope, actor, id)
+  if (processId) await publishChange(env, guard.teamId, "processes", processId)
+  return json({ ok: true })
+}
+
+/** POST /api/tenancy/processes/steps/delete — the step should never have
+ * existed. Hard delete, for a mistaken add only: the lib refuses a step cut
+ * into any agreed version or one a live step loops back to, with the reason in
+ * the refusal (see `deleteStep`). R17: already gone = zero rows = no ping. */
+export async function postDeleteStep(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "delete")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Step", TEXT_LIMITS.short)
+  const processId = await deleteStep(cfg, guard, scope, actor, id)
   if (processId) await publishChange(env, guard.teamId, "processes", processId)
   return json({ ok: true })
 }

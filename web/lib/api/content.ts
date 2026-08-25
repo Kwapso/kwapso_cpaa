@@ -682,6 +682,9 @@ export const content = {
       skipped: boolean
       caughtUp: boolean
       total: number
+      /** The services the sweep had to work with. Empty + empty results means
+       * "nothing is connected", which is a different sentence from "nothing new". */
+      connectedServices: string[]
     }>("/api/content/knowledge/sync-google", post({ onlyIfStale })),
 
   /* -------------------------------- meetings -------------------------------- */

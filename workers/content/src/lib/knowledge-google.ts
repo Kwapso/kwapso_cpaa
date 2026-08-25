@@ -396,15 +396,22 @@ export async function sweepGoogle(
     onlyIfStale?: boolean
     limit?: number
   } = {}
-): Promise<{ results: SweepResult[]; skipped: boolean }> {
+): Promise<{ results: SweepResult[]; skipped: boolean; connectedServices: GoogleService[] }> {
   const connected = new Set(
     (await listConnections(cfg, guard)).filter((c) => c.active).map((c) => c.service)
   )
+  // WHAT IS CONNECTED, said out loud. An empty sweep has two very different
+  // causes — nothing changed, or nothing was ever connected — and the screen
+  // was collapsing both into "Nothing new to bring in" (the owner pressed the
+  // button with zero connections and was told there was nothing to fetch, as
+  // if a fetch had happened). Derived from the same read as the filter below,
+  // in the same breath, so the flag can never disagree with the behaviour.
+  const connectedServices = [...connected]
   const seen = new Map<GoogleService, Set<string>>()
   const kinds = googleIngestKinds(env, cfg, guard, seen).filter((k) =>
     connected.has(serviceOfStateKey(k.stateKey as string, guard.userId))
   )
-  if (kinds.length === 0) return { results: [], skipped: false }
+  if (kinds.length === 0) return { results: [], skipped: false, connectedServices }
 
   // THE FLOOR (14.12). This door now fires by itself when somebody opens the
   // app, so "how often may it ask Google?" stopped being a question about a
@@ -431,14 +438,14 @@ export async function sweepGoogle(
   // confusion `sweepGoogle` already refuses to create for an unconnected service.
   if (options.onlyIfStale) {
     const recent = await sweptWithin(cfg, guard, kinds, GOOGLE_SWEEP_FLOOR_MS)
-    if (recent) return { results: recent, skipped: true }
+    if (recent) return { results: recent, skipped: true, connectedServices }
   }
 
   const results = await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK)
   // AFTER the sweep, never instead of it: the reads above are what filled `seen`,
   // and a retire pass that ran first would be reasoning about last tick's world.
   await retireVanished(env, cfg, guard, seen)
-  return { results, skipped: false }
+  return { results, skipped: false, connectedServices }
 }
 
 /** HOW LONG A PERSON'S GOOGLE STAYS "JUST CHECKED" — the floor above. Five

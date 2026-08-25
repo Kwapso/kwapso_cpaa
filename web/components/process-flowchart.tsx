@@ -85,7 +85,7 @@ export function ProcessFlowchart({
      * one accent, which is the kit's rule for mango: one accent, one meaning. */
     const isDecision = (i: number) => (ranks[i + 1]?.steps.length ?? 0) > 1
 
-    const node = (s: ProcessStep, i: number, inBranch: boolean) => ({
+    const node = (s: ProcessStep, i: number, inBranch: boolean, siblingsLabelled = false) => ({
       id: s.stepKey,
       label: `${numberOf.get(s.stepKey)}. ${s.name}`,
       // WHO AND HOW OFTEN on the quiet line. A removed step says what happened
@@ -114,8 +114,17 @@ export function ProcessFlowchart({
       tone: s.removed ? ("removed" as const) : isDecision(i) ? ("decision" as const) : ("pending" as const),
       // The word on a fork — "if the client is new". Only a branch draws it,
       // which is the only place it means "you get here when…" rather than
-      // describing the step itself.
-      condition: inBranch ? (s.branchLabel ?? undefined) : undefined,
+      // describing the step itself. A branch with NO condition beside branches
+      // that have one says "otherwise": a bare box in a row of "if…"s reads as
+      // a mistake, and "otherwise" is the word the room would use — it is also
+      // what makes a step that fell into a fork by accident LOOK like what it
+      // is, instead of hiding.
+      condition: inBranch
+        ? (s.branchLabel ?? (siblingsLabelled ? t("otherwise") : undefined))
+        : undefined,
+      // The way back, as a line a finger can follow (kit v1.0.3). The sentence
+      // on the node stays; the line is the cue.
+      loopTo: !s.removed && s.loopsBackTo && numberOf.has(s.loopsBackTo) ? s.loopsBackTo : undefined,
     })
 
     return ranks.map((rank, i) =>
@@ -124,10 +133,10 @@ export function ProcessFlowchart({
         : ({
             type: "branch",
             branches: rank.steps.map((s, b) => ({
-              node: node(s, i, true),
-              // Exactly one branch re-centres onto the trunk — the kit draws one
-              // elbow per fork and takes the first if more are marked. The first
-              // is the right one: it is the branch the reader's eye is already on.
+              node: node(s, i, true, rank.steps.some((x) => x.branchLabel)),
+              // Marking any branch makes the fork REJOIN, and since kit v1.0.3
+              // the rejoin gathers every branch — the merge rail is the mirror
+              // of the fork, which is the owner's own reading of a join.
               continues: b === 0,
             })),
           } as const)

@@ -2,9 +2,12 @@
 //
 // The owner opened an app's Value tab: "I did open it, and I was able to see
 // hours, but I was not able to see money given back." The money was on screen —
-// it said 0.00 — and nothing said why, or what to do about it. The chain the
-// figure hangs on is process → role → rate, and any of the three links can be
-// missing, so the screen has to name WHICH one and offer the door to it.
+// it said 0.00 — and nothing said why, or what to do about it. Since 25 Aug
+// 2026 the money is the ONE savings seam's own step arithmetic (each step's
+// saving times the client-role rate frozen onto it — the same figure the map
+// shows), so exactly one link can be missing: a map none of whose steps names
+// a role. The screen has to name it and offer the door to it, and say partial
+// coverage on the row it qualifies.
 //
 // The door's half is proved against a real database
 // (workers/tenancy/test/app-money-chain.test.ts). This is the screen's half: it
@@ -32,10 +35,10 @@ type Line = AppMoneyBack["lines"][number]
 
 const line = (over: Partial<Line> & { processId: string }): Line => ({
   name: "Invoice approval",
-  roleName: null,
   savedSecondsPerMonth: 36000,
-  centsPerHour: null,
   moneyCentsPerMonth: null,
+  pricedSteps: 0,
+  totalSteps: 3,
   ...over,
 })
 
@@ -53,24 +56,24 @@ function show(over: Partial<AppMoneyBack>) {
 }
 
 describe("the Value tab says which link is missing", () => {
-  it("names the FIRST link when a map has no role on it", () => {
+  it("names the missing link when a map has no role on any step", () => {
     show({})
-    expect(screen.getByText(/no role attached, so there is no rate to price/i)).toBeTruthy()
+    expect(screen.getByText(/no role on any of its steps, so there is no rate to price/i)).toBeTruthy()
     // …and the way to close it: the map itself, by name.
     expect(screen.getByRole("button", { name: /Invoice approval/ })).toBeTruthy()
   })
 
-  it("names the SECOND link, and the role, when nobody has priced it", () => {
+  it("says partial coverage ON THE ROW, where the number it qualifies is", () => {
     show({
-      lines: [line({ processId: "p-1", roleName: "Bookkeeper" })],
+      moneyCentsPerMonth: 45000,
+      unpricedProcesses: 0,
+      lines: [
+        line({ processId: "p-1", moneyCentsPerMonth: 45000, pricedSteps: 4, totalSteps: 9 }),
+      ],
     })
-    // The ROLE, not a count. "Bookkeeper has no rate" is a sentence somebody can
-    // act on; "1 process is unpriced" is one they have to go and investigate.
-    // Named twice on purpose — once in the sentence that says what is missing,
-    // once on the row it is missing from — so getAllByText, not getByText.
-    expect(screen.getByText(/No hourly cost is set for:/)).toBeTruthy()
-    expect(screen.getAllByText(/Bookkeeper/).length).toBeGreaterThan(0)
-    expect(screen.getByRole("button", { name: /Price a role/ })).toBeTruthy()
+    expect(screen.getByText(/4 of 9 steps priced/)).toBeTruthy()
+    // Fully-missing is the only thing the fix-it box exists for.
+    expect(screen.queryByText(/no role on any of its steps/i)).toBeNull()
   })
 
   it("says it even when the total is only PARTLY missing", () => {
@@ -79,7 +82,7 @@ describe("the Value tab says which link is missing", () => {
     show({
       moneyCentsPerMonth: 45000,
       lines: [
-        line({ processId: "p-1", roleName: "Bookkeeper", centsPerHour: 4500, moneyCentsPerMonth: 45000 }),
+        line({ processId: "p-1", moneyCentsPerMonth: 45000, pricedSteps: 3, totalSteps: 3 }),
         line({ processId: "p-2", name: "Dispatch run" }),
       ],
     })
@@ -87,27 +90,27 @@ describe("the Value tab says which link is missing", () => {
     expect(screen.getByRole("button", { name: /Dispatch run/ })).toBeTruthy()
   })
 
-  it("says nothing about missing links when the chain is whole", () => {
+  it("says nothing about missing links when every map is priced", () => {
     show({
       moneyCentsPerMonth: 45000,
       unpricedProcesses: 0,
-      lines: [line({ processId: "p-1", roleName: "Bookkeeper", centsPerHour: 4500, moneyCentsPerMonth: 45000 })],
+      lines: [line({ processId: "p-1", moneyCentsPerMonth: 45000, pricedSteps: 3, totalSteps: 3 })],
     })
-    expect(screen.queryByText(/no role attached/i)).toBeNull()
-    expect(screen.queryByText(/No hourly cost is set/)).toBeNull()
-    expect(screen.queryByRole("button", { name: /Price a role/ })).toBeNull()
+    expect(screen.queryByText(/no role on any of its steps/i)).toBeNull()
+    expect(screen.queryByText(/waiting on/)).toBeNull()
   })
 
   it("tells a deliberate zero apart from a broken one", () => {
-    // A rate of zero is legal and the door reports it as PRICED, so the panel
-    // must not send somebody off to fix a chain that is already whole. The row
-    // says the price is nothing, and the fix-it block stays away.
+    // A step priced at a rate of zero is legal: the seam reports it PRICED with
+    // zero money, so the row shows 0.00 and the fix-it box stays away — the
+    // panel must not send somebody off to fix a chain that is already whole.
     show({
+      moneyCentsPerMonth: 0,
       unpricedProcesses: 0,
-      lines: [line({ processId: "p-1", roleName: "Volunteer", centsPerHour: 0, moneyCentsPerMonth: 0 })],
+      lines: [line({ processId: "p-1", moneyCentsPerMonth: 0, pricedSteps: 3, totalSteps: 3 })],
     })
-    expect(screen.getByText(/priced at nothing/)).toBeTruthy()
-    expect(screen.queryByRole("button", { name: /Price a role/ })).toBeNull()
+    expect(screen.queryByText(/waiting on/)).toBeNull()
+    expect(screen.queryByText(/no role on any of its steps/i)).toBeNull()
   })
 
   it("still renders the hours, the money and R25's caption in every state", () => {

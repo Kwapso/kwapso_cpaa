@@ -47,11 +47,13 @@ import {
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Plus } from "@shared/ui/icons"
+import { Settings2 } from "@shared/ui/icons"
+
+import { InAppLink } from "@/components/in-app-link"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { richTextValue } from "@shared/web/rich-text"
+import { richTextValue, safeHref } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 import { periodLabel } from "@shared/web/frequency"
@@ -65,14 +67,10 @@ export type StepFormValues = {
   /** how many times, in the period below */
   runsPerPeriod: number
   frequencyPeriod: "day" | "week" | "month" | "year"
-  /** WHO DOES IT — one of the client's own roles, or null for nobody named. */
+  /** THE ROLE — one of the client's own, or null for nobody named. */
   roleId: string | null
-  /** A ROLE THAT DOES NOT EXIST YET. The caller creates it and passes the new id
-   * back — pick-or-create, and the reason the field is never empty. */
-  newRoleName: string | null
-  /** WHAT IT IS DONE IN — exactly ONE (both respondents' ruling). */
+  /** THE TOOL — exactly ONE (both respondents' ruling). */
   toolId: string | null
-  newToolName: string | null
   /** WHERE IT GOES. Undefined = after everything else, which is what a step
    * ordinarily is. A NUMBER puts it at that position — and a position another
    * step already holds is a FORK, which is the only way to draw one. */
@@ -87,11 +85,10 @@ export type StepRoleOption = { id: string; name: string; centsPerHour: number | 
 export type StepToolOption = { id: string; name: string }
 export type StepPeerOption = { stepKey: string; name: string; position: number }
 
-/** NOBODY NAMED, and ADD A NEW ONE, as values a picker can hold. A Select cannot
- * carry `null`, so the two sentinels are written once here rather than spelled
- * differently at each end. */
+/** NOBODY NAMED, as a value a picker can hold. A Select cannot carry `null`,
+ * so the sentinel is written once here rather than spelled differently at each
+ * end. */
 const NONE = "__none__"
-const NEW = "__new__"
 /** WHERE A NEW STEP LANDS by default: at the end, on its own. */
 const AFTER_ALL = "__after_all__"
 /** The two answers to "does the work split here?". */
@@ -109,13 +106,13 @@ const minutesField = {
 const runsField = { ...defaultFieldConfig, label: "How often it happens", required: true }
 const roleField = {
   ...defaultFieldConfig,
-  label: "Who does it",
+  label: "Role",
   required: false,
-  hint: "Their role, and what an hour of it costs them, is what turns these minutes into money.",
+  hint: "Who does it. The role's hourly cost is what turns these minutes into money.",
 }
 const toolField = {
   ...defaultFieldConfig,
-  label: "What it is done in",
+  label: "Tool",
   required: false,
   hint: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
 }
@@ -148,6 +145,7 @@ export function StepFormDialog({
   tools = [],
   peers = [],
   hasClient = true,
+  manageHref = null,
   draftKey,
   onSubmit,
 }: {
@@ -165,6 +163,9 @@ export function StepFormDialog({
     toolId: string | null
     branchLabel: string | null
     loopsBackTo: string | null
+    /** where it sits — a position a PEER also holds means this step is one
+     * branch of a fork, and the shape question opens showing exactly that. */
+    position: number
   }
   /** The client's live roles and tools. EMPTY IS ORDINARY — the fields render
    * anyway and offer to create one, which is the whole point of this rewrite. */
@@ -176,11 +177,18 @@ export function StepFormDialog({
    * the door refuses either. The form says so rather than offering an empty
    * picker that fails on save. */
   hasClient?: boolean
+  /** The client's record, Organisation tab — the ONE place roles and tools are
+   * added and edited. Null when the map has no client. */
+  manageHref?: string | null
   draftKey?: string
   onSubmit: (values: StepFormValues) => Promise<void>
 }) {
   const t = useT()
   const editing = initial !== undefined
+  /** The step is CURRENTLY one branch of a fork exactly when a peer holds its
+   * position — the same derivation the picture draws from, so the form can
+   * never open disagreeing with the map. */
+  const besideNow = editing ? peers.find((x) => x.position === initial.position) : undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
@@ -190,10 +198,8 @@ export function StepFormDialog({
       runs: initial ? String(initial.runsPerPeriod) : "",
       period: (initial?.frequencyPeriod ?? "month") as string,
       roleId: initial?.roleId ?? NONE,
-      newRole: "",
       toolId: initial?.toolId ?? NONE,
-      newTool: "",
-      place: AFTER_ALL,
+      place: besideNow?.stepKey ?? AFTER_ALL,
       branch: initial?.branchLabel ?? "",
       loop: initial?.loopsBackTo ?? NONE,
     },
@@ -210,42 +216,52 @@ export function StepFormDialog({
   // SPLITTING IS DERIVED, never stored: a step is one branch of a fork exactly
   // when it has been placed beside another one. Two facts that could disagree
   // would eventually disagree.
-  const splitting = values.place !== AFTER_ALL && values.place !== undefined
+  /** A DRAFT CAN OUTLIVE THE STEP IT POINTED AT — the exact class of bug round
+   * six shipped: a stale key makes the Select show its placeholder while the
+   * submit sends nothing. So the place is normalised HERE, once, and everything
+   * below — the question, the pickers, the submit — reads the normalised one. */
+  const place =
+    values.place === AFTER_ALL || peers.some((x) => x.stepKey === values.place)
+      ? values.place
+      : AFTER_ALL
+  const splitting = place !== AFTER_ALL && place !== undefined
+  /** Editing a branch back to "it carries on" DETACHES it — it needs a position
+   * of its own, and the one that changes nothing else is the end of the map. */
+  const detaching = editing && besideNow !== undefined && !splitting
   const minutes = whole(values.minutes)
   const runs = whole(values.runs)
-  const namingRole = values.roleId === NEW
-  const namingTool = values.toolId === NEW
-  const ready =
-    values.name.trim() !== "" &&
-    minutes !== null &&
-    runs !== null &&
-    (!namingRole || values.newRole.trim() !== "") &&
-    (!namingTool || values.newTool.trim() !== "")
+  const ready = values.name.trim() !== "" && minutes !== null && runs !== null
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!ready || minutes === null || runs === null) return
     setBusy(true)
     try {
+      // WHERE IT GOES, in both modes — the door's update takes a position too.
+      //   adding, carries on      -> undefined: after everything else
+      //   adding, splits          -> the chosen peer's position (a shared
+      //                              position IS the fork)
+      //   editing, joins a fork   -> that peer's position
+      //   editing, detaches       -> one past the last position, said out loud
+      //                              in the helper under the question
+      //   editing, shape untouched-> undefined: the door leaves it alone
+      const position = splitting
+        ? peers.find((x) => x.stepKey === place)?.position
+        : detaching
+          ? Math.max(initial?.position ?? 0, ...peers.map((x) => x.position)) + 1
+          : undefined
       await onSubmit({
         name: values.name.trim(),
         description: richTextValue(values.description),
         secondsPerRun: minutes * 60,
         runsPerPeriod: runs,
         frequencyPeriod: values.period as StepFormValues["frequencyPeriod"],
-        roleId: namingRole ? null : values.roleId === NONE ? null : values.roleId,
-        newRoleName: namingRole ? values.newRole.trim() : null,
-        toolId: namingTool ? null : values.toolId === NONE ? null : values.toolId,
-        newToolName: namingTool ? values.newTool.trim() : null,
-        // WHERE IT GOES. Only on a new step: moving an existing one is a
-        // different verb and a different door. `undefined` means "after
-        // everything else", which is what the door does with no position at all.
-        position: editing
-          ? undefined
-          : values.place === AFTER_ALL
-            ? undefined
-            : peers.find((x) => x.stepKey === values.place)?.position,
-        branchLabel: values.branch.trim() || null,
+        roleId: values.roleId === NONE ? null : values.roleId,
+        toolId: values.toolId === NONE ? null : values.toolId,
+        position,
+        // A condition belongs to a branch. A straight step carries none — which
+        // is also what clears a stale "if it is a letter" off a detached one.
+        branchLabel: splitting ? values.branch.trim() || null : null,
         loopsBackTo: values.loop === NONE ? null : values.loop,
       })
       clearDraft()
@@ -340,40 +356,28 @@ export function StepFormDialog({
         </div>
       </Field>
 
-      {/* WHO DOES IT. Always rendered, even with no roles recorded — see the note
-          at the top of this file for the day that mattered. */}
+      {/* THE ROLE. Always rendered, even with no roles recorded — the link
+          under the tool picker is the signpost to where one is added. */}
       <Field config={roleField} htmlFor="step-role" className={fieldSpacing}>
         {hasClient ? (
-          <div className="flex flex-col gap-2">
-            <Select
-              value={values.roleId}
-              onValueChange={(v) => setValues((s) => ({ ...s, roleId: v }))}
-              disabled={busy}
-            >
-              <SelectTrigger id="step-role">
-                <SelectValue placeholder={t("Nobody named yet")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>{t("Nobody named yet")}</SelectItem>
-                {roles.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name}
-                    {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
-                  </SelectItem>
-                ))}
-                <SelectItem value={NEW}>{t("Add a role…")}</SelectItem>
-              </SelectContent>
-            </Select>
-            {namingRole && (
-              <Input
-                value={values.newRole}
-                onChange={(e) => setValues((s) => ({ ...s, newRole: e.target.value }))}
-                placeholder={t("e.g. Dispatch clerk")}
-                disabled={busy}
-                autoFocus
-              />
-            )}
-          </div>
+          <Select
+            value={values.roleId}
+            onValueChange={(v) => setValues((s) => ({ ...s, roleId: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="step-role">
+              <SelectValue placeholder={t("Nobody named yet")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>{t("Nobody named yet")}</SelectItem>
+              {roles.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.name}
+                  {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : (
           <p className="text-muted-foreground text-sm">
             {t("File this map under a client and their roles can be named here.")}
@@ -381,7 +385,7 @@ export function StepFormDialog({
         )}
       </Field>
 
-      {/* WHAT IT IS DONE IN — one, by ruling. */}
+      {/* THE TOOL — one, by ruling. */}
       <Field config={toolField} htmlFor="step-tool" className={fieldSpacing}>
         {hasClient ? (
           <div className="flex flex-col gap-2">
@@ -400,17 +404,20 @@ export function StepFormDialog({
                     {x.name}
                   </SelectItem>
                 ))}
-                <SelectItem value={NEW}>{t("Add a tool…")}</SelectItem>
               </SelectContent>
             </Select>
-            {namingTool && (
-              <Input
-                value={values.newTool}
-                onChange={(e) => setValues((s) => ({ ...s, newTool: e.target.value }))}
-                placeholder={t("e.g. The shared spreadsheet")}
-                disabled={busy}
-                autoFocus
-              />
+            {/* THE SIGNPOST — the same shape ManageDropdownsLink draws under a
+                dropdown. Roles and tools are records on the client, managed on
+                the client's record, and this is the door there. The half-filled
+                step survives the trip: the draft is per-session (R7). */}
+            {manageHref && (
+              <InAppLink
+                href={safeHref(manageHref) ?? ""}
+                className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
+              >
+                <Settings2 className="size-3" aria-hidden />
+                {t("Add or edit their roles and tools")}
+              </InAppLink>
             )}
           </div>
         ) : (
@@ -437,16 +444,27 @@ export function StepFormDialog({
           step added the ordinary way lands on its own, and one box after two IS
           the join. The helper line says that out loud rather than leaving
           somebody hunting for a button that should not exist. */}
-      {!editing && peers.length > 0 && (
+      {/* THE SHAPE, in BOTH modes. It was add-only, and the owner found the
+          hole the same day the split shipped: a step that landed in a fork by
+          mistake could not be taken out of it — "I think something is wrong…
+          and I can't even edit it." Editing now opens showing the truth
+          (derived from positions, the same way the picture is) and can change
+          it: join a fork, switch forks, or leave one. */}
+      {peers.length > 0 && (
         <Field config={shapeField} htmlFor="step-shape" className={fieldSpacing}>
           <Select
             value={splitting ? SPLIT : STRAIGHT}
             onValueChange={(v) =>
               setValues((st) => ({
                 ...st,
-                // Choosing "it carries on" clears BOTH halves of the split, so a
+                // Choosing "No" clears BOTH halves of the split, so a
                 // half-answered fork can never be submitted.
-                place: v === SPLIT ? (st.place === AFTER_ALL ? peers[0].stepKey : st.place) : AFTER_ALL,
+                place:
+                  v === SPLIT
+                    ? (st.place === AFTER_ALL || !peers.some((x) => x.stepKey === st.place)
+                        ? (besideNow?.stepKey ?? peers[0].stepKey)
+                        : st.place)
+                    : AFTER_ALL,
                 branch: v === SPLIT ? st.branch : "",
               }))
             }
@@ -456,10 +474,19 @@ export function StepFormDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={STRAIGHT}>{t("No — it just carries on")}</SelectItem>
-              <SelectItem value={SPLIT}>{t("Yes — this is one of the ways it can go")}</SelectItem>
+              {/* The owner's ruling, 25 Aug 2026: "It'll just be yes or no."
+                  The explaining lives in the hint above, not in the option. */}
+              <SelectItem value={STRAIGHT}>{t("No")}</SelectItem>
+              <SelectItem value={SPLIT}>{t("Yes")}</SelectItem>
             </SelectContent>
           </Select>
+          {detaching && (
+            /* Detaching needs a position of its own and takes the end of the
+               map — SAID before it happens, never discovered after. */
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("It leaves the split and moves to the end of the map.")}
+            </p>
+          )}
         </Field>
       )}
 
@@ -470,7 +497,7 @@ export function StepFormDialog({
         <div className="border-primary/40 ml-1 flex flex-col gap-4 border-l-2 pl-4">
           <Field config={insteadField} htmlFor="step-place">
             <Select
-              value={values.place === AFTER_ALL ? peers[0].stepKey : values.place}
+              value={place === AFTER_ALL ? peers[0].stepKey : place}
               onValueChange={(v) => setValues((st) => ({ ...st, place: v }))}
               disabled={busy}
             >
@@ -498,21 +525,6 @@ export function StepFormDialog({
         </div>
       )}
 
-      {/* EDITING a step keeps the plain condition box: the shape question above
-          is about where a NEW step lands, and moving an existing one is a
-          different verb with a different door. */}
-      {editing && (
-        <Field config={branchField} htmlFor="step-branch" className={fieldSpacing}>
-          <Input
-            id="step-branch"
-            value={values.branch}
-            onChange={(e) => setValues((st) => ({ ...st, branch: e.target.value }))}
-            placeholder={t("e.g. if the claim is rejected")}
-            disabled={busy}
-          />
-        </Field>
-      )}
-
       {peers.length > 0 && (
         <Field config={loopField} htmlFor="step-loop" className={fieldSpacing}>
           <Select
@@ -535,16 +547,6 @@ export function StepFormDialog({
         </Field>
       )}
 
-      {/* The add-a-role and add-a-tool rows are the only place this form creates
-          anything of its own, and the icon says so (the house mapping: create =
-          Plus). It is a hint rather than a button because the Select above IS
-          the control — two ways to do one thing is how a form gets confusing. */}
-      {(namingRole || namingTool) && (
-        <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-          <Plus className="size-3.5" aria-hidden />
-          {t("It will be added to this client's organisation when you save.")}
-        </p>
-      )}
     </FormShellDialog>
   )
 }

@@ -665,6 +665,13 @@ const BURGLARIES: Burglary[] = [
     expect: "refused",
   },
   {
+    route: "POST /api/tenancy/processes/steps/delete",
+    why: "delete the victim's step and its whole history — a removal even the slider could no longer see",
+    attack: () => req("POST /api/tenancy/processes/steps/delete", { id: IDS.victimStep }),
+    honest: () => req("POST /api/tenancy/processes/steps/delete", { id: IDS.victimStep }),
+    expect: "refused",
+  },
+  {
     route: "GET /api/tenancy/processes/drafts",
     why: "read the proposals sitting against another client's maps — what a call about them suggested, before anybody agreed to it",
     attack: () => req("GET /api/tenancy/processes/drafts?processId=" + IDS.victimProcess),

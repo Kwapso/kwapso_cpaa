@@ -1009,24 +1009,31 @@ export type RoleRate = {
 }
 
 /** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
- * INTERNAL, always: it is computed from the role rate card, so no client-
- * reachable path may read it (R24). */
+ * The money is the ONE savings seam's own arithmetic (shared/workers/savings):
+ * each step's saving times the CLIENT-role rate frozen on that step — the same
+ * figure the process screen shows, because for six days this panel priced a
+ * SECOND way (a process-level role against the internal rate card) and the two
+ * answers disagreed on the owner's own screen: €2,766.35 on the map, 0.00 one
+ * tab over. One arithmetic, one seam, or the numbers stop being believable.
+ * Still a staff door (the portal has its own hours-only view). */
 export type AppMoneyBack = {
   appId: string
   savedSecondsPerMonth: number
-  /** the sum of the priced lines only — see `unpricedProcesses`. */
+  /** the sum of the priced steps only — see `unpricedProcesses`. */
   moneyCentsPerMonth: number
-  /** how many processes could not be priced, because they name no role or the
-   * role has no live rate. Shown, never hidden: a total that silently left work
-   * out is the sort of number that costs the screen its credit. */
+  /** how many processes carry NO priced step at all. Shown, never hidden: a
+   * total that silently left work out is the sort of number that costs the
+   * screen its credit. */
   unpricedProcesses: number
   lines: {
     processId: string
     name: string
-    roleName: string | null
     savedSecondsPerMonth: number
-    centsPerHour: number | null
+    /** null when no step is priced — distinct from "priced at zero". */
     moneyCentsPerMonth: number | null
+    /** the money's own coverage: how many of this map's steps carry a rate. */
+    pricedSteps: number
+    totalSteps: number
   }[]
   /** R25 — the sentence the figure may not be shown without, carried on the
    * payload so the screen never assembles it. */

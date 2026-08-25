@@ -235,7 +235,15 @@ export function AccountDetailScreen({
   const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
   const ratesTotal = useCachedValue<number | null>(totalKey("account-rates", accountId))
 
-  const [tab, setTab] = React.useState("overview")
+  // The one deep-linkable tab. `?tab=organisation` is what the step form's
+  // "add or edit their roles and tools" link carries — the management surface
+  // is a tab on this record, and a link that lands one tab away is a link that
+  // makes the reader hunt. Read once, on mount; the strip owns it after that.
+  const [tab, setTab] = React.useState(() => {
+    if (typeof window === "undefined") return "overview"
+    const asked = new URLSearchParams(window.location.search).get("tab")
+    return asked === "organisation" ? asked : "overview"
+  })
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
   const [newContactOpen, setNewContactOpen] = React.useState(false)

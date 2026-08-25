@@ -16,12 +16,17 @@
 //  · Counts and tags are QUIET TEXT, never badges — ch14: "counts are quiet,
 //    never badges". The old `badgeVariant` colour is therefore not drawn.
 //
-// Icons: a TabItem carries a lucide icon NAME as serialisable data. The kit's
-// icons export the same names (PascalCase), so the name is resolved against
-// the kit's own set; a name the kit lacks renders no icon rather than
-// throwing, same contract as the old DynamicIcon fallback.
+// Icons: a TabItem carries a lucide icon NAME as serialisable data, resolved
+// against the kit's own set first (the drawn art wins where it exists) and the
+// full lucide set second — the same fallback CollectionHeading and the nav
+// already use, so a tab and the heading beside it can never disagree about
+// what a name draws. Before the fallback, "info" and "user" resolved to
+// NOTHING here while rendering fine one component up, which is why Overview
+// tabs shipped bare while their headings carried art.
 
 import * as React from "react"
+
+import { DynamicIcon, type IconName } from "lucide-react/dynamic"
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/controls/tabs/tabs"
 import * as KitIcons from "@shared/ui/icons"
@@ -77,13 +82,93 @@ export const defaultTabsConfig: TabsConfig = {
   fullWidth: false,
 }
 
-/** kebab-case name → the kit's PascalCase icon component, or null. */
+/** kebab-case name → the kit's PascalCase icon component where one is drawn,
+ * the full lucide set otherwise, and null only for a name neither knows. */
 export function kitIcon(name: string): React.ReactNode {
   const pascal = name.replace(/(^|-)([a-z0-9])/g, (_, __, c: string) => c.toUpperCase())
   const Icon = (KitIcons as Record<string, unknown>)[pascal]
-  return typeof Icon === "function" || (typeof Icon === "object" && Icon !== null)
-    ? React.createElement(Icon as React.ComponentType<{ size?: number }>, { size: 16 })
-    : null
+  if (typeof Icon === "function" || (typeof Icon === "object" && Icon !== null))
+    return React.createElement(Icon as React.ComponentType<{ size?: number }>, { size: 16 })
+  return React.createElement(DynamicIcon, { name: name as IconName, size: 16 })
+}
+
+/** THE TAB VOCABULARY — one icon per tab identity, wherever it appears.
+ *
+ * The owner's rule (25 Aug 2026): every folder tab carries an icon, and the
+ * same tab means the same icon on every screen — Overview on an account and
+ * Overview on a process are one identity wearing one glyph. So the icon is
+ * keyed here by the tab's VALUE (stable, untranslated data; the label moves
+ * per language) and this table WINS over a call site's own choice, which is
+ * what turns "the same everywhere" from a review comment into a property.
+ *
+ * A value outside the table keeps the call site's icon; a folder tab that
+ * would otherwise render bare falls back to the folder glyph, so no strip can
+ * ship half-dressed — and the census in web/test/rules.test.ts fails the
+ * build when a NEW tab value reaches for that fallback, so the generic glyph
+ * is a net under a decision, never the decision. Typed `IconName` so a name
+ * lucide cannot draw refuses to compile. */
+export const TAB_ICONS: Record<string, IconName> = {
+  overview: "info",
+  activity: "history",
+  // the record kinds, matching CONCEPT_ICON in web/lib/pages.ts word for word
+  apps: "app-window",
+  companies: "building-2",
+  contacts: "contact",
+  deliverables: "package",
+  impact: "piggy-bank",
+  knowledge: "library-big",
+  meetings: "calendar-clock",
+  sprints: "calendar-range",
+  stories: "hammer",
+  tickets: "life-buoy",
+  time: "timer",
+  todos: "inbox",
+  versions: "git-branch",
+  waves: "layers",
+  portal: "key-round",
+  rates: "banknote",
+  maps: "route",
+  // the process record's own strip and its inner view switch
+  steps: "list-checks",
+  list: "list",
+  flow: "workflow",
+  compare: "columns-2",
+  conversation: "message-square",
+  // record-specific sections
+  organisation: "network",
+  stakeholders: "users-round",
+  modules: "blocks",
+  permissions: "shield-check",
+  source: "file-text",
+  files: "paperclip",
+  notes: "notebook-pen",
+  // the draft review's three lists of proposed records
+  roles: "user-cog",
+  tools: "wrench",
+  // collection filters that appear as strips
+  all: "asterisk",
+  active: "circle-check",
+  inactive: "circle-off",
+  archived: "archive",
+  week: "calendar-days",
+  calendar: "calendar",
+  // the agency's own record (the Kwapso screen)
+  details: "scroll-text",
+  team: "building",
+  brand: "palette",
+}
+
+/** What a tab actually draws: the vocabulary first, the call site second, and
+ * for a folder tab — which is never drawn bare — the folder glyph as the net. */
+function tabIcon(t: TabItem, variant: "line" | "folder"): React.ReactNode {
+  const named = TAB_ICONS[t.value]
+  if (named) return kitIcon(named)
+  if (typeof t.icon === "string") {
+    if (t.icon) return kitIcon(t.icon)
+  } else if (t.icon !== null && t.icon !== undefined) {
+    return t.icon
+  }
+  return variant === "folder" ? kitIcon("folder") : null
 }
 
 export function TabsView({
@@ -123,7 +208,7 @@ export function TabsView({
             value={t.value}
             className={cn(config.fullWidth && "flex-1")}
           >
-            {typeof t.icon === "string" ? (t.icon ? kitIcon(t.icon) : null) : (t.icon ?? null)}
+            {tabIcon(t, variant)}
             {t.label}
             {t.badge !== "" && (
               <span className="text-micro tabular-nums text-ink-secondary">{t.badge}</span>

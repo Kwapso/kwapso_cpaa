@@ -302,6 +302,10 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
     // reports 0, which is a complete and honest answer.
     indexed,
     total: await countSources(cfg, guard),
+    // WHICH SERVICES THE SWEEP HAD TO WORK WITH. An empty `results` has two
+    // unlike causes — nothing changed, or nothing connected — and only the
+    // caller who can tell them apart can say an honest sentence about it.
+    connectedServices: sweep.connectedServices,
   })
 }
 

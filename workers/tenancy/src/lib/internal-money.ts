@@ -510,17 +510,22 @@ export async function setRoleRate(
 
 /** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
  *
- * The hours are `listSavings`' own arithmetic, unchanged and un-recomputed: the
- * baseline minus the latest, step by step, rolled up per process. This adds the
- * one thing that file cannot know without importing a price — WHOSE hours they
- * were, and what an hour of that person is worth.
+ * BOTH halves are `listSavings`' own arithmetic now, unchanged and
+ * un-recomputed: the baseline minus the latest, step by step, priced by the
+ * CLIENT-role rate frozen onto each step when it was written. This function
+ * used to add a SECOND price — a role named on the process, looked up against
+ * the internal rate card — and on 25 Aug 2026 the two arithmetics disagreed on
+ * the owner's own screen: the map said €2,766.35 a month, this tab said 0.00
+ * and "no role attached", because the map's roles live on its STEPS. One
+ * subtraction, one seam (R25's whole argument), so this now carries the seam's
+ * money through untouched and adds only the per-process rollup shape the panel
+ * draws.
  *
- * A PROCESS WITH NO ROLE, OR A ROLE WITH NO LIVE RATE, CONTRIBUTES ZERO MONEY
- * AND ITS FULL HOURS. That asymmetry is deliberate and it is the honest one: the
- * time saved is a measurement and it is true whether or not anybody has priced
- * it, while the money is an inference that needs a number nobody has given yet.
- * Inventing a default rate would produce a figure that looks the same as a real
- * one, which is precisely the sort of number that costs a screen its credit.
+ * A PROCESS WITH NO PRICED STEP CONTRIBUTES NULL MONEY AND ITS FULL HOURS. The
+ * asymmetry is deliberate and honest: the time is a measurement, true whether
+ * or not anybody priced it; the money is an inference that needs a number
+ * nobody has given yet, and null says so where a zero would claim the work is
+ * free.
  *
  * R25 rides the object: the caption comes from `listSavings` and is passed on
  * word for word, because the money is made of the same estimates the hours are.
@@ -531,41 +536,22 @@ export async function appMoneyBack(
   scope: AccountScope,
   appId: string
 ): Promise<AppMoneyBack> {
-  const [view, roles, rates] = await Promise.all([
-    listSavings(cfg, guard, scope, { appId }),
-    d1Query<{ id: string; role_name: string | null }>(
-      cfg,
-      guard.databaseId,
-      // R14 hard cap — the processes inside one app, which is a bounded set.
-      `SELECT id, role_name FROM processes WHERE app_id = ? AND deactivated_at IS NULL LIMIT ${LIST_HARD_CAP}`,
-      [appId]
-    ),
-    listRoleRates(cfg, guard),
-  ])
-  const roleOf = new Map(roles.map((r) => [r.id, r.role_name]))
-  const priceOf = new Map(rates.rows.filter((r) => r.active).map((r) => [r.roleName, r.centsPerHour]))
+  const view = await listSavings(cfg, guard, scope, { appId })
   const app = view.apps[0]
-  const lines = (app?.processes ?? []).map((p) => {
-    const roleName = roleOf.get(p.processId) ?? null
-    const centsPerHour = roleName ? (priceOf.get(roleName) ?? null) : null
-    return {
-      processId: p.processId,
-      name: p.name,
-      roleName,
-      savedSecondsPerMonth: p.savedSecondsPerMonth,
-      centsPerHour,
-      // Rounded ONCE per line, so the lines always add up to the total shown —
-      // the same rule `margin` keeps one function up this file.
-      moneyCentsPerMonth:
-        centsPerHour == null ? null : Math.round((p.savedSecondsPerMonth / 3600) * centsPerHour),
-    }
-  })
+  const lines = (app?.processes ?? []).map((p) => ({
+    processId: p.processId,
+    name: p.name,
+    savedSecondsPerMonth: p.savedSecondsPerMonth,
+    moneyCentsPerMonth: p.pricedSteps > 0 ? p.savedCentsPerMonth : null,
+    pricedSteps: p.pricedSteps,
+    totalSteps: p.totalSteps,
+  }))
   return {
     appId,
     savedSecondsPerMonth: view.savedSecondsPerMonth,
     moneyCentsPerMonth: lines.reduce((sum, l) => sum + (l.moneyCentsPerMonth ?? 0), 0),
-    /** how many of the lines could not be priced — the screen says so rather
-     * than quietly reporting a smaller number as if it were the whole. */
+    /** how many of the lines could not be priced at all — the screen says so
+     * rather than quietly reporting a smaller number as if it were the whole. */
     unpricedProcesses: lines.filter((l) => l.moneyCentsPerMonth == null).length,
     lines,
     caption: view.caption,

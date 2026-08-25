@@ -2195,6 +2195,15 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildBody: (i) => ({ id: str(i, "id") }),
     agent: { write: true, confirm: true, summarize: (i) => `Record that step ${str(i, "id")} stopped happening` },
   },
+  {
+    name: "delete_process_step",
+    summary:
+      "Delete a step COMPLETELY (by `id`) — for a step added by mistake, as if it was never added, history included. This is a different verb from `remove_process_step`: stopping is a fact about the work and becomes a saving; deleting is an admission the row was wrong. The door refuses a step that is part of an agreed version, or one another step sends work back to — those can only be switched off — and says which rule refused.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/delete",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: true, summarize: (i) => `Delete step ${str(i, "id")} completely` },
+  },
   // ── WAVES ────────────────────────────────────────────────────────────────
   // What a client BOUGHT. On the machine surface because the owner ruled the
   // assistant should be able to help PLAN one — "plan a blueprint wave for Keno

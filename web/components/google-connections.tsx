@@ -117,8 +117,27 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     // The query is cleared FIRST, so a refresh can never re-run a spent
     // handshake and show a confusing second failure.
     window.history.replaceState({}, "", window.location.pathname)
+    // NOTHING IS SAID BEFORE THE ROWS ARE READ. Two arrivals here are false
+    // alarms: a bounced callback after an earlier pass already connected
+    // everything, and a finish whose one-shot cookie was already spent (a
+    // replayed redirect, a second tab, a phone app restoring the page). In
+    // both, the grant can be fully live while the flow reports failure — and
+    // "it didn't finish, try again" over four working connections is exactly
+    // what the owner was shown (25 Aug 2026). So every path ends in a read,
+    // and the sentence comes from what the rows say, not from how we got here.
+    const speakFromTruth = async (fallback: string) => {
+      try {
+        const r = await content.googleConnections()
+        primeCache(key, { connections: r.connections, sources: r.sources, ready: r.ready })
+        const live = new Set(r.connections.filter((c) => c.active).map((c) => c.service))
+        if (GOOGLE_SERVICES.every((service) => live.has(service))) toast.success(t("Connected."))
+        else toast.error(fallback)
+      } catch {
+        toast.error(fallback)
+      }
+    }
     if (outcome !== "connected") {
-      toast.error(t("That Google connection didn't finish. Try again."))
+      void speakFromTruth(t("That Google connection didn't finish. Try again."))
       return
     }
     void content
@@ -127,7 +146,9 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         primeCache(key, { ...r, ready: true })
         toast.success(t("Connected."))
       })
-      .catch((err) => toast.error(err instanceof ApiFailure ? err.message : t("Couldn't finish that connection.")))
+      .catch((err) =>
+        speakFromTruth(err instanceof ApiFailure ? err.message : t("Couldn't finish that connection."))
+      )
   }, [key, t])
 
   const connections = q.data?.connections.filter((c) => c.active) ?? []

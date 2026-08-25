@@ -134,6 +134,9 @@ export function GoogleSyncButton({
     setSyncing(true)
     let brought = 0
     let changed = false
+    // Starts true so the calendar-only case never claims "not connected" on
+    // knowledge's behalf; the knowledge sweep overwrites it with the truth.
+    let anythingConnected = true
     try {
       if (doesCalendar) {
         const r = await content.syncCalendar()
@@ -143,6 +146,7 @@ export function GoogleSyncButton({
       if (doesKnowledge) {
         for (let pass = 0; pass < MAX_SYNC_PASSES; pass++) {
           const r = await content.syncGoogleKnowledge()
+          anythingConnected = r.connectedServices.length > 0
           brought += r.results.reduce((n, k) => n + k.indexed, 0)
           changed = changed || r.results.some((k) => k.indexed > 0)
           // A KIND THAT FAILED CARRIES ITS OWN SENTENCE (R12 records it on the
@@ -161,11 +165,19 @@ export function GoogleSyncButton({
       markGoogleSyncedNow()
       if (teamId) invalidate(googleSyncKey(teamId))
       if (changed) onSynced?.()
-      toast.success(
-        brought > 0
-          ? `Brought in ${brought} ${brought === 1 ? "thing" : "things"}.`
-          : t("Nothing new to bring in.")
-      )
+      // "Nothing new" is only an honest answer when there was somewhere to
+      // look. With zero connections the sweep did not ask Google anything, and
+      // saying "nothing new" would dress that up as a completed check — which
+      // is exactly how the owner read it (25 Aug 2026).
+      if (brought === 0 && !anythingConnected) {
+        toast.error(t("No Google services are connected. Connect them in Settings first."))
+      } else {
+        toast.success(
+          brought > 0
+            ? `Brought in ${brought} ${brought === 1 ? "thing" : "things"}.`
+            : t("Nothing new to bring in.")
+        )
+      }
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your Google material just now."))
     } finally {

@@ -1,18 +1,16 @@
-// THE CHAIN THE MONEY HANGS ON: process → role → rate.
+// THE CHAIN THE MONEY HANGS ON: step → client role → frozen rate.
 //
-// The owner opened an app's Value tab and reported "I was able to see hours, but
-// I was not able to see money given back". The arithmetic was right and the chain
-// was broken at its first link: the New process form has asked "who does it"
-// since the role rate card shipped, and the CREATE door never read the answer.
-// So every map ever made was born with no role, a process with no role has no
-// rate, and an app whose processes have no rate reports its hours and 0.00.
-//
-// It was invisible because nothing tested this chain end to end — appMoneyBack
-// had no coverage at all, and the create door dropping a field is exactly the
-// kind of gap a lib test cannot see. So the suite runs the REAL doors against a
-// real SQLite database with the real migrations, and walks the chain link by
-// link: a map with no role, a role with no rate, a rate of zero, and the whole
-// thing joined up.
+// The model moved on 25 Aug 2026. The first cut priced a process by ONE role
+// named on the process against the internal rate card, and the step work then
+// gave every STEP a client role whose rate is FROZEN onto the row when it is
+// written — the one savings seam prices the subtraction step by step, and the
+// process screen shows that figure. For six days appMoneyBack still ran the old
+// arithmetic beside it, and the two disagreed on the owner's own screen:
+// €2,766.35 on the map, 0.00 on the Value tab, "no role attached" about a map
+// with four priced steps. One subtraction, one seam; this suite now proves the
+// rollup IS the seam's answer, through the real doors against a real database:
+// a map with no priced step, a step that gains a priced role, a rate of zero,
+// and — the owner's ruling — a rate rise that must NOT move an agreed figure.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -112,102 +110,103 @@ describe("an app's money, link by link", () => {
     speedItUp()
   })
 
-  it("counts the hours and reports NO money while the map names no role", async () => {
+  /** A client role on the victim's account, priced, through the real door. */
+  async function priceARole(name: string, centsPerHour: number): Promise<string> {
+    const res = await post("POST /api/tenancy/client/roles", {
+      accountId: IDS.victimAccount,
+      name,
+      centsPerHour,
+    })
+    const body = (await res.json()) as { id: string }
+    return body.id
+  }
+
+  /** Attach a role to the current version's step through the steps door — the
+   * moment the rate FREEZES onto the row. */
+  async function saySomebodyDoesIt(roleId: string) {
+    await post("POST /api/tenancy/processes/steps/update", {
+      id: "PS2",
+      name: "Check it against the order",
+      secondsPerRun: 600,
+      runsPerPeriod: 20,
+      frequencyPeriod: "month",
+      roleId,
+    })
+  }
+
+  it("counts the hours and reports NO money while no step names a role", async () => {
     const view = await money()
     expect(view.savedSecondsPerMonth).toBe(SAVED_SECONDS)
     expect(view.moneyCentsPerMonth).toBe(0)
     expect(view.unpricedProcesses).toBe(1)
-    // The line carries WHICH link is missing, which is what the screen reads to
-    // say so: no role at all, rather than a role nobody has priced.
-    expect(view.lines[0].roleName).toBeNull()
-    expect(view.lines[0].centsPerHour).toBeNull()
+    // The line says WHICH link is missing in the seam's own terms: the money's
+    // coverage, step by step — which is what the screen reads to say so.
+    expect(view.lines[0].pricedSteps).toBe(0)
+    expect(view.lines[0].totalSteps).toBeGreaterThan(0)
     expect(view.lines[0].moneyCentsPerMonth).toBeNull()
   })
 
-  it("still reports no money when the role is named but nobody has priced it", async () => {
-    await post("POST /api/tenancy/processes/update", {
-      id: IDS.victimProcess,
-      name: "Bergman invoice approval",
-      roleName: "Bookkeeper",
-    })
-    const view = await money()
-    expect(view.moneyCentsPerMonth).toBe(0)
-    expect(view.unpricedProcesses).toBe(1)
-    // …and the two states are DISTINGUISHABLE, which is the whole point: one is
-    // fixed on the map, the other on the rate card, and a screen that could not
-    // tell them apart could only say "unpriced" and leave somebody hunting.
-    expect(view.lines[0].roleName).toBe("Bookkeeper")
-    expect(view.lines[0].centsPerHour).toBeNull()
-  })
-
-  it("prices the hours once the role has a rate", async () => {
-    await post("POST /api/tenancy/processes/update", {
-      id: IDS.victimProcess,
-      name: "Bergman invoice approval",
-      roleName: "Bookkeeper",
-    })
-    await post("POST /api/tenancy/role-rates", {
-      roleName: "Bookkeeper",
-      centsPerHour: 4500,
-      active: true,
-    })
+  it("prices the hours once a step's role carries a rate", async () => {
+    await saySomebodyDoesIt(await priceARole("Bookkeeper", 4500))
     const view = await money()
     expect(view.savedSecondsPerMonth).toBe(SAVED_SECONDS)
     expect(view.moneyCentsPerMonth).toBe(SAVED_HOURS * 4500)
     expect(view.unpricedProcesses).toBe(0)
-    expect(view.lines[0].centsPerHour).toBe(4500)
+    expect(view.lines[0].pricedSteps).toBe(1)
     // R25 — the figure never travels without the sentence that says what it is
     // made of, and it comes back on the payload rather than being written here.
     expect(view.caption).toBeTruthy()
   })
 
   it("a rate of zero is priced, not unpriced — a zero somebody chose", async () => {
-    // The nastiest of the four states: the money is 0.00 and `unpricedProcesses`
-    // is 0, so the old screen showed a bare zero with no explanation at all. It
-    // is a legal answer (the rate card's CHECK allows it), so the door keeps
-    // saying it and the screen has to tell it apart from a broken chain — which
-    // it can, because `centsPerHour` is 0 and not null.
-    await post("POST /api/tenancy/processes/update", {
-      id: IDS.victimProcess,
-      name: "Bergman invoice approval",
-      roleName: "Volunteer",
-    })
-    await post("POST /api/tenancy/role-rates", {
-      roleName: "Volunteer",
-      centsPerHour: 0,
-      active: true,
-    })
+    // The nastiest state: the money is 0.00 and nothing is missing. Legal (the
+    // rate card's CHECK allows zero), and the payload keeps it distinguishable
+    // from a broken chain: pricedSteps counts it, moneyCentsPerMonth is 0, not
+    // null — so the screen shows an honest zero instead of a fix-it box.
+    await saySomebodyDoesIt(await priceARole("Volunteer", 0))
     const view = await money()
     expect(view.moneyCentsPerMonth).toBe(0)
     expect(view.unpricedProcesses).toBe(0)
-    expect(view.lines[0].centsPerHour).toBe(0)
+    expect(view.lines[0].pricedSteps).toBe(1)
     expect(view.lines[0].moneyCentsPerMonth).toBe(0)
   })
 
-  it("retiring a rate un-prices the hours rather than keeping a stale number", async () => {
-    await post("POST /api/tenancy/processes/update", {
-      id: IDS.victimProcess,
-      name: "Bergman invoice approval",
-      roleName: "Bookkeeper",
-    })
-    await post("POST /api/tenancy/role-rates", {
-      roleName: "Bookkeeper",
-      centsPerHour: 4500,
-      active: true,
-    })
+  it("a pay rise CANNOT move an agreed figure — the rate is frozen on the step", async () => {
+    // The owner's ruling, proved at the rollup: what a client was told their
+    // saving is worth must not drift when a rate is corrected next year. The
+    // step froze 4500 when the role was attached; re-pricing the role moves
+    // nothing already written.
+    const roleId = await priceARole("Bookkeeper", 4500)
+    await saySomebodyDoesIt(roleId)
     expect((await money()).moneyCentsPerMonth).toBe(SAVED_HOURS * 4500)
 
-    await post("POST /api/tenancy/role-rates", {
-      roleName: "Bookkeeper",
-      centsPerHour: 4500,
-      active: false,
+    await post("POST /api/tenancy/client/roles/update", {
+      id: roleId,
+      name: "Bookkeeper",
+      centsPerHour: 9900,
     })
     const view = await money()
-    expect(view.moneyCentsPerMonth).toBe(0)
-    // And it says so, so the screen can point at the rate card instead of
-    // leaving a number that quietly became a guess.
-    expect(view.unpricedProcesses).toBe(1)
-    expect(view.lines[0].roleName).toBe("Bookkeeper")
-    expect(view.lines[0].centsPerHour).toBeNull()
+    expect(view.moneyCentsPerMonth).toBe(SAVED_HOURS * 4500)
+    expect(view.unpricedProcesses).toBe(0)
+  })
+
+  it("partial coverage is said on the line — priced and total steps travel", async () => {
+    await saySomebodyDoesIt(await priceARole("Bookkeeper", 4500))
+    // A second, unpriced step in the current version: the money is now partial
+    // and the line has to say so rather than reading as the whole answer.
+    await post("POST /api/tenancy/processes/steps", {
+      processId: IDS.victimProcess,
+      name: "File the paperwork",
+      secondsPerRun: 300,
+      runsPerPeriod: 20,
+      frequencyPeriod: "month",
+      roleId: null,
+    })
+    const view = await money()
+    expect(view.lines[0].pricedSteps).toBe(1)
+    expect(view.lines[0].totalSteps).toBe(2)
+    expect(view.moneyCentsPerMonth).toBe(SAVED_HOURS * 4500)
+    // Partial is not "unpriced": the fix-it box is for a map with NOTHING.
+    expect(view.unpricedProcesses).toBe(0)
   })
 })

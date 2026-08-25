@@ -39,6 +39,7 @@ import {
   addStep,
   createProcess,
   cutVersion,
+  deleteStep,
   getProcess,
   listProcessSteps,
   listSavings,
@@ -296,5 +297,99 @@ describe("the map's own figure is the client's figure", () => {
     const dropped = detail.saving?.steps.find((s) => s.name === "Set the renewal reminder")
     expect(dropped?.removed).toBe(true)
     expect(dropped?.savedSecondsPerMonth).toBe(300 * 40)
+  })
+})
+
+
+// ── DELETE, the verb for a mistake ───────────────────────────────────────────
+//
+// `removeStep` records a FACT (the work stopped; the row stays and its time
+// becomes a saving). `deleteStep` retracts a MISTAKE: the row and its history
+// go, and the door refuses whenever going would bend an agreed number — which
+// is exactly the two refusals proved here. Owner's ruling, 25 Aug 2026.
+describe("deleting a step that should never have existed", () => {
+  it("a just-added step deletes completely — the row and its history", async () => {
+    const processId = await mapWithThreeSteps()
+    await addStep(cfg, guard, staff, actor, {
+      processId,
+      name: "Added by mistake",
+      secondsPerRun: 60,
+      runsPerPeriod: 1,
+    })
+    const before = await listProcessSteps(cfg, guard, staff, processId)
+    const mistake = before.find((x) => x.name === "Added by mistake")!
+    const out = await deleteStep(cfg, guard, staff, actor, mistake.id)
+    expect(out).toBe(processId)
+    const after = await listProcessSteps(cfg, guard, staff, processId)
+    expect(after.map((x) => x.name)).not.toContain("Added by mistake")
+    // The slider must not keep drawing it: its revision rows went with it.
+    const left = (holder.db as DatabaseSync)
+      .prepare("SELECT COUNT(*) AS n FROM process_step_revisions WHERE step_key = ?")
+      .get(mistake.stepKey) as { n: number }
+    expect(left.n).toBe(0)
+  })
+
+  it("deleting it twice is quiet — null, no second history line (R17)", async () => {
+    const processId = await mapWithThreeSteps()
+    await addStep(cfg, guard, staff, actor, { processId, name: "Twice", secondsPerRun: 60, runsPerPeriod: 1 })
+    const step = (await listProcessSteps(cfg, guard, staff, processId)).find((x) => x.name === "Twice")!
+    await deleteStep(cfg, guard, staff, actor, step.id)
+    expect(await deleteStep(cfg, guard, staff, actor, step.id)).toBeNull()
+  })
+
+  it("a step cut into an agreed version refuses, and says to switch it off", async () => {
+    const processId = await mapWithThreeSteps()
+    await cutVersion(cfg, guard, staff, actor, { processId, label: "Agreed" })
+    const step = (await listProcessSteps(cfg, guard, staff, processId))[0]
+    await expect(deleteStep(cfg, guard, staff, actor, step.id)).rejects.toMatchObject({
+      code: "step_agreed",
+    })
+  })
+
+  it("a loop's target refuses while the loop stands, and deletes once it is gone", async () => {
+    const processId = await mapWithThreeSteps()
+    const steps = await listProcessSteps(cfg, guard, staff, processId)
+    const target = steps[2] // "Set the renewal reminder"
+    await addStep(cfg, guard, staff, actor, {
+      processId,
+      name: "Check it went out",
+      secondsPerRun: 120,
+      runsPerPeriod: 40,
+      loopsBackTo: target.stepKey,
+    })
+    // Wait — the LOOPER is deletable; the TARGET is not. Prove both ways round.
+    const looper = (await listProcessSteps(cfg, guard, staff, processId)).find(
+      (x) => x.name === "Check it went out"
+    )!
+    await expect(deleteStep(cfg, guard, staff, actor, target.id)).rejects.toMatchObject({
+      code: "step_looped",
+    })
+    // Point the loop away and the target frees up.
+    await updateStep(cfg, guard, staff, actor, looper.id, {
+      name: looper.name,
+      secondsPerRun: looper.secondsPerRun,
+      runsPerPeriod: looper.runsPerPeriod,
+      loopsBackTo: null,
+    })
+    expect(await deleteStep(cfg, guard, staff, actor, target.id)).toBe(processId)
+  })
+
+  it("one branch of a fork deletes; its sibling stands alone again", async () => {
+    const processId = await mapWithThreeSteps()
+    const second = (await listProcessSteps(cfg, guard, staff, processId))[1]
+    await addStep(cfg, guard, staff, actor, {
+      processId,
+      name: "The other way",
+      secondsPerRun: 300,
+      runsPerPeriod: 40,
+      position: second.position,
+      branchLabel: "if it is urgent",
+    })
+    const branch = (await listProcessSteps(cfg, guard, staff, processId)).find(
+      (x) => x.name === "The other way"
+    )!
+    expect(await deleteStep(cfg, guard, staff, actor, branch.id)).toBe(processId)
+    const after = await listProcessSteps(cfg, guard, staff, processId)
+    expect(after.filter((x) => x.position === second.position)).toHaveLength(1)
   })
 })

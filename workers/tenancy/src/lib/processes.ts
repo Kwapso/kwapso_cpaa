@@ -2273,6 +2273,127 @@ export async function removeStep(
   return changed[0].process_id
 }
 
+/** THE STEP SHOULD NEVER HAVE EXISTED. The owner's ruling (25 Aug 2026), and a
+ * different verb from `removeStep` on purpose: STOPPING is a fact about the
+ * work — the row stays, its whole time becomes a saving — while DELETING is an
+ * admission the row was a mistake, and a mistake must not leave a saving, a
+ * slider stop or a baseline line behind it.
+ *
+ * WHAT IT REFUSES, and why each refusal keeps a number honest:
+ *   · a step CUT INTO ANY OTHER VERSION. An agreed version stays exactly as it
+ *     was agreed; deleting only the live copy would make the step "vanish"
+ *     between versions and silently drop it out of the savings join — the
+ *     precise corruption `removeStep`'s header warns about.
+ *   · a LOOP'S TARGET. Another step's "sends the work back to" would point at
+ *     nothing, and the picture would draw an arrow to a step that is not there.
+ *
+ * BOTH predicates RIDE THE DELETE as NOT EXISTS clauses (CONCURRENCY.md: the
+ * check that matters is the one in the same statement as the write — a loop
+ * added between a read and a write must still refuse). The reads before it
+ * exist only to name the refusal: "zero rows moved" alone cannot say WHICH rule
+ * refused, and a person deserves the sentence, not the shrug.
+ *
+ * THE HISTORY GOES WITH IT. `process_step_revisions` rows for this step_key are
+ * deleted too — an accidental step never officially existed, and rows left
+ * behind would keep drawing it on the date slider for ever. This is the one
+ * place in the module that hard-deletes, which is exactly why it is fenced to
+ * the never-agreed, never-referenced case above.
+ *
+ * R17, delete-shaped: the row already being gone is zero rows moved — no
+ * activity line, no ping, a quiet null. */
+export async function deleteStep(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string
+): Promise<string | null> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{
+    process_id: string
+    version_id: string
+    step_key: string
+    name: string
+  }>(
+    cfg,
+    guard.databaseId,
+    `SELECT process_id, version_id, step_key, name FROM process_steps
+     ${where([fence.sql, "id = ?"])} LIMIT 1`,
+    [...fence.params, id]
+  )
+  if (!rows[0]) return null
+  const before = rows[0]
+
+  // The three named refusals, read here so each can say its own sentence. The
+  // statement below re-checks all three in the same breath as the write.
+  if (!(await isInLatestVersion(cfg, guard, scope, id)))
+    throw new GuardError(
+      409,
+      "not_latest",
+      "That step belongs to an older version of the process. Only the current version can be changed."
+    )
+  const agreed = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM process_steps
+     ${where([fence.sql, "process_id = ?", "step_key = ?", "id <> ?"])}`,
+    [...fence.params, before.process_id, before.step_key, id]
+  )
+  if ((agreed[0]?.n ?? 0) > 0)
+    throw new GuardError(
+      409,
+      "step_agreed",
+      "That step is already part of an agreed version, and versions stay exactly as they were agreed. Switch it off instead."
+    )
+  const loopedFrom = await d1Query<{ name: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT name FROM process_steps
+     ${where([fence.sql, "version_id = ?", "loops_back_to = ?", "id <> ?", "removed_at IS NULL"])} LIMIT 1`,
+    [...fence.params, before.version_id, before.step_key, id]
+  )
+  if (loopedFrom[0])
+    throw new GuardError(
+      409,
+      "step_looped",
+      `"${loopedFrom[0].name}" sends work back to this step. Point that somewhere else first, or switch this step off instead.`
+    )
+
+  const changed = await d1Query<{ process_id: string }>(
+    cfg,
+    guard.databaseId,
+    `DELETE FROM process_steps
+     ${where([
+       fence.sql,
+       "id = ?",
+       // …only in the newest version,
+       "version_id = (SELECT id FROM process_versions v WHERE v.process_id = process_steps.process_id ORDER BY v.version_no DESC LIMIT 1)",
+       // …never once another version holds a copy,
+       "NOT EXISTS (SELECT 1 FROM process_steps o WHERE o.process_id = process_steps.process_id AND o.step_key = process_steps.step_key AND o.id <> process_steps.id)",
+       // …and never while a live step sends work back to it.
+       "NOT EXISTS (SELECT 1 FROM process_steps l WHERE l.version_id = process_steps.version_id AND l.loops_back_to = process_steps.step_key AND l.id <> process_steps.id AND l.removed_at IS NULL)",
+     ])} RETURNING process_id`,
+    [...fence.params, id]
+  )
+  if (!changed[0]) return null
+
+  // The revisions go with the row — fenced the same way, keyed the same way.
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `DELETE FROM process_step_revisions
+     ${where([fence.sql, "process_id = ?", "step_key = ?"])}`,
+    [...fence.params, before.process_id, before.step_key]
+  )
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Step deleted",
+    description: `${actor.name} deleted the step "${before.name}" — added by mistake, never part of an agreed version`,
+    relatedTable: "process_steps",
+    relatedRowId: id,
+  })
+  return changed[0].process_id
+}
+
 // ── the version cut ──────────────────────────────────────────────────────────
 
 /** CUT A NEW VERSION: copy the current version's steps forward, keeping every

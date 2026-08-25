@@ -2534,3 +2534,45 @@ describe("a tab strip is not nested inside another one", () => {
     ).toEqual([])
   })
 })
+
+// EVERY TAB IS IN THE VOCABULARY.
+//
+// The owner's rule (25 Aug 2026): a tab always carries an icon, and the same
+// tab means the same icon on every screen. TabsView enforces the rendering half
+// (TAB_ICONS wins over call sites, a folder tab falls back to the folder glyph
+// rather than shipping bare) — this census enforces the deciding half: a NEW
+// tab value must be given its own line in the vocabulary, so the fallback is a
+// net under a decision and never the decision itself. Derived, not remembered:
+// tab objects are the only shape in either app carrying `badgeVariant`, so the
+// census keys on that and reads the values beside it.
+describe("every tab value has an icon in the vocabulary", () => {
+  it("tab-icons: each tab value used by either app is a TAB_ICONS key", () => {
+    const vocab = read(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx"))
+    const table = vocab.slice(vocab.indexOf("TAB_ICONS"), vocab.indexOf("}", vocab.indexOf("TAB_ICONS")))
+    const known = new Set([...table.matchAll(/^\s*"?([a-z0-9-]+)"?:\s*"/gm)].map((m) => m[1]))
+    expect(known.size, "the TAB_ICONS table went missing or unreadable").toBeGreaterThan(20)
+
+    const missing = new Map<string, string>()
+    let scanned = 0
+    for (const f of [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+      { path: join(WEB, "lib", "screens.ts") },
+    ]) {
+      const src = read(f.path)
+      for (const m of src.matchAll(/badgeVariant/g)) {
+        const back = src.slice(Math.max(0, m.index - 600), m.index)
+        const values = [...back.matchAll(/value:\s*"([a-z0-9_-]+)"/g)]
+        const value = values.at(-1)?.[1]
+        if (!value) continue
+        scanned++
+        if (!known.has(value)) missing.set(value, f.path.replace(ROOT + "/", ""))
+      }
+    }
+    expect(scanned, "the tab census found nothing — its signature stopped matching").toBeGreaterThan(30)
+    expect(
+      [...missing.entries()].map(([v, f]) => `${v} (${f})`),
+      "these tab values have no line in TAB_ICONS (shared/web/screen-engine/tabs-view.tsx) — give each an icon there, so the same tab draws the same glyph on every screen"
+    ).toEqual([])
+  })
+})

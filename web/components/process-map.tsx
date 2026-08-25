@@ -25,9 +25,14 @@
 // was added or dropped.
 //
 // COLOUR CARRIES ONE THING ONLY: whether the step got faster, slower, or went
-// away. Everything else is the neutral surface, because five colours on a
-// diagram is five decisions a reader has to make before they can read it. The
-// tokens are the closed palette's own (R32) — no ramps, no hex.
+// away — and it is painted on the NEWER side alone. Both boxes of a pair used
+// to take the tone, and on a phone (where the pair stacks) the owner read the
+// result as soup: "with this whole mix of colours, it's a bit difficult to
+// understand the difference between version 1 and version 2". The old box is
+// the quiet past (muted fill, always); the new box says what changed; a short
+// version chip on each box says WHICH version it is without re-reading a full
+// label nine times. The tokens are the closed palette's own (R32) — no ramps,
+// no hex.
 
 import * as React from "react"
 
@@ -94,18 +99,47 @@ const TONE_CLASS: Record<Tone, string> = {
   new: "border-chart-1/50 bg-chart-1/5",
 }
 
-function StepBox({ step, tone, t }: { step: ProcessStep | null; tone: Tone; t: (s: string) => string }) {
+/** The OLDER side's one look: the quiet past. Never a change tone — the change
+ * is a fact about where the step ENDED UP, and saying it twice per line is the
+ * colour soup the owner reported. */
+const OLD_CLASS = "border-border bg-muted/40"
+
+function StepBox({
+  step,
+  tone,
+  side,
+  chip,
+  t,
+}: {
+  step: ProcessStep | null
+  tone: Tone
+  side: "old" | "new"
+  /** the short version name on the box's shoulder — "Version 1" — so a stacked
+   * pair on a phone stays legible without a full label over every box */
+  chip?: string
+  t: (s: string) => string
+}) {
   // AN ABSENT STEP IS DRAWN, not skipped. A gap opposite its pair is what says
   // "this did not exist in that version"; leaving the line short would just look
   // like the two columns had drifted.
   if (!step)
     return (
       <div className="border-border/50 text-muted-foreground rounded-xl border border-dashed p-3 text-xs">
+        {chip ? <span className="mr-2 font-medium">{chip}</span> : null}
         {t("Not in this version")}
       </div>
     )
   return (
-    <div className={`rounded-xl border p-3 ${TONE_CLASS[tone]}`}>
+    <div className={`relative rounded-xl border p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
+      {chip ? (
+        <span
+          className={`float-right ms-2 rounded-full px-2 py-0.5 text-[0.625rem] font-medium ${
+            side === "old" ? "bg-muted text-muted-foreground" : "bg-foreground text-background"
+          }`}
+        >
+          {chip}
+        </span>
+      ) : null}
       <p className="text-sm font-medium">{step.name}</p>
       <p className="text-muted-foreground mt-1 text-xs">
         {[
@@ -128,12 +162,19 @@ export function ProcessMap({
   right,
   leftLabel,
   rightLabel,
+  leftShort,
+  rightShort,
 }: {
   /** the OLDER version's steps, or null to draw one version on its own */
   left: ProcessStep[] | null
   right: ProcessStep[]
   leftLabel?: string
   rightLabel?: string
+  /** the two-word version names for the box chips — "Version 1", "Version 2".
+   * Full labels are said ONCE in the legend; nine repetitions of "Version 1,
+   * How it worked before (baseline)" is what made the stacked view unreadable. */
+  leftShort?: string
+  rightShort?: string
 }) {
   const t = useT()
   const lines = left ? alignVersions(left, right) : right.map((s) => ({ stepKey: s.stepKey, left: null, right: s }))
@@ -142,12 +183,22 @@ export function ProcessMap({
   return (
     <div className="flex flex-col gap-3">
       {comparing && (
-        // The two column headings, at the width the columns appear. Below `lg`
-        // the columns stack, so a heading row would be two words with nothing
-        // under them — it is hidden there and each box carries its own label.
-        <div className="text-muted-foreground hidden gap-3 text-xs font-medium lg:grid lg:grid-cols-2">
-          <span>{leftLabel}</span>
-          <span>{rightLabel}</span>
+        // The legend: the full names, said once, at every width — on a phone it
+        // is the ONLY place they appear in full; each box carries its short
+        // chip instead.
+        <div className="text-muted-foreground flex flex-col gap-1 text-xs font-medium lg:grid lg:grid-cols-2 lg:gap-3">
+          <span>
+            <span className="bg-muted text-muted-foreground me-1.5 rounded-full px-2 py-0.5 text-[0.625rem]">
+              {leftShort}
+            </span>
+            {leftLabel}
+          </span>
+          <span>
+            <span className="bg-foreground text-background me-1.5 rounded-full px-2 py-0.5 text-[0.625rem]">
+              {rightShort}
+            </span>
+            {rightLabel}
+          </span>
         </div>
       )}
       <ol className="flex flex-col gap-3">
@@ -156,18 +207,12 @@ export function ProcessMap({
           return (
             <li key={line.stepKey} className="flex flex-col gap-3">
               {comparing ? (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-xs lg:hidden">{leftLabel}</span>
-                    <StepBox step={line.left} tone={tone} t={t} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-xs lg:hidden">{rightLabel}</span>
-                    <StepBox step={line.right} tone={tone} t={t} />
-                  </div>
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 lg:gap-3">
+                  <StepBox step={line.left} tone={tone} side="old" chip={leftShort} t={t} />
+                  <StepBox step={line.right} tone={tone} side="new" chip={rightShort} t={t} />
                 </div>
               ) : (
-                <StepBox step={line.right} tone={tone} t={t} />
+                <StepBox step={line.right} tone={tone} side="new" t={t} />
               )}
               {/* THE CONNECTOR, and only between steps — never after the last
                   one, which would be an arrow pointing at nothing. */}

@@ -70,7 +70,7 @@ import {
 } from "@shared/ui/controls/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { Comments } from "@shared/ui/structures/comments/comments"
-import { Ban, GitBranch, ListOrdered, Pencil, Plus, Power } from "@shared/ui/icons"
+import { Ban, GitBranch, ListOrdered, Pencil, Plus, Power, Trash2 } from "@shared/ui/icons"
 
 import type {
   ClientRole,
@@ -132,7 +132,7 @@ import { ProcessMap } from "@/components/process-map"
  * what somebody called it. Written once so the picker, the banner and the
  * versions list cannot describe the same version three ways. */
 function versionLabel(v: ProcessVersion): string {
-  return `Version ${v.versionNo}${v.label ? `, ${v.label}` : ""}${v.isBaseline ? "(baseline)" : ""}`
+  return `Version ${v.versionNo}${v.label ? `, ${v.label}` : ""}${v.isBaseline ? " (baseline)" : ""}`
 }
 
 /** One step's whole monthly cost: how long it takes, times how often it happens.
@@ -303,29 +303,12 @@ export function ProcessDetailScreen({
   }
 
   async function saveStep(values: StepFormValues) {
-    // PICK-OR-CREATE. A role or a tool typed rather than picked is created FIRST,
-    // and its new id is what the step is saved with. It happens here rather than
-    // inside the step door because creating a client's role is a different
-    // permission and a different record — folding it into the step write would
-    // hide one behind the other.
-    let roleId = values.roleId
-    let toolId = values.toolId
-    if (values.newRoleName && process.accountId) {
-      const made = await tenancy.createClientRole({
-        accountId: process.accountId,
-        name: values.newRoleName,
-      })
-      roleId = made.id
-      invalidate(clientRolesKey(teamId))
-    }
-    if (values.newToolName && process.accountId) {
-      const made = await tenancy.createClientTool({
-        accountId: process.accountId,
-        name: values.newToolName,
-      })
-      toolId = made.id
-      invalidate(clientToolsKey(teamId))
-    }
+    // Roles and tools are PICKED here and MANAGED on the client's record — the
+    // form's own link goes there. The create path this function carried for one
+    // day (24–25 Aug 2026) is gone by the owner's ruling: a dropdown offers
+    // what a section manages, it does not mint records of its own.
+    const roleId = values.roleId
+    const toolId = values.toolId
     if (editingStep)
       await tenancy.updateStep({
         id: editingStep.id,
@@ -797,6 +780,12 @@ export function ProcessDetailScreen({
                           : undefined
                       }
                       rightLabel={shownVersion ? versionLabel(shownVersion) : undefined}
+                      leftShort={
+                        againstId
+                          ? `V${(versions.find((v) => v.id === againstId) ?? shownVersion!).versionNo}`
+                          : undefined
+                      }
+                      rightShort={shownVersion ? `V${shownVersion.versionNo}` : undefined}
                     />
                   </div>
                 ) : shownSteps.length === 0 ? (
@@ -911,6 +900,39 @@ export function ProcessDetailScreen({
                                             () => tenancy.removeStep(step.id),
                                             t("Step recorded as no longer done."),
                                             t("Couldn't record that.")
+                                          ),
+                                      }),
+                                  },
+                                ]
+                              : []),
+                            // DELETE, for the step that should never have
+                            // existed (owner, 25 Aug 2026). Distinct from
+                            // Stopped on purpose: stopping is a FACT about the
+                            // work and the largest saving there is; deleting is
+                            // an admission the row was a mistake. The door
+                            // refuses when the step is woven in — cut into an
+                            // agreed version, or a loop's target — and its
+                            // refusal names the reason.
+                            ...(canArchive && isCurrent
+                              ? [
+                                  {
+                                    key: "delete",
+                                    label: t("Delete"),
+                                    icon: <Trash2 className="size-3.5" />,
+                                    disabled: busy,
+                                    destructive: true,
+                                    onSelect: () =>
+                                      setConfirm({
+                                        title: t('Delete "{step}" completely?', { step: step.name }),
+                                        body: t(
+                                          "For a step added by mistake: it disappears from the map and its history, as if it was never added, and this cannot be undone. A step that is already part of an agreed version, or that another step sends work back to, can only be switched off."
+                                        ),
+                                        action: t("Delete it"),
+                                        run: () =>
+                                          run(
+                                            () => tenancy.deleteStep(step.id),
+                                            t("Step deleted."),
+                                            t("Couldn't delete it.")
                                           ),
                                       }),
                                   },
@@ -1120,6 +1142,11 @@ export function ProcessDetailScreen({
           /* The position rides along so "beside this one" can resolve to the
              number the door wants — two steps at one position are a fork. */
           .map((x) => ({ stepKey: x.stepKey, name: x.name, position: x.position }))}
+        manageHref={
+          process.accountId && teamId
+            ? `/t/${teamId}/accounts/${process.accountId}?tab=organisation`
+            : null
+        }
         initial={
           editingStep
             ? {
@@ -1132,6 +1159,7 @@ export function ProcessDetailScreen({
                 toolId: editingStep.toolId,
                 branchLabel: editingStep.branchLabel,
                 loopsBackTo: editingStep.loopsBackTo,
+                position: editingStep.position,
               }
             : undefined
         }

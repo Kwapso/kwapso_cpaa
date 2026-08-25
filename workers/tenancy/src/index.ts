@@ -65,6 +65,7 @@
 //   POST /api/tenancy/processes/steps      -> add a step to the current version
 //   POST /api/tenancy/processes/steps/update -> edit a step (current version only)
 //   POST /api/tenancy/processes/steps/remove -> the step no longer happens
+//   POST /api/tenancy/processes/steps/delete -> a mistaken add, gone completely
 //   POST /api/tenancy/processes/versions   -> cut a version (button, or a sprint's id)
 //   GET  /api/tenancy/processes/comments   -> the conversation on a map (?processId)
 //   POST /api/tenancy/processes/comments   -> comment on a map (clients too)
@@ -198,6 +199,7 @@ import {
   postProcessActive,
   postProcessComment,
   postRemoveStep,
+  postDeleteStep,
   postUnlinkProcesses,
   postUpdateApp,
   postUpdateProcess,
@@ -351,6 +353,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/processes/steps": { handler: postAddStep, kind: "mutation" },
   "POST /api/tenancy/processes/steps/update": { handler: postUpdateStep, kind: "mutation" },
   "POST /api/tenancy/processes/steps/remove": { handler: postRemoveStep, kind: "mutation" },
+  "POST /api/tenancy/processes/steps/delete": { handler: postDeleteStep, kind: "mutation" },
   "POST /api/tenancy/processes/versions": { handler: postCutVersion, kind: "mutation" },
   "GET /api/tenancy/processes/comments": { handler: getProcessComments, kind: "read" },
   "POST /api/tenancy/processes/comments": { handler: postProcessComment, kind: "mutation" },

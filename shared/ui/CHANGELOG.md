@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.0.3 — 2026-08-25
+
+A patch off `v1.0.2`. Two changes to one structure, and like the two before it
+this does NOT carry the restructure under *Unreleased*: an app pinned to the
+v1.0.x line takes it without moving an import.
+
+### Changed — the rejoin gathers every branch
+
+`structures/flowchart/flowchart.tsx` drew a fork's rejoin as ONE elbow from
+ONE branch (`continues`, "the first wins"). Read on a real process map, that
+says only that branch carries on — the owner's exact reading: "if it's a join,
+then both splits … should be drawn from all of them." The elbow is replaced by
+a merge rail, the mirror of the fork above: every branch column drops a rail
+down its own remaining height (so uneven branches meet the run cleanly), one
+horizontal run spans the outer centres, one centre drop carries on to the
+trunk. Marking ANY branch `continues` now draws the full merge; a fork whose
+ways never meet again still marks none and draws nothing.
+
+### Added — return lines for loops
+
+A `FlowNode` may name `loopTo`: the id of an earlier node the work goes back
+to. The chart draws it as a dashed 1px return line up the left margin in
+ink-tertiary, one lane per loop so two never share a rail, with an arrowhead
+where the work lands. Measured off the DOM after layout (the tree is DOM, so
+the browser's geometry is the only honest one) and re-measured on resize. The
+line is a cue, not a sentence — the words on the node stay the call site's.
+
 ## v1.0.2 — 2026-08-25
 
 A patch off `v1.0.1`. One fix, and like v1.0.1 it does NOT carry the

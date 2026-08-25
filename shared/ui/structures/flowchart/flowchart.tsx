@@ -157,6 +157,14 @@ export interface FlowNode {
   condition?: React.ReactNode;
   /** A glyph of the call site's own, in place of the kind's. */
   icon?: React.ReactNode;
+  /**
+   * The id of an EARLIER node this step sends the work back to. Drawn as a
+   * dashed return line up the left margin, one lane per loop, with an
+   * arrowhead where it lands — the quiet cue that a reader can follow with a
+   * finger. The words on the node ("sends it back to step 3") stay the call
+   * site's own; the line never replaces the sentence.
+   */
+  loopTo?: string;
 }
 
 export interface FlowBranch {
@@ -165,10 +173,13 @@ export interface FlowBranch {
   /** Steps below it, stacked with a connector between each. */
   chain?: FlowNode[];
   /**
-   * This branch RE-JOINS the trunk: an elbow is drawn from its centre back to
-   * the middle and the tree carries on below. The artifact draws exactly one
-   * per fork ("Approved (left third) re-centers to the trunk"). If more than
-   * one is marked, the first wins — two trunks is not a tree.
+   * This fork RE-JOINS the trunk below it. Marking ANY branch draws the
+   * rejoin, and the rejoin gathers EVERY branch: each column drops a rail to
+   * one horizontal run, and one centre drop carries on to the trunk — the
+   * mirror of the fork above. (It was one elbow from one branch, and the owner
+   * read it as only that branch continuing: "if it's a join, then both splits
+   * … should be drawn from all of them", 25 Aug 2026.) A fork whose ways never
+   * meet again marks none.
    */
   continues?: boolean;
 }
@@ -229,6 +240,66 @@ export interface FlowchartProps extends Omit<React.ComponentPropsWithoutRef<"div
   emptyBody?: string;
   errorLabel?: string;
   errorBody?: string;
+}
+
+
+/* ----------------------------------------------------------------------------
+   The RETURN LINES. A step that sends the work back says so in words on its
+   own face (the call site's sentence); this layer adds the line a finger can
+   follow — dashed, up the left margin, one lane per loop so two loops never
+   share a rail, an arrowhead where the work lands. Measured off the DOM after
+   layout (the tree is DOM, not SVG, so the only honest geometry is the
+   browser's own), re-measured whenever the tree resizes, and drawn in
+   ink-tertiary at 1px dashed — quieter than a node, louder than a hairline.
+   ------------------------------------------------------------------------- */
+type LoopPath = { d: string; arrow: string; key: string };
+
+function measureLoops(
+  container: HTMLElement,
+  loops: { from: string; to: string }[],
+): LoopPath[] {
+  const box = container.getBoundingClientRect();
+  const rectOf = (id: string) => {
+    const el = container.querySelector(`[data-flow-id="${CSS.escape(id)}"]`);
+    return el ? el.getBoundingClientRect() : null;
+  };
+  /* Outer loops take the outer lanes: sort by the vertical span they cover so
+     a loop nested inside another never crosses it. */
+  const measured = loops
+    .map((l, i) => {
+      const from = rectOf(l.from);
+      const to = rectOf(l.to);
+      if (!from || !to) return null;
+      return {
+        key: `${l.from}->${l.to}`,
+        x1: from.left - box.left,
+        y1: from.top - box.top + from.height / 2,
+        x2: to.left - box.left,
+        y2: to.top - box.top + to.height / 2,
+        span: Math.abs(from.top - to.top),
+        i,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => a.span - b.span);
+
+  const LANE = 8;
+  const R = 6;
+  return measured.map((m, lane) => {
+    const inner = Math.min(m.x1, m.x2);
+    const lx = Math.max(3, inner - 12 - lane * LANE);
+    const up = m.y2 < m.y1 ? -1 : 1;
+    const d =
+      `M ${m.x1} ${m.y1} ` +
+      `L ${lx + R} ${m.y1} ` +
+      `Q ${lx} ${m.y1} ${lx} ${m.y1 + up * R} ` +
+      `L ${lx} ${m.y2 - up * R} ` +
+      `Q ${lx} ${m.y2} ${lx + R} ${m.y2} ` +
+      `L ${m.x2 - 2} ${m.y2}`;
+    const ax = m.x2 - 2;
+    const arrow = `M ${ax} ${m.y2} l -5 -3.5 l 0 7 Z`;
+    return { d, arrow, key: m.key };
+  });
 }
 
 /* ----------------------------------------------------------------------------
@@ -322,6 +393,42 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
   ) => {
     const compact = density === "compact";
 
+    /* Every (from, to) pair the tree declares, wherever the node sits. */
+    const loops = React.useMemo(() => {
+      const out: { from: string; to: string }[] = [];
+      const ids = new Set<string>();
+      const see = (n: FlowNode) => {
+        ids.add(n.id);
+        if (n.loopTo) out.push({ from: n.id, to: n.loopTo });
+      };
+      for (const step of steps) {
+        if (step.type === "branch") {
+          for (const b of step.branches) {
+            see(b.node);
+            for (const n of b.chain ?? []) see(n);
+          }
+        } else see(step.node);
+      }
+      return out.filter((l) => ids.has(l.to) && l.to !== l.from);
+    }, [steps]);
+
+    const treeRef = React.useRef<HTMLDivElement | null>(null);
+    const [loopPaths, setLoopPaths] = React.useState<LoopPath[]>([]);
+    React.useLayoutEffect(() => {
+      const el = treeRef.current;
+      if (!el || loops.length === 0) {
+        setLoopPaths((prev) => (prev.length === 0 ? prev : []));
+        return;
+      }
+      const draw = () => setLoopPaths(measureLoops(el, loops));
+      draw();
+      /* The tree reflows when a label wraps, the text size changes, or the
+         panel resizes — the observer is what keeps the lines attached. */
+      const ro = new ResizeObserver(draw);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }, [loops, steps, density]);
+
     /* Exclusive states resolved in JS (PATTERN §4). */
     const state = loading
       ? "loading"
@@ -388,6 +495,7 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
         <Card
           key={node.id}
           data-slot="flow-node"
+          data-flow-id={node.id}
           data-tone={tone}
           data-selected={selected || undefined}
           variant={TONE_VARIANT[tone]}
@@ -473,6 +581,7 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
       return (
         <div
           data-slot="flow-decision"
+          data-flow-id={node.id}
           data-tone={tone}
           data-selected={selected || undefined}
           className={cn("relative shrink-0", diamondBox)}
@@ -511,35 +620,28 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
       </div>
     );
 
-    /* ---- the elbow that re-centres one branch onto the trunk ------------- */
-    const renderElbow = (index: number, count: number) => {
-      const from = centreOf(index, count);
-      const mid = index < (count - 1) / 2;
-
-      return (
-        <div
-          aria-hidden="true"
-          className={cn("relative h-[2.375rem] w-full", forkWidth)}
-        >
-          <span
-            className={cn("absolute top-0 h-[1.125rem] w-px -translate-x-1/2", RAIL)}
-            style={{ insetInlineStart: from }}
-          />
-          <span
-            className={cn("absolute top-[1.125rem] h-px", RAIL)}
-            style={
-              mid
-                ? { insetInlineStart: from, insetInlineEnd: "50%" }
-                : { insetInlineStart: "50%", insetInlineEnd: `${100 - parseFloat(from)}%` }
-            }
-          />
-          <span
-            className={cn("absolute top-[1.125rem] h-[1.125rem] w-px -translate-x-1/2", RAIL)}
-            style={{ insetInlineStart: "50%" }}
-          />
-        </div>
-      );
-    };
+    /* ---- the merge rail that gathers every branch back onto the trunk ----
+       The MIRROR of the fork: one horizontal run spanning the outer branch
+       centres, fed by the stretchy drops each branch column already drew down
+       its own remaining height (see the branch cells), and one centre drop
+       carrying on. It replaced a single elbow from a single branch, which the
+       owner read — correctly — as only that branch continuing. */
+    const renderMerge = (count: number) => (
+      <div
+        aria-hidden="true"
+        data-slot="flow-merge"
+        className={cn("relative w-full", forkRail, forkWidth)}
+      >
+        <span
+          className={cn("absolute top-0 h-px", RAIL)}
+          style={{ insetInlineStart: centreOf(0, count), insetInlineEnd: centreOf(0, count) }}
+        />
+        <span
+          className={cn("absolute top-0 w-px -translate-x-1/2", forkRail, RAIL)}
+          style={{ insetInlineStart: "50%" }}
+        />
+      </div>
+    );
 
     /* ---- the whole tree --------------------------------------------------- */
     const renderSteps = () => {
@@ -569,7 +671,8 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
         }
 
         const count = step.branches.length;
-        const continues = step.branches.findIndex((b) => b.continues === true);
+        /* ANY branch marked = the fork rejoins, and the rejoin gathers all. */
+        const rejoins = !last && step.branches.some((b) => b.continues === true);
 
         out.push(
           <React.Fragment key={`b-${index}`}>
@@ -609,10 +712,19 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
                       {renderNode(node, "branch")}
                     </div>
                   ))}
+                  {/* THE DROP TO THE MERGE. Grid cells stretch to the tallest
+                      branch, so a SHORT branch's rail has ground to cover
+                      before the horizontal run — flex-1 is exactly that
+                      remaining height, and on the tallest branch it is the
+                      ordinary connector gap. Drawn only when the fork rejoins:
+                      a fork whose ways end draws nothing below its leaves. */}
+                  {rejoins ? (
+                    <span aria-hidden="true" className={cn("w-px flex-1", chainGap, RAIL)} />
+                  ) : null}
                 </div>
               ))}
             </div>
-            {!last && continues >= 0 ? renderElbow(continues, count) : null}
+            {rejoins ? renderMerge(count) : null}
             </div>
           </React.Fragment>,
         );
@@ -668,8 +780,31 @@ const Flowchart = React.forwardRef<HTMLDivElement, FlowchartProps>(
             data-slot="flowchart-tree"
             className="flex min-w-0 flex-1 flex-col overflow-x-auto"
           >
-            <div className="flex min-w-max flex-col items-center px-1 pt-[var(--space-2h)] pb-1">
+            <div
+              ref={treeRef}
+              className="relative flex min-w-max flex-col items-center px-1 pt-[var(--space-2h)] pb-1"
+            >
               {renderSteps()}
+              {loopPaths.length > 0 ? (
+                <svg
+                  aria-hidden="true"
+                  data-slot="flow-loops"
+                  className="pointer-events-none absolute inset-0 size-full overflow-visible text-ink-tertiary"
+                >
+                  {loopPaths.map((l) => (
+                    <g key={l.key}>
+                      <path
+                        d={l.d}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        strokeDasharray="3 3"
+                      />
+                      <path d={l.arrow} fill="currentColor" stroke="none" />
+                    </g>
+                  ))}
+                </svg>
+              ) : null}
             </div>
           </div>
         ) : null}

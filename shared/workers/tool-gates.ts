@@ -199,6 +199,7 @@ export const TOOL_GATES: Record<string, string> = {
   add_process_step: "processes:create",
   update_process_step: "processes:edit",
   remove_process_step: "processes:delete",
+  delete_process_step: "processes:delete",
   cut_process_version: "processes:create",
   // MOVING THE AUDIT DATE IS AN EDIT ON THE MAP, not a new record — it changes
   // which agreed version counts as the "before" and therefore every figure the
