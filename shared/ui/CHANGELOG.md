@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.0.2 — 2026-08-25
+
+A patch off `v1.0.1`. One fix, and like v1.0.1 it does NOT carry the
+restructure described under *Unreleased* below, so an app pinned to the v1.0.x
+line can take it without moving a single import.
+
+### Fixed — a Select inside a Dialog opened behind it
+
+`controls/select/select.tsx` put its portalled list at `z-50`. The system's
+layers are sheet 55, dialog and alert-dialog 60, then popover, dropdown-menu,
+tooltip and hover-card at 70 — the four anchored surfaces that must clear a
+dialog, because a dialog is where a form lives and a form is where you pick
+things. Select was the only portalled surface left under that line.
+
+Inside a dialog the list was painted behind the dialog it was opened from:
+options visible, every click landing on the dialog in front. On a phone, where
+the list fills most of the screen, the effect is a form whose pickers do not
+work at all — reported from a handset with three dead pickers on one form.
+
+Raised to `z-[70]`, which is the layer the kit already assigns to "anchored to
+a control, must clear a dialog". `date-picker`'s panel also reads `z-50` and is
+deliberately untouched: it is `absolute`, not portalled, so its number is scoped
+to its own field rather than to the overlay stack.
+
 ## v1.0.1 — 2026-08-25
 
 A patch off `v1.0.0`. It carries **one fix and nothing else** — in particular
