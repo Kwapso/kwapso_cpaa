@@ -931,6 +931,8 @@ type SprintRow = {
   account_name: string | null
   app_id: string | null
   app_name: string | null
+  wave_id: string | null
+  wave_name: string | null
   starts_on: string | null
   ends_on: string | null
   sold_price_cents: number
@@ -944,10 +946,14 @@ type SprintRow = {
 }
 
 const SPRINT_COLS = `sp.id, sp.ref, sp.name, sp.goal, sp.sprint_type, sp.account_id, sp.app_id,
-  sp.starts_on, sp.ends_on, sp.sold_price_cents, sp.currency, sp.completed_at, sp.deactivated_at,
-  sp.created_at, sp.creator_name,
+  sp.wave_id, sp.starts_on, sp.ends_on, sp.sold_price_cents, sp.currency, sp.completed_at,
+  sp.deactivated_at, sp.created_at, sp.creator_name,
   (SELECT a.name FROM accounts a WHERE a.id = sp.account_id) AS account_name,
   (SELECT ap.name FROM apps ap WHERE ap.id = sp.app_id) AS app_name,
+  -- The package it was sold inside. A sub-select like the two above it, and for
+  -- the same reason: the name travels with the row so a sprint can be read
+  -- without a second lookup, and an old sprint still says the wave it was in.
+  (SELECT w.name FROM waves w WHERE w.id = sp.wave_id) AS wave_name,
   (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id) AS story_count,
   (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id AND s.status <> 'done') AS open_story_count`
 
@@ -962,6 +968,8 @@ function toSprint(r: SprintRow): Sprint {
     accountName: r.account_name,
     appId: r.app_id,
     appName: r.app_name,
+    waveId: r.wave_id,
+    waveName: r.wave_name,
     startsOn: r.starts_on,
     endsOn: r.ends_on,
     soldPriceCents: r.sold_price_cents,

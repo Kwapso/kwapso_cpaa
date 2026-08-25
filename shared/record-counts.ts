@@ -115,6 +115,10 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     { key: "apps-account", module: "processes", resource: "apps", door: "tenancy" },
     // What we have SOLD them, and what we are waiting on them for.
     { key: "sprints-account", module: "work", resource: "sprints", door: "content" },
+    // …and the PACKAGES those sprints were sold inside. Same module as a sprint
+    // (a wave is a package of them) and the tenancy door, because that is the
+    // worker that owns the table.
+    { key: "waves-account", module: "work", resource: "waves", door: "tenancy" },
     { key: "todos-account", module: "todos", resource: "todos", door: "content" },
     // A PERSON's three. `tickets-account` and `meetings-account` are read on the
     // contact screen; a company's screen never draws them, and priming a sidecar

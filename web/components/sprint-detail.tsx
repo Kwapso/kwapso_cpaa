@@ -162,6 +162,25 @@ export function SprintDetailScreen({
     { label: t("Type"), value: kindLine },
     { label: t("Client"), value: sprint.accountName || "Ours, no client" },
     { label: t("App"), value: sprint.appName || "—" },
+    // THE PACKAGE IT WAS SOLD INSIDE. A sprint can be sold on its own, so "—" is
+    // an ordinary answer rather than a gap. Where there IS a wave the name is a
+    // way in: a reader who wants to know what else was in the package should not
+    // have to go and look for it by name.
+    {
+      label: t("Wave"),
+      value:
+        sprint.waveId && sprint.waveName ? (
+          <button
+            type="button"
+            onClick={() => softNavigate(`${host.base}/waves/${sprint.waveId}`)}
+            className="hover:text-foreground text-left underline-offset-2 hover:underline"
+          >
+            {sprint.waveName}
+          </button>
+        ) : (
+          "—"
+        ),
+    },
     { label: t("What it's for"), value: sprint.goal ? <RichText html={sprint.goal} /> : "—" },
     {
       label: t("Runs"),

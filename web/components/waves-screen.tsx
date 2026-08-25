@@ -41,6 +41,13 @@ import { toast } from "@shared/ui/controls/sonner/sonner"
 import { Pencil, Power, RotateCcw } from "@shared/ui/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
+import {
+  EMPTY_WAVE_QUERY,
+  WaveFinder,
+  selectWaves,
+  waveQueryIsActive,
+  type WaveQuery,
+} from "@/components/wave-finder"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { InAppLink } from "@/components/in-app-link"
 import { WaveFormDialog } from "@/components/wave-form-dialog"
@@ -73,13 +80,25 @@ export function fetchWaves(teamId: string): Promise<Wave[]> {
   })
 }
 
-export function WavesScreen({
+/**
+ * THE WAVES COLLECTION, wherever it is drawn.
+ *
+ * The sidebar page and the client's own record show the SAME list with the same
+ * search, the same sort and the same actions; the only difference is whether the
+ * client is already decided. So it is one component with one optional argument,
+ * rather than two lists that agree until somebody edits one of them.
+ */
+export function WaveCollection({
   teamId,
   basePath,
+  accountId,
 }: {
   teamId: string
   /** the waves list in the URL form we arrived through (/waves or /t/<team>/waves) */
   basePath: string
+  /** set on a client's own record: the list is that client's, and the client
+   * filter is not offered because it has already been answered */
+  accountId?: string
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
@@ -96,6 +115,7 @@ export function WavesScreen({
   // so opening this page adds no round trip for a team that has been there.
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
 
+  const [query, setQuery] = React.useState<WaveQuery>(EMPTY_WAVE_QUERY)
   const [addOpen, setAddOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Wave | null>(null)
   const [switchingOff, setSwitchingOff] = React.useState<Wave | null>(null)
@@ -115,24 +135,47 @@ export function WavesScreen({
   if (wavesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the waves.")}</p>
   if (wavesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
-  const rows = wavesQ.data
+  // ON A CLIENT'S RECORD the list is narrowed before anything else is asked, so
+  // the count under the search box and the empty state both speak about that
+  // client rather than about the team.
+  const all = accountId ? wavesQ.data.filter((w) => w.accountId === accountId) : wavesQ.data
+  const rows = selectWaves(all, query)
   const clients = (accountsQ.data ?? []).filter((a) => a.active)
+  const asking = waveQueryIsActive(query)
 
   return (
     <div className="flex flex-col gap-6">
-      {/* R16: the count lives in the heading (a sidebar page has no tab strip to
-          badge), and it is the door's exact COUNT(*). */}
-      <CollectionHeading sectionKey="waves" total={total} />
+      {/* R16: the count lives in the heading ONLY on the sidebar page, which has
+          no tab strip to badge, and it is the door's exact COUNT(*). On a
+          client's record the tab badge is the count and it counts that CLIENT's
+          waves — so the team-wide total must not be drawn beside it, which is
+          the same figure saying two different things. */}
+      {accountId ? null : <CollectionHeading sectionKey="waves" total={total} />}
 
       <SectionWithCreate
         show={canCreate && clients.length > 0}
         label={t("Sell a wave")}
         icon="plus"
         onCreate={() => setAddOpen(true)}
+        aboveCard={
+          /* Only once there is something to look through. A search box over an
+             empty collection is a control that cannot do anything. */
+          all.length > 0 ? (
+            <WaveFinder
+              query={query}
+              onChange={setQuery}
+              clients={clients}
+              showClientFilter={!accountId}
+              resultCount={rows.length}
+            />
+          ) : undefined
+        }
       >
         {rows.length === 0 ? (
           <p className="text-muted-foreground py-4 text-sm">
-            {t("No waves yet. A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.")}
+            {asking
+              ? t("No waves match that.")
+              : t("No waves yet. A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -253,4 +296,16 @@ export function WavesScreen({
       </AlertDialog>
     </div>
   )
+}
+
+/** THE SIDEBAR PAGE. The heading with the door's exact COUNT(*) (R16 — a sidebar
+ * page has no tab strip to badge), and the collection under it. */
+export function WavesScreen({
+  teamId,
+  basePath,
+}: {
+  teamId: string
+  basePath: string
+}) {
+  return <WaveCollection teamId={teamId} basePath={basePath} />
 }

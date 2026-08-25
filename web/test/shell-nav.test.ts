@@ -148,8 +148,23 @@ describe("the shell's own chrome stays on screen", () => {
     const src = read("components/app-shell.tsx")
     const bottom = src.indexOf("mt-auto flex")
     expect(bottom, "the profile/theme/collapse row must still be bottom-anchored").toBeGreaterThan(-1)
-    const row = src.slice(bottom, bottom + 400)
+    const row = src.slice(bottom, bottom + 700)
     expect(row).toContain("<ProfileMenu")
-    expect(row).toContain("<ModeToggle")
+    expect(row).toContain("toggleCollapsed")
+  })
+
+  it("the theme control is in the profile menu, not the rail", () => {
+    // It is a three-segment pill and the kit does not collapse it to an icon
+    // (its set has no sun and no moon), so in a 240px rail it was the widest
+    // thing there and the reason the rail grew a horizontal scrollbar. It is a
+    // personal preference, so it sits with the person's other ones.
+    //
+    // Asserted BOTH ways on purpose: "it left the rail" alone would pass if it
+    // had simply been deleted, and a theme control nobody can reach is worse
+    // than a wide one.
+    const shell = read("components/app-shell.tsx")
+    const bottom = shell.indexOf("mt-auto flex")
+    expect(shell.slice(bottom, bottom + 700), "the rail must not draw it").not.toContain("<ModeToggle")
+    expect(read("components/profile-menu.tsx"), "…and the menu must").toContain("<ModeToggle")
   })
 })

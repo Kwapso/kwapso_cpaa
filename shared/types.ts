@@ -1454,6 +1454,12 @@ export type Sprint = {
   accountName: string | null
   appId: string | null
   appName: string | null
+  /** WHICH PACKAGE IT WAS SOLD INSIDE, if any. A sprint can be sold on its own —
+   * null is ordinary, not missing — but where it belongs to a wave the sprint's
+   * own screen has to say so, or a reader has to go and look for it. Read
+   * alongside like the account and the app, for the same reason: one round trip. */
+  waveId: string | null
+  waveName: string | null
   startsOn: string | null
   endsOn: string | null
   soldPriceCents: number

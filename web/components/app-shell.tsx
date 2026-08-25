@@ -369,8 +369,10 @@ export function AppShell({
         <div
           className={`mt-auto flex min-w-0 flex-wrap items-center gap-2 p-3 ${collapsed ? "flex-col" : "justify-between"}`}
         >
+          {/* The theme control moved INTO this menu — see profile-menu.tsx. It
+              was the widest thing in a 240px rail and the reason the rail
+              grew a horizontal scrollbar. */}
           <ProfileMenu active={active} />
-          {!collapsed && <ModeToggle />}
           <button
             type="button"
             onClick={toggleCollapsed}

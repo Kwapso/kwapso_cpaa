@@ -1872,6 +1872,23 @@ export const SEED: Catalogue = {
   "General": { de: "Allgemein", es: "General", ca: "General" },
   "Attach a file to import": { de: "Datei zum Import anhängen", es: "Adjuntar un archivo para importar", ca: "Adjuntar un fitxer per importar" },
   "Remove attachment": { de: "Anhang entfernen", es: "Quitar el adjunto", ca: "Treure l'adjunt" },
+  // The waves toolbar and the theme control, hand-written for the same reason
+  // everything else here is: the machine translator spends the owner's own key.
+  "Appearance": { de: "Darstellung", es: "Apariencia", ca: "Aparença" },
+  "No waves match that.": {
+    de: "Keine Wellen passen dazu.",
+    es: "Ninguna wave coincide.",
+    ca: "Cap wave hi coincideix.",
+  },
+  "Plan a sprint": { de: "Sprint planen", es: "Planificar un sprint", ca: "Planificar un sprint" },
+  "Search waves…": { de: "Wellen durchsuchen…", es: "Buscar waves…", ca: "Cercar waves…" },
+  "Sort by": { de: "Sortieren nach", es: "Ordenar por", ca: "Ordenar per" },
+  "Sprint planned, and it is in this wave.": {
+    de: "Sprint geplant und in dieser Welle.",
+    es: "Sprint planificado y dentro de esta wave.",
+    ca: "Sprint planificat i dins d'aquesta wave.",
+  },
+  "When it runs": { de: "Wann sie läuft", es: "Cuándo se ejecuta", ca: "Quan s'executa" },
   // The flowchart's own line on a step that sends the work back. `{n}` is the
   // step NUMBER a reader can see on the box above, so the hole stays a hole in
   // every language and the sentence reorders around it.

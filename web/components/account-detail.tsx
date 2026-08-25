@@ -112,6 +112,7 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { WaveCollection } from "@/components/waves-screen"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
@@ -228,6 +229,9 @@ export function AccountDetailScreen({
   // both in the cache.
   const appsTotal = useCachedValue<number | null>(totalKey("apps-account", accountId))
   const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-account", accountId))
+  // WHAT THEY BOUGHT IT ALL INSIDE. The exact server COUNT(*) for this client,
+  // through the same badge door as every other tab (R16).
+  const wavesTotal = useCachedValue<number | null>(totalKey("waves-account", accountId))
   const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
   const ratesTotal = useCachedValue<number | null>(totalKey("account-rates", accountId))
 
@@ -510,6 +514,13 @@ export function AccountDetailScreen({
       ...(canSeeWork
         ? [
             {
+              value: "waves",
+              label: t("Waves"),
+              icon: CONCEPT_ICON.waves,
+              badge: formatCount(wavesTotal),
+              badgeVariant: "" as const,
+            },
+            {
               value: "sprints",
               label: t("Sprints"),
               icon: CONCEPT_ICON.sprints,
@@ -744,6 +755,17 @@ export function AccountDetailScreen({
                 accountName={account.name}
                 host={{ base: `${basePath}/${accountId}` }}
                 onNew={canWriteApps ? () => setAppOpen(true) : undefined}
+              />
+            )
+          if (tabItem.value === "waves")
+            return (
+              <WaveCollection
+                teamId={teamId}
+                /* NESTED, like every other child on this record: a wave opened
+                   from here keeps the client in the address, so the trail reads
+                   Client › Waves › the wave and Back goes where it came from. */
+                basePath={`${basePath}/${accountId}/waves`}
+                accountId={accountId}
               />
             )
           if (tabItem.value === "sprints")

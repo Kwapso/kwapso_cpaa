@@ -29,7 +29,7 @@ import { Button } from "@shared/ui/controls/button/button"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Pencil, Power, RotateCcw, UserMinus } from "@shared/ui/icons"
+import { Pencil, Plus, Power, RotateCcw, UserMinus } from "@shared/ui/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { OverviewList } from "@/components/overview-list"
@@ -45,7 +45,10 @@ import {
 } from "@/components/record-chrome"
 import { ApiFailure } from "@/lib/api"
 import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
-import { listFetch, sprintsKey } from "@/lib/live-resources"
+import { SprintFormDialog } from "@/components/sprint-form-dialog"
+import { content as contentApi } from "@/lib/api/content"
+import { sliceKey } from "@/components/work-panels"
+import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -81,11 +84,19 @@ export function WaveDetailScreen({
   // The team's sprints, from the same bounded cache the sprints screen holds —
   // opening this record costs no extra round trip for anybody who has been there.
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
+  // The client's own systems, for the sprint form's app picker. Same cache the
+  // apps screen holds, so opening this tab adds no round trip on a warm app.
+  const appsQ = useCached<{ id: string; name: string; accountId: string | null; active: boolean }[]>(
+    appsKey(teamId),
+    () => listFetch.apps(teamId) as Promise<{ id: string; name: string; accountId: string | null; active: boolean }[]>
+  )
 
   const { can } = usePermissions(teamId)
+  const canCreate = can("work", "create")
   const canEdit = can("work", "edit")
 
   const [tab, setTab] = React.useState("overview")
+  const [planOpen, setPlanOpen] = React.useState(false)
   const [editOpen, setEditOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
 
@@ -261,6 +272,27 @@ export function WaveDetailScreen({
           if (panel.value === "sprints")
             return (
               <div className="flex flex-col gap-4">
+                {/* TWO VERBS, AND THEY ARE DIFFERENT ONES. "Plan a sprint" writes
+                    a NEW block of work and drops it straight into this package —
+                    which is the order the work actually happens in, because a
+                    wave is sold first and the sprints inside it are planned
+                    afterwards. "Put a sprint in this wave" moves one that
+                    already exists. A screen offering only the second makes
+                    somebody leave, create a sprint somewhere else, and come
+                    back to find it. */}
+                {canCreate ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-fit gap-1"
+                    disabled={busy}
+                    onClick={() => setPlanOpen(true)}
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                    {t("Plan a sprint")}
+                  </Button>
+                ) : null}
+
                 {canEdit && addable.length > 0 ? (
                   <RecordPicker
                     id="wave-add-sprint"
@@ -316,6 +348,46 @@ export function WaveDetailScreen({
             )
           if (panel.value === "activity") return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
+        }}
+      />
+
+      {/* PLANNING A SPRINT FROM INSIDE A PACKAGE. The client is a fact about
+          where you are standing rather than a question — a sprint is sold TO
+          somebody and cannot be moved afterwards — so it is fixed, exactly as
+          it is when the form is opened from the client's own record. The wave
+          is not a field on the sprint form: the sprint is created, then put in
+          this wave through the same door the picker above uses, so there is one
+          way a sprint joins a package rather than two. */}
+      <SprintFormDialog
+        open={planOpen}
+        onOpenChange={setPlanOpen}
+        apps={(appsQ.data ?? [])
+          .filter((a) => a.active && a.accountId === wave.accountId)
+          .map((a) => ({ id: a.id, name: a.name }))}
+        fixedAccount={wave.accountId ? { id: wave.accountId, name: wave.accountName ?? "" } : undefined}
+        draftKey={`sprint:add:wave:${waveId}`}
+        onSubmit={async (v) => {
+          // The create door answers with the whole LIST rather than the new row,
+          // so the new sprint is the one that was not there a moment ago. Read
+          // that way rather than off the top: "newest first" is an ordering, and
+          // an ordering is not an identity.
+          const before = new Set((sprintsQ.data ?? []).map((x) => x.id))
+          const after = await contentApi.createSprint({
+            name: v.name,
+            goal: v.goal || undefined,
+            sprintType: v.sprintType || undefined,
+            accountId: wave.accountId ?? undefined,
+            appId: v.appId || undefined,
+            startsOn: v.startsOn || undefined,
+            endsOn: v.endsOn || undefined,
+            soldPriceCents: v.soldPriceCents,
+            currency: v.currency || undefined,
+          })
+          const created = after.sprints.find((x) => !before.has(x.id))
+          if (created) await moveSprint(created.id, waveId)
+          invalidate(sprintsKey(teamId))
+          if (wave.accountId) invalidate(sliceKey("sprints-account", wave.accountId))
+          toast.success(t("Sprint planned, and it is in this wave."))
         }}
       />
 

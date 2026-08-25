@@ -19,7 +19,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { LogOut, Settings, UserRound } from "@shared/ui/icons"
+import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
+import { LogOut, Palette, Settings, UserRound } from "@shared/ui/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
@@ -66,6 +67,25 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
           <Settings className="size-4" />
           {t("Settings")}
         </DropdownMenuItem>
+        {/* LIGHT / DARK / SYSTEM, HERE RATHER THAN IN THE RAIL.
+            It is a three-segment pill, and the kit does not collapse it to an
+            icon on purpose — its icon set has no sun and no moon. So in the
+            sidebar's bottom row it was the widest thing in a 240px rail,
+            sitting beside the profile and the collapse control as though
+            choosing a theme were a peer of signing out. It is a personal
+            preference, so it lives with the person's other ones. `onSelect`
+            is stopped because the segments ARE the control: letting the item
+            close the menu would shut it on the first click, before anybody
+            could see what they had picked. */}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-muted-foreground flex items-center gap-2 font-normal">
+          <Palette className="size-4" aria-hidden />
+          {t("Appearance")}
+        </DropdownMenuLabel>
+        <div className="px-2 pb-1.5" onClick={(e) => e.stopPropagation()}>
+          <ModeToggle />
+        </div>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() =>
             void auth.logout().then(() => {
