@@ -212,7 +212,7 @@ export function StaffPanel({
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-medium tracking-tight">
+        <h2 className="flex flex-wrap items-center gap-2 text-lg font-medium tracking-tight">
           {t("Certificates")}
           {/* R16: the number is the door's exact total through the ONE seam. This
               one counts the TEAM's register, which is what the door counts — a

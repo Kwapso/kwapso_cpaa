@@ -2330,3 +2330,92 @@ describe("a sidebar section can draw its collection", () => {
     ).toEqual([])
   })
 })
+
+// THE PAGE DOES NOT SCROLL SIDEWAYS, AND A NAME DOES NOT LOSE TO A BADGE.
+//
+// Two mobile defects with one thing in common: both are whole-screen symptoms
+// with a single local cause, so both were fixed where they were noticed and both
+// came back somewhere else. The owner reported the horizontal scroll more times
+// than I can defend, and the last report was from a phone with the module wall
+// reading "Au…" beside a badge that had taken the whole row.
+//
+// So they are settled structurally and checked here rather than looked for.
+describe("nothing pushes the page sideways", () => {
+  const doors = [
+    ["web", join(WEB, "app", "globals.css")],
+    ["web-portal", join(ROOT, "web-portal", "app", "globals.css")],
+  ] as const
+
+  it("page-width: both front doors clip horizontal overflow at the root", () => {
+    for (const [name, css] of doors) {
+      const src = read(css)
+      expect(src, `${name}: <html> must clip sideways overflow`).toMatch(/html\s*\{[^}]*overflow-x:\s*clip/)
+      expect(src, `${name}: <body> must clip it too`).toMatch(/body\s*\{[^}]*overflow-x:\s*clip/)
+    }
+  })
+
+  it("page-width: it is CLIP and never HIDDEN", () => {
+    // They look identical and they are not. CSS says an element with
+    // `overflow-x: hidden` and a visible other axis computes `overflow-y` to
+    // `auto` — which turns <html> into a scroll container and silently breaks
+    // `position: sticky` on every header in the app. `clip` clips the same
+    // overflow and creates no scroll container.
+    for (const [name, css] of doors) {
+      const root = read(css).match(/(?:^|\n)(?:html|body)\s*\{[^}]*\}/g) ?? []
+      for (const block of root)
+        expect(block.includes("overflow-x: hidden"), `${name}: use clip, not hidden`).toBe(false)
+    }
+  })
+
+  it("page-width: the mobile app bar cannot be wider than the phone", () => {
+    // It was. The theme control is three segments the kit will not collapse to
+    // an icon, and beside the brand, the timer and the avatar it did not fit a
+    // 375px screen — so the bar overflowed and took the page with it.
+    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    const bar = shell.slice(shell.indexOf("md:hidden"), shell.indexOf("md:hidden") + 200)
+    const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"))
+    expect(header, "the bar must clip its own contents").toContain("overflow-hidden")
+    expect(header, "…and must not draw the theme control").not.toContain("<ModeToggle")
+    expect(bar.length).toBeGreaterThan(0)
+  })
+})
+
+describe("a record's name survives a narrow screen", () => {
+  // A row that pairs a NAME with a badge is a flex row with two kinds of child:
+  // one that can shrink (`min-w-0 flex-1`) and one that will not (a Badge is
+  // `whitespace-nowrap`, so its min-content is the whole phrase). On a phone the
+  // rigid one wins and the name becomes "Au…", which is the one piece of
+  // information the row exists to carry.
+  //
+  // The fix is that the ROW WRAPS: the name keeps the first line and the chips
+  // drop below it. Derived, so the sixteenth row is caught the day it is written.
+  it("wrapped-rows: every name-and-badge row wraps rather than crushing the name", () => {
+    const offenders: string[] = []
+    let scanned = 0
+    const files = [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }).map((f) => f.path),
+    ]
+    for (const f of files) {
+      const src = read(f)
+      for (const m of src.matchAll(/className="([^"]*\bflex\b[^"]*)"/g)) {
+        const cls = m[1]
+        if (cls.includes("flex-col") || !cls.includes("items-center")) continue
+        const block = src.slice(m.index! + m[0].length, m.index! + m[0].length + 1400)
+        if (!block.includes("min-w-0")) continue
+        if (!block.includes("<Badge") && !block.includes("formatCount")) continue
+        scanned++
+        if (!cls.includes("flex-wrap"))
+          offenders.push(`${f.replace(ROOT + "/", "")}:${src.slice(0, m.index).split("\n").length}`)
+      }
+    }
+    // A walk that stops matching must not report an all-clear.
+    expect(scanned, "the row census found nothing — it has stopped matching").toBeGreaterThan(8)
+    expect(
+      offenders,
+      `these rows crush the record's name on a phone. Add \`flex-wrap\` to the row and ` +
+        `\`basis-[12rem]\` to the name block so the chips drop to a second line instead: ` +
+        offenders.join(", ")
+    ).toEqual([])
+  })
+})

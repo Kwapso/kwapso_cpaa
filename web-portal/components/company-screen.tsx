@@ -95,8 +95,8 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
         ) : (
           <ul className="flex flex-col gap-4">
             {contacts.map((c) => (
-              <li key={c.id} className="flex items-center gap-2 rounded-xl border p-4">
-                <span className="min-w-0 flex-1 truncate">{c.personName}</span>
+              <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl border p-4">
+                <span className="min-w-0 flex-1 basis-[12rem] truncate">{c.personName}</span>
                 {c.isMainStakeholder ? <Badge variant="secondary">{t("Main contact")}</Badge> : null}
                 {/* Staff often type the relationship as "Main contact" too, and then
                     the row says it twice. Say it once — the badge is the stronger

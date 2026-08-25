@@ -71,13 +71,13 @@ export function HelpStakeholders({
           {stakeholders.map((s) => (
             <li
               key={s.userId}
-              className="flex items-center gap-2 px-3 py-2"
+              className="flex flex-wrap items-center gap-2 px-3 py-2"
             >
               <Avatar className="size-8">
                 {s.imageUrl && <AvatarImage src={s.imageUrl} alt="" />}
                 <AvatarFallback>{letterMark(s.name || s.email)}</AvatarFallback>
               </Avatar>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-[12rem]">
                 <p className="truncate text-sm font-medium">{s.name || s.email}</p>
                 <p className="text-muted-foreground truncate text-xs">{s.email}</p>
               </div>

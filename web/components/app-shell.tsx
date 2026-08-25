@@ -11,7 +11,6 @@ import * as React from "react"
 import { usePathname } from "next/navigation"
 
 import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/icons"
 // `Layers` is the audit module's mark and the kit's 96 have no glyph of that
@@ -402,14 +401,20 @@ export function AppShell({
       <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
         {/* Mobile top bar, an explicit height, because `--shell-top` above is a
             promise about it. */}
-        <header className="bg-card sticky top-0 z-20 flex h-[3.75rem] items-center justify-between gap-2 border-b px-4 md:hidden">
-          <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
-          <div className="flex items-center gap-1">
+        <header className="bg-card sticky top-0 z-20 flex h-[3.75rem] min-w-0 items-center justify-between gap-2 overflow-hidden border-b px-4 md:hidden">
+          <div className="flex min-w-0 shrink items-center">
+            <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
+          </div>
+          <div className="flex min-w-0 shrink items-center gap-1">
             {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
                 it lives in the shell rather than on any one page. It renders
                 nothing when nothing is running, which is most of the time. */}
             {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
-            <ModeToggle />
+            {/* THE THEME CONTROL IS NOT HERE, and it is the reason this bar used
+                to be wider than a phone. It is three segments the kit will not
+                collapse to an icon, and on a 375px screen it pushed the avatar
+                off the edge and the whole PAGE sideways with it. It lives in
+                Settings, under the text size, and in the profile menu. */}
             <ProfileMenu active={active} />
           </div>
         </header>

@@ -63,9 +63,9 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="hover:bg-accent/50 motion-hover flex items-center gap-2 rounded-xl border p-4"
+      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-xl border p-4"
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-2">
         <p className="line-clamp-2">{richTextPlain(ticket.description)}</p>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
           <Badge variant={status.variant}>{t(status.label)}</Badge>

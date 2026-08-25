@@ -262,7 +262,7 @@ export function TimePanel({
       <div className="flex items-center justify-between gap-2">
         {/* THE HOURS. Not the collection's count (the heading above says that) —
             the number anybody reading a timesheet actually came for. */}
-        <p className="text-muted-foreground flex items-center gap-1 text-sm">
+        <p className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm">
           <Clock className="size-3.5" />
           {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
         </p>

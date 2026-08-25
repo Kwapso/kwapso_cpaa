@@ -58,6 +58,7 @@ import { usePermissions } from "@/lib/perms"
 import { auth } from "@/lib/api"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { AppearanceSection } from "@shared/web/appearance-section"
 import { ScaleSection } from "@shared/web/scale-section"
 import { useT } from "@shared/web/language"
 
@@ -105,6 +106,12 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
         save={(scale) => auth.setScale(scale)}
         className="motion-panel-in"
       />
+
+      {/* LIGHT / DARK / SYSTEM, directly under the size and nowhere else on this
+          page. The owner's own instruction, and it is the right shape: two
+          preferences about how the app looks, side by side, in the one place a
+          person goes to change how the app looks. */}
+      <AppearanceSection className="motion-panel-in" />
 
       {/* THE TEAM'S OWN ADMIN — see the header for why these rows are here. */}
       {teamId && adminSections.length > 0 && (

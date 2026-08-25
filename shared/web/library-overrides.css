@@ -135,3 +135,31 @@ html {
 body[data-scroll-locked] {
   margin-right: 0 !important;
 }
+
+/* ============================================================================
+   A SELECT'S LIST MUST BE ABOVE THE DIALOG IT WAS OPENED FROM.
+
+   Reported from a phone, and it is not a phone bug — it is just impossible to
+   miss there. The kit's own stacking order is:
+
+       select content .......... z-50
+       dialog / sheet .......... z-60 / z-55
+       popover, dropdown-menu .. z-70
+
+   So a Select opened INSIDE a dialog paints UNDERNEATH it. The list is there,
+   it receives the click, and it is invisible — which is the worst shape a bug
+   can take, because the control looks broken rather than hidden. Popover and
+   dropdown-menu sit at 70 and were always fine; Select is the only one below
+   the line, so "Add a step" on a phone had three pickers that could not be
+   used: how often, who does it, and what it is done in.
+
+   THIS BELONGS UPSTREAM, and it is on the design lane's list — the kit should
+   raise `selectContentClasses` to the same 70 the other two portalled surfaces
+   use. Until that tag lands this is the app-side stop-gap, and it is the shape
+   this file's own header asks for: one rule, one reason, and a stated exit.
+
+   DELETE THIS when shared/ui/VERSION.json passes the tag that fixes it.
+   ========================================================================= */
+[data-slot="select-content"] {
+  z-index: 80;
+}

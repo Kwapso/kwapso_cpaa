@@ -216,7 +216,7 @@ export function ClientOrgPanel({
     <div className="flex flex-col gap-6">
       {/* ── departments ──────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between">
           <h3 className="text-sm font-medium">{t("Departments")}</h3>
           {canCreate ? (
             <AddButton onClick={() => setAddingDept(true)} label={t("Add department")} />
@@ -229,8 +229,8 @@ export function ClientOrgPanel({
         ) : (
           <ul className="flex flex-col gap-2">
             {departments.map((d) => (
-              <li key={d.id} className="bg-card flex items-center gap-3 rounded-xl border p-3">
-                <div className="min-w-0 flex-1">
+              <li key={d.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
+                <div className="min-w-0 flex-1 basis-[12rem]">
                   <p className="truncate text-sm font-medium">{d.name}</p>
                   <p className="text-muted-foreground text-xs">
                     {d.roleCount === 1 ? t("1 role") : `${d.roleCount} ${t("roles")}`}
@@ -274,8 +274,8 @@ export function ClientOrgPanel({
           <ul className="flex flex-col gap-2">
             {roles.map((r) => (
               <li key={r.id} className="bg-card flex flex-col gap-2 rounded-xl border p-3">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1 basis-[12rem]">
                     <p className="truncate text-sm font-medium">{r.name}</p>
                     <p className="text-muted-foreground text-xs">
                       {/* WHAT AN UNKNOWN COST LOOKS LIKE, and it is not a zero.
@@ -376,7 +376,7 @@ export function ClientOrgPanel({
 
       {/* ── tools ────────────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between">
           <h3 className="text-sm font-medium">{t("Tools")}</h3>
           {canCreate ? <AddButton onClick={() => setAddingTool(true)} label={t("Add tool")} /> : null}
         </div>
@@ -387,11 +387,11 @@ export function ClientOrgPanel({
         ) : (
           <ul className="flex flex-col gap-2">
             {tools.map((x) => (
-              <li key={x.id} className="bg-card flex items-center gap-3 rounded-xl border p-3">
+              <li key={x.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
                 <span aria-hidden className="w-6 shrink-0 text-center text-lg">
                   {x.mark || "·"}
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-[12rem]">
                   <p className="truncate text-sm font-medium">{x.name}</p>
                   <p className="text-muted-foreground text-xs">
                     {x.cents == null

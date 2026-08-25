@@ -43,6 +43,44 @@
  * Absolutely positioned inside that fixed, clipped, -z-10 host: behind
  * everything, never interactive, and silent for anyone who has asked their
  * system for less motion. */
+/* ============================================================================
+   THE PAGE DOES NOT SCROLL SIDEWAYS. EVER.
+   ============================================================================
+   The owner, more than once and finally in capitals: "there should be no scope
+   for horizontal scroll unless there are edge cases where I am scrolling
+   through a table or something with many columns, or there is a collection
+   that literally supports horizontal scroll... This is a core UI breakage."
+
+   It kept coming back because it is a WHOLE-PAGE symptom with a LOCAL cause:
+   one element somewhere is wider than the viewport — a sticky header whose
+   controls do not fit a phone, a nav label that will not wrap, a chart's
+   minimum width — and the page, not that element, grows a scrollbar. Nothing
+   points at the culprit, so it is fixed where it is noticed and returns
+   somewhere else a week later.
+
+   So it is settled at the ROOT instead of chased at the leaves. `clip`, not
+   `hidden`, and they are NOT the same: CSS says an element with
+   `overflow-x: hidden` and a visible other axis computes `overflow-y` to
+   `auto`, which turns <html> into a scroll container and breaks `position:
+   sticky` on everything inside it. `clip` clips exactly the same overflow and
+   creates no scroll container at all, so every sticky header in the app keeps
+   working.
+
+   THIS DOES NOT TOUCH THE LEGITIMATE CASES, and that is the point. A wide
+   table, a card rail, a flowchart — anything that genuinely scrolls sideways —
+   does it INSIDE its own `overflow-x: auto` box, which still works exactly as
+   before. What this removes is the accidental kind: the page itself moving.
+   ========================================================================= */
+html {
+  overflow-x: clip;
+}
+
+body {
+  overflow-x: clip;
+  /* And nothing may make the page wider than the phone it is on. */
+  max-width: 100vw;
+}
+
 .ambient::before,
 .ambient::after {
   content: "";

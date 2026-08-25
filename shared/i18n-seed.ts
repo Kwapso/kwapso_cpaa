@@ -1895,6 +1895,11 @@ export const SEED: Catalogue = {
   "After everything else": { de: "Nach allem anderen", es: "Después de todo lo demás", ca: "Després de tot la resta" },
   "Beside {step}": { de: "Neben {step}", es: "Junto a {step}", ca: "Al costat de {step}" },
   "Where it goes": { de: "Wohin er gehört", es: "Dónde va", ca: "On va" },
+  "Light, dark, or whatever this device is set to. It is remembered on this device.": {
+    de: "Hell, dunkel oder was dieses Gerät eingestellt hat. Es wird auf diesem Gerät gemerkt.",
+    es: "Claro, oscuro o lo que tenga este dispositivo. Se recuerda en este dispositivo.",
+    ca: "Clar, fosc o el que tingui aquest dispositiu. Es recorda en aquest dispositiu.",
+  },
   // The flowchart's own line on a step that sends the work back. `{n}` is the
   // step NUMBER a reader can see on the box above, so the hole stays a hole in
   // every language and the sentence reorders around it.

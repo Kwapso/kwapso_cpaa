@@ -22,6 +22,7 @@ import { usePathname, useRouter } from "next/navigation"
 
 import { Button } from "@shared/ui/controls/button/button"
 import { toast } from "@shared/ui/controls/sonner/sonner"
+import { AppearanceMenu } from "@shared/web/appearance-menu"
 import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/icons"
@@ -157,7 +158,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     <LanguageProvider value={session.user?.language}>
     <div className="flex min-h-[100svh] flex-col">
       <header className="bg-background sticky top-0 z-30 border-b">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-5 py-3">
+        <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center gap-2 overflow-hidden px-5 py-3">
           <AccountSwitcher
             accounts={session.accounts}
             currentAccountId={session.currentAccountId}
@@ -170,7 +171,11 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
            * same class of thing as a theme — a personal display preference,
            * wanted from every screen, about nothing in the client's own data. */}
           <LanguageMenu save={(lang) => auth.setLanguage(lang)} />
-          <ModeToggle />
+          {/* BEHIND AN ICON, the same size as the flag beside it. The bare pill
+              is three segments wide and did not fit a phone next to the account
+              switcher and sign out, which is how this header took the page
+              sideways. See shared/web/appearance-menu.tsx. */}
+          <AppearanceMenu />
           <Button variant="ghost" size="icon" aria-label={t("Sign out")} onClick={() => void signOut()}>
             <LogOut className="size-3.5" />
           </Button>
