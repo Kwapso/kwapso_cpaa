@@ -336,6 +336,10 @@ export function ProcessDetailScreen({
         frequencyPeriod: values.frequencyPeriod,
         roleId,
         toolId,
+        // WHERE IT GOES. Undefined = after everything else, which is what the
+        // door does with no position at all; a number another step already
+        // holds is a FORK. R20: the door type-checks it before it reaches SQL.
+        position: values.position,
         branchLabel: values.branchLabel,
         loopsBackTo: values.loopsBackTo,
       })
@@ -349,6 +353,10 @@ export function ProcessDetailScreen({
         frequencyPeriod: values.frequencyPeriod,
         roleId,
         toolId,
+        // WHERE IT GOES. Undefined = after everything else, which is what the
+        // door does with no position at all; a number another step already
+        // holds is a FORK. R20: the door type-checks it before it reaches SQL.
+        position: values.position,
         branchLabel: values.branchLabel,
         loopsBackTo: values.loopsBackTo,
       })
@@ -1104,7 +1112,9 @@ export function ProcessDetailScreen({
         hasClient={!!process.accountId}
         peers={(shownSteps ?? [])
           .filter((x) => x.stepKey !== editingStep?.stepKey)
-          .map((x) => ({ stepKey: x.stepKey, name: x.name }))}
+          /* The position rides along so "beside this one" can resolve to the
+             number the door wants — two steps at one position are a fork. */
+          .map((x) => ({ stepKey: x.stepKey, name: x.name, position: x.position }))}
         initial={
           editingStep
             ? {

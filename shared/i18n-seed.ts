@@ -1889,6 +1889,12 @@ export const SEED: Catalogue = {
     ca: "Sprint planificat i dins d'aquesta wave.",
   },
   "When it runs": { de: "Wann sie läuft", es: "Cuándo se ejecuta", ca: "Quan s'executa" },
+  // Where a new step lands. "Beside" is the whole gesture that draws a fork, so
+  // it is a sentence with a hole rather than a word beside a name — the hole is
+  // the only shape a translator can move.
+  "After everything else": { de: "Nach allem anderen", es: "Después de todo lo demás", ca: "Després de tot la resta" },
+  "Beside {step}": { de: "Neben {step}", es: "Junto a {step}", ca: "Al costat de {step}" },
+  "Where it goes": { de: "Wohin er gehört", es: "Dónde va", ca: "On va" },
   // The flowchart's own line on a step that sends the work back. `{n}` is the
   // step NUMBER a reader can see on the box above, so the hole stays a hole in
   // every language and the sentence reorders around it.

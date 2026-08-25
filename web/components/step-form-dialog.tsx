@@ -73,6 +73,10 @@ export type StepFormValues = {
   /** WHAT IT IS DONE IN — exactly ONE (both respondents' ruling). */
   toolId: string | null
   newToolName: string | null
+  /** WHERE IT GOES. Undefined = after everything else, which is what a step
+   * ordinarily is. A NUMBER puts it at that position — and a position another
+   * step already holds is a FORK, which is the only way to draw one. */
+  position?: number
   /** the word on a fork, when this step is one branch of a decision */
   branchLabel: string | null
   /** the step this one can send the work back to */
@@ -81,13 +85,15 @@ export type StepFormValues = {
 
 export type StepRoleOption = { id: string; name: string; centsPerHour: number | null }
 export type StepToolOption = { id: string; name: string }
-export type StepPeerOption = { stepKey: string; name: string }
+export type StepPeerOption = { stepKey: string; name: string; position: number }
 
 /** NOBODY NAMED, and ADD A NEW ONE, as values a picker can hold. A Select cannot
  * carry `null`, so the two sentinels are written once here rather than spelled
  * differently at each end. */
 const NONE = "__none__"
 const NEW = "__new__"
+/** WHERE A NEW STEP LANDS by default: at the end, on its own. */
+const AFTER_ALL = "__after_all__"
 
 const nameField = { ...defaultFieldConfig, label: "Step", required: true }
 const descField = { ...defaultFieldConfig, label: "What happens in it", required: false }
@@ -109,6 +115,12 @@ const toolField = {
   label: "What it is done in",
   required: false,
   hint: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
+}
+const placeField = {
+  ...defaultFieldConfig,
+  label: "Where it goes",
+  required: false,
+  hint: "Beside another step means the work SPLITS there — two things that can happen next. The step after them joins it back up.",
 }
 const branchField = {
   ...defaultFieldConfig,
@@ -172,6 +184,7 @@ export function StepFormDialog({
       newRole: "",
       toolId: initial?.toolId ?? NONE,
       newTool: "",
+      place: AFTER_ALL,
       branch: initial?.branchLabel ?? "",
       loop: initial?.loopsBackTo ?? NONE,
     },
@@ -211,6 +224,14 @@ export function StepFormDialog({
         newRoleName: namingRole ? values.newRole.trim() : null,
         toolId: namingTool ? null : values.toolId === NONE ? null : values.toolId,
         newToolName: namingTool ? values.newTool.trim() : null,
+        // WHERE IT GOES. Only on a new step: moving an existing one is a
+        // different verb and a different door. `undefined` means "after
+        // everything else", which is what the door does with no position at all.
+        position: editing
+          ? undefined
+          : values.place === AFTER_ALL
+            ? undefined
+            : peers.find((x) => x.stepKey === values.place)?.position,
         branchLabel: values.branch.trim() || null,
         loopsBackTo: values.loop === NONE ? null : values.loop,
       })
@@ -387,9 +408,39 @@ export function StepFormDialog({
         )}
       </Field>
 
-      {/* THE SHAPE. Both empty on nearly every step, which is why they sit last:
-          a fork and a loop are real and uncommon, and a form that asked about
-          them first would make every ordinary step feel complicated. */}
+      {/* THE SHAPE. All three empty on nearly every step, which is why they sit
+          last: a fork and a loop are real and uncommon, and a form that asked
+          about them first would make every ordinary step feel complicated.
+          
+          "Where it goes" is HOW A FORK IS DRAWN, and it is the only way. Two
+          steps at the same position are branches of one decision — the owner's
+          own model — so putting a step BESIDE another one is the whole gesture.
+          There is nothing to press for a rejoin: the next step added after
+          everything else lands on its own, and one column after two IS the join.
+          
+          Only on a NEW step. Moving an existing one around is a different verb
+          with a different door, and offering it here would look like it worked. */}
+      {!editing && peers.length > 0 && (
+        <Field config={placeField} htmlFor="step-place" className={fieldSpacing}>
+          <Select
+            value={values.place}
+            onValueChange={(v) => setValues((s) => ({ ...s, place: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="step-place">
+              <SelectValue placeholder={t("After everything else")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AFTER_ALL}>{t("After everything else")}</SelectItem>
+              {peers.map((x) => (
+                <SelectItem key={x.stepKey} value={x.stepKey}>
+                  {t("Beside {step}").replace("{step}", x.name)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
       <Field config={branchField} htmlFor="step-branch" className={fieldSpacing}>
         <Input
           id="step-branch"
