@@ -2466,7 +2466,14 @@ describe("a tab strip's shape is decided in one place", () => {
   })
 
   it("tab-shape: only the two inner filter strips override it", () => {
-    const allowed = new Set(["web/components/tickets-collection.tsx", "web/components/meetings-screen.tsx"])
+    const allowed = new Set([
+      "web/components/tickets-collection.tsx",
+      "web/components/meetings-screen.tsx",
+      // The steps view switch (List / Flow / Compare) sits INSIDE the Steps
+      // folder tab. Two folders stacked put one strip's feet through the
+      // other's toolbar — seen on a phone the moment the default flipped.
+      "web/components/process-detail.tsx",
+    ])
     const offenders: string[] = []
     let scanned = 0
     const files = [
@@ -2495,5 +2502,35 @@ describe("a tab strip's shape is decided in one place", () => {
       .filter((f) => /variant:\s*"pill"/.test(read(f.path)))
       .map((f) => f.path.replace(ROOT + "/", ""))
     expect(offenders, `\`pill\` is accepted and silently drawn as a line — say what you mean`).toEqual([])
+  })
+})
+
+// TWO FOLDER STRIPS MUST NOT BE STACKED.
+//
+// A folder tab is drawn with feet that attach to the card below it. Nest one
+// inside another and the inner strip's feet come through the outer one's
+// toolbar — which is exactly what happened on a phone the moment the folder
+// became the default, on the steps view switch. Derived rather than remembered:
+// a screen rendering more than one strip has an inner one, and an inner one is
+// a line.
+describe("a tab strip is not nested inside another one", () => {
+  it("tab-shape: any screen with two strips gives the inner one a line", () => {
+    const offenders: string[] = []
+    let scanned = 0
+    for (const f of [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+    ]) {
+      const src = read(f.path)
+      if ((src.match(/<TabsView/g) ?? []).length < 2) continue
+      scanned++
+      if (!/variant:\s*"line"/.test(src)) offenders.push(f.path.replace(ROOT + "/", ""))
+    }
+    expect(scanned, "the nested-strip census found nothing — it has stopped matching").toBeGreaterThan(0)
+    expect(
+      offenders,
+      `these screens stack two folder strips; the inner one switches a VIEW and takes ` +
+        `\`variant: "line"\`: ${offenders.join(", ")}`
+    ).toEqual([])
   })
 })

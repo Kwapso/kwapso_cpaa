@@ -680,6 +680,12 @@ export function ProcessDetailScreen({
                     <TabsView
                       config={{
                         ...defaultTabsConfig,
+                        // A LINE. This switches the VIEW of the steps already
+                        // chosen by the folder above it — it is inside that
+                        // tab, not beside it — and a folder tab is drawn with
+                        // feet that attach to a card. Two folders stacked put
+                        // one strip's feet through the other's toolbar.
+                        variant: "line" as const,
                         tabs: [
                           { value: "list", label: t("List"), icon: "list", badge: "", badgeVariant: "" as const },
                           { value: "flow", label: t("Flow"), icon: "git-branch", badge: "", badgeVariant: "" as const },
