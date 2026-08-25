@@ -447,27 +447,59 @@ const Chart = React.forwardRef<HTMLDivElement, ChartProps>(
       tickMargin: 8,
     } as const;
 
-    const furniture = (
-      <>
-        {grid ? (
-          <CartesianGrid
-            vertical={false}
-            /* The kit's 6% hairline, exactly — `--hair-faint` IS 6%. */
-            stroke="var(--hair-faint)"
-          />
-        ) : null}
-        {xAxis ? <XAxis dataKey={xKey} axisLine={{ stroke: "var(--hair-strong)" }} {...axisCommon} /> : null}
-        {yAxis ? <YAxis axisLine={false} width={40} {...axisCommon} /> : null}
-        {showZeroLine ? <ReferenceLine y={0} stroke="var(--hair-strong)" /> : null}
-        {tooltip ? (
-          <Tooltip
-            cursor={{ fill: "var(--accent)" }}
-            content={<TooltipCard series={measures} formatValue={formatValue} />}
-          />
-        ) : null}
-        {legend ? <Legend content={<LegendRow />} /> : null}
-      </>
-    );
+    /* AN ARRAY, NEVER A FRAGMENT, AND THE REASON IS NOT STYLE.
+       ------------------------------------------------------------------
+       recharts does not read its children as React renders them. It walks
+       them itself (`ReactUtils.toArray`), matches each one by `displayName`
+       against a render map, and DROPS anything it does not recognise —
+       silently, with no warning and no error. A `<CartesianGrid />` it
+       cannot name is not a broken axis; it is no axis at all.
+
+       `toArray` is written to descend into a fragment:
+
+           if (isFragment(child)) result = result.concat(toArray(child.props.children))
+
+       and that line is dead in this app. `isFragment` comes from `react-is`,
+       recharts 2.15 resolves `react-is@18`, and react-is@18 identifies an
+       element by `$$typeof === Symbol.for("react.element")`. React 19 stamps
+       its elements `Symbol.for("react.transitional.element")` instead. So
+       `isFragment` answers false for every fragment React 19 builds, the
+       fragment is pushed into the list AS a child, its `displayName` matches
+       nothing in the render map, and every element inside it is discarded.
+
+       The visible cost was the whole of a chart except its data: no grid, no
+       x-axis, no y-axis, no zero line, no legend and no hover, on every chart
+       in every app on this kit, under a green build. Bars drew, so the
+       picture looked finished.
+
+       An ARRAY of keyed elements is flattened by `React.Children.forEach`
+       before `isFragment` is ever consulted, so it does not depend on the
+       version agreeing. That is the whole fix, and it is the reason a
+       fragment must never be handed to a recharts chart — here or anywhere
+       downstream of this file. */
+    const furniture = [
+      grid ? (
+        <CartesianGrid
+          key="grid"
+          vertical={false}
+          /* The kit's 6% hairline, exactly — `--hair-faint` IS 6%. */
+          stroke="var(--hair-faint)"
+        />
+      ) : null,
+      xAxis ? (
+        <XAxis key="x" dataKey={xKey} axisLine={{ stroke: "var(--hair-strong)" }} {...axisCommon} />
+      ) : null,
+      yAxis ? <YAxis key="y" axisLine={false} width={40} {...axisCommon} /> : null,
+      showZeroLine ? <ReferenceLine key="zero" y={0} stroke="var(--hair-strong)" /> : null,
+      tooltip ? (
+        <Tooltip
+          key="tooltip"
+          cursor={{ fill: "var(--accent)" }}
+          content={<TooltipCard series={measures} formatValue={formatValue} />}
+        />
+      ) : null,
+      legend ? <Legend key="legend" content={<LegendRow />} /> : null,
+    ];
 
     const plot =
       type === "bar" ? (

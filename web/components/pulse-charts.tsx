@@ -36,9 +36,13 @@ const BAND_HEIGHT = 170
 
 /** WHERE THE REQUESTS ARE SITTING — one bar per live stage.
  *
- * No legend (a single series would name what the heading already names) and no
- * y-axis: the number sits ON the bar instead, which is what makes a 170px chart
- * legible without something to read it against. */
+ * No legend: one series, and the heading already names it. Everything else the
+ * kit draws by default stays on, and that is a correction rather than a taste.
+ * This chart used to switch the y-axis and the grid off, on the stated grounds
+ * that "the number sits ON the bar instead" — the kit's Chart has never drawn a
+ * number on a bar, so what shipped was three bars of unlabelled height with
+ * nothing at all to read them against. The scale and the hairlines ARE the
+ * something to read them against. */
 export function StageChart({ rows, label }: { rows: { label: string; count: number }[]; label: string }) {
   return (
     <Chart
@@ -47,8 +51,6 @@ export function StageChart({ rows, label }: { rows: { label: string; count: numb
       xKey="label"
       series={[{ key: "count", label, color: "var(--chart-1)" }]}
       legend={false}
-      grid={false}
-      yAxis={false}
       height={`${BAND_HEIGHT}px`}
     />
   )
@@ -71,13 +73,15 @@ export function WeeksChart({ rows, label }: { rows: { label: string; hours: numb
 }
 
 /** HOURS BY SOMETHING — who spent the time on one record, or what kind of work
- * it was. One bar per group, biggest first, the number ON the bar.
+ * it was. One bar per group, biggest first, read against the hours scale.
  *
  * The same shape as StageChart and deliberately not a pie: these are quantities
  * a person compares ("Marta did twice what I did"), and a bar is the only chart
- * anybody reads a comparison off reliably. The ORDER here is the tally's, not a
- * lifecycle's — unlike the stages above, there is no natural sequence for four
- * colleagues, so biggest-first is the ordering that carries information. */
+ * anybody reads a comparison off reliably — which is also why the scale is back
+ * on. A comparison needs a unit; "twice" is only visible against something.
+ * The ORDER here is the tally's, not a lifecycle's — unlike the stages above,
+ * there is no natural sequence for four colleagues, so biggest-first is the
+ * ordering that carries information. */
 export function HoursByChart({ rows, label }: { rows: { label: string; hours: number }[]; label: string }) {
   return (
     <Chart
@@ -86,8 +90,6 @@ export function HoursByChart({ rows, label }: { rows: { label: string; hours: nu
       xKey="label"
       series={[{ key: "hours", label, color: "var(--chart-3)" }]}
       legend={false}
-      grid={false}
-      yAxis={false}
       height={`${BAND_HEIGHT}px`}
     />
   )
@@ -96,7 +98,12 @@ export function HoursByChart({ rows, label }: { rows: { label: string; hours: nu
 /** HOW FULL THE RUNNING SPRINTS ARE — done stacked under still-open.
  *
  * Done FIRST so it stacks at the bottom: a bar fills from the floor as the work
- * closes, which is the direction everybody already reads a progress bar in. */
+ * closes, which is the direction everybody already reads a progress bar in.
+ *
+ * The ONLY chart on the band that carries a legend, because it is the only one
+ * with two series: two colours stacked in one bar and nothing saying which is
+ * which is not a chart, it is a puzzle. The kit's rule is the same sentence
+ * read the other way — "off with one series, a legend of one is a label". */
 export function SprintBurndownChart({
   rows,
   doneLabel,
@@ -115,8 +122,7 @@ export function SprintBurndownChart({
           { key: "done", label: doneLabel, color: "var(--chart-2)" },
           { key: "open", label: openLabel, color: "var(--chart-4)" },
         ]}
-      grid={false}
-      yAxis={false}
+      legend
       height={`${BAND_HEIGHT}px`}
     />
   )

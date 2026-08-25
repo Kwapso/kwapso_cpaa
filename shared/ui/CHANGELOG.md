@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.0.1 — 2026-08-25
+
+A patch off `v1.0.0`. It carries **one fix and nothing else** — in particular
+it does NOT carry the restructure described under *Unreleased* below, so an app
+pinned to `v1.0.0` can take it without moving a single import.
+
+### Fixed — every chart was drawing its data and none of its furniture
+
+`structures/chart/chart.tsx` built its grid, both axes, the zero line, the
+tooltip and the legend inside a **fragment** and handed that to the recharts
+chart. recharts does not read its children the way React renders them: it walks
+them itself and drops anything whose `displayName` it cannot match. Its
+fragment-descent line is guarded by `isFragment` from `react-is@18`, which
+identifies an element by `Symbol.for("react.element")` — and React 19 stamps
+`Symbol.for("react.transitional.element")`. So the guard answered false for
+every fragment, and everything inside it was discarded without a warning.
+
+The bars drew. Nothing else did. On every chart, in every app on this kit.
+
+The furniture is now an **array of keyed elements**, which
+`React.Children.forEach` flattens before `isFragment` is ever consulted. No
+other file in the kit renders recharts, so this is the whole of it — but the
+rule it earns is general: **never hand a fragment to a recharts chart.**
+
 ## Unreleased — 2026-08-24
 
 **The restructure.** The repository takes the four names the client uses, and
