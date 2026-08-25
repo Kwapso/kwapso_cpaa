@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.0.6 — 2026-08-26
+
+A patch off `v1.0.5`; still none of the *Unreleased* restructure.
+
+### Fixed — the agent chat fills its host, scrolls, and follows its foot
+
+`agent-chat` was a plain flex column with no growing region and no internal
+scroll. In a height-constrained host (the assistant slide-in hands it
+`h-full`) everything huddled under the header — empty state and composer at
+the top, a void beneath — and a long thread walked invisibly out of the panel
+with no way to reach it. The owner's verdict from the screen: "the chat
+function is completely broken."
+
+The turns region now grows (`flex-1 min-h-0`) and scrolls, which is also what
+pins the composer to the foot where a thumb expects it; the empty register
+centres in the grown region; and the region follows its own newest words on a
+new turn and while streaming. In the standalone auto-height card all of it is
+inert — no free space, nothing to scroll, no surplus to follow.
+
 ## v1.0.5 — 2026-08-25
 
 A patch off `v1.0.4`; still none of the *Unreleased* restructure.

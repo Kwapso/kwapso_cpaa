@@ -629,6 +629,18 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
     /* Which turn carries the caret: the last one, and only while streaming. */
     const lastIndex = list.length - 1;
 
+    /* KEEP THE FOOT IN VIEW. A thread that scrolls needs to follow its own
+       newest words: on a new turn, and while one is streaming, the region
+       pins to its bottom. Only when it CAN scroll — the standalone card has
+       no scrollHeight surplus and this is a no-op there. Deliberately simple
+       (no "user scrolled up" detection): the panel is a conversation, and the
+       newest words are the ones being read. */
+    const turnsRef = React.useRef<HTMLDivElement | null>(null);
+    React.useEffect(() => {
+      const el = turnsRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, [list.length, streaming]);
+
     return (
       <div
         ref={ref}
@@ -660,12 +672,29 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
         ) : null}
 
         <div
+          ref={turnsRef}
           data-slot="agent-chat-turns"
           /* motion.css §10 rule (b): the container must not animate its own
              height while streaming. `.motion-stream-body` states that. */
           /* No `--measure-body` cap: ruling 36's 62% is the width rule now,
              and the two are different numbers for different things. */
-          className="motion-stream-body flex min-w-0 flex-col items-stretch gap-[var(--space-2h)]"
+          /* FILL AND SCROLL. In a height-constrained host (the assistant
+             slide-in gives this component `h-full`), a column with no growing
+             region huddles at the top: empty state and composer pressed under
+             the header, a void below, and a LONG thread walking invisibly out
+             of the panel with no way to scroll it — the owner's screenshot,
+             26 Aug 2026: "the chat function is completely broken". The turns
+             region is the part that grows and the part that scrolls, which is
+             also what pins the composer to the foot, where a thumb expects
+             it. In the standalone auto-height card these three classes are
+             inert: no free space to grow into, nothing to scroll. The empty
+             register centres in the grown region rather than hanging off the
+             header. */
+          className={cn(
+            "motion-stream-body flex min-w-0 flex-col items-stretch gap-[var(--space-2h)]",
+            "min-h-0 flex-1 overflow-y-auto",
+            state === "empty" && "justify-center",
+          )}
         >
           {state === "loading"
             ? (loadingState ?? <Skeleton variant="text" lines={4} label={loadingLabel} />)
