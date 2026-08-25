@@ -76,7 +76,6 @@ export function SelectableFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("New dropdown value")}</DialogTitle>}
       subtitle={

@@ -129,7 +129,6 @@ export function StaffProfileDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{subjectName}&apos;s profile</DialogTitle>}
       subtitle={

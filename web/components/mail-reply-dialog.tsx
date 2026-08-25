@@ -142,7 +142,6 @@ export function MailReplyDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy !== null}
-      clearDraft={clearDraft}
       onSubmit={send}
       title={<DialogTitle>{t("Reply by email")}</DialogTitle>}
       subtitle={

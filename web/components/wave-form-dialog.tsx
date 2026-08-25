@@ -118,7 +118,6 @@ export function WaveFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{editing ? t("Edit wave") : t("Sell a wave")}</DialogTitle>}
       subtitle={

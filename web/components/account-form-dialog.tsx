@@ -283,7 +283,6 @@ export function AccountFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={
         <DialogTitle>{isEdit ? t("Edit this account") : t("Add an account")}</DialogTitle>

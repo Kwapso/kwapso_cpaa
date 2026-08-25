@@ -119,7 +119,6 @@ export function ProcessFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{editing ? t("Edit process") : t("Map a process")}</DialogTitle>}
       subtitle={

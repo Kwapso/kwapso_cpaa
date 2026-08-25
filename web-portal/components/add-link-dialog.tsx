@@ -82,7 +82,6 @@ export function AddLinkDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Add a link")}</DialogTitle>}
       subtitle={

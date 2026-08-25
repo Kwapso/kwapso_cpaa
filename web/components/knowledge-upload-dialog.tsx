@@ -156,7 +156,6 @@ export function KnowledgeUploadDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Add a file to the knowledge base")}</DialogTitle>}
       subtitle={

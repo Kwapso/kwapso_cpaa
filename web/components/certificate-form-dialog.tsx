@@ -101,7 +101,6 @@ export function CertificateFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{isEdit ? t("Edit certificate") : `Record a certificate for ${subjectName}`}</DialogTitle>}
       subtitle={

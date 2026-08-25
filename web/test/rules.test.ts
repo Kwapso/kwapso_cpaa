@@ -2419,3 +2419,29 @@ describe("a record's name survives a narrow screen", () => {
     ).toEqual([])
   })
 })
+
+// A DISMISSED FORM KEEPS WHAT YOU TYPED — held here, not only in the hook's tests.
+//
+// The behaviour lives in two files: `useFormDraft` stores it, and
+// `FormShellDialog` decides whether closing throws it away. It used to, on every
+// dismiss — Esc, backdrop, the close button — and on a phone the backdrop is most
+// of the screen. Every form in BOTH front doors renders through this shell (R4),
+// so one line here is the whole app's answer, and one line here can also undo it.
+describe("closing a form is not a decision to discard it", () => {
+  it("form-drafts: FormShellDialog does not clear the draft on dismiss", () => {
+    const src = stripComments(read(join(ROOT, "shared", "web", "form-shell.tsx")))
+    const handler = src.slice(src.indexOf("onOpenChange={(o) =>"), src.indexOf("onOpenChange={(o) =>") + 260)
+    expect(handler, "the dismiss handler must still exist to be checked").toContain("if (busy) return")
+    expect(
+      handler,
+      "closing a form must not throw the draft away — clear it on submit instead"
+    ).not.toContain("clearDraft")
+  })
+
+  it("form-drafts: a saved draft is merged over the form's shape", () => {
+    // Whole-object restore is how a newly added field silently becomes undefined.
+    const src = stripComments(read(join(ROOT, "shared", "web", "use-form-draft.ts")))
+    expect(src, "read() must take the current shape").toMatch(/function read<T extends object>\(\s*id: string,\s*shape: T/)
+    expect(src, "…and spread it under the saved values").toContain("{ ...shape, ...saved }")
+  })
+})

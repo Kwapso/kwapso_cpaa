@@ -163,7 +163,6 @@ export function KnowledgeFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{isEdit ? t("Correct this source") : t("Add to the knowledge base")}</DialogTitle>}
       subtitle={

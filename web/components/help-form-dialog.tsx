@@ -243,7 +243,6 @@ export function HelpFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{isEdit ? t("Edit this ticket") : t("Raise a ticket")}</DialogTitle>}
       subtitle={

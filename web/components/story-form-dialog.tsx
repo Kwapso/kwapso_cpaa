@@ -342,7 +342,6 @@ export function StoryFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{editing ? t("Edit story") : t("New story")}</DialogTitle>}
       subtitle={

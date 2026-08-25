@@ -87,7 +87,6 @@ export function TeamEditDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Edit your team")}</DialogTitle>}
       subtitle={

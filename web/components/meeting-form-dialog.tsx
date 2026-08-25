@@ -148,7 +148,6 @@ export function MeetingFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{isEdit ? t("Edit this meeting") : t("New meeting")}</DialogTitle>}
       subtitle={

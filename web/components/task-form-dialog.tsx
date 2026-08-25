@@ -202,7 +202,6 @@ export function TaskFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("New task")}</DialogTitle>}
       subtitle={<DialogDescription>{t("Our own admin. Time can be logged against it.")}</DialogDescription>}

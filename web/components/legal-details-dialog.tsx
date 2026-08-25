@@ -99,7 +99,6 @@ export function LegalDetailsDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Our details")}</DialogTitle>}
       subtitle={

@@ -126,7 +126,6 @@ export function RaiseTicketDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Ask us something")}</DialogTitle>}
       subtitle={

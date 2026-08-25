@@ -76,7 +76,6 @@ export function ResolveDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Answer this ticket")}</DialogTitle>}
       subtitle={

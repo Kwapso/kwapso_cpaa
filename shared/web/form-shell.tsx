@@ -129,10 +129,22 @@ export function FormShell({
 /** A FormShell inside a dialog — which is how nearly every form in the app appears.
  *
  * The wrapper around FormShell was written out eleven times, byte for byte: the same
- * Dialog, the same DialogContent, and the same two dismissal rules, which are the only
- * part with teeth. While a save is in flight the form CANNOT be dismissed (busy), and
- * dismissing it any other way — Esc, backdrop, the close button — DISCARDS the draft,
- * so a form the user walked away from doesn't reappear half-filled tomorrow.
+ * Dialog, the same DialogContent, and the same dismissal rule, which is the only part
+ * with teeth: while a save is in flight the form CANNOT be dismissed (busy).
+ *
+ * A DISMISSED FORM KEEPS WHAT YOU TYPED. It did not, and the argument for throwing it
+ * away was that "a form the user walked away from doesn't reappear half-filled
+ * tomorrow" — which was answering a worry the storage had already answered. Drafts
+ * live in sessionStorage: they die with the tab and are wiped on sign-out, so tomorrow
+ * was never on the table. What the rule actually did was punish the commonest accident
+ * there is, and on a phone it is barely an accident at all — the backdrop is most of
+ * the screen. The owner, reporting it: "I type in three little input components, shut
+ * it by mistake, reopen the same form three seconds later, and the changes are gone."
+ *
+ * So the draft is cleared on SUBMIT, where a real record has superseded it — by the
+ * form itself, which already did that. The shell used to take a `clearDraft` prop for
+ * the dismiss path; with no dismiss path to serve it was a prop nothing read, so it
+ * is gone and every call site is one line shorter.
  *
  * The draft itself stays at the call site: each form owns the shape of what it saves,
  * so `useFormDraft` lives there and hands `clearDraft` down. */
@@ -140,7 +152,6 @@ export function FormShellDialog({
   open,
   onOpenChange,
   busy,
-  clearDraft,
   title,
   subtitle,
   children,
@@ -152,8 +163,6 @@ export function FormShellDialog({
   onOpenChange: (open: boolean) => void
   /** A save in flight — the dialog refuses to close until it lands. */
   busy?: boolean
-  /** Dismissing the form throws its draft away. */
-  clearDraft?: () => void
   /** Pass a <DialogTitle>…</DialogTitle>. */
   title: React.ReactNode
   /** Pass a <DialogDescription>…</DialogDescription>. */
@@ -171,7 +180,8 @@ export function FormShellDialog({
       open={open}
       onOpenChange={(o) => {
         if (busy) return
-        if (!o) clearDraft?.()
+        // NOTHING IS DISCARDED HERE. Closing a form is not a decision to throw
+        // away what you typed — see the header.
         onOpenChange(o)
       }}
     >

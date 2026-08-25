@@ -252,7 +252,6 @@ export function SprintFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{isEdit ? t("Edit this sprint") : t("Start a sprint")}</DialogTitle>}
       subtitle={

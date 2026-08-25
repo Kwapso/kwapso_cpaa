@@ -79,7 +79,6 @@ export function InviteDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Invite someone to the team")}</DialogTitle>}
       subtitle={

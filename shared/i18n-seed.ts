@@ -1892,9 +1892,34 @@ export const SEED: Catalogue = {
   // Where a new step lands. "Beside" is the whole gesture that draws a fork, so
   // it is a sentence with a hole rather than a word beside a name — the hole is
   // the only shape a translator can move.
-  "After everything else": { de: "Nach allem anderen", es: "Después de todo lo demás", ca: "Després de tot la resta" },
   "Beside {step}": { de: "Neben {step}", es: "Junto a {step}", ca: "Al costat de {step}" },
-  "Where it goes": { de: "Wohin er gehört", es: "Dónde va", ca: "On va" },
+  // The step form's shape question, asked in whole sentences because a fragment
+  // is not something a translator can reorder around anything.
+  "Does the work split here?": {
+    de: "Teilt sich die Arbeit hier?",
+    es: "¿Se divide el trabajo aquí?",
+    ca: "Es divideix la feina aquí?",
+  },
+  "No — it just carries on": {
+    de: "Nein — es geht einfach weiter",
+    es: "No — simplemente continúa",
+    ca: "No — simplement continua",
+  },
+  "Yes — this is one of the ways it can go": {
+    de: "Ja — das ist einer der möglichen Wege",
+    es: "Sí — este es uno de los caminos posibles",
+    ca: "Sí — aquest és un dels camins possibles",
+  },
+  "It is an alternative to": {
+    de: "Es ist eine Alternative zu",
+    es: "Es una alternativa a",
+    ca: "És una alternativa a",
+  },
+  "This way is taken when": {
+    de: "Dieser Weg wird gewählt, wenn",
+    es: "Este camino se toma cuando",
+    ca: "Aquest camí es pren quan",
+  },
   "Light, dark, or whatever this device is set to. It is remembered on this device.": {
     de: "Hell, dunkel oder was dieses Gerät eingestellt hat. Es wird auf diesem Gerät gemerkt.",
     es: "Claro, oscuro o lo que tenga este dispositivo. Se recuerda en este dispositivo.",

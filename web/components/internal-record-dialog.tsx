@@ -112,7 +112,6 @@ export function InternalRecordDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{title}</DialogTitle>}
       subtitle={<DialogDescription>{subtitle}</DialogDescription>}

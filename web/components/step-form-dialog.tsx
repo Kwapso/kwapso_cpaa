@@ -94,6 +94,9 @@ const NONE = "__none__"
 const NEW = "__new__"
 /** WHERE A NEW STEP LANDS by default: at the end, on its own. */
 const AFTER_ALL = "__after_all__"
+/** The two answers to "does the work split here?". */
+const STRAIGHT = "__straight__"
+const SPLIT = "__split__"
 
 const nameField = { ...defaultFieldConfig, label: "Step", required: true }
 const descField = { ...defaultFieldConfig, label: "What happens in it", required: false }
@@ -116,17 +119,23 @@ const toolField = {
   required: false,
   hint: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
 }
-const placeField = {
+const shapeField = {
   ...defaultFieldConfig,
-  label: "Where it goes",
+  label: "Does the work split here?",
   required: false,
-  hint: "Beside another step means the work SPLITS there — two things that can happen next. The step after them joins it back up.",
+  hint: "A split is two things that can happen next, and which one happens depends on something. The next step you add afterwards joins them back up on its own.",
+}
+const insteadField = {
+  ...defaultFieldConfig,
+  label: "It is an alternative to",
+  required: false,
+  hint: "The step this one happens INSTEAD of. The two sit side by side in the picture.",
 }
 const branchField = {
   ...defaultFieldConfig,
-  label: "Only when",
+  label: "This way is taken when",
   required: false,
-  hint: "Leave empty unless this step is one branch of a decision.",
+  hint: "The words that decide it — written the way somebody would say it out loud.",
 }
 const loopField = { ...defaultFieldConfig, label: "Sends the work back to", required: false }
 
@@ -198,6 +207,10 @@ export function StepFormDialog({
     const n = Number(raw.trim())
     return raw.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
   }
+  // SPLITTING IS DERIVED, never stored: a step is one branch of a fork exactly
+  // when it has been placed beside another one. Two facts that could disagree
+  // would eventually disagree.
+  const splitting = values.place !== AFTER_ALL && values.place !== undefined
   const minutes = whole(values.minutes)
   const runs = whole(values.runs)
   const namingRole = values.roleId === NEW
@@ -249,7 +262,6 @@ export function StepFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{editing ? t("Edit step") : t("Add a step")}</DialogTitle>}
       subtitle={
@@ -408,53 +420,104 @@ export function StepFormDialog({
         )}
       </Field>
 
-      {/* THE SHAPE. All three empty on nearly every step, which is why they sit
-          last: a fork and a loop are real and uncommon, and a form that asked
-          about them first would make every ordinary step feel complicated.
-          
-          "Where it goes" is HOW A FORK IS DRAWN, and it is the only way. Two
-          steps at the same position are branches of one decision — the owner's
-          own model — so putting a step BESIDE another one is the whole gesture.
-          There is nothing to press for a rejoin: the next step added after
-          everything else lands on its own, and one column after two IS the join.
-          
-          Only on a NEW step. Moving an existing one around is a different verb
-          with a different door, and offering it here would look like it worked. */}
+      {/* THE SHAPE OF THE WORK, asked as ONE question instead of three fields a
+          person had to assemble in their head.
+
+          It was "Where it goes" + "Only when" + "Sends the work back to", three
+          unrelated-looking pickers at the bottom of a form, and the owner's
+          verdict was fair: "how the fuck do you split something and join
+          something, and what is a condition?" The controls were right and the
+          QUESTION was never asked. So it is asked now, in the words somebody
+          would use about their own business, and the two fields a split needs
+          appear together underneath it only once the answer is yes.
+
+          A SPLIT IS STILL TWO STEPS AT ONE POSITION — the owner's own model, and
+          what the picture draws. Nothing about the data changed; what changed is
+          that the form says so. And a REJOIN still needs no control: the next
+          step added the ordinary way lands on its own, and one box after two IS
+          the join. The helper line says that out loud rather than leaving
+          somebody hunting for a button that should not exist. */}
       {!editing && peers.length > 0 && (
-        <Field config={placeField} htmlFor="step-place" className={fieldSpacing}>
+        <Field config={shapeField} htmlFor="step-shape" className={fieldSpacing}>
           <Select
-            value={values.place}
-            onValueChange={(v) => setValues((s) => ({ ...s, place: v }))}
+            value={splitting ? SPLIT : STRAIGHT}
+            onValueChange={(v) =>
+              setValues((st) => ({
+                ...st,
+                // Choosing "it carries on" clears BOTH halves of the split, so a
+                // half-answered fork can never be submitted.
+                place: v === SPLIT ? (st.place === AFTER_ALL ? peers[0].stepKey : st.place) : AFTER_ALL,
+                branch: v === SPLIT ? st.branch : "",
+              }))
+            }
             disabled={busy}
           >
-            <SelectTrigger id="step-place">
-              <SelectValue placeholder={t("After everything else")} />
+            <SelectTrigger id="step-shape">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={AFTER_ALL}>{t("After everything else")}</SelectItem>
-              {peers.map((x) => (
-                <SelectItem key={x.stepKey} value={x.stepKey}>
-                  {t("Beside {step}").replace("{step}", x.name)}
-                </SelectItem>
-              ))}
+              <SelectItem value={STRAIGHT}>{t("No — it just carries on")}</SelectItem>
+              <SelectItem value={SPLIT}>{t("Yes — this is one of the ways it can go")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
       )}
-      <Field config={branchField} htmlFor="step-branch" className={fieldSpacing}>
-        <Input
-          id="step-branch"
-          value={values.branch}
-          onChange={(e) => setValues((s) => ({ ...s, branch: e.target.value }))}
-          placeholder={t("e.g. if the claim is rejected")}
-          disabled={busy}
-        />
-      </Field>
+
+      {splitting && (
+        /* The two halves of a split, together and indented, because neither one
+           means anything without the other: WHICH step this is an alternative
+           to, and WHEN this way is taken instead. */
+        <div className="border-primary/40 ml-1 flex flex-col gap-4 border-l-2 pl-4">
+          <Field config={insteadField} htmlFor="step-place">
+            <Select
+              value={values.place === AFTER_ALL ? peers[0].stepKey : values.place}
+              onValueChange={(v) => setValues((st) => ({ ...st, place: v }))}
+              disabled={busy}
+            >
+              <SelectTrigger id="step-place">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {peers.map((x) => (
+                  <SelectItem key={x.stepKey} value={x.stepKey}>
+                    {x.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field config={branchField} htmlFor="step-branch">
+            <Input
+              id="step-branch"
+              value={values.branch}
+              onChange={(e) => setValues((st) => ({ ...st, branch: e.target.value }))}
+              placeholder={t("e.g. if the claim is rejected")}
+              disabled={busy}
+            />
+          </Field>
+        </div>
+      )}
+
+      {/* EDITING a step keeps the plain condition box: the shape question above
+          is about where a NEW step lands, and moving an existing one is a
+          different verb with a different door. */}
+      {editing && (
+        <Field config={branchField} htmlFor="step-branch" className={fieldSpacing}>
+          <Input
+            id="step-branch"
+            value={values.branch}
+            onChange={(e) => setValues((st) => ({ ...st, branch: e.target.value }))}
+            placeholder={t("e.g. if the claim is rejected")}
+            disabled={busy}
+          />
+        </Field>
+      )}
+
       {peers.length > 0 && (
         <Field config={loopField} htmlFor="step-loop" className={fieldSpacing}>
           <Select
             value={values.loop}
-            onValueChange={(v) => setValues((s) => ({ ...s, loop: v }))}
+            onValueChange={(v) => setValues((st) => ({ ...st, loop: v }))}
             disabled={busy}
           >
             <SelectTrigger id="step-loop">
@@ -462,15 +525,16 @@ export function StepFormDialog({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>{t("Nowhere — it carries on")}</SelectItem>
-              {peers.map((p) => (
-                <SelectItem key={p.stepKey} value={p.stepKey}>
-                  {p.name}
+              {peers.map((x) => (
+                <SelectItem key={x.stepKey} value={x.stepKey}>
+                  {x.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
       )}
+
       {/* The add-a-role and add-a-tool rows are the only place this form creates
           anything of its own, and the icon says so (the house mapping: create =
           Plus). It is a hint rather than a button because the Select above IS

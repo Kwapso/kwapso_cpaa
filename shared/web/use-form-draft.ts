@@ -19,10 +19,26 @@ import * as React from "react"
 const PREFIX = "kwapso:draft:"
 const storageKey = (id: string) => PREFIX + id
 
-function read<T>(id: string): T | null {
+/**
+ * A saved draft, MERGED OVER the form's current shape — never in place of it.
+ *
+ * It used to return the stored object whole, and that is a silent bug generator:
+ * the day a form gains a field, anybody holding a draft written before it gets
+ * `undefined` for that field, with no error and nothing on screen to say so. It
+ * cost a real feature — the step form grew a "Where it goes" picker, the picker
+ * rendered its PLACEHOLDER (which is what a Select shows for an undefined
+ * value), so it looked set and carried nothing, and the fork it exists to draw
+ * silently did not happen.
+ *
+ * Merging fixes the class rather than the instance: a field the draft has wins,
+ * a field it has never heard of keeps the shape's own value.
+ */
+function read<T extends object>(id: string, shape: T): T | null {
   try {
     const raw = sessionStorage.getItem(storageKey(id))
-    return raw ? (JSON.parse(raw) as T) : null
+    if (!raw) return null
+    const saved = JSON.parse(raw) as Partial<T>
+    return { ...shape, ...saved }
   } catch {
     return null
   }
@@ -77,7 +93,7 @@ export function useFormDraft<T extends object>(
   // inactive→active edge (a reopened dialog). Synchronous (not an effect) so even
   // UNCONTROLLED inputs — the rich-text editor — mount with the saved value, not empty.
   const [values, setValuesRaw] = React.useState<T>(() =>
-    active && id ? (read<T>(id) ?? initial) : initial
+    active && id ? (read<T>(id, initial) ?? initial) : initial
   )
   // Bumped each time the form re-activates — key uncontrolled editors by it so they
   // remount with the restored value.
@@ -86,7 +102,7 @@ export function useFormDraft<T extends object>(
   if (active !== prevActive.current) {
     prevActive.current = active
     if (active) {
-      setValuesRaw(id ? (read<T>(id) ?? initialRef.current) : initialRef.current)
+      setValuesRaw(id ? (read<T>(id, initialRef.current) ?? initialRef.current) : initialRef.current)
       setSeed((s) => s + 1)
     }
   }

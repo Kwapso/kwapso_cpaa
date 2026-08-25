@@ -297,7 +297,6 @@ export function AppFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{editing ? t("Edit app") : t("Record an app")}</DialogTitle>}
       subtitle={

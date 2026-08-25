@@ -196,7 +196,6 @@ export function ReviewDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Ready for review")}</DialogTitle>}
       subtitle={

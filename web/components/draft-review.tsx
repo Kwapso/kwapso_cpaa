@@ -202,7 +202,6 @@ export function DraftReviewDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("What the call proposed")}</DialogTitle>}
       subtitle={

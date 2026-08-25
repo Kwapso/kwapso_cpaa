@@ -74,7 +74,6 @@ export function TriageReplyDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{t("Reply")}</DialogTitle>}
       subtitle={<DialogDescription>{t("A message on the ticket. It does not resolve it.")}</DialogDescription>}

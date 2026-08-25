@@ -149,7 +149,6 @@ export function TimeFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       busy={busy}
-      clearDraft={clearDraft}
       onSubmit={submit}
       title={<DialogTitle>{isEdit ? t("Correct this time") : t("Log time")}</DialogTitle>}
       subtitle={
