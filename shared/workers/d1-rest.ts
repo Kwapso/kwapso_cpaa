@@ -363,6 +363,54 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
  * multi-statement entry point, which is what this always asked the REST door
  * for — so migrations, seeds and the copy path behave identically, they just
  * stop paying for a management-API call each. */
+/**
+ * SPLIT A SCRIPT INTO ITS STATEMENTS, respecting quoting.
+ *
+ * `D1Database.exec()` is a MAINTENANCE door: it splits its input by NEWLINE and
+ * treats each line as a whole statement. Every script in this repo is written as
+ * an indented multi-line template, so on the native path the first line arrived
+ * alone and SQLite answered `incomplete input` — which is precisely what it was
+ * given. That went unseen because `logActivity` writes its row inside a
+ * try/catch, so the audit trail stopped without a single failed request.
+ *
+ * `batch()` has no such rule: it takes prepared statements and runs them in one
+ * transaction, which is also the semantics an exec SCRIPT already implied. So
+ * the only thing missing is the split, and the only hard part of the split is
+ * that a `;` inside a value is not a statement boundary — `sqlString` escapes a
+ * quote by doubling it, so the scanner has to read the same grammar back.
+ */
+export function splitStatements(script: string): string[] {
+  const out: string[] = []
+  let start = 0
+  let inString = false
+  for (let i = 0; i < script.length; i++) {
+    const c = script[i]
+    if (inString) {
+      /* '' inside a string is an escaped quote, not the end of one. */
+      if (c === "'") {
+        if (script[i + 1] === "'") i++
+        else inString = false
+      }
+      continue
+    }
+    if (c === "'") { inString = true; continue }
+    /* -- runs to the end of the line, and a `;` inside one is not a boundary. */
+    if (c === "-" && script[i + 1] === "-") {
+      const nl = script.indexOf("\n", i)
+      i = nl === -1 ? script.length : nl
+      continue
+    }
+    if (c === ";") {
+      const stmt = script.slice(start, i).trim()
+      if (stmt) out.push(stmt)
+      start = i + 1
+    }
+  }
+  const tail = script.slice(start).trim()
+  if (tail) out.push(tail)
+  return out
+}
+
 export async function d1ExecScript(
   cfg: D1Rest,
   databaseId: string,
@@ -372,7 +420,11 @@ export async function d1ExecScript(
   if (native) {
     const started = Date.now()
     try {
-      await native.exec(script)
+      /* NOT `exec()` — see splitStatements above for why it cannot take these.
+         batch() runs the lot in one transaction, which is what a script meant. */
+      const statements = splitStatements(script)
+      if (statements.length === 0) return
+      await native.batch(statements.map((sql) => native.prepare(sql)))
     } finally {
       cfg.stats?.push({ op: "EXEC script", ms: Date.now() - started })
     }

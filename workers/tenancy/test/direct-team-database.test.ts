@@ -21,7 +21,7 @@
 
 import { describe, expect, it, vi } from "vitest"
 
-import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { nativeTeamDatabases } from "@shared/workers/gating"
 
 const OURS = "727537f7-aaaa-bbbb-cccc-000000000001"
@@ -179,5 +179,121 @@ describe("what the env scan will and will not accept", () => {
     // never end up in the per-team routing map.
     const map = nativeTeamDatabases({ DB: db, TEAM_DB_0: db, TEAM_DB_0_ID: OURS } as never)
     expect(Object.values(map)).toHaveLength(1)
+  })
+})
+
+// AND THE WRITE PATH, WHICH THIS SUITE DID NOT COVER — SO IT BROKE.
+//
+// Everything above proves `d1Query`. `d1ExecScript` is the other half of the
+// data door and it was never exercised here, so when the native path shipped it
+// took `D1Database.exec()` — which is a MAINTENANCE door. exec() splits its
+// input BY NEWLINE and treats each line as a whole statement. Every script in
+// this repo is an indented multi-line template, so the first line arrived alone
+// and SQLite answered, accurately, `incomplete input`.
+//
+// It was invisible for a day because `logActivity` writes its row inside a
+// try/catch: the audit trail simply stopped, and no request failed. The
+// knowledge base's sync is what surfaced it, because that one returns its error.
+//
+// So: the native write path goes through `batch()` with real statements, and a
+// `;` inside a VALUE is not a statement boundary — `sqlString` escapes a quote
+// by doubling it, and the splitter reads the same grammar back.
+describe("the native path can write, not only read", () => {
+  /** A binding that records what it was asked to prepare and batch. */
+  function fakeWriter() {
+    const prepared: string[] = []
+    const batches: number[] = []
+    let execCalls = 0
+    return {
+      prepared,
+      batches,
+      execCalls: () => execCalls,
+      binding: {
+        prepare(sql: string) {
+          prepared.push(sql)
+          return { sql }
+        },
+        async batch(stmts: unknown[]) {
+          batches.push(stmts.length)
+          return []
+        },
+        async exec() {
+          execCalls++
+          return { count: 0, duration: 0 }
+        },
+      } as unknown as D1Database,
+    }
+  }
+
+  const cfgFor = (binding: D1Database): D1Rest =>
+    ({ accountId: "acct", token: "t", natives: { [OURS]: binding } }) as unknown as D1Rest
+
+  it("exec-script: a multi-line statement arrives WHOLE, not one line at a time", async () => {
+    const w = fakeWriter()
+    await d1ExecScript(
+      cfgFor(w.binding),
+      OURS,
+      `INSERT INTO activity
+         (id, type, description)
+       VALUES ('01A', 'created', 'a thing');`
+    )
+    expect(w.prepared).toHaveLength(1)
+    expect(w.prepared[0], "the statement must not be cut at the first newline").toContain("INSERT INTO activity")
+    expect(w.prepared[0]).toContain("VALUES")
+    expect(w.batches).toEqual([1])
+  })
+
+  it("exec-script: exec() is never used — it is the door that cannot take these", async () => {
+    const w = fakeWriter()
+    await d1ExecScript(cfgFor(w.binding), OURS, `UPDATE t SET a = 1\n WHERE b = 2;`)
+    expect(w.execCalls(), "exec() splits by newline; that is the whole bug").toBe(0)
+  })
+
+  it("exec-script: a semicolon INSIDE a value is not a statement boundary", async () => {
+    const w = fakeWriter()
+    // What a real error message looks like once sqlString has quoted it.
+    await d1ExecScript(
+      cfgFor(w.binding),
+      OURS,
+      `UPDATE google_connections SET last_error = 'read failed; retry later' WHERE id = '01B';`
+    )
+    expect(w.prepared, "one statement, not two").toHaveLength(1)
+    expect(w.prepared[0]).toContain("retry later")
+  })
+
+  it("exec-script: a doubled quote is an escaped quote, not the end of the string", async () => {
+    const w = fakeWriter()
+    await d1ExecScript(cfgFor(w.binding), OURS, `UPDATE t SET a = 'it''s here; really' WHERE id = '1';`)
+    expect(w.prepared).toHaveLength(1)
+  })
+
+  it("exec-script: several real statements still run as several", async () => {
+    const w = fakeWriter()
+    await d1ExecScript(cfgFor(w.binding), OURS, `UPDATE a SET x = 1;\nUPDATE b SET y = 2;`)
+    expect(w.prepared).toHaveLength(2)
+    expect(w.batches, "one transaction, both statements").toEqual([2])
+  })
+
+  it("exec-script: a script with nothing in it asks the database for nothing", async () => {
+    const w = fakeWriter()
+    await d1ExecScript(cfgFor(w.binding), OURS, `  \n ; \n `)
+    expect(w.prepared).toHaveLength(0)
+    expect(w.batches).toHaveLength(0)
+  })
+
+  it("exec-script: a database with no binding still goes the way it always did", async () => {
+    const w = fakeWriter()
+    const fetched: string[] = []
+    const cfg = {
+      accountId: "acct",
+      token: "t",
+      natives: { [OURS]: w.binding },
+      fetch: async (url: string, init: RequestInit) => {
+        fetched.push(String(init.body))
+        return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 })
+      },
+    } as unknown as D1Rest
+    await d1ExecScript(cfg, THEIRS, `UPDATE t SET a = 1;`).catch(() => {})
+    expect(w.prepared, "the unbound id must not touch the bound database").toHaveLength(0)
   })
 })
