@@ -2070,19 +2070,33 @@ export async function updateStep(
   const process = await processOrThrow(cfg, guard, scope, before.processId)
   const nextRoleId = input.roleId === undefined ? before.roleId : input.roleId
   const nextTool = input.toolId === undefined ? before.toolId : input.toolId
-  // THE ROLE'S COST IS RE-FROZEN ONLY WHEN THE ROLE CHANGES, and that is the
-  // owner's ruling working: leaving the role alone keeps the cost the step was
-  // recorded with, so editing a duration does not silently re-price history at
-  // today's rate. Picking a DIFFERENT role is a new fact and takes that role's
-  // cost as of now.
+  // THE ROLE'S COST IS RE-FROZEN WHEN THE ROLE CHANGES, and that is the owner's
+  // ruling working: leaving the role alone keeps the cost the step was recorded
+  // with, so editing a duration does not silently re-price history at today's
+  // rate. Picking a DIFFERENT role is a new fact and takes that role's cost now.
+  //
+  // …AND WHEN THE STEP HAS NO COST AT ALL, which is a different case that the
+  // rule above was swallowing. A step written while its role had no rate carries
+  // `null`, and `null` is not a price somebody agreed — it is the absence of one.
+  // Protecting it protected nothing and made the gap permanent: the screen said
+  // "the money covers 4 of 5 steps", the owner priced the missing role, re-saved
+  // the step, and it still said 4 of 5. There was no way, through the app, to
+  // ever price that step — the only escape was to switch the role to another and
+  // back, which is a trick rather than a feature.
+  //
+  // So a gap fills; a price never moves. `null -> a number` is the one transition
+  // this allows, and a step that already carries a cost is untouched.
   const roleChanged = nextRoleId !== before.roleId
-  const nextRole = roleChanged && nextRoleId
+  const fillingAGap = !roleChanged && nextRoleId !== null && before.roleCentsPerHour === null
+  const nextRole = (roleChanged || fillingAGap) && nextRoleId
     ? await roleInScopeOrThrow(cfg, guard, scope, nextRoleId, process.accountId)
     : null
   const nextRoleName = roleChanged ? (nextRole?.name ?? null) : before.roleName
   const nextRoleCents = roleChanged
     ? (nextRole?.cents_per_hour ?? null)
-    : before.roleCentsPerHour
+    : fillingAGap
+      ? (nextRole?.cents_per_hour ?? null)
+      : before.roleCentsPerHour
   if (nextTool && nextTool !== before.toolId)
     await toolInScopeOrThrow(cfg, guard, scope, nextTool, process.accountId)
   const period = input.frequencyPeriod === undefined

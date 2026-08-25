@@ -269,6 +269,64 @@ describe("the saving, measured from the version in force at the audit date", () 
     expect(saving.totalSteps).toBe(1)
   })
 
+  // A GAP IS NOT A PRICE, AND THE RULE ABOVE WAS SWALLOWING THE DIFFERENCE.
+  //
+  // "The rate is frozen onto the step" protects a figure the client agreed to
+  // from a later payroll rise — the test above. It was ALSO stopping a step that
+  // had never had a cost from ever getting one: `null` is not a price somebody
+  // agreed, it is the absence of one, and protecting it made the gap permanent.
+  // On staging the owner priced the missing role, re-saved the step, and the
+  // screen still read "the money covers 4 of 5". Through the app there was no
+  // way to make it 5 — the only escape was switching the role to another and
+  // back, which is a trick, not a feature.
+  it("a step with NO cost takes one the moment its role has one", async () => {
+    const processId = await aMap()
+    await addStep(cfg, guard, staff, actor, {
+      processId, name: "Pay it", secondsPerRun: 1500, runsPerPeriod: 30, roleId: "ROLE_FREE",
+    })
+    await cutVersion(cfg, guard, staff, actor, { processId, label: "After" })
+    await updateStep(cfg, guard, staff, actor, await liveStepId(processId), {
+      name: "Pay it", secondsPerRun: 300, runsPerPeriod: 30, roleId: "ROLE_FREE",
+    })
+    expect(
+      (await listSavings(cfg, guard, staff, { processId })).apps[0].processes[0].pricedSteps,
+      "no rate anywhere yet, so nothing is priced"
+    ).toBe(0)
+
+    // The role finally gets one…
+    ;(holder.db as DatabaseSync).exec(`UPDATE client_roles SET cents_per_hour = 5500 WHERE id = 'ROLE_FREE'`)
+    // …and re-saving the step is what takes it. Editing is the deliberate act.
+    await updateStep(cfg, guard, staff, actor, await liveStepId(processId), {
+      name: "Pay it", secondsPerRun: 300, runsPerPeriod: 30, roleId: "ROLE_FREE",
+    })
+
+    const saving = (await listSavings(cfg, guard, staff, { processId })).apps[0].processes[0]
+    expect(saving.pricedSteps, "the gap fills").toBe(1)
+    expect(saving.steps[0].savedCentsPerMonth, "and the money is real now").toBeGreaterThan(0)
+  })
+
+  it("…but a step that already HAS a cost still refuses to move", async () => {
+    const processId = await aMap()
+    await addStep(cfg, guard, staff, actor, {
+      processId, name: "Take the call", secondsPerRun: 1500, runsPerPeriod: 30, roleId: "ROLE_CLERK",
+    })
+    await cutVersion(cfg, guard, staff, actor, { processId, label: "After" })
+    await updateStep(cfg, guard, staff, actor, await liveStepId(processId), {
+      name: "Take the call", secondsPerRun: 300, runsPerPeriod: 30, roleId: "ROLE_CLERK",
+    })
+    const before = (await listSavings(cfg, guard, staff, { processId })).savedCentsPerMonth
+
+    ;(holder.db as DatabaseSync).exec(`UPDATE client_roles SET cents_per_hour = 99999 WHERE id = 'ROLE_CLERK'`)
+    // Re-saving it — the exact act that fills a gap — must not re-price this one.
+    await updateStep(cfg, guard, staff, actor, await liveStepId(processId), {
+      name: "Take the call", secondsPerRun: 300, runsPerPeriod: 30, roleId: "ROLE_CLERK",
+    })
+    expect(
+      (await listSavings(cfg, guard, staff, { processId })).savedCentsPerMonth,
+      "a price the client agreed to is still frozen"
+    ).toBe(before)
+  })
+
   it("moving the audit date twice to the same day writes one history line, not two", async () => {
     const processId = await aMap()
     await setAuditDate(cfg, guard, staff, actor, processId, "2026-06-01")
