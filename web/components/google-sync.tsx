@@ -169,14 +169,24 @@ export function GoogleSyncButton({
     // Starts true so the calendar-only case never claims "not connected" on
     // knowledge's behalf; the knowledge sweep overwrites it with the truth.
     let anythingConnected = true
+    // ANOTHER DEVICE, NOT ANOTHER TAB. `runExclusive` already stops this tab
+    // pressing twice; this is the door's own lease saying somebody else's
+    // press is in flight right now (the owner's "persist across the same
+    // user's multiple sessions on different devices", 26 Aug 2026). It is not
+    // an error — it is the honest reason "brought" stayed at 0.
+    let busyElsewhere = false
     try {
       if (doesCalendar) {
         // `runExclusive` starts it, or JOINS the one already going — which is
         // how the Meetings page's own button and this one stay one act.
         const r = await runExclusive(calendarJobKey(teamId), () => content.syncCalendar())
         onCalendarResult?.(r)
-        brought += r.created + r.updated + r.cancelled
-        changed = changed || r.created + r.updated + r.cancelled > 0
+        if (r.busy) {
+          busyElsewhere = true
+        } else {
+          brought += r.created + r.updated + r.cancelled
+          changed = changed || r.created + r.updated + r.cancelled > 0
+        }
       }
       if (doesKnowledge) {
         // The WHOLE walk is one act, not one act per pass: a person who leaves
@@ -188,6 +198,9 @@ export function GoogleSyncButton({
           let connected = true
           for (let pass = 0; pass < MAX_SYNC_PASSES; pass++) {
             const r = await content.syncGoogleKnowledge()
+            // Another device's press is holding the lease. Stop here rather
+            // than spin through the remaining passes hitting the same refusal.
+            if (r.busy) return { indexed, connected, error: null as string | null, busy: true }
             connected = r.connectedServices.length > 0
             indexed += r.results.reduce((n, k) => n + k.indexed, 0)
             // A KIND THAT FAILED CARRIES ITS OWN SENTENCE (R12 records it on the
@@ -195,11 +208,12 @@ export function GoogleSyncButton({
             // worth showing — "connect it again in Settings" is actionable where a
             // generic "couldn't read your Google material" is not.
             const failed = r.results.find((k) => k.error)
-            if (failed?.error) return { indexed, connected, error: failed.error }
+            if (failed?.error) return { indexed, connected, error: failed.error, busy: false }
             if (r.caughtUp) break
           }
-          return { indexed, connected, error: null as string | null }
+          return { indexed, connected, error: null as string | null, busy: false }
         })
+        if (swept.busy) busyElsewhere = true
         anythingConnected = swept.connected
         brought += swept.indexed
         changed = changed || swept.indexed > 0
@@ -216,7 +230,9 @@ export function GoogleSyncButton({
       // look. With zero connections the sweep did not ask Google anything, and
       // saying "nothing new" would dress that up as a completed check — which
       // is exactly how the owner read it (25 Aug 2026).
-      if (brought === 0 && !anythingConnected) {
+      if (busyElsewhere && brought === 0) {
+        toast.info(t("Already syncing on another device. Try again in a moment."))
+      } else if (brought === 0 && !anythingConnected) {
         toast.error(t("No Google services are connected. Connect them in Settings first."))
       } else {
         toast.success(

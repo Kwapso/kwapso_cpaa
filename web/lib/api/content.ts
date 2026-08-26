@@ -683,9 +683,14 @@ export const content = {
     api<{
       results: { kind: string; read: number; indexed: number; caughtUp: boolean; error?: string }[]
       /** true = we did NOT ask Google, because this person's kinds were already
-       * brought into step inside the door's five-minute floor (14.12). The
-       * results are then the state as of that last real sweep. */
+       * brought into step inside the door's five-minute floor (14.12), OR
+       * another caller was mid-sweep (see `busy`). The results are then the
+       * state as of that last real sweep. */
       skipped: boolean
+      /** true = another tab or device, this same person, was bringing this in
+       * RIGHT NOW — nothing here was read or written. Distinct from `skipped`:
+       * that means "up to date", this means "try again in a moment". */
+      busy: boolean
       caughtUp: boolean
       total: number
       /** The services the sweep had to work with. Empty + empty results means
@@ -749,6 +754,9 @@ export const content = {
       ahead: { eventId: string; title: string; startsAt: string; url: string | null }[]
       swept: string | null
       caughtUp: boolean
+      /** true = another tab or device, this same person, was already bringing
+       * the calendar into step — nothing here was read or written. */
+      busy: boolean
     }>("/api/content/meetings/sync-calendar", post({})),
   /** WHAT WAS SAID, in full — read off the meeting row rather than from Google,
    * so any colleague who may read meetings can read it. Its own call because of

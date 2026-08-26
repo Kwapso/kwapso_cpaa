@@ -258,6 +258,9 @@ export async function postSyncCalendar(request: Request, env: Env): Promise<Resp
     ahead: result.ahead,
     swept: result.swept,
     caughtUp: result.caughtUp,
+    // ANOTHER CALLER — another tab, another device, this same person — was
+    // already mid-sweep, so nothing here was read or written.
+    busy: result.busy,
   })
 }
 

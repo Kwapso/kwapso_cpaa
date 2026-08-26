@@ -296,6 +296,11 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
   return json({
     results: sweep.results,
     skipped: sweep.skipped,
+    // ANOTHER CALLER — another tab, another device, this same person — was
+    // already mid-sweep, so nothing here was read or written. Kept apart from
+    // `skipped` (which reads as "up to date") for the same reason
+    // `sweepGoogle`'s own return type does.
+    busy: sweep.busy,
     caughtUp: sweep.results.every((r) => r.caughtUp && !r.error),
     // WHAT IT ACTUALLY WROTE, so "it says it synced and nothing changed" is a
     // readable sentence rather than a mystery. A pass that finds nothing new

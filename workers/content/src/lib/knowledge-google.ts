@@ -53,6 +53,7 @@ import { accessTokenFor, listConnections, listNamedSources } from "./google"
 import { googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
 import { indexSource } from "./knowledge"
+import { withSyncLease } from "./sync-lease"
 import { brand } from "@shared/brand"
 import {
   INGEST_SOURCES_PER_TICK,
@@ -397,7 +398,17 @@ export async function sweepGoogle(
     onlyIfStale?: boolean
     limit?: number
   } = {}
-): Promise<{ results: SweepResult[]; skipped: boolean; connectedServices: GoogleService[] }> {
+): Promise<{
+  results: SweepResult[]
+  skipped: boolean
+  connectedServices: GoogleService[]
+  /** true = another caller — another tab, another device, this same person —
+   * is bringing this in RIGHT NOW, so nothing here was read or written. Kept
+   * apart from `skipped` (which means "found nothing to do") because the two
+   * need different sentences: one is "up to date", the other is "wait a
+   * moment and press again". */
+  busy: boolean
+}> {
   const connected = new Set(
     (await listConnections(cfg, guard)).filter((c) => c.active).map((c) => c.service)
   )
@@ -412,7 +423,7 @@ export async function sweepGoogle(
   const kinds = googleIngestKinds(env, cfg, guard, seen).filter((k) =>
     connected.has(serviceOfStateKey(k.stateKey as string, guard.userId))
   )
-  if (kinds.length === 0) return { results: [], skipped: false, connectedServices }
+  if (kinds.length === 0) return { results: [], skipped: false, connectedServices, busy: false }
 
   // THE FLOOR (14.12). This door now fires by itself when somebody opens the
   // app, so "how often may it ask Google?" stopped being a question about a
@@ -439,14 +450,31 @@ export async function sweepGoogle(
   // confusion `sweepGoogle` already refuses to create for an unconnected service.
   if (options.onlyIfStale) {
     const recent = await sweptWithin(cfg, guard, kinds, GOOGLE_SWEEP_FLOOR_MS)
-    if (recent) return { results: recent, skipped: true, connectedServices }
+    if (recent) return { results: recent, skipped: true, connectedServices, busy: false }
   }
 
-  const results = await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK)
-  // AFTER the sweep, never instead of it: the reads above are what filled `seen`,
-  // and a retire pass that ran first would be reasoning about last tick's world.
-  await retireVanished(env, cfg, guard, seen)
-  return { results, skipped: false, connectedServices }
+  // THE LEASE. Everything above this line is a READ (connections, state rows) —
+  // cheap, and safe to repeat if two callers land here at once. Everything
+  // below WRITES to knowledge_ingest and reads Google with this person's own
+  // token, and that is the part that must never run twice at the same instant
+  // (migration 0057's header carries the owner's own report). Claimed on the
+  // ACT, not the request, so the Meetings page's own knowledge sweep and this
+  // one collide correctly.
+  const lease = await withSyncLease(
+    cfg,
+    guard.databaseId,
+    `google-knowledge:${guard.userId}`,
+    async () => {
+      const results = await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK)
+      // AFTER the sweep, never instead of it: the reads above are what filled
+      // `seen`, and a retire pass that ran first would be reasoning about last
+      // tick's world.
+      await retireVanished(env, cfg, guard, seen)
+      return results
+    }
+  )
+  if (!lease.ran) return { results: [], skipped: true, connectedServices, busy: true }
+  return { results: lease.result, skipped: false, connectedServices, busy: false }
 }
 
 /** HOW LONG A PERSON'S GOOGLE STAYS "JUST CHECKED" — the floor above. Five

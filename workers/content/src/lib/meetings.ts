@@ -27,6 +27,7 @@ import { accessTokenFor } from "./google"
 import { calendarGet, calendarList, type CalendarEvent } from "./google-api"
 import { capToRow } from "./knowledge-files"
 import { findTranscript, type TranscriptRoute } from "./google-transcript"
+import { withSyncLease } from "./sync-lease"
 import { MEETING_LOG_KIND } from "./work-logs"
 import type { Env } from "../env"
 
@@ -988,6 +989,10 @@ export type CalendarSync = {
   /** true once the walk has reached the far end of the wide window: from here on
    * it only has to keep pace with the calendar rather than catch up with it. */
   caughtUp: boolean
+  /** true = another caller — another tab, another device, this same person —
+   * is bringing the calendar into step RIGHT NOW, so nothing here was read or
+   * written. See `syncCalendar`'s lease below. */
+  busy: boolean
 }
 
 /** THE MIRROR, AS COLUMNS. One place that turns a Google event into the
@@ -1034,13 +1039,17 @@ type SyncedRow = {
  * owner's sentence that settled it. An entry that is ALREADY a record here
  * (somebody pushed it out from kwapso) is refreshed whatever it looks like,
  * because that is a meeting we own and Google has facts about it.
+ *
+ * LEASED, NOT BARE — see `syncCalendar` below, the exported door onto this.
+ * This function is the WORK; the lease around it is what stops two callers
+ * doing the work at once.
  */
-export async function syncCalendar(
+async function runCalendarSync(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor
-): Promise<CalendarSync> {
+): Promise<Omit<CalendarSync, "busy">> {
   const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
   const now = new Date()
   const since = new Date(now.getTime() - CATCH_UP_DAYS * 24 * 60 * 60 * 1000)
@@ -1262,6 +1271,27 @@ VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.descri
     swept,
     caughtUp: swept !== null && Date.parse(swept) >= backfillCeiling(now).getTime(),
   }
+}
+
+/**
+ * BRING THE CALENDAR INTO STEP — the door onto `runCalendarSync`, leased so two
+ * callers for the same person can't run it at the same instant (the owner's
+ * "never should there be 2 of the same syncs running simultaneously", 26 Aug
+ * 2026 — see migration 0057's header). A refused claim does no Google reads and
+ * no writes; it answers with every count at zero and `busy: true`, which the
+ * screen reads as "wait a moment and press again" rather than "nothing new".
+ */
+export async function syncCalendar(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor
+): Promise<CalendarSync> {
+  const lease = await withSyncLease(cfg, guard.databaseId, `google-calendar:${guard.userId}`, () =>
+    runCalendarSync(env, cfg, guard, actor)
+  )
+  if (!lease.ran) return { created: 0, updated: 0, cancelled: 0, ahead: [], swept: null, caughtUp: false, busy: true }
+  return { ...lease.result, busy: false }
 }
 
 /* ---------------- the resumable walk over the WHOLE calendar --------------- */

@@ -3712,6 +3712,40 @@ ALTER TABLE process_steps ADD COLUMN branch_of TEXT;
 ALTER TABLE process_step_revisions ADD COLUMN branch_of TEXT;
 `,
   },
+  {
+    // ── ONE CONTROL WHERE THERE WERE TWO ────────────────────────────────────
+    //
+    // THE OWNER, 26 Aug 2026: "If I switch pages after I hit the Sync button…
+    // the button just shows me 'Bring it in' again. That means there is a high
+    // possibility that people would launch two simultaneous syncs." Then, once
+    // the per-tab fix (`shared/web/running-jobs.ts`) landed: "would be nice if
+    // this could also persist across the same user's multiple sessions on
+    // different devices and different pages… never should there be 2 of the
+    // same syncs running simultaneously."
+    //
+    // A per-tab map answers "is THIS TAB already doing it" and cannot answer
+    // the cross-device question — a phone and a laptop signed into the same
+    // person do not share a JS module. The door itself has to refuse the
+    // second caller, which means the fact has to live where both callers can
+    // see it: a row in this database.
+    //
+    // ONE TABLE, KEYED BY THE ACT (`google-knowledge:<userId>`,
+    // `google-calendar:<userId>`) — the same key the client-side registry
+    // already uses, so the two layers agree on what "the same sync" means.
+    // `expires_at` rather than a bare "is it running" flag: a worker that dies
+    // mid-sweep (a killed request, a crashed tab) must not leave a lease no
+    // living caller can ever clear, so the claim is a lease with a TTL, not a
+    // permanent lock (CONCURRENCY.md's "atomic conditional SQL" — the claim and
+    // the takeover-when-expired are the same UPSERT's WHERE clause; see
+    // `workers/content/src/lib/sync-lease.ts`).
+    version: "0057_one_control_where_there_were_two",
+    sql: `
+CREATE TABLE sync_leases (
+  lease_key TEXT PRIMARY KEY,
+  expires_at TEXT NOT NULL
+);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

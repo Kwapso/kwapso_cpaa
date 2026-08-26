@@ -17,7 +17,6 @@
 // The rule: a form-dialog submit handler forwards what it was given — a spread,
 // or the argument itself — rather than transcribing it.
 
-import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
@@ -25,10 +24,6 @@ import { describe, expect, it } from "vitest"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
-
-/** The form dialogs whose payload is a RECORD's fields — the ones where a
- * dropped key is silent data loss rather than a missing option. */
-const FORMS = ["HelpFormDialog", "StoryFormDialog", "AccountFormDialog", "StepFormDialog"]
 
 describe("a form's payload is forwarded, never transcribed", () => {
   /** The calls that carry a whole record's fields to a door. A payload built by
@@ -61,7 +56,7 @@ describe("a form's payload is forwarded, never transcribed", () => {
     let payloads = 0
     for (const f of sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })) {
       const src = stripComments(f.source)
-      for (const m of [...src.matchAll(DOORS)]) {
+      for (const m of src.matchAll(DOORS)) {
         // THE ARGUMENT ITSELF, by balanced braces — not a fixed window around
         // it. A window was the second attempt and it kept finding an unrelated
         // spread a few lines away, so the check passed its own sabotage three
