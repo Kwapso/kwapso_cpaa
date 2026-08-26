@@ -47,7 +47,7 @@ import {
 } from "../lib/help-attachments"
 import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
-import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
 import { safeExternalLink } from "../lib/internal-fields"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import type { Env } from "../env"
@@ -695,13 +695,27 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
       return fail(400, "invalid_input", "A link has to start with http:// or https://.")
     url = safe
   } else {
-    const parsed = parseUploadDataUrl(body.fileDataUrl, TICKET_FILE_MAX_BYTES)
+    // ANY TYPE, STORED SO IT CANNOT RUN. The list used to be inline-safe media
+    // only, which refused an .md, a .csv, a saved page — most of what somebody
+    // actually attaches — and said "up to 10MB" while doing it, blaming a size
+    // that was never the problem. `storedContentType` keeps the XSS boundary
+    // where it belongs: on how the bytes are served back, not on whether they
+    // are accepted (shared/workers/image.ts has the whole argument).
+    const parsed = parseUploadDataUrl(body.fileDataUrl, TICKET_FILE_MAX_BYTES, ANY_FILE_TYPE)
     if (!parsed)
-      return fail(400, "invalid_input", "That file didn't come through. Try again, up to 10MB.")
+      // …AND THE REFUSAL NAMES THE REAL REASON. One sentence for three causes is
+      // how somebody spends ten minutes shrinking a file that was never too big.
+      return fail(
+        400,
+        "invalid_input",
+        typeof body.fileDataUrl === "string" && dataUrlBytes(body.fileDataUrl) > TICKET_FILE_MAX_BYTES
+          ? "That file is over 10MB. Try a smaller one."
+          : "That file didn't come through. Try attaching it again."
+      )
     // The key carries a ULID, which is what makes the capability URL unguessable;
     // the team id keeps one team's objects out of another's prefix.
     const key = mediaKey("ticket", guard.teamId)
-    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     url = `/media/${key}`
     contentType = parsed.contentType
     sizeBytes = parsed.bytes.byteLength

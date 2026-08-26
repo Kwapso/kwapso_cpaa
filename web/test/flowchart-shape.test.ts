@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { armsOf, ranksOf } from "@/components/process-flowchart"
+import { armsOf, ranksOf, numbersOf } from "@/components/process-flowchart"
 import type { ProcessStep } from "@shared/types"
 
 const step = (name: string, position: number, extra: Partial<ProcessStep> = {}): ProcessStep => ({
@@ -159,5 +159,47 @@ describe("a branch can carry on without rejoining", () => {
     const dangling = [step("a", 1), step("ghost", 2, { branchOf: "deleted" })]
     expect(ranksOf(dangling).map((r) => r.position)).toEqual([1])
     expect(armsOf(dangling).get("deleted")?.map((s) => s.name)).toEqual(["ghost"])
+  })
+})
+
+// EVERY STEP HAS A NUMBER, ARMS INCLUDED.
+//
+// THE OWNER, an hour after the arm shipped, looking at his own map: "seems to be
+// working but why does it say undefined?" Because the numbering walked the RANKS,
+// and a step on an arm is deliberately not a rank any more — so it got no number
+// and the label rendered the word `undefined` where the number should be.
+//
+// A number is not a rank. It is the order a person counts the steps in, so an
+// arm continues counting from the head it hangs off, before the trunk resumes.
+describe("the numbers a reader sees", () => {
+  const tree = [
+    step("raise", 1),
+    step("triage", 2),
+    step("resolve", 3, { branchLabel: "if resolved" }),
+    step("schedule", 3, { branchLabel: "if not" }),
+    step("review", 4, { branchOf: "schedule" }),
+    step("done", 5, { branchOf: "schedule" }),
+  ]
+
+  it("numbers every step, including the ones on an arm", () => {
+    const n = numbersOf(ranksOf(tree), armsOf(tree))
+    for (const s of tree)
+      expect(n.get(s.stepKey), `"${s.name}" has no number — it renders as "undefined."`).toBeTypeOf("number")
+  })
+
+  it("an arm counts on from the head it hangs off", () => {
+    const n = numbersOf(ranksOf(tree), armsOf(tree))
+    expect(n.get("raise")).toBe(1)
+    expect(n.get("triage")).toBe(2)
+    expect(n.get("resolve")).toBe(3)
+    expect(n.get("schedule")).toBe(4)
+    // …and the schedule arm's own two, in their order, straight after it.
+    expect(n.get("review")).toBe(5)
+    expect(n.get("done")).toBe(6)
+  })
+
+  it("no two steps share a number", () => {
+    const n = numbersOf(ranksOf(tree), armsOf(tree))
+    expect(new Set(n.values()).size).toBe(tree.length)
   })
 })

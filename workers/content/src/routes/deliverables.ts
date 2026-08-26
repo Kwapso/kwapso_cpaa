@@ -60,7 +60,7 @@ import { fail, json } from "@shared/workers/http"
 import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { INLINE_SAFE_UPLOAD, mediaKey } from "@shared/workers/image"
+import { ANY_FILE_TYPE, mediaKey, storedContentType } from "@shared/workers/image"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countDeliverables,
@@ -270,13 +270,22 @@ export async function postStreamDeliverableFile(request: Request, env: Env): Pro
   const { cfg, guard } = await gated(request, env, "deliverables", "create")
   await refusePortalCaller(cfg, guard)
 
+  // ANY WELL-FORMED TYPE, STORED SO IT CANNOT RUN — the same move the four
+  // data-URL doors made on 26 Aug 2026. A deliverable is "a handover PDF, a
+  // recorded walkthrough" and also, in practice, a spreadsheet, an archive, a
+  // saved page; the old list took none of those and said "isn't a supported
+  // upload" without saying which. `storedContentType` keeps the XSS boundary
+  // exactly where it was — on what the browser is allowed to render — while the
+  // door stops deciding what a deliverable is allowed to be.
   const contentType = (request.headers.get("content-type") ?? "").split(";")[0].trim()
-  if (!INLINE_SAFE_UPLOAD.test(contentType))
-    return fail(400, "invalid_input", "That file isn't a supported upload.")
+  if (!ANY_FILE_TYPE.test(contentType))
+    return fail(400, "invalid_input", "That upload did not say what kind of file it is.")
   if (!request.body) return fail(400, "invalid_input", "That upload had no file in it.")
 
   const key = mediaKey(guard.teamId)
-  await env.INTERNAL_MEDIA.put(key, request.body, { httpMetadata: { contentType } })
+  await env.INTERNAL_MEDIA.put(key, request.body, {
+    httpMetadata: { contentType: storedContentType(contentType) },
+  })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType })
 }

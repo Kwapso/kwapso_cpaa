@@ -17,7 +17,7 @@ import { publishChange } from "@shared/workers/realtime"
 import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
-import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
 import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos, todoOrThrow } from "../lib/todos"
 import { countTasks, createTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
@@ -127,10 +127,22 @@ export async function postCompleteTodo(request: Request, env: Env): Promise<Resp
     // here, while the request is still only words. (completeTodo re-fences
     // atomically on the UPDATE; this read is the one that guards the bucket.)
     await todoOrThrow(cfg, guard, scope, id)
-    const parsed = parseUploadDataUrl(body.fileDataUrl, MAX_TODO_FILE_BYTES)
-    if (!parsed) return fail(400, "invalid_input", "That file isn't one we can take (max 10 MB).")
+    // Any type, stored so it cannot run — the same rule the ticket and story
+    // doors take, and for the same reason: refusing an .md or a .csv is refusing
+    // most of what a person attaches, and the XSS boundary belongs on how the
+    // bytes are served back (shared/workers/image.ts · storedContentType).
+    const parsed = parseUploadDataUrl(body.fileDataUrl, MAX_TODO_FILE_BYTES, ANY_FILE_TYPE)
+    if (!parsed)
+      // …and the refusal names which of the two it was.
+      return fail(
+        400,
+        "invalid_input",
+        typeof body.fileDataUrl === "string" && dataUrlBytes(body.fileDataUrl) > MAX_TODO_FILE_BYTES
+          ? "That file is over 10MB. Try a smaller one."
+          : "That file didn't come through. Try attaching it again."
+      )
     const key = mediaKey("todo", guard.teamId)
-    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     file = {
       url: `/media/${key}`,
       name: optionalText(body.fileName, "File name", TEXT_LIMITS.short) ?? "attachment",
@@ -304,10 +316,22 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
   // — so every object carries a random ULID segment.
   let file: { url: string; name: string } | null = null
   if (body.fileDataUrl !== undefined && body.fileDataUrl !== null) {
-    const parsed = parseUploadDataUrl(body.fileDataUrl, MAX_TASK_FILE_BYTES)
-    if (!parsed) return fail(400, "invalid_input", "That file isn't one we can take (max 10 MB).")
+    // Any type, stored so it cannot run — the same rule the ticket and story
+    // doors take, and for the same reason: refusing an .md or a .csv is refusing
+    // most of what a person attaches, and the XSS boundary belongs on how the
+    // bytes are served back (shared/workers/image.ts · storedContentType).
+    const parsed = parseUploadDataUrl(body.fileDataUrl, MAX_TASK_FILE_BYTES, ANY_FILE_TYPE)
+    if (!parsed)
+      // …and the refusal names which of the two it was.
+      return fail(
+        400,
+        "invalid_input",
+        typeof body.fileDataUrl === "string" && dataUrlBytes(body.fileDataUrl) > MAX_TASK_FILE_BYTES
+          ? "That file is over 10MB. Try a smaller one."
+          : "That file didn't come through. Try attaching it again."
+      )
     const key = mediaKey(guard.teamId, "tasks")
-    await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+    await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     file = {
       url: `/media/internal/${key}`,
       name: optionalText(body.fileName, "File name", TEXT_LIMITS.short) ?? "attachment",

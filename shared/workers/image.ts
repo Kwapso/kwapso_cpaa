@@ -241,6 +241,32 @@ export const ANY_FILE_TYPE = /^[\w.+-]+\/[\w.+-]+$/
  * an instruction to a renderer.) */
 export const NEUTRALISED_CONTENT_TYPE = "application/octet-stream"
 
+/** HOW AN ATTACHMENT IS STORED, given what it turned out to be.
+ *
+ * THE OWNER, 26 Aug 2026, attaching an .md to a ticket: "even though there are
+ * so many files (like HTML files, MD files, or PDFs) that I try to upload under
+ * 10 MB, they are not getting uploaded. It just gives me this error message
+ * saying, 'Try something under 10 MB', and I'm pretty sure they were under
+ * 10 MB." They were. The refusal was never about size — the ticket and story
+ * doors accepted ONLY `INLINE_SAFE_UPLOAD` (raster images, short A/V, PDF), and
+ * everything else was refused by a sentence that blamed the wrong thing.
+ *
+ * The narrow list was there for a real reason: an attachment is served back by
+ * the gateway under its declared type, on the SAME origin as the app, so a
+ * `text/html` upload is stored XSS with a two-line setup. But the knowledge base
+ * had already answered this the right way round — the boundary is not WHICH
+ * TYPES, it is HOW THEY ARE STORED. A file the browser will never render as its
+ * declared type cannot be a script, whatever it contains.
+ *
+ * So: an inline-safe type keeps its own, because a screenshot on a ticket should
+ * open in a tab rather than land in Downloads. Anything else is stored
+ * neutralised and the browser saves it instead of running it. One rule, both
+ * doors, stated once — a second copy of this decision is how one of them gets
+ * widened and the other does not. */
+export function storedContentType(declared: string): string {
+  return INLINE_SAFE_UPLOAD.test(declared) ? declared : NEUTRALISED_CONTENT_TYPE
+}
+
 /** General data-URL parser for uploaded attachments: base64-decodes, enforces a
  * caller-supplied byte cap, and — critically — accepts ONLY an inline-safe media mime
  * (`INLINE_SAFE_UPLOAD`; never text/html or svg). Returns null if the input isn't a

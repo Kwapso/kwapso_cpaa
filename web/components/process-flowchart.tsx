@@ -87,6 +87,22 @@ export function ranksOf(steps: ProcessStep[]): Rank[] {
     .map(([position, group]) => ({ position, steps: group }))
 }
 
+/** THE NUMBERS, given the ranks and the arms. Exported so the rule can be
+ * tested without rendering a chart — see the note above `numberOf`. */
+export function numbersOf(
+  ranks: Rank[],
+  arms: Map<string, ProcessStep[]>
+): Map<string, number> {
+  const m = new Map<string, number>()
+  let n = 0
+  for (const rank of ranks)
+    for (const s of rank.steps) {
+      m.set(s.stepKey, ++n)
+      for (const c of arms.get(s.stepKey) ?? []) m.set(c.stepKey, ++n)
+    }
+  return m
+}
+
 export function ProcessFlowchart({
   steps,
   emptyMessage,
@@ -99,12 +115,15 @@ export function ProcessFlowchart({
   const arms = React.useMemo(() => armsOf(steps), [steps])
 
   /** stepKey -> the number a reader sees, so "sends it back to step 2" names
-   * the same 2 the box above is labelled with. */
-  const numberOf = React.useMemo(() => {
-    const m = new Map<string, number>()
-    ranks.forEach((r, i) => r.steps.forEach((s) => m.set(s.stepKey, i + 1)))
-    return m
-  }, [ranks])
+   * the same 2 the box above is labelled with.
+   *
+   * …AND STEPS ON AN ARM HAVE NUMBERS TOO. They are no longer ranks, so walking
+   * the ranks alone left every one of them un-numbered and the label rendered
+   * literally as "undefined. Send stories for review" — the owner's screenshot,
+   * an hour after the arm shipped. A number is not a rank: it is the order a
+   * person counts the steps in, so an arm's steps continue counting from the
+   * head they hang off, in their own order, before the next rank resumes. */
+  const numberOf = React.useMemo(() => numbersOf(ranks, arms), [ranks, arms])
 
   const flow = React.useMemo<KitFlowStep[]>(() => {
     /** A rank whose NEXT rank forks is where the decision is taken. It gets the
