@@ -345,10 +345,10 @@ export async function postUpdateSprint(request: Request, env: Env): Promise<Resp
 }
 
 /** POST /api/content/sprints/complete — mark a sprint finished, or reopen it
- * (work:edit). R17: the current-state predicate rides the UPDATE, which matters
- * more here than anywhere else — a completing sprint is what cuts a version of
- * every process map beneath it, and a version cut twice is a baseline nobody can
- * subtract from. */
+ * (work:edit). R17: the current-state predicate rides the UPDATE — a repeat
+ * moves zero rows and says nothing twice. (Completing used to ALSO cut a
+ * version of every map beneath it; 0051 moved the cut to the map itself, so
+ * this door changes no map any more.) */
 export async function postSprintComplete(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; complete?: unknown }>(
     request,
@@ -408,8 +408,9 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
   // The story must exist BEFORE anything is written. The bucket write below is
   // a capability URL served with no session, and the attachment INSERT has no
   // foreign key behind it — a mistyped id used to leave both an orphaned
-  // object and a row pointing at a story that never existed.
-  await storyOrThrow(cfg, guard, id)
+  // object and a row pointing at a story that never existed. The row also
+  // carries the account the stamped ping needs (stories is scope-stamped).
+  const story = await storyOrThrow(cfg, guard, id)
 
   let url: string
   let contentType: string | null = null
@@ -440,7 +441,7 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
     contentType,
     sizeBytes,
   })
-  await publishChange(env, guard.teamId, "stories", id, "edit")
+  await publishChange(env, guard.teamId, "stories", id, "edit", story.account_id ?? undefined)
   return json({ attachments, total: attachments.length })
 }
 
@@ -456,8 +457,9 @@ export async function postStoryAttachmentRemove(request: Request, env: Env): Pro
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)
+  const story = await storyOrThrow(cfg, guard, id) // the stamped ping's account
   // R17: a second press moves zero rows → no ping, no duplicate history.
   const { moved, attachments } = await removeStoryAttachment(cfg, guard, actor, id, attachmentId)
-  if (moved) await publishChange(env, guard.teamId, "stories", id, "edit")
+  if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", story.account_id ?? undefined)
   return json({ attachments, total: attachments.length })
 }

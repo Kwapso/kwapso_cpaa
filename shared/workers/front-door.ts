@@ -252,8 +252,11 @@ export async function recordClientError(
     // read still gets its crash recorded, on the shared bucket.
     const who = await me
       .json()
-      .then((d) => (d as { user?: { id?: unknown } })?.user?.id)
-      .catch(() => undefined)
+      .then((d) => {
+        const u = (d as { user?: { id?: unknown; currentTeamId?: unknown } })?.user
+        return { id: u?.id, teamId: u?.currentTeamId }
+      })
+      .catch(() => ({ id: undefined, teamId: undefined }))
     let b: { where?: string; message?: string; stack?: string; url?: string } = {}
     try {
       b = JSON.parse(raw)
@@ -271,7 +274,11 @@ export async function recordClientError(
             message: b.message,
             stack: b.stack,
             url: b.url,
-            userId: typeof who === "string" ? who : undefined,
+            userId: typeof who.id === "string" ? who.id : undefined,
+            // The team off the same verified answer — a 2026-08-16 live row had
+            // user + url and no team, which made "whose tenant broke?" a join
+            // nobody could run (round-two error_log review).
+            teamId: typeof who.teamId === "string" ? who.teamId : undefined,
             // Off the HEADER this door stamped, never off the beacon's body:
             // a browser that could name its own request id could staple its
             // crash onto somebody else's trace. Same rule as userId, one line up.

@@ -1,7 +1,11 @@
 // kwapso REALTIME worker — the live "switchboard".
 //
-// ONE Durable Object per team (TeamChannel, addressed by name "team:<id>") holds
-// that team's open WebSocket connections and fans out tiny "X changed" pings.
+// TWO Durable Object classes. TeamChannel (addressed "team:<id>#0…N-1", one
+// object per SHARD of a team) holds open WebSocket connections and fans out
+// tiny "X changed" pings; TeamInterest (one per team) remembers which shards
+// hold listeners for which resources, so a ping visits only the shards that
+// care. (This header said "ONE Durable Object per team" for a year after the
+// second class shipped — the file's own Env declared both the whole time.)
 // Connections are accepted with the Hibernation API, so an idle team's object is
 // evicted from memory while its sockets stay open — idle teams cost ~nothing.
 // It stores NO application data; the databases remain the single source of truth.

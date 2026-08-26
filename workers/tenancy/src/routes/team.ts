@@ -8,7 +8,7 @@ import { logActivity } from "@shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
 import { getMyPermissions } from "../lib/roles"
 import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "@shared/rules/registry"
-import { requireMember, requireRight } from "../lib/permissions"
+import { GuardError, requireMember, requireRight } from "../lib/permissions"
 import {
   acceptPendingInvites,
   createTeam,
@@ -64,7 +64,7 @@ export async function bootstrap(request: Request, env: Env): Promise<Response> {
   // for. Refused only once a team is resolved: a caller with none cannot be a
   // client login (portal-ness is a row in a TEAM database), and refusing before
   // that would lock the very first sign-in out of onboarding.
-  await refuseClientOnTeams(env, user.id, teams)
+  teams = await refuseClientOnTeams(env, user.id, teams)
 
   const current = await env.DB.prepare("SELECT current_team_id FROM users WHERE id = ?")
     .bind(user.id)
@@ -91,24 +91,50 @@ export async function bootstrap(request: Request, env: Env): Promise<Response> {
  * client knows perfectly well which team they belong to; what they were being
  * handed is what the team LOOKS LIKE from the inside. The exemption is gone from
  * the registry with this. */
-async function refuseClientOnTeams(env: Env, userId: string, teams: { id: string }[]): Promise<void> {
-  // Which team they are STANDING in, resolved the same way `active` resolves it
-  // (stored pointer if it is still one of theirs, else the first) — so the two
-  // doors can never disagree about who is being asked about.
-  const stored = await env.DB.prepare("SELECT current_team_id FROM users WHERE id = ?")
-    .bind(userId)
-    .first<{ current_team_id: string | null }>()
-  const current = teams.find((t) => t.id === stored?.current_team_id) ?? teams[0]
-  if (!current) return
+async function refuseClientOnTeams<T extends { id: string }>(
+  env: Env,
+  userId: string,
+  teams: T[]
+): Promise<T[]> {
+  // PER TEAM, not per pointer. This used to fence only the team the caller was
+  // STANDING in — while the answer carried EVERY team's row, and since core
+  // 0025 a row carries the four legal fields (name on the contract, address,
+  // registration numbers, phone). A person can be a client of team A and an
+  // ordinary staff member of team B: with their pointer on B, the one check
+  // said staff and team A's legal block rode out anyway (round-two security
+  // sweep, N3). So each team answers for itself — a team where this caller
+  // reads as a portal login is DROPPED from the list (that team's face is not
+  // theirs to see from this origin), and a caller every team refuses gets the
+  // same 403 a pure client always got. Kwapso runs one team, so the common
+  // case is exactly one fence read, as before.
   const cfg = d1Config(env)
-  await refusePortalCaller(cfg, await requireMember(env, userId, current.id))
+  const kept: T[] = []
+  let refusals = 0
+  for (const t of teams) {
+    try {
+      await refusePortalCaller(cfg, await requireMember(env, userId, t.id))
+      kept.push(t)
+    } catch (e) {
+      if (e instanceof GuardError && e.code === "client_login") {
+        refusals++
+        continue
+      }
+      throw e
+    }
+  }
+  if (teams.length > 0 && kept.length === 0 && refusals > 0)
+    throw new GuardError(
+      403,
+      "client_login",
+      "This sign-in is a client login, your company's work is on the client portal."
+    )
+  return kept
 }
 
 export async function myTeams(request: Request, env: Env): Promise<Response> {
   const user = await whoAmI(request, env)
   if (!user) return fail(401, "signed_out", "Not signed in.")
-  const teams = await listMyTeams(env, user.id)
-  await refuseClientOnTeams(env, user.id, teams)
+  const teams = await refuseClientOnTeams(env, user.id, await listMyTeams(env, user.id))
   return json({ teams, currentTeamId: user.currentTeamId })
 }
 
@@ -299,7 +325,13 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   if (scope === "record") {
     const table = queryText(url.searchParams.get("table"), "Table")
     if (!id || !table) return emptyFeed()
-    const module = ACTIVITY_GATE_MAP[table]
+    // hasOwnProperty, not bare bracket access: `?table=__proto__` resolves an
+    // INHERITED member, passes the truthiness check below as a live module,
+    // and 500s inside requireRight — verified live by the round-two security
+    // sweep. The fourth instance of the class the first sweep fixed three of.
+    const module = Object.prototype.hasOwnProperty.call(ACTIVITY_GATE_MAP, table)
+      ? ACTIVITY_GATE_MAP[table]
+      : undefined
     if (!module) return emptyFeed()
     await requireRight(cfg, guard, module, "read")
     return feed((await getActivity(cfg, guard, "record", id, table, null, cursor, await accountScope(cfg, guard))))

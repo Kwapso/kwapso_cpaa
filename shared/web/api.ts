@@ -9,6 +9,7 @@
 // both facts. What was genuinely the same is the plumbing underneath, which used
 // to exist twice, byte for byte, owned by nobody.
 
+import { reportError } from "./log"
 import type { ApiError } from "../types"
 
 /** A non-2xx answer from a worker, carrying the machine `code` a screen can
@@ -30,13 +31,28 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null
+    // A refusal WITHOUT the contract's error body is not an ordinary refusal —
+    // every worker's central catch answers a clean {error, message}, so an
+    // opaque non-2xx is a gateway 5xx, an HTML error page, or a crash the
+    // catch never saw. Reported HERE, once, which covers all ~74 files that
+    // call this seam without touching one of them (round-two error_log
+    // review: 92% of catch-and-toast sites never reported). An ordinary 4xx
+    // with its body stays silent — a validation refusal is not an incident.
+    if (!body) reportError("api/opaque-refusal", new Error(`${res.status} ${path}`))
     throw new ApiFailure(
       res.status,
       body?.error ?? "unknown",
       body?.message ?? "Something went wrong. Try again."
     )
   }
-  return (await res.json()) as T
+  try {
+    return (await res.json()) as T
+  } catch (e) {
+    // A 2xx whose body is not JSON is always a bug somewhere — same seam, same
+    // reasoning as above.
+    reportError("api/2xx-bad-json", e instanceof Error ? e : new Error(String(e)))
+    throw new ApiFailure(res.status, "bad_json", "Something went wrong. Try again.")
+  }
 }
 
 /** R14: what every PAGED door returns — the rows, the server `total`, and the

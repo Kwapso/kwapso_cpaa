@@ -1199,12 +1199,10 @@ export async function updateSprint(
 /** COMPLETE a sprint, or reopen it.
  *
  * R17: the current-state predicate rides the UPDATE (`completed_at IS NULL` /
- * `IS NOT NULL`), so a double-clicked Complete moves zero rows the second time —
- * which matters more here than anywhere else in this file, because a completing
- * sprint is what CUTS A VERSION of every process map beneath it (BUILD-1 §3),
- * and a version cut twice is a baseline nobody can subtract from. The money
- * lane's own partial unique index refuses the second cut as well; this is the
- * half that stops it ever being attempted. */
+ * `IS NOT NULL`), so a double-clicked Complete moves zero rows the second time
+ * and says nothing twice. (Completing used to ALSO cut a version of every
+ * process map beneath it — 0051 moved the cut to the map itself, where a
+ * person cuts it on purpose, so this door changes no map any more.) */
 export async function setSprintComplete(
   cfg: D1Rest,
   guard: MemberGuard,

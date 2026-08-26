@@ -240,7 +240,7 @@ export async function postApplyProcessDraft(request: Request, env: Env): Promise
     // …and the MAP, whose steps and whose saving have just changed under
     // somebody else's open screen.
     if (detail.draft.processId)
-      await publishChange(env, guard.teamId, "processes", detail.draft.processId)
+      await publishChange(env, guard.teamId, "processes", detail.draft.processId, undefined, detail.draft.accountId ?? undefined)
   }
   return json(result)
 }

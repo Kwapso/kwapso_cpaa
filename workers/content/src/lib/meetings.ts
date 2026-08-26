@@ -1127,6 +1127,21 @@ export async function syncCalendar(
   let updated = 0
   let cancelled = 0
 
+  // CLASSIFY IN MEMORY, WRITE IN BATCHES. This used to run the loop below with
+  // one REST hop per changed event — fine at the steady state's 0–3 events,
+  // and minutes of serial ~400ms hops on the click that matters most: a first
+  // connection or a backfill catch-up walks up to 750 events, behind the same
+  // button as everything else called "sync". Every branch below decides purely
+  // from `known` + the event's own fields (no read inside the loop), so the
+  // decisions and the writes separate cleanly. The three counters keep their
+  // exact meanings: creates/updates count per COMMITTED chunk (the script door
+  // runs statements in order and aborts on the first error, so a counted chunk
+  // is a written chunk), and cancels count from one predicated RETURNING —
+  // rows already off stay uncounted, same as the per-row loop (R17).
+  const createStmts: string[] = []
+  const updateStmts: string[] = []
+  const cancels: { rowId: string; googleUpdatedAt: string | null }[] = []
+
   for (const event of inWindow) {
     const row = known.get(event.id)
 
@@ -1137,13 +1152,11 @@ export async function syncCalendar(
       // order to cancel it.
       if (event.status === "cancelled") continue
       const id = ulid()
-      await d1ExecScript(
-        cfg,
-        guard.databaseId,
-        // `status` and `held_at` are not named. A meeting brought in from the
-        // past used to arrive already ticked `held`; the tick meant nothing to
-        // anybody the moment the start time became the answer, and writing it
-        // would be writing a column nothing reads.
+      // `status` and `held_at` are not named. A meeting brought in from the
+      // past used to arrive already ticked `held`; the tick meant nothing to
+      // anybody the moment the start time became the answer, and writing it
+      // would be writing a column nothing reads.
+      createStmts.push(
         `INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at,
            recurring_event_id, from_calendar,
            google_event_id, google_event_url, google_join_url, google_organizer,
@@ -1152,24 +1165,13 @@ export async function syncCalendar(
            created_at, creator_id, creator_email, creator_name)
 VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(utcMoment(event.start))}, ${sqlString(utcMoment(event.end || null))}, ${sqlString(event.recurringEventId || null)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
       )
-      created++
       continue
     }
 
     // CALLED OFF IN GOOGLE → called off here, once. The predicate rides the
-    // UPDATE (R17), so a sweep that runs every hour over a fortnight of
-    // cancelled entries writes nothing after the first one.
+    // UPDATE (R17), batched below into one statement whose RETURNING is the count.
     if (event.status === "cancelled") {
-      const moved = await d1Query<{ id: string }>(
-        cfg,
-        guard.databaseId,
-        `UPDATE meetings SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
-            deactivator_name = ?, google_status = 'cancelled', google_updated_at = ?, google_synced_at = ?,
-            updated_at = ?
-          WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
-        [at, actor.id, actor.email, actor.name, event.updatedAt, at, at, row.id]
-      )
-      if (moved[0]) cancelled++
+      cancels.push({ rowId: row.id, googleUpdatedAt: event.updatedAt })
       continue
     }
 
@@ -1187,12 +1189,41 @@ VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.descri
              location = ${sqlString(event.location || null)},
              agenda = ${sqlString(event.description || null)}`
         : ""
-    await d1ExecScript(
+    updateStmts.push(`UPDATE meetings SET ${mirrorOf(event, at)}${ownWords} WHERE id = ${sqlString(row.id)};`)
+  }
+
+  // The insert/update literals carry attendee + attachment JSON, so the chunk
+  // size follows the same statement-size precedent as the knowledge writer's
+  // CHUNK_WRITE_BATCH (knowledge.ts) rather than going for one giant script.
+  const SYNC_WRITE_CHUNK = 20
+  for (let i = 0; i < createStmts.length; i += SYNC_WRITE_CHUNK) {
+    const chunk = createStmts.slice(i, i + SYNC_WRITE_CHUNK)
+    await d1ExecScript(cfg, guard.databaseId, chunk.join("\n"))
+    created += chunk.length
+  }
+  for (let i = 0; i < updateStmts.length; i += SYNC_WRITE_CHUNK) {
+    const chunk = updateStmts.slice(i, i + SYNC_WRITE_CHUNK)
+    await d1ExecScript(cfg, guard.databaseId, chunk.join("\n"))
+    updated += chunk.length
+  }
+  if (cancels.length) {
+    // One statement for every cancellation: the R17 predicate rides it, the
+    // RETURNING is the exact count, and a CASE keeps each row's
+    // google_updated_at stamp byte-identical to the per-row loop it replaces.
+    const caseArms = cancels
+      .map((c) => `WHEN ${sqlString(c.rowId)} THEN ${sqlString(c.googleUpdatedAt)}`)
+      .join(" ")
+    const moved = await d1Query<{ id: string }>(
       cfg,
       guard.databaseId,
-      `UPDATE meetings SET ${mirrorOf(event, at)}${ownWords} WHERE id = ${sqlString(row.id)};`
+      `UPDATE meetings SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
+          deactivator_name = ?, google_status = 'cancelled', google_synced_at = ?, updated_at = ?,
+          google_updated_at = CASE id ${caseArms} ELSE google_updated_at END
+        WHERE id IN (${cancels.map((c) => sqlString(c.rowId)).join(", ")})
+          AND deactivated_at IS NULL RETURNING id`,
+      [at, actor.id, actor.email, actor.name, at, at]
     )
-    updated++
+    cancelled = moved.length
   }
 
   // THE CURSOR MOVES LAST, and only over ground this call actually covered.

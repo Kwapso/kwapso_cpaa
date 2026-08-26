@@ -31,6 +31,7 @@ import { fileToDataUrl } from "@/lib/image"
 import { useT } from "@shared/web/language"
 import { MarkLoader } from "@shared/web/mark-loader"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
+import { InvitationsPanel } from "@/components/invitations"
 
 const firstNameField = { ...defaultFieldConfig, label: "First name", required: true }
 const lastNameField = { ...defaultFieldConfig, label: "Last name", required: true }
@@ -207,8 +208,25 @@ export default function OnboardingPage() {
             refuse the creation — so pressing it looped back to this screen,
             silently, for ever. A promise the product forbids is not softened
             by keeping the button; it is withdrawn (same rule as the
-            team-switcher's hidden Create item, web/test/one-team.test.ts). */}
-        {teamless && TEAM_CREATION_CLOSED ? null : (
+            team-switcher's hidden Create item, web/test/one-team.test.ts).
+
+            AND THE ACCEPT LIVES HERE NOW. The withdrawal orphaned the other
+            half of its own sentence: "ask for a new invite" — while
+            use-active-team bounces every teamless person OFF /invitations and
+            back to this screen, and the withdrawn form was the only caller of
+            bootstrap, the door that accepts. So the invitations panel mounts
+            exactly where the bounce lands, and accepting re-checks and routes
+            home. The email's /invitations link now ends somewhere alive. */}
+        {teamless && TEAM_CREATION_CLOSED ? (
+          <div className="mt-6">
+            <InvitationsPanel
+              refresh={async () => {
+                const { teams } = await tenancy.bootstrap()
+                if (teams.length > 0) router.replace("/home")
+              }}
+            />
+          </div>
+        ) : (
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
             <div className="flex flex-col items-center gap-4">
               <Avatar className="size-20">

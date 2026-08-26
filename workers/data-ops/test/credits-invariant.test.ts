@@ -99,7 +99,11 @@ describe("the no-daily-cap switch", () => {
   // of tables, so a knob set here and forgotten there is a single allowance
   // enforced at two different heights — and the person who discovers it is the one
   // who ran out on one screen while the other still said there was plenty.
-  const SPENDERS = ["data-ops", "content"] as const
+  // TENANCY joined when reading a call into a proposed map started spending a
+  // unit (process-drafts.ts) — and its staging var sat at "0" beside the other
+  // two's "true" for weeks, which is precisely the two-heights failure this
+  // suite's own comment warns about. The list the check walks IS the fix.
+  const SPENDERS = ["data-ops", "content", "tenancy"] as const
 
   it("is OFF in the production vars block, on every worker that spends", () => {
     for (const w of SPENDERS)

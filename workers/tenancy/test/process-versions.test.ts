@@ -59,12 +59,12 @@ const staff = { kind: "staff" } as const
  * alphabet. The times are the ones a client would recognise: half an hour of
  * chasing documents, forty times a month. */
 async function mapWithThreeSteps(): Promise<string> {
-  const processId = await createProcess(cfg, guard, staff, actor, {
+  const processId = (await createProcess(cfg, guard, staff, actor, {
     appId: IDS.victimApp,
     name: "Taking on a new client",
     description: "How it is done now, and how it was done before.",
     baselineLabel: "Before us",
-  })
+  })).id
   await addStep(cfg, guard, staff, actor, {
     processId,
     name: "Collect the documents",
@@ -205,10 +205,10 @@ describe("opening an older version", () => {
   // worse sentence than "no such version".
   it("refuses a version belonging to another map", async () => {
     const mine = await mapWithThreeSteps()
-    const theirs = await createProcess(cfg, guard, staff, actor, {
+    const theirs = (await createProcess(cfg, guard, staff, actor, {
       appId: IDS.victimApp,
       name: "Another way of working",
-    })
+    })).id
     const theirVersion = (await getProcess(cfg, guard, staff, theirs)).shownVersionId
     await expect(getProcess(cfg, guard, staff, mine, { versionId: theirVersion })).rejects.toThrow(
       /doesn't exist/
@@ -245,7 +245,7 @@ describe("an older version cannot be changed", () => {
   it("still answers a repeat removal with silence, not a refusal", async () => {
     const processId = await mapWithThreeSteps()
     const steps = await listProcessSteps(cfg, guard, staff, processId)
-    expect(await removeStep(cfg, guard, staff, actor, steps[0].id)).toBe(processId)
+    expect(await removeStep(cfg, guard, staff, actor, steps[0].id)).toEqual({ processId, accountId: "A_VICTIM" })
     expect(await removeStep(cfg, guard, staff, actor, steps[0].id)).toBeNull()
   })
 })
@@ -319,7 +319,7 @@ describe("deleting a step that should never have existed", () => {
     const before = await listProcessSteps(cfg, guard, staff, processId)
     const mistake = before.find((x) => x.name === "Added by mistake")!
     const out = await deleteStep(cfg, guard, staff, actor, mistake.id)
-    expect(out).toBe(processId)
+    expect(out).toEqual({ processId, accountId: "A_VICTIM" })
     const after = await listProcessSteps(cfg, guard, staff, processId)
     expect(after.map((x) => x.name)).not.toContain("Added by mistake")
     // The slider must not keep drawing it: its revision rows went with it.
@@ -371,7 +371,7 @@ describe("deleting a step that should never have existed", () => {
       runsPerPeriod: looper.runsPerPeriod,
       loopsBackTo: null,
     })
-    expect(await deleteStep(cfg, guard, staff, actor, target.id)).toBe(processId)
+    expect(await deleteStep(cfg, guard, staff, actor, target.id)).toEqual({ processId, accountId: "A_VICTIM" })
   })
 
   it("one branch of a fork deletes; its sibling stands alone again", async () => {
@@ -388,7 +388,7 @@ describe("deleting a step that should never have existed", () => {
     const branch = (await listProcessSteps(cfg, guard, staff, processId)).find(
       (x) => x.name === "The other way"
     )!
-    expect(await deleteStep(cfg, guard, staff, actor, branch.id)).toBe(processId)
+    expect(await deleteStep(cfg, guard, staff, actor, branch.id)).toEqual({ processId, accountId: "A_VICTIM" })
     const after = await listProcessSteps(cfg, guard, staff, processId)
     expect(after.filter((x) => x.position === second.position)).toHaveLength(1)
   })

@@ -66,8 +66,9 @@ it: an auth deploy that goes wrong is a total outage rather than a degraded one.
 ## 2 · Who owns a fact
 
 Two components that can both write the same fact will eventually disagree about
-it, and no log will explain why. Three tables in this codebase are written from
-more than one worker in production. **None of them is a shared field**, each is
+it, and no log will explain why. Four tables in this codebase are written from
+more than one worker in production — the rows below are the census, and a new
+second writer means a new row. **None of them is a shared field**, each is
 a clean split that nothing had written down until now.
 
 | table | owner | the other writer | the split |

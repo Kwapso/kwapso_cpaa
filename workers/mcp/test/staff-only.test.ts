@@ -177,10 +177,14 @@ describe("the cached staff verdict has no transition to miss", () => {
     // A liveness condition in the WHERE would turn presence into liveness and
     // reopen the transition (revoke → reads as staff → mints a token). The
     // deactivated column may be SELECTed and ORDERed on — never filtered on.
-    expect(
-      /WHERE[^;]*deactivated_at IS NULL(?![\s\S]*ORDER)/.test(where.split("ORDER BY")[0].split("WHERE")[1] ?? ""),
-      "portal_users must be matched by PRESENCE — no deactivated_at filter in the WHERE"
-    ).toBe(false)
+    //
+    // EXACT EQUALITY on the clause, not a regex over a split. The first
+    // version split the string on "WHERE" and then matched a pattern anchored
+    // on WHERE — which the split had just removed, so the assertion could
+    // never fire and the exact regression it names passed green (found by two
+    // independent round-two reviewers, one by mutation-testing the fence).
+    const clause = /WHERE([\s\S]*?)ORDER BY/.exec(where)?.[1] ?? ""
+    expect(clause.trim(), "the fence's WHERE must be presence and nothing else").toBe("user_id = ?")
     // And the bridge's own gatekeeper refuses anything that is not cleanly staff.
     const staff = readFileSync(join(__dirname, "../src/lib/staff.ts"), "utf8")
     expect(staff).toContain('kind !== "staff"')

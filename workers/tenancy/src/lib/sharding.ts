@@ -271,7 +271,7 @@ export async function alertNewAlarms(
       // The action, not just the fact — the same rule the console line has always
       // followed. OPERATIONS.md § Growth watch is the runbook it points at.
       footnote:
-        "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). There is about 2 GB of headroom left above the alarm line.",
+        "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). If the team is also SLOW rather than just big, that is the moment to put its database on a native binding (OPERATIONS.md, the native-binding runbook) — the two fixes are independent. There is about 2 GB of headroom left above the alarm line.",
     })
     if (ok) mailed++
   }

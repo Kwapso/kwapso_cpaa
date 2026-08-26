@@ -43,8 +43,8 @@ Workspace mail. Nothing here writes DNS on it.
 |---|---|---|
 | `agency-staging.kwapso.app` | `kwapso-staging` (agency gateway) | attached, serving |
 | `staging-client.kwapso.app` | `kwapso-portal-staging` (portal gateway) | attached, serving |
-| `agency.kwapso.app` | `kwapso` (agency gateway) | **not attached**, no DNS record, deliberately, until there is a real client |
-| `client.kwapso.app` | `kwapso-portal` (portal gateway) | **not attached**, same reason |
+| `agency.kwapso.app` | `kwapso` (agency gateway) | attached, serving (since 20 Aug 2026 — this row said "not attached, deliberately" until 26 Aug 2026, six days after its own `dig` check below stopped agreeing) |
+| `client.kwapso.app` | `kwapso-portal` (portal gateway) | attached, serving (same date, same correction) |
 | `portal.kwapso.app` | the legacy **Glide** portal | **NOT OURS TO TOUCH.** Live, serving real clients, until cutover |
 
 Every name is a single label under `kwapso.app` on purpose: Cloudflare's free
@@ -110,7 +110,11 @@ existing team and will go green with a dead token.
 
 ### `~/.config/kwapso/keys.env`, the file that is not in the repository
 
-Eight places in this codebase tell you to `source ~/.config/kwapso/keys.env`.
+Docs and scripts all over this codebase tell you to `source
+~/.config/kwapso/keys.env` — the live census is `grep -rl "keys.env"`, which
+counts 13 files (22 mentions) on 26 Aug 2026; this sentence said "eight places"
+while the number quietly grew, the count-in-prose defect DATA-MODEL.md carries a
+post-mortem for.
 **That file lived on the author's machine and is not recoverable.** Recreate it;
 it is a plain shell file of exports, and nothing is lost but the values, each of
 which can be reissued from the table above:

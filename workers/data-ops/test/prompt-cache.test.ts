@@ -18,12 +18,16 @@
 // diff the two as strings. No network, no key, no live model.
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// WHAT IT SAVES, measured rather than assumed (`npm test` sizes, 2026-08-18):
+// WHAT IT SAVES, measured rather than assumed. Re-measured 2026-08-26 by the
+// round-two spend review (the 2026-08-18 figures below it had drifted 17% as
+// the catalogue grew — 163 tools became 191):
 //
-//   163 tool definitions, serialised as the API receives them      91,801 chars
-//   system prompt incl. the generated capability brief             20,225 chars
+//   191 tool definitions, serialised as the API receives them     ≈ 109 KB
+//   system prompt incl. the generated capability brief (3,670)    ≈  21 KB
 //   the per-reader-language paragraph systemFor() appends             594 chars
-//                                                        preamble ≈ 112 KB
+//                                                        preamble ≈ 130,544 chars
+//
+// (2026-08-18, for the record: 163 tools / 91,801 chars / ≈112 KB total.)
 //
 // At roughly 3.5 characters per token on Sonnet 5's tokenizer that is about
 // 32,000 tokens of preamble, re-sent on every model turn. A question that runs
@@ -39,10 +43,14 @@
 //   cache, warm   4 × 32k × $0.30/M                            = $0.038
 //
 // Add ~5k tokens of conversation (~$0.015) and ~1.2k output (~$0.018) either way
-// and a question costs $0.417 uncached, $0.182 cold, $0.071 warm. At 2,600
-// questions a month that is $1,084 with no cache against $287 at the hit rate a
-// 5-minute TTL earns here (~65%: at 100 questions across a working day the gaps
-// average under five minutes) — a 3.8× reduction, clearing the condition.
+// and a question costs $0.417 uncached, $0.182 cold, $0.071 warm. The owner's
+// stated volume is 20,000+ replies a month (2026-08-26; this comment modelled
+// 2,600 for a week after that number was said out loud): at 20,000 that is
+// ~$8,340 with no cache against ~$1,640 at the hit rate a 5-minute TTL earns
+// here (~65%+, and the denser the traffic the warmer the cache) — the same
+// 3.8×+ reduction, at stakes ~7.7× the old arithmetic's. Each ADDED tool now
+// costs ≈ $5/month at this volume before it is ever called — the catalogue is
+// a bill, not a menu (round-two spend review).
 //
 // THE BREAK-EVEN, which is the honest number rather than the flattering one:
 // 3× needs the cached cost at or below $0.139 a question, so the warm-start rate

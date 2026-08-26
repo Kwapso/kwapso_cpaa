@@ -14,7 +14,7 @@ export function InvitationsScreen({ active }: { active: ActiveTeam }) {
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
         {t("Invites waiting for you")}
       </h2>
-      <InvitationsPanel active={active} />
+      <InvitationsPanel refresh={active.refresh} />
     </div>
   )
 }

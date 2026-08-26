@@ -1270,9 +1270,12 @@ export async function getProcess(
   id: string,
   opts: { versionId?: string; asOf?: string } = {}
 ): Promise<ProcessDetail> {
-  const summary = await processOrThrow(cfg, guard, scope, id)
+  // Independent fenced reads — one wait, not two (each ~a REST hop).
+  const [summary, shown] = await Promise.all([
+    processOrThrow(cfg, guard, scope, id),
+    versionOrThrow(cfg, guard, scope, id, opts.versionId),
+  ])
   const auditDate = summary.auditDate ?? summary.createdAt.slice(0, 10)
-  const shown = await versionOrThrow(cfg, guard, scope, id, opts.versionId)
   // WHO MAY SEE AN HOURLY COST ON THIS MAP, resolved ONCE and handed to every
   // reader on this screen. Resolving it per reader is what let the rule ship in
   // `listSavings` alone while the same field rode two other readers in the same
@@ -1506,7 +1509,7 @@ export async function createProcess(
      * which is exactly what the owner opened the Value tab and saw. */
     roleName?: string
   }
-): Promise<string> {
+): Promise<{ id: string; accountId: string | null }> {
   const app = await appOrThrow(cfg, guard, scope, input.appId)
   const id = ulid()
   const now = new Date().toISOString()
@@ -1539,7 +1542,7 @@ export async function createProcess(
     relatedTable: "processes",
     relatedRowId: id,
   })
-  return id
+  return { id, accountId: app.accountId ?? null }
 }
 
 export async function updateProcess(
@@ -1549,7 +1552,10 @@ export async function updateProcess(
   actor: Actor,
   id: string,
   input: { name: string; description?: string | null; roleName?: string | null }
-): Promise<void> {
+/* returns the ids the route's two pings need: the account stamp, and the APP
+ * row id — the route used to ping resource "apps" with the PROCESS id, a
+ * row no listener holds. */
+): Promise<{ accountId: string | null; appId: string }> {
   const before = await processOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
@@ -1579,6 +1585,7 @@ export async function updateProcess(
     relatedTable: "processes",
     relatedRowId: id,
   })
+  return { accountId: before.accountId, appId: before.appId }
 }
 
 /** Archive / restore a process. R17 predicate; zero rows moved = silence. */
@@ -1589,7 +1596,7 @@ export async function setProcessActive(
   actor: Actor,
   id: string,
   active: boolean
-): Promise<boolean> {
+): Promise<{ accountId: string | null } | null> {
   const process = await processOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const now = new Date().toISOString()
@@ -1605,14 +1612,14 @@ export async function setProcessActive(
          ${where([fence.sql, "id = ?", "deactivated_at IS NULL"])} RETURNING id`,
     active ? [now, ...fence.params, id] : [now, actor.id, actor.email, actor.name, now, ...fence.params, id]
   )
-  if (!changed[0]) return false
+  if (!changed[0]) return null
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Process restored" : "Process archived",
     description: `${actor.name} ${active ? "restored" : "archived"} the process ${process.name}`,
     relatedTable: "processes",
     relatedRowId: id,
   })
-  return true
+  return { accountId: process.accountId }
 }
 
 // ── steps ────────────────────────────────────────────────────────────────────
@@ -1943,7 +1950,7 @@ export async function addStep(
     /** the step key this one can send the work back to */
     loopsBackTo?: string | null
   }
-): Promise<string> {
+): Promise<{ id: string; accountId: string | null }> {
   const process = await processOrThrow(cfg, guard, scope, input.processId)
   const version = await latestVersionOrThrow(cfg, guard, scope, input.processId)
   const id = ulid()
@@ -2012,7 +2019,7 @@ export async function addStep(
     relatedTable: "process_steps",
     relatedRowId: id,
   })
-  return id
+  return { id, accountId: process.accountId }
 }
 
 /** Edit ONE step, in the version it belongs to. Editing a step of an OLD version
@@ -2039,7 +2046,7 @@ export async function updateStep(
     branchLabel?: string | null
     loopsBackTo?: string | null
   }
-): Promise<string> {
+): Promise<{ processId: string; accountId: string | null }> {
   const before = await stepOrThrow(cfg, guard, scope, id)
   const process = await processOrThrow(cfg, guard, scope, before.processId)
   const nextRoleId = input.roleId === undefined ? before.roleId : input.roleId
@@ -2155,7 +2162,7 @@ export async function updateStep(
     relatedTable: "process_steps",
     relatedRowId: id,
   })
-  return changed[0].process_id
+  return { processId: changed[0].process_id, accountId: process.accountId }
 }
 
 /** THE WORK STOPPED HAPPENING. Not a delete: the row stays, its frequency stays,
@@ -2179,11 +2186,11 @@ export async function removeStep(
   scope: AccountScope,
   actor: Actor,
   id: string
-): Promise<string | null> {
+): Promise<{ processId: string; accountId: string | null } | null> {
   const before = await stepOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const now = new Date().toISOString()
-  const changed = await d1Query<{ process_id: string }>(
+  const changed = await d1Query<{ process_id: string; account_id: string | null }>(
     cfg,
     guard.databaseId,
     `UPDATE process_steps SET removed_at = ?, seconds_per_run = 0, ${editedBy(actor, now).sql}
@@ -2195,7 +2202,7 @@ export async function removeStep(
        // in front of it because a version cut between a check and a write would
        // leave the check true and the write wrong.
        "version_id = (SELECT id FROM process_versions v WHERE v.process_id = process_steps.process_id ORDER BY v.version_no DESC LIMIT 1)",
-     ])} RETURNING process_id`,
+     ])} RETURNING process_id, account_id`,
     [now, ...editedBy(actor, now).params, ...fence.params, id]
   )
   // ZERO ROWS MOVED HAS TWO CAUSES NOW, and they are not the same answer. Already
@@ -2244,7 +2251,7 @@ export async function removeStep(
     relatedTable: "process_steps",
     relatedRowId: id,
   })
-  return changed[0].process_id
+  return { processId: changed[0].process_id, accountId: changed[0].account_id }
 }
 
 /** THE STEP SHOULD NEVER HAVE EXISTED. The owner's ruling (25 Aug 2026), and a
@@ -2281,17 +2288,18 @@ export async function deleteStep(
   scope: AccountScope,
   actor: Actor,
   id: string
-): Promise<string | null> {
+): Promise<{ processId: string; accountId: string | null } | null> {
   const fence = accountScopeClause(scope, "account_id")
   const rows = await d1Query<{
     process_id: string
     version_id: string
     step_key: string
     name: string
+    account_id: string | null
   }>(
     cfg,
     guard.databaseId,
-    `SELECT process_id, version_id, step_key, name FROM process_steps
+    `SELECT process_id, version_id, step_key, name, account_id FROM process_steps
      ${where([fence.sql, "id = ?"])} LIMIT 1`,
     [...fence.params, id]
   )
@@ -2365,7 +2373,7 @@ export async function deleteStep(
     relatedTable: "process_steps",
     relatedRowId: id,
   })
-  return changed[0].process_id
+  return { processId: changed[0].process_id, accountId: before.account_id }
 }
 
 // ── the version cut ──────────────────────────────────────────────────────────
@@ -2392,7 +2400,7 @@ export async function cutVersion(
   scope: AccountScope,
   actor: Actor,
   input: { processId: string; label?: string }
-): Promise<{ versionId: string; versionNo: number } | null> {
+): Promise<{ versionId: string; versionNo: number; accountId: string | null } | null> {
   const process = await processOrThrow(cfg, guard, scope, input.processId)
   const current = await latestVersionOrThrow(cfg, guard, scope, input.processId)
 
@@ -2450,7 +2458,7 @@ export async function cutVersion(
     relatedTable: "process_versions",
     relatedRowId: versionId,
   })
-  return { versionId, versionNo: current.versionNo + 1 }
+  return { versionId, versionNo: current.versionNo + 1, accountId: process.accountId }
 }
 
 // ── the conversation on a map ────────────────────────────────────────────────
@@ -3074,7 +3082,10 @@ export async function setAuditDate(
   actor: Actor,
   processId: string,
   auditDate: string
-): Promise<void> {
+  /* returns the process's account for the stamped ping, or null when zero rows
+   * moved — which is also the R17 gate the route used to lack (it pinged on a
+   * repeat). */
+): Promise<string | null> {
   const process = await processOrThrow(cfg, guard, scope, processId)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
@@ -3087,13 +3098,14 @@ export async function setAuditDate(
       ${where([fence.sql, "id = ?", "COALESCE(audit_date, '') <> ?"])} RETURNING id`,
     [auditDate, ...audit.params, ...fence.params, processId, auditDate]
   )
-  if (!rows[0]) return
+  if (!rows[0]) return null
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Audit date moved",
     description: `${actor.name} set the audit date of ${process.name} to ${auditDate}`,
     relatedTable: "processes",
     relatedRowId: processId,
   })
+  return process.accountId ?? null
 }
 
 /** THE MAPS THIS ONE CONNECTS TO, both ways.
@@ -3157,7 +3169,9 @@ export async function linkProcesses(
   scope: AccountScope,
   actor: Actor,
   input: { fromProcessId: string; toProcessId: string; note?: string | null }
-): Promise<string | null> {
+  /* the accountId rides back for the stamped ping — both ends are proven the
+   * same account below, so one stamp serves both publishes. */
+): Promise<{ id: string; accountId: string | null } | null> {
   if (input.fromProcessId === input.toProcessId)
     throw new GuardError(400, "same_process", "A process can't be connected to itself.")
   const from = await processOrThrow(cfg, guard, scope, input.fromProcessId)
@@ -3200,7 +3214,7 @@ export async function linkProcesses(
     relatedTable: "processes",
     relatedRowId: input.fromProcessId,
   })
-  return id
+  return { id, accountId: from.accountId }
 }
 
 /** Take a connection away. A link is a signpost, not a record of work, so this
@@ -3212,20 +3226,22 @@ export async function unlinkProcesses(
   scope: AccountScope,
   actor: Actor,
   id: string
-): Promise<boolean> {
+  /* the link row carries the account; it rides the RETURNING so the route can
+   * stamp its ping without a second read. Null = nothing removed (R17). */
+): Promise<{ accountId: string | null } | null> {
   const fence = accountScopeClause(scope, "account_id")
-  const rows = await d1Query<{ from_process_id: string }>(
+  const rows = await d1Query<{ from_process_id: string; account_id: string | null }>(
     cfg,
     guard.databaseId,
-    `DELETE FROM process_links ${where([fence.sql, "id = ?"])} RETURNING from_process_id`,
+    `DELETE FROM process_links ${where([fence.sql, "id = ?"])} RETURNING from_process_id, account_id`,
     [...fence.params, id]
   )
-  if (!rows[0]) return false
+  if (!rows[0]) return null
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Processes disconnected",
     description: `${actor.name} removed a connection between process maps`,
     relatedTable: "processes",
     relatedRowId: rows[0].from_process_id,
   })
-  return true
+  return { accountId: rows[0].account_id }
 }

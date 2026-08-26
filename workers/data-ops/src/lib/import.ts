@@ -14,6 +14,8 @@ import { type Actor } from "@shared/workers/gating"
 import type { Env } from "../env"
 import type { ImportColumn } from "@shared/types"
 import { TARGETS, type TargetDef } from "./targets"
+import { forwardToDoor } from "@shared/workers/http"
+import { requestId } from "@shared/workers/trace"
 
 export type CatalogTarget = {
   id: string
@@ -115,10 +117,18 @@ export async function writeRow(
   body: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
   const fetcher = target.endpoint.binding === "CONTENT" ? env.CONTENT : env.TENANCY
-  const res = await fetcher.fetch(`https://internal${target.endpoint.path}`, {
+  // Through the ONE cookie-forward seam (round-two architecture review): this
+  // used to hand-build the fetch, so an import that failed on row 412 landed
+  // in error_logs unjoinable to its batch, and a hung door held the whole run.
+  // The seam requires the trace id and this door runs once PER ROW — a row is
+  // one write, and thirty seconds is a hang, not a slow write.
+  const res = await forwardToDoor(fetcher, {
+    path: target.endpoint.path,
     method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: request.headers.get("Cookie") ?? "" },
-    body: JSON.stringify(body),
+    cookie: request.headers.get("Cookie") ?? "",
+    traceId: requestId(request),
+    body,
+    timeoutMs: 30_000,
   })
   if (res.ok) return { ok: true }
   let error = `Couldn't add a row (HTTP ${res.status}).`

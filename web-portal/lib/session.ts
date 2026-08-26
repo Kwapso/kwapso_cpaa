@@ -67,9 +67,19 @@ function isAccessAnswer(e: unknown): boolean {
 }
 
 async function resolveSession(): Promise<Resolved> {
+  // ONE wait, not two — the identity read and the standing read are
+  // independent doors, and this is the first paint of every portal visit
+  // (measured 1.4–1.7s serialised; the agency's boot got the same fix a round
+  // earlier). The context read fires alongside and is simply not awaited on
+  // the paths that never need it.
+  const mePromise = auth.me()
+  const contextPromise = portal.context()
+  // A rejection that is only ever read on the ready path must not become an
+  // unhandled rejection on the paths that return before reading it.
+  contextPromise.catch(() => {})
   let user: SessionUser
   try {
-    user = (await auth.me()).user
+    user = (await mePromise).user
   } catch (e) {
     if (isAccessAnswer(e)) return { kind: "signed-out" }
     throw e
@@ -81,7 +91,7 @@ async function resolveSession(): Promise<Resolved> {
   if (!user.currentTeamId) return { kind: "no-access", user }
 
   try {
-    const context = await portal.context()
+    const context = await contextPromise
     // A person with no company to stand in has no portal, however valid their
     // login. Standing NOWHERE is the fence's fail-closed answer, and it must
     // read as "not yet", never as "empty".

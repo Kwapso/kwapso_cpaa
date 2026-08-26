@@ -496,8 +496,10 @@ saving it represents is never erased. (`workers/tenancy/src/lib/processes.ts`,
 `deleteStep`; the smaller sibling deletes, all child rows too, are a
 `process_links` row when two maps are disconnected — the connection is a
 statement, not a record — a corrected day's replaced price row in
-`client_tool_prices`, and the join rows a whole-set write reconciles in
-`client_role_departments` / `client_role_people`.)
+`client_tool_prices`, the join rows a whole-set write reconciles in
+`client_role_departments` / `client_role_people`, and — the same whole-set
+shape on content's side — the `story_processes` rows a story's process list
+replaces (`workers/content/src/lib/stories.ts`).)
 
 **Deactivate must stay reversible. Never a dead end.** A management LIST must still
 RETURN deactivated rows (active first, each carrying an `active` flag) so the screen can

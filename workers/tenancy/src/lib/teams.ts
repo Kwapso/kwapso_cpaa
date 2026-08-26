@@ -331,6 +331,10 @@ export async function acceptPendingInvites(
       .bind(ulid(), invite.team_id, actor.id, invite.role_id, now, actor.id, actor.email, actor.name)
       .run()
     await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now)
+    // The history line rides the SWEEP too. This is the COMMON join path —
+    // under TEAM_CREATION_CLOSED every new person arrives through here — and
+    // the round-two review found only the explicit accept door writing it.
+    await logMemberJoined(env, invite.team_id, actor)
     invites.push(invite)
   }
 

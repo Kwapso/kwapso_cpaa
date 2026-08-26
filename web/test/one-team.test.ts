@@ -38,6 +38,18 @@ describe("one team: the UI offers no way to make another", () => {
       src.includes("Start my own team"),
       "the dead promise is back — the button's label returned"
     ).toBe(false)
+    // …and the OTHER half of its own sentence: "ask for a new invite" needs a
+    // place to ACCEPT one, and every teamless person is bounced to exactly this
+    // screen. Withdrawing the form without mounting the panel stranded
+    // removed-then-reinvited members with no in-product way back in.
+    expect(
+      src.includes("<InvitationsPanel"),
+      "the teamless branch must mount the accept surface (InvitationsPanel)"
+    ).toBe(true)
+    expect(
+      src.includes("tenancy.bootstrap()"),
+      "accepting must re-check bootstrap so a fresh team routes them home"
+    ).toBe(true)
   })
 
   for (const [file, what] of [

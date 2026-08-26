@@ -87,6 +87,13 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   // just landed may be the explanation for a step that got slower, and that
   // changes what the impact screen says beside it.
   process_comments: () => [cacheKeys.impact],
+  // A step edit, a version cut or a rate change moves the figures this screen
+  // is FOR — and until 26 Aug 2026 the socket filtered both resources out
+  // before arrival (neither was scope-stamped, and a ping the fence cannot
+  // check is a ping a fenced listener never hears). Every publisher stamps the
+  // account now, held by the stamped-publishers census in tenancy's tests.
+  processes: () => [cacheKeys.impact],
+  account_rates: () => [cacheKeys.impact],
   /** THE MOMENT SOMETHING IS SHARED WITH THEM, their screen says so — which is
    * the whole reason this resource is worth hearing. The agency presses "Show to
    * the client" and the card appears where the client is already looking, rather

@@ -118,8 +118,9 @@ Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
 Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
 
 Then call tools/list to see what I can do. You act as me, in one team, capped by my
-role — reads, exports and imports are free; only the assistant tools (agent_chat,
-agent_confirm, plan_import), and ask_knowledge when you set compose, use the team's
+role — reads, exports and import writes are free; only the assistant tools
+(agent_chat, agent_confirm, and plan_import — the import step that asks the
+assistant to plan a batch), plus ask_knowledge when you set compose, use the team's
 AI quota.
 ```
 
@@ -631,9 +632,12 @@ a machine was right when pushing a sprint was assistant-only — is answered by
 neither being possible. `google_calendar_events` and `google_meeting_transcript`
 remain, and both are reads, on the assistant's side.
 
-**ONE tool still crosses the line into Google, and the sentence above used to deny
-it.** It is gated exactly as its door is and reaches nobody else's account, but it
-belongs in front of you rather than in a catalogue you skim:
+**THREE tools still cross the line into Google, and this paragraph used to name
+only one of them** *(fact updated 26 Aug 2026: the two meeting-side reads below
+were on this surface all along — §3 documents both — while this security section,
+the one a reader consults before handing a token to a third party, said ONE)*.
+Each is gated exactly as its door is and reaches nobody else's account, but they
+belong in front of you rather than in a catalogue you skim:
 
 - **`sync_google_knowledge`** does not browse Google, but it does READ it: gated
   `knowledge:create` **and** `google:read`, it sweeps the caller's own connected
@@ -643,6 +647,17 @@ belongs in front of you rather than in a catalogue you skim:
   which is narrower than the browse tools (nobody else's account, no send, no
   delete) but is not nothing, and is not what "the MCP catalogue exposes none of
   them" led a reader to expect.
+- **`sync_calendar_series`** reads the caller's own Google Calendar live, into
+  Meetings — one way, always; nothing here writes to a calendar. Its door demands
+  `google:read` beside the meetings right.
+- **`read_meeting_transcript`** hunts a meeting's transcript through the caller's
+  own Google, in order of proof: the file attached to the calendar entry, then a
+  document in a shared Drive folder, then Google's own notice in the caller's
+  mail. Same shape at the door: `google:read` beside `meetings:edit`.
+
+What a leaked token reaches, then, is its owner's calendar, the transcript
+documents their own Google can see, and whatever the knowledge sweep already
+covers — never a send, never a delete, never anybody else's account.
 
 It is recorded here rather than quietly removed because taking a capability off a
 published surface breaks somebody's script, and that is a decision with an owner.

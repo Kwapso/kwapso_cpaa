@@ -32,7 +32,6 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { primeCache, useCached } from "@shared/web/store"
-import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
 
 /** The signed-in person's pending received invitations. Shared cache key so the
@@ -43,7 +42,11 @@ export function useReceivedInvites() {
   )
 }
 
-export function InvitationsPanel({ active }: { active: ActiveTeam }) {
+/** `refresh` is all this panel ever needed from ActiveTeam — narrowed so the
+ * ONBOARDING page (which has no team context yet, by definition) can mount it:
+ * the round-two review found the teamless screen telling people to ask for an
+ * invite while the only surface that could ACCEPT one bounced them back here. */
+export function InvitationsPanel({ refresh }: { refresh: () => Promise<void> }) {
   const t = useT()
   const invitesQ = useReceivedInvites()
   const invites = invitesQ.data
@@ -56,7 +59,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
       primeCache("invitations", res.invitations)
       // Join + switch: refresh reloads the context, whose active team is now the
       // one just joined.
-      await active.refresh()
+      await refresh()
       toast.success(`Joined ${inv.teamName}`)
       if (res.invitations.length === 0) softNavigate("/home")
     } catch (err) {

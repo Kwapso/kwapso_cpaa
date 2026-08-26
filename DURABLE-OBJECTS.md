@@ -33,12 +33,16 @@ an instance and points here for what an instance IS.
 |---|---|---|---|
 | **Worker** | Deployed code (auth, tenancy, realtime, content, data-ops, mcp, gateway, portal-gateway) | 8 built | No |
 | **DO class** | A class *inside* a worker (`TeamChannel` + `TeamInterest`, both in realtime) | 2 today (26 Aug 2026) | No |
-| **DO instance** | A *runtime* entity addressed by name (`team:<id>`, `user:<id>`) | Unlimited | Yes, one per team **and** one per signed-in user |
+| **DO instance** | A *runtime* entity addressed by name (`team:<id>#0…3`, `team:<id>!interest`, `user:<id>`) | Unlimited | Yes — five per team (four `TeamChannel` shards + one `TeamInterest`) **and** one `TeamChannel` per signed-in user |
 
 An instance is **not** a worker. Addressing one by name conjures it; idle ones
 hibernate and cost ~nothing. Exactly like OOP: one `class` (code), millions of
-objects (runtime). 10,000 teams + their members is still 8 workers + one
-`TeamChannel` class, but that many instances, almost all asleep.
+objects (runtime). 10,000 teams + their members is still 8 workers + two DO
+classes, but ~50,000 team-side instances (four channel shards and one interest
+registry per team) plus one per signed-in user, almost all asleep. *(Fact
+updated 26 Aug 2026: this paragraph used to count one class and one instance
+per team. The class count moved when `TeamInterest` shipped; the instance
+arithmetic moved with the shard split §2 describes.)*
 
 This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the class.
 
@@ -49,9 +53,28 @@ This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the clas
 `TeamChannel` lives in `workers/realtime/src/index.ts`. It is a **pub/sub relay
 and nothing else**:
 
-- **One instance per channel.** A team's data channel is addressed `team:<id>`;
-  a person's identity channel is addressed `user:<id>`. `env.CHANNELS.getByName(
-  channel)` resolves the instance by name, creating it on first use.
+- **One channel per team or per person — and a TEAM channel is four instances.**
+  A person's identity channel is one instance, addressed `user:<id>`. A team's
+  data channel is addressed `team:<id>` by every PUBLISHER, but since the split
+  of 14 Aug 2026 (ARCHITECTURE §7 records the decision; this section is its
+  mechanism) it is **spread across `REALTIME_SHARDS` (4) instances**, named by
+  `teamShardName` as `team:<id>#0` … `team:<id>#3`. All three names —
+  `REALTIME_SHARDS`, `shardFor` (a stable hash of the user id) and
+  `teamShardName` — live in `shared/workers/realtime.ts`, the seam the client
+  and the worker both import, so the two can never disagree about the count.
+  The fan-out is owned by the realtime worker's `/publish` door, not by the
+  publishers: a publisher still makes ONE call naming `team:<id>`, and the door
+  asks the team's `TeamInterest` registry (`teamInterestName`,
+  `team:<id>!interest`, one small instance per team remembering which shards
+  hold a listener for which resource) which shards to send to — every unknown
+  answers "all of them", so a stale entry costs an extra send, never a missed
+  one. A listener joins the shard of `shardFor(userId)`, so one person's devices
+  land together and a reconnect returns to the same object.
+  `env.CHANNELS.getByName(name)` resolves an instance by name, creating it on
+  first use — which is why nothing listens on a bare `team:<id>`: publish
+  through the door, or address a shard. *(Fact updated 26 Aug 2026: this bullet
+  said "one instance per channel" from the day the doc was locked until the
+  split, and for twelve days after it.)*
 - **It holds open WebSockets, not data.** The DO stores **no application data**;
   the databases (global core D1 + per-team D1) stay the single source of truth
   (`index.ts` header: *"Stores NO app data"*). It keeps a set of sockets and
@@ -120,7 +143,9 @@ plain `server.accept()`. The difference is the whole cost model:
   DO never has to hold a live JS closure per socket just to receive events.
 
 So 10,000 teams with quiet channels use ~no memory. That is the property that
-makes "one instance per team **and** per user" affordable.
+makes "five instances per team **and** one per user" affordable — the shard
+split multiplied the instance count and hibernation is what made that free.
+*(Fact updated 26 Aug 2026: this line used to say "one instance per team".)*
 
 ### The three entry points
 
@@ -128,8 +153,8 @@ makes "one instance per team **and** per user" affordable.
 
 | Route | Method | Who calls it | What it does |
 |---|---|---|---|
-| `/publish` | POST | Other workers, **service binding only** | `env.CHANNELS.getByName(channel).broadcast(JSON.stringify(event))` |
-| `/api/realtime?team=<id>` / `?user=<id>` | GET (WebSocket upgrade) | A browser, via the gateway | Gate, then hand the request to the addressed `TeamChannel` |
+| `/publish` | POST | Other workers, **service binding only** | For a bare `team:<id>`: ask `TeamInterest` which shards care, then `broadcast` to each interested `team:<id>#n`. For `user:<id>` (or an explicitly named shard): `env.CHANNELS.getByName(channel).broadcast(…)` |
+| `/api/realtime?team=<id>` / `?user=<id>` | GET (WebSocket upgrade) | A browser, via the gateway | Gate, then hand the request to the caller's shard of the team's channel (`shardFor(user.id)`) or to the one `user:<id>` instance |
 | `/api/realtime/health` | GET | Ops | `{ ok: true }` |
 
 `/publish` is internal: it is reached only over the service binding
@@ -397,17 +422,28 @@ Sibling helpers: `publishUserChange(userId, resource, id?, op?)` posts to
 `user:<userId>`; `publishSignOut(userId)` posts a `{resource:"session",
 op:"session"}` event with no id.
 
-### Step 3, the DO fans it out (realtime worker)
+### Step 3, the door fans it out (realtime worker)
 
-`/publish` resolves the instance by name and broadcasts:
+`/publish` looks at the channel name. A `user:<id>` (or an explicitly named
+shard) resolves one instance and broadcasts. A bare `team:<id>` is the sharded
+case (§2): the door asks the team's `TeamInterest` registry which shards hold a
+listener for this resource — any unknown answers "all of them" — then
+broadcasts to each interested shard concurrently, settled rather than raced, so
+one dead shard cannot cost the other three their ping:
 
 ```ts
-await env.CHANNELS.getByName(channel).broadcast(JSON.stringify(event))
+const answer = await env.INTEREST.getByName(teamInterestName(teamId)).shardsFor(resource)
+// `shards` is the narrowed list, or all of 0…REALTIME_SHARDS-1 on any doubt
+await Promise.allSettled(
+  shards.map(async (shard) =>
+    env.CHANNELS.getByName(teamShardName(teamId, shard)).broadcast(payload)
+  )
+)
 ```
 
 `broadcast` loops `this.ctx.getWebSockets()` and `ws.send`s the JSON to every
-socket on that one channel that MAY HEAR IT (staff: all of them; a client login:
-its own accounts only. "The listener's fence", §2). The DO is single-threaded,
+socket on that one instance that MAY HEAR IT (staff: all of them; a client login:
+its own accounts only. "The listener's fence", §2). Each DO is single-threaded,
 so this is a clean fan-out; a dead socket throws on `send` and is ignored (the
 runtime drops it on close).
 
@@ -467,9 +503,10 @@ small own-account feed.
 worker write (D1, committed)
   → publishChange(env.REALTIME, teamId, resource, id, op)   [best-effort]
     → POST https://realtime/publish { channel:"team:<id>", event:{resource,id,op} }
-      → env.CHANNELS.getByName("team:<id>").broadcast(json)
-        → ws.send to every open socket on that channel
-          → client onEvent → patchRow(re-pull ONE row via gated endpoint) → swap in place
+      → TeamInterest("team:<id>!interest").shardsFor(resource)   [any doubt ⇒ every shard]
+        → TeamChannel("team:<id>#n").broadcast(json), each interested shard
+          → ws.send to every open socket on that shard
+            → client onEvent → patchRow(re-pull ONE row via gated endpoint) → swap in place
 ```
 
 No row content ever leaves the database over this path. The ping says *what*

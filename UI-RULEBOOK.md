@@ -1343,10 +1343,12 @@ about the same subject. A **boundary** between two blocks conforms when it carri
 Zero cues and two cues both fail, and they fail for the same reason: the eye is being told
 nothing, or told twice.
 
-**What the app scores today.** 53 screens measured across both front doors, mean **75.9**
+**What the app scored when it was measured — 18 Aug 2026, before the density round
+§12 now marks Done.** 53 screens measured across both front doors, mean **75.9**
 (*fine*): 21 calm, 12 fine, 13 busy, 7 overwhelming. The agency app means 74.4 and the
-portal 84.4. The full table, and the work that follows from it, live in
-`.session-notes/ui-rearrangement-plan.md`.
+portal 84.4. The full table, and the work that followed from it, live in
+`.session-notes/ui-rearrangement-plan.md`; nothing has re-measured the estate since
+that round landed, so these are the before numbers, not today's.
 
 ---
 
@@ -1355,7 +1357,10 @@ portal 84.4. The full table, and the work that follows from it, live in
 The fifth fact moves to a second line, into the three-dot menu, or off the screen. It does
 not get squeezed onto the end.
 
-The worst bands in the app today, all counted off the source:
+The worst bands as counted on 18 Aug 2026, off the source as it then stood *(fact
+updated 26 Aug 2026: the four worst — the 29-pill switcher, the 9-column table and
+both 8-fact rows — have since been fixed, and §12's table marks each one **Done**;
+these rows stand as the evidence that round was ordered on, not as today's screens)*:
 
 | Band | File | Units |
 |---|---|---|

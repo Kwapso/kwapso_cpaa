@@ -7,14 +7,17 @@
 //
 // IT IS SHARED BECAUSE THE ALLOWANCE IS. It sat in data-ops while data-ops was the
 // only worker that spent a model. Content spends one now — it WRITES the answer the
-// knowledge base found (R23) — and there is exactly one allowance between them: the
+// knowledge base found (R23) — and tenancy spends one reading a call into a
+// proposed process map (process-drafts). One allowance between all three: the
 // team's. A second copy of this file would be a second daily counter with the same
 // name, and the first person to notice would be the one who ran out twice.
 //
 // THE CEILING IS A VAR, SO EVERY SPENDER MUST READ THE SAME ONE. `AGENT_FREE_DAILY`
-// and `AGENT_NO_DAILY_CAP` are declared in BOTH spenders' wrangler configs with the
-// same values, and credits-invariant.test.ts compares them — a cap set on one worker
-// and not the other is one allowance enforced at two different heights.
+// and `AGENT_NO_DAILY_CAP` are declared in every spender's wrangler config with the
+// same values, and credits-invariant.test.ts compares all three — a cap set on one
+// worker and not another is one allowance enforced at two different heights,
+// which is exactly how tenancy's staging sat at "0" beside the others' "true"
+// for weeks before the third name joined the list.
 
 import type { D1Database } from "@cloudflare/workers-types"
 

@@ -71,12 +71,14 @@ curl -s https://agency.kwapso.app/mcp \
 
 ## 4 · What it costs
 
-Reads, CSV exports, and imports are **free**, just endpoint calls. Only the assistant
-tools (`agent_chat`, `agent_confirm`, the `plan_import` step — and `ask_knowledge`
-when you set `compose`, which asks the app to write the answer for you) use the
-**team's AI quota**, and only if your role has the AI-agent right. A role without it
-can't spend any AI budget, reads/exports still work, and `ask_knowledge` without
-`compose` stays free.
+Reads, CSV exports, and import **writes** are free, just endpoint calls. Only the
+assistant tools use the **team's AI quota** — `agent_chat`, `agent_confirm`, the
+`plan_import` step (the one part of a multi-file import that thinks: it asks the
+assistant to plan the batch, so it spends a unit; confirming and writing the rows
+is free) — and `ask_knowledge` when you set `compose`, which asks the app to write
+the answer for you. All of it only if your role has the AI-agent right. A role
+without it can't spend any AI budget, reads/exports still work, and
+`ask_knowledge` without `compose` stays free.
 
 ## 5 · Good to know
 

@@ -343,7 +343,9 @@ export async function reconcile(
  * row that moved into it is deduped by id, and rows beyond it stay in the
  * order they had — a merge must never know LESS than the screen already does.
  * A row deleted server-side lingers in the tail until the next real load,
- * which is the cheaper wrong. No-op when the key isn't loaded (cache-first). */
+ * which is the cheaper wrong. A COLD key simply takes the page as its value —
+ * a merge into nothing is a prime (the docstring briefly claimed no-op; the
+ * test pins the real behaviour). */
 export function mergePage(
   key: string,
   idField: string,

@@ -15,7 +15,10 @@ scroll, so: the two tiers, in order.
 **GLOBAL core** (`kwapso-core`, reached by `env.DB`), identity and billing across teams:
 `users` · `teams` · `team_members` · `email_change_logs` · `account_activity` ·
 `importable_databases` · `agent_usage` · `agent_credits` · `agent_usage_log` ·
-`mcp_tokens` · `error_logs` · `selectable_data_types` (the one still to build) ·
+`mcp_tokens` · `error_logs` · the sharding machinery, `team_module_databases` +
+`team_module_moves` + `db_alerts` + `db_growth` (where a module lives, the mover's
+resumable ledger, and the size + rate watch) ·
+`selectable_data_types` (the one still to build) ·
 *Retention in core*, the only place rows are really deleted.
 
 **[PER-TEAM](#per-team-each-lives-in-that-teams-own-database)** (one D1 database per team, reached over the REST door), everything a team owns:
@@ -180,7 +183,15 @@ global core DB so the gate can spend a unit without opening a team database.
 Purpose: the usage TRAIL behind the panel's "where did my credits go" view.
 Real data: `id`, `team_id`, `actor_id`, `actor_name`, `created_at`, `credits`
 (units this command consumed), `source` (`free` / `credit` / `mixed`), `summary`,
-and **`kind`** (`db/core/0014`: `'action'` | `'prompt'` | NULL). **Visibility rides
+**`kind`** (`db/core/0014`: `'action'` | `'prompt'` | NULL), and the **four token
+columns** (`db/core/0027`): `input_tokens`, `output_tokens`, `cache_write_tokens`,
+`cache_read_tokens` — the provider's own `usage` block recorded per command, because
+`credits` counts REQUESTS and two one-unit turns can differ tenfold in tokens, so
+"what did this month cost" is a query rather than an estimate, and the prompt-cache
+hit rate (`cache_read ÷ (cache_read + cache_write + input)`) can only be written
+down while the turn is happening. All four NULLABLE on purpose: a row from before
+the migration was never measured, and a back-filled 0 would read as "measured, and
+it cost nothing". **Visibility rides
 `kind` (C3, the log tells the TEAM where its credits went):** an `action` row's
 summary is TEAM-VISIBLE (the team is entitled to see what was done in its name); a
 `prompt` row's summary is the author's OWN (a teammate sees who spent how much and
@@ -332,9 +343,34 @@ repeatable core write now carries a per-caller ceiling that rides its INSERT
 watches **every** database in the account, core included, it used to filter
 `team-*`, so `kwapso-core` could never raise one.
 
----
+### team_module_databases + team_module_moves. KEEP (BUILT: routing `db/core/0004`, the resumable ledger `db/core/0023`). WHERE A MODULE LIVES, AND HOW IT GETS THERE
+*(Sections added 26 Aug 2026 — both tables predate them, and "the canonical
+data-model reference" was carrying two core tables it never named.)*
 
-## PER-TEAM (each lives in that team's own database)
+**`team_module_databases`** (`0004_sharding`) is the routing override: by default a
+team's data lives in its one database (`teams.database_id`), and when a module gets
+heavy the mover relocates that module's tables to a dedicated database and records
+it here — `team_id`, `module`, `database_id`, `created_at`, `UNIQUE (team_id,
+module)`. The data door consults this table to know where a (team, module) lives,
+which is why the mover flips it LAST: no row, no re-routing, no doubled read.
+`0004` also creates `db_alerts`, the 80%-of-10-GB size alarms `db_growth` above
+turns into a rate.
+
+**`team_module_moves`** (`0023_module_moves`) is what makes a killed move a
+CONTINUATION rather than an orphaned second database (ARCHITECTURE §7 marks the
+mover **RESUMED 2026-08-17** on the strength of it). One row per (team, module)
+move: the `database_id` created for it (written BEFORE the first byte is copied, so
+a retry reuses it — the field whose absence caused the orphan), `source_database_id`,
+`tables_json` (the set the caller named, so a resume moves the SAME set), `status`
+(`copying` → `copied` → `routed` → `drained` → `done`, named after what has ALREADY
+happened), `cursors_json` (per-table last-id-copied — a cursor, not a row count,
+because the copy walks by key and can stop at any moment), `verified_json` ("the
+counts agreed" is a separate fact from "I reached the last row", and only it
+licenses a drain), `drained_json`, `rows_copied`, `claimed_at` (the claim IS the
+lock: an UPDATE with the current status in its WHERE, zero rows changed means
+somebody else has it), `last_error`, and the audit timestamps. A partial unique
+index (`status <> 'done'`) holds ONE live move per (team, module) — two rows would
+mean two databases and a merged read counting everything twice.
 
 ### member_roles + role_permissions. KEEP (built; we split Glide's WIDE → TALL)
 Glide `Member roles` was WIDE: `Identity/Title`, `Description`, `Is default`,

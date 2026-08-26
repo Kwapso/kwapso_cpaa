@@ -101,6 +101,7 @@ import {
 import { knownContactEmails } from "../lib/google-read"
 import { findTranscript } from "../lib/google-transcript"
 import type { Env } from "../env"
+import { brand } from "@shared/brand"
 
 // ── the connection itself ────────────────────────────────────────────────────
 
@@ -837,7 +838,7 @@ export async function postGoogleMailSend(request: Request, env: Env): Promise<Re
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Mail sent",
-    description: `kwapso sent mail as ${actor.name}${to ? ` to ${to}` : ""}`,
+    description: `${brand.name} sent mail as ${actor.name}${to ? ` to ${to}` : ""}`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ sent })
@@ -879,7 +880,7 @@ export async function postGoogleMailReply(request: Request, env: Env): Promise<R
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Reply sent",
-    description: `kwapso replied to ${sent.to} as ${actor.name}, "${sent.subject}"`,
+    description: `${brand.name} replied to ${sent.to} as ${actor.name}, "${sent.subject}"`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ sent })
@@ -1247,7 +1248,7 @@ export async function postGoogleChat(request: Request, env: Env): Promise<Respon
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Posted in a space",
-    description: `kwapso posted in "${source.name}" as ${actor.name}`,
+    description: `${brand.name} posted in "${source.name}" as ${actor.name}`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ message })

@@ -82,11 +82,20 @@ accounts of one model are two accounts that can disagree.
 
 What this section locks is the part that is a DECISION rather than a fact of the
 platform, **what gets a DO instance, and what does NOT:**
-- **Live channels, one instance per team AND one per user** (`TeamChannel`,
-  addressed `team:<id>` or `user:<id>`). A team change pings that team's channel
-  (every active member); an identity / cross-team-membership / sign-out event pings
-  that user's channel (their devices). Each ping is **row-level** (`{resource, id,
-  op}`), NOT one-DO-per-record.
+- **Live channels, one channel per team AND one per user** (`TeamChannel`,
+  addressed `team:<id>` or `user:<id>` by every publisher). A team change pings that
+  team's channel (every active member); an identity / cross-team-membership /
+  sign-out event pings that user's channel (their devices). Each ping is
+  **row-level** (`{resource, id, op}`), NOT one-DO-per-record. *(Fact updated
+  26 Aug 2026: "one channel" is no longer "one instance". Since §7's split of
+  14 Aug 2026 a TEAM's channel is `REALTIME_SHARDS` (4) `TeamChannel` instances,
+  `team:<id>#0…3`, plus one `TeamInterest` registry at `team:<id>!interest`; the
+  realtime worker's `/publish` door owns the fan-out, so a publisher still names
+  `team:<id>` and a listener joins the shard of `shardFor(userId)`. A USER's
+  channel is still one instance. This bullet used to say "one instance per team",
+  which was true when it was locked and is now the wrong shape to build against —
+  address a shard, or publish through the door; a bare `team:<id>` instance has no
+  listeners. DURABLE-OBJECTS.md §1–2 is the mechanism.)*
 - **Transactional entity, one instance per *contended* thing** (an inventory
   cell, a ledger account, a booking slot), and ONLY where serialized
   read-modify-write matters. Reserved for hot counters/balances. Race-free
@@ -285,7 +294,9 @@ on top follows [CACHING.md](CACHING.md).
   lock's word-ban stands narrowed or falls is an owner decision still to be made;
   both facts are recorded here rather than one silently deleted.
 - **Activity log records meaningful changes**, created, edited, role changed,
-  invite sent/revoked, member removed (deletes don't happen). One reusable writer
+  invite sent/revoked, member removed (a removed member is deactivated, never
+  deleted — and the one hard delete, the step carve-out above, writes its own
+  activity row rather than escaping the log). One reusable writer
   (`shared/workers/activity.ts`) writes to each team's own `activity` table; each
   row carries a relation (`related_table`/`related_row_id`) so the SAME feed
   surfaces four ways, the whole team, one user, one role, or one invite.
@@ -478,7 +489,9 @@ where it ended up and what is still true.
 
 **WHERE THE CEILING NOW SITS, and the arithmetic, because the honest answer is not
 "solved".** Wall-clock per broadcast falls by the shard count, so the per-object
-listener ceiling goes from ~3,000–5,000 to roughly **12,000–20,000 per team**. But the
+listener ceiling goes from ~3,000–5,000 to roughly **12,000–20,000 per team** — the
+same worst-case arithmetic as the table below, every ping reaching every shard, so
+interest routing can only raise it. But the
 work is `publishes/second × sockets × per-socket cost`, and sharding divides only by N
 *(fact updated 26 Aug 2026: the table below assumes every ping reaches every shard,
 which stopped being true when interest-routing shipped in August 2026 — see the
@@ -546,7 +559,7 @@ its largest tenant is a few hundred people or a few hundred thousand.
 | No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
 | The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams |
 | R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md), changing it means rule, registry and check together | an activity table past ~5M rows in one team |
-| Per-caller rate limiting on ordinary doors | not the config change it looks like: neither gateway decodes a session, so neither can key a limiter on a user; per-IP puts one office behind one bucket | any abuse, or a paid tier where a caller's cost is somebody else's bill |
+| ~~Per-caller rate limiting on ordinary doors~~ **BUILT 2026-08-17** *(fact updated 26 Aug 2026: this row used to record the limiter as held down)* | the reasoning that kept it out of the gateways stands — neither decodes a session, so neither can key a limiter on a user, and per-IP puts one office behind one bucket — so it sits where the caller is already known: `teamContext` (`shared/workers/gating.ts` → `shared/workers/rate-limit.ts`) checks `callerHasBudget` once per request, keyed on the resolved user id, `CALLER_REQUESTS_PER_MINUTE` (600, `shared/workers/limits.ts`) per caller per worker, before the membership read, failing OPEN (a broken safety valve must not become the outage). The `CALLER_LIMIT` binding rides tenancy, content, data-ops and mcp (the `/mcp` desk keys `machine:<user_id>` so a token loop is refused before it fans out) | a paid tier where a caller's cost is somebody else's bill (the number, and where it sits, get renegotiated) |
 
 The growth alarms **are** delivered (`ALERT_TO` on tenancy, one mail per tick, once per
 new alarm), [OPERATIONS.md](OPERATIONS.md) § *Growth watch*.

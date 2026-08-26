@@ -320,7 +320,11 @@ export async function requireRight(
     throw new GuardError(
       403,
       "forbidden",
-      `You don't have permission to do that, your role is missing the "${right}" right on ${module.replace(/_/g, " ")}.`
+      // String(module) defensively: a prototype-shaped lookup once handed this an
+      // OBJECT as the module name and the refusal message itself crashed into a
+      // 500 (live, 26 Aug 2026). The lookup bug is fixed at its site; a denial
+      // message must still never be the thing that throws.
+      `You don't have permission to do that, your role is missing the "${right}" right on ${String(module).replace(/_/g, " ")}.`
     )
 }
 

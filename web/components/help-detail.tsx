@@ -220,8 +220,15 @@ export function HelpDetailScreen({
     setStatusBusy(true)
     try {
       const r = await what()
-      if (r && "tickets" in r) primeCache(`help:${teamId}`, r.tickets)
-      invalidate(`help:${teamId}`)
+      // Merge the page the door already returned — this used to prime and then
+      // invalidate the SAME key one line later, so the fresh page was thrown
+      // away and refetched (the ~1s rebuild, measured; round-two speed review).
+      if (r && "tickets" in r) {
+        mergePage(`help:${teamId}`, "id", r.tickets as unknown as Record<string, unknown>[])
+        const extras = r as { byType?: Record<string, number>; byStatus?: Record<string, number> }
+        if (extras.byType) primeCache(`help-by-type:${teamId}`, extras.byType)
+        if (extras.byStatus) primeCache(`help-by-status:${teamId}`, extras.byStatus)
+      } else invalidate(`help:${teamId}`)
       invalidate(recordActivityKey("help", helpId))
       toast.success(done)
     } catch (err) {
@@ -253,7 +260,7 @@ export function HelpDetailScreen({
     appId?: string
     raisedByContactId?: string
   }) {
-    const { tickets } = await content.updateHelp({
+    const { tickets, byType, byStatus } = await content.updateHelp({
       id: helpId,
       description: input.description,
       helpType: input.helpType,
@@ -269,6 +276,8 @@ export function HelpDetailScreen({
     // Merge, don't replace: priming the whole key with this first page threw
     // away rows scrolled in past it (same seam-fix as the collection's edit).
     mergePage(`help:${teamId}`, "id", tickets as unknown as Record<string, unknown>[])
+    if (byType) primeCache(`help-by-type:${teamId}`, byType)
+    if (byStatus) primeCache(`help-by-status:${teamId}`, byStatus)
     invalidate(recordActivityKey("help", helpId))
     toast.success(t("Ticket updated."))
   }
@@ -630,7 +639,9 @@ export function HelpDetailScreen({
               />
             )
           if (panel.value === "files")
-            return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "read")} />
+            // help:EDIT since the door tightened (e36b254) — read kept the
+            // button visible and every press a 403.
+            return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "edit")} />
           if (panel.value === "stakeholders")
             return (
               <HelpStakeholders

@@ -270,8 +270,20 @@ a value, it is a typo.
 
 ## 5 · What has NOT been done
 
-No row has been written to any database. No schema has changed. No table has been
-created. The import path described in `AGENTIC-IMPORT.md` is the mechanism when the
-time comes — normalise, map, order the interdependent tables, resolve foreign keys,
-reject honestly, and write through the gated door — but it needs the work engine to
-exist first, and it needs the six answers above.
+> **This section is history, and stopped being the present some time ago (noted
+> 26 Aug 2026).** The work engine was built, the six answers were given, and the
+> import has RUN — into **staging**: `scripts/seed-staging.mjs` reads
+> `glide/normalised.json` and writes the history through the gated doors, signed
+> in as a real person (apps, modules, sprints, stories, tasks, work logs,
+> meetings, and the tickets — 1,820 in the history; the default run seeds a cut
+> and `--full` lifts every cap for the migration run; the script's own header
+> carries the counts). The team migrations have long since created the schema.
+> The paragraph below records what was true when this reconciliation was
+> written, and a reader must NOT re-run the seed on the strength of it — the
+> seed is idempotent, but "nothing has been written" is no longer why.
+
+No row had been written to any database. No schema had changed. No table had been
+created. The import path described in `AGENTIC-IMPORT.md` is the mechanism it was
+later done with — normalise, map, order the interdependent tables, resolve foreign
+keys, reject honestly, and write through the gated door — but it needed the work
+engine to exist first, and it needed the six answers above.

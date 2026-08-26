@@ -8,6 +8,7 @@
 import { GuardError } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import type { Env } from "../env"
+import { brand } from "@shared/brand"
 import {
   LIST_HARD_CAP, // R14 hard cap
   MAX_ACTIVE_MCP_TOKENS_PER_USER,
@@ -36,7 +37,11 @@ export async function sha256Hex(value: string): Promise<string> {
 /** 32 random bytes, hex — prefixed so a leaked string is recognizable in scans. */
 export function newTokenSecret(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return `kwapso_mcp_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`
+  // Derived from the brand seam so a FORK re-brands its token prefix in one
+  // file — while for THIS product the value stays byte-identical to the
+  // external contract every doc, validator and live token already carries
+  // (`kwapso_mcp_<64 hex>`). The prefix is an identity, not a secret.
+  return `${brand.name}_mcp_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`
 }
 
 /** Create a token for the signed-in caller, pinned to their CURRENT team. The

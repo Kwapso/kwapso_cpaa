@@ -33,7 +33,13 @@ export function TeamSectionNav({
   if (!perms) return null
   // Only "tab" sections live in this strip — Learning/Tickets are sidebar pages and
   // Import is reached contextually. Each tab is gated by its own read right.
-  const visible = TEAM_SECTIONS.filter((s) => s.placement === "tab" && perms[s.module]?.read)
+  // Overview bypasses the read gate ON PURPOSE: reading a team is `whoAmI`,
+  // not a right — the matrix offers no `teams:read` box, so gating the tab on
+  // it hid the landing tab from every from-scratch role (the screen dropped
+  // the same gate in e36b254; this is the tab half of that decision).
+  const visible = TEAM_SECTIONS.filter(
+    (s) => s.placement === "tab" && (s.key === "overview" || perms[s.module]?.read)
+  )
   if (visible.length <= 1) return null
 
   const hrefFor = (s: TeamSection) => (s.segment ? `/t/${teamId}/${s.segment}` : `/t/${teamId}`)

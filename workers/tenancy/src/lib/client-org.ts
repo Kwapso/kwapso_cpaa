@@ -473,6 +473,15 @@ export async function setRoleDepartments(
        ${wanted.length ? `AND department_id NOT IN (${wanted.map(sqlString).join(", ")})` : ""};
      ${rows}`
   )
+  // The link rows are hard-replaced (a signpost, not a record of work), which
+  // is exactly why the HISTORY line matters: without it this was the one write
+  // in the module that left no trace anywhere (round-two activity review).
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Role departments set",
+    description: `${actor.name} set which departments this role belongs to, ${wanted.length} ${wanted.length === 1 ? "department" : "departments"}`,
+    relatedTable: "client_roles",
+    relatedRowId: input.id,
+  })
 }
 
 export async function setRoleActive(
@@ -548,6 +557,14 @@ export async function setRolePerson(
         WHERE role_id = ${sqlString(input.id)} AND person_account_id = ${sqlString(input.personAccountId)}`
     )
   }
+  // Same reason as setRoleDepartments above: a hard-replaced link still owes
+  // the feed its line.
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: input.attached ? "Person attached to role" : "Person taken off role",
+    description: `${actor.name} ${input.attached ? "attached a person to" : "took a person off"} this role`,
+    relatedTable: "client_roles",
+    relatedRowId: input.id,
+  })
   return { accountId }
 }
 

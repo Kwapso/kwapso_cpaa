@@ -94,7 +94,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
       {pendingInvites.length > 0 && (
         <section className="motion-panel-in flex flex-col gap-4">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invites waiting for you")}</h2>
-          <InvitationsPanel active={active} />
+          <InvitationsPanel refresh={active.refresh} />
         </section>
       )}
 

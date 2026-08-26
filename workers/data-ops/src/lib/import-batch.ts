@@ -16,6 +16,8 @@ import { norm, TARGETS, type TargetDef } from "./targets"
 import { resolveRow, scanRows } from "./import-plan"
 import { analyzeBatch, type AnalyzeFile } from "./import-agent"
 import { writeRow } from "./import"
+import { forwardToDoor } from "@shared/workers/http"
+import { requestId } from "@shared/workers/trace"
 
 const MAX_FILES = 8
 const MAX_ROWS_PER_FILE = 1000
@@ -159,8 +161,13 @@ async function buildResolvedMap(
   const map = new Map<string, string>()
   if (!def.list) return map
   const fetcher = def.endpoint.binding === "CONTENT" ? env.CONTENT : env.TENANCY
-  const res = await fetcher.fetch(`https://internal${def.list.path}`, {
-    headers: { Cookie: request.headers.get("Cookie") ?? "" },
+  // Same seam as writeRow (import.ts) — trace + deadline, for the same reasons.
+  const res = await forwardToDoor(fetcher, {
+    path: def.list.path,
+    method: "GET",
+    cookie: request.headers.get("Cookie") ?? "",
+    traceId: requestId(request),
+    timeoutMs: 30_000,
   })
   if (!res.ok) return map
   const data = (await res.json().catch(() => null)) as Record<string, unknown> | null

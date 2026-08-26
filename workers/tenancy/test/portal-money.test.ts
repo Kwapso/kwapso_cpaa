@@ -67,10 +67,10 @@ async function aPricedMap(): Promise<string> {
     INSERT INTO client_roles (id, account_id, name, cents_per_hour, created_at)
       VALUES ('ROLE_CLERK', '${IDS.victimAccount}', 'Dispatch clerk', 6000, '2026-01-01');
   `)
-  const processId = await createProcess(cfg, guard, staff, actor, {
+  const processId = (await createProcess(cfg, guard, staff, actor, {
     appId: IDS.victimApp,
     name: "Recording a damage case",
-  })
+  })).id
   await addStep(cfg, guard, staff, actor, {
     processId,
     name: "Take the call",
@@ -236,10 +236,10 @@ describe("a connection between two maps", () => {
       INSERT INTO apps (id, account_id, name, created_at)
         VALUES ('AP_OTHER', 'A_OTHER', 'Their system', '2026-01-01');
     `)
-    const theirs = await createProcess(cfg, guard, staff, actor, {
+    const theirs = (await createProcess(cfg, guard, staff, actor, {
       appId: "AP_OTHER",
       name: "Their own way of working",
-    })
+    })).id
     await expect(
       linkProcesses(cfg, guard, staff, actor, { fromProcessId: mine, toProcessId: theirs })
     ).rejects.toThrow(/different clients/)

@@ -711,4 +711,9 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // order, because the Drive lane grew long enough to starve the ones behind it
 // (document had run 194 times to message's 180, and the gap widened every tick).
 // Which lane goes first is not something any kind SAYS, so no textVersion moves.
-const SHARED_DIGEST = "9abb1170387dedc9"
+// 26 Aug 2026: the sweep gained its activity line (a feed entry when it filed
+// passages) — an APPEND after the loop, no reader touched, so again no
+// textVersion moves. Later the same day: the machine-actor attribution
+// literals ('kwapso' as creator/deactivator) moved onto the brand seam —
+// column VALUES, not words any kind says.
+const SHARED_DIGEST = "2e61e3d70b2fdd3d"

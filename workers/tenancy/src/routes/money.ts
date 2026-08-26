@@ -76,7 +76,7 @@ export async function postCreateAccountRate(request: Request, env: Env): Promise
     centsPerHour: centsPerHour(Number(body.centsPerHour)),
     currency: optionalText(body.currency, "Currency", TEXT_LIMITS.short),
   })
-  await publishChange(env, guard.teamId, "account_rates", accountId, "add")
+  await publishChange(env, guard.teamId, "account_rates", accountId, "add", accountId)
   return json({ id })
 }
 
@@ -91,7 +91,7 @@ export async function postUpdateAccountRate(request: Request, env: Env): Promise
   })
   // The ACCOUNT is what a listener can act on — a rate is only ever read on its
   // account's own card, the same shape a contact and a login already have.
-  await publishChange(env, guard.teamId, "account_rates", accountId)
+  await publishChange(env, guard.teamId, "account_rates", accountId, undefined, accountId)
   return json({ ok: true })
 }
 
@@ -104,7 +104,7 @@ export async function postAccountRateActive(request: Request, env: Env): Promise
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Deactivate or activate?")
   // R17: null = zero rows moved = already like that → no ping, no history row.
   const accountId = await setAccountRateActive(cfg, guard, scope, actor, id, body.active)
-  if (accountId) await publishChange(env, guard.teamId, "account_rates", accountId)
+  if (accountId) await publishChange(env, guard.teamId, "account_rates", accountId, undefined, accountId)
   return json({ ok: true })
 }
 

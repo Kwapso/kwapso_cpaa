@@ -60,6 +60,21 @@ the owner asks (destructive; confirm scope) → production, always owner-gated �
 merging `main` means "this is what production runs". `npm run check` (types + full
 test suite) must be green before any commit; deploy order is realtime-first.
 
+## Parallel lanes, when several sessions work one repo
+Multiple Claude sessions (lanes) may work the same project at once, and often share
+ONE checkout — so treat the working tree as shared ground, not your own. The habits
+that keep that safe:
+- **Briefs travel in the repo, not in chat memory.** `.session-notes/lanes/` is the
+  tracked mailbox: a lane hands another its brief (and gets its reply) as a file
+  there, so the handoff survives every session ending.
+- **Verify HEAD before you commit.** Another lane can switch branches or land
+  commits under you mid-task; re-check `git log`/`git status` against what you
+  started from, and rebase your intent rather than clobbering theirs.
+- **Code-writing lanes isolate in worktrees.** A lane that edits source takes a git
+  worktree of its own; doc-only or read-only lanes may share the main checkout.
+- **A prompt handed to another lane must stand alone** — its own setup, paths and
+  context inside it, executable without this conversation.
+
 ## Security and data habits
 - **Act-as-user everywhere.** Every automation surface, the AI agent, imports,
   the MCP tools, acts AS the signed-in user through the same gated endpoints. No

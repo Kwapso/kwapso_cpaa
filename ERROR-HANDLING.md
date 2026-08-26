@@ -79,9 +79,10 @@ environment (staging and production errors never mix), cross-team by design
   client beacons must never spend the budget a crashing worker needs to report
   itself, and one noisy browser must not mute anybody else's.
   **Retention:** there is none yet, the ceiling bounds the RATE, not the total,
-  so the table still grows at up to 120 rows per active caller per hour. The
-  nightly size alarms (OPERATIONS.md) are what notice; a trim job for resolved
-  rows older than 90 days is the next step if the store ever shows up in them.
+  so the table grows at up to 120 rows per active caller per hour — and the
+  nightly retention sweep trims rows older than 90 days (shipped 14 Aug 2026;
+  this line called it "the next step" for twelve days after it ran nightly).
+  The size alarms (OPERATIONS.md) stay as the backstop.
 - **View (owner-only, x-admin-key, the maintenance key):**
   `GET /api/data-ops/admin/errors?status=open|resolved|all&limit=N`, newest
   first. In practice: ask Claude to read it, or curl it.

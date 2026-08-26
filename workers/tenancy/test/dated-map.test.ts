@@ -77,7 +77,7 @@ function backdate(processId: string, stepKey: string, day: string): void {
 }
 
 async function aMap(): Promise<string> {
-  return createProcess(cfg, guard, staff, actor, { appId: IDS.victimApp, name: "Recording a damage case" })
+  return (await createProcess(cfg, guard, staff, actor, { appId: IDS.victimApp, name: "Recording a damage case" })).id
 }
 
 beforeEach(() => {

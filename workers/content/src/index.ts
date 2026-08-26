@@ -704,7 +704,11 @@ export default {
             env.DB,
             "content",
             `cron/google-autopilot (${team.id}/${err.userId}/${err.where})`,
-            new Error(err.message)
+            new Error(err.message),
+            undefined,
+            // A cron has no request, but THIS loop knows exactly whose token and
+            // whose team each failure belongs to — the columns exist to be queried.
+            { teamId: team.id, userId: err.userId }
           )
         // A kind that failed recorded itself on its own row (knowledge_ingest);
         // it is recorded HERE too, because that row is only read by someone who

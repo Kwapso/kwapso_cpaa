@@ -466,8 +466,12 @@ export async function postAuditDate(request: Request, env: Env): Promise<Respons
   const auditDate = requireText(body.auditDate, "Date", TEXT_LIMITS.short)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(auditDate))
     throw new GuardError(400, "invalid_input", "That date isn't a day we can read.")
-  await setAuditDate(cfg, guard, scope, actor, processId, auditDate)
-  await publishChange(env, guard.teamId, "processes", processId)
+  // The stamp is the client's world: a fenced portal listener only hears a
+  // ping it can check against its own account (mayHearChange), so every
+  // `processes` publish carries the account — half-stamped is silently deaf.
+  // Null = zero rows moved (R17): no ping, which this route used to send anyway.
+  const moved = await setAuditDate(cfg, guard, scope, actor, processId, auditDate)
+  if (moved !== null) await publishChange(env, guard.teamId, "processes", processId, undefined, moved ?? undefined)
   return json({ ok: true })
 }
 
@@ -483,14 +487,15 @@ export async function postLinkProcesses(request: Request, env: Env): Promise<Res
   const scope = await refusePortalCaller(cfg, guard)
   const fromProcessId = requireText(body.fromProcessId, "Process", TEXT_LIMITS.short)
   const toProcessId = requireText(body.toProcessId, "Process", TEXT_LIMITS.short)
-  const id = await linkProcesses(cfg, guard, scope, actor, {
+  const link = await linkProcesses(cfg, guard, scope, actor, {
     fromProcessId,
     toProcessId,
     note: optionalText(body.note, "Note", TEXT_LIMITS.short),
   })
-  await publishChange(env, guard.teamId, "processes", fromProcessId)
-  await publishChange(env, guard.teamId, "processes", toProcessId)
-  return json(id ? { ok: true } : { alreadyLinked: true })
+  const linkScope = link?.accountId ?? undefined
+  await publishChange(env, guard.teamId, "processes", fromProcessId, undefined, linkScope)
+  await publishChange(env, guard.teamId, "processes", toProcessId, undefined, linkScope)
+  return json(link ? { ok: true } : { alreadyLinked: true })
 }
 
 /** POST /api/tenancy/processes/unlink — take a connection away. AGENCY ONLY.
@@ -503,8 +508,9 @@ export async function postUnlinkProcesses(request: Request, env: Env): Promise<R
   const id = requireText(body.id, "Link", TEXT_LIMITS.short)
   const processId = requireText(body.processId, "Process", TEXT_LIMITS.short)
   // R17: nothing removed = nothing to say and nothing to publish.
-  if (await unlinkProcesses(cfg, guard, scope, actor, id))
-    await publishChange(env, guard.teamId, "processes", processId)
+  const unlinked = await unlinkProcesses(cfg, guard, scope, actor, id)
+  if (unlinked)
+    await publishChange(env, guard.teamId, "processes", processId, undefined, unlinked.accountId ?? undefined)
   return json({ ok: true })
 }
 
@@ -513,7 +519,7 @@ export async function postUnlinkProcesses(request: Request, env: Env): Promise<R
 export async function postCreateProcess(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
   const scope = await refusePortalCaller(cfg, guard)
-  const id = await createProcess(cfg, guard, scope, actor, {
+  const created = await createProcess(cfg, guard, scope, actor, {
     appId: requireText(body.appId, "App", TEXT_LIMITS.short),
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
@@ -524,15 +530,15 @@ export async function postCreateProcess(request: Request, env: Env): Promise<Res
     // and every map started unpriced.
     roleName: optionalText(body.roleName, "Who does it", TEXT_LIMITS.short),
   })
-  await publishChange(env, guard.teamId, "processes", id, "add")
-  return json({ id })
+  await publishChange(env, guard.teamId, "processes", created.id, "add", created.accountId ?? undefined)
+  return json({ id: created.id })
 }
 
 export async function postUpdateProcess(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Process", TEXT_LIMITS.short)
-  await updateProcess(cfg, guard, scope, actor, id, {
+  const updated = await updateProcess(cfg, guard, scope, actor, id, {
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description:
       "description" in body
@@ -543,10 +549,11 @@ export async function postUpdateProcess(request: Request, env: Env): Promise<Res
     roleName:
       "roleName" in body ? (optionalText(body.roleName, "Who does it", TEXT_LIMITS.short) ?? null) : undefined,
   })
-  await publishChange(env, guard.teamId, "processes", id)
+  await publishChange(env, guard.teamId, "processes", id, undefined, updated.accountId ?? undefined)
   // The app's money figure is computed from this process's role, so it moves
-  // when the role does — and it is keyed per app, which the process knows.
-  await publishChange(env, guard.teamId, "apps", id)
+  // when the role does — keyed by the APP row. This used to ping "apps" with
+  // the PROCESS id, a row no listener holds (round-two realtime review).
+  await publishChange(env, guard.teamId, "apps", updated.appId)
   return json({ ok: true })
 }
 
@@ -556,7 +563,7 @@ export async function postProcessActive(request: Request, env: Env): Promise<Res
   const id = requireText(body.id, "Process", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Archive or restore?")
   const changed = await setProcessActive(cfg, guard, scope, actor, id, body.active)
-  if (changed) await publishChange(env, guard.teamId, "processes", id)
+  if (changed) await publishChange(env, guard.teamId, "processes", id, undefined, changed.accountId ?? undefined)
   return json({ ok: true })
 }
 
@@ -568,7 +575,7 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
   const scope = await refusePortalCaller(cfg, guard)
   const processId = requireText(body.processId, "Process", TEXT_LIMITS.short)
-  await addStep(cfg, guard, scope, actor, {
+  const added = await addStep(cfg, guard, scope, actor, {
     processId,
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
@@ -589,7 +596,7 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
   })
   // The PROCESS is what a listener can act on: a step is only ever read on its
   // map, and the map's savings change the moment a duration does.
-  await publishChange(env, guard.teamId, "processes", processId)
+  await publishChange(env, guard.teamId, "processes", processId, undefined, added.accountId ?? undefined)
   return json({ ok: true })
 }
 
@@ -597,7 +604,7 @@ export async function postUpdateStep(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Step", TEXT_LIMITS.short)
-  const processId = await updateStep(cfg, guard, scope, actor, id, {
+  const step = await updateStep(cfg, guard, scope, actor, id, {
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     description:
       "description" in body
@@ -616,7 +623,7 @@ export async function postUpdateStep(request: Request, env: Env): Promise<Respon
     branchLabel: "branchLabel" in body ? (optionalText(body.branchLabel, "Branch", TEXT_LIMITS.short) ?? null) : undefined,
     loopsBackTo: "loopsBackTo" in body ? (optionalText(body.loopsBackTo, "Loops back to", TEXT_LIMITS.short) ?? null) : undefined,
   })
-  await publishChange(env, guard.teamId, "processes", processId)
+  await publishChange(env, guard.teamId, "processes", step.processId, undefined, step.accountId ?? undefined)
   return json({ ok: true })
 }
 
@@ -628,8 +635,8 @@ export async function postRemoveStep(request: Request, env: Env): Promise<Respon
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Step", TEXT_LIMITS.short)
   // R17: null = zero rows moved = already removed → no ping, no duplicate history.
-  const processId = await removeStep(cfg, guard, scope, actor, id)
-  if (processId) await publishChange(env, guard.teamId, "processes", processId)
+  const removed = await removeStep(cfg, guard, scope, actor, id)
+  if (removed) await publishChange(env, guard.teamId, "processes", removed.processId, undefined, removed.accountId ?? undefined)
   return json({ ok: true })
 }
 
@@ -641,8 +648,8 @@ export async function postDeleteStep(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "delete")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Step", TEXT_LIMITS.short)
-  const processId = await deleteStep(cfg, guard, scope, actor, id)
-  if (processId) await publishChange(env, guard.teamId, "processes", processId)
+  const deleted = await deleteStep(cfg, guard, scope, actor, id)
+  if (deleted) await publishChange(env, guard.teamId, "processes", deleted.processId, undefined, deleted.accountId ?? undefined)
   return json({ ok: true })
 }
 
@@ -668,7 +675,7 @@ export async function postCutVersion(request: Request, env: Env): Promise<Respon
     label: optionalText(body.label, "Name", TEXT_LIMITS.short),
   })
   if (!cut) return json({ alreadyCut: true })
-  await publishChange(env, guard.teamId, "processes", processId)
+  await publishChange(env, guard.teamId, "processes", processId, undefined, cut.accountId ?? undefined)
   return json({ versionId: cut.versionId, versionNo: cut.versionNo })
 }
 

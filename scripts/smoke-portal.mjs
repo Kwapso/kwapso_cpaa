@@ -266,6 +266,10 @@ const FED_BY = {
   stories: "GET /api/content/portal/delivery",
   sprints: "GET /api/content/portal/delivery",
   process_comments: "GET /api/tenancy/impact",
+  // A step edit or a rate change moves the Impact figures — both resources
+  // joined the stamped set on 26 Aug 2026 and refill from the same computed read.
+  processes: "GET /api/tenancy/impact",
+  account_rates: "GET /api/tenancy/impact",
   deliverables: "GET /api/content/portal/deliverables",
 }
 

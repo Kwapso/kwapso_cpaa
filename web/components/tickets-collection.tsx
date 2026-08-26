@@ -70,7 +70,7 @@ import {
 import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { formatRelative } from "@shared/web/format"
-import { invalidate,
+import { primeCache, invalidate,
   mergePage, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { HelpTicket, SelectableValue } from "@shared/types"
@@ -386,9 +386,12 @@ function TriageQueue({
   async function markRead(id: string) {
     setBusy(id)
     try {
-      await contentApi.triageRead(id)
+      const r = await contentApi.triageRead(id)
       invalidate(triageKey(teamId))
-      invalidate(helpKey(teamId, "all"))
+      // The door returns the fresh page — merge it (round-two speed review).
+      mergePage(helpKey(teamId, "all"), "id", r.tickets as unknown as Record<string, unknown>[])
+      if (r.byType) primeCache(`help-by-type:${teamId}`, r.byType)
+      if (r.byStatus) primeCache(`help-by-status:${teamId}`, r.byStatus)
       toast.success(t("Marked as read."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
@@ -410,12 +413,17 @@ function TriageQueue({
     raisedByContactId?: string
   }) {
     if (!editing) return
-    const { tickets } = await contentApi.updateHelp({ id: editing.id, ...input })
+    const { tickets, byType, byStatus } = await contentApi.updateHelp({ id: editing.id, ...input })
     invalidate(triageKey(teamId))
     // The door's response IS the fresh first page — this used to be thrown
     // away and the same ~1s five-read rebuild fetched again one frame later.
     // Merged by id so rows scrolled in past page one survive the patch.
     mergePage(helpKey(teamId, "all"), "id", tickets as unknown as Record<string, unknown>[])
+    // …and the facet badges from the same response — merging the rows while
+    // the strip's counts stayed stale left the editor's own tabs lying
+    // (round-two realtime review).
+    if (byType) primeCache(`help-by-type:${teamId}`, byType)
+    if (byStatus) primeCache(`help-by-status:${teamId}`, byStatus)
     toast.success(t("Ticket updated."))
   }
 

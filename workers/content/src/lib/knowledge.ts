@@ -2229,7 +2229,8 @@ async function crossCheck(
   const out = new Map<string, { status: string; checkedAt: string }>()
   const byTable = new Map<string, { sourceId: string; rowId: string }[]>()
   for (const r of rows) {
-    if (!r.origin_table || !r.origin_row_id || !LIVE_STATUS[r.origin_table]) continue
+    if (!r.origin_table || !r.origin_row_id) continue
+    if (!Object.prototype.hasOwnProperty.call(LIVE_STATUS, r.origin_table)) continue
     if (!byTable.has(r.origin_table)) byTable.set(r.origin_table, [])
     const list = byTable.get(r.origin_table) as { sourceId: string; rowId: string }[]
     if (!list.some((x) => x.rowId === r.origin_row_id))

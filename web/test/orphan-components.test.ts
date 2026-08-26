@@ -16,8 +16,13 @@ import { describe, expect, it } from "vitest"
 import { sourceFiles } from "@shared/rules/source-scan"
 
 const WEB = join(__dirname, "..")
+const PORTAL = join(WEB, "..", "web-portal")
+// BOTH front doors' import universes — round two asked why the census stopped
+// at one door when the orphan it was built for could just as well have been a
+// portal file.
 const ROOTS = ["components", "app", "lib", "test"].map((d) => join(WEB, d))
 ROOTS.push(join(WEB, "..", "shared", "web"))
+ROOTS.push(join(PORTAL, "components"), join(PORTAL, "app"), join(PORTAL, "lib"), join(PORTAL, "test"))
 
 /** Components that are unmounted ON PURPOSE, each with the decision that parks
  * it. Rot-checked below: a line whose file has gained an importer (or lost its
@@ -40,22 +45,27 @@ describe("every component file is mounted, or parked with a reason", () => {
     for (const m of src.matchAll(/from\s+"([^"]+)"/g)) imported.add(m[1])
     for (const m of src.matchAll(/import\(\s*"([^"]+)"\s*\)/g)) imported.add(m[1])
   }
-  const importedBases = new Set(
-    [...imported].map((s) => s.replace(/\.(ts|tsx)$/, "").split("/").pop() ?? s)
-  )
+  // Matched by TRAILING PATH, not bare basename — two components in different
+  // folders sharing a name must not vouch for each other (round-two lean note).
+  const importedPaths = [...imported].map((s) => s.replace(/\.(ts|tsx)$/, ""))
+  const mounted = (rel: string): boolean => {
+    const base = rel.split("/").pop() ?? rel
+    return importedPaths.some((p) => p === rel || p.endsWith("/" + rel) || p === base || p.endsWith("/" + base))
+  }
 
-  it("web/components holds no unmounted file outside PARKED", () => {
+  it("neither door's components folder holds an unmounted file outside PARKED", () => {
     const offenders: string[] = []
     const parkedStillParked: string[] = []
-    for (const { path: file } of sourceFiles(join(WEB, "components"), { extensions: [".ts", ".tsx"] })) {
-      const rel = relative(join(WEB, "components"), file).replace(/\.(ts|tsx)$/, "")
-      const base = rel.split("/").pop() ?? rel
-      const mounted = importedBases.has(base)
-      if (rel in PARKED) {
-        if (mounted) parkedStillParked.push(rel)
-        continue
+    for (const dir of [join(WEB, "components"), join(PORTAL, "components")]) {
+      for (const { path: file } of sourceFiles(dir, { extensions: [".ts", ".tsx"] })) {
+        const rel = relative(dir, file).replace(/\.(ts|tsx)$/, "")
+        const isMounted = mounted(rel)
+        if (rel in PARKED) {
+          if (isMounted) parkedStillParked.push(rel)
+          continue
+        }
+        if (!isMounted) offenders.push(`${dir.includes("web-portal") ? "portal/" : ""}${rel}`)
       }
-      if (!mounted) offenders.push(rel)
     }
     expect(
       offenders,
@@ -68,7 +78,7 @@ describe("every component file is mounted, or parked with a reason", () => {
       `PARKED names components that are mounted now — delete these lines: ${parkedStillParked.join(", ")}`
     ).toEqual([])
     // Tripwire: an import scan that found nothing passes exactly like a clean one.
-    expect(importedBases.size, "the import scan went blind").toBeGreaterThan(50)
+    expect(importedPaths.length, "the import scan went blind").toBeGreaterThan(50)
   })
 
   it("every PARKED entry still names a real file", () => {

@@ -195,6 +195,7 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
     stack?: unknown
     url?: unknown
     userId?: unknown
+    teamId?: unknown
     requestId?: unknown
   }
   // Type-checked field by field rather than put through requireText, because
@@ -217,6 +218,9 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
       // browser's body; a caller who reached this door already holds INTERNAL_KEY
       // and could write anything, so there is nothing further to prove here.
       userId: typeof b.userId === "string" ? b.userId : undefined,
+      // The team, off the same verified /me answer the gateway resolved the
+      // userId from — never off the browser's body (same provenance rule).
+      teamId: typeof b.teamId === "string" ? b.teamId : undefined,
       // The thread back to the click. Like `userId`, it arrives from the DOOR
       // (off the `x-request-id` header it stamped) and never from the browser's
       // body — a beacon that could name its own request id could staple a

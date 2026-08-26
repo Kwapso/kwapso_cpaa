@@ -34,6 +34,7 @@ import { createToken, listTokens, revokeToken, verifyToken } from "./lib/tokens"
 import { dropCachedSession, sessionCookieFor } from "./lib/bridge"
 import { requireStaff } from "./lib/staff"
 import { forwardTool, getMcpTool, MCP_TOOLS } from "./lib/tools"
+import { brand } from "@shared/brand"
 
 const PROTOCOL_VERSION = "2025-06-18"
 
@@ -74,7 +75,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
       return rpcResult(id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
-        serverInfo: { name: "kwapso-mcp", version: "1.0.0" },
+        serverInfo: { name: `${brand.name}-mcp`, version: "1.0.0" }, // brand-derived; kwapso's value unchanged
         instructions:
           "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota.",
       })

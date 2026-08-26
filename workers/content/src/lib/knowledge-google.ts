@@ -45,7 +45,7 @@
 // one of them may have filed it privately. Sharing one row would make the last
 // sweep to run decide who else can read somebody's document.
 
-import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
+import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
 import type { Env } from "../env"
@@ -53,6 +53,7 @@ import { accessTokenFor, listConnections, listNamedSources } from "./google"
 import { googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
 import { indexSource } from "./knowledge"
+import { brand } from "@shared/brand"
 import {
   INGEST_SOURCES_PER_TICK,
   listIngestState,
@@ -607,7 +608,7 @@ async function retire(env: Env, cfg: D1Rest, guard: MemberGuard, sourceId: strin
     guard.databaseId,
     // R17: the predicate rides the UPDATE, so a source another pass already
     // retired moves zero rows and this one does nothing twice.
-    `UPDATE knowledge_sources SET deactivated_at = ?, deactivator_name = 'kwapso', updated_at = ?
+    `UPDATE knowledge_sources SET deactivated_at = ?, deactivator_name = ${sqlString(brand.name)}, updated_at = ?
       WHERE id = ? AND deactivated_at IS NULL`,
     [now, now, sourceId]
   )

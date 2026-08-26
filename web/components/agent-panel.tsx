@@ -89,7 +89,17 @@ export function AgentPanel({
                     title={t("See where your assistant credits went")}
                   >
                     <Badge
-                      variant={chat.quota?.blocked ? "destructive" : "secondary"}
+                      variant={
+                        chat.quota?.blocked
+                          ? "destructive"
+                          : // NEARLY OUT wears the warning colour — a colour, not a
+                            // sentence, so R28 owes nothing. The threshold is the
+                            // last handful, not a fraction: 3 is "you will feel this
+                            // today", whatever the team's allowance is.
+                            chat.quota && !chat.quota.unlimited && chat.quota.remaining <= 3
+                            ? "warning"
+                            : "secondary"
+                      }
                       className="cursor-pointer text-badge"
                     >
                       {chat.quotaLabel}

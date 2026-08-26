@@ -53,6 +53,8 @@ import type { Env } from "../env"
 import { AGENCY_COMPARTMENT, accountCompartment, indexableText, indexSource } from "./knowledge"
 import { buildSummary } from "./knowledge-summary"
 import { contentHash, plainText } from "./knowledge-text"
+import { logActivity } from "@shared/workers/activity"
+import { brand } from "@shared/brand"
 
 /** Rows one kind may ingest per tick. The bound on the work a single invocation
  * does — the reason a cron handler here cannot become a long-running job. Sized
@@ -1399,7 +1401,7 @@ async function sweepKind(
          (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id,
           app_id, ticket_id, sprint_id, record_date, title, summary, body, body_bytes,
           source_url, created_at, creator_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'kwapso')
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)})
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, summary = excluded.summary, body = excluded.body,
                      body_bytes = excluded.body_bytes, source_url = excluded.source_url,
@@ -1455,7 +1457,7 @@ async function sweepKind(
         await d1Query(
           cfg,
           guard.databaseId,
-          `UPDATE knowledge_sources SET deactivated_at = ?, deactivator_name = 'kwapso', updated_at = ?
+          `UPDATE knowledge_sources SET deactivated_at = ?, deactivator_name = ${sqlString(brand.name)}, updated_at = ?
             WHERE id = ? AND deactivated_at IS NULL`,
           [now, now, source.id]
         )
@@ -1572,6 +1574,20 @@ export async function sweepKinds(
       await recordRun(cfg, guard, stateKey, { cursor: null, indexed: 0, error })
       results.push({ kind: stateKey, read: 0, indexed: 0, caughtUp: false, error })
     }
+  }
+  // THE SWEEP OWES THE FEED A LINE — but only when it changed something. A row
+  // per quiet tick would be 96 lines of noise a day (R17's philosophy: silence
+  // when nothing moved); a sweep that filed passages is a real change to what
+  // the team knows, made by nobody at a keyboard, which is exactly what a feed
+  // is for. Best-effort like every recorder here.
+  const indexedNow = results.reduce((n, r) => n + r.indexed, 0)
+  if (indexedNow > 0) {
+    await logActivity(cfg, guard.databaseId, { id: guard.userId, email: "", name: "Automatic sync" }, {
+      type: "Knowledge updated",
+      description: `Automatic sync filed ${indexedNow} ${indexedNow === 1 ? "passage" : "passages"} into the knowledge base`,
+      relatedTable: "knowledge_sources",
+      relatedRowId: guard.teamId,
+    }).catch(() => {})
   }
   return results
 }

@@ -27,6 +27,7 @@
 // and it is the one reader that cannot follow an import.
 
 import { B, N, obj, S, str } from "./tool-args"
+import { brand } from "../brand"
 
 /* ---------------------- the body builders a tool declares --------------------- */
 
@@ -1073,17 +1074,18 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "complete_sprint",
     summary:
-      "Mark a sprint finished, or reopen it (`complete`: true / false). Completing one CUTS A VERSION of every process map beneath it, the point from which the next savings figure is measured, so it is not a label, it is an event. Re-completing an already-complete sprint changes nothing and cuts nothing.",
+      "Mark a sprint finished, or reopen it (`complete`: true / false). Completion is the delivery milestone the wave and the margin read. Process-map versions are cut BY HAND on the map itself — the automatic cut on completion was purged in migration 0051, so completing a sprint changes no map. Re-completing an already-complete sprint changes nothing.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints/complete",
     schema: obj({ id: S, complete: B }, ["id", "complete"]),
     buildBody: (i) => ({ id: str(i, "id"), complete: i.complete === true }),
     agent: {
       write: true,
       // CONFIRM, and it is the only work-engine write that does. Completing a
-      // sprint is not an edit to a row — it is the moment a process map's next
-      // version is cut, which is the baseline every later savings figure a client
-      // is shown is subtracted from. A model reaching it while reading a ticket
-      // somebody else wrote should stop and ask.
+      // sprint is the delivery milestone the wave's progress and the account's
+      // margin both read — a figure a client sees moves with it. (It used to
+      // ALSO cut every map's next version; 0051 moved the cut to the map
+      // itself.) A model reaching it while reading a ticket somebody else
+      // wrote should stop and ask.
       confirm: (i) => i.complete === true,
       summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
     },
@@ -1136,7 +1138,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_meeting",
     summary:
-      "Put a meeting on the meetings list. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: kwapso reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
+      "Put a meeting on the meetings list. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: " + brand.name + " reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings",
     schema: obj(
       { title: S, startsAt: S, endsAt: S, accountId: S, appId: S, purposeId: S, agenda: S, notes: S, location: S },
@@ -1221,7 +1223,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_calendar_series",
     summary:
-      "Read the caller's Google Calendar into Meetings. ONE WAY, always: nothing in kwapso writes to a calendar. Every entry in the live window (a fortnight back, four weeks on) with no record yet becomes one, whether it repeats or not and whether it is past or future, and `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the description, the location, the guest list and what each person answered, the organiser, the join link, the attachments and the link back to the entry, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. Entries beyond the live horizon come back in `ahead` as read-only. It ALSO walks one slice of the caller's whole calendar, five years back to a year ahead, resuming from where the last call stopped: `swept` is the moment that walk has reached and `caughtUp` is true once it has reached the far end, so call it repeatedly to bring in a whole history. Safe to call twice: an entry that already has a record cannot get a second one, and one Google has not touched since the last call is skipped without a write.",
+      "Read the caller's Google Calendar into Meetings. ONE WAY, always: nothing in " + brand.name + " writes to a calendar. Every entry in the live window (a fortnight back, four weeks on) with no record yet becomes one, whether it repeats or not and whether it is past or future, and `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the description, the location, the guest list and what each person answered, the organiser, the join link, the attachments and the link back to the entry, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. Entries beyond the live horizon come back in `ahead` as read-only. It ALSO walks one slice of the caller's whole calendar, five years back to a year ahead, resuming from where the last call stopped: `swept` is the moment that walk has reached and `caughtUp` is true once it has reached the far end, so call it repeatedly to bring in a whole history. Safe to call twice: an entry that already has a record cannot get a second one, and one Google has not touched since the last call is skipped without a write.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
     schema: obj({}),
     buildBody: () => ({}),

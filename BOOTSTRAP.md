@@ -269,8 +269,10 @@ npx wrangler vectorize create kwapso-knowledge --dimensions=1024 --metric=cosine
 npx wrangler vectorize create kwapso-knowledge-staging --dimensions=1024 --metric=cosine
 
 for INDEX in kwapso-knowledge kwapso-knowledge-staging; do
-  # The nine labels the router narrows by — the list is METADATA_INDEXES in
-  # workers/content/src/lib/knowledge-vectors.ts, and the tenth slot of ten is
+  # The nine labels the router narrows by. They mirror METADATA_INDEXES (beside
+  # VectorLabels) in workers/content/src/lib/knowledge-vectors.ts — mirror BY
+  # HAND: nothing reads that constant, so no check keeps this block and that
+  # file in step, and a new label means editing both. The tenth slot of ten is
   # deliberately left free.
   npx wrangler vectorize create-metadata-index $INDEX --property-name=level      --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=compartment --type=string

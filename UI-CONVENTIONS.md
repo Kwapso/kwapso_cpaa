@@ -279,6 +279,18 @@ Navigation *inside* `/t/*` uses the History API, never the framework router, a s
 export would otherwise full-reload and wipe the warm in-memory cache. Write UI is
 URL-driven (`?panel` / `?confirm`) so Back closes it and links are shareable.
 
+**A component file is mounted, or it is parked — never merely present.** A finished
+component nothing imports is not a feature, it is a rumour: twice on 26 Aug 2026 an
+outside review found one (a superseded dialog, unmounted for weeks) that every suite
+walked straight past, because the reachable-screens suite walks doors to controls and
+never asked whether a file is reachable at all. So `web/test/orphan-components.test.ts`
+censuses every file under `web/components` off the disk: each must be imported by
+something — statically, or through the one `dynamic()` split — or sit in that test's
+`PARKED` list with the decision that parks it, rot-checked so a parked file that gains
+an importer (or loses its file) turns the build red and the list can only shrink.
+Adding a component before wiring it up is therefore a red `npm run check`, on purpose:
+wire it, or park it with its reason.
+
 ---
 
 ## 3. The Laws of the Base that touch the UI
@@ -738,10 +750,16 @@ alive underneath, that's the "immovable, contentless page" feel.
 
 ## 8. Checklist, before you ship a UI change
 
-- [ ] New primitive-shaped control? **Build it in `shared/ui/`**, which this repo owns.
-      Don't keep a second copy of it in `web/components/`.
+- [ ] New primitive-shaped control? **Build it upstream in `Kwapso/design`, tag, and
+      pull** (`scripts/sync-design.mjs`) — `shared/ui/` is a PINNED dependency and a
+      hand-edit under it turns the build red (`web/test/vendored-kit.test.ts`). A
+      kwapso-only control belongs in `web/components/`; never keep a second copy of
+      a kit component there.
 - [ ] New screen? Recipe if the engine can express it; a host-composed component only if
       it carries a control the engine has no block for (like `role-detail`).
+- [ ] New component file? It is **mounted** (something imports it) or **parked** with
+      its reason in `web/test/orphan-components.test.ts`'s `PARKED` list (§2) — the
+      census fails the build on a component nothing imports.
 - [ ] New record detail? It has **Overview + Activity** tabs (R2), recipe data, or, if
       bespoke, `TabsView` + `ActivityFeed`, and it's registered (or a reasoned
       exception) in `shared/rules/registry.ts`.

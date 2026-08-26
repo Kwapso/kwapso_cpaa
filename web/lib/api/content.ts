@@ -247,14 +247,14 @@ export const content = {
     appId?: string
     moduleId?: string
     raisedByContactId?: string
-  }) => api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
+  }) => api<{ tickets: HelpTicket[]; byType?: Record<string, number>; byStatus?: Record<string, number> }>("/api/content/help/update", post(input)),
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
+    api<{ tickets: HelpTicket[]; byType?: Record<string, number>; byStatus?: Record<string, number> }>("/api/content/help/status", post({ id, status })),
   /** SOMEBODY HAS READ IT — the one judgement in the ticket lifecycle nothing can
    * infer, and the only act the triage screen performs (5.11). Everything after
    * it happens by itself. */
   triageRead: (id: string) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/triage-read", post({ id })),
+    api<{ tickets: HelpTicket[]; byType?: Record<string, number>; byStatus?: Record<string, number> }>("/api/content/help/triage-read", post({ id })),
   /** THE CLIENT SAYS YES (5.13). Staff press it too, for the answer that arrives
    * by phone; a client presses it in their own portal. */
   validateHelp: (id: string) =>

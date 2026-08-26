@@ -389,6 +389,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
         assistantId
       )
     } catch (err) {
+      reportError("agent-chat/resolve", err) // send's twin — same reason
       if (!(await resyncAfterDrop())) {
         const msg =
           err instanceof ApiFailure ? err.message : "The connection dropped. Reopen the chat to see what happened."

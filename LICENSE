@@ -42,7 +42,9 @@ The principal direct dependencies and their licences at the time of writing:
     wrangler        MIT OR Apache-2.0   Cloudflare, Inc.
     oxlint          MIT      Boshen and oxc contributors
     vitest          MIT      Vitest contributors
-    @kwapso/ui      proprietary — Swift Struck (github.com/Kwapso/kwapso_ui)
+    shared/ui       proprietary — Swift Struck; not an npm dependency but the
+                    vendored kwapso design kit, pinned from github.com/Kwapso/design
+                    (it replaced the retired @kwapso/ui package)
 
 Nothing in the dependency tree is licensed under the GPL or another copyleft
 licence that would place obligations on this Software's own distribution terms.

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
-import { invalidate, patchRow, primeCache, reconcile, useCached } from "@shared/web/store"
+import { mergePage, invalidate, patchRow, primeCache, reconcile, useCached } from "@shared/web/store"
 
 type Row = Record<string, unknown>
 
@@ -215,5 +215,45 @@ describe("live subscriber — a row patch is NOT clobbered by a refetch (regress
     // … and the patch did NOT trigger a full-list refetch (the defeated-optimization
     // bug the adversarial review found: notify() must re-render from cache, not refetch).
     expect(listFetches).toBe(1)
+  })
+})
+
+
+// THE PAGED SIBLING. `reconcile` REPLACES (a whole bounded list: absent = gone);
+// `mergePage` KEEPS THE TAIL (a paged list: absent = beyond the window). The
+// round-two realtime review found the commit that shipped mergePage claiming a
+// test "says why" when none existed — this is that test, both halves.
+describe("mergePage", () => {
+  it("fresh window first, tail kept, moved rows deduped", () => {
+    primeCache("mp:list", [
+      { id: "a", v: 1 },
+      { id: "b", v: 1 },
+      { id: "c", v: 1 }, // scrolled in past page one
+    ])
+    // The fresh page-one: b changed, d is new, a moved out of the window, and
+    // c was never in it.
+    mergePage("mp:list", "id", [
+      { id: "d", v: 1 },
+      { id: "b", v: 2 },
+    ])
+    expect(readCache("mp:list")).toEqual([
+      { id: "d", v: 1 },
+      { id: "b", v: 2 }, // updated, and only once
+      { id: "a", v: 1 }, // the tail survives, after the window
+      { id: "c", v: 1 },
+    ])
+  })
+
+  it("a row deleted server-side lingers in the tail — the documented cheaper wrong", () => {
+    primeCache("mp:ghost", [{ id: "x", v: 1 }, { id: "y", v: 1 }])
+    mergePage("mp:ghost", "id", [{ id: "y", v: 2 }])
+    // x is gone on the server and still here — until the next real load. The
+    // alternative was a catch-up that silently threw away every scrolled row.
+    expect(readCache("mp:ghost")).toEqual([{ id: "y", v: 2 }, { id: "x", v: 1 }])
+  })
+
+  it("cold key: the page simply becomes the value", () => {
+    mergePage("mp:cold", "id", [{ id: "z", v: 1 }])
+    expect(readCache("mp:cold")).toEqual([{ id: "z", v: 1 }])
   })
 })

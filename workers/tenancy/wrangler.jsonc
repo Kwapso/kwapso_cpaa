@@ -49,7 +49,6 @@
   "ai": { "binding": "AI" },
   "vars": {
     "AGENT_FREE_DAILY": "50",
-    "AGENT_NO_DAILY_CAP": "0",
     "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
     // The public web origin the SPA is served on — used for links in outbound
@@ -111,7 +110,9 @@
       "ai": { "binding": "AI" },
       "vars": {
         "AGENT_FREE_DAILY": "50",
-        "AGENT_NO_DAILY_CAP": "0",
+        // "true" like content + data-ops: ONE allowance, ONE height — staging
+        // never refuses for running out (the counters still record).
+        "AGENT_NO_DAILY_CAP": "true",
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",

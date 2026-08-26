@@ -290,6 +290,7 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
     cookie,
     traceId: requestId(request),
     query: `?id=${encodeURIComponent(id)}`,
+    timeoutMs: 30_000,
   })
   if (!read.ok) return fail(read.status, "help_not_found", "That ticket doesn't exist.")
   const ticket = ((await read.json()) as { tickets?: TranslatableTicket[] }).tickets?.[0]
@@ -332,6 +333,7 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
     method: "POST",
     cookie,
     traceId: requestId(request),
+    timeoutMs: 30_000,
     body: {
       id,
       description: ticket.description,
