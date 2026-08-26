@@ -20,10 +20,7 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { CalendarSync } from "@shared/ui/icons"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
@@ -35,7 +32,7 @@ import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recip
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
-import { GoogleSyncButton, calendarJobKey } from "@/components/google-sync"
+import { GoogleSyncButton } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
@@ -46,14 +43,13 @@ import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { RecordTable, visibleActions } from "@/components/record-table"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
-import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
+import { content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
-import { runExclusive, useRunning } from "@shared/web/running-jobs"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
 import { useT } from "@shared/web/language"
@@ -217,11 +213,6 @@ export function MeetingsScreen({
   // 9.7 — the repeating entries. `ahead` is the instances beyond the four-week
   // horizon: shown, never stored, because one that far out can still be moved or
   // called off in Google before it happens.
-  // The calendar sweep is ONE ACT for the whole tab, not one per button: this
-  // control and the shared GoogleSyncButton's calendar half share a key, so
-  // pressing here and walking to Settings finds it already running rather than
-  // offering a second copy (shared/web/running-jobs · the owner, 26 Aug 2026).
-  const syncing = useRunning(calendarJobKey(teamId))
   const [ahead, setAhead] = React.useState<{ eventId: string; title: string; startsAt: string }[]>([])
   // HAS THE WALK OVER THE WHOLE CALENDAR FINISHED? Null until somebody presses,
   // because the honest thing to say before the first press is nothing.
@@ -237,41 +228,6 @@ export function MeetingsScreen({
   // Google.
   useGoogleCatchUp(teamId, can)
 
-  async function bringInSeries() {
-    if (syncing) return
-    try {
-      const r = await runExclusive(calendarJobKey(teamId), () => contentApi.syncCalendar())
-      setAhead(r.ahead)
-      setCaughtUp(r.caughtUp)
-      invalidate(meetingsKey(teamId))
-      invalidate(meetingsKey(teamId, "week"))
-      const moved = r.created + r.updated + r.cancelled
-      // AND WHETHER THERE IS MORE OF THE PAST TO COME. The sweep walks the whole
-      // calendar a slice at a time, so "nothing new" on the first press is an
-      // honest answer about the last fortnight and a misleading one about 2023.
-      // Saying so is what stops somebody pressing once and concluding their
-      // history is not there.
-      const more = r.caughtUp ? "" : " Press again to keep reaching further back."
-      toast.success(
-        (moved === 0
-          ? "Nothing new to bring in."
-          : // ALL THREE VERBS, because the sweep does three things and a
-            // sentence naming only the new records would leave somebody
-            // wondering why a meeting they know changed said nothing happened.
-            [
-              r.created ? `${r.created} new` : "",
-              r.updated ? `${r.updated} brought up to date` : "",
-              r.cancelled ? `${r.cancelled} called off` : "",
-            ]
-              .filter(Boolean)
-              .join(", ") + " in Meetings.") + more
-      )
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your calendar."))
-    }
-    // The busy flag clears itself when the promise settles, for every screen
-    // watching the act — including ones this function has never heard of.
-  }
 
   async function add(values: MeetingFormValues) {
     await contentApi.createMeeting({
@@ -503,46 +459,57 @@ export function MeetingsScreen({
         }}
       </PagedFind>
 
-      {/* THE CALENDAR, READ IN. ONE WAY — nothing here writes to a calendar.
-          A button rather than only an automatic pass: it reads a person's own
-          Google calendar with their own token, and somebody who has just moved a
-          meeting in Google wants to press something and see it. It is also how
-          the WALK over the whole calendar advances, one slice per press, which is
-          why the line underneath says when there is more of the past to come.
-          `ahead` is the other reason this control is here rather than the shared
-          one — the entries beyond the horizon come back in its answer. */}
+      {/* BRINGING GOOGLE IN — ONE CONTROL, ONE SENTENCE, ONE FRAME.
+       *
+       * THE OWNER, 26 Aug 2026, looking at this corner of the screen: "it is very
+       * cluttered everywhere. At the bottom near this 'Bring it in' button, there
+       * is too much text. Not well done."
+       *
+       * He was right, and it was not a typography problem. There were TWO buttons
+       * a few pixels apart doing two different things with two different labels
+       * ("Bring in the calendar", "Bring it in"), each with its own status line,
+       * plus a caption, plus a walk-progress sentence — six pieces of text
+       * sprayed across the full width of a 1600px page, none of them framed.
+       *
+       * There is one act here as far as a person is concerned: bring in what
+       * Google knows. The shared control has always been able to do both halves
+       * (`scope="both"`), and the only reason this screen kept its own was that
+       * the calendar sweep's answer carries two facts this screen shows — how far
+       * back the walk has got, and which entries are still beyond the horizon.
+       * `onCalendarResult` hands those over, so the second button is gone.
+       *
+       * The FRAME belongs to the screen and not to the control: on the knowledge
+       * heading band the same control is an inline toolbar item, and a bordered
+       * card there would be wrong. Here it is the foot of a list, so it gets a
+       * card. */}
       {canCreate && (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={syncing}
-              onClick={() => void bringInSeries()}
-              className="w-fit gap-1"
-            >
-              {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
-                {syncing ? t("Bringing in the calendar…") : t("Bring in the calendar")}
-            </Button>
-            {/* And the material half, so the assistant can answer from what is in
-                these meetings — the same control that is now on every screen
-                showing Google material. */}
-            <GoogleSyncButton teamId={teamId} scope="knowledge" />
-            {/* HOW FAR BACK IT HAS GOT. Only after a press, and only while there
-                is more: a line that always said something would be furniture, and
-                one that never said anything would leave somebody believing their
-                whole history was in after the first press. */}
-            {caughtUp === false && (
-              <span className="text-muted-foreground text-xs">
-                {t("Still reading your older meetings, press again to go further back.")}
-              </span>
-            )}
-          </div>
+        <div className="flex flex-col gap-3 rounded-xl border p-4">
+          <GoogleSyncButton
+            teamId={teamId}
+            scope="both"
+            onCalendarResult={(r) => {
+              setAhead(r.ahead)
+              setCaughtUp(r.caughtUp)
+            }}
+            onSynced={() => {
+              invalidate(meetingsKey(teamId))
+              invalidate(meetingsKey(teamId, "week"))
+            }}
+          />
+          {/* HOW FAR BACK IT HAS GOT. Only after a press, and only while there is
+              more: a line that always said something would be furniture, and one
+              that never said anything would leave somebody believing their whole
+              history was in after the first press. */}
+          {caughtUp === false && (
+            <p className="text-muted-foreground text-xs">
+              {t("Still reading your older meetings, press again to go further back.")}
+            </p>
+          )}
           {ahead.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {/* NOT RECORDS YET, AND SAID SO. The live window reaches four
-                  weeks ahead; these are further out. The walk will reach them
-                  too, which is why the sentence says "yet". */}
+            <div className="flex flex-col gap-2 border-t pt-3">
+              {/* NOT RECORDS YET, AND SAID SO. The live window reaches four weeks
+                  ahead; these are further out. The walk will reach them too,
+                  which is why the sentence says "yet". */}
               <p className="text-muted-foreground text-xs">
                 {t("Further out, and not records yet, each becomes one four weeks before it happens.")}
               </p>

@@ -1264,6 +1264,15 @@ export type ProcessStep = {
    * decision; this is what distinguishes them ("if approved" / "if rejected").
    * Null on an ordinary step, which is nearly all of them. */
   branchLabel: string | null
+  /** WHICH ARM OF A FORK THIS STEP IS ON — the step_key of the branch HEAD it
+   * continues, or null for an ordinary step on the trunk.
+   *
+   * A fork used to be able to say only two things: steps sharing a position are
+   * branches, and a single step below them is the rejoin. So a step meant to
+   * continue ONE arm was drawn centred under both and read as a join. This is
+   * the third thing it can say, and the picture library has been able to draw it
+   * all along (`FlowBranch.chain`). */
+  branchOf: string | null
   /** THE WAY BACK. The step key this one can return to — "if rejected, go back
    * to step two". Rejections and rework are real work and a map that cannot draw
    * them is describing a process nobody runs. */

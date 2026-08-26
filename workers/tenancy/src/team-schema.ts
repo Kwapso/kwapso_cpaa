@@ -3679,6 +3679,39 @@ ALTER TABLE meetings ADD COLUMN transcript_attempts INTEGER NOT NULL DEFAULT 0
   CHECK (transcript_attempts >= 0);
 `,
   },
+  {
+    // ── A BRANCH THAT CARRIES ON ALONE ──────────────────────────────────────
+    //
+    // THE OWNER, 26 Aug 2026: "What if I want to add more steps under a branched
+    // step? … under the split step, which says 'Schedule stories', I then want to
+    // add step number four underneath it in the same split. I don't want it to be
+    // a join step."
+    //
+    // The map's shape came from `position` alone, and that shape can say exactly
+    // two things: steps sharing a position are a fork, and the column count going
+    // back to one is the rejoin. It had no way to say "this arm continues and
+    // that arm is finished", so a fourth step drew itself centred under both and
+    // read as a join. The picture library has drawn branch CHAINS since it landed
+    // (`FlowBranch.chain`); nothing here had a fact to feed it.
+    //
+    // `branch_of` is that fact and nothing more: the step_key of the branch HEAD
+    // this step continues. Null on every ordinary step, which is nearly all of
+    // them, so no row needs a back-fill and the old shape is unchanged.
+    //
+    // WHY THE HEAD'S KEY AND NOT THE STEP DIRECTLY ABOVE. Because a chain is
+    // identified by the arm it belongs to, not by its neighbour: deleting the
+    // middle step of a three-step arm must leave the third one still in that arm,
+    // and a pointer to its predecessor would leave it pointing at nothing.
+    // BOTH TABLES, because the dated map is drawn from the revisions and not
+    // from the live rows: without it, asking what the map looked like in June
+    // would show June's times on today's shape — and an arm that carried on
+    // would silently become a join every time somebody looked backwards.
+    version: "0056_a_branch_carries_on",
+    sql: `
+ALTER TABLE process_steps ADD COLUMN branch_of TEXT;
+ALTER TABLE process_step_revisions ADD COLUMN branch_of TEXT;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

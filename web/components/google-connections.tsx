@@ -437,7 +437,11 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
              * written out here and only here, which is exactly why nowhere else
              * had one — see components/google-sync.tsx. Both halves, because
              * this is the card where a person comes to sort Google out. */}
-            <GoogleSyncButton teamId={teamId} scope="both" />
+            {/* `describe={false}`: this card already carries a title and a
+                caption of its own, so the control's own "what it brings in" line
+                would be a third sentence saying the same thing — which is the
+                clutter the owner reported on 26 Aug, seen from the other screen. */}
+            <GoogleSyncButton teamId={teamId} scope="both" describe={false} />
           </div>
           <p className="text-muted-foreground text-xs">
             {t("Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just yourself stays answerable to you alone.")}

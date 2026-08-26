@@ -543,9 +543,14 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             the band by itself and is still correct. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+          {/* Inline on the heading band, so no caption: a toolbar control that
+              explains itself in two lines pushes the heading it sits beside out
+              of alignment, and this screen's own title already says what the
+              collection is. The Meetings foot is where the sentence belongs. */}
           <GoogleSyncButton
             teamId={teamId as string}
             scope="knowledge"
+            describe={false}
             onSynced={() => invalidate(knowledgeKey(teamId as string))}
           />
         </div>

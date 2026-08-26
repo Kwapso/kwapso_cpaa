@@ -77,6 +77,9 @@ export type StepFormValues = {
   position?: number
   /** the word on a fork, when this step is one branch of a decision */
   branchLabel: string | null
+  /** the step key of the branch head this step CONTINUES, for an arm that
+   * carries on instead of joining the sides back up */
+  branchOf: string | null
   /** the step this one can send the work back to */
   loopsBackTo: string | null
 }
@@ -94,6 +97,12 @@ const AFTER_ALL = "__after_all__"
 /** The two answers to "does the work split here?". */
 const STRAIGHT = "__straight__"
 const SPLIT = "__split__"
+/** THE THIRD SHAPE, added 26 Aug 2026. A step can now also CONTINUE one side of
+ * a split rather than joining the sides back up — the owner's "I don't want it
+ * to be a join step". It is the same question the other two answer (what shape
+ * is this step?), so it is a third option on the one control and not a second
+ * control beside it. */
+const ON_ARM = "__on_arm__"
 
 const nameField = { ...defaultFieldConfig, label: "Step", required: true }
 const descField = { ...defaultFieldConfig, label: "What happens in it", required: false }
@@ -118,9 +127,15 @@ const toolField = {
 }
 const shapeField = {
   ...defaultFieldConfig,
-  label: "Does the work split here?",
+  label: "Where does this step sit?",
   required: false,
-  hint: "A split is two things that can happen next, and which one happens depends on something. The next step you add afterwards joins them back up on its own.",
+  hint: "A split is two things that can happen next, and which one happens depends on something. A step added after a split joins the two sides back up — unless you say it carries on from one of them.",
+}
+const armField = {
+  ...defaultFieldConfig,
+  label: "It carries on from",
+  required: false,
+  hint: "The side of the split this step continues. It hangs under that one instead of joining the two back together.",
 }
 const insteadField = {
   ...defaultFieldConfig,
@@ -162,6 +177,7 @@ export function StepFormDialog({
     roleId: string | null
     toolId: string | null
     branchLabel: string | null
+    branchOf: string | null
     loopsBackTo: string | null
     /** where it sits — a position a PEER also holds means this step is one
      * branch of a fork, and the shape question opens showing exactly that. */
@@ -201,6 +217,7 @@ export function StepFormDialog({
       toolId: initial?.toolId ?? NONE,
       place: besideNow?.stepKey ?? AFTER_ALL,
       branch: initial?.branchLabel ?? "",
+      arm: initial?.branchOf ?? NONE,
       loop: initial?.loopsBackTo ?? NONE,
     },
     open
@@ -225,9 +242,18 @@ export function StepFormDialog({
       ? values.place
       : AFTER_ALL
   const splitting = place !== AFTER_ALL && place !== undefined
+  /** WHICH STEPS ARE THE SIDES OF A SPLIT — a peer whose position another peer
+   * also holds. Derived, like everything else about shape here, so the picker
+   * can never offer an arm the picture does not draw. */
+  const armHeads = peers.filter((x) => peers.some((y) => y !== x && y.position === x.position))
+  /** …and normalised the same way `place` is: a draft can outlive the step it
+   * named, and a Select holding a dead value shows its placeholder while the
+   * submit sends nothing (round six's bug, in the other picker). */
+  const arm = armHeads.some((x) => x.stepKey === values.arm) ? values.arm : NONE
+  const onArm = !splitting && arm !== NONE
   /** Editing a branch back to "it carries on" DETACHES it — it needs a position
    * of its own, and the one that changes nothing else is the end of the map. */
-  const detaching = editing && besideNow !== undefined && !splitting
+  const detaching = editing && besideNow !== undefined && !splitting && !onArm
   const minutes = whole(values.minutes)
   const runs = whole(values.runs)
   const ready = values.name.trim() !== "" && minutes !== null && runs !== null
@@ -247,6 +273,11 @@ export function StepFormDialog({
       //   editing, shape untouched-> undefined: the door leaves it alone
       const position = splitting
         ? peers.find((x) => x.stepKey === place)?.position
+        // ON AN ARM: the end of the map. Position only ORDERS it within its arm
+        // (the picture pulls arm steps out of the ranks entirely), so the one
+        // value that cannot be mistaken for anything else is past everything.
+        : onArm && !editing
+          ? Math.max(0, ...peers.map((x) => x.position)) + 1
         : detaching
           ? Math.max(initial?.position ?? 0, ...peers.map((x) => x.position)) + 1
           : undefined
@@ -262,6 +293,10 @@ export function StepFormDialog({
         // A condition belongs to a branch. A straight step carries none — which
         // is also what clears a stale "if it is a letter" off a detached one.
         branchLabel: splitting ? values.branch.trim() || null : null,
+        // Exclusive by construction: a step is a side of a split, OR on one, OR
+        // neither. Clearing it on the other two shapes is what lets somebody take
+        // a step off an arm again.
+        branchOf: onArm ? arm : null,
         loopsBackTo: values.loop === NONE ? null : values.loop,
       })
       clearDraft()
@@ -453,12 +488,13 @@ export function StepFormDialog({
       {peers.length > 0 && (
         <Field config={shapeField} htmlFor="step-shape" className={fieldSpacing}>
           <Select
-            value={splitting ? SPLIT : STRAIGHT}
+            value={splitting ? SPLIT : onArm ? ON_ARM : STRAIGHT}
             onValueChange={(v) =>
               setValues((st) => ({
                 ...st,
-                // Choosing "No" clears BOTH halves of the split, so a
-                // half-answered fork can never be submitted.
+                // THE THREE ARE EXCLUSIVE, and each choice clears the others'
+                // answers — so a half-answered fork, or a step that is somehow
+                // both a side of a split and on one, can never be submitted.
                 place:
                   v === SPLIT
                     ? (st.place === AFTER_ALL || !peers.some((x) => x.stepKey === st.place)
@@ -466,6 +502,10 @@ export function StepFormDialog({
                         : st.place)
                     : AFTER_ALL,
                 branch: v === SPLIT ? st.branch : "",
+                arm:
+                  v === ON_ARM
+                    ? (armHeads.some((x) => x.stepKey === st.arm) ? st.arm : (armHeads[0]?.stepKey ?? NONE))
+                    : NONE,
               }))
             }
             disabled={busy}
@@ -474,10 +514,15 @@ export function StepFormDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {/* The owner's ruling, 25 Aug 2026: "It'll just be yes or no."
-                  The explaining lives in the hint above, not in the option. */}
-              <SelectItem value={STRAIGHT}>{t("No")}</SelectItem>
-              <SelectItem value={SPLIT}>{t("Yes")}</SelectItem>
+              {/* Three shapes, and they are the three things the picture can
+                  draw. "It carries on" is offered only when there is a split to
+                  carry on FROM — an option that can name nothing is a control
+                  that teaches people the feature is broken. */}
+              <SelectItem value={STRAIGHT}>{t("It carries on after everything")}</SelectItem>
+              <SelectItem value={SPLIT}>{t("It is one side of a split")}</SelectItem>
+              {armHeads.length > 0 && (
+                <SelectItem value={ON_ARM}>{t("It carries on from one side of a split")}</SelectItem>
+              )}
             </SelectContent>
           </Select>
           {detaching && (
@@ -488,6 +533,32 @@ export function StepFormDialog({
             </p>
           )}
         </Field>
+      )}
+
+      {onArm && (
+        /* WHICH SIDE IT CARRIES ON FROM. Indented like the split's own halves,
+           because it is the same kind of answer: a shape that only means
+           something once you say which step it points at. */
+        <div className="border-primary/40 ml-1 flex flex-col gap-4 border-l-2 pl-4">
+          <Field config={armField} htmlFor="step-arm">
+            <Select
+              value={arm === NONE ? (armHeads[0]?.stepKey ?? NONE) : arm}
+              onValueChange={(v) => setValues((st) => ({ ...st, arm: v }))}
+              disabled={busy}
+            >
+              <SelectTrigger id="step-arm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {armHeads.map((x) => (
+                  <SelectItem key={x.stepKey} value={x.stepKey}>
+                    {x.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
       )}
 
       {splitting && (

@@ -95,18 +95,32 @@ describe("the sync controls read the registry and not their own state", () => {
   // Derived, so a future button that hand-rolls `useState(false)` for "syncing"
   // is caught the day it lands rather than the day somebody double-syncs.
   it("no Google sync control keeps its own busy flag", async () => {
+    // DERIVED, not listed. This named two files, and one of them stopped having
+    // a button the same day the Meetings sync was collapsed into the shared
+    // control — so the check went red for a change that made it MORE true. A
+    // list of files is a list of the ones somebody remembered.
+    //
+    // The subject is now "anything that starts a Google sweep": every component
+    // that calls one of the two sweep doors. Those, and only those, are the
+    // controls that can double-start.
     const { readFileSync } = await import("node:fs")
-    const { join, dirname } = await import("node:path")
+    const { join, dirname, basename } = await import("node:path")
     const { fileURLToPath } = await import("node:url")
+    const { sourceFiles, stripComments } = await import("@shared/rules/source-scan")
     const HERE = dirname(fileURLToPath(import.meta.url))
-    const files = ["../components/google-sync.tsx", "../components/meetings-screen.tsx"]
-    for (const f of files) {
-      const src = readFileSync(join(HERE, f), "utf8")
+    const starters = sourceFiles(join(HERE, "..", "components"), { extensions: [".tsx"] })
+      .map((f) => ({ name: basename(f.path), src: stripComments(readFileSync(f.path, "utf8")) }))
+      .filter((f) => /\.(syncCalendar|syncGoogleKnowledge)\(/.test(f.src))
+    expect(
+      starters.length,
+      "no component starts a Google sweep any more — this check has gone blind"
+    ).toBeGreaterThan(0)
+    for (const f of starters) {
       expect(
-        /setSyncing/.test(src),
-        `${f} still owns a local busy flag — walking off the page will forget the run`
+        /setSyncing|setBusy\(true\)/.test(f.src),
+        `${f.name} keeps a local busy flag — walking off the page will forget the run`
       ).toBe(false)
-      expect(src, `${f} must read the shared registry`).toContain("useRunning(")
+      expect(f.src, `${f.name} must start its sweep through the shared registry`).toContain("runExclusive(")
     }
   })
 })

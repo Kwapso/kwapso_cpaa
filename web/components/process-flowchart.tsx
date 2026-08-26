@@ -48,11 +48,36 @@ import { useT } from "@shared/web/language"
  * ordinary row; two or more are branches of the decision above them. */
 type Rank = { position: number; steps: ProcessStep[] }
 
+/** WHICH STEPS HANG UNDER EACH BRANCH HEAD, deepest chain first in position
+ * order. A step names the HEAD of the arm it is on (`branchOf`), never its own
+ * neighbour, so deleting the middle of a three-step arm leaves the third still
+ * on that arm rather than pointing at nothing. */
+export function armsOf(steps: ProcessStep[]): Map<string, ProcessStep[]> {
+  const arms = new Map<string, ProcessStep[]>()
+  for (const s of steps) {
+    if (!s.branchOf) continue
+    const chain = arms.get(s.branchOf)
+    if (chain) chain.push(s)
+    else arms.set(s.branchOf, [s])
+  }
+  for (const chain of arms.values()) chain.sort((a, b) => a.position - b.position)
+  return arms
+}
+
 /** GROUP BY POSITION, IN ORDER. The only layout decision in the file, and it is
- * the owner's model rather than an inference: a shared position IS a fork. */
+ * the owner's model rather than an inference: a shared position IS a fork.
+ *
+ * …AND A STEP ON AN ARM IS NOT A RANK OF ITS OWN. Before 26 Aug 2026 it was, and
+ * that is the whole of the fault the owner reported: a fourth step meant to
+ * continue one arm of a fork got a row to itself, and a row with one step in it
+ * is by this model the REJOIN, so it drew itself centred under both arms. Steps
+ * naming an arm are pulled out here and handed to that arm's chain instead. */
 export function ranksOf(steps: ProcessStep[]): Rank[] {
+  const arms = armsOf(steps)
+  const onAnArm = new Set([...arms.values()].flat().map((s) => s.id))
   const by = new Map<number, ProcessStep[]>()
   for (const s of steps) {
+    if (onAnArm.has(s.id)) continue
     const list = by.get(s.position)
     if (list) list.push(s)
     else by.set(s.position, [s])
@@ -71,6 +96,7 @@ export function ProcessFlowchart({
 }) {
   const t = useT()
   const ranks = React.useMemo(() => ranksOf(steps), [steps])
+  const arms = React.useMemo(() => armsOf(steps), [steps])
 
   /** stepKey -> the number a reader sees, so "sends it back to step 2" names
    * the same 2 the box above is labelled with. */
@@ -134,14 +160,22 @@ export function ProcessFlowchart({
             type: "branch",
             branches: rank.steps.map((s, b) => ({
               node: node(s, i, true, rank.steps.some((x) => x.branchLabel)),
-              // Marking any branch makes the fork REJOIN, and since kit v1.0.3
-              // the rejoin gathers every branch — the merge rail is the mirror
-              // of the fork, which is the owner's own reading of a join.
-              continues: b === 0,
+              // THE STEPS THAT HANG UNDER THIS ARM, if any. The kit has drawn a
+              // branch chain since it landed; nothing here had a fact to feed it
+              // until `branchOf` (26 Aug 2026).
+              chain: (arms.get(s.stepKey) ?? []).map((c) => node(c, i, false)),
+              // …AND WHETHER THE FORK MEETS AGAIN, which is now an ANSWER rather
+              // than a constant. Marking any branch makes the whole fork rejoin
+              // (the merge rail is the mirror of the fork — the owner's own
+              // reading of a join, kit v1.0.3), so it is marked only when there
+              // is genuinely a rank BELOW this one for the ways to meet at. A
+              // fork whose arms simply run out marks none, and the drawing stops
+              // claiming a join that never happens.
+              continues: b === 0 && i < ranks.length - 1,
             })),
           } as const)
     )
-  }, [ranks, numberOf, t])
+  }, [ranks, arms, numberOf, t])
 
   const total = steps.reduce((n, s) => n + s.secondsPerRun * s.runsPerMonth, 0)
 

@@ -590,8 +590,11 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
     // should do. Sent as null, the role is deliberately nobody.
     roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
     toolId: "toolId" in body ? (optionalText(body.toolId, "Tool", TEXT_LIMITS.short) ?? null) : undefined,
-    // THE SHAPE. A branch label is the word on a fork; a loop is the way back.
+    // THE SHAPE. A branch label is the word on a fork; `branchOf` is which ARM a
+    // step is on — the step key of the branch head it continues, for a fork whose
+    // ways do not meet again — and a loop is the way back.
     branchLabel: "branchLabel" in body ? (optionalText(body.branchLabel, "Branch", TEXT_LIMITS.short) ?? null) : undefined,
+    branchOf: "branchOf" in body ? (optionalText(body.branchOf, "Branch of", TEXT_LIMITS.short) ?? null) : undefined,
     loopsBackTo: "loopsBackTo" in body ? (optionalText(body.loopsBackTo, "Loops back to", TEXT_LIMITS.short) ?? null) : undefined,
   })
   // The PROCESS is what a listener can act on: a step is only ever read on its
@@ -621,6 +624,7 @@ export async function postUpdateStep(request: Request, env: Env): Promise<Respon
     roleId: "roleId" in body ? (optionalText(body.roleId, "Role", TEXT_LIMITS.short) ?? null) : undefined,
     toolId: "toolId" in body ? (optionalText(body.toolId, "Tool", TEXT_LIMITS.short) ?? null) : undefined,
     branchLabel: "branchLabel" in body ? (optionalText(body.branchLabel, "Branch", TEXT_LIMITS.short) ?? null) : undefined,
+    branchOf: "branchOf" in body ? (optionalText(body.branchOf, "Branch of", TEXT_LIMITS.short) ?? null) : undefined,
     loopsBackTo: "loopsBackTo" in body ? (optionalText(body.loopsBackTo, "Loops back to", TEXT_LIMITS.short) ?? null) : undefined,
   })
   await publishChange(env, guard.teamId, "processes", step.processId, undefined, step.accountId ?? undefined)

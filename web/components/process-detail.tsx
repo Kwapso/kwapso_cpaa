@@ -324,6 +324,9 @@ export function ProcessDetailScreen({
         // holds is a FORK. R20: the door type-checks it before it reaches SQL.
         position: values.position,
         branchLabel: values.branchLabel,
+        // WHICH ARM, when this step continues one side of a split rather than
+        // joining the two back up (the owner's ask, 26 Aug 2026).
+        branchOf: values.branchOf,
         loopsBackTo: values.loopsBackTo,
       })
     else
@@ -341,6 +344,9 @@ export function ProcessDetailScreen({
         // holds is a FORK. R20: the door type-checks it before it reaches SQL.
         position: values.position,
         branchLabel: values.branchLabel,
+        // WHICH ARM, when this step continues one side of a split rather than
+        // joining the two back up (the owner's ask, 26 Aug 2026).
+        branchOf: values.branchOf,
         loopsBackTo: values.loopsBackTo,
       })
     refresh()
@@ -1158,6 +1164,7 @@ export function ProcessDetailScreen({
                 roleId: editingStep.roleId,
                 toolId: editingStep.toolId,
                 branchLabel: editingStep.branchLabel,
+                branchOf: editingStep.branchOf,
                 loopsBackTo: editingStep.loopsBackTo,
                 position: editingStep.position,
               }

@@ -2148,10 +2148,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_process_step",
     summary:
-      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time; `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it: 2 a day, or 40 a month, and everything downstream converts to months once. Both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolId` is the ONE thing it is done in, from `list_client_tools`: a step done in two systems has a handoff in the middle of it, and that is two steps. `branchLabel` is the word on a fork, such as: if the claim is rejected, and `loopsBackTo` is the step key this one sends the work back to.",
+      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time; `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it: 2 a day, or 40 a month, and everything downstream converts to months once. Both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolId` is the ONE thing it is done in, from `list_client_tools`: a step done in two systems has a handoff in the middle of it, and that is two steps. `branchLabel` is the word on a fork, such as: if the claim is rejected. `branchOf` is which ARM a step is on — the step key of the branch head it continues — for a fork whose ways do not meet again; leave it out and a step below a fork is the rejoin. `loopsBackTo` is the step key this one sends the work back to.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps",
     schema: obj(
-      { processId: S, name: S, description: S, secondsPerRun: N, runsPerPeriod: N, frequencyPeriod: S, position: N, roleId: S, toolId: S, branchLabel: S, loopsBackTo: S },
+      { processId: S, name: S, description: S, secondsPerRun: N, runsPerPeriod: N, frequencyPeriod: S, position: N, roleId: S, toolId: S, branchLabel: S, branchOf: S, loopsBackTo: S },
       ["processId", "name", "secondsPerRun", "runsPerPeriod"]
     ),
     buildBody: (i) => ({
@@ -2165,6 +2165,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       roleId: opt(i, "roleId"),
       toolId: opt(i, "toolId"),
       branchLabel: opt(i, "branchLabel"),
+      branchOf: opt(i, "branchOf"),
       loopsBackTo: opt(i, "loopsBackTo"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Add the step "${str(i, "name")}"` },
@@ -2172,10 +2173,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_process_step",
     summary:
-      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolId` is the ONE thing it is done in. `branchLabel` and `loopsBackTo` describe the shape — the word on a fork, and the step key this one sends work back to.",
+      "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolId` is the ONE thing it is done in. `branchLabel`, `branchOf` and `loopsBackTo` describe the shape — the word on a fork, which arm a step is on (the branch head it continues, for a fork whose ways do not meet again), and the step key this one sends work back to.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/update",
     schema: obj(
-      { id: S, name: S, description: S, secondsPerRun: N, runsPerPeriod: N, frequencyPeriod: S, position: N, roleId: S, toolId: S, branchLabel: S, loopsBackTo: S },
+      { id: S, name: S, description: S, secondsPerRun: N, runsPerPeriod: N, frequencyPeriod: S, position: N, roleId: S, toolId: S, branchLabel: S, branchOf: S, loopsBackTo: S },
       ["id", "name", "secondsPerRun", "runsPerPeriod"]
     ),
     buildBody: (i) => ({
@@ -2189,6 +2190,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       roleId: sent(i, "roleId"),
       toolId: sent(i, "toolId"),
       branchLabel: sent(i, "branchLabel"),
+      branchOf: sent(i, "branchOf"),
       loopsBackTo: sent(i, "loopsBackTo"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the step "${str(i, "name")}"` },

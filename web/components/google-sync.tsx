@@ -101,11 +101,24 @@ export function GoogleSyncButton({
   /** what to drop from the cache once something has actually changed — the keys
    * of the collection this screen is showing. */
   onSynced,
+  /** THE CALENDAR SWEEP'S OWN ANSWER, for the one screen that needs more of it
+   * than "something changed": Meetings shows how far back the walk has got and
+   * which entries are still beyond the horizon, and both ride this response.
+   * Before this, that screen kept a SECOND calendar button of its own to get at
+   * them — two controls, two labels and three lines of prose for one act. */
+  onCalendarResult,
+  /** Whether to print the line saying what gets brought in. On by default,
+   * because the owner could not tell what the button covered (26 Aug 2026).
+   * OFF where the surrounding card already says it — a control that repeats its
+   * frame's own sentence is the clutter, not the cure. */
+  describe = true,
   className,
 }: {
   teamId: string | null
   scope: GoogleSyncScope
   onSynced?: () => void
+  onCalendarResult?: (r: Awaited<ReturnType<typeof content.syncCalendar>>) => void
+  describe?: boolean
   className?: string
 }) {
   const t = useT()
@@ -161,6 +174,7 @@ export function GoogleSyncButton({
         // `runExclusive` starts it, or JOINS the one already going — which is
         // how the Meetings page's own button and this one stay one act.
         const r = await runExclusive(calendarJobKey(teamId), () => content.syncCalendar())
+        onCalendarResult?.(r)
         brought += r.created + r.updated + r.cancelled
         changed = changed || r.created + r.updated + r.cancelled > 0
       }
@@ -242,7 +256,7 @@ export function GoogleSyncButton({
 
   return (
     <div className={`flex flex-col gap-1 ${className ?? ""}`}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Button variant="secondary" size="sm" disabled={syncing} onClick={sync} className="gap-1">
         {syncing ? <Spinner /> : <RefreshCw className="size-3.5" aria-hidden />}
         {syncing ? t("Bringing it in…") : t("Bring it in")}
@@ -271,7 +285,7 @@ export function GoogleSyncButton({
         <span className="text-muted-foreground text-xs">{t("Not brought in yet")}</span>
       )}
       </div>
-      <span className="text-muted-foreground text-xs">{covers}</span>
+      {describe && <span className="text-muted-foreground text-xs">{covers}</span>}
     </div>
   )
 }

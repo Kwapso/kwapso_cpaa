@@ -1404,6 +1404,7 @@ export async function listProcessSteps(
     tool_name: string | null
     tool_mark: string | null
     branch_label: string | null
+    branch_of: string | null
     loops_back_to: string | null
   }>(
     cfg,
@@ -1420,7 +1421,7 @@ export async function listProcessSteps(
             s.seconds_per_run, s.runs_per_month, s.frequency_period, s.removed_at,
             s.client_role_id, r.name AS role_name, s.role_cents_per_hour,
             s.client_tool_id, t.name AS tool_name, t.mark AS tool_mark,
-            s.branch_label, s.loops_back_to, s.account_id
+            s.branch_label, s.branch_of, s.loops_back_to, s.account_id
        FROM process_steps s
        LEFT JOIN client_roles r ON r.id = s.client_role_id
        LEFT JOIN client_tools t ON t.id = s.client_tool_id
@@ -1454,6 +1455,7 @@ export async function listProcessSteps(
     toolName: r.tool_name,
     toolMark: r.tool_mark,
     branchLabel: r.branch_label,
+    branchOf: r.branch_of,
     loopsBackTo: r.loops_back_to,
   }))
 }
@@ -1782,6 +1784,7 @@ async function writeRevision(
     roleCentsPerHour: number | null
     toolId: string | null
     branchLabel: string | null
+    branchOf: string | null
     loopsBackTo: string | null
     removed: boolean
   },
@@ -1795,19 +1798,20 @@ async function writeRevision(
     `INSERT INTO process_step_revisions
        (id, process_id, account_id, step_key, effective_on, name, description, position,
         seconds_per_run, runs_per_period, frequency_period, client_role_id, role_cents_per_hour,
-        client_tool_id, branch_label, loops_back_to, removed, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        client_tool_id, branch_label, branch_of, loops_back_to, removed, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (process_id, step_key, effective_on) DO UPDATE SET
        name = excluded.name, description = excluded.description, position = excluded.position,
        seconds_per_run = excluded.seconds_per_run, runs_per_period = excluded.runs_per_period,
        frequency_period = excluded.frequency_period, client_role_id = excluded.client_role_id,
        role_cents_per_hour = excluded.role_cents_per_hour, client_tool_id = excluded.client_tool_id,
-       branch_label = excluded.branch_label, loops_back_to = excluded.loops_back_to,
+       branch_label = excluded.branch_label, branch_of = excluded.branch_of,
+       loops_back_to = excluded.loops_back_to,
        removed = excluded.removed`,
     [
       ulid(), step.processId, step.accountId, step.stepKey, day, step.name, step.description,
       step.position, step.secondsPerRun, step.runsPerPeriod, step.frequencyPeriod, step.roleId,
-      step.roleCentsPerHour, step.toolId, step.branchLabel, step.loopsBackTo, step.removed ? 1 : 0,
+      step.roleCentsPerHour, step.toolId, step.branchLabel, step.branchOf, step.loopsBackTo, step.removed ? 1 : 0,
       now, actor.id, actor.email, actor.name,
     ]
   )
@@ -1850,6 +1854,7 @@ export async function mapAsOf(
     tool_name: string | null
     tool_mark: string | null
     branch_label: string | null
+    branch_of: string | null
     loops_back_to: string | null
     removed: number
   }>(
@@ -1865,7 +1870,7 @@ export async function mapAsOf(
             r.seconds_per_run, r.runs_per_period, r.frequency_period,
             r.client_role_id, cr.name AS role_name, r.role_cents_per_hour,
             r.client_tool_id, ct.name AS tool_name, ct.mark AS tool_mark,
-            r.branch_label, r.loops_back_to, r.removed
+            r.branch_label, r.branch_of, r.loops_back_to, r.removed
        FROM process_step_revisions r
        LEFT JOIN client_roles cr ON cr.id = r.client_role_id
        LEFT JOIN client_tools ct ON ct.id = r.client_tool_id
@@ -1900,6 +1905,7 @@ export async function mapAsOf(
     toolName: r.tool_name,
     toolMark: r.tool_mark,
     branchLabel: r.branch_label,
+    branchOf: r.branch_of,
     loopsBackTo: r.loops_back_to,
     effectiveOn: r.effective_on,
   }))
@@ -1947,6 +1953,9 @@ export async function addStep(
     toolId?: string | null
     /** the word on a fork, when this step is one branch of a decision */
     branchLabel?: string | null
+    /** the step key of the branch HEAD this step continues, for an arm that
+     * carries on rather than rejoining */
+    branchOf?: string | null
     /** the step key this one can send the work back to */
     loopsBackTo?: string | null
   }
@@ -1982,6 +1991,7 @@ export async function addStep(
     role_cents_per_hour: roleCents,
     client_tool_id: toolId,
     branch_label: input.branchLabel ?? null,
+    branch_of: input.branchOf ?? null,
     loops_back_to: input.loopsBackTo ?? null,
     name: input.name,
     description: input.description ?? null,
@@ -2010,6 +2020,7 @@ export async function addStep(
     roleCentsPerHour: roleCents,
     toolId,
     branchLabel: input.branchLabel ?? null,
+    branchOf: input.branchOf ?? null,
     loopsBackTo: input.loopsBackTo ?? null,
     removed: false,
   })
@@ -2044,6 +2055,7 @@ export async function updateStep(
     /** what it is done in — ONE. Undefined leaves it alone; null clears it. */
     toolId?: string | null
     branchLabel?: string | null
+    branchOf?: string | null
     loopsBackTo?: string | null
   }
 ): Promise<{ processId: string; accountId: string | null }> {
@@ -2087,6 +2099,7 @@ export async function updateStep(
   const nextPos = input.position ?? before.position
   const nextBranch = input.branchLabel === undefined ? before.branchLabel : input.branchLabel
   const nextLoop = input.loopsBackTo === undefined ? before.loopsBackTo : input.loopsBackTo
+  const nextArm = input.branchOf === undefined ? before.branchOf : input.branchOf
 
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
@@ -2099,7 +2112,7 @@ export async function updateStep(
     // different things, and one settled value arrives here.
     `UPDATE process_steps SET name = ?, description = ?, seconds_per_run = ?, runs_per_month = ?,
        frequency_period = ?, position = ?, client_role_id = ?, role_cents_per_hour = ?,
-       client_tool_id = ?, branch_label = ?, loops_back_to = ?, ${audit.sql}
+       client_tool_id = ?, branch_label = ?, branch_of = ?, loops_back_to = ?, ${audit.sql}
      ${where([
        fence.sql,
        "id = ?",
@@ -2117,6 +2130,7 @@ export async function updateStep(
       nextRoleCents,
       nextTool,
       nextBranch,
+      nextArm,
       nextLoop,
       ...audit.params,
       ...fence.params,
@@ -2143,6 +2157,7 @@ export async function updateStep(
     roleCentsPerHour: nextRoleCents,
     toolId: nextTool,
     branchLabel: nextBranch,
+    branchOf: nextArm,
     loopsBackTo: nextLoop,
     removed: false,
   })
@@ -2242,6 +2257,7 @@ export async function removeStep(
     roleCentsPerHour: before.roleCentsPerHour,
     toolId: before.toolId,
     branchLabel: before.branchLabel,
+    branchOf: before.branchOf,
     loopsBackTo: before.loopsBackTo,
     removed: true,
   })
@@ -2441,11 +2457,11 @@ export async function cutVersion(
     `INSERT INTO process_steps
        (id, process_id, version_id, account_id, step_key, name, description, position,
         seconds_per_run, runs_per_month, removed_at, client_role_id,
-        role_cents_per_hour, client_tool_id, frequency_period, branch_label, loops_back_to,
+        role_cents_per_hour, client_tool_id, frequency_period, branch_label, branch_of, loops_back_to,
         created_at, creator_id, creator_email, creator_name)
      SELECT lower(hex(randomblob(16))), s.process_id, ?, s.account_id, s.step_key, s.name, s.description,
             s.position, s.seconds_per_run, s.runs_per_month, s.removed_at, s.client_role_id,
-            s.role_cents_per_hour, s.client_tool_id, s.frequency_period, s.branch_label, s.loops_back_to,
+            s.role_cents_per_hour, s.client_tool_id, s.frequency_period, s.branch_label, s.branch_of, s.loops_back_to,
             ?, ?, ?, ?
        FROM process_steps s
       WHERE s.process_id = ? AND s.version_id = ?`,
@@ -3002,6 +3018,7 @@ async function stepOrThrow(
   roleCentsPerHour: number | null
   toolId: string | null
   branchLabel: string | null
+  branchOf: string | null
   loopsBackTo: string | null
   accountId: string | null
 }> {
@@ -3022,6 +3039,7 @@ async function stepOrThrow(
     role_cents_per_hour: number | null
     client_tool_id: string | null
     branch_label: string | null
+    branch_of: string | null
     loops_back_to: string | null
     account_id: string | null
   }>(
@@ -3037,7 +3055,7 @@ async function stepOrThrow(
     `SELECT s.id, s.process_id, s.version_id, s.step_key, s.name, s.description, s.position,
             s.seconds_per_run, s.runs_per_month, s.frequency_period, s.client_role_id,
             r.name AS role_name, s.role_cents_per_hour, s.client_tool_id,
-            s.branch_label, s.loops_back_to, s.account_id
+            s.branch_label, s.branch_of, s.loops_back_to, s.account_id
        FROM process_steps s
        LEFT JOIN client_roles r ON r.id = s.client_role_id
        ${where([fence.sql, "s.id = ?"])} LIMIT 1`,
@@ -3061,6 +3079,7 @@ async function stepOrThrow(
     roleCentsPerHour: r.role_cents_per_hour,
     toolId: r.client_tool_id,
     branchLabel: r.branch_label,
+    branchOf: r.branch_of,
     loopsBackTo: r.loops_back_to,
     accountId: r.account_id,
   }
