@@ -54,7 +54,7 @@
 
 import * as React from "react"
 
-import { markExit, splashInner } from "./splash"
+import { markExit, markExitSpan, splashInner } from "./splash"
 
 declare global {
   interface Window {
@@ -153,6 +153,12 @@ export function useMarkHold(waiting: boolean): boolean {
   React.useEffect(() => {
     if (waiting || settled.current || !shown.current) return
     settled.current = true
+    // ASK BEFORE HOLDING. Zero means there is no ending to reach — no animator,
+    // no clock, reduced motion, or the mark is already at the end of Dissolve —
+    // and holding for it would put a frame of loader in front of a screen that
+    // was ready. That is not hypothetical: it took onboarding's form off screen
+    // in the test environment, where nothing animates at all.
+    if (markExitSpan() <= 0) return
     setPlayingOut(true)
     let live = true
     void markExit().then(() => {

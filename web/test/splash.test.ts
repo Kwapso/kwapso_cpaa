@@ -57,6 +57,7 @@ import {
   SPLASH_MARK_MS,
   assertSameOrigin,
   markExit,
+  markExitSpan,
   markLoopScript,
   markScript,
   splashInner,
@@ -1298,6 +1299,30 @@ describe("markExit — the mark always reaches its ending, on a budget", () => {
       expect(done, "an exit with 200ms left took longer than 200ms").toBe(true)
       // …and it did not overshoot into the next pass either.
       expect(window.__ksMarkSkew ?? 0).toBeLessThan(1)
+    } finally {
+      c.restore()
+    }
+  })
+
+  it("says BEFORE it starts that there is nothing to play out", () => {
+    // The synchronous half, and the reason it exists. `useMarkHold` used to set
+    // its holding state first and learn afterwards, which put one extra render
+    // of the loader in front of every screen on a machine where nothing is
+    // animating — and took onboarding's form off screen entirely in the test
+    // environment. A hold that might be zero must be able to say so up front.
+    delete (window as { __ksMarkBase?: unknown }).__ksMarkBase
+    expect(markExitSpan(), "no clock on the window means no ending to reach").toBe(0)
+  })
+
+  it("never asks for more than the budget, and never for less than is left", () => {
+    const c = clock()
+    try {
+      window.__ksMarkBase = c.now - 400 // 3.4s of composition still unplayed
+      expect(markExitSpan()).toBe(SPLASH_EXIT_MS)
+      window.__ksMarkBase = c.now - (SPLASH_MARK_MS - 200) // 200ms left
+      expect(markExitSpan()).toBe(200)
+      window.__ksMarkBase = c.now - (SPLASH_MARK_MS - 5) // inside one frame of the end
+      expect(markExitSpan(), "a sub-frame remainder is not an ending worth holding for").toBe(0)
     } finally {
       c.restore()
     }

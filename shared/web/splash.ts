@@ -152,32 +152,55 @@ export const SPLASH_EXIT_MS = 700
  * or reduced motion, in which case what is on screen is the resting mark and
  * there is no ending to reach. A boot must never be delayed to animate something
  * that is not animating. */
-export function markExit(): Promise<void> {
+function exitClock(): { W: Window; base: number; rAF: typeof requestAnimationFrame } | null {
   const W = typeof window === "undefined" ? undefined : window
   const base = W?.__ksMarkBase
   const rAF = W?.requestAnimationFrame
   const still = W?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
-  const clock = () => (W?.performance?.now ? performance.now() : Date.now())
-  if (!W || !rAF || base === undefined || still) return Promise.resolve()
+  if (!W || !rAF || base === undefined || still) return null
+  return { W, base, rAF }
+}
 
-  const phase = (clock() - base + (W.__ksMarkSkew ?? 0)) % SPLASH_MARK_MS
+const now = (): number =>
+  typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()
+
+/** HOW LONG THE ENDING WOULD TAKE, RIGHT NOW, ASKED SYNCHRONOUSLY. Zero means
+ * there is nothing to play out: no animator, no clock, reduced motion, or the
+ * mark is already at the end of Dissolve.
+ *
+ * It exists so a caller can decide whether to hold AT ALL without waiting a
+ * frame to find out. `useMarkHold` used to set its holding state first and learn
+ * afterwards, which put one extra render of the loader in front of every screen
+ * on a machine with no animation running — including, it turned out, the test
+ * environment, where onboarding's form stopped being on screen at all. A hold
+ * that might be zero has to be able to say so before it starts. */
+export function markExitSpan(): number {
+  const c = exitClock()
+  if (!c) return 0
+  const phase = (now() - c.base + (c.W.__ksMarkSkew ?? 0)) % SPLASH_MARK_MS
   const left = SPLASH_MARK_MS - phase
-  // Already at the ending (or past it, on a stopped run): nothing to compress.
-  if (left <= 16) return Promise.resolve()
+  // Within a frame of the ending (or past it, on a stopped run): nothing to compress.
+  return left <= 16 ? 0 : Math.min(SPLASH_EXIT_MS, left)
+}
 
-  const span = Math.min(SPLASH_EXIT_MS, left)
-  const extra = left - span // how much phase the clock will not supply itself
-  const skew0 = W.__ksMarkSkew ?? 0
-  const t0 = clock()
+export function markExit(): Promise<void> {
+  const c = exitClock()
+  const span = markExitSpan()
+  if (!c || span <= 0) return Promise.resolve()
+
+  const phase = (now() - c.base + (c.W.__ksMarkSkew ?? 0)) % SPLASH_MARK_MS
+  const extra = SPLASH_MARK_MS - phase - span // phase the clock will not supply itself
+  const skew0 = c.W.__ksMarkSkew ?? 0
+  const t0 = now()
 
   return new Promise<void>((done) => {
     const step = () => {
-      const on = Math.min(1, (clock() - t0) / span)
-      W.__ksMarkSkew = skew0 + extra * on
-      if (on < 1) rAF.call(W, step)
+      const on = Math.min(1, (now() - t0) / span)
+      c.W.__ksMarkSkew = skew0 + extra * on
+      if (on < 1) c.rAF.call(c.W, step)
       else done()
     }
-    rAF.call(W, step)
+    c.rAF.call(c.W, step)
   })
 }
 
