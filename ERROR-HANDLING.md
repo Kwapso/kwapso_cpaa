@@ -78,7 +78,7 @@ environment (staging and production errors never mix), cross-team by design
   ceiling bounds rows whatever the body says. **Why per bucket:** a flood of
   client beacons must never spend the budget a crashing worker needs to report
   itself, and one noisy browser must not mute anybody else's.
-  **Retention:** there is none yet, the ceiling bounds the RATE, not the total,
+  **Retention:** a nightly sweep trims rows older than 90 days (shipped 14 Aug 2026); the per-caller ceiling bounds the RATE rather than the total,
   so the table grows at up to 120 rows per active caller per hour — and the
   nightly retention sweep trims rows older than 90 days (shipped 14 Aug 2026;
   this line called it "the next step" for twelve days after it ran nightly).

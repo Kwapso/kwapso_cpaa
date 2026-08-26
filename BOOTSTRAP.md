@@ -270,10 +270,13 @@ npx wrangler vectorize create kwapso-knowledge-staging --dimensions=1024 --metri
 
 for INDEX in kwapso-knowledge kwapso-knowledge-staging; do
   # The nine labels the router narrows by. They mirror METADATA_INDEXES (beside
-  # VectorLabels) in workers/content/src/lib/knowledge-vectors.ts — mirror BY
-  # HAND: nothing reads that constant, so no check keeps this block and that
-  # file in step, and a new label means editing both. The tenth slot of ten is
-  # deliberately left free.
+  # VectorLabels) in workers/content/src/lib/knowledge-vectors.ts, and since
+  # 26 Aug 2026 a check keeps the two in step —
+  # workers/content/test/vector-indexes-mirror.test.ts reads THIS block and
+  # fails the build if they disagree, because Vectorize cannot add a metadata
+  # index after the fact: getting it wrong here means rebuilding the index and
+  # re-embedding everything. A new label still means editing both, and the
+  # tenth slot of ten is deliberately left free.
   npx wrangler vectorize create-metadata-index $INDEX --property-name=level      --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=compartment --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=owner      --type=string

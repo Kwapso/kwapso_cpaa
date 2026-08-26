@@ -204,15 +204,19 @@ fence so the two can never disagree. A client hears silence for the agency's
 members, roles, invites and articles, they have no screen in this app that
 reads any of them.
 
-**Tickets are the one resource that needed the promised extension, and it was
-made one line at a time.** A ping carries a row id, and a *ticket* id tells the
-fence nothing about whose ticket it is, so a help ping additionally NAMES the
-account it belongs to (`ChangeEvent.scope`), and `SCOPE_STAMPED_RESOURCES` is
-the short, reviewed list of resources allowed to be heard that way. A publisher
-that forgets the stamp makes a screen stale; a fence that guessed would make it
-a disclosure, so the unstamped case is silence. That is the fail-closed
-direction, kept: the door opened for exactly the resource that needed it, rather
-than having been open to everything all along.
+**The stamped list grows one reviewed line at a time — nine today** (fact
+updated 26 Aug 2026: tickets were the first; `processes` and `account_rates`
+joined in `a9694fb` so the client's Impact screen could hear its own subject).
+A ping carries a row id, and a *ticket* id tells the fence nothing about whose
+ticket it is, so such a ping additionally NAMES the account it belongs to
+(`ChangeEvent.scope`); `SCOPE_STAMPED_RESOURCES` is the reviewed list of
+resources allowed to be heard that way, and a census
+(`workers/tenancy/test/stamped-publishers.test.ts`) fails the build when a
+publisher on that list forgets its stamp. A forgotten stamp makes a screen
+stale; a fence that guessed would make it a disclosure, so the unstamped case
+is silence. That is the fail-closed direction, kept — the list opens for a
+named resource at a time, rather than having been open to everything all
+along.
 
 ### An authorization has a deadline
 

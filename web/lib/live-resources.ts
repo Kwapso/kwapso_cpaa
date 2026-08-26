@@ -947,6 +947,12 @@ export const TEAM_RESOURCES: Record<
       processCommentsKey(id),
       `activity:record:processes:${id}`,
       impactKey(t),
+      // …and the per-ACCOUNT Impact tab, which was in no deps list at all: the
+      // stamp map made the CLIENT's Impact screen live while the agency's own
+      // view of the same figures stayed still (round-three realtime review).
+      // The ping names the map, not the account, so the family is dropped and
+      // whatever is on screen re-reads — cache-first, so nothing costs.
+      ...cachedKeys("impact:account:"),
       // …and the Process maps badge on whichever app screen is open (R15).
       ...recordCountDeps("processes"),
     ],
@@ -1191,6 +1197,13 @@ export const TEAM_RESOURCES: Record<
     // …and the Apps badge on whichever client's record is open (R15).
     deps: (t, id) => [
       impactKey(t),
+      // THE APP'S OWN MONEY PANEL, keyed by the app — which is the row this
+      // ping names. The `apps` ping fires when a process's role changes
+      // (routes/processes.ts), and that figure is computed from exactly that:
+      // the panel was left re-reading only on its own mount, so a colleague's
+      // edit moved a number nobody's open screen heard about (round-three
+      // realtime review).
+      appMoneyKey(id),
       sprintsKey(t),
       storiesKey(t),
       `activity:record:apps:${id}`,

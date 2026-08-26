@@ -472,7 +472,7 @@ where it ended up and what is still true.
   devices land together and a reconnect returns to the same object.
 - **Subscriptions narrow the sends.** The socket URL carries `?sub=`, the DO keeps it
   on the attachment beside the fence, and a broadcast skips a socket that did not ask
-  for that resource. The client portal now asks for **ten** resources instead of
+  for that resource. The client portal now asks for **twelve** resources (26 Aug 2026: `processes` and `account_rates` joined with the account stamp) instead of
   everything (`PORTAL_SUBSCRIPTIONS.length`, counted 26 Aug 2026), derived from
   `PORTAL_LISTENERS` so the two cannot drift.
 - **The two filters fail in OPPOSITE directions, on purpose.** The fence decides what a

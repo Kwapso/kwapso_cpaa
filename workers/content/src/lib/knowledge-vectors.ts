@@ -134,9 +134,10 @@ export type VectorLabels = {
 }
 
 /** The metadata indexes this index must be created with, in the order BOOTSTRAP
- * creates them. Exported for BOOTSTRAP's index-creation step to mirror by
- * hand — no check reads this today (the docstring used to promise one), so
- * keeping the list beside the schema it describes is the honest whole of it.
+ * creates them. Exported so the check CAN read them off this file rather than
+ * off a wiki page: vector-indexes-mirror.test.ts compares this list against
+ * BOOTSTRAP.md's own wrangler block, in order, and fails the build when they
+ * part company — and so a tenth is a visible decision.
  *
  * VECTORIZE WILL NOT INDEX RETROSPECTIVELY: "vectors upserted before a metadata
  * index was created won't have their metadata contained in that index". So the
