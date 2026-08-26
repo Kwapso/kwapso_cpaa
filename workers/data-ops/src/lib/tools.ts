@@ -29,7 +29,7 @@ import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
 import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
-import { isPrivilegeWrite } from "@shared/workers/tool-gates"
+import { isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
 import type { Env } from "../env"
 import type { ToolSpec } from "./model"
@@ -650,9 +650,38 @@ export function getTool(name: string): AgentTool | undefined {
   return TOOL_CATALOG.find((t) => t.name === name)
 }
 
-/** The specs handed to the model (name + description + input schema). */
-export function toolSpecs(): ToolSpec[] {
-  return TOOL_CATALOG.map((t) => ({ name: t.name, description: t.description, schema: t.schema }))
+/** The specs handed to the model (name + description + input schema).
+ *
+ * ── WHY THIS TAKES AN ARGUMENT NOW ──────────────────────────────────────────
+ *
+ * The catalogue is a BILL, not a menu. 191 tool definitions are ~109 KB of the
+ * ~130 KB preamble that is re-sent on every model turn, and at the owner's
+ * stated volume each tool costs about $5 a month before it is ever called
+ * (test/prompt-cache.test.ts derives it). Sending a Viewer the definition of
+ * `remove_member` is money spent describing a door that will refuse them.
+ *
+ * So `held` — the caller's own rights, as `module:right` — drops the tools their
+ * role could never call. It changes no permission: every tool still runs through
+ * the real gated door as the user, and the door is still the authority. It only
+ * stops paying to describe the ones that are certain to be refused.
+ *
+ * FAIL OPEN, DELIBERATELY, IN BOTH DIRECTIONS:
+ *   • no `held` at all (the sheet could not be read) → the whole catalogue, which
+ *     is exactly the behaviour before this existed. A permissions read that fails
+ *     must never quietly shrink what the assistant can do.
+ *   • a tool with no declared gate in TOOL_GATES → kept. An undeclared gate means
+ *     "nobody has classified this", not "nobody may call it", and guessing the
+ *     second from the first would silently retire a working tool.
+ *
+ * The cost of that choice is honest: 33 of the 166 shared tools carry no gate, so
+ * they are sent to everybody. R36's `offered-rights` is what keeps that number
+ * falling, because it fails when a right is asked for and never offered. */
+export function toolSpecs(held?: ReadonlySet<string>): ToolSpec[] {
+  return TOOL_CATALOG.filter((t) => {
+    if (!held) return true
+    const gate = TOOL_GATES[t.name]
+    return !gate || held.has(gate)
+  }).map((t) => ({ name: t.name, description: t.description, schema: t.schema }))
 }
 
 /** Confirm rule (the ONE place it's decided): a write pauses for the yes/no panel only

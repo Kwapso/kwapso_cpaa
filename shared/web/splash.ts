@@ -114,6 +114,73 @@ export const SPLASH_MARK_MS = total((s) => s.played)
  * and not a rewrite. */
 export const SPLASH_AUTHORED_MS = total((s) => s.authored)
 
+declare global {
+  interface Window {
+    /** The document's animation clock, set once per page load by whichever run
+     * starts first (see the tick loop). Read by `markExit` to find the phase. */
+    __ksMarkBase?: number
+    /** Milliseconds of phase the app has ASKED FOR beyond what the clock has
+     * supplied — written only by `markExit`, added by the tick loop. This is how
+     * the ending is reached early without a second timeline. */
+    __ksMarkSkew?: number
+  }
+}
+
+/** HOW LONG THE ENDING IS ALLOWED TO TAKE.
+ *
+ * The exit plays whatever is left of the pass — however much that is — inside
+ * this window, so the mark always reaches the end of Dissolve and the boot cost
+ * of that is a number rather than a coin toss. 700ms is one beat: long enough to
+ * read as a resolution rather than a cut, short enough that nobody waits for it.
+ *
+ * It is a CEILING, never a floor. If less than 700ms of the composition remains
+ * the exit takes exactly that long and plays at ordinary speed — the ending is
+ * never slowed down to fill the window, because a logo in slow motion is the
+ * other way to look broken. */
+export const SPLASH_EXIT_MS = 700
+
+/** PLAY THE MARK OUT TO ITS ENDING, then resolve.
+ *
+ * Called once, by whatever is holding the loader on screen, at the moment the
+ * app is ready. It leaves the animator alone — the run keeps ticking, the pool
+ * is untouched, `take()` still heals — and moves the PHASE instead, by writing
+ * the one term the tick loop adds to its clock. The phase advances at
+ * `remaining / duration` (never below 1×), so the run lands exactly on the end
+ * of Dissolve as the promise settles.
+ *
+ * Returns immediately when there is nothing to play out — no animator, no clock,
+ * or reduced motion, in which case what is on screen is the resting mark and
+ * there is no ending to reach. A boot must never be delayed to animate something
+ * that is not animating. */
+export function markExit(): Promise<void> {
+  const W = typeof window === "undefined" ? undefined : window
+  const base = W?.__ksMarkBase
+  const rAF = W?.requestAnimationFrame
+  const still = W?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+  const clock = () => (W?.performance?.now ? performance.now() : Date.now())
+  if (!W || !rAF || base === undefined || still) return Promise.resolve()
+
+  const phase = (clock() - base + (W.__ksMarkSkew ?? 0)) % SPLASH_MARK_MS
+  const left = SPLASH_MARK_MS - phase
+  // Already at the ending (or past it, on a stopped run): nothing to compress.
+  if (left <= 16) return Promise.resolve()
+
+  const span = Math.min(SPLASH_EXIT_MS, left)
+  const extra = left - span // how much phase the clock will not supply itself
+  const skew0 = W.__ksMarkSkew ?? 0
+  const t0 = clock()
+
+  return new Promise<void>((done) => {
+    const step = () => {
+      const on = Math.min(1, (clock() - t0) / span)
+      W.__ksMarkSkew = skew0 + extra * on
+      if (on < 1) rAF.call(W, step)
+      else done()
+    }
+    rAF.call(W, step)
+  })
+}
+
 /** HOW MUCH EXPOSURE A SCREEN GETS, and the one thing in this file that is a
  * judgement about a DEVICE rather than about the composition.
  *
@@ -650,7 +717,25 @@ function markLoopBody(): string {
     'function tick(now){if(!live)return;' +
     // The host was unmounted and nobody stopped us. Nothing is on screen, so
     // neither is this.
-    'if(host.isConnected===false)return stop();var el=(now-base)/1000;' +
+    // `__ksMarkSkew` is how the app ASKS FOR THE ENDING. Nothing else writes it.
+    //
+    // THE OWNER, 26 Aug 2026: "the animation does not get a chance to complete".
+    // He is right and it is structural: the loader is the page's own content, so
+    // React takes it away the instant there is something to show — which on a
+    // warm boot is about 400ms, a third of the way through Coalesce. The mark
+    // starts assembling and vanishes. It never locks and it never dissolves, so
+    // the one frame the composition is ABOUT is the one nobody has ever seen.
+    //
+    // The cure cannot be "wait for the loop": that is up to 3.8 seconds added to
+    // every cold boot to watch a logo, which is the trade nobody wants. So the
+    // exit COMPRESSES the remainder instead of waiting for it — the same warp
+    // this file already applies to the authored piece, applied once more to
+    // whatever is left. `markExit` (below) drives this term so the phase runs
+    // faster than the clock, and the mark reaches the end of Dissolve inside a
+    // bounded window however early the app arrived. It is additive and lives on
+    // the WINDOW beside `base`, so every host in the document stays in phase.
+    'if(host.isConnected===false)return stop();' +
+    'var el=(now-base+(W.__ksMarkSkew||0))/1000;' +
     // Heal on the RESTING MARK, not merely on being detached — that narrowness
     // is the whole safety of it. `.ks-rest` is in `splashInner` and in nothing
     // else, so its presence says precisely "somebody re-applied the server

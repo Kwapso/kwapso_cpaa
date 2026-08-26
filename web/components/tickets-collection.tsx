@@ -233,7 +233,14 @@ export function TicketsCollection({
             canTriage={can("help", "edit")}
             canEdit={can("help", "edit")}
             helpTypeOptions={helpTypeOptions}
-            onOpen={(id) => onIntent({ kind: "open", module: "help", id })}
+            // The engine's open intent carries a URL SEGMENT, not a permission
+            // module — its only consumer builds an address out of it
+            // (deep-link-screen.tsx). Everywhere else in the app the two words
+            // are the same string, so passing `help` here looked right and
+            // produced `/help/<id>`, which is not a route: triage's Open button
+            // answered 404 for as long as the tab has existed. `tickets` is the
+            // segment; MODULE_PERMISSION is where it becomes `help` again.
+            onOpen={(id) => onIntent({ kind: "open", module: "tickets", id })}
           />
         ) : scopedQ.error ? (
           <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>

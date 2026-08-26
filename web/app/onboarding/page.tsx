@@ -29,7 +29,7 @@ import { BrandMark } from "@/components/brand-mark"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
 import { useT } from "@shared/web/language"
-import { MarkLoader } from "@shared/web/mark-loader"
+import { MarkLoader, useMarkHold } from "@shared/web/mark-loader"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { InvitationsPanel } from "@/components/invitations"
 
@@ -46,6 +46,9 @@ export default function OnboardingPage() {
   const t = useT()
   const router = useRouter()
   const [checking, setChecking] = React.useState(true)
+  // Held one beat past `checking` so the mark reaches its ending rather than
+  // being cut wherever this door happens to resolve (shared/web/mark-loader).
+  const holding = useMarkHold(checking)
   const [firstName, setFirstName] = React.useState("")
   const [lastName, setLastName] = React.useState("")
   const [photo, setPhoto] = React.useState<string | undefined>()
@@ -156,8 +159,10 @@ export default function OnboardingPage() {
   }
 
   // Still deciding which door this is — an app-boot wait, not a screen waiting on
-  // one of its own reads, so it wears the mark like every other one.
-  if (checking) return <MarkLoader label={t("Loading…")} />
+  // one of its own reads, so it wears the mark like every other one… and, like
+  // the shell's, it is held open until the mark finishes: this is a first-load
+  // wait, so the composition gets its ending here too (useMarkHold · splash.ts).
+  if (holding) return <MarkLoader label={t("Loading…")} />
 
   // THE WRONG DOOR, SAID ONCE AND WITHOUT A FORM UNDER IT. There is deliberately
   // nothing to press: this app has nothing for a client, and a button that tried

@@ -8,6 +8,7 @@ import type { Fetcher, D1Database } from "@cloudflare/workers-types"
 
 import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
+import { LIST_HARD_CAP } from "./limits"
 import { fail } from "./http"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
 import { beginD1Timing } from "./timing"
@@ -292,6 +293,51 @@ function moduleRights(cfg: D1Rest, guard: MemberGuard, module: string): Promise<
       throw err
     })
   byModule.set(module, fresh)
+  return fresh
+}
+
+/** THE WHOLE SHEET IN ONE READ — every right this role holds, as `module:right`.
+ *
+ * `moduleRights` above is one query PER MODULE, which is exactly right for a door
+ * that checks one thing. It is exactly wrong for a caller that wants to know
+ * what a role can do across the board: the assistant's tool list is gated on
+ * about twenty modules, and twenty REST-door round trips at ~400ms each is not a
+ * read, it is a page load.
+ *
+ * So this is the other shape of the same fact, and it is bounded by the module
+ * catalogue rather than by anything a request can influence. Memoised on the
+ * GUARD OBJECT for the same tenant-isolation reason as `moduleRights`: a
+ * role-keyed cache in a Worker isolate can answer one caller with another
+ * caller's permissions, and the guard is a fresh object per request.
+ *
+ * A failure is not cached and not swallowed — the caller decides what an
+ * unreadable sheet means, and for the assistant it means "offer everything and
+ * let the doors refuse", which is what it did before this existed. */
+const sheetPerRequest = new WeakMap<MemberGuard, Promise<Set<string>>>()
+
+export function rightsSheet(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
+  const memo = sheetPerRequest.get(guard)
+  if (memo) return memo
+  const fresh = d1Query<RightsRow & { module: string }>(
+    cfg,
+    guard.databaseId,
+    // Bounded by the number of MODULES, which is a property of the code and not
+    // of any request (R14's reasoning, on a read too small to page).
+    `SELECT module, can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? LIMIT ${LIST_HARD_CAP}`,
+    [guard.roleId]
+  )
+    .then((rows) => {
+      const held = new Set<string>()
+      for (const r of rows)
+        for (const right of ["read", "create", "edit", "delete"] as const)
+          if (r[`can_${right}`] === 1) held.add(`${r.module}:${right}`)
+      return held
+    })
+    .catch((err: unknown) => {
+      sheetPerRequest.delete(guard)
+      throw err
+    })
+  sheetPerRequest.set(guard, fresh)
   return fresh
 }
 

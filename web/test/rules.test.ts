@@ -31,12 +31,15 @@ import {
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
+  BASE_LAW_CEILING,
+  BASE_REPOSITORY,
+  LAW_ID_ORIGIN,
 } from "@shared/rules/registry"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
-import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"
+import { BASE_RECIPES, MODULE_PERMISSION, tabCountKey, withTabCounts } from "../lib/screens"
 import { COLLECTION_FILTERS } from "../lib/collection-filters"
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
@@ -144,6 +147,58 @@ describe("RULES — the laws of the base", () => {
     const md = read(join(ROOT, "RULES.md"))
     const inDoc = [...md.matchAll(/^\|\s*(R\d+[a-z]?)\s*\|/gm)].map((m) => m[1])
     expect(new Set(inDoc)).toEqual(new Set(ids))
+  })
+
+  // …AND THE NUMBER SAYS WHOSE BOOK IT IS.
+  //
+  // `registry-integrity` proves our ids are unique HERE. They are not unique
+  // across the estate: this repository and the canonical base
+  // (alaap-swift-struck/brimba) forked their numbering at R20 and both kept
+  // minting, so seven ids carry a different law in each book. The owner ruled on
+  // 26 Aug 2026 that brimba's series is canonical and ours is the divergent one
+  // — it is the most recent (its R26 is the newest law either repo holds) and it
+  // is the one that travels into every future product.
+  //
+  // The seven that already collide are DATA, so they are a recorded decision
+  // rather than a thing somebody rediscovers. What this check is actually for is
+  // the EIGHTH: a law we mint from here on must sit above the base's ceiling, so
+  // a number we invent can never be one the base also invents.
+  it("law-id-origin: a law we mint cannot take a number the base could mint", () => {
+    const ours = new Map(RULES_REGISTRY.map((r) => [r.id, r.checkId]))
+    // i · every pinned collision is still real on our side — an entry naming a
+    // law we no longer have is a record of an argument nobody is having.
+    for (const row of LAW_ID_ORIGIN) {
+      expect(ours.has(row.id), `LAW_ID_ORIGIN names ${row.id} and we have no such law — delete the line`).toBe(true)
+      expect(
+        ours.get(row.id),
+        `LAW_ID_ORIGIN says ${row.id} is our "${row.ours}" and the registry now says "${ours.get(row.id)}" — ` +
+          `re-read the base and update the pin`
+      ).toBe(row.ours)
+    }
+    // ii · …and nothing at or below the base's ceiling is UNPINNED. A law of
+    // ours inside brimba's range that nobody has compared is the exact shape of
+    // the fault this closes: silent, invisible to both builds, and only found
+    // when somebody tries to merge the two books.
+    const pinned = new Set(LAW_ID_ORIGIN.map((r) => r.id))
+    const unpinned = RULES_REGISTRY.filter(
+      (r) => Number(r.id.replace(/^R/, "").replace(/[a-z]$/, "")) <= BASE_LAW_CEILING && !pinned.has(r.id)
+    ).map((r) => r.id)
+    // R1–R19 predate the divergence: same number, same law, in both books.
+    // Anything else at or under the ceiling has to be checked against the base
+    // by hand and then pinned.
+    const inherited = unpinned.filter((id) => Number(id.replace(/^R/, "").replace(/[a-z]$/, "")) >= 20)
+    expect(
+      inherited,
+      `these laws sit inside ${BASE_REPOSITORY}'s minted range and are not pinned in LAW_ID_ORIGIN — ` +
+        `compare them with the base's book and record the answer: ${inherited.join(", ")}`
+    ).toEqual([])
+    // iii · the next law we write starts above the base's high-water mark.
+    const highest = Math.max(...RULES_REGISTRY.map((r) => Number(r.id.replace(/^R/, "").replace(/[a-z]$/, ""))))
+    expect(
+      highest,
+      `our newest law is ${highest} and the base has minted up to ${BASE_LAW_CEILING} — ` +
+        `mint above the ceiling, or raise it after re-reading ${BASE_REPOSITORY}`
+    ).toBeGreaterThan(BASE_LAW_CEILING)
   })
 
   // R2 — every record-detail screen exposes Overview + Activity tabs. The
@@ -307,6 +362,44 @@ describe("RULES — the laws of the base", () => {
         /onOpen=\{\(id\) => onIntent\(\{ kind: "open"/.test(read(f)),
         `${f} shows a calendar whose records go nowhere — pass onOpen through onIntent`
       ).toBe(true)
+  })
+
+  // …AND THE WORD IT CARRIES IS AN ADDRESS, NOT A PERMISSION.
+  //
+  // The open intent's `module` has exactly one consumer and it builds a URL out
+  // of it (deep-link-screen.tsx: `/${intent.module}/${intent.id}`). So the field
+  // is a URL SEGMENT by usage — and for every module in the app but one the
+  // segment and the permission module are the same string, which is why passing
+  // the wrong one is invisible to a reader, to TypeScript (both are `string`)
+  // and to every other law here.
+  //
+  // Tickets is the one. The segment is `tickets`, the right the server enforces
+  // is `help` (MODULE_PERMISSION says why each stays). Triage's Open button
+  // passed `help`, so it navigated to `/help/<id>` — not a route on either URL
+  // form — and answered "This page could not be found" for the whole life of the
+  // tab, under a green build, on the one screen whose job is to open tickets.
+  // Reported from staging on 26 Aug 2026.
+  //
+  // The keys of MODULE_PERMISSION ARE the segments, so this needs no list of its
+  // own: a module string that is not a key is not an address.
+  it("open-intent-segments: every open intent names a URL segment, never a permission module", () => {
+    const segments = new Set(Object.keys(MODULE_PERMISSION))
+    const offenders: string[] = []
+    let seen = 0
+    for (const f of [...componentFiles(), ...sourceFiles(join(WEB, "lib"), { extensions: [".ts", ".tsx"] }).map((x) => x.path)]) {
+      for (const m of stripComments(read(f)).matchAll(/kind:\s*"open"\s*,\s*module:\s*"([^"]+)"/g)) {
+        seen++
+        if (!segments.has(m[1]))
+          offenders.push(`${basename(f)} → "${m[1]}"`)
+      }
+    }
+    expect(
+      offenders,
+      `these open intents build an address out of a word that is not a URL segment — ` +
+        `the link will 404. Pass the segment (a key of MODULE_PERMISSION): ${offenders.join(", ")}`
+    ).toEqual([])
+    // Tripwire: a census that matched nothing passes exactly like a clean one.
+    expect(seen, "the open-intent scan went blind").toBeGreaterThan(4)
   })
 
   // …AND A PICKER OVER A PAGED COLLECTION ASKS THE DOOR, never the list cache.

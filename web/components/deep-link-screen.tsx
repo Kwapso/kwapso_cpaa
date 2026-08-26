@@ -32,6 +32,7 @@ import {
 import { type ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { AppShell, ShellLoading } from "@/components/app-shell"
+import { useMarkHold } from "@shared/web/mark-loader"
 import { TeamSectionNav } from "@/components/team-section-nav"
 import { CountedTabs } from "@/components/counted-tabs"
 import { buildCrumbs, namedByList } from "@/components/deep-link/crumbs"
@@ -294,6 +295,19 @@ export function DeepLinkScreen() {
 
   /* --------------------------------- render -------------------------------- */
 
+  // THE BOOT WAIT, HELD OPEN UNTIL THE MARK REACHES ITS ENDING. This is the one
+  // place in the agency app where a person actually watches the loader, so it is
+  // the one place that owes the composition a last beat: `useMarkHold` keeps the
+  // frame up while `markExit` compresses whatever is left of the pass into at
+  // most 700ms. It adds nothing when the loader never showed — a warm boot has
+  // `active.loading` false on the first render and this returns false with it.
+  // The two ShellLoading returns below are REDIRECT flickers, not waits, and are
+  // deliberately not held: the ending is owed to a boot, not to a hop.
+  const booting = active.loading || !active.ctx || !route
+  if (useMarkHold(booting)) return <ShellLoading />
+  // Said again, unchanged, because the line above is a BOOLEAN and this one is
+  // the type narrowing: `active.ctx` and `route` are non-null from here down,
+  // and only the original shape tells TypeScript so.
   if (active.loading || !active.ctx || !route) return <ShellLoading />
 
   // Account screens (/home, /settings, /invitations, /profile) render DIRECTLY in the shell — they

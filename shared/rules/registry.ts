@@ -22,6 +22,68 @@ export interface Rule {
   status: RuleStatus
 }
 
+/** ── WHOSE BOOK IS THIS? THE NUMBERS ARE NOT UNIQUE ACROSS THE ESTATE ────────
+ *
+ * THE OWNER, 26 Aug 2026, on the collision a review round surfaced: "pick the
+ * law that overrides the other. The one that is the most recent and makes more
+ * sense in the broader context, you figure out what."
+ *
+ * The ruling, and it is a governance decision rather than a fix:
+ * **`alaap-swift-struck/brimba`'s R-series is canonical. This repository's is
+ * the divergent one.** Two reasons, and they agree:
+ *
+ *   • MOST RECENT. The newest law either repository holds is brimba's R26
+ *     (`fork-sweep-complete`, 25 Aug 2026). Every law of ours that competes with
+ *     a brimba number was written on 10–12 Aug, before the divergence was
+ *     visible to anybody.
+ *   • BROADER CONTEXT. brimba is the base a future product FORKS. Its R-series
+ *     travels into every app built on it; ours travels nowhere. When one of two
+ *     namespaces has to yield, it is the one with a single reader.
+ *
+ * WHAT WAS ACTUALLY WRONG, which is bigger than the R26 that was reported. The
+ * two books forked their numbering at R20 and both kept minting: SEVEN ids
+ * (R20–R26) carry a completely different law in each repository, and we hold
+ * eleven more (R27–R37) that brimba will mint over the top of the moment it
+ * writes its twenty-seventh law. One collision was the visible edge of a
+ * divergent series.
+ *
+ * WHAT IS NOT BEING DONE, and why it is a decision and not an omission.
+ * Renumbering our seven would rewrite 847 references across the source, the
+ * docs and the tests — a change with no user, no behaviour and real risk, on a
+ * repository that shares no build with brimba and goes red for none of this.
+ * The harm is not to a build; it is to a PERSON who reads "R24" and cannot tell
+ * which book it came from. So the cure is to make the book say so, and to make
+ * the NEXT collision impossible, which is the only harm still in front of us.
+ *
+ * `LAW_ID_ORIGIN` below is that record, and the check on it is the guard. */
+export const BASE_REPOSITORY = "alaap-swift-struck/brimba"
+
+/** The highest law id the canonical base had minted when this was last read
+ * (26 Aug 2026, brimba@ab21e2b). A law WE mint must sit above it, so a number
+ * this repository invents can never be one the base also invents.
+ *
+ * Raise it when the base mints more — and if raising it would swallow ids we
+ * already hold, that is the divergence widening and it wants the owner, not a
+ * bigger number. */
+export const BASE_LAW_CEILING = 26
+
+/** THE SEVEN THAT ALREADY COLLIDE, named so that nobody rediscovers them as a
+ * surprise. `ours` is this repository's checkId for that number; `theirs` is
+ * brimba's. Both are real, enforced laws in their own book.
+ *
+ * This list may only SHRINK — an entry goes when the two books agree on that
+ * number again, which in practice means when one of the two laws is retired or
+ * this repository is merged back into the base and renumbered as one act. */
+export const LAW_ID_ORIGIN: { id: string; ours: string; theirs: string }[] = [
+  { id: "R20", ours: "validated-bodies", theirs: "static-destinations" },
+  { id: "R21", ours: "client-reachable-doors", theirs: "create-returns-row" },
+  { id: "R22", ours: "agent-body-parity", theirs: "create-opens-record" },
+  { id: "R23", ours: "cited-answers", theirs: "mutation-returns-row" },
+  { id: "R24", ours: "internal-money-never-in-portal", theirs: "bulk-twin-declared" },
+  { id: "R25", ours: "savings-caption", theirs: "activity-birth-to-death" },
+  { id: "R26", ours: "vector-fence", theirs: "fork-sweep-complete" },
+]
+
 export const RULES_REGISTRY: Rule[] = [
   {
     id: "R1",
@@ -1534,6 +1596,10 @@ export const EMAIL_CENSUS: Record<string, EmailClassification> = {
   "workers/tenancy/src/lib/notify.ts::notifyInviteRevoked": {
     refersToRecord: false,
     why: "the invite it names has been withdrawn, so the invites inbox the invite email points at would show them nothing. 'No action is needed' is the whole message, and a button under it would suggest otherwise.",
+  },
+  "workers/tenancy/src/lib/portal-welcome.ts::sendPortalWelcome": {
+    refersToRecord: true,
+    link: "portalHome → the client portal's own home, for a CLIENT recipient. It is the only email tenancy sends to somebody outside the agency, and the one destination in the map that is not a record: what it is about is the portal itself. The agency column is deliberately null — a colleague has no portal to be welcomed to, and a link to one would advertise a door they may not pass (R21). Opt-in at the moment of the grant, so what goes out is the agency's decision and not the software's.",
   },
   "workers/tenancy/src/lib/sharding.ts::alertNewAlarms": {
     refersToRecord: false,

@@ -460,9 +460,17 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/accounts/links/active", post({ id, active })),
 
   /** Give someone at this account a login. The person is picked off the account
-   * (`personAccountId`); the door resolves their email to their platform account. */
-  grantPortalAccess: (accountId: string, personAccountId: string) =>
-    api<{ id: string }>("/api/tenancy/portal-users", post({ accountId, personAccountId })),
+   * (`personAccountId`); the door resolves their email to their platform account.
+   *
+   * `notify` sends them the welcome that tells them their portal exists and where
+   * to sign in — opt-in, decided at the moment of the grant. `emailSent` in the
+   * answer is what ACTUALLY happened, not what was asked for, so the screen never
+   * claims a message went out when the send door refused it. */
+  grantPortalAccess: (accountId: string, personAccountId: string, notify = false) =>
+    api<{ id: string; emailSent: boolean }>(
+      "/api/tenancy/portal-users",
+      post({ accountId, personAccountId, notify })
+    ),
   /** Revoke / restore a login. Revoking switches the login off; every record stays. */
   setPortalAccessActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/portal-users/active", post({ id, active })),

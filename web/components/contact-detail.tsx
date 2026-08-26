@@ -45,6 +45,8 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/controls/button/button"
+import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
+import { Label } from "@shared/ui/controls/label/label"
 import { Spinner } from "@shared/ui/controls/spinner/spinner"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import {
@@ -168,12 +170,17 @@ export function ContactDetailScreen({
   }, [accountId, teamId, onSaved])
 
   const run = React.useCallback(
-    async (what: () => Promise<unknown>, done: string, fallback: string) => {
+    // `done` may be a FUNCTION, because a few of these acts only know what
+    // happened once they have happened: the portal grant reports whether the
+    // welcome email actually went out, and a plain string would be composed
+    // before the call and therefore always say the wrong thing. A string is
+    // still a string for the dozen callers where the sentence is known up front.
+    async (what: () => Promise<unknown>, done: string | (() => string), fallback: string) => {
       setBusy(true)
       try {
         await what()
         refresh()
-        toast.success(done)
+        toast.success(typeof done === "function" ? done() : done)
         return true
       } catch (err) {
         toast.error(err instanceof ApiFailure ? err.message : fallback)
@@ -245,10 +252,35 @@ export function ContactDetailScreen({
   const onAccountId = companies.find((c) => c.active)?.accountId ?? accountId
   const liveLogin = portalUsers.find((p) => p.active) ?? null
 
+  /** WHETHER TO TELL THEM, decided at the moment of the act.
+   *
+   * THE OWNER, 26 Aug 2026: "We need to add a switch at the time of granting
+   * portal access that would say whether an email is allowed or not."
+   *
+   * On by default, because the fault it answers is silence: switching a login on
+   * used to send nothing at all, so somebody had to remember to type the portal's
+   * address into a mail by hand. Off is still one click away, and it is a real
+   * choice — a login is often switched on days before anybody means to tell the
+   * client. */
+  const [notify, setNotify] = React.useState(true)
+
   async function giveAccess() {
+    // The toast says what HAPPENED, not what was asked for: the send is
+    // best-effort at the door and `emailSent` is the real outcome, so a mail
+    // that did not go out is never reported as one that did.
+    let sent = false
     await run(
-      () => tenancy.grantPortalAccess(onAccountId, accountId),
-      "Access switched on.",
+      async () => {
+        const r = await tenancy.grantPortalAccess(onAccountId, accountId, notify)
+        sent = r.emailSent
+        return r
+      },
+      () =>
+        !notify
+          ? t("Access switched on.")
+          : sent
+            ? t("Access switched on, and we've emailed them the link.")
+            : t("Access switched on. We couldn't send the email, tell them the address yourself."),
       "Couldn't switch that login on."
     )
   }
@@ -532,7 +564,22 @@ export function ContactDetailScreen({
           return (
             <div className="flex flex-col gap-4">
               {canGrant && !liveLogin && (
-                <div className="flex flex-wrap justify-end gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+                  {/* THE SWITCH, BESIDE THE BUTTON RATHER THAN INSIDE A DIALOG.
+                      The choice belongs at the moment of the act, with its
+                      consequence written next to it — and a whole form dialog for
+                      one tick would be more screen than the decision deserves. */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="portal-notify"
+                      checked={notify}
+                      onCheckedChange={(c) => setNotify(c === true)}
+                      disabled={busy}
+                    />
+                    <Label htmlFor="portal-notify" className="text-sm font-normal">
+                      {t("Email them the link to sign in")}
+                    </Label>
+                  </div>
                   <Button size="sm" disabled={busy} onClick={() => void giveAccess()} className="gap-1">
                     {busy ? <Spinner /> : <KeyRound className="size-4" />}
                     {t("Switch their login on")}

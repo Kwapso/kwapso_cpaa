@@ -36,7 +36,7 @@ export type LinkEnv = { PUBLIC_APP_URL?: string; PUBLIC_PORTAL_URL?: string }
 
 /** The record kinds an email can be about. Adding one here is how a new email
  * earns a button; R29's census is what makes forgetting impossible. */
-export type RecordKind = "ticket" | "ticketList" | "todo" | "invite" | "member"
+export type RecordKind = "ticket" | "ticketList" | "todo" | "invite" | "member" | "portalHome"
 
 /** What is known about the record being linked to. Every field is optional and
  * every destination below checks what it needs, so a caller that cannot supply
@@ -122,6 +122,20 @@ const DESTINATIONS: Record<RecordKind, Record<Audience, Destination | null>> = {
     // The portal has no invites screen, and an invite is how a portal login
     // comes into being in the first place — there is nowhere else to send it.
     portal: null,
+  },
+  // THE PORTAL ITSELF — the one destination that is not a record.
+  //
+  // Until 26 Aug 2026 nothing told a client their portal EXISTED. Switching a
+  // login on wrote a row and sent nothing at all, so somebody at the agency had
+  // to remember to type the address into a mail by hand — and the address is
+  // configuration precisely because nobody should be typing it from memory
+  // (portal.kwapso.app is a different product of the owner's; see the note at
+  // the top of this file). This is the destination that email points at.
+  portalHome: {
+    // Never sent to staff: a colleague has no portal to be welcomed to, and a
+    // link to one would be a door they may not pass (R21).
+    agency: null,
+    portal: { label: "Open your portal", path: () => "/home" },
   },
 }
 

@@ -449,7 +449,22 @@ describe("AGENT_PROMPT_CACHE", () => {
     const cfg = JSON.parse(
       readFileSync(join(__dirname, "..", "wrangler.jsonc"), "utf8").replace(/(?<![:"])\/\/[^\n]*/g, "")
     ) as Cfg
-    expect(cfg.vars?.AGENT_PROMPT_CACHE).toBe("5m")
-    expect(cfg.env?.staging?.vars?.AGENT_PROMPT_CACHE).toBe("5m")
+    const live = cfg.vars?.AGENT_PROMPT_CACHE
+    const staging = cfg.env?.staging?.vars?.AGENT_PROMPT_CACHE
+    // NOT a pinned literal. This used to assert `toBe("5m")` twice, which made
+    // the test a COPY of the config rather than a check on it: changing the knob
+    // on the owner's word turned the build red for agreeing with him, and the
+    // fix was to edit the assertion, which is a test that can only ever say
+    // "nobody changed this". What actually matters is the two properties a
+    // price knob has to have.
+    //
+    // i · it is a word the parser recognises EXACTLY. `cacheMode` falls back to
+    // "5m" for anything it does not know, so a typo would ship silently at a
+    // different price from the one intended.
+    expect(live, "the production block must declare the knob").toBeTruthy()
+    expect(cacheMode(live), `"${live}" is not a mode — cacheMode would silently fall back`).toBe(live)
+    // ii · staging measures what production spends. Two environments on
+    // different cache settings make every cost measurement here a guess there.
+    expect(staging, "staging and production must agree, or a measurement means nothing").toBe(live)
   })
 })

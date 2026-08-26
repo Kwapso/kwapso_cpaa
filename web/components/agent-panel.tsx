@@ -28,6 +28,7 @@ import {
   SheetDescription,
 } from "@shared/ui/controls/sheet/sheet"
 import { AgentChat } from "@shared/ui/structures/agent-chat/agent-chat"
+import { CollectionRegister } from "@shared/ui/structures/collection-frame/collection-frame"
 import { RunSteps } from "@shared/ui/structures/run-steps/run-steps"
 
 import { AgentHistoryDialog } from "@/components/agent-history-dialog"
@@ -187,13 +188,33 @@ export function AgentPanel({
                 )}
                 streaming={chat.showTyping}
                 disabled={chat.busy || chat.quota?.blocked || !!chat.pending}
-                // Stacked, email-free example prompts: an inline address gets auto-
-                // detected (underlined) on phones and breaks the centred line mid-quote.
+                // THE EMPTY PANEL, THROUGH THE KIT'S OWN REGISTER RATHER THAN A
+                // HAND-BUILT BOX.
+                //
+                // THE OWNER, 26 Aug 2026: "the interface of the chat is still
+                // quite wonky and weird, not only when the chat is new but even
+                // in an existing chat."
+                //
+                // The examples were a bare `flex max-w-64 flex-col` — vertically
+                // centred by the kit's empty register, horizontally NOT, so two
+                // ragged left-aligned lines hung in the middle of an otherwise
+                // empty panel with no eyebrow, no measure and no relationship to
+                // anything above or below them. It is the one screen state a new
+                // person always sees, and it was the one part of this panel the
+                // design system had never drawn.
+                //
+                // `CollectionRegister` is what the kit puts in an empty region
+                // everywhere else in the app — eyebrow, centred body, the 40ch
+                // measure — so the assistant's blank state now looks like every
+                // other blank state instead of like a mistake. Email-free on
+                // purpose: an inline address auto-detects on phones and breaks
+                // the centred line mid-quote.
                 emptyState={
-                  <div className="flex max-w-64 flex-col gap-1">
-                    <span>{t("Try “invite a member as a Viewer”")}</span>
-                    <span>{t("or “what changed this week?”")}</span>
-                  </div>
+                  <CollectionRegister
+                    tone="quiet"
+                    eyebrow={t("Try asking")}
+                    body={t("“Invite a member as a Viewer”, or “what changed this week?”")}
+                  />
                 }
                 onSend={(t) => void chat.send(t)}
               />
@@ -205,7 +226,12 @@ export function AgentPanel({
                 batch engine with the next message, and the run passes through
                 the normal confirm panel. Drag-and-drop onto the panel still
                 works above. */}
-            <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2">
+            {/* …and it reads as the composer's own toolbar rather than a second
+                bar under it: no rule between the two, tight to the field it
+                belongs to. The border used to cut the panel across just above
+                the paperclip, so the input and its own attach control looked
+                like two unrelated strips (same report). */}
+            <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
               <input
                 ref={attachInputRef}
                 type="file"

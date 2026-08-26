@@ -76,8 +76,25 @@ describe("the identity column is really what a grant resolves a person from", ()
     // chain is why editing the email is an access decision. If this stops being
     // true, the declaration above is stale and this goes red.
     const fn = accountsSrc.slice(at(accountsSrc, "async function userIdForPerson"))
-    expect(fn.slice(0, at(fn, "return row.id"))).toContain("person.email")
-    expect(fn).toMatch(/SELECT id FROM users WHERE email = \?/)
+    // ANCHORED ON THE LOOKUP, NOT ON HOW THE ANSWER IS SPELLED. This used to
+    // anchor on the literal `return row.id`, so widening the return to carry the
+    // person's email and name alongside the id — which the portal welcome needs
+    // — turned it red for a change that altered nothing it was written to
+    // protect. A test that pins a spelling reports on the spelling.
+    //
+    // What actually matters is the ORDER: the account row's own email is read
+    // first, and it is that email the platform user is found by. Both halves,
+    // in that sequence, and neither can be satisfied by an id typed into a body.
+    const lookup = at(fn, "SELECT id FROM users WHERE email = ?")
+    expect(
+      fn.slice(0, lookup),
+      "the grant door must read the person's email off their account row BEFORE resolving a user"
+    ).toContain("person.email")
+    // …and the id it hands back is the one that lookup found, however the return
+    // is shaped.
+    expect(fn.slice(lookup), "userIdForPerson must return the user it just resolved").toMatch(
+      /return\s*\{?[^}]*row\.id/
+    )
     // …and the grant door is what calls it, or the chain starts nowhere.
     expect(at(accountsSrc, "postGrantPortalAccess")).toBeLessThan(
       at(accountsSrc, "await userIdForPerson(")

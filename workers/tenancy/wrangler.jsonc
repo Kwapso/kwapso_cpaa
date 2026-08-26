@@ -54,6 +54,11 @@
     // The public web origin the SPA is served on — used for links in outbound
     // emails (invite CTA). NOT request-derived, so agent-sent invites are correct.
     "PUBLIC_APP_URL": "https://agency.kwapso.app",
+    // …and the CLIENT PORTAL's origin, because one email tenancy sends goes to
+    // a client rather than to us: the welcome that tells a new portal login
+    // where to sign in (R30 — the recipient decides which app the link opens,
+    // and neither hostname is ever spelled at a call site).
+    "PUBLIC_PORTAL_URL": "https://client.kwapso.app",
     // WHO HEARS THE NIGHTLY GROWTH ALARM. Comma-separated; both of the owner's
     // addresses, chosen 14 Aug 2026. It is a VAR rather than a secret because an
     // address is not a credential, and it belongs in git for the reason
@@ -118,6 +123,8 @@
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
         // The public staging web origin — used for invite-email links.
         "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
+        // The staging portal, for the same one email.
+        "PUBLIC_PORTAL_URL": "https://staging-client.kwapso.app",
         // Staging alarms go to the same place. Deliberately not silenced: staging
         // is where a broken alarm path is supposed to be discovered, and an
         // environment that never mails is one nobody notices is unwired.

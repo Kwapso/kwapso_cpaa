@@ -43,6 +43,8 @@ import {
   updateAccount,
   type AccountFilters,
 } from "../lib/accounts"
+import { sendPortalWelcome } from "../lib/portal-welcome"
+import { teamName } from "@shared/workers/notify"
 import type { Env } from "../env"
 
 /** A route body is untrusted JSON until each field is validated below — the
@@ -480,7 +482,8 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
   // caller, including a colleague and including the owner: portal-ness is decided
   // by the PRESENCE of this row, so the grant is a demotion nobody consented to.
   const personAccountId = requireText(body.personAccountId, "Person", TEXT_LIMITS.short)
-  const userId = await userIdForPerson(env, cfg, guard, scope, personAccountId)
+  const person = await userIdForPerson(env, cfg, guard, scope, personAccountId)
+  const userId = person.userId
   if (!userId) return fail(400, "invalid_input", "Pick the person this login is for.")
   // Staff are not clients. Granting a portal login to a team member would fence
   // them out of the agency side at the next request.
@@ -518,7 +521,23 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
     appRestriction: optionalText(body.appRestriction, "App restriction", TEXT_LIMITS.short),
   })
   await publishChange(env, guard.teamId, "portal_users", accountId, "add")
-  return json({ id })
+  // TELL THEM, IF THAT IS WHAT WAS ASKED FOR.
+  //
+  // Opt-in, and read POSITIONALLY (R20): `=== true` is the check, so a missing
+  // field, a string "true" or anything else at all means no email. The default
+  // has to be silence — a body that forgot to say sends nothing, which is the
+  // failure mode that costs nobody a mail they did not intend.
+  //
+  // AFTER the grant and after the ping, deliberately: the login exists whatever
+  // the mail does, and `sendPortalWelcome` never throws. `emailSent` is the real
+  // outcome rather than the intention, so no screen and no agent can claim a
+  // message went out when it did not (the invite path settled the same argument).
+  const emailSent =
+    body.notify === true ? await sendPortalWelcome(env, person.email, {
+      personName: person.name,
+      teamName: await teamName(env, guard.teamId),
+    }) : false
+  return json({ id, emailSent })
 }
 
 /** A person's account row (inside the fence) → their platform account. A client
@@ -530,7 +549,7 @@ async function userIdForPerson(
   guard: MemberGuard,
   scope: AccountScope,
   personAccountId: string
-): Promise<string> {
+): Promise<{ userId: string; email: string; name: string }> {
   const person = await getAccountRow(cfg, guard, scope, personAccountId)
   // ONLY A CONTACT MAY HOLD A LOGIN (7.4 — Aurora's ruling, over "both levels").
   //
@@ -569,7 +588,12 @@ async function userIdForPerson(
       "no_account",
       `${person.name} hasn't signed in here yet. Ask them to sign in once with ${email}, then switch their access on.`
     )
-  return row.id
+  // The EMAIL and the NAME come back with the id because the welcome email needs
+  // both and this function has already read them off the account row inside the
+  // fence. Reading them again at the call site would be a second round trip to
+  // the same row for facts already in hand — and, worse, a second place that
+  // could resolve a different person than the one the login was granted to.
+  return { userId: row.id, email, name: person.name }
 }
 
 /** POST /api/tenancy/portal-users/active — the hard revoke, and its undo. The row

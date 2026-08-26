@@ -35,7 +35,7 @@ import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recip
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
-import { GoogleSyncButton } from "@/components/google-sync"
+import { GoogleSyncButton, calendarJobKey } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
@@ -53,6 +53,7 @@ import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { runExclusive, useRunning } from "@shared/web/running-jobs"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
 import { useT } from "@shared/web/language"
@@ -216,7 +217,11 @@ export function MeetingsScreen({
   // 9.7 — the repeating entries. `ahead` is the instances beyond the four-week
   // horizon: shown, never stored, because one that far out can still be moved or
   // called off in Google before it happens.
-  const [syncing, setSyncing] = React.useState(false)
+  // The calendar sweep is ONE ACT for the whole tab, not one per button: this
+  // control and the shared GoogleSyncButton's calendar half share a key, so
+  // pressing here and walking to Settings finds it already running rather than
+  // offering a second copy (shared/web/running-jobs · the owner, 26 Aug 2026).
+  const syncing = useRunning(calendarJobKey(teamId))
   const [ahead, setAhead] = React.useState<{ eventId: string; title: string; startsAt: string }[]>([])
   // HAS THE WALK OVER THE WHOLE CALENDAR FINISHED? Null until somebody presses,
   // because the honest thing to say before the first press is nothing.
@@ -233,9 +238,9 @@ export function MeetingsScreen({
   useGoogleCatchUp(teamId, can)
 
   async function bringInSeries() {
-    setSyncing(true)
+    if (syncing) return
     try {
-      const r = await contentApi.syncCalendar()
+      const r = await runExclusive(calendarJobKey(teamId), () => contentApi.syncCalendar())
       setAhead(r.ahead)
       setCaughtUp(r.caughtUp)
       invalidate(meetingsKey(teamId))
@@ -263,9 +268,9 @@ export function MeetingsScreen({
       )
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your calendar."))
-    } finally {
-      setSyncing(false)
     }
+    // The busy flag clears itself when the promise settles, for every screen
+    // watching the act — including ones this function has never heard of.
   }
 
   async function add(values: MeetingFormValues) {
@@ -517,7 +522,7 @@ export function MeetingsScreen({
               className="w-fit gap-1"
             >
               {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
-                {t("Bring in the calendar")}
+                {syncing ? t("Bringing in the calendar…") : t("Bring in the calendar")}
             </Button>
             {/* And the material half, so the assistant can answer from what is in
                 these meetings — the same control that is now on every screen

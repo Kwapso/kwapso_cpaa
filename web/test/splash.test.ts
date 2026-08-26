@@ -53,8 +53,10 @@ import {
   GEOMETRY,
   SCENES,
   SPLASH_AUTHORED_MS,
+  SPLASH_EXIT_MS,
   SPLASH_MARK_MS,
   assertSameOrigin,
+  markExit,
   markLoopScript,
   markScript,
   splashInner,
@@ -1197,5 +1199,137 @@ describe("the animator, run", () => {
     expect(drawn(m.host).length, "the resting mark is not on screen under reduced motion").toBe(3)
     window.matchMedia = real
     m.restore()
+  })
+})
+
+// ─── THE ENDING, WHICH FOR A YEAR NOBODY EVER SAW ──────────────────────────
+//
+// THE OWNER, 26 Aug 2026: "the animation does not get a chance to complete."
+//
+// The loader is the page's own content, so React removes it the moment there is
+// something to show — on a warm boot roughly 400ms in, a third of the way
+// through Coalesce. Every real boot cut the mark mid-assembly; Lock and Dissolve
+// were shipped, tested, and never once on screen.
+//
+// `markExit` answers it by compressing what is LEFT of the pass instead of
+// waiting for it: the phase runs fast enough to land exactly on the end of
+// Dissolve inside a bounded window. These lock the three promises that makes —
+// it always finishes, it is never slow, and it never delays a boot it was not
+// owed to.
+describe("markExit — the mark always reaches its ending, on a budget", () => {
+  /** Drives requestAnimationFrame off a clock the test moves by hand, so a
+   * "700ms exit" is 700 milliseconds of arithmetic and not 700 of waiting. */
+  function clock() {
+    let now = 1_000
+    const frames: Array<(t: number) => void> = []
+    const realRaf = window.requestAnimationFrame
+    const realNow = performance.now
+    window.requestAnimationFrame = ((cb: (t: number) => void) => frames.push(cb)) as never
+    performance.now = () => now
+    return {
+      set now(v: number) {
+        now = v
+      },
+      get now() {
+        return now
+      },
+      /** Advance the clock and run every frame that is waiting. */
+      async step(ms: number) {
+        now += ms
+        const due = frames.splice(0, frames.length)
+        for (const f of due) f(now)
+        await Promise.resolve()
+      },
+      restore() {
+        window.requestAnimationFrame = realRaf
+        performance.now = realNow
+        delete (window as { __ksMarkBase?: unknown }).__ksMarkBase
+        delete (window as { __ksMarkSkew?: unknown }).__ksMarkSkew
+      },
+    }
+  }
+
+  /** Where in the composition the mark is, in ms, exactly as the tick loop
+   * computes it: `(now - base + skew) % PLAY`. */
+  const phase = (now: number) =>
+    (now - (window.__ksMarkBase ?? 0) + (window.__ksMarkSkew ?? 0)) % SPLASH_MARK_MS
+
+  it("lands on the end of Dissolve however early the app arrived", async () => {
+    const c = clock()
+    try {
+      // The worst case and the one that actually happens: ready 400ms in, with
+      // 3.4 of the 3.8 seconds still unplayed.
+      window.__ksMarkBase = c.now - 400
+      const settled = markExit()
+      let done = false
+      void settled.then(() => (done = true))
+
+      await c.step(0) // the first frame schedules; nothing has moved yet
+      expect(done, "the exit resolved before it drew anything").toBe(false)
+
+      await c.step(SPLASH_EXIT_MS)
+      await settled
+      expect(done).toBe(true)
+      // The phase has reached the end of the pass — the modulo puts that at 0,
+      // so allow either end of the wrap.
+      const at = phase(c.now)
+      expect(
+        at < 2 || at > SPLASH_MARK_MS - 2,
+        `the mark stopped at ${Math.round(at)}ms of ${SPLASH_MARK_MS} — it was cut, not finished`
+      ).toBe(true)
+    } finally {
+      c.restore()
+    }
+  })
+
+  it("never plays the ending slower than the composition", async () => {
+    const c = clock()
+    try {
+      // Already deep in Dissolve: 200ms left, which is less than the window. The
+      // exit must take 200ms, not stretch to 700 — a logo in slow motion is the
+      // other way to look broken.
+      window.__ksMarkBase = c.now - (SPLASH_MARK_MS - 200)
+      let done = false
+      const settled = markExit()
+      void settled.then(() => (done = true))
+      await c.step(0)
+      await c.step(200)
+      await settled
+      expect(done, "an exit with 200ms left took longer than 200ms").toBe(true)
+      // …and it did not overshoot into the next pass either.
+      expect(window.__ksMarkSkew ?? 0).toBeLessThan(1)
+    } finally {
+      c.restore()
+    }
+  })
+
+  it("resolves at once when there is no animation to finish", async () => {
+    const c = clock()
+    try {
+      // No clock on the window: the animator never ran (reduced motion, no rAF,
+      // markup it did not recognise). What is on screen is the resting mark, and
+      // holding a boot to animate a still picture is the fault this must not add.
+      delete (window as { __ksMarkBase?: unknown }).__ksMarkBase
+      let done = false
+      void markExit().then(() => (done = true))
+      await Promise.resolve()
+      expect(done, "a boot was delayed to play out an animation that is not running").toBe(true)
+    } finally {
+      c.restore()
+    }
+  })
+
+  it("the budget is a ceiling somebody can read", () => {
+    // A number nobody can find is a number that drifts. It is exported, it is
+    // shorter than one pass, and it is long enough to read as a resolution.
+    expect(SPLASH_EXIT_MS).toBeLessThan(SPLASH_MARK_MS)
+    expect(SPLASH_EXIT_MS).toBeGreaterThanOrEqual(400)
+  })
+
+  it("the animator reads the term the exit writes", () => {
+    // The two halves are a runtime string and a module, so nothing but this
+    // sentence connects them: if the tick loop stops adding `__ksMarkSkew`, the
+    // exit becomes 700ms of a mark that does not move.
+    expect(markLoopScript()).toContain("__ksMarkSkew")
   })
 })

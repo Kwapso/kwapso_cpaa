@@ -23,7 +23,7 @@ import { TOOL_RESULT_TAG } from "@shared/workers/model-text"
 import { executeTool, getTool, requiresConfirm, toolSpecs, type ToolResult } from "./tools"
 import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages, requireOwnThread } from "./threads"
 import { addBatchFile, createBatch, getBatchView, planBatch } from "./import-batch"
-import { GuardError } from "@shared/workers/gating"
+import { GuardError, rightsSheet } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId, traceHeaders } from "@shared/workers/trace"
 import { brand } from "@shared/brand"
@@ -709,7 +709,18 @@ async function runPlanLoop(
   emit?: Emit
 ): Promise<ChatOutcome> {
   const model = selectModel(env)
-  const tools = model.canActWithTools ? toolSpecs() : []
+  // WHAT THIS CALLER CAN ACTUALLY DO, in one read, so the preamble stops paying
+  // to describe doors that are certain to refuse them (toolSpecs' own note has
+  // the arithmetic). Fail OPEN: an unreadable sheet means the whole catalogue,
+  // which is what shipped before this line — a permissions read that fails must
+  // never quietly shrink the assistant.
+  //
+  // It costs one query, and it makes the cached prefix ROLE-shaped rather than
+  // identical for everybody. That is the right trade at a one-hour TTL and a
+  // handful of roles per team: each distinct role warms its own prefix within
+  // the first question of the day and stays warm.
+  const held = await rightsSheet(cfg, guard).catch(() => undefined)
+  const tools = model.canActWithTools ? toolSpecs(held) : []
   // Stream text deltas only when the caller wants live progress AND the model supports
   // it; otherwise take the one-shot path (Workers AI, or any non-streamed request).
   const streaming = !!emit && model.canStream && !!model.stream
@@ -1045,8 +1056,11 @@ export async function confirmAndRun(
   ]
 
   if (failed) {
-    // Same seam as the plan loop: the model explains what was refused and why.
-    const note = await failureWrapUp(selectModel(env), convo, toolSpecs(), tally)
+    // Same seam as the plan loop: the model explains what was refused and why —
+    // and reads the same tool list this caller was offered, so the explanation
+    // cannot name a tool they were never shown. Fail open, as everywhere else.
+    const held = await rightsSheet(cfg, guard).catch(() => undefined)
+    const note = await failureWrapUp(selectModel(env), convo, toolSpecs(held), tally)
     emit?.({ t: "text", d: note })
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: note, source: opts.source })
     // Fold into the propose row (not a separate row) — APPENDING the actions

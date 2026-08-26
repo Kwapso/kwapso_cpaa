@@ -51,6 +51,7 @@ import { formatActivityWhen } from "@shared/web/format"
 import { markGoogleSyncedNow } from "@/lib/use-google-catch-up"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached } from "@shared/web/store"
+import { runExclusive, useRunning } from "@shared/web/running-jobs"
 import { useT } from "@shared/web/language"
 
 /** How many bounded ticks one press will run. Each files up to
@@ -65,6 +66,16 @@ const MAX_SYNC_PASSES = 12
 export function googleSyncKey(teamId: string): string {
   return `google-sync:${teamId}`
 }
+
+/** THE TWO ACTS THIS BUTTON CAN START, named so that two different screens
+ * offering the same one collide instead of both running it.
+ *
+ * Keyed by the ACT and the team, never by the screen: the Meetings page's own
+ * calendar button and this component's calendar half are the same act, and a
+ * person who presses one then walks to the other must find it already running
+ * rather than be offered a second copy (shared/web/running-jobs says why). */
+export const knowledgeJobKey = (teamId: string): string => `google-knowledge:${teamId}`
+export const calendarJobKey = (teamId: string): string => `google-calendar:${teamId}`
 
 type SyncRow = { kind: string; lastRunAt: string | null; lastOkAt: string | null; lastError: string | null }
 
@@ -99,7 +110,14 @@ export function GoogleSyncButton({
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
-  const [syncing, setSyncing] = React.useState(false)
+  // WHETHER IT IS RUNNING IS NOT THIS COMPONENT'S TO REMEMBER. It used to be
+  // React state here, so walking to another page unmounted the answer and the
+  // button came back offering a run that was already going — the owner's
+  // "high possibility that people would launch two simultaneous syncs", 26 Aug
+  // 2026. Both halves are watched separately so a button that does only one of
+  // them is not disabled by the other.
+  const knowledgeRunning = useRunning(teamId ? knowledgeJobKey(teamId) : null)
+  const calendarRunning = useRunning(teamId ? calendarJobKey(teamId) : null)
 
   // THE RIGHTS EACH HALF NEEDS, checked here only to decide whether the control
   // is worth offering — the doors demand them anyway. A button that always
@@ -127,11 +145,12 @@ export function GoogleSyncButton({
     .at(-1)
   const failing = googleRows.find((r) => r.lastError)?.lastError ?? null
 
+  const syncing = (doesKnowledge && knowledgeRunning) || (doesCalendar && calendarRunning)
+
   if (!doesKnowledge && !doesCalendar) return null
 
   async function sync() {
-    if (syncing) return
-    setSyncing(true)
+    if (syncing || !teamId) return
     let brought = 0
     let changed = false
     // Starts true so the calendar-only case never claims "not connected" on
@@ -139,26 +158,40 @@ export function GoogleSyncButton({
     let anythingConnected = true
     try {
       if (doesCalendar) {
-        const r = await content.syncCalendar()
+        // `runExclusive` starts it, or JOINS the one already going — which is
+        // how the Meetings page's own button and this one stay one act.
+        const r = await runExclusive(calendarJobKey(teamId), () => content.syncCalendar())
         brought += r.created + r.updated + r.cancelled
         changed = changed || r.created + r.updated + r.cancelled > 0
       }
       if (doesKnowledge) {
-        for (let pass = 0; pass < MAX_SYNC_PASSES; pass++) {
-          const r = await content.syncGoogleKnowledge()
-          anythingConnected = r.connectedServices.length > 0
-          brought += r.results.reduce((n, k) => n + k.indexed, 0)
-          changed = changed || r.results.some((k) => k.indexed > 0)
-          // A KIND THAT FAILED CARRIES ITS OWN SENTENCE (R12 records it on the
-          // row; the door hands it back per kind), and that sentence is the one
-          // worth showing — "connect it again in Settings" is actionable where a
-          // generic "couldn't read your Google material" is not.
-          const failed = r.results.find((k) => k.error)
-          if (failed?.error) {
-            toast.error(failed.error)
-            return
+        // The WHOLE walk is one act, not one act per pass: a person who leaves
+        // the page between pass three and pass four must find the button still
+        // busy, and a second presser must join this loop rather than start a
+        // second one beside it.
+        const swept = await runExclusive(knowledgeJobKey(teamId), async () => {
+          let indexed = 0
+          let connected = true
+          for (let pass = 0; pass < MAX_SYNC_PASSES; pass++) {
+            const r = await content.syncGoogleKnowledge()
+            connected = r.connectedServices.length > 0
+            indexed += r.results.reduce((n, k) => n + k.indexed, 0)
+            // A KIND THAT FAILED CARRIES ITS OWN SENTENCE (R12 records it on the
+            // row; the door hands it back per kind), and that sentence is the one
+            // worth showing — "connect it again in Settings" is actionable where a
+            // generic "couldn't read your Google material" is not.
+            const failed = r.results.find((k) => k.error)
+            if (failed?.error) return { indexed, connected, error: failed.error }
+            if (r.caughtUp) break
           }
-          if (r.caughtUp) break
+          return { indexed, connected, error: null as string | null }
+        })
+        anythingConnected = swept.connected
+        brought += swept.indexed
+        changed = changed || swept.indexed > 0
+        if (swept.error) {
+          toast.error(swept.error)
+          return
         }
       }
       // The automatic caller has just been given what it would have asked for.
@@ -180,13 +213,36 @@ export function GoogleSyncButton({
       }
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your Google material just now."))
-    } finally {
-      setSyncing(false)
     }
+    // No `finally` that clears a flag: the flag is the promise in the registry,
+    // and it clears itself when the work settles — including for the screens
+    // that only JOINED this run and are not in this function at all.
   }
 
+  // WHAT, EXACTLY, GETS BROUGHT IN — said on the screen rather than known by the
+  // person who built it.
+  //
+  // THE OWNER, 26 Aug 2026: "When they click the 'Bring in' button everywhere,
+  // Settings, and all other pages, it is a bit unclear to me what exactly we are
+  // syncing. Are we bringing in everything, or are we bringing in a particular
+  // Google service?"
+  //
+  // A button that says "Bring it in" answers neither question, and the answer is
+  // genuinely different per scope: the knowledge sweep reads four Google services
+  // and files them for the assistant to answer from, while the calendar sweep
+  // makes meeting RECORDS. One caption per scope, always visible — not a tooltip,
+  // because the doubt is at the moment of pressing and a tooltip is for after you
+  // have already decided.
+  const covers =
+    doesKnowledge && doesCalendar
+      ? t("Your Google Calendar entries as meetings, and your Drive, Gmail, Calendar and Chat for the knowledge base.")
+      : doesCalendar
+        ? t("Your Google Calendar entries, brought in as meetings.")
+        : t("Your Google Drive, Gmail, Calendar and Chat, so the knowledge base can answer from them.")
+
   return (
-    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className ?? ""}`}>
+    <div className={`flex flex-col gap-1 ${className ?? ""}`}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <Button variant="secondary" size="sm" disabled={syncing} onClick={sync} className="gap-1">
         {syncing ? <Spinner /> : <RefreshCw className="size-3.5" aria-hidden />}
         {syncing ? t("Bringing it in…") : t("Bring it in")}
@@ -214,6 +270,8 @@ export function GoogleSyncButton({
       ) : (
         <span className="text-muted-foreground text-xs">{t("Not brought in yet")}</span>
       )}
+      </div>
+      <span className="text-muted-foreground text-xs">{covers}</span>
     </div>
   )
 }

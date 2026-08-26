@@ -60,7 +60,19 @@
     // stable prefix — the tool catalogue + the system prompt, about nine tenths of
     // every turn's input — as cacheable. It adds a `cache_control` key and changes
     // nothing else the model reads, so it is a price knob and not a behaviour one.
-    "AGENT_PROMPT_CACHE": "5m",
+    //
+    // ONE HOUR, from 26 Aug 2026, on the owner's word ("let's go with your pick"
+    // on the tool-list diet). A one-hour write costs 2× input instead of 1.25×,
+    // so it raises the break-even warm rate from 39% to 63% — and takes the
+    // EXPECTED warm rate to nearly 100%, because an hour is longer than any gap
+    // in a working day's traffic. At the owner's stated 20,000 replies a month
+    // that is ≈ $1,460 against the five-minute TTL's ≈ $1,620, and the gap widens
+    // with the 1 Sept list-price rise, because everything here scales with input
+    // price. The arithmetic is derived in test/prompt-cache.test.ts, which is
+    // also where the assumption behind it is written down: it is the RIGHT knob
+    // only while traffic is dense enough to keep an hour warm, and the day this
+    // app goes quiet the five-minute TTL is cheaper again.
+    "AGENT_PROMPT_CACHE": "1h",
     "AGENT_FREE_DAILY": "50",
     "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
   },
@@ -114,7 +126,9 @@
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
         "AGENT_MODEL": "claude-sonnet-5",
         "AGENT_EFFORT": "low",
-        "AGENT_PROMPT_CACHE": "5m",
+        // Staging shares the production knob so a cost measurement here means
+        // something there (test/prompt-cache.test.ts).
+        "AGENT_PROMPT_CACHE": "1h",
         "AGENT_FREE_DAILY": "50",
         "AGENT_NO_DAILY_CAP": "true",
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"

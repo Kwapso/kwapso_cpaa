@@ -54,7 +54,7 @@
 
 import * as React from "react"
 
-import { splashInner } from "./splash"
+import { markExit, splashInner } from "./splash"
 
 declare global {
   interface Window {
@@ -120,4 +120,51 @@ export function MarkLoader({
       </span>
     </div>
   )
+}
+
+/** KEEP THE LOADER ON SCREEN UNTIL THE MARK HAS FINISHED ITS SENTENCE.
+ *
+ * Pass whatever the screen's own "still waiting" condition is; render the loader
+ * for as long as this returns true.
+ *
+ * THE FAULT IT ANSWERS. The loader is the page's own content, so React removes
+ * it the moment the app has something to show — at whatever frame the mark
+ * happens to be on. On a warm boot that is about 400ms in, a third of the way
+ * through Coalesce, so the mark starts to assemble and then is simply not there.
+ * The composition locks and dissolves; on a real boot nobody had ever seen it do
+ * either. Reported by the owner on 26 Aug 2026 as "the animation does not get a
+ * chance to complete".
+ *
+ * WHAT IT DOES NOT DO. It does not wait for the loop. `markExit` compresses
+ * whatever is left of the pass into at most `SPLASH_EXIT_MS`, so the ending is
+ * reached on a bounded budget rather than a variable one — and never played
+ * slower than authored.
+ *
+ * WHY THE `shown` REF. Without it, a screen that never waited at all would mount
+ * a loader for the length of the exit — 700ms of ident inserted in front of a
+ * screen that was ready. The ending is only owed when there was a beginning, so
+ * the play-out runs only if the loader was actually on screen for a render. */
+export function useMarkHold(waiting: boolean): boolean {
+  const shown = React.useRef(false)
+  const settled = React.useRef(false)
+  const [playingOut, setPlayingOut] = React.useState(false)
+  if (waiting) shown.current = true
+
+  React.useEffect(() => {
+    if (waiting || settled.current || !shown.current) return
+    settled.current = true
+    setPlayingOut(true)
+    let live = true
+    void markExit().then(() => {
+      if (live) setPlayingOut(false)
+    })
+    // The promise is not cancellable — it is a few frames of arithmetic — so the
+    // unmount path drops the RESULT instead. Setting state on a gone component
+    // is the one thing this must not do.
+    return () => {
+      live = false
+    }
+  }, [waiting])
+
+  return waiting || playingOut
 }
