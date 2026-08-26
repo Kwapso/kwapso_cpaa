@@ -91,7 +91,18 @@ async function ticketPage(
   scope: AccountScope,
   filter: TicketFilter,
   cursor: string | null,
-  ordering?: Parameters<typeof listTickets>[5]
+  ordering?: Parameters<typeof listTickets>[5],
+  /** THE ROW THIS CALL JUST MADE, when it made one.
+   *
+   * The create door answers with a PAGE, which is right — every open list wants
+   * the new state — but it meant the caller never learned WHICH ticket it had
+   * raised. A form that lets somebody attach a screenshot while writing the
+   * ticket needs that id: R2 storage is addressed by ticket id, and on a create
+   * there is no id until the door answers. Finding it in the page is not an
+   * option either, because the list is drag-ranked, so the newest is not
+   * reliably first — the same reason the story door hands its id back rather
+   * than letting the form guess. */
+  createdId?: string
 ): Promise<Response> {
   const [page, counts, facets] = await Promise.all([
     listTickets(cfg, guard, scope, filter, cursor, ordering),
@@ -108,7 +119,14 @@ async function ticketPage(
   return pagedJson(
     "tickets",
     { ...page, total: counts.total },
-    { mineTotal: counts.mineTotal, byType: facets.byType, byStatus: facets.byStatus }
+    {
+      mineTotal: counts.mineTotal,
+      byType: facets.byType,
+      byStatus: facets.byStatus,
+      // Only on the door that made one, so no read carries a field that means
+      // nothing on it.
+      ...(createdId ? { id: createdId } : {}),
+    }
   )
 }
 
@@ -256,7 +274,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null, undefined, id)
 }
 
 /** POST /api/content/help/update — edit a ticket (help:edit). */

@@ -31,6 +31,9 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/controls/button/button"
+import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { Paperclip, X } from "@shared/ui/icons"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -38,7 +41,7 @@ import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure, content, tenancy } from "@/lib/api"
 import { appModulesKey, appsKey, listFetch } from "@/lib/live-resources"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -46,6 +49,7 @@ import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 import { RecordPicker } from "@/components/record-picker"
 import type { AppModule, AppRow } from "@shared/types"
+import { readFileAsDataUrl } from "@shared/web/file"
 import { useT } from "@shared/web/language"
 
 const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }
@@ -100,6 +104,15 @@ const contactField = {
 // Radix Select can't hold an empty value, so "no type" uses a sentinel.
 const NONE = "__none__"
 
+/** THE SCREENSHOT FIELD. Same words as the story form's, because it is the same
+ * act and a second phrasing would be a second idea. */
+const fileField = {
+  ...defaultFieldConfig,
+  label: "Something to show",
+  required: false,
+  hint: "A screenshot, a recording, a document somebody can open.",
+}
+
 export function HelpFormDialog({
   open,
   onOpenChange,
@@ -110,6 +123,8 @@ export function HelpFormDialog({
   initial,
   draftKey,
   teamId,
+  helpId,
+  canAttach = true,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -120,7 +135,13 @@ export function HelpFormDialog({
     appId?: string
     moduleId?: string
     raisedByContactId?: string
-  }) => Promise<void>
+    /** RETURNS THE NEW TICKET'S ID on a create, when the caller has one.
+     *
+     * An attachment needs a ticket to belong to, and on a create there is no
+     * ticket until the door answers — so the id comes back out rather than the
+     * form guessing which row is new (the list is drag-ranked, so the newest is
+     * not reliably first). An edit already knows it, as `helpId`. */
+  }) => Promise<string | void>
   /** The team's active "Ticket type" dropdown values. */
   helpTypeOptions: string[]
   /** THE GLYPH BESIDE EACH WORD (R35). A map rather than richer options,
@@ -147,6 +168,12 @@ export function HelpFormDialog({
   draftKey?: string
   /** active team — drives the gated "Manage dropdowns" link */
   teamId?: string | null
+  /** THE TICKET BEING EDITED, when one is. Attachments hang off it; on a create
+   * the id arrives from `onSubmit`'s answer instead. */
+  helpId?: string
+  /** Whether this person may attach at all. The door gates on `help:edit`, so a
+   * control that always refused would be worse than none. */
+  canAttach?: boolean
 }) {
   const t = useT()
   const isEdit = !!initial
@@ -180,6 +207,25 @@ export function HelpFormDialog({
   // Per-session draft: restores what you typed if you navigate away and reopen.
   const [values, setValues, clearDraft] = useFormDraft(draftKey, initialValues, open)
   const [busy, setBusy] = React.useState(false)
+  /** WHAT SOMEBODY PICKED, held until there is a ticket to hang it on.
+   *
+   * THE OWNER, 26 Aug 2026: "add the ability to attach screenshots and files to
+   * tickets while adding or editing them, just like we have at the story level."
+   *
+   * The doors have existed since attachments shipped — the detail screen has a
+   * Files and links tab reading them — but the FORM never offered one, so the
+   * moment a person is most likely to have the screenshot in hand (while
+   * describing the fault) was the one moment they could not add it.
+   *
+   * They wait here rather than riding the create payload because storage is
+   * addressed by ticket id, and on a create that id does not exist until the
+   * door answers. Deliberately NOT in the draft: a File cannot be serialised
+   * into sessionStorage, and a draft that silently dropped them would be worse
+   * than one that never held them. */
+  const [pending, setPending] = React.useState<File[]>([])
+  React.useEffect(() => {
+    if (!open) setPending([])
+  }, [open])
   // WHICH CLIENT THE CONTACT LIST BELONGS TO — the one already on the ticket, or
   // the one being picked. Read from the same door the account screen reads, so
   // "who is a contact here" has one answer in the app.
@@ -203,11 +249,32 @@ export function HelpFormDialog({
     ? { id: initial.accountId, name: detailQ.data?.account.name ?? t("this client") }
     : null
 
+  /** ONE FILE AT A TIME, and a failure here never fails the ticket.
+   *
+   * The ticket is already raised by the time this runs. Turning a rejected
+   * upload into a thrown submit would close nothing, clear no draft, and tell
+   * somebody their request was not saved when it was — so the toast names the
+   * attachment and the ticket stands. The same argument the story form settled. */
+  async function attach(target: string, files: File[]) {
+    for (const file of files) {
+      try {
+        await content.addHelpAttachment({
+          id: target,
+          kind: "file",
+          label: file.name,
+          fileDataUrl: await readFileAsDataUrl(file),
+        })
+      } catch (err) {
+        toast.error(err instanceof ApiFailure ? err.message : t("Couldn't attach that."))
+      }
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     try {
-      await onSubmit({
+      const madeId = await onSubmit({
         description: richTextValue(values.description),
         helpType: values.helpType === NONE ? undefined : values.helpType,
         // On a ticket that already has a client, send the one it has — the door
@@ -223,6 +290,11 @@ export function HelpFormDialog({
         raisedByContactId:
           values.raisedByContactId === NONE ? undefined : values.raisedByContactId,
       })
+      // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `helpId` on an edit,
+      // the id the create door just handed back otherwise.
+      const target = helpId ?? (typeof madeId === "string" ? madeId : null)
+      if (target && pending.length) await attach(target, pending)
+      setPending([])
       clearDraft()
       onOpenChange(false)
     } catch (err) {
@@ -266,6 +338,44 @@ export function HelpFormDialog({
           className="min-h-32"
         />
       </Field>
+      {/* THE SCREENSHOT, BESIDE THE WORDS THAT DESCRIBE IT — and on BOTH halves
+          of this dialog, which is the whole of the owner's ask: "while adding or
+          editing them, just like we have at the story level." One field, one
+          code path; the upload simply knows a different id on an edit.
+          Behind `help:edit`, because that is what the attachments door gates on
+          and a control that always refused would be worse than none. */}
+      {canAttach && (
+        <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
+          <div className="flex flex-col gap-2">
+            {pending.length > 0 && (
+              <ul className="divide-border divide-y rounded-xl border">
+                {pending.map((file, i) => (
+                  <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
+                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6"
+                      aria-label={t("Take it off")}
+                      disabled={busy}
+                      onClick={() => setPending((f) => f.filter((_, j) => j !== i))}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <FileUpload
+              multiple
+              onFilesSelected={(files) => setPending((f) => [...f, ...files])}
+              className={busy ? "pointer-events-none opacity-60" : undefined}
+            />
+          </div>
+        </Field>
+      )}
       {/* The type vocabulary is the team's own and grows on the Dropdown values
           screen, so it gets the search box too — and the picker's own clear X
           replaces the one this field used to draw by hand. */}

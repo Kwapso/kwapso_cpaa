@@ -165,9 +165,13 @@ export function useScreenActions(teamId: string | null) {
   const createHelp = React.useCallback(
     async (input: { description: string; helpType?: string; accountId?: string }) => {
       if (!teamId) return
-      const { tickets } = await contentApi.createHelp(input)
+      const { tickets, id } = await contentApi.createHelp(input)
       primeCache(`help:${teamId}`, tickets)
       toast.success(t("Ticket raised."))
+      // The new ticket's id, so a screenshot picked while writing it has
+      // something to hang on (help-form-dialog's own note says why the page
+      // cannot answer that: the list is drag-ranked).
+      return id
     },
     [teamId, t]
   )

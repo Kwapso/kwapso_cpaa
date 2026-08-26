@@ -238,7 +238,13 @@ export const content = {
     /** WHICH SECTION of that system. Refused unless it belongs to `appId`. */
     moduleId?: string
     raisedByContactId?: string
-  }) => api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
+    /** THE TICKET THIS CALL MADE. The answer is a PAGE — every open list wants
+     * the new state — so `id` is what tells the caller WHICH row it raised. A
+     * form that attaches a screenshot while the ticket is being written needs
+     * it: storage is addressed by ticket id, and finding the row in the page is
+     * not an option because the list is drag-ranked and the newest is not
+     * reliably first. */
+  }) => api<{ tickets: HelpTicket[]; id?: string }>("/api/content/help", post(input)),
   updateHelp: (input: {
     id: string
     description: string

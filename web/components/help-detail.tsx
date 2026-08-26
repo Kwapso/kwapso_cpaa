@@ -806,6 +806,8 @@ export function HelpDetailScreen({
           raisedByContactId: ticket.raisedByContactId,
         }}
         onSubmit={editTicket}
+        helpId={helpId}
+        canAttach={canEdit}
       />
     </RecordScreen>
   )

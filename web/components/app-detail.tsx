@@ -632,10 +632,13 @@ export function AppDetailScreen({
         fixedApp={{ id: appId, name: app.name }}
         draftKey={`help:add:app:${appId}`}
         onSubmit={async (v) => {
-          await contentApi.createHelp(v)
+          // The id comes back so a screenshot picked while writing the ticket
+          // has something to hang on (help-form-dialog's own note says why).
+          const { id } = await contentApi.createHelp(v)
           invalidate(sliceKey("tickets-app", appId))
           invalidate(helpKey(teamId, "all"))
           toast.success(t("Ticket raised."))
+          return id
         }}
       />
 

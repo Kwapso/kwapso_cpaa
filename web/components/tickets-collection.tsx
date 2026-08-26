@@ -551,6 +551,8 @@ function TriageQueue({
             : undefined
         }
         onSubmit={saveEdit}
+        helpId={editing?.id}
+        canAttach={canEdit}
       />
       <TriageReplyDialog
         open={replying !== null}
