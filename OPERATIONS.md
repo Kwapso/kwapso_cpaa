@@ -47,7 +47,9 @@ BOOTSTRAP.md stands the whole thing up from zero.
   The check is a second apart and fails before the two-minute build rather than after it.
 - deploy_staging_command: npm run deploy:staging (root; runs `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
 - deploy_production_command: npm run deploy:production (root; `lang:check` first, then the same eight-worker realtime-first order, production names)
-- github_remote: origin (https://github.com/Kwapso/kwapso_cpaa.git)
+- github_remote: origin (https://github.com/Kwapso/kwapso_system.git — renamed from
+  `kwapso_cpaa` on 2026-08-26; GitHub redirects the old URL, but the remote and every
+  reference below point at the live name directly)
 
 ## Reset config
 

@@ -34,8 +34,9 @@ end with a live base you can sign into and build on.
   from the root, never inside a worker directory.
 - **Wrangler**, comes via `npx wrangler`, pinned at `^4.0.0` in the root
   `package.json`. No global install needed.
-- **`git`**, and read access to `github.com/Kwapso/kwapso_cpaa` (private). That
-  one repository is now the whole story: the UI component library used to be
+- **`git`**, and read access to `github.com/Kwapso/kwapso_system` (private,
+  renamed from `kwapso_cpaa` on 2026-08-26 — the old URL redirects, clone the
+  live name). That one repository is now the whole story: the UI component library used to be
   installed from its own public GitHub repo, and since it was vendored on
   2026-08-22 it arrives with the clone, in `shared/ui/`. So there is no second
   repository to reach and no extra credential to arrange — but note the flip
