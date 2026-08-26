@@ -30,9 +30,10 @@
 // (2026-08-18, for the record: 163 tools / 91,801 chars / ≈112 KB total.)
 //
 // At roughly 3.5 characters per token on Sonnet 5's tokenizer that is about
-// 32,000 tokens of preamble, re-sent on every model turn. A question that runs
-// three tools is four turns, so ~128,000 of the ~133,000 input tokens one
-// question costs are the same block, four times.
+// 37,000 tokens of preamble, re-sent on every model turn (the 2026-08-18
+// figure was 32,000 — the number that moves when the catalogue grows). A
+// question that runs three tools is four turns, so ~148,000 of the ~153,000
+// input tokens one question costs are the same block, four times.
 //
 // Sonnet 5 list prices: input $3.00/MTok, output $15.00/MTok; a cache WRITE is
 // 1.25× input ($3.75) at the 5-minute TTL or 2× ($6.00) at one hour; a cache
@@ -43,21 +44,28 @@
 //   cache, warm   4 × 32k × $0.30/M                            = $0.038
 //
 // Add ~5k tokens of conversation (~$0.015) and ~1.2k output (~$0.018) either way
-// and a question costs $0.417 uncached, $0.182 cold, $0.071 warm. The owner's
-// stated volume is 20,000+ replies a month (2026-08-26; this comment modelled
-// 2,600 for a week after that number was said out loud): at 20,000 that is
-// ~$8,340 with no cache against ~$1,640 at the hit rate a 5-minute TTL earns
-// here (~65%+, and the denser the traffic the warmer the cache) — the same
-// 3.8×+ reduction, at stakes ~7.7× the old arithmetic's. Each ADDED tool now
-// costs ≈ $5/month at this volume before it is ever called — the catalogue is
-// a bill, not a menu (round-two spend review).
+// and a question costs $0.417 uncached, $0.182 cold, $0.071 warm — blending
+// to ≈ $0.081 at the hit rate a 5-minute TTL earns here (~65%+, and the denser
+// the traffic the warmer the cache). The owner's stated volume is 20,000+
+// replies a month (2026-08-26; this comment modelled 2,600 for a week after
+// that number was said out loud), so: ≈ $8,340/month with no cache against
+// ≈ $1,620/month with it — the same 3.8× reduction at ~7.7× the old
+// arithmetic's stakes. Each ADDED tool costs ≈ $5/month at this volume before
+// it is ever called: the catalogue is a bill, not a menu.
+//
+// THE DATED ITEM: on 1 Sept 2026 list prices move and one reply becomes
+// ≈ $0.122 blended — ≈ $2,440/month at the same volume, ≈ +$810. Nothing in
+// the code changes; the arithmetic does (round-three spend review).
 //
 // THE BREAK-EVEN, which is the honest number rather than the flattering one:
 // 3× needs the cached cost at or below $0.139 a question, so the warm-start rate
 // must be at least **39%** on the 5-minute TTL. Below that the cache still saves
 // money, just not threefold. Setting AGENT_PROMPT_CACHE="1h" doubles the write
 // premium but makes nearly every question warm — break-even rises to 63% and the
-// expected hit rate rises to ~100%, landing around $190/month (5.7×).
+// expected hit rate rises to ~100%. At the owner's 20,000 replies that lands
+// near $1,460/month against the 5-minute TTL's $1,620 (the old "$190/month"
+// here was this same shape at the retired 2,600-reply volume, left un-derived
+// when the volume changed — round-three spend review).
 //
 // Every figure above is a list-price estimate with the token count derived from
 // measured characters; the point of recording usage per turn (migration 0027) is

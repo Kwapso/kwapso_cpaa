@@ -39,10 +39,28 @@ describe("every stamped resource's publisher names the account", () => {
         extensions: [".ts"],
       })) {
         const code = stripComments(source)
-        // Each call, captured to its closing paren (publish calls here are one
-        // statement; nesting inside the args is only ever `?? undefined`).
-        for (const m of code.matchAll(/publishChange\(([^)]*)\)/g)) {
-          const args = m[1]
+        // Each call, captured with BALANCED parens — `[^)]*` stopped at the
+        // first `)`, so a call whose own arguments contain one (a nested helper,
+        // `?? undefined` beside a cast) was skipped silently rather than judged.
+        // A census that quietly skips is the failure shape this file exists for
+        // (round-three security sweep, N5 — no live instance, and it would not
+        // have stayed that way).
+        for (const m of code.matchAll(/publishChange\(/g)) {
+          const open = (m.index ?? 0) + m[0].length - 1
+          let depth = 0
+          let close = -1
+          for (let i = open; i < code.length; i++) {
+            if (code[i] === "(") depth++
+            else if (code[i] === ")") {
+              depth--
+              if (depth === 0) {
+                close = i
+                break
+              }
+            }
+          }
+          if (close === -1) continue
+          const args = code.slice(open + 1, close)
           const resource = /,\s*"([a-z_]+)"/.exec(args)?.[1]
           if (!resource || !stamped.has(resource)) continue
           sites++
@@ -56,13 +74,23 @@ describe("every stamped resource's publisher names the account", () => {
           // per-account ping published BESIDE it (see postBulkHelpStatus) —
           // an id-less ping with no stamp reaches no fenced listener and
           // misleads nobody. Flag the middle: an id without a stamp.
-          const commas = args.split(",").length - 1
+          let depth2 = 0
+          let commas = 0
+          for (const ch of args) {
+            if (ch === "(") depth2++
+            else if (ch === ")") depth2--
+            else if (ch === "," && depth2 === 0) commas++
+          }
           if (commas >= 3 && commas < 5)
             offenders.push(`${path.slice(ROOT.length + 1)} → publishChange(…"${resource}"…)`)
         }
       }
     }
-    expect(sites, "the census found no stamped publishes — it has gone blind").toBeGreaterThan(15)
+    // The balanced parser sees every call, not only the paren-free ones: an
+    // independent control census counted 55 stamped publishes at the commit
+    // that widened it. A floor well above the old regex's reach is the tripwire
+    // that the parser did not quietly narrow again.
+    expect(sites, "the census found too few stamped publishes — the parser narrowed").toBeGreaterThan(40)
     expect(
       offenders,
       `these publish a STAMPED resource without naming the account — the fenced side goes ` +

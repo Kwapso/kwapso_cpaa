@@ -166,7 +166,20 @@ async function agencyContext(env: Env, userId: string) {
   // Resolved from the ANSWER, never from the stored pointer — getActiveContext
   // self-heals a stale current team, and a guard built from the un-healed value
   // would refuse a member who is simply looking at a different team today.
-  if (ctx.team) await refusePortalCaller(cfg, await requireMember(env, userId, ctx.team.id))
+  if (ctx.team) {
+    await refusePortalCaller(cfg, await requireMember(env, userId, ctx.team.id))
+    // …and the OTHER teams in the answer fence for themselves, exactly as the
+    // team-list doors below do (round-three security sweep, N4: the per-team
+    // fence landed on myTeams/bootstrap while this door — the SAME payload,
+    // eight lines down — still shipped every team's legal block filtered only
+    // on the pointer). The pointer team just passed above, so the common
+    // one-team case adds ZERO reads; a multi-team caller pays one fence read
+    // per extra team, and a team where they read as a client drops out.
+    const currentId = ctx.team.id
+    const others = await refuseClientOnTeams(env, userId, ctx.teams.filter((t) => t.id !== currentId))
+    const keep = new Set([currentId, ...others.map((t) => t.id)])
+    ctx.teams = ctx.teams.filter((t) => keep.has(t.id))
+  }
   return ctx
 }
 

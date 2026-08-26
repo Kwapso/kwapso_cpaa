@@ -133,6 +133,45 @@ describe("the shared tool catalog — contracts that must not silently drift", (
       expect(t.description, `${t.name} description must name its required right`).toContain(`Needs ${gate}.`)
     }
   })
+
+  // THE PAUSE TRAVELS AS WORDS, AND THE WORDS ARE LOCKED.
+  //
+  // In the app a confirm-shaped tool stops for a yes/no panel; on this surface
+  // there is no panel — the connecting client owns the confirming UI and its
+  // model reads nothing but the description. So the sentence IS the safety
+  // signal, and a sentence nothing checks is one a refactor can drop in
+  // silence. Hardcoded on purpose: asserting it against the source constant
+  // would pass just as happily if both moved together, which is exactly the
+  // regression this guards.
+  const PAUSE = " Destructive or access-widening: confirm with a person before calling this."
+
+  it("every confirm-shaped tool CARRIES the pause sentence, and no other tool does", () => {
+    const carried: string[] = []
+    const missing: string[] = []
+    const spurious: string[] = []
+    for (const s of SHARED_TOOLS) {
+      const t = getMcpTool(s.mcpName ?? s.name)
+      if (!t) continue
+      const shouldPause = Boolean(s.agent.confirm)
+      const doesPause = t.description.includes(PAUSE)
+      if (shouldPause && doesPause) carried.push(t.name)
+      if (shouldPause && !doesPause) missing.push(t.name)
+      if (!shouldPause && doesPause) spurious.push(t.name)
+    }
+    expect(
+      missing,
+      `these stop for a person in the app and say nothing about it to a machine client — ` +
+        `toMcpTool must append the pause: ${missing.join(", ")}`
+    ).toEqual([])
+    expect(
+      spurious,
+      `these tell a machine client to pause for something the app itself runs without ` +
+        `asking — the two surfaces must agree: ${spurious.join(", ")}`
+    ).toEqual([])
+    // Tripwire: a projection that produced no paused tools at all would satisfy
+    // both assertions above while saying nothing to anybody.
+    expect(carried.length, "no tool carries the pause — the projection has gone silent").toBeGreaterThan(40)
+  })
 })
 
 describe("personal access tokens", () => {
