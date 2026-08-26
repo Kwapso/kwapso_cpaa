@@ -276,26 +276,39 @@ export function HelpDetailScreen({
     toast.success(r.alreadyResolved ? t("Already answered.") : t("Answered, and they've been told."))
   }
 
+  /** THE WHOLE FORM, FORWARDED — never a hand-listed copy of it.
+   *
+   * THE OWNER, 26 Aug 2026: "there are some fields in many screens that don't
+   * get saved in the edit screen. One example… the ticket modules are not
+   * getting saved."
+   *
+   * This rebuilt the payload field by field, and `moduleId` was not among them.
+   * The form offered the picker, the person chose a module, the door was ready
+   * to write it — and this function quietly dropped it between the two. Nothing
+   * errored, the toast said "Ticket updated", and the field came back as it was.
+   *
+   * TypeScript could not see it: a handler that accepts FEWER properties is
+   * assignable to one that supplies more, so narrowing the parameter type hid
+   * the omission rather than reporting it. The two other screens that open this
+   * form pass their argument WHOLE (`{ id, ...input }`), which is why the same
+   * edit saved from the tickets list and not from here.
+   *
+   * So it spreads. The door decides what it accepts; this is a courier. */
   async function editTicket(input: {
     description: string
     helpType?: string
+    // Naming the client on a ticket that has none. Once it has one the form
+    // sends the SAME id back and the door leaves it where it is; it refuses a
+    // DIFFERENT one, which is the case this field must never quietly cause.
     accountId?: string
+    // These three are correctable, unlike the client: a request filed against
+    // the wrong system, the wrong section of it, or a colleague who actually
+    // raised it, are all ordinary mistakes.
     appId?: string
+    moduleId?: string
     raisedByContactId?: string
   }) {
-    const { tickets, byType, byStatus } = await content.updateHelp({
-      id: helpId,
-      description: input.description,
-      helpType: input.helpType,
-      // Naming the client on a ticket that has none. Once it has one the form
-      // sends the SAME id back and the door leaves it where it is; it refuses a
-      // DIFFERENT one, which is the case this field must never quietly cause.
-      accountId: input.accountId,
-      // Both correctable, unlike the client: a request filed against the wrong
-      // system, or a colleague who actually raised it, are ordinary mistakes.
-      appId: input.appId,
-      raisedByContactId: input.raisedByContactId,
-    })
+    const { tickets, byType, byStatus } = await content.updateHelp({ id: helpId, ...input })
     // Merge, don't replace: priming the whole key with this first page threw
     // away rows scrolled in past it (same seam-fix as the collection's edit).
     mergePage(`help:${teamId}`, "id", tickets as unknown as Record<string, unknown>[])

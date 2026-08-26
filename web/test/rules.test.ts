@@ -2661,7 +2661,9 @@ describe("a tab strip's shape is decided in one place", () => {
       // The steps view switch (List / Flow / Compare) sits INSIDE the Steps
       // folder tab. Two folders stacked put one strip's feet through the
       // other's toolbar — seen on a phone the moment the default flipped.
-      "web/components/process-detail.tsx",
+      // It moved out of `process-detail.tsx` with the panel it belongs to on
+      // 26 Aug 2026; the reason above is unchanged, only the address.
+      "web/components/process/steps-panel.tsx",
     ])
     const offenders: string[] = []
     let scanned = 0

@@ -163,7 +163,19 @@ export function useScreenActions(teamId: string | null) {
   // Raise a help ticket — its own handler (a small object payload). Primes the list
   // so the ticket shows at once; the realtime "add" ping refreshes everyone else.
   const createHelp = React.useCallback(
-    async (input: { description: string; helpType?: string; accountId?: string }) => {
+    // EVERY FIELD THE FORM OFFERS, because this is a courier and the door is
+    // what decides. The type used to name three of the six — it worked only
+    // because the object is forwarded whole, which is luck rather than design,
+    // and the same narrowing is what hid a dropped `moduleId` on the ticket
+    // detail (help-detail.tsx · editTicket) where the payload was rebuilt.
+    async (input: {
+      description: string
+      helpType?: string
+      accountId?: string
+      appId?: string
+      moduleId?: string
+      raisedByContactId?: string
+    }) => {
       if (!teamId) return
       const { tickets, id } = await contentApi.createHelp(input)
       primeCache(`help:${teamId}`, tickets)
