@@ -537,12 +537,23 @@ describe("granting a login: the person is picked off the account, never typed in
     await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
     const first = await grant({ accountId: IDS.victimAccount, personAccountId: ana })
     expect(first.status).toBe(200)
-    // …they accept the invite: a live membership on the client role.
-    db()
-      .prepare(
-        "INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('TM_CLIENT', ?, ?, 'R_CLIENT', '2026-08-24')"
-      )
-      .run(IDS.team, IDS.clientUser)
+    // …AND THE GRANT IS WHAT MADE THEM A MEMBER. This used to be a hand-rolled
+    // INSERT standing in for "they accept the invite", because until 26 Aug 2026
+    // no product path did it: the door wrote a portal_users row and stopped, so
+    // the owner granted a login, watched the tab say "Can sign in", and was told
+    // at the client door that somebody needed to switch his access on. The
+    // simulation was the test quietly holding up the half the product was
+    // missing. The door does it now, and this is the assertion that says so.
+    const enrolled = db()
+      .prepare("SELECT role_id, deactivated_at FROM team_members WHERE team_id = ? AND user_id = ?")
+      .get(IDS.team, IDS.clientUser) as { role_id: string; deactivated_at: string | null } | undefined
+    expect(enrolled?.role_id, "granting a login must put the person on the team (R21)").toBe(IDS.clientRole)
+    expect(enrolled?.deactivated_at).toBe(null)
+    // …and their pointer, or the portal cannot name a team to ask.
+    expect(
+      (db().prepare("SELECT current_team_id c FROM users WHERE id = ?").get(IDS.clientUser) as { c: string | null }).c,
+      "a client with no current team has no portal, however valid their login"
+    ).toBe(IDS.team)
     // …their login is switched off, as a pause.
     db().prepare("UPDATE portal_users SET deactivated_at = '2026-08-25' WHERE user_id = ?").run(IDS.clientUser)
     // The re-grant must not be told they are staff.

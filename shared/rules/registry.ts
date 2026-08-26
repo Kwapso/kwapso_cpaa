@@ -357,6 +357,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "in-app-anchors",
     status: "enforced",
   },
+  {
+    id: "R38",
+    dimension: "ui",
+    law: "A RECORD DETAIL MAY NOT LOOK ITS RECORD UP IN A PAGE. A screen that shows one record of a collection R14 makes PAGE (`GROWING_COLLECTIONS`) must read that record by ID — a dedicated per-record door, or a `<module>:one:<id>` fallback beside the list — never a `find` over the cached list, which holds only the loaded prefix. The check is POSITIONAL, as R20's is: it ties the `find` to the query VARIABLE built from a paged cache key, so a find over a BOUNDED collection (apps, member roles) — where page one IS the collection — is never caught. The by-id key then has to reach a listener like any other (R15), or a status change patches the list and leaves the open record showing yesterday.",
+    why: "The owner opened a ticket from the triage queue on 26 Aug 2026 and was told 'That ticket no longer exists.' It existed: number 1,030 of 1,820 in staging, and the entire lookup was a `find` over the newest fifty rows. Every ticket past the cursor was unreachable by direct link, from an email button, from a bookmark — and the screen made the most alarming claim available to it, that the record was gone, on a collection whose whole point is that it grows. Nothing was red: the door had answered `?id` since paging landed and says why in its own comment, and the API client's `helpOne` had been written and never called. Three sibling screens already had it right — `meeting-detail` and `knowledge-detail` name the variable `inPage`, and `story:one:` was added to the live registry in August after the identical fault — so this was one screen left behind by a pattern the rest of the app knew. R14 made the lists page and nothing asked what that did to the screens that read them.",
+    checkId: "details-ask-the-door",
+    status: "enforced",
+  },
 ]
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back

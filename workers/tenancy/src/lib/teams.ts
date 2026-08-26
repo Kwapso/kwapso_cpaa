@@ -620,3 +620,70 @@ export async function getTeamMeta(env: Env, teamId: string): Promise<TeamMeta> {
     updatedAt: row?.updated_at ?? null,
   }
 }
+
+/** PUT A CLIENT LOGIN ON THE TEAM — the other half of "give access".
+ *
+ * THE OWNER, 26 Aug 2026: he granted portal access to a contact, watched the
+ * Portal access tab say "Can sign in", signed in at the client door, and was
+ * told "There's nothing here for you yet. Someone at kwapso needs to switch your
+ * access on." Both screens were telling the truth about different things.
+ *
+ * WHY IT HAPPENED. A client login is, by R21's own words, "an ordinary team
+ * member holding an ordinary role" — the portal resolves which team's database
+ * to ask from the caller's `current_team_id`, and every door behind it opens
+ * with a `MemberGuard`. Granting portal access wrote a `portal_users` row and
+ * nothing else, so the person had a fence and no membership: the portal could
+ * not name a team, and `session.ts` fell to `no-access`.
+ *
+ * The seed script did BOTH acts — grant, then invite, then accept — which is why
+ * every seeded client works and no real one could. The seed knew; the product
+ * did not, and the button says "Switch their login on" as though it were one act.
+ * It is one act now.
+ *
+ * WHY NOT AN INVITE. Because a client cannot accept one. The portal gateway
+ * forwards a named allow-list that deliberately excludes `/api/tenancy/invites`
+ * and `bootstrap` (R21), so the only way to spend a client's invite is to send
+ * them to the AGENCY hostname — a door they may not pass — and let the 403 they
+ * receive be the thing that enrols them. That is not a journey anybody would
+ * design; it is what the seed's own comment describes as a curiosity.
+ *
+ * WHAT MAKES IT SAFE. The consent an invite exists to capture is already here in
+ * a stronger form: the grant is a gated, confirmed act by a holder of
+ * `portal_users:create`, on a person who is already on the account's own books
+ * and has already signed in to this platform at least once, holding a role the
+ * granter CHOSE. The grant door refuses an existing staff member outright, so
+ * this can never quietly demote a colleague.
+ *
+ * UPSERT, like the accept path, because a removed member's row is deactivated
+ * and never deleted: re-granting a login to somebody whose access was taken away
+ * must revive them rather than silently do nothing. */
+export async function enrolPortalMember(
+  env: Env,
+  teamId: string,
+  userId: string,
+  roleId: string,
+  actor: Actor
+): Promise<void> {
+  const now = new Date().toISOString()
+  await env.DB.prepare(
+    `INSERT INTO team_members (id, team_id, user_id, role_id, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(team_id, user_id) DO UPDATE SET
+       deactivated_at = NULL, role_id = excluded.role_id, updated_at = excluded.created_at`
+  )
+    .bind(ulid(), teamId, userId, roleId, now, actor.id, actor.email, actor.name)
+    .run()
+  // THEIR POINTER, ONLY IF THEY HAVE NONE. The portal reads `current_team_id` to
+  // decide whose database to ask, so a client with no pointer has no portal
+  // however valid their login — that is the fault this closes. But moving a
+  // pointer that already points somewhere would yank a person out of the team
+  // they are standing in, which is a different person's decision.
+  await env.DB.prepare(
+    "UPDATE users SET current_team_id = ?, updated_at = ? WHERE id = ? AND current_team_id IS NULL"
+  )
+    .bind(teamId, now, userId)
+    .run()
+  await publishChange(env, teamId, "members", userId, "add")
+  // Cross-team, so the client's own other devices notice they are now somewhere.
+  await publishUserChange(env, userId, "teams", teamId, "add")
+}

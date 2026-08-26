@@ -43,6 +43,8 @@ import {
   updateAccount,
   type AccountFilters,
 } from "../lib/accounts"
+import { enrolPortalMember } from "../lib/teams"
+import { requireGrantableRole } from "../lib/roles"
 import { sendPortalWelcome } from "../lib/portal-welcome"
 import { teamName } from "@shared/workers/notify"
 import type { Env } from "../env"
@@ -514,12 +516,43 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
         "That person is a member of your team, a client login would lock them out of the agency app."
       )
   }
+  // WHICH ROLE THEY HOLD ON THE TEAM — because a client login IS a team member
+  // (R21), and until 26 Aug 2026 this door made them one of those things and not
+  // the other. See `enrolPortalMember` for the whole account of it.
+  //
+  // Named explicitly, or the team's own role titled "Client". Never invented: a
+  // role decides what a person can see, and a door that quietly created one
+  // would be answering a permissions question nobody asked it.
+  const roleId = optionalText(body.roleId, "Role", TEXT_LIMITS.short)
+  const clientRole = roleId
+    ? roleId
+    : (
+        await d1Query<{ id: string }>(
+          cfg,
+          guard.databaseId,
+          "SELECT id FROM member_roles WHERE lower(title) = 'client' AND deactivated_at IS NULL LIMIT 1",
+          []
+        )
+      )[0]?.id
+  if (!clientRole)
+    return fail(
+      400,
+      "no_client_role",
+      "Make a role for clients first, then give access — a login is a role on your team, and this one has no role called Client."
+    )
+  // The same ceiling the invite door opens with: nobody may hand out rights they
+  // do not hold themselves. It also proves the role exists in THIS team.
+  await requireGrantableRole(cfg, guard, clientRole)
+
   const id = await grantPortalAccess(cfg, guard, scope, actor, {
     onAccountId: accountId,
     personAccountId,
     userId,
     appRestriction: optionalText(body.appRestriction, "App restriction", TEXT_LIMITS.short),
   })
+  // …AND PUT THEM ON THE TEAM, which is the half that was missing. After the
+  // grant, so a refused grant never leaves a stray membership behind.
+  await enrolPortalMember(env, guard.teamId, userId, clientRole, actor)
   await publishChange(env, guard.teamId, "portal_users", accountId, "add")
   // TELL THEM, IF THAT IS WHAT WAS ASKED FOR.
   //

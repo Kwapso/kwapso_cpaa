@@ -891,6 +891,10 @@ export const TEAM_RESOURCES: Record<
     // when the tab is clicked, so nothing else would ever re-read them (R15).
     deps: (t, id) => [
       `activity:record:help:${id}`,
+      // AND THE TICKET'S OWN SCREEN. `help-detail` reads page one and falls back
+      // to `help:one:<id>` for a ticket past the cursor, which the row patch
+      // above cannot reach — the same fault `story:one:` was added for on 19 Aug.
+      `help:one:${id}`,
       `help-stakeholders:${id}`,
       // THE OPEN CONVERSATION. A reply pings help_threads (deaf on this door —
       // its id is the REPLY's) and the parent help row (this ping, whose id IS

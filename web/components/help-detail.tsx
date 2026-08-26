@@ -88,7 +88,30 @@ export function HelpDetailScreen({
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
     content.help().then((r) => r.tickets)
   )
-  const ticket = ticketsQ.data?.find((t) => t.id === helpId) ?? null
+  // TICKETS ARE THE GROWING COLLECTION (R14), SO THIS LIST IS A PAGE.
+  //
+  // THE OWNER, 26 Aug 2026, opening a ticket from Triage: "That ticket no longer
+  // exists." It existed. It was ticket 1,030 of 1,820 in staging, and this line
+  // was the whole of the lookup — a `find` over the newest fifty. Every ticket
+  // past the cursor was unreachable by direct link, from the triage queue, from
+  // an email button, from a bookmark, and the screen said the most alarming
+  // thing it could: that the record was gone.
+  //
+  // The door has answered `?id` since paging landed, and says why in its own
+  // comment ("One ticket by id is a LOOKUP, not a page"). `content.helpOne` was
+  // written for it. Nothing had ever called either.
+  //
+  // Page one first, so a ticket that IS loaded paints with no round trip
+  // (CACHING.md is cache-first), and the by-id read only when it is not — the
+  // same shape meeting-detail and knowledge-detail already use. The `:one:` key
+  // is registered in the live registry beside `help`, or a status change would
+  // patch the list and leave this screen showing yesterday.
+  const inPage = ticketsQ.data?.find((t) => t.id === helpId) ?? null
+  const oneQ = useCached<HelpTicket | null>(
+    ticketsQ.data !== undefined && !inPage ? `help:one:${helpId}` : null,
+    () => content.helpOne(helpId)
+  )
+  const ticket = inPage ?? oneQ.data ?? null
 
   const repliesQ = useCached<HelpMessage[]>(`help-thread:${helpId}`, () =>
     content.helpThread(helpId).then((r) => {
@@ -350,7 +373,11 @@ export function HelpDetailScreen({
   }
 
   if (ticketsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the ticket.")}</p>
-  if (ticketsQ.data === undefined) return <Skeleton variant="list" lines={4} />
+  // …AND NOT WHILE THE BY-ID READ IS STILL GOING. "That ticket no longer exists"
+  // is a claim, and a claim made before the only read that could disprove it has
+  // answered is a lie that happens to be quick.
+  if (ticketsQ.data === undefined || (!inPage && oneQ.data === undefined && !oneQ.error))
+    return <Skeleton variant="list" lines={4} />
   if (!ticket) return <p className="text-muted-foreground text-sm">{t("That ticket no longer exists.")}</p>
 
   // WHO YOU CAN TAG. Our own people, minus yourself. A client login is an

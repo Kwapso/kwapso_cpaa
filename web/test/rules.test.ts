@@ -364,6 +364,68 @@ describe("RULES — the laws of the base", () => {
       ).toBe(true)
   })
 
+  // A RECORD DETAIL MAY NOT LOOK ITS RECORD UP IN A PAGE.
+  //
+  // THE OWNER, 26 Aug 2026, opening a ticket from the triage queue: "That ticket
+  // no longer exists." It existed. It was number 1,030 of 1,820, and the whole
+  // of the lookup was a `find` over the cached list — which, for a collection
+  // R14 makes PAGE (GROWING_COLLECTIONS), is the newest fifty rows. Every ticket
+  // past the cursor was unreachable by direct link, from an email button, from a
+  // bookmark, and the screen said the most alarming thing it could: that the
+  // record was gone.
+  //
+  // The door had answered `?id` since paging landed and says why in its own
+  // comment; the API client had `helpOne`; nothing had ever called either. Three
+  // sibling screens had already got it right — `meeting-detail` and
+  // `knowledge-detail` name the variable `inPage`, and `story:one:` was added to
+  // the live registry in August for exactly this — so this was one screen left
+  // behind by a pattern the rest of the app already knew.
+  //
+  // The rule is POSITIONAL, like R20's: a `find` by id over a cached list is
+  // only honest when the same file also holds a by-id read. A detail screen that
+  // reads its record through a dedicated per-record door (account-detail,
+  // process-detail) never touches a list and is never caught.
+  it("details-ask-the-door: no record detail resolves its record out of a paged list", () => {
+    // The cache-key builders of the collections R14 makes page. A `find` over
+    // any other list is over a bounded one, where page one IS the collection.
+    // The cache-key builders of the collections R14 makes page, plus the one
+    // written as a template literal rather than through its builder — which is
+    // the spelling the fault actually shipped in.
+    const pagedKeys = Object.values(GROWING_COLLECTIONS)
+      .map((c) => c.webKey)
+      .filter((k) => k.endsWith("("))
+      .concat("`help:${")
+    const offenders: string[] = []
+    let scanned = 0
+    for (const f of componentFiles()) {
+      if (!basename(f).endsWith("-detail.tsx")) continue
+      const src = stripComments(read(f))
+      const asksTheDoor = src.includes(":one:")
+      // POSITIONAL, the way R20 identifies a checked field: what matters is the
+      // query VARIABLE built from a paged key, and whether THAT variable is the
+      // one being searched. Asking only "does this file read a paged list, and
+      // does it contain any find" caught app-detail and role-detail, whose finds
+      // are over `apps` and `member_roles` — both bounded collections, where
+      // page one IS the collection and a find over it is exactly right.
+      const searched = new Set(
+        [...src.matchAll(/(\w+)\.data\?\.find\(\([^)]*\)\s*=>\s*\w+\.id ===/g)].map((m) => m[1])
+      )
+      for (const m of src.matchAll(/const\s+(\w+)\s*=\s*useCached<[^>]*>\(\s*([^,]*),/g)) {
+        const [, name, keyExpr] = m
+        if (!pagedKeys.some((k) => keyExpr.includes(k))) continue
+        scanned++
+        if (searched.has(name) && !asksTheDoor) offenders.push(`${basename(f)} (${name})`)
+      }
+    }
+    expect(
+      offenders,
+      `these detail screens find their record in a PAGED list and will say it does not exist ` +
+        `for every row past the cursor — add the by-id read (see help-detail): ${offenders.join(", ")}`
+    ).toEqual([])
+    // Tripwire: a scan that matched no paged read passes exactly like a clean one.
+    expect(scanned, "the paged-detail census found no screens — it has gone blind").toBeGreaterThan(2)
+  })
+
   // …AND THE WORD IT CARRIES IS AN ADDRESS, NOT A PERMISSION.
   //
   // The open intent's `module` has exactly one consumer and it builds a URL out
@@ -2248,6 +2310,7 @@ describe("RULES — the laws of the base", () => {
       "wrapped-strings", // R33: web/test/wrapped-strings.test.ts — R28's walk read the other way round, over both front doors
       "offered-rights", // R36: the offered-vs-consulted census below
       "in-app-anchors", // R37: web/test/shell-nav.test.ts — every component's anchors, classified by where the href points
+      "details-ask-the-door", // R38: the paged-detail census above — a find over a PAGE is not a lookup
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

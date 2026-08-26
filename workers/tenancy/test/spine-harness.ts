@@ -136,7 +136,17 @@ export function buildSpineDb(): DatabaseSync {
     -- missing here until a suite read the members door, which selects it.
     CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, image_url TEXT, current_team_id TEXT, updated_at TEXT, deactivated_at TEXT);
     CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, logo_url TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', created_at TEXT, creator_name TEXT, creator_email TEXT, updated_at TEXT, deactivated_at TEXT, legal_name TEXT, legal_address TEXT, legal_numbers TEXT, phone TEXT);
-    CREATE TABLE team_members (id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, role_id TEXT, created_at TEXT, deactivated_at TEXT);
+    -- THE REAL SHAPE (db/core/0002_teams.sql), audit block and unique index
+    -- included. This was a five-column stub, so the first door to write a
+    -- membership through it — the portal grant, which now enrols the client —
+    -- answered 500 with "table team_members has no column named creator_id",
+    -- and the UPSERT it relies on had no constraint to conflict on.
+    CREATE TABLE team_members (
+      id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, role_id TEXT, created_at TEXT,
+      creator_id TEXT, creator_email TEXT, creator_name TEXT,
+      updated_at TEXT, deactivated_at TEXT,
+      UNIQUE (team_id, user_id)
+    );
     INSERT INTO teams (id, name, database_id, created_at, creator_name, creator_email)
       VALUES ('${IDS.team}', 'Kwapso', 'db_team', '2026-01-01', 'Staff', 'staff@kwapso.app');
     INSERT INTO users (id, email, first_name, current_team_id) VALUES
@@ -192,9 +202,15 @@ export function buildSpineDb(): DatabaseSync {
   // material IS the client's, so a client role plausibly holding it is the very
   // thing the door's refusal has to survive. The narrowing itself is proved
   // separately, by a caller whose right is taken away (deliverables.test.ts).
-  const grantAll = (roleId: string) =>
+  // The TITLE matters now, not only the id: granting a portal login puts the
+  // person on the team (R21 — a client login IS an ordinary member), and the
+  // grant door resolves which role that is from `roleId` or, failing that, from
+  // a role the team has called "Client". A fixture whose client role was titled
+  // "R_CLIENT" modelled a team no owner would ever build, and the leak suite's
+  // positive control failed for it.
+  const grantAll = (roleId: string, title: string = roleId) =>
     db.exec(`
-      INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
+      INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${title}', 0, '2026-01-01');
       INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
         FROM (SELECT 'accounts' AS module UNION ALL SELECT 'contacts'
@@ -225,7 +241,7 @@ export function buildSpineDb(): DatabaseSync {
     db.exec(readFileSync(join(__dirname, "..", "..", "..", "db", "core", `${m}.sql`), "utf8"))
   db.exec(`INSERT INTO agent_credits (team_id, balance) VALUES ('${IDS.team}', 100);`)
   grantAll(IDS.adminRole)
-  grantAll(IDS.clientRole)
+  grantAll(IDS.clientRole, "Client")
 
   const account = (id: string, type: string, name: string, parent: string | null) =>
     db.exec(
