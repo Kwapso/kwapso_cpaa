@@ -153,3 +153,47 @@ the request that added it, and is answerable from page 270 —
   hand-written column should be read as a direction, not a measurement.
 - **Chunk overlap**, which was not tried at all and is the cheapest remaining
   idea: a fact split across a chunk boundary is currently in neither chunk.
+
+---
+
+## GHOST IDS IN THE VECTOR INDEX — measured 27 Aug 2026, NOT fixed
+
+The largest un-repaired defect in retrieval, written down here because the lane
+that found it routed around it rather than fixing it, and the next person will
+otherwise re-derive it from scratch.
+
+**The measurement**, against `kwapso-knowledge-staging`, team
+`01KZWXFD86N0K3RZRBHKMKRWYS`:
+
+| question | neighbours over the floor | how many exist in D1 | first survivor |
+|---|---|---|---|
+| "What did we agree in the week recap?" | 100 of 100 | **15** | rank 17 |
+| across the 20-question bench, earlier | 306 | 255 | — (17% ghosts) |
+
+A ghost is a vector whose `source_id` is not in `knowledge_sources` at all — not
+retired, absent. Re-indexing replaces a source's chunks with new ids and the old
+vectors are not always removed, so the index accumulates them.
+
+**Why it is not merely cosmetic.** R26 makes a ghost SAFE to meet: it reads back
+as no row, never as somebody else's paragraph. It does not make it free. A ghost
+is still a nearest neighbour, so it takes a slot at the top of the ranking, and
+the top of the ranking is the worst place to lose slots. On the question above it
+consumed 16 of the ranking pool's 24 places and the base refused a question it
+holds two 96-chunk transcripts of.
+
+**What was done instead.** `RANKING_POOL` was raised from 24 to 100 — the whole
+candidate list — so the pool is a budget for attrition rather than a guess. That
+routes around the ghosts and does not repair them; every one still costs a slot.
+
+**What repairing it needs.** Vectorize has no "list every id" call, so the ghosts
+cannot be enumerated from the index. The two honest routes are a full re-index
+(every live chunk re-upserted by id, which overwrites, and the orphans left to be
+deleted by derived id from a source census) or a rebuild of the index. Both are
+the full re-index reserved for the chunk-first ingestion branch, which is why
+this was left alone.
+
+**How to watch it.** `scripts/kb-bench.mjs` can be extended with a flag that
+reports, per question, how many hits over the floor read back as no row — about
+fifteen lines. A lane whose job is moving this percentage should add that in its
+first commit rather than half way through, so the number is tracked from the
+start rather than measured once.
