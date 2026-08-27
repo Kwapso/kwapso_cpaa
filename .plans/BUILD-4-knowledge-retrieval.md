@@ -200,7 +200,48 @@ start rather than measured once.
 
 ---
 
-## READING A PDF PROPERLY — scoped 27 Aug 2026, NOT built
+## READING A PDF PROPERLY — scoped 27 Aug 2026, then RETRACTED the same day
+
+> **DO NOT BUILD WHAT THIS SECTION RECOMMENDS.** Everything below about a
+> `/ToUnicode` CMap parser is correct about WHY the Drive lane's PDFs are glyph
+> indices and wrong about what to do, because it was written without opening the
+> upload door. Kept rather than deleted, because the diagnosis is still the
+> reason the right fix works — and because a scope that was confidently wrong is
+> worth leaving legible.
+>
+> **THE READER ALREADY EXISTS AND IS ON THE OTHER DOOR.** `extractFile`
+> (`knowledge-files.ts`) converts an uploaded file with `env.AI.toMarkdown`, and
+> its `CONVERTIBLE_MIMES` covers application/pdf, five image types, html, xml,
+> xlsx/xls, docx, ods/odt, csv and numbers. It is proven on real material: a
+> comment there records tuning it on "the first real document put through this
+> door — a one-page runbook".
+>
+> So a PDF UPLOADED is read properly, and the same PDF sitting in a Drive folder
+> goes to the hand-rolled `pdfText` and comes out as rubbish. Two readers for one
+> format, and which one a file gets is decided by which door it walked through.
+> Nobody chose that; it is what happens when the reader is picked at the call
+> site instead of declared.
+>
+> They are also COMPLEMENTARY, which is the part that makes a registry pay for
+> itself immediately rather than eventually: `toMarkdown` reads PDFs and images
+> and cannot read `.pptx`; `file-text.ts` unzips `.pptx` correctly and cannot
+> read a PDF or an image at all. Between them the base can nearly cover its own
+> list today — it simply cannot do it from both doors.
+>
+> **The fix is a declared source-resolver registry** (see
+> `.plans/BUILD-5-every-source-readable.md`): one table mapping type to reader
+> with an ordered fallback, both existing readers registered against it, and both
+> call sites asking the table instead of choosing. No new READING code for PDF or
+> images. Smaller than the parser below, and every line of it deletes a decision
+> rather than adding one.
+>
+> It is also the same lesson as everything else in this round: `toMarkdown`
+> exists, works, and the Drive lane never asks it — *a predicate nobody calls is
+> not a guard*. A declared table is what makes "was this reader asked, for this
+> type, on this door?" answerable off the disk, which a call-site `if` can never
+> be.
+
+### The original scope, kept for its diagnosis
 
 Asked for as a scope, not an implementation. The short version: **we already read
 PDFs, and the missing piece is one specific thing.**
