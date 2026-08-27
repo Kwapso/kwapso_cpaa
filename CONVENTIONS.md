@@ -834,8 +834,33 @@ the *why*. Add the least code that does the job, and keep `npm run check` green.
 
 ## Reading config, and writing a check that can fail
 
-Three conventions that look like trivia and are not, each one shipped as a real
+Four conventions that look like trivia and are not, each one shipped as a real
 defect first.
+
+- **A CHECK THAT NEEDS EDITING WHENEVER SOMETHING ELSE CHANGES IS MATCHING THE
+  WRONG THING.** The tell is that it needed the edit, not that the edit was hard.
+
+  Earned three times in one session on 27 Aug 2026, by one strip. The knowledge
+  base's writer keeps appending a list of its own sources under an answer, so the
+  list is removed at the boundary. Version one matched a heading that BEGAN with a
+  source phrase and measured 10/16 to 0/16 — then a prompt edit produced "This
+  information comes from the sources:" and it walked past. Version two matched a
+  heading that ENDED in one — then another prompt edit produced "The sources used
+  to answer this question include:" and it walked past. Both times the fix was to
+  add a phrase, and both times it held until the next prompt change.
+
+  A phrase list is a guess about WORDING, and wording is the one thing that
+  changes whenever anybody touches a prompt. The version that holds asks the
+  question that cannot be reworded: **are the items in that block our own source
+  titles?** A model listing the titles it was handed is signing off, whatever it
+  calls the heading — and the strictness then lives in the items, which lets the
+  heading match be almost anything, because "Sources:" over two steps of a process
+  is refused by the items rather than by the heading.
+
+  It is the same move as asking what a check would say if the thing it guards were
+  deleted: stop matching the SHAPE somebody happened to write, and match the FACT
+  you actually own. If a rule has to be updated every time an unrelated file
+  changes, that coupling IS the bug report.
 
 - **A SHIPPED STRING MUST NOT INTERPOLATE A COMPILE-TIME CONSTANT.** If a string
   reaches the browser as text the app writes itself, its literal is typed out, and

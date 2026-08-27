@@ -47,6 +47,7 @@
 import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -64,6 +65,28 @@ const TOKEN =
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging
 const INDEX = process.env.KB_INDEX || "kwapso-knowledge-staging"
 const TEAM_NAME = process.env.KB_TEAM || "Kwapso"
+
+/** THE MODEL PRODUCTION COMPOSES WITH, read out of the worker's own config.
+ *
+ * The bench and the deployed worker agreed on this by COINCIDENCE until 27 Aug
+ * 2026: `cheapText` falls back to `CHEAP_TEXT_MODEL` when `WORKERS_AI_MODEL` is
+ * unset, the bench set nothing, and wrangler happened to set the same value. The
+ * day somebody changes that var, production moves and a bench relying on the
+ * fallback does not — and every ANSWER figure would then describe a system nobody
+ * runs, silently, with no test able to notice.
+ *
+ * So it is read from the config rather than assumed to match. If the file ever
+ * stops naming a model this throws, which is the right failure: a bench that
+ * cannot say what it is measuring should not produce a number. */
+function productionComposeModel() {
+  const raw = readFileSync(join(REPO, "workers", "content", "wrangler.jsonc"), "utf8")
+  const found = /"WORKERS_AI_MODEL"\s*:\s*"([^"]+)"/.exec(raw)
+  if (!found)
+    throw new Error(
+      "workers/content/wrangler.jsonc no longer names WORKERS_AI_MODEL — the bench cannot know which model production composes with"
+    )
+  return found[1]
+}
 
 const { retrieve } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
 const { writeAnswer } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts"))
@@ -169,6 +192,9 @@ const cfg = { accountId: ACCOUNT, apiToken: TOKEN }
 // writer's failures would report a bad answer as a bad PROMPT.
 const env = {
   AI,
+  // Composed with the model the worker is configured to use, not the library's
+  // fallback — see `productionComposeModel`.
+  WORKERS_AI_MODEL: productionComposeModel(),
   KNOWLEDGE_INDEX: vectorizeStandIn(),
   DB: { prepare: () => ({ bind: () => ({ run: async () => {}, all: async () => ({ results: [] }) }) }) },
 }
