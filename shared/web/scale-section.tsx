@@ -22,7 +22,7 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "sonner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"

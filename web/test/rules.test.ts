@@ -30,6 +30,7 @@ import {
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
+  UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
   BASE_LAW_CEILING,
   BASE_REPOSITORY,
@@ -2311,6 +2312,7 @@ describe("RULES — the laws of the base", () => {
       "offered-rights", // R36: the offered-vs-consulted census below
       "in-app-anchors", // R37: web/test/shell-nav.test.ts — every component's anchors, classified by where the href points
       "details-ask-the-door", // R38: the paged-detail census above — a find over a PAGE is not a lookup
+      "kit-supplies-the-ui", // R39: the UI-package census below, derived from what the kit itself imports
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -2766,4 +2768,66 @@ describe("every tab value has an icon in the vocabulary", () => {
       "these tab values have no line in TAB_ICONS (shared/web/screen-engine/tabs-view.tsx) — give each an icon there, so the same tab draws the same glyph on every screen"
     ).toEqual([])
   })
+
+  // ── R39 · THE KIT SUPPLIES THE UI, AND NOTHING ELSE DOES ──────────────────
+  //
+  // A design system is the source of truth only for as long as nothing else can
+  // supply the same thing, and every breach starts as ONE import for ONE thing
+  // the kit did not have that day. The icon swap is the worked example: 96 kit
+  // glyphs were not enough, so five files reached for lucide and a sixth for
+  // lucide's RUNTIME loader — and the app carried a second pack of 3,924 glyphs
+  // without anyone deciding to. When the art became Iconoir, thirty-seven names
+  // kept drawing the OLD pack beside the new one, same screen, green build.
+  //
+  // The deny-list is DERIVED from the kit's own source: every bare specifier
+  // shared/ui/ imports is a package the kit owns, and the app must reach it
+  // THROUGH the kit. React and the framework are excluded — the app imports
+  // those in its own right. The known icon packs are added by name because the
+  // kit imports none of them and none may ever appear.
+  it("kit-supplies-the-ui: no UI package is imported outside the kit", () => {
+    const FRAMEWORK = new Set(["react", "react-dom", "next", "vitest", "clsx"])
+    const kitOwned = new Set<string>()
+    for (const f of sourceFiles(join(ROOT, "shared", "ui"), { extensions: [".ts", ".tsx"], relativeTo: ROOT }))
+      for (const m of f.source.matchAll(/from\s+"(@?[a-z][^"'.][^"]*)"/g)) {
+        const spec = m[1]
+        if (spec.startsWith(".") || spec.startsWith("@shared/")) continue
+        const pkg = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]
+        if (!FRAMEWORK.has(pkg)) kitOwned.add(pkg)
+      }
+    expect(kitOwned.size, "read no packages off the kit — the derivation broke").toBeGreaterThan(5)
+    const ICON_PACKS = ["lucide-react", "@heroicons/react", "react-icons", "@tabler/icons-react"]
+    const denied = new Set([...kitOwned, ...ICON_PACKS])
+
+    const offenders: string[] = []
+    const seen = new Set<string>()
+    for (const f of sourceFiles(
+      [join(ROOT, "web"), join(ROOT, "web-portal"), join(ROOT, "shared", "web")],
+      { extensions: [".ts", ".tsx"], relativeTo: ROOT }
+    )) {
+      if (/(^|\/)(test|e2e)\//.test(f.rel)) continue
+      for (const m of f.source.matchAll(/from\s+"(@?[a-z][^"'.][^"]*)"/g)) {
+        const spec = m[1]
+        const pkg = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]
+        if (!denied.has(pkg)) continue
+        seen.add(f.rel)
+        if (UI_PACKAGE_EXEMPT[f.rel]) continue
+        offenders.push(`  ${f.rel} imports ${spec}`)
+      }
+    }
+    expect(
+      offenders,
+      `a UI package is imported outside shared/ui/:\n${offenders.join("\n")}\n\n` +
+        `The kit is the one source of a control, a glyph and a toast. Import it through ` +
+        `@shared/ui/…, or add a reasoned UI_PACKAGE_EXEMPT line naming the gap in the kit.`
+    ).toEqual([])
+
+    // …and the pins rot-check: one whose file no longer imports a UI package is
+    // a record of an argument nobody is having, so the list can only shrink.
+    const stale = Object.keys(UI_PACKAGE_EXEMPT).filter((rel) => !seen.has(rel))
+    expect(
+      stale,
+      `UI_PACKAGE_EXEMPT pins a file that no longer imports one — delete the line: ${stale.join(", ")}`
+    ).toEqual([])
+  })
+
 })

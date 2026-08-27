@@ -25,7 +25,7 @@ import {
 } from "@shared/ui/controls/dropdown-menu/dropdown-menu"
 import { Button } from "@shared/ui/controls/button/button"
 import { Check } from "@shared/ui/icons"
-import { toast } from "sonner"
+import { toast } from "@shared/ui/controls/sonner/sonner"
 
 import { LANGUAGES, translate, type Language } from "../i18n"
 import { useLanguage } from "./language"

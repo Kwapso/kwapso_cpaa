@@ -365,7 +365,24 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "details-ask-the-door",
     status: "enforced",
   },
+  {
+    id: "R39",
+    dimension: "ui",
+    law: "THE KIT SUPPLIES THE UI, AND NOTHING ELSE DOES. No file in `web/`, `web-portal/` or `shared/web/` imports a UI package. The kit at `shared/ui/` is the one source of a control, a structure, a glyph and a toast; its own dependencies (Radix, sonner, recharts, class-variance-authority) are ITS to import, and the app reaches them THROUGH it — `@shared/ui/controls/sonner/sonner`, never `sonner`. The deny-list is DERIVED from the kit's own package.json peers plus the icon packs, so a dependency the kit adds tomorrow is covered without anyone editing this law. Exceptions are data in `UI_PACKAGE_EXEMPT` with a reason each, rot-checked so a pin whose file no longer imports the package turns the build red and the list can only shrink.",
+    why: "A design system is a source of truth only for as long as nothing else can supply the same thing, and every breach of that starts as one import for one component the kit did not have that day. The icon swap of 2026-08-27 is the worked example: 96 kit glyphs were not enough, so five files imported lucide directly and a sixth reached for lucide's RUNTIME loader, which meant the app carried a second icon pack of 3,924 glyphs — and when the kit's art changed, thirty-seven names kept drawing the OLD pack beside the new one, on the same screen, under a green build. Nothing was wrong with any single import; the whole was a second design system nobody had decided to have. This law is the sentence that makes the next one impossible, written the day the last one was removed rather than after the next one arrives.",
+    checkId: "kit-supplies-the-ui",
+    status: "enforced",
+  },
 ]
+
+/** R39 — the reviewed exceptions. A file here imports a UI package directly
+ * because the kit does not expose what it needs. Each is a GAP IN THE KIT
+ * stated out loud, not a preference: the fix is upstream, and when it lands the
+ * pin goes red because the import is gone. */
+export const UI_PACKAGE_EXEMPT: Record<string, string> = {
+  "shared/web/screen-engine/screen-renderer.tsx":
+    "ScreenLayer draws a dialog in four presentations — responsive (bottom sheet on a phone, centred card on a desktop), overlay, sheet and fullscreen — and the kit exposes neither: its DialogContent is centred only and its Sheet takes a fixed `side`. Radix is the kit's OWN dependency and this uses the very primitive the kit's Dialog and Sheet are built on, so the two can never disagree about behaviour — but it is still the app deciding a shape. UPSTREAM FIX: a `presentation` prop on the kit's DialogContent. Delete this line the day it ships.",
+}
 
 /** R33 — the copy TABLES: a file that declares words as data and reads them back
  * through `t` somewhere else, so the position where they are WRITTEN is not the
