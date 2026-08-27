@@ -36,7 +36,7 @@ import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
-import { richTextPlain } from "@shared/web/rich-text"
+import { richTextPlain, safeHref } from "@shared/web/rich-text"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -737,18 +737,49 @@ export function TodosPanel({
         <EmptyLine concept="todos">{t("Nothing outstanding with a client.")}</EmptyLine>
       ) : (
         <RowList>
-          {rows.map((todo) => (
+          {rows.map((todo) => {
+            // WHAT THE CLIENT ACTUALLY SENT US, as a thing you can open.
+            //
+            // The filename used to be a third item in the ` · ` join below — a
+            // string in a paragraph — while `todo.fileUrl` sat on the row and
+            // was read by no component in either front door. So the agency asked
+            // a client for a document, the client uploaded it through the
+            // portal's "Send a file", the door wrote the bytes to the bucket and
+            // the row, and a member of staff was shown the word "invoice.pdf"
+            // that they could not click. The upload worked every time; nothing
+            // ever led back to it.
+            //
+            // Through `safeHref` like every other file on a screen, even though
+            // this path is one THIS app minted (/media/…): the seam decides, not
+            // the origin of the string. A URL it refuses prints as the plain
+            // text it always was — the same fallback `staff-panel.tsx` gives a
+            // certificate, whose shape this copies rather than inventing a third.
+            const fileLink = safeHref(todo.fileUrl)
+            return (
             <Row key={todo.id} live={!todo.completedAt && !todo.cancelled} mark={<RecordMark name={todo.title} />}>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
                 <p className="text-muted-foreground truncate text-xs">
-                  {[
-                    todo.accountName,
-                    todo.dueOn ? `due ${formatDate(todo.dueOn)}` : "no date",
-                    todo.fileName,
-                  ]
+                  {[todo.accountName, todo.dueOn ? `due ${formatDate(todo.dueOn)}` : "no date"]
                     .filter(Boolean)
                     .join(" · ")}
+                  {todo.fileName && (
+                    <>
+                      {" · "}
+                      {fileLink ? (
+                        <a
+                          href={fileLink}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="text-primary underline-offset-2 hover:underline"
+                        >
+                          {todo.fileName}
+                        </a>
+                      ) : (
+                        todo.fileName
+                      )}
+                    </>
+                  )}
                 </p>
               </div>
               {todo.completedAt && (
@@ -768,7 +799,8 @@ export function TodosPanel({
                 </Button>
               )}
             </Row>
-          ))}
+            )
+          })}
         </RowList>
       )}
     </div>
