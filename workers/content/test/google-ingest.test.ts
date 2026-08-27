@@ -971,3 +971,60 @@ describe("a Drive file that stops being readable collapses instead of lingering"
     ).toBe(true)
   })
 })
+
+// ── WHEN A GOOGLE SOURCE IS FROM ───────────────────────────────────────────
+//
+// Every lane already built this moment for its cursor and none of them wrote it
+// to the row. Measured on staging 27 Aug 2026: 799 of 4,026 live sources carried
+// no `record_date` at all — email 431, document 225, message 96, event 47, every
+// single one — while everything this app owns had one. Twenty percent of the
+// base, invisible to anything that reasons about "latest" or "since last week".
+//
+// The owner asked for the latest on a FluClinic integration and got last week's
+// meeting. The chat thread he meant was in the base, current, and dateless.
+//
+// IT ALSO REPAIRS WHAT IS ALREADY STORED, with no backfill: the sweep's upsert
+// writes `record_date = excluded.record_date` on EVERY visit, before the
+// hash-skip is even consulted — so a row keeps its text and gains its date the
+// next time the lane walks past it. Which is also why a backfill run BEFORE this
+// shipped would have been erased by the next sweep.
+describe("a Google source carries the date it is from", () => {
+  const dateOf = (table: string, originRowId: string) =>
+    (
+      db()
+        .prepare("SELECT record_date AS d FROM knowledge_sources WHERE origin_table = ? AND origin_row_id = ?")
+        .get(table, originRowId) as { d: string | null } | undefined
+    )?.d ?? null
+
+  it("every kind — a document, a mail, an entry and a conversation", async () => {
+    await sweep()
+    for (const [table, id] of [
+      ["google_drive", `${IDS.staffUser}:FILE_1`],
+      ["google_gmail", `${IDS.staffUser}:MAIL_1`],
+      ["google_calendar", `${IDS.staffUser}:EVENT_1`],
+      ["google_chat", `${IDS.staffUser}:spaces/AAA/threads/T1`],
+    ] as const)
+      expect(dateOf(table, id), `${table} must carry a date`).toBeTruthy()
+  })
+
+  // THE ROW'S OWN MOMENT, NOT TODAY'S. A date invented at sweep time would make
+  // every source look equally recent, which is worse than no date at all: the
+  // recency this unlocks would then rank on the day we happened to read it.
+  it("and it is the record's own moment, not the moment we read it", async () => {
+    await sweep()
+    const mail = dateOf("google_gmail", `${IDS.staffUser}:MAIL_1`)
+    expect(mail, "the mail was sent on 4 August 2026 and says so").toContain("2026-08-04")
+    const event = dateOf("google_calendar", `${IDS.staffUser}:EVENT_1`)
+    expect(event, "the meeting was on 5 August 2026").toContain("2026-08-05")
+  })
+
+  // AND IT IS NEVER GUESSED. A row whose moment cannot be read keeps NULL — a
+  // missing date is a fact and a wrong one is a ranking built on fiction.
+  it("and a row with no readable moment is left without one, not given today's", async () => {
+    holder.events = [
+      { id: "NO_WHEN", summary: "Undated", description: "", start: "", end: "", url: "", attendees: [] },
+    ]
+    await sweep()
+    expect(dateOf("google_calendar", `${IDS.staffUser}:NO_WHEN`)).toBeNull()
+  })
+})
