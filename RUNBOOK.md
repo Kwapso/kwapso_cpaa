@@ -227,6 +227,7 @@ job after repeated test logins, not a fault. Wait it out.
 | Sign-in code request 500s | same: a core migration behind the send throttle has not been applied |
 | Live updates stop for client logins only | `CF_D1_TOKEN` missing on **realtime**, the channel fails closed rather than leak row ids |
 | An existing team's ticket-type picker is empty | a team-schema migration has not been rolled out. `POST /api/tenancy/admin/migrate-teams` with `x-admin-key` |
+| The deploy refuses saying **team databases are behind** | working as intended, and it is the same cause as the row above, caught one step earlier. Run the migration robot — `POST /api/tenancy/admin/migrate-teams` with `x-admin-key`, safe to re-run — then re-run the deploy. **Do not disable the gate.** If a team genuinely cannot be migrated, deactivate it or add a dated waiver; the header of `scripts/check-team-migrations.mjs` has both and says why there is no off switch |
 | A worker "not found" on a first deploy | the cold-start binding cycle. OPERATIONS.md § deploy order has the one-time fix |
 | The import target picker looks wrong | it self-heals on read; a target an owner switched off stays off on purpose |
 

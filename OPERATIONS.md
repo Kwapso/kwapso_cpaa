@@ -38,6 +38,20 @@ BOOTSTRAP.md stands the whole thing up from zero.
   and answers 400 at the workers.dev alias BY DESIGN (an open-redirect defence;
   the comment above `scripts/smoke-portal.mjs`'s own default says so). Export
   them to run against other hosts.)
+- migration_gate: `npm run migrations:check -- <staging|production>`
+  (`scripts/check-team-migrations.mjs`). Reads the environment's core database and
+  refuses if any live team's `schema_version` is behind the last entry in
+  `TEAM_MIGRATIONS` — the sentence two paragraphs below ("roll it out with
+  migrate-teams first, then deploy") finally said by something that can fail a
+  build. `npm run check` cannot catch this: the test suite replays the whole
+  migration list every run, so only an environment with a HISTORY can be behind.
+  BOTH deploy commands open with it, before `lang:check`, because it is one read
+  and it must fail before the two-minute build. It counts exactly the teams the
+  migration robot counts (`db_status = 'ready'`, not deactivated — the clause is
+  lifted from `migrateTeams`, not copied), so a stranded team the robot skips can
+  never block a ship. When a live team genuinely cannot be migrated: deactivate
+  it, or add a dated, rot-checked waiver — the script's header has the reasoning
+  and says why there is deliberately no way to switch it off.
 - build_command: npm run build (root; builds BOTH static exports, web/ → web/out and web-portal/ → web-portal/out). `npm run build:portal` builds the portal alone.
 - language_sweep: `npm run lang` (extract every user-visible English string, then prune
   the catalogue and the seed to the languages `shared/i18n.ts` declares — English,
@@ -45,8 +59,8 @@ BOOTSTRAP.md stands the whole thing up from zero.
   commands now open with `npm run lang:check` and REFUSE on a stale catalogue, so a
   ship can no longer carry a sentence nobody translated or a language nobody speaks.
   The check is a second apart and fails before the two-minute build rather than after it.
-- deploy_staging_command: npm run deploy:staging (root; runs `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
-- deploy_production_command: npm run deploy:production (root; `lang:check` first, then the same eight-worker realtime-first order, production names)
+- deploy_staging_command: npm run deploy:staging (root; runs `migrations:check` then `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
+- deploy_production_command: npm run deploy:production (root; `migrations:check` then `lang:check` first, then the same eight-worker realtime-first order, production names)
 - github_remote: origin (https://github.com/Kwapso/kwapso_system.git — renamed from
   `kwapso_cpaa` on 2026-08-26; GitHub redirects the old URL, but the remote and every
   reference below point at the live name directly)
