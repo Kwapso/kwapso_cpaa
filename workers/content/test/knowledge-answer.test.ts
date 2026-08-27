@@ -40,7 +40,7 @@ const passage = (sourceId: string, title: string, text: string, seq = 0): Knowle
   compartment: "agency",
   seq,
   text,
-  score: 0.9,
+  score: 0.9, recordDate: null,
 })
 
 const cite = (sourceId: string, title: string, liveStatus: string | null = null): KnowledgeCitation => ({
@@ -352,5 +352,71 @@ describe("stripTrailingSourceList — the one-line form", () => {
 
   it("and never the whole answer", () => {
     expect(stripTrailingSourceList("Sources: the Week recap")).toBe("Sources: the Week recap")
+  })
+})
+
+// ── THE SHAPE THAT SLIPPED PAST THE FIRST STRIP ────────────────────────────
+//
+// Measured 10/16 to 0/16 an hour before this, and stale within that hour: adding
+// dates to the prompt changed the shape the model produces, and "This information
+// comes from the sources:" walked straight past a matcher anchored on how a
+// heading BEGINS. A boundary strip measured against one prompt is measured
+// against that prompt, not against the model — every prompt change reopens it.
+describe("stripTrailingSourceList — matched on how the heading ENDS", () => {
+  it("catches the shapes a changed prompt produced", () => {
+    for (const heading of [
+      "This information comes from the sources:",
+      "The above came from the sources:",
+      "Taken from the sources:",
+      "Sources:",
+    ])
+      expect(
+        stripTrailingSourceList(`The webhook was fixed on 27 August.\n\n${heading}\n- FluClinic: Stripe integration QC\n`),
+        heading
+      ).toBe("The webhook was fixed on 27 August.")
+  })
+
+  // AND THE LISTS THAT ARE THE ANSWER ARE STILL UNTOUCHABLE — the wider matcher
+  // has to earn that, because "ends in a colon" would eat every one of them.
+  it("and still refuses to eat a list that is the answer", () => {
+    for (const heading of ["The steps are:", "What was agreed:", "Here is what happens next:", "The team agreed:"]) {
+      const answer = `${heading}\n- Collect the documents by email\n- Type the details into the system`
+      expect(stripTrailingSourceList(answer), heading).toBe(answer)
+    }
+  })
+})
+
+// ── TIME, AND WHAT MAY NOT BE CLAIMED ABOUT IT ─────────────────────────────
+//
+// "Latest", "since last week" and "yesterday" are words with no referent unless
+// the writer is told what day it is — which is how a question about the newest
+// Stripe work came back with the week before's meeting.
+describe("the writer is told when things happened", () => {
+  const today = new Date().toISOString().slice(0, 10)
+
+  it("today's date, once, at the top", () => {
+    const prompt = composeUserPrompt("what is the latest?", [passage("S1", "A meeting", "We agreed.")], [])
+    expect(prompt.startsWith(`Today's date is ${today}.`)).toBe(true)
+  })
+
+  it("and each source's own date beside it", () => {
+    const dated = { ...passage("S1", "A meeting", "We agreed."), recordDate: "2026-08-27T09:00:00.000Z" }
+    expect(composeUserPrompt("what is the latest?", [dated], [])).toContain("That source is from 2026-08-27.")
+  })
+
+  // NEVER A GUESS, AND SAID OUT LOUD. A fifth of this base carried no date at all
+  // and the Google kinds gain theirs gradually, so a mixed set is the normal case.
+  // The absence is stated so the instruction against ranking undated material has
+  // something to stand on.
+  it("and says plainly when a source has no date, rather than hiding it", () => {
+    expect(composeUserPrompt("what is the latest?", [passage("S1", "A note", "Words.")], [])).toContain(
+      "That source carries no date."
+    )
+  })
+
+  it("and the writer is forbidden to call anything the latest across undated material", () => {
+    const system = composeSystemPrompt()
+    expect(system).toMatch(/never call something the latest/i)
+    expect(system, "and it must say WHY, or it reads as a style rule").toMatch(/you cannot know/i)
   })
 })

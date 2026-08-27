@@ -2041,6 +2041,7 @@ type ScoredRow = {
   compartment: string
   origin_table: string | null
   origin_row_id: string | null
+  record_date: string | null
 }
 
 /** WEIGHTED RECIPROCAL RANK FUSION. Two ranked lists whose scores mean entirely
@@ -2052,7 +2053,32 @@ type ScoredRow = {
  * at a tenth of a vote, gated to questions that contain something exact, it is
  * invisible on questions it has nothing to say about and decisive on the ones
  * it does. Nothing else is added here — no record hint, no recency, no
- * hand-tuned boost. Every one of those was tried and every one was worse. */
+ * hand-tuned boost. Every one of those was tried and every one was worse.
+ *
+ * ── RECENCY, CONSIDERED AGAIN ON 27 AUG 2026 AND LEFT OUT ──────────────────
+ *
+ * The measurement above was taken on seven novels, and this file's own note says
+ * the retest belongs on the agency's material. It got one, because the owner
+ * asked the question that would need it: "the latest news on the flu clinic
+ * stripe integration", and got the week before's meeting.
+ *
+ * THE CASE FOR ADDING A RECENCY TERM GOT WEAKER, NOT STRONGER. The newest source
+ * — a transcript from that morning — was ALREADY retrieved, at rank six of six.
+ * Nothing was missing from the ranking. What was missing is that the writer was
+ * never told when anything was from, or what day it is, so "latest" was a word
+ * with no referent. Giving it the dates answers the question with the ranking
+ * untouched (see knowledge-compose.ts), and a term here would have put a measured
+ * 20/20 at risk to fix something that was not broken.
+ *
+ * WHAT WOULD REOPEN IT, and it is deliberately a high bar: a question whose
+ * newest material is NOT RETRIEVED AT ALL. Not ranked low — absent. Ranked low is
+ * the writer's problem and it now has the dates to solve it. If the bench turns
+ * up an absent one, start with recency GATED ON INTENT — a term that applies only
+ * when the question itself says "latest", "recent", "today" — because that leaves
+ * every ordinary question at the behaviour these numbers were measured on.
+ *
+ * A rejection without its evidence gets re-tried by the next person who has the
+ * same good idea. This is the evidence. */
 function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; score: number }[] {
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
@@ -2203,7 +2229,7 @@ export async function retrieve(
     // worker's own, read back out of its own table, so they are interpolated
     // (CONVENTIONS) and the statement stays under D1's 100-parameter ceiling.
     `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
-            s.origin_table, s.origin_row_id
+            s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
         AND s.deactivated_at IS NULL AND ${reader.sql}
@@ -2257,7 +2283,7 @@ export async function retrieve(
       // The SAME fence and the SAME columns as the read above — a second way in
       // may not be a wider one. R14: bounded by RANKING_POOL, said here.
       `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
-              s.origin_table, s.origin_row_id
+              s.origin_table, s.origin_row_id, s.record_date
          FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
         WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
           AND s.deactivated_at IS NULL AND ${reader.sql}
@@ -2284,6 +2310,7 @@ export async function retrieve(
     seq: row.seq,
     text: plainText(row.text),
     score: Math.round(score * 1000) / 1000,
+    recordDate: row.record_date ?? null,
   }))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
   const evidence = {
