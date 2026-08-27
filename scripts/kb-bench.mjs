@@ -1,34 +1,49 @@
 // THE RETRIEVAL BENCH — what the knowledge base actually answers, measured
 // against the agency's own material rather than against books.
 //
-// WHY IT RUNS THE SHIPPED CODE IN NODE. A bench that asked the deployed door
-// would measure whatever is deployed, so a change on a branch could not be
-// measured before it shipped — and "deploy it and see" is not a gate, it is a
-// hope. So this imports `retrieve` from the working tree and stands in for the
-// only two things a Worker gives it that Node does not:
+// ── IT MEASURES A BRANCH, WITHOUT DEPLOYING ANYTHING ────────────────────────
 //
-//   • env.KNOWLEDGE_INDEX -> Vectorize's REST door, the same index, the same
-//     namespace, the same filter. The fence is exercised, not asserted.
-//   • env.AI             -> Workers AI's REST door, the same bge-m3.
+// That is the whole property, and it is the reason a retrieval change can be
+// judged at all. A bench that asked the deployed door would measure whatever is
+// deployed — so a change sitting on a branch could not be measured before it
+// shipped, and "ship it and see" is a hope, not a gate. Three things make the
+// other way possible, and the third is the one nobody guesses:
 //
-// D1 needs no stand-in at all: `d1Query` already speaks to Cloudflare's REST
-// door, so pointing `cfg` at the real team database means the WORDS come out of
-// the real database under the real reader clause (R26), exactly as they do in
-// production.
+//   • `retrieve` is IMPORTED FROM THE WORKING TREE. The code under test is the
+//     file you just edited, not a copy of it and not a deployment of it.
+//   • env.KNOWLEDGE_INDEX and env.AI are one small object each — Vectorize and
+//     bge-m3 over their REST doors, same index, same namespace, same filter,
+//     same model. A Worker gives a binding; Node gives a `fetch`. Nothing else
+//     differs, and the fence is exercised rather than asserted.
+//   • D1 NEEDS NO STAND-IN AT ALL. `d1Query` already speaks to Cloudflare's REST
+//     door, so pointing `cfg` at the real team database means the WORDS come out
+//     of the real database under the real reader clause (R26), exactly as they
+//     do in production.
 //
-// WHAT IT COSTS. One embedding call per question (a few thousand tokens, on
-// Workers AI) and one Vectorize query each. It never asks for `compose`, so it
-// spends nothing from the team's own AI allowance — composing is the only act on
-// this module that draws it.
+// So: real code, real index, real embeddings, real rows, real fences — and no
+// deploy. Run it on `main`, run it on your branch, read the difference.
 //
-//   export TEST_LOGIN_KEY=…            # not needed; kept out on purpose
-//   node --experimental-strip-types scripts/kb-bench.mjs
-//   node --experimental-strip-types scripts/kb-bench.mjs --verbose
-//   KB_ENV=production … to point it at the other index (read-only either way)
+// ── HOW TO RUN IT ───────────────────────────────────────────────────────────
 //
-// The token comes from the Keychain, like every other script here. Nothing is
-// written to staging: every statement this runs is a SELECT.
-
+//   node --experimental-transform-types scripts/kb-bench.mjs
+//   node --experimental-transform-types scripts/kb-bench.mjs --verbose
+//
+// `--experimental-transform-types`, NOT `--experimental-strip-types`: the strip
+// mode cannot compile the constructor parameter properties in
+// shared/workers/gating.ts and dies before the first question. `@shared/*` is
+// resolved by scripts/lib/shared-alias.mjs, imported on the first line below.
+//
+// KB_INDEX / KB_CORE / KB_TEAM point it at another environment; it is read-only
+// in every one of them.
+//
+// ── WHAT IT COSTS ───────────────────────────────────────────────────────────
+//
+// One embedding call per question (a few thousand tokens, on Workers AI) and one
+// Vectorize query each. It never asks for `compose`, so it spends nothing from
+// the team's own AI allowance — composing is the only act on this module that
+// draws it. The token comes from the Keychain, like every other script here.
+// Nothing is written: every statement this runs is a SELECT.
+//
 import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
