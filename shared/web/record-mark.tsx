@@ -78,6 +78,25 @@
 //       keeping the element off the page. Measured: good → bad gave the mark
 //       correctly, and bad → good stayed on the mark.
 //
+// AND `naturalWidth === 0` IS A SAFE TEST HERE, which is not obvious and was not
+// assumed: it is ALSO the answer for a picture that loaded fine but has no
+// intrinsic size, and an SVG wordmark is exactly that shape — so the check could
+// have hidden good artwork behind a fallback. It does not, MEASURED rather than
+// reasoned, on all three shapes an SVG comes in: sized (reports 64), viewBox-only
+// (reports 150, the viewBox), and neither (reports 300x150, CSS's default object
+// size). A browser answers an intrinsic-less picture with the default object
+// size, never zero, so only one that actually failed reads 0 — and the genuine
+// 404 measured beside them did.
+//
+// NOT because these are only ever uploads. They are not: `safeSrc` checks the
+// SCHEME and nothing else, so `INLINE_SAFE_UPLOAD`'s deliberate exclusion of SVG
+// does not reach this — an `https://.../logo.svg` typed into `logo_url` by hand
+// or written by a machine caller arrives here untouched, which is the case the
+// hand-pasted-URL note above is already about. Pinning the reason to that
+// allow-list would assert a coupling that does not exist and would send the next
+// reader to the wrong file. What would break this is a BROWSER changing its
+// answer for an intrinsic-less image; re-measure the three shapes above.
+//
 // SO THE FAILURE IS REMEMBERED AGAINST THE PICTURE IT BELONGS TO, not as a bare
 // boolean. `failed` holds the src that broke; `broken` is that src still being
 // the one we are asked to draw. A new picture is therefore not broken because
