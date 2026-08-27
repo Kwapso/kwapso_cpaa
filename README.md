@@ -46,6 +46,11 @@ until cutover.)
 
 ## The documents
 
+**Making your FIRST change?** [CONTRIBUTING.md](CONTRIBUTING.md) is the path
+through all of this once, in the order the work happens: clone → the planning
+ritual → where the change goes → `npm run check` → the commit convention → ship.
+Start there, then come back to this map when you need a specific document.
+
 **New here, developer or agent? Read in this order:** [CLAUDE.md](CLAUDE.md) (the
 rules) → [BASE-MANUAL.md](BASE-MANUAL.md) (how the base works and *why*, incl. how to
 **fork it for a new product** and **how each part scales**) →

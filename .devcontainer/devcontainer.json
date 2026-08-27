@@ -1,0 +1,50 @@
+{
+  "name": "kwapso / Brimba",
+
+  // Node 22 — the SAME version .nvmrc pins and .github/workflows/ci.yml runs.
+  // Three places now name it; if you bump one, bump all three or the container
+  // stops being a faithful copy of what CI proves.
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+
+  "features": {
+    // The repo is reached over HTTPS and the docs assume `gh` is available for
+    // the pull-request half of the workflow.
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  // `npm ci` rather than `npm install`: the lockfile is committed and the whole
+  // point of this container is a build that matches CI exactly. `--ignore-scripts`
+  // is deliberately NOT set — the toolchain needs its install scripts.
+  "postCreateCommand": "npm ci",
+
+  // Both front doors. The agency app and the client portal run side by side,
+  // which is how several of the account-fence behaviours are actually checked.
+  "forwardPorts": [3000, 3001],
+  "portsAttributes": {
+    "3000": { "label": "agency app" },
+    "3001": { "label": "client portal" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "oxc.oxc-vscode",
+        "bradlc.vscode-tailwindcss",
+        "vitest.explorer"
+      ],
+      "settings": {
+        // oxlint is the linter (`npm run lint`, ~15ms over the whole repo).
+        // ESLint is not installed here; pointing the editor at it produces
+        // phantom problems.
+        "editor.formatOnSave": false
+      }
+    }
+  },
+
+  // NO SECRETS ARE MOUNTED, and that is the design. Everything a newcomer needs
+  // — install, typecheck, the full test suite, both dev servers — runs with no
+  // cloud account and no credentials (README § Develop). Deploying is a
+  // different list: see BOOTSTRAP.md § 0 and INVENTORY.md § 4, and keep the
+  // values outside the repository (the convention is ~/.config/kwapso/keys.env).
+  "remoteUser": "node"
+}
