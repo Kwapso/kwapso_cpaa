@@ -452,14 +452,15 @@ export function ContactDetailScreen({
             {companies
               .filter((c) => c.active)
               .map((c) => (
-                <button
+                <Button
                   key={c.id}
+                  variant="link"
                   type="button"
                   onClick={() => softNavigate(`${basePath}/${c.accountId}`)}
-                  className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                  className="hover:text-foreground"
                 >
                   {c.relationship ? `${c.relationship} at ${c.personName}` : c.personName}
-                </button>
+                </Button>
               ))}
           </p>
         ) : undefined

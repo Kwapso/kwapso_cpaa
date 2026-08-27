@@ -35,6 +35,7 @@ import {
   DialogTitle,
 } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { Label } from "@shared/ui/components/label/label"
 import { Input } from "@shared/ui/components/input/input"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
@@ -157,9 +158,9 @@ export function ContactLinkDialog({
           onCheckedChange={(c) => setValues((v) => ({ ...v, isMainStakeholder: c === true }))}
           disabled={busy}
         />
-        <label htmlFor="contact-main" className="text-sm">
+        <Label htmlFor="contact-main">
           {t("Main contact, the person you deal with first")}
-        </label>
+        </Label>
       </div>
     </FormShellDialog>
   )
@@ -313,9 +314,9 @@ export function ContactCreateDialog({
           onCheckedChange={(c) => set({ isMainStakeholder: c === true })}
           disabled={busy}
         />
-        <label htmlFor="new-contact-main" className="text-sm">
+        <Label htmlFor="new-contact-main">
           {t("Main contact, the person you deal with first")}
-        </label>
+        </Label>
       </div>
     </FormShellDialog>
   )

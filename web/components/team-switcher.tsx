@@ -80,8 +80,10 @@ export function TeamSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {collapsed ? (
-          <button
-            className="rounded-[var(--radius)] ring-offset-2"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 rounded-[var(--radius)] p-0"
             title={name}
             aria-label={t("Switch team")}
           >
@@ -89,7 +91,7 @@ export function TeamSwitcher({
               {ctx?.team?.logoUrl && <AvatarImage src={ctx.team.logoUrl} alt={ctx.team.name} />}
               <AvatarFallback className="text-xs">{letterMark(ctx?.team?.name)}</AvatarFallback>
             </Avatar>
-          </button>
+          </Button>
         ) : (
           <Button variant="ghost" className="h-auto w-full justify-start gap-2 px-2 py-1.5">
             <Avatar className="size-7">

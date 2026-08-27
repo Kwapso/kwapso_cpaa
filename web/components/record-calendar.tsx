@@ -384,13 +384,14 @@ export function RecordCalendar({
                       // "+6 more" USED TO BE DEAD TEXT — a line naming six records
                       // with no way to reach any of them, which is worse than not
                       // mentioning them. It is a button now, and it opens the day.
-                      <button
+                      <Button
+                        variant="link"
                         type="button"
                         onClick={() => setOpenDay(key)}
-                        className="text-muted-foreground hover:text-foreground motion-hover rounded px-1 text-left text-xs underline-offset-2 hover:underline"
+                        className="text-muted-foreground hover:text-foreground text-xs"
                       >
                         {t("+{n} more", { n: hidden })}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

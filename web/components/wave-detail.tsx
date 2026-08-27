@@ -233,13 +233,14 @@ export function WaveDetailScreen({
       headerExtra={
         wave.accountId && wave.accountName ? (
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <button
+            <Button
+              variant="link"
               type="button"
               onClick={() => softNavigate(`${basePath}/${waveId}/accounts/${wave.accountId}`)}
-              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              className="hover:text-foreground"
             >
               {t("For")} {wave.accountName}
-            </button>
+            </Button>
           </p>
         ) : undefined
       }

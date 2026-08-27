@@ -10,6 +10,7 @@
 // ACTIVE team (the module-cached session — safe to read from anywhere) and renders
 // nothing until you're signed in with a team, so login / onboarding have no co-pilot.
 
+import { Button } from "@shared/ui/components/button/button"
 import { Sparkles } from "@shared/ui/foundations/icons"
 
 import { AgentPanel } from "@/components/agent-panel"
@@ -38,16 +39,22 @@ export function AgentHost() {
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        size="icon"
         onClick={() => setAgentOpen(true)}
         aria-label={t("Open the assistant")}
-        // The copilot launcher — motion.css §13 names it, by that word, as one of
-        // the three things allowed to gain elevation on hover.
-        className="bg-primary text-primary-foreground hover:bg-primary/90 motion-hover-lift fixed right-4 bottom-20 z-30 flex size-12 items-center justify-center rounded-pill shadow-lg md:bottom-6"
+        // The copilot launcher, drawn the way the kit's own `copilot-overlay`
+        // draws it: `size="icon"` at the standing control height, the primary
+        // fill and its hover token, `shadow-lg`. Only the PLACING is ours — the
+        // kit pins its launcher at the viewport corner, and ours has to clear
+        // the phone's bottom nav bar. `motion-hover-lift` stays because
+        // motion.css §13 names the copilot launcher, by that word, as one of the
+        // three things allowed to gain elevation on hover.
+        className="motion-hover-lift fixed right-4 bottom-20 z-30 shadow-lg md:bottom-6"
       >
-        <Sparkles className="size-5" />
-      </button>
+        <Sparkles />
+      </Button>
       <AgentPanel teamId={teamId} open={open} onOpenChange={setAgentOpen} />
     </>
   )

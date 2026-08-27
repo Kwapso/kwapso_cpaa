@@ -657,13 +657,14 @@ export function AccountDetailScreen({
       headerExtra={
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {parent ? (
-            <button
+            <Button
+              variant="link"
               type="button"
               onClick={() => openAccount(parent.id)}
-              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              className="hover:text-foreground"
             >
               {t("Part of")} {parent.name}
-            </button>
+            </Button>
           ) : (
             <span>{t("Sits on its own")}</span>
           )}

@@ -170,13 +170,14 @@ export function SprintDetailScreen({
       label: t("Wave"),
       value:
         sprint.waveId && sprint.waveName ? (
-          <button
+          <Button
+            variant="link"
             type="button"
             onClick={() => softNavigate(`${host.base}/waves/${sprint.waveId}`)}
-            className="hover:text-foreground text-left underline-offset-2 hover:underline"
+            className="hover:text-foreground"
           >
             {sprint.waveName}
-          </button>
+          </Button>
         ) : (
           "—"
         ),
@@ -268,22 +269,24 @@ export function SprintDetailScreen({
               bought it, both one tap away. */}
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {sprint.appId && sprint.appName && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {t("On")} {sprint.appName}
-              </button>
+              </Button>
             )}
             {sprint.accountId && sprint.accountName && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {t("For")} {sprint.accountName}
-              </button>
+              </Button>
             )}
           </p>
         </>

@@ -28,6 +28,7 @@ import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { Label } from "@shared/ui/components/label/label"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
@@ -429,7 +430,7 @@ export function AppFormDialog({
             <p className="text-muted-foreground text-sm">{t("Nobody on the team yet.")}</p>
           ) : (
             members.map((m) => (
-              <label key={m.id} className="flex items-center gap-2 text-sm">
+              <Label key={m.id} className="flex">
                 <Checkbox
                   checked={values.staffUserIds.includes(m.id)}
                   onCheckedChange={(c) =>
@@ -444,7 +445,7 @@ export function AppFormDialog({
                   disabled={busy}
                 />
                 {m.name}
-              </label>
+              </Label>
             ))
           )}
         </div>
@@ -480,7 +481,7 @@ export function AppFormDialog({
               </p>
             ) : (
               contacts.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-sm">
+                <Label key={c.id} className="flex">
                   <Checkbox
                     checked={values.stakeholderContactIds.includes(c.id)}
                     onCheckedChange={(ch) =>
@@ -495,7 +496,7 @@ export function AppFormDialog({
                     disabled={busy}
                   />
                   {c.name}
-                </label>
+                </Label>
               ))
             )}
           </div>
