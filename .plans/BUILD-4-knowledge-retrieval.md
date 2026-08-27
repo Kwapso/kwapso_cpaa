@@ -513,3 +513,59 @@ different answer depending on which way it came in. The check therefore censuses
 both doors off the disk, with comments stripped, and fails if either names a
 reader the table did not give it. *A predicate nobody calls is not a guard, and a
 table nobody asks is not a registry.*
+
+
+---
+
+## THE WRAPPER LINE AT THE FRONT OF A GOOD PASSAGE — for chunk-first ingestion
+
+Measured 27 Aug 2026, on the branch, against staging. Recorded beside the ghost
+ids because it is the third thing this round found and deliberately did not fix,
+and whoever takes chunk-first ingestion should inherit the case rather than
+rediscover it.
+
+**What it looks like.** Ask "summarise the week recap meeting" and the answer now
+reaches the two 96-chunk transcripts and the 84-chunk Gemini notes — the 2027
+calendar stubs are gone, which was the fix. But the passage taken from the
+transcript is its FIRST chunk, and that chunk opens with the line the mirror
+writes onto every record:
+
+    ⏮️ Week recap is a meeting of ours, on 2026-08-14.
+
+So the top quote under an answer can still begin with a sentence saying the
+meeting exists, before a word anybody said. It is one line at the front of real
+material, not a passage of nothing — but it is the first thing a reader's eye
+lands on, and "it quoted me a line telling me the meeting happened" is a
+complaint somebody will make.
+
+**Why the substance rule does not catch it, and must not be made to.**
+`saysSomething` asks whether a passage adds words its own title does not have.
+Chunk 0 of a real transcript does — the wrapper plus the beginning of the
+content — so it passes, correctly. The rule is working. The header is simply at
+the FRONT of the best passage rather than being a passage of its own.
+
+Teaching it to look at WHERE text sits inside a chunk would end its checkability:
+the whole reason it is a rule and not a heuristic is that it asks one question of
+a whole passage and a person can run the same question by hand. A rule with a
+clause about the first forty characters is a rule nobody can hold in their head.
+
+**So it belongs to the chunker, not the ranker.** Two shapes worth measuring when
+that branch opens, in this order:
+
+1. **Do not put the wrapper in chunk 0's text at all.** The mirror's opening
+   sentence is metadata that happens to be prose — the same fact the row already
+   carries in `title`, `kind` and `record_date`. If it were excluded from the
+   chunked text and kept on the row, every passage would start with content. The
+   thing to check before doing it: the wrapper is also what makes a bare PAST
+   meeting findable at all ("when did we meet?"), so removing it needs that
+   question to keep working — probably by keeping the wrapper as its own trailing
+   chunk rather than the leading one.
+2. **Chunk overlap**, which the "what would change our mind" list at the top of
+   this file already names as the cheapest untried idea. A fact split across a
+   boundary is currently in neither chunk, and the same machinery that fixes that
+   decides where a chunk starts.
+
+**Do not treat this as a ranking bug.** It was found by asking which passage was
+chosen and then reading it — the ranking chose right. Everything above the
+chunker is now doing its job, which is exactly why this is visible: it is the
+next layer down.
