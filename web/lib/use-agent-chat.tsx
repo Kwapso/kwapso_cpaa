@@ -18,14 +18,23 @@ import type { AgentChatMessage } from "@shared/ui/components/agent-chat/agent-ch
  * drew tool rows itself; the kit's does not, so the row is app data here and
  * the panel renders it as an assistant-side step chip. */
 export type AgentChatItem =
-  | AgentChatMessage
+  /** An assistant turn also carries WHAT IT READ, when it read anything: the
+   * answer seam's own citations and passages (Law R23). The kit's message type
+   * carries `sources` — the ruled `collection · record` pills — and the panel
+   * maps this onto them, because the ruled shape is two names and the evidence
+   * is a knowledge source with a kind, a record path and the passage's words.
+   * Mapping in the panel keeps the kind's WORD on the side that can translate
+   * it. */
+  | (AgentChatMessage & { evidence?: TurnEvidence })
   | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed" }
 import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, PendingCall } from "@shared/types"
+import { evidenceFromSaved, mergeEvidence, type TurnEvidence } from "@shared/agent-cites"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
 import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
+import { clearPendingQuestion, usePendingQuestion } from "@/lib/agent-open"
 import { traceFor } from "@/lib/agent-trace"
 import { emitTrace } from "@/lib/screen-trace"
 import { AgentMarkdown } from "@/components/agent-markdown"
@@ -71,19 +80,34 @@ const clearLastThread = (teamId: string) => {
  * empty grey bubbles ("blank pills") between the step rows on resume. The tool rows
  * already show what happened, so an empty assistant bubble is pure noise. (We keep them
  * server-side — the model replay needs them — just don't paint them.) */
-const toChatItems = (messages: AgentMessage[]): AgentChatItem[] =>
-  messages
+const toChatItems = (messages: AgentMessage[]): AgentChatItem[] => {
+  // WHAT THE LAST RETRIEVAL FOUND, carried forward to the assistant turn that
+  // was written from it. A saved thread stores the retrieval as the tool row's
+  // own text (evidenceFromSaved), and the answer is the message AFTER it — so a
+  // conversation reopened tomorrow draws the same sources it drew live, and the
+  // marks in its prose still have pills to point at. Nothing was added to the
+  // database for this: the audit trail R23 already wanted IS the record.
+  let pending: TurnEvidence | undefined
+  return messages
     .filter((m) => !(m.role === "assistant" && !(m.content ?? "").trim()))
-    .map((m): AgentChatItem =>
-      m.role === "tool"
-        ? {
-            id: m.id,
-            role: "tool",
-            actionLabel: m.toolCalls?.[0]?.summary ?? m.toolCalls?.[0]?.tool ?? "Action",
-            status: m.toolCalls?.[0]?.status ?? (m.content?.startsWith("FAILED") ? "failed" : "done"),
-          }
-        : { id: m.id, role: m.role, content: <AgentMarkdown text={m.content ?? ""} /> }
-    )
+    .map((m): AgentChatItem => {
+      if (m.role === "tool") {
+        const found = evidenceFromSaved(m.toolCalls?.[0]?.tool, m.content)
+        if (found) pending = mergeEvidence(pending, found)
+        return {
+          id: m.id,
+          role: "tool",
+          actionLabel: m.toolCalls?.[0]?.summary ?? m.toolCalls?.[0]?.tool ?? "Action",
+          status: m.toolCalls?.[0]?.status ?? (m.content?.startsWith("FAILED") ? "failed" : "done"),
+        }
+      }
+      const evidence = m.role === "assistant" ? pending : undefined
+      // Spent: the next question's answer stands on its own retrieval, which is
+      // the same sentence the model is told (CITE_RULE).
+      pending = undefined
+      return { id: m.id, role: m.role, content: <AgentMarkdown text={m.content ?? ""} />, evidence }
+    })
+}
 
 /** The paused turn's proposed actions, as the panel's step rows: the one-line
  * summary AND — under it — the payload the door will receive (server-built, see
@@ -116,6 +140,23 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   const [quota, setQuota] = React.useState<AgentQuota | null>(null)
   // A paused turn awaiting the user's go-ahead — the proposed actions + the text.
   const [pending, setPending] = React.useState<{ calls: PendingCall[]; text: string } | null>(null)
+
+  // A QUESTION HANDED IN FROM A SCREEN (web/lib/agent-open.ts): the knowledge
+  // base's ask box, and the same box on an account's or an app's knowledge tab.
+  // It waits for the panel to be open, for the person to be allowed to use the
+  // assistant, and for any turn already running to finish — then it is sent as
+  // an ordinary message and forgotten. Cleared BEFORE the send, so a re-render
+  // mid-request cannot ask it twice and spend the credit twice.
+  const handedIn = usePendingQuestion()
+  React.useEffect(() => {
+    if (!handedIn || !open || !canUse || busy) return
+    clearPendingQuestion()
+    void send(handedIn)
+    // `send` is remade every render and closes over the state it needs; listing
+    // it would re-fire this on every keystroke in the composer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handedIn, open, canUse, busy])
+
 
   // On open: pull the quota (cheap; not cached — it changes per turn) and, if this is
   // a fresh panel (no messages yet), RESUME the right conversation. Resume order:
@@ -221,6 +262,20 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
             prev.map((it) =>
               it.id === stepId
                 ? { ...it, actionLabel: label, status: ev.ok ? "done" : "failed" }
+                : it
+            )
+          )
+          break
+        }
+        case "sources": {
+          // R23, arriving mid-turn: what the retrieval found, hung on the turn
+          // that is being written from it. Merged rather than replaced — a turn
+          // may ask twice, and the citation's POSITION is the number the mark in
+          // the prose points at, so an existing source keeps the place it had.
+          setItems((prev) =>
+            prev.map((it) =>
+              it.id === assistantId && it.role === "assistant"
+                ? { ...it, evidence: mergeEvidence(it.evidence, { citations: ev.citations, passages: ev.passages }) }
                 : it
             )
           )

@@ -82,7 +82,7 @@ import { AppFormDialog } from "@/components/app-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
-import { KnowledgeAsk } from "@/components/knowledge-ask"
+import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { RichText } from "@shared/web/rich-text-view"
 import { ImpactPanel } from "@/components/impact-panel"
 import { createAppFrom } from "@/components/apps-screen"
@@ -807,28 +807,24 @@ export function AccountDetailScreen({
               />
             )
           // THE KNOWLEDGE BASE, IN CONTEXT (7.15), THE SAME WAY AN APP DOES IT
-          // (8.9). Two things travel and they do different jobs. `accountId`
-          // names the COMPARTMENT, so a question typed here cannot be answered
-          // out of another client's material and R23's `reason` says which one
-          // it searched. `context` is the record's own details prepended to the
-          // question — and the panel SHOWS what it added, because a question
-          // quietly changed on the way to the server is an answer nobody can
-          // account for. It is written as a phrase that reads after the word
-          // "About", exactly as the app's does.
+          // (8.9). One thing travels now and it does both jobs: `context` is the
+          // record's own details prepended to the question, and it NAMES THE
+          // CLIENT, which is how the compartment is chosen — the assistant asks
+          // the same door and does not hold the account's id, so the door
+          // resolves the client from the question's own words and R23's `reason`
+          // still says which compartment it searched. The box SHOWS what it
+          // added, because a question quietly changed on the way is an answer
+          // nobody can account for. It is written as a phrase that reads after
+          // the word "About", exactly as the app's does.
           if (tabItem.value === "knowledge")
             return (
-              <KnowledgeAsk
-                accountId={accountId}
+              <AskTheAssistant
                 context={[
                   `the client ${account.name}`,
                   account.industry ? `in ${account.industry}` : null,
                 ]
                   .filter(Boolean)
                   .join(", ")}
-                onOpenSource={(sourceId) =>
-                  softNavigate(`${basePath.replace(/\/accounts$/, "")}/knowledge/${sourceId}`)
-                }
-                onOpenRecord={(path) => softNavigate(`${basePath.replace(/\/accounts$/, "")}/${path}`)}
               />
             )
 

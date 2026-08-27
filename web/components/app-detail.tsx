@@ -42,7 +42,7 @@ import {
   sliceKey,
 } from "@/components/work-panels"
 import { DeliverablesPanel } from "@/components/deliverables-panel"
-import { KnowledgeAsk } from "@/components/knowledge-ask"
+import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -567,8 +567,7 @@ export function AppDetailScreen({
           if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />
           if (panel.value === "knowledge")
             return (
-              <KnowledgeAsk
-                accountId={app.accountId}
+              <AskTheAssistant
                 context={[
                   `the app "${app.name}"`,
                   accountName ? `built for ${accountName}` : "one of our own systems",
@@ -576,8 +575,6 @@ export function AppDetailScreen({
                 ]
                   .filter(Boolean)
                   .join(", ")}
-                onOpenSource={(sourceId) => softNavigate(`${host.base}/knowledge/${sourceId}`)}
-                onOpenRecord={(path) => softNavigate(`${host.base}/${path}`)}
               />
             )
           if (panel.value === "activity")

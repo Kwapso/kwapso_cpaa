@@ -57,3 +57,47 @@ export function useAgentOpen(): boolean {
     () => false
   )
 }
+
+/* ---------------------------- asking it something --------------------------- */
+
+// A QUESTION HANDED TO THE ASSISTANT FROM A SCREEN — the knowledge base's own
+// ask box, and the same box on an account's or an app's knowledge tab.
+//
+// It lives here rather than in the panel for the reason the open flag does: the
+// panel is mounted ONCE at the root and the screen doing the asking is somewhere
+// else entirely, so the two can only meet at a module-level store. It is NOT
+// mirrored to sessionStorage — an open panel should survive a reload, an
+// unanswered question should not be asked twice.
+//
+// Taken exactly once. `useAgentChat` clears it the moment it sends, so a re-render
+// (or a second panel, in a test) cannot re-ask and re-spend a credit.
+
+let question: string | null = null
+
+/** Open the assistant and ask it this. */
+export function askAssistant(text: string): void {
+  const q = text.trim()
+  if (!q) return
+  question = q
+  for (const fn of subscribers) fn()
+  setAgentOpen(true)
+}
+
+/** The question waiting to be asked, or null. */
+export function usePendingQuestion(): string | null {
+  return useSyncExternalStore(
+    (cb) => {
+      subscribers.add(cb)
+      return () => subscribers.delete(cb)
+    },
+    () => question,
+    () => null
+  )
+}
+
+/** Sent — forget it, so it is never asked twice. */
+export function clearPendingQuestion(): void {
+  if (question === null) return
+  question = null
+  for (const fn of subscribers) fn()
+}
