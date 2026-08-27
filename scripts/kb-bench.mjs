@@ -362,6 +362,18 @@ if (COMPOSE && graded.length) {
   console.log(`  leads with the answer      ${String(leads).padStart(2)}/${graded.length}  ${pct(leads)}   "beating around the bush"`)
   console.log(`  every citation on topic    ${String(onTopic).padStart(2)}/${graded.length}  ${pct(onTopic)}   "files that were not important"`)
   console.log(`  no slot spent on nothing   ${String(earned).padStart(2)}/${graded.length}  ${pct(earned)}   "the big juicy files it didn't touch"`)
+  // ONE RUN IS NOT A SCORE, for the top line and the first row only. Measured over
+  // three consecutive runs of the same code against the same material on 27 Aug
+  // 2026: the two rows decided by RETRIEVAL — on topic, and no slot spent on
+  // nothing — were identical every time (63% and 88%), because the passages are
+  // the same passages. `leads` moved 69/81/81, and the combined line with it
+  // (5/16, 7/16, 7/16), because it is the only row that depends on the words the
+  // writer chose. So read a change in the bottom two rows as a change in the code,
+  // and a change of one or two questions in `leads` as weather.
+  console.log(
+    "\n  (leads — and the combined line above — vary by a question or two between runs;\n" +
+      "   the other two rows are decided by retrieval and do not.)"
+  )
 }
 if (!VERBOSE) console.log("\nre-run with --verbose to see every citation, and every first sentence")
 if (!COMPOSE) console.log("re-run with --compose to grade the answer a person actually reads")
