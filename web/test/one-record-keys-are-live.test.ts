@@ -51,7 +51,18 @@ function perRecordKeys(): { key: string; rel: string }[] {
 
 describe("R15 · a record's own cache key is reached by the ping about that record", () => {
   it("every `<module>:one:` key a component reads is named in live-resources.ts", () => {
-    const registry = readFileSync(join(WEB, "lib", "live-resources.ts"), "utf8")
+    // COMMENTS STRIPPED ON THIS SIDE TOO, and it is not symmetry for its own
+    // sake — this check was satisfiable by PROSE. `live-resources.ts` explains
+    // each of these keys in a comment beside the dep that carries it, so
+    // deleting the real `story:one:${id}` line left the sentence describing it
+    // and the census went on passing. Measured, not feared: removing that one
+    // line reintroduces the exact timer bug of 19 Aug 2026 — the one this file
+    // exists for — and the suite stayed green.
+    //
+    // The component side was stripped from the first day, with a note saying the
+    // header would otherwise satisfy the rule it explains. The same sentence was
+    // true of the registry side and nobody wrote it down.
+    const registry = stripComments(readFileSync(join(WEB, "lib", "live-resources.ts"), "utf8"))
     const unreachable = [
       ...new Set(
         perRecordKeys()

@@ -554,10 +554,25 @@ export function brandAssetsKey(teamId: string): string {
  * ticket's attachment list is dropped by nothing at all, so a screenshot a
  * colleague adds appears on their screen and not on yours. Putting the story's
  * key in lib is what lets `TEAM_RESOURCES.stories` below carry it, which is R15
- * for this collection. (The ticket half is the same bug one record along; it is
- * recorded in the upload scan rather than fixed in this commit.) */
+ * for this collection. */
 export function storyAttachmentsKey(storyId: string): string {
   return `story-attachments:${storyId}`
+}
+/** …AND THE TICKET'S, for the same reason and after the same bug.
+ *
+ * This lived in `web/components/help-attachments.tsx` and carried a comment
+ * saying "the ticket's own deps carry this". They did not. They could not: this
+ * file is `lib`, `lib` must not import a component, so `TEAM_RESOURCES.help`
+ * below had no way to NAME the key even though the resource it needed was
+ * already publishing. Nothing dropped it, and a screenshot a colleague attached
+ * to a ticket stayed invisible on everybody else's screen until they reloaded.
+ *
+ * The comment is the reason it survived: it described the wiring as done, so
+ * anybody checking read a sentence instead of a dependency list. Moving the key
+ * HERE is the whole fix — the same shape the story panel got, arrived at by
+ * checking the pattern rather than copying it. */
+export function helpAttachmentsKey(ticketId: string): string {
+  return `help-attachments:${ticketId}`
 }
 /** WHAT WE HANDED OVER, ON ONE APP. Its rows live ONLY in a per-app slice,
  * because a deliverable is never read anywhere but the app it belongs to —
@@ -940,6 +955,13 @@ export const TEAM_RESOURCES: Record<
       // day the composer was fixed and the thread still only moved on reload.
       `help-thread:${id}`,
       `total:help-thread:${id}`,
+      // …AND WHAT SOMEBODY ATTACHED. Every attachment write publishes `help`
+      // (the row is part of the ticket, not a collection beside it), so this is
+      // where the Files and links tab learns that a colleague added a
+      // screenshot. Its exact total rides `recordCountDeps` below on the same
+      // ping. The story's twin is directly above; this is its ticket half.
+      helpAttachmentsKey(id),
+      `total:${helpAttachmentsKey(id)}`,
       `help-mine:${t}`,
       insightsKey(t),
       ...recordCountDeps("help"),

@@ -52,14 +52,9 @@ import { readFileAsDataUrl } from "@shared/web/file"
 import { safeHref } from "@shared/web/rich-text"
 import { formatRelative } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
+import { helpAttachmentsKey } from "@/lib/live-resources"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import { useT } from "@shared/web/language"
-
-/** The cache key the live registry drops when the ticket row moves — every
- * attachment write publishes `help`, so the ticket's own deps carry this. */
-export function helpAttachmentsKey(ticketId: string): string {
-  return `help-attachments:${ticketId}`
-}
 
 /** WILL WE PUT THIS IN AN `href`? (The seam that answers it is `safeHref`; this
  * says which of ITS answers this screen also accepts.)
