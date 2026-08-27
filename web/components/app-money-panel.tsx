@@ -28,9 +28,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Route } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Route } from "@shared/ui/foundations/icons"
 
 import { tenancy } from "@/lib/api"
 import { appMoneyKey } from "@/lib/live-resources"

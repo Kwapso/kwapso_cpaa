@@ -22,10 +22,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { Plus } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { Plus } from "@shared/ui/foundations/icons"
 
 import { invalidate } from "@shared/web/store"
 import { support } from "@/lib/api"

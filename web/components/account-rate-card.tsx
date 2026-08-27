@@ -20,9 +20,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { AccountRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"

@@ -31,7 +31,7 @@
 
 import * as React from "react"
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/controls/tabs/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/components/tabs/tabs"
 import { cn } from "@shared/ui/lib/utils"
 
 import { iconComponent } from "./icon"

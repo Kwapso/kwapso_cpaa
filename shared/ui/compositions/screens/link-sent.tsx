@@ -58,8 +58,8 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Text } from "../../controls/typography/typography";
+import { Button } from "../../components/button/button";
+import { Text } from "../../components/typography/typography";
 import { AuthShell } from "./sign-in";
 
 /**
@@ -239,16 +239,24 @@ function LinkSentScreen({
             soft-paper strip. */}
         <div
           data-slot="link-sent-address"
-          className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-2 rounded-[var(--radius)] bg-surface-panel px-[var(--space-4)] py-[var(--space-3)]"
+          className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[var(--radius)] bg-surface-panel px-[var(--space-5)] py-[var(--space-4)]"
         >
-          <Text as="span" size="base" className="min-w-0 break-all">
+          {/* The address at 500 — p28 draws it `font-weight: 500` at both
+              widths, the one bolded thing in the strip, because it IS the
+              statement. "Wrong address?" sits BESIDE it (the artifact's
+              `gap: 12px` row, wrapping under it at narrow) — it was pushed
+              to the strip's far end, which is nobody's drawing. */}
+          <Text
+            as="span"
+            size="sm"
+            className="min-w-0 break-all font-[var(--font-weight-medium)]"
+          >
             {email}
           </Text>
           {onWrongAddress === undefined ? null : (
             <Button
               type="button"
               variant="text"
-              className="ms-auto"
               disabled={disabled}
               onClick={onWrongAddress}
             >
@@ -263,11 +271,16 @@ function LinkSentScreen({
           <span className="md:hidden">{helpLineNarrow}</span>
         </Text>
 
-        {/* Quiet ink, and it states its own condition rather than vanishing. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {/* A PILL IN THE DISABLED SKIN, NOT A TEXT LINK. p28 draws Send again
+            as a 999-radius button — 44 high, a paper fill, the disabled ink —
+            with the countdown as loose type beside it; "sits in quiet ink"
+            names the INK, and the drawing puts it on a pill. A text link here
+            was the build's own reading and read as a second "Wrong address?".
+            `Button`'s one disabled skin is the kit's fill-and-ink pair. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-[var(--space-3h)]">
           <Button
             type="button"
-            variant="text"
+            variant="secondary"
             disabled={disabled || counting}
             onClick={onResend}
           >

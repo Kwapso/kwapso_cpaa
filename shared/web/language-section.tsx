@@ -36,8 +36,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/select/select"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
 import { useLanguage } from "./language"

@@ -10,7 +10,7 @@
 // ACTIVE team (the module-cached session — safe to read from anywhere) and renders
 // nothing until you're signed in with a team, so login / onboarding have no co-pilot.
 
-import { Sparkles } from "@shared/ui/icons"
+import { Sparkles } from "@shared/ui/foundations/icons"
 
 import { AgentPanel } from "@/components/agent-panel"
 import { useActiveTeam } from "@/lib/use-active-team"

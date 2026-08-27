@@ -36,9 +36,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Dialog, DialogContent } from "@shared/ui/controls/dialog/dialog"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { Button } from "@shared/ui/components/button/button"
+import { Dialog, DialogContent } from "@shared/ui/components/dialog/dialog"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
 
 import { useT } from "./language"
 

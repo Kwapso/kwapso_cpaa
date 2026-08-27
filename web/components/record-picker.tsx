@@ -46,7 +46,7 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Command,
   CommandEmpty,
@@ -54,16 +54,16 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@shared/ui/controls/command/command"
+} from "@shared/ui/components/command/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@shared/ui/controls/popover/popover"
-import { Sheet, SheetContent, SheetTitle } from "@shared/ui/controls/sheet/sheet"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
-import { Check, ChevronsUpDown, X } from "@shared/ui/icons"
+} from "@shared/ui/components/popover/popover"
+import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/sheet"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
+import { Check, ChevronsUpDown, X } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached } from "@shared/web/store"

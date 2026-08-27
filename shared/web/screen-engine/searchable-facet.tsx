@@ -5,12 +5,12 @@
 // filter-bar.tsx; see RangeFacet for the sibling control.
 
 import * as React from "react"
-import { Check, ChevronsUpDown, X } from "@shared/ui/icons"
+import { Check, ChevronsUpDown, X } from "@shared/ui/foundations/icons"
 
 import { type FacetOption, type FilterFacet } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Command,
   CommandEmpty,
@@ -18,9 +18,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@shared/ui/controls/command/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@shared/ui/controls/popover/popover"
-import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
+} from "@shared/ui/components/command/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@shared/ui/components/popover/popover"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 
 /** A `control:"select"` facet rendered as a searchable combobox. Shows `options`
  * up front; when `onSearch` is set it fires (debounced) as the user types and the

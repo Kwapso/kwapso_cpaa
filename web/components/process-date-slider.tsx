@@ -24,9 +24,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Slider } from "@shared/ui/controls/slider/slider"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Slider } from "@shared/ui/components/slider/slider"
 import { useT } from "@shared/web/language"
 
 export function ProcessDateSlider({

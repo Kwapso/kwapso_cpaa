@@ -37,23 +37,21 @@ break, and every rule there applies to a screen as well as to a component.
 
 | tier | folder | what lives there | count |
 |---|---|---|---|
-| 0 | `controls/` | a button, a field, a badge, a dialog | 67 |
-| 2 | `structures/` | a table, a board, a thread, a heat map | 42 |
+| 0 | `controls/` | a button, a field, a badge, a dialog | 66 |
+| 2 | `structures/` | a table, a board, a thread, a heat map | 40 |
 | 3 | `compositions/templates/` | the SHAPE of a screen, nothing product-specific in it | 15 |
 | 3 | `compositions/screens/` | the finished pages named as exceptions | 17 |
 | 3 | `compositions/overlays/` | what opens **over** a screen rather than replacing it | 8 |
 | 3 | `compositions/states/` | the same screen with nothing in it | 5 |
 
-A template answers *"what shape is this"*. A screen answers *"what is
-happening"* — the session expired, the import needs approving, the collection
-is empty, six tickets are waiting to be triaged.
-
-> **`compositions/system/` and `compositions/portal/` no longer exist.** The
+> **`compositions/system/`, `portal/` and `shapes/` no longer exist.** The
 > 2026-08-24 restructure deleted 24 files and 11,731 lines of example collection
-> and detail routes: the kit ships the TEMPLATE for a main screen and a detail
-> screen, and the application builds the page. `AccountsRoute`, `AppsRoute`,
-> `TicketsRoute` and the twenty-one others are gone and are not coming back. If
-> you are looking for one, you want `compositions/templates/` and section 2.
+> and detail routes: the kit ships the TEMPLATE and the application builds the
+> page. If you are looking for one, you want `compositions/templates/`.
+
+A route answers *"where am I"*. A screen answers *"what is happening"* — the
+session expired, the import needs approving, the collection is empty, six
+tickets are waiting to be triaged.
 
 ### 1.1 Check it does not already exist
 
@@ -266,7 +264,7 @@ that only draws inside a helpful parent is not delivered.
 
 ### 6.6 No px, no literal hex, no font size.
 
-`tokens/tokens.css` is the only place a colour or a size is decided. Everything
+`foundations/tokens/tokens.css` is the only place a colour or a size is decided. Everything
 is rem against a 16px authoring base; the root renders at 15px. Above 32px use
 the named `--space-*` steps.
 
@@ -284,7 +282,7 @@ In this order, because this is the order that actually catches things.
 
 ```bash
 npx tsc --noEmit               # exit 0
-node tokens/build-tokens.mjs   # four guards, one warning
+node foundations/tokens/build-tokens.mjs   # four guards, one warning
 npm run build
 ```
 

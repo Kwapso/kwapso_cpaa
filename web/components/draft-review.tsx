@@ -40,14 +40,14 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Ban, CheckCheck, Undo2, UserRound } from "@shared/ui/icons"
-import { HelpCircle, TaskList, Wrench } from "@shared/ui/icons"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Ban, CheckCheck, Undo2, UserRound } from "@shared/ui/foundations/icons"
+import { HelpCircle, TaskList, Wrench } from "@shared/ui/foundations/icons"
 
 import type {
   DraftDecisions,

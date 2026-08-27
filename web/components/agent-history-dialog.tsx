@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@shared/ui/controls/dialog/dialog"
-import { ScrollArea } from "@shared/ui/controls/scroll-area/scroll-area"
+} from "@shared/ui/components/dialog/dialog"
+import { ScrollArea } from "@shared/ui/components/scroll-area/scroll-area"
 
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"

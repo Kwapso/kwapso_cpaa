@@ -29,16 +29,16 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import {
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Input } from "@shared/ui/components/input/input"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Plus } from "@shared/ui/icons"
+import { Plus } from "@shared/ui/foundations/icons"
 
 import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"

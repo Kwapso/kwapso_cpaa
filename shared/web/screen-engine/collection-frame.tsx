@@ -18,24 +18,24 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/icons"
-import { Filter } from "@shared/ui/icons"
+import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/foundations/icons"
+import { Filter } from "@shared/ui/foundations/icons"
 import { kitIcon } from "./tabs-view"
 
 import { selectRows } from "./collection"
 import { type CollectionConfig } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import { FilterBar } from "./filter-bar"
-import { SortControl } from "@shared/ui/controls/sort-control/sort-control"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@shared/ui/controls/popover/popover"
-import { SearchInput } from "@shared/ui/controls/search-input/search-input"
-import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
+} from "@shared/ui/components/popover/popover"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 
 function CollectionFrame<T>({

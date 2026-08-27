@@ -7,7 +7,7 @@ You do not need to have seen this system before, and you do not need a designer
 to ask. Everything a designer would tell you is already written down; this
 document tells you where, and in what order.
 
-**The deeper reference is `controls/PATTERN.md`.** This document
+**The deeper reference is `components/PATTERN.md`.** This document
 is its public-facing form: the same law, arranged as a procedure, with the
 reasons pulled forward. Where the two could ever be read as disagreeing,
 `PATTERN.md` wins — it is what a reviewer holds you to, and it carries detail
@@ -45,8 +45,7 @@ application.
 ### 1.1 Check it does not already exist
 
 ```bash
-ls controls          # 65 folders
-ls structures         # 26 folders
+ls components          # 108 folders
 grep -n '"YourName"' manifest.json
 ```
 
@@ -54,25 +53,42 @@ grep -n '"YourName"' manifest.json
 props and its states. If the name is in there, extend that component rather
 than adding a second one.
 
-### 1.2 Decide: primitive or collection?
+### 1.2 One tier, not two
 
-| | **Primitive** — `controls/` | **Collection** — `structures/` |
-|---|---|---|
-| Knows about | one control or one shape | an assembly of primitives, and a domain shape |
-| May contain product words | **never** | yes — that is what it is for |
-| Responsive behaviour | almost always **unchanged**; inherits width from the parent | yes, this is where it lives |
-| Imports other components | rarely, and only within its own family | freely, from primitives |
-| Example | `Button`, `Input`, `Badge`, `Separator` | `DataTable`, `Kanban`, `TicketThread` |
+**RETIRED 2026-08-26.** This section used to be "Decide: primitive or
+collection?", with a table sorting every component into `controls/` (a
+button, a field, a badge) or `structures/` (a table, a board, a thread) —
+two folders, two sets of rules. The client, verbatim: "i still don't
+understand the difference between controls / structures. please merge
+them, and rename to components." They merged, flat, into one `components/`
+folder — no subfolder split either, so there is no `components/controls/`
+or `components/structures/` to sort into. There is no decision to make any
+more: every component goes in `components/`, one folder per component.
 
-**No product vocabulary in a primitive.** No "ticket", no "sprint", no
-"account", no "system" — in a name, a prop, a default string, or a comment.
-`List`, not `TicketList`. A primitive that knows what a ticket is cannot be
-used for anything that is not a ticket, and the name is then wrong in every
-other context it gets pulled into.
+**What the old table was actually protecting, and why it still matters even
+though the folder split is gone.** The distinction was never really about
+which folder a file sat in — it was about SCOPE. Some components know
+about one control or one shape and nothing else (a button knows nothing
+about tickets); others are an assembly of those, shaped around a domain
+concept (a `DataTable` is built out of buttons and badges, and a
+`TicketThread` knows what a thread is). That difference in scope is still
+real and still worth thinking about when you write a component — it is just
+no longer expressed as a folder choice:
 
-**A collection imports primitives, not other collections.** The one recorded
-exception is the shared empty/error register, and even that runs one way only.
-`GAPS.md` COL3-3.
+- **No product vocabulary in a small, single-purpose component.** No
+  "ticket", no "sprint", no "account", no "system" — in a name, a prop, a
+  default string, or a comment. `List`, not `TicketList`. A component that
+  knows what a ticket is cannot be used for anything that is not a ticket,
+  and the name is then wrong in every other context it gets pulled into.
+- **A component built from other components should build from the small,
+  general ones, not from another domain-shaped one.** The one recorded
+  exception is the shared empty/error register, and even that runs one way
+  only. `GAPS.md` COL3-3.
+
+If you are unsure which kind you are writing, look at four or five
+components near it alphabetically in `components/` and match the nearest
+one's shape — the folder itself carries no signal any more, but the file
+you are about to write should still look like the ones next to it.
 
 ### 1.3 Pick the exemplar you are copying
 
@@ -98,13 +114,13 @@ blank line in your header.
 ## 2 · Where the file goes
 
 ```
-controls/<name>/<name>.tsx
+components/<name>/<name>.tsx
 ```
 
 One folder, one file, one lowercase kebab name **matching the folder**.
 
-- `controls/status-chip/status-chip.tsx` ✔
-- `controls/StatusChip/index.tsx` ✘
+- `components/status-chip/status-chip.tsx` ✔
+- `components/StatusChip/index.tsx` ✘
 
 The folder name is also the demo's anchor id and the manifest key, so a
 mismatch breaks two things quietly.
@@ -334,7 +350,7 @@ already kwapso-timed. **Restate `duration-[var(--duration-colour)] ease-kwapso`
 anyway**, for the same import-order reason.
 
 For anything larger than a colour swap, add **one class** from
-`motion/motion.css` — there are 57, covering all 16 commission cases:
+`foundations/motion/motion.css` — there are 57, covering all 16 commission cases:
 
 ```tsx
 <DialogContent className={cn("motion-dialog", className)} />
@@ -677,7 +693,7 @@ build must be:
 
 ```css
 @import "tailwindcss" source(none);
-@import "../tokens/tokens.css";
+@import "../foundations/tokens/tokens.css";
 @source "../components/**/*.{ts,tsx}";
 ```
 
@@ -712,11 +728,11 @@ the demo and to the next reader.
 
 ### 12.1 `manifest.json`
 
-Add an entry under `components` (or `collections`), keyed by folder name:
+Add an entry under `components`, keyed by folder name:
 
 ```json
 "badge": {
-  "file": "controls/badge/badge.tsx",
+  "file": "components/badge/badge.tsx",
   "exports": ["Badge"],
   "props": {
     "variant": ["default", "secondary", "outline", "destructive",
@@ -772,8 +788,8 @@ Four things, all of which must pass:
 
 | | What it checks |
 |---|---|
-| `node tokens/build-tokens.mjs --check` | dark-block drift · orphan tokens · px leaks · unresolved `var()` chains |
-| `node icons/generate-icons.mjs --check` | the generated icon module is not stale |
+| `node foundations/tokens/build-tokens.mjs --check` | dark-block drift · orphan tokens · px leaks · unresolved `var()` chains |
+| `node foundations/icons/generate-icons.mjs --check` | the generated icon module is not stale |
 | `node demo/gen-states.mjs --check` | `states.generated.ts` matches the TEN STATES blocks |
 | `tsc --noEmit` | types |
 
@@ -873,7 +889,7 @@ These fail review. There is no discussion attached to any of them.
 You have been asked for a **`StatusChip`** — a status dot plus a word.
 
 **1 · Does it exist?** `grep StatusChip manifest.json` — no. But
-`grep -n 'dot-' tokens/tokens.css` finds `--dot-shipped`, `--dot-building`,
+`grep -n 'dot-' foundations/tokens/tokens.css` finds `--dot-shipped`, `--dot-building`,
 `--dot-review`, `--dot-blocked`, `--dot-archived`, `--dot-done`, plus
 `--pill-fill`, `--pill-label` and `--dot-status: 0.4375rem`. **The kit has
 already designed this.** Kit ruling 26.
@@ -925,7 +941,7 @@ not a seventh colour you picked.
 
 | For | Read |
 |---|---|
-| The full house pattern, with detail this file compresses | `controls/PATTERN.md` — **the deeper reference** |
+| The full house pattern, with detail this file compresses | `components/PATTERN.md` — **the deeper reference** |
 | The laws a consuming app must not break | `docs/RULES.md` |
 | What every token means and when to reach for it | `docs/TOKENS.md` |
 | Why a value is what it is | `GAPS.md` |

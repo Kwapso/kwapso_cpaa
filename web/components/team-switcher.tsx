@@ -16,9 +16,9 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
+} from "@shared/ui/components/avatar/avatar"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,9 +26,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Check, ChevronsUpDown, Inbox, Plus } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Check, ChevronsUpDown, Inbox, Plus } from "@shared/ui/foundations/icons"
 
 import { useReceivedInvites } from "@/components/invitations"
 import { letterMark } from "@/lib/identity"

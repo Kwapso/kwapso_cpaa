@@ -101,15 +101,15 @@
 
 import * as React from "react";
 
-import { AmbientBackground } from "../../controls/ambient-background/ambient-background";
-import { Button } from "../../controls/button/button";
-import { Field } from "../../controls/field/field";
-import { Input } from "../../controls/input/input";
+import { AmbientBackground } from "../../components/ambient-background/ambient-background";
+import { Button } from "../../components/button/button";
+import { Field } from "../../components/field/field";
+import { Input } from "../../components/input/input";
 import {
   Headline,
   Text,
-} from "../../controls/typography/typography";
-import { Logotype } from "../../controls/brand/brand";
+} from "../../components/typography/typography";
+import { Logotype } from "../../components/brand/brand";
 /* The one picture every screen on this shell draws. Defined beside `SignIn`
    in the shape so the two shells cannot drift onto different photographs;
    this is the only thing this file takes from `../shapes`. */

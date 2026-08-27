@@ -61,9 +61,13 @@
    · ONE LOG LINE PER RECORD IS SAID ON THE SCREEN. It is the save bar's meta
      line, beside the commit, because the promise is about what the press
      does.
-   · ONE MANGO, AND IT IS "Change 6". Every control in the bulk bar is paper,
-     Delete included: the poppy fill belongs to 27.4's confirmation, where the
-     press is actually irreversible, not to a bar control that opens it.
+   · ONE MANGO, AND IT IS "Change 6". Every control in the bulk bar is paper
+     EXCEPT Delete, which p36 draws as the poppy fill at both widths
+     (`background: var(--poppy)`, charcoal label) — the one filled red pill
+     the compositions draw outside 27.4's confirmation. 27.20's "never a
+     filled red button in a list" governs LISTS; the bulk bar is a toolbar
+     replacement acting on a counted selection, and the artifact's own
+     drawing separates the two. The code follows the drawing.
    · THERE IS NO `door` PROP. The portal has no bulk edit and no row
      checkboxes; a prop offering a portal variant would imply one exists.
    · EVERY STRING IS A PROP with a default (PATTERN §7).
@@ -115,30 +119,31 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Field } from "../../controls/field/field";
-import { Input } from "../../controls/input/input";
+import { Button } from "../../components/button/button";
+import { Field } from "../../components/field/field";
+import { Input } from "../../components/input/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
+} from "../../components/select/select";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "../../controls/sheet/sheet";
-import { Text } from "../../controls/typography/typography";
-import { type CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
+} from "../../components/sheet/sheet";
+import { Text } from "../../components/typography/typography";
+import { type CollectionFrameTab } from "../../components/collection-frame/collection-frame";
 import {
   DataTable,
   type DataTableColumn,
-} from "../../structures/data-table/data-table";
-import { Form, FormActions } from "../../structures/form/form";
+} from "../../components/data-table/data-table";
+import { Form, FormActions } from "../../components/form/form";
+import { Check, Download, EditPencil, List } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { MainScreen } from "../templates";
 
@@ -569,19 +574,25 @@ function BulkEditScreen({
         <span className="sm:hidden">{formatSelectedNarrow(count)}</span>
       </Text>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        {/* Each bar word leads with its glyph — p36/p37 draw ✎ Edit, the
+            list mark on Assign and the download mark on Export; the slots
+            waited on the icon pack, which is on main now. */}
         {onEdit === undefined ? null : (
           <Button variant="secondary" size="sm" onClick={onEdit}>
+            <EditPencil aria-hidden="true" />
             {words.edit}
           </Button>
         )}
         {onAssign === undefined ? null : (
           <Button variant="secondary" size="sm" onClick={onAssign}>
+            <List aria-hidden="true" />
             {words.assign}
           </Button>
         )}
         {/* The artifact's narrow bar drops Export and keeps the other four. */}
         {onExport === undefined ? null : (
           <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={onExport}>
+            <Download aria-hidden="true" />
             {words.exportLabel}
           </Button>
         )}
@@ -758,7 +769,11 @@ function BulkEditScreen({
               {words.cancel}
             </Button>
             {/* THE ONE MANGO, AND IT CARRIES THE COUNT — 4 of 4. */}
-            <Button onClick={onCommit}>{formatCommit(count)}</Button>
+            <Button onClick={onCommit}>
+              {/* p36 draws the ✓ on the commit at both widths. */}
+              <Check aria-hidden="true" />
+              {formatCommit(count)}
+            </Button>
           </FormActions>
         </SheetContent>
       </Sheet>

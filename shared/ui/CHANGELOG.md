@@ -1,5 +1,114 @@
 # Changelog
 
+## Unreleased — 2026-08-26
+
+**controls/ and structures/ merge into components/.** Client ruling,
+verbatim: *"i still don't understand the difference between controls /
+structures. please merge them, and rename to components."* The second
+folder restructure in one day, and the one that changes a consuming app's
+import prefix count from two down to one.
+
+### Changed — one flat `components/`, not two tiers
+
+67 control folders and 42 structure folders become 108 under one
+`components/` — no `components/controls/` or `components/structures/`
+subfolder, per the client's explicit "not even as a subfolder split." Every
+folder moved with `git mv`, so `git log --follow` still works across the
+second rename this repo's had today. **README.md carries the new import
+table**, appended after the 2026-08-24 one rather than overwriting it.
+
+### Removed — `PortalConversation`, deleted outright
+
+Client ruling, verbatim: *"delete portal conversation."* Checked every real
+call site first: `PortalConversation` and `PortalApprovalBand` had exactly
+one consumer in the whole repository — a demo gallery specimen — and no
+composition (template, screen, overlay or state) ever imported either
+export. Deleted cleanly; nothing functional depended on it. `components/`
+is 108 rather than 109 as a result.
+
+### Fixed — the recurring `@source` failure, a third time
+
+Same class of bug as 2026-08-24's restructure and D10-B before it: a moved
+source folder compiles to zero classes while `tsc` and both builds stay
+green, because Tailwind treats a missing `@source` as a smaller stylesheet,
+not an error. `demo/demo.css`, `mini-app/mini.css` and eight `verify/`
+harness stylesheets all still read `../controls/**` and `../structures/**`.
+Fixed, and two of them had picked up a genuinely duplicated `../components/
+**` line from a blind find-replace during the same pass — deduped, not
+just renamed. Proved with a sentinel class, built, grepped the compiled
+CSS, confirmed, removed.
+
+### Fixed — map's chapter table still said "primitive"
+
+Client ruling, verbatim: *"about structures - map is a collection view.
+recategorize."* The component itself had been a structure since
+2026-08-24; what was still wrong was `demo/artifact.ts`'s internal chapter
+lookup (`map` was keyed in `PRIMITIVE_CHAPTERS`, with a comment asserting
+it "is the one view that is NOT in this folder: it is a primitive"),
+`docs/ARTIFACT-MAP.md`'s chapter-21 and 27.29 rows (`controls/map/`, never
+updated after the 2026-08-24 move), and a missing `tier="structures"` on
+the Map `<Section>` in `demo/collections/views-h-q.tsx` — the one section
+in that file that didn't say so, which is why the demo rail filed it under
+"— UNFILED" instead of "19 · Collection views." All four corrected.
+
+### Changed — demo nav, three words now
+
+`foundations · controls · structures · compositions` → `foundations ·
+components · compositions`. The "Controls" and "Structures" bands merge
+into one "Components" band; the rail still runs the two former tiers as
+separate chapter-grouped sections (08–16, then 17–23) under that one view.
+Also shortened all four `VIEW_META` captions to one line each — a client
+screenshot of the Compositions caption's full paragraph, always rendered
+at the top of the page, came with the instruction "remove this or put it
+somewhere else. the goal is to have a slimmer top nav"; applied to all
+four rather than singling one out, since all four were the same shape. The
+fuller history lives in README.md's Layout section.
+
+### Fixed — the folder tab's active fill and its own panel finally agree
+
+Client, verbatim: *"very important: fix the folder tabs! the active needs
+to be the same color as the container (white). all disabled have the same
+color. and more! we have already reviewed folder tabs multiple times!
+review your own work."* Read the whole history first, because this exact
+component has three WITHDRAWN overrides behind it (30, 38, 39, all gone
+with 2026-08-23's K1 reversal) and the register is explicit that the active
+tab and its panel are BOTH soft paper `#F7F2EB` (`#1C1B18` dark) — not
+white. So the question was never "does the client want white now" (a
+fourth flip on the same ruling); it was whether the build actually renders
+the register's own answer. It does not, in exactly one place.
+
+**The bug, measured on the client's own specimen** (`demo/sections/t-z.tsx`'s
+`Tabs variant="folder"` — Overview / Details / Disabled, the same three
+tabs the screenshot shows): the active tab's fill is `--kw-folder-live`,
+resolved straight to `--surface-panel` on the `Tabs` root (TAB-C1), and it
+was already correct everywhere — `#F7F2EB` light, `#1C1B18` dark, standalone
+or inside `CollectionFrame`. `TabsContent`'s own panel, on the same variant,
+painted `bg-card` instead — and `--card` is the kit's OFF-BEIGE page tone
+(`--kw-off-beige` `#FFFEF9` / `--kw-unlit-raised` `#26241F`), not the panel
+tone, *unless* a caller separately rebinds `--card` to `--surface-panel`.
+`collection-frame.tsx` does exactly that rebinding for its own internal
+strip — which is why the mismatch never showed up there — but a bare
+`<Tabs variant="folder">`, exactly what the demo specimen and the client's
+screenshot both are, gets no such rebinding, so the panel measured one
+whole paper lighter than the tab sitting on it: `#FFFEF9` vs `#F7F2EB`
+(1.081 apart) light, `#26241F` vs `#1C1B18` (1.238 apart) dark. THAT is the
+seam the client is seeing, and their read of it — "the active needs to
+match the container" — is correct; it is simply the CONTAINER that was
+wrong, not the tab. **Fix (TAB-C2, `components/tabs/tabs.tsx`):**
+`TabsContent`'s folder skin now paints `bg-[var(--kw-folder-live)]` — the
+identical property the active shape already reads — instead of `bg-card`,
+so the panel and the active tab share one value in every container by
+construction, and nothing needs a rebinding to agree twice.
+
+**"All disabled have the same color" — checked, and it already was.**
+Measured the disabled tab standalone and inside `CollectionFrame`, both
+palettes: `#E2DDD4` light / `#2F2D28` dark in both places, because
+`--btn-disabled-fill` is a fixed token the shape reads directly and never
+depends on the surrounding `--card`/`--surface-panel` rebinding that caused
+the panel bug above. No change needed there; logged so it is not
+re-litigated as a fourth pass on this component. Measured live, both
+palettes, standalone and inside `CollectionFrame`, before and after the fix.
+
 ## v1.0.7 — 2026-08-26
 
 A patch off `v1.0.6`. One fix, found by watching a real reply stream.
@@ -154,7 +263,7 @@ history.
 ### The tree
 
 ```
-foundations   tokens/ · icons/ · motion/   (still at the root — see below)
+foundations/  tokens/ · icons/ · motion/   (moved in under D10-B — see below)
 controls/     67   was components/primitives/
 structures/   42   was components/collections/
 lib/          2    was components/lib/
@@ -233,14 +342,81 @@ header of the file that owns them.
   max-content, so the constraint is circular. Splash, the system door and the
   portal boot screen each draw a 450px lockup in a 380 window.
 
-### Not done, and it needs a decision
+### `foundations/` — ruled `D10-B` and built
 
-`foundations/` is **not** a folder yet. Thirteen decision and index pages
-under `verify/` link `tokens/tokens.css` and `motion/motion.css` by relative
-path, and those pages are the record of what the client was looking at when
-they ruled. `tokens/`, `icons/` and `motion/` stay at the root until someone
-says those thirteen may be edited. The demo LABEL "foundations" is applied
-regardless, which is the part the client asked for.
+`foundations/` **is** a folder now. The client ruled `D10-B` after seeing the
+full cost drawn in `verify/decide-2.html` §D10, and `tokens/`, `icons/` and
+`motion/` moved into it by `git mv`, history intact.
+
+**The count was eighty, not thirteen.** Re-grepped rather than trusted: eighty
+tracked files reach the three folders by relative path, across 107 reference
+lines.
+
+| group | n | how it fails if missed |
+|---|---|---|
+| Decision & index pages under `verify/` | 14 | **silently** — plain HTML, one `<link>` each |
+| Verify harnesses | 11 | 10 Tailwind entry sheets + 1 `.tsx` |
+| Kit source | 42 | 20 `controls/` · 11 `structures/` · 11 `compositions/`; `tsc` catches these |
+| Demo & mini-app | 7 | loud |
+| Docs & prose | 6 | stale text only |
+| Named without a `../` | 5 | `package.json` · `tsconfig.json` · `manifest.json` · `README.md` · `vite.config.ts` |
+
+**Two references that grep did not count, because they point OUT of the moved
+folders rather than into them, and both broke on the move:**
+
+- `foundations/tokens/tokens.css` reached `../assets/fonts/` for its three
+  `@font-face` rules. Left alone this fails **silently in the worst way** —
+  the fonts 404, the page renders in the fallback, and computed
+  `font-family` still reads `"Saans"`, so the obvious assertion passes while
+  the page is wrong. Now `../../assets/fonts/`.
+- `foundations/icons/icon-base.tsx` reached `../lib/utils`. Now `../../`.
+
+**Consuming apps.** There is no `exports` map and no path alias — the kit is
+vendored source, so every path is literal. Two stylesheet imports and one
+import specifier change; `README.md`'s import table carries the rows.
+
+```css
+@import "kwapso-design/foundations/tokens/tokens.css";
+@import "kwapso-design/foundations/motion/motion.css";
+```
+```tsx
+import { Pencil } from "kwapso-design/foundations/icons";
+```
+
+`controls/`, `structures/`, `compositions/` and `lib/` are untouched.
+
+**The verification is the work, not the move.** All fourteen decision pages
+were reopened in a browser and asserted styled — stylesheet count, computed
+body `font-family` against the kit stack, and computed background against the
+token colour — because a missing stylesheet is not an error in HTML and no
+build, test or console would have told anyone.
+
+All fourteen pass in both palettes, plus `verify/whats-left.html`, which a
+sibling agent was writing while this move was in flight and which this move
+broke. Each page resolves its stylesheet (25 rules from the external sheet),
+computes `font-family: Saans, system-ui, …`, and paints
+`rgb(255, 254, 249)` in light and `rgb(20, 19, 16)` in dark.
+
+**The assertion was checked against a negative control**, because an assertion
+that cannot fail proves nothing: `needs-you.html` was re-served with its link
+reverted to the old `../tokens/tokens.css` and the same check reported
+`font: "Times"`, `background: rgba(0, 0, 0, 0)` and `0` rules from the
+external sheet — §D10's drawing, reproduced. The check has teeth.
+
+`document.fonts.check('300 1rem Saans')` is part of the assertion, because the
+font-url break is the one failure that `font-family` alone cannot see: the
+computed value still reads `"Saans"` while the browser paints the fallback.
+`/assets/fonts/Saans-Light.woff2` returns 200 and the face loads on every page.
+
+Demo and mini app verified at 380 / 834 / 1440 in both palettes — twelve
+combinations, all green, icons rendering in each.
+
+**Three verify harnesses do not build, and did not before this move:**
+`kit-f`, `rulings-c` and `track3c` import `demo/screens/wall`,
+`compositions/screens/triage-sitting` and `compositions/screens/notifications`,
+all deleted in the restructure above; `overflow` imports `OnboardingScreen`,
+which was renamed `OnboardingRoute`. `rail`, `kit-bc` and `kit-de` build clean.
+Left alone — stale harnesses are their own repair, not this one.
 
 ## v0.4.0 — 2026-08-22
 

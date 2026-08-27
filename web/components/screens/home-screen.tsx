@@ -24,10 +24,10 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Badge } from "@shared/ui/controls/badge/badge"
+} from "@shared/ui/components/avatar/avatar"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/icons"
+import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/foundations/icons"
 
 import { PulseBand } from "@/components/pulse"
 import { letterMark } from "@/lib/identity"

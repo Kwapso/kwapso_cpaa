@@ -129,28 +129,28 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Input } from "../../controls/input/input";
-import { SearchInput } from "../../controls/search-input/search-input";
+import { Button } from "../../components/button/button";
+import { Input } from "../../components/input/input";
+import { SearchInput } from "../../components/search-input/search-input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
+} from "../../components/select/select";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "../../controls/sheet/sheet";
-import { Hint, Text } from "../../controls/typography/typography";
-import { FilterBar, type FilterChip } from "../../controls/filter-bar/filter-bar";
-import { type CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
-import { FormActions } from "../../structures/form/form";
-import { Plus, X } from "../../icons";
+} from "../../components/sheet/sheet";
+import { Hint, Text } from "../../components/typography/typography";
+import { FilterBar, type FilterChip } from "../../components/filter-bar/filter-bar";
+import { type CollectionFrameTab } from "../../components/collection-frame/collection-frame";
+import { FormActions } from "../../components/form/form";
+import { Check, Plus, X } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { MainScreen } from "../templates";
 
@@ -755,8 +755,16 @@ function FilterBuilderScreen({
                 sentence about removal never needing the panel. Saving a view
                 for everyone on the collection is the one act this screen
                 does not offer on a phone. Logged as T3B-11. */}
+            {/* CLEAR IS A PAPER PILL, NOT A TEXT WORD — p37 draws all three
+                footer controls as pills: Clear plain paper, Save as a tab
+                paper with the + glyph, Show 6 mango with the ✓. A text-word
+                Clear was the build's own reading of "context left". */}
             {onClear === undefined ? null : (
-              <Button variant="text" className="hidden sm:inline-flex" onClick={onClear}>
+              <Button
+                variant="secondary"
+                className="hidden sm:inline-flex"
+                onClick={onClear}
+              >
                 {words.clear}
               </Button>
             )}
@@ -766,11 +774,15 @@ function FilterBuilderScreen({
                 className="hidden sm:inline-flex"
                 onClick={onSaveAsTab}
               >
+                <Plus aria-hidden="true" />
                 {words.saveAsTab}
               </Button>
             )}
-            {/* THE ONE MANGO, AND IT CARRIES THE COUNT. */}
-            <Button onClick={onShow}>{formatShow(matchCount)}</Button>
+            {/* THE ONE MANGO, AND IT CARRIES THE COUNT — and p37's ✓. */}
+            <Button onClick={onShow}>
+              <Check aria-hidden="true" />
+              {formatShow(matchCount)}
+            </Button>
           </FormActions>
         </SheetContent>
       </Sheet>

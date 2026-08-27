@@ -69,14 +69,14 @@
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Text } from "../../controls/typography/typography";
-import type { DataTableColumn } from "../../structures/data-table/data-table";
-import type { CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
-import type { FilterChip } from "../../controls/filter-bar/filter-bar";
-import type { SortOption } from "../../controls/sort-control/sort-control";
-import { Plus } from "../../icons";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Text } from "../../components/typography/typography";
+import type { DataTableColumn } from "../../components/data-table/data-table";
+import type { CollectionFrameTab } from "../../components/collection-frame/collection-frame";
+import type { FilterChip } from "../../components/filter-bar/filter-bar";
+import type { SortOption } from "../../components/sort-control/sort-control";
+import { Plus } from "../../foundations/icons";
 import { CollectionScreen, StatStrip, type StatStripFigure } from "../templates";
 import { type ShapeState, type ShapeStateCopy } from "../states";
 

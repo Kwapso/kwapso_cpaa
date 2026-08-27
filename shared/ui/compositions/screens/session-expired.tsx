@@ -61,11 +61,11 @@
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Field } from "../../controls/field/field";
-import { Input } from "../../controls/input/input";
-import { Text } from "../../controls/typography/typography";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Field } from "../../components/field/field";
+import { Input } from "../../components/input/input";
+import { Text } from "../../components/typography/typography";
 import { AuthShell } from "./sign-in";
 
 export interface SessionExpiredScreenProps
@@ -206,7 +206,10 @@ function SessionExpiredScreen({
             <Text as="span" size="sm" tone="secondary">
               {destinationLabel}
             </Text>
-            <Badge variant="outline">{destinationRef}</Badge>
+            {/* THE BLACK CHIP IS ALWAYS THE ID — override 73, the client's
+                universal rule ("we always use black chips for IDs"). It was
+                `outline`; the ruling beats the artifact's lighter drawing. */}
+            <Badge variant="inverse">{destinationRef}</Badge>
             {destinationTitle === undefined ? null : (
               <Text as="span" size="sm" className="hidden min-w-0 truncate md:inline">
                 {destinationTitle}

@@ -61,21 +61,21 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
+import { Button } from "../../components/button/button";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "../../controls/sheet/sheet";
-import { Text } from "../../controls/typography/typography";
+} from "../../components/sheet/sheet";
+import { Hint, Text } from "../../components/typography/typography";
 import {
   Form,
-  FormActions,
   FormSection,
   type FormErrorItem,
-} from "../../structures/form/form";
+} from "../../components/form/form";
+import { Upload } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { useHasRoom } from "../../lib/use-has-room";
 import {
@@ -129,16 +129,38 @@ export interface FormScreenProps
    * screens. Pass it explicitly only to override the width answer.
    */
   side?: "right" | "bottom";
+  /**
+   * The panel's drawn measure, when it comes from the side. ch27.2 draws the
+   * ADD panel at 484px, max 78% of the window; ch27.3 draws the EDIT panel at
+   * 512px, max 80% — "Add and Edit are one composition with two headers", and
+   * the width is the one other thing that differs. Ignored for the bottom
+   * sheet, which is always the full width.
+   */
+  panelWidth?: "add" | "edit";
   open?: boolean;
   /** The panel opened or closed. A stray click behind it closes it (ch27.2). */
   onOpenChange?: (open: boolean) => void;
   /** The ✕'s accessible name. */
   closeLabel?: string;
 
+  /**
+   * The quiet context line ABOVE the panel's title — ch27.2 draws
+   * "Collection · New" over "New record", and 27.3 draws
+   * "Collection · 4182 · editing" over the record's title. Panel surface
+   * only; a page form's context is the screen's own header band.
+   */
+  eyebrow?: React.ReactNode;
   /** What this form is for. In a panel it is the sheet's title. */
   title?: React.ReactNode;
   /** A line under the title. */
   description?: React.ReactNode;
+  /**
+   * The identity chips under the panel's title — ch27.3's edit header draws
+   * the record's status pill, relation, owner and "Opened 13 Jun 2026" in a
+   * row below "Record title goes here". Panel surface only; an add form has
+   * none, because a record that does not exist yet has no identity to state.
+   */
+  chips?: React.ReactNode;
 
   /** The groups. */
   sections?: FormScreenSection[];
@@ -147,12 +169,49 @@ export interface FormScreenProps
   /** One column or two, for an ungrouped form. */
   columns?: 1 | 2;
 
-  /** The summary at the top, one line per problem, each a link to its field. */
+  /**
+   * The fields that need attention, one entry per problem. ON A PANEL these
+   * are NOT drawn as a head summary — ch27.35: "Never a red banner at the top
+   * of the panel, never a tooltip, never a dialog listing errors. The count
+   * sits above the button" — so the panel draws the attention card directly
+   * above Cancel and Save instead: the count in words, the reassurance, and
+   * "Go to the first". On a page the head summary stands (it is the reachable
+   * in-page anchor list a long page needs).
+   */
   errors?: FormErrorItem[];
-  /** The summary's heading. */
+  /** The summary's heading. Page surface only. */
   errorsTitle?: string;
-  /** Jump to a field from the summary. */
+  /** Jump to a field from the summary or from "Go to the first". */
   onErrorSelect?: (id: string) => void;
+  /** How the attention card's count reads. ch27.35: "Two fields need attention." */
+  formatAttention?: (count: number) => string;
+  /** The sentence after the count. */
+  attentionReassurance?: React.ReactNode;
+  /** The narrow render's shorter sentence — "Nothing is lost." */
+  attentionReassuranceNarrow?: React.ReactNode;
+  /** "Go to the first" — walks to the first field named. */
+  goToFirstLabel?: React.ReactNode;
+
+  /**
+   * THE SAVE ITSELF FAILED — ch27.35's second case, kept apart from
+   * validation: "A server refusal keeps its own card: it says the change was
+   * refused, not lost, offers Retry with the same values, and offers to copy
+   * what was written." Never a toast, never a dialog; the panel stays open
+   * and the values stay in the fields.
+   */
+  refused?: boolean;
+  /** The refusal card's title. */
+  refusedTitle?: React.ReactNode;
+  /** Its sentence. */
+  refusedBody?: React.ReactNode;
+  /** Sends exactly what is on screen. */
+  onRetry?: () => void;
+  /** Its label. */
+  retryLabel?: React.ReactNode;
+  /** Puts what was written on the clipboard. */
+  onCopyDraft?: () => void;
+  /** Its label — "Copy what I wrote". */
+  copyDraftLabel?: React.ReactNode;
 
   /**
    * The names of the required fields still empty. ch27.2 puts the count and
@@ -163,6 +222,24 @@ export interface FormScreenProps
   formatMissing?: (names: readonly string[]) => string;
   /** Anything else beside the commit. Drawn after the missing sentence. */
   meta?: React.ReactNode;
+
+  /**
+   * The names of the fields changed and not saved — ch27.3's dirty state.
+   * Non-empty, the panel pins ONE MANGO BAND directly above Discard and Save:
+   * "how many fields changed, then which ones. It is the one place mango
+   * appears as a band rather than a button — the warning and the decision it
+   * concerns are never separated by a scroll." Panel surface only.
+   */
+  changed?: readonly string[];
+  /** How the band's first sentence reads. The count is a word, as ch27.2's. */
+  formatChanged?: (names: readonly string[]) => string;
+  /**
+   * "Review" — the word at the band's trailing end. Omitted, the word is not
+   * drawn; the band still states the count and the names.
+   */
+  onReview?: () => void;
+  /** Its label. */
+  reviewLabel?: React.ReactNode;
 
   /** Commit. */
   onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -187,12 +264,54 @@ export interface FormScreenProps
   errorAction?: React.ReactNode;
 }
 
+/* ch27.2 writes the count as a WORD — "Two required fields are empty — Title,
+   Owner" — not a digit. Ten and up falls back to figures, which is the usual
+   English typographic rule and past any count a form footer should reach. */
+const COUNT_WORDS = [
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+] as const;
+
 function defaultFormatMissing(names: readonly string[]): string {
   if (names.length === 0) return "";
-  return names.length === 1
-    ? `One required field is empty — ${names[0]}`
-    : `${names.length} required fields are empty — ${names.join(", ")}`;
+  if (names.length === 1) return `One required field is empty — ${names[0]}`;
+  const count = COUNT_WORDS[names.length] ?? String(names.length);
+  return `${count} required fields are empty — ${names.join(", ")}`;
 }
+
+/* ch27.35's card writes its count as a word too: "Two fields need
+   attention." */
+function defaultFormatAttention(count: number): string {
+  if (count === 1) return "One field needs attention.";
+  const word = COUNT_WORDS[count] ?? String(count);
+  return `${word} fields need attention.`;
+}
+
+/* ch27.3's band writes its count the same way: "Two fields changed and not
+   saved", then the names beside it in their own quieter span. */
+function defaultFormatChanged(names: readonly string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return "One field changed and not saved";
+  const count = COUNT_WORDS[names.length] ?? String(names.length);
+  return `${count} fields changed and not saved`;
+}
+
+/* ch27.2 draws the ADD panel "position: absolute … width: 484px; max-width:
+   78%" and ch27.3 the EDIT panel at 512px / 80%. Both beat the CH20 drawer's
+   generic 420, which stays the default for every other sheet. Side panels
+   only — the bottom sheet is full-width. */
+const PANEL_WIDTH: Record<"add" | "edit", string> = {
+  add: "w-[30.25rem] max-w-[78%]",
+  edit: "w-[32rem] max-w-[80%]",
+};
 
 /**
  * The one form shell.
@@ -232,21 +351,39 @@ function FormScreen({
   className,
   surface = "page",
   side,
+  panelWidth = "add",
   density = "comfortable",
   open,
   onOpenChange,
   closeLabel,
+  eyebrow,
   title,
   description,
+  chips,
   sections,
   children,
   columns,
   errors,
   errorsTitle,
   onErrorSelect,
+  formatAttention = defaultFormatAttention,
+  attentionReassurance = "Nothing has been saved and nothing you typed is lost.",
+  attentionReassuranceNarrow = "Nothing is lost.",
+  goToFirstLabel = "Go to the first",
+  refused = false,
+  refusedTitle = "This could not be saved",
+  refusedBody = "The change was refused, not lost. Your text is still in the fields above and Retry sends exactly what you see.",
+  onRetry,
+  retryLabel = "Retry",
+  onCopyDraft,
+  copyDraftLabel = "Copy what I wrote",
   missing,
   formatMissing = defaultFormatMissing,
   meta,
+  changed,
+  formatChanged = defaultFormatChanged,
+  onReview,
+  reviewLabel = "Review",
   onSubmit,
   submitLabel = "Save",
   onCancel,
@@ -270,6 +407,47 @@ function FormScreen({
   const blocked = missing !== undefined && missing.length > 0;
   const missingLine = blocked ? formatMissing(missing) : undefined;
 
+  const dirty = changed !== undefined && changed.length > 0;
+  /* THE DIRTY BAND — ch27.3, drawn: a full-bleed mango strip directly above
+     the footer row, charcoal ink, the count at 13.5/500, the names beside it
+     one step down, "Review" at the trailing end. The narrow render keeps the
+     sentence alone, inset and rounded, and drops the names and the word. */
+  const changedBand = !dirty ? null : (
+    <div
+      data-slot="form-screen-changed"
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1",
+        "bg-surface-brand text-ink-on-accent",
+        "px-[var(--space-6)] py-[var(--space-3)]",
+        "max-sm:mx-[var(--space-4)] max-sm:rounded-[var(--radius)] max-sm:px-[var(--space-4)]",
+      )}
+    >
+      <Text
+        as="span"
+        size="sm"
+        tone="inherit"
+        className="font-[var(--font-weight-medium)]"
+      >
+        {formatChanged(changed)}
+      </Text>
+      <Text as="span" size="sm" tone="inherit" className="hidden sm:inline">
+        {changed.join(", ")}
+      </Text>
+      {onReview === undefined ? null : (
+        <button
+          type="button"
+          onClick={onReview}
+          /* Bare medium type at the band's end, as the artifact draws it —
+             a pill here would be a second button over the two the footer
+             already holds. tokens.css §8 rings it. */
+          className="ms-auto hidden cursor-pointer border-0 bg-transparent p-0 text-sm font-[var(--font-weight-medium)] text-current sm:inline"
+        >
+          {reviewLabel}
+        </button>
+      )}
+    </div>
+  );
+
   const footerMeta =
     missingLine === undefined && meta === undefined ? undefined : (
       <span className="flex min-w-0 flex-col gap-1">
@@ -281,6 +459,94 @@ function FormScreen({
         {meta}
       </span>
     );
+
+  /* THE ATTENTION CARD — ch27.35, drawn: a hairlined off-beige card directly
+     above the buttons, opening on the 8 poppy dot; the count at 500, the
+     reassurance after it in the same sentence, "Go to the first" underlined
+     at the trailing end. Narrow: a soft-paper strip, the short reassurance,
+     no link — the first field is one thumb-scroll away. Panel surface only;
+     a page keeps its head summary, which is the reachable anchor list a long
+     page needs. */
+  const hasAttention =
+    surface === "panel" && errors !== undefined && errors.length > 0;
+  const goToFirst = () => {
+    const first = errors?.[0];
+    if (first === undefined) return;
+    if (first.fieldId !== undefined) {
+      document.getElementById(first.fieldId)?.focus();
+    }
+    onErrorSelect?.(first.id);
+  };
+  const attentionCard = !hasAttention ? null : (
+    <div
+      data-slot="form-screen-attention"
+      className={cn(
+        "mx-[var(--space-6)] flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1",
+        "rounded-[var(--radius)] px-[var(--space-4h)] py-[var(--space-4)]",
+        "bg-card shadow-[var(--hairline-strong)]",
+        "max-sm:mx-[var(--space-4)] max-sm:bg-surface-panel max-sm:shadow-none",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className="size-[var(--dot-status)] shrink-0 rounded-pill bg-destructive"
+      />
+      <Text as="span" size="sm" className="min-w-0 flex-1">
+        <span className="font-[var(--font-weight-medium)]">
+          {formatAttention(errors.length)}
+        </span>{" "}
+        <span className="hidden sm:inline">{attentionReassurance}</span>
+        <span className="sm:hidden">{attentionReassuranceNarrow}</span>
+      </Text>
+      <Button
+        type="button"
+        variant="text"
+        className="ms-auto hidden sm:inline-flex"
+        onClick={goToFirst}
+      >
+        {goToFirstLabel}
+      </Button>
+    </div>
+  );
+
+  /* THE REFUSAL CARD — ch27.35's second case: "it says the change was
+     refused, not lost, offers Retry with the same values, and offers to copy
+     what was written." A soft-paper card, the poppy dot on the title, Retry
+     as a paper pill with the send-up glyph, the copy offer underlined. It
+     never becomes a toast, and the panel it sits in stays open. */
+  const refusedCard = !refused ? null : (
+    <div
+      data-slot="form-screen-refused"
+      role="alert"
+      className={cn(
+        "mx-[var(--space-6)] flex min-w-0 flex-col gap-[var(--space-2h)]",
+        "rounded-[var(--radius)] bg-surface-panel p-[var(--space-5)]",
+        "max-sm:mx-[var(--space-4)]",
+      )}
+    >
+      <span className="inline-flex items-center gap-[var(--space-2h)] text-base font-[var(--font-weight-medium)] text-foreground">
+        <span
+          aria-hidden="true"
+          className="size-[var(--dot-status)] shrink-0 rounded-pill bg-destructive"
+        />
+        {refusedTitle}
+      </span>
+      <Text as="p" size="sm" tone="secondary">
+        {refusedBody}
+      </Text>
+      <div className="flex flex-wrap items-center gap-[var(--space-2h)] pt-1">
+        <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+          <Upload aria-hidden="true" />
+          {retryLabel}
+        </Button>
+        {onCopyDraft === undefined ? null : (
+          <Button type="button" variant="text" onClick={onCopyDraft}>
+            {copyDraftLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   const fields =
     sections === undefined ? (
@@ -329,6 +595,7 @@ function FormScreen({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side={resolvedSide} closeLabel={closeLabel}>
           <SheetHeader>
+            {eyebrow === undefined ? null : <Hint as="span">{eyebrow}</Hint>}
             <SheetTitle>{title}</SheetTitle>
             {description === undefined ? null : (
               <SheetDescription>{description}</SheetDescription>
@@ -349,10 +616,19 @@ function FormScreen({
       description={surface === "panel" ? undefined : description}
       columns={columns}
       sectioned={sections !== undefined}
-      errors={errors}
+      /* ch27.35 forbids the head banner ON A PANEL — "never a red banner at
+         the top of the panel, never a dialog listing errors" — so the panel
+         keeps the messages at their fields and counts them on the attention
+         card above the buttons instead. The page keeps its summary. */
+      errors={surface === "panel" ? undefined : errors}
       errorsTitle={errorsTitle}
       onErrorSelect={onErrorSelect}
-      disabled={disabled || blocked}
+      /* THE FIELDS STAY LIVE WHILE THE COMMIT IS CLOSED. ch27.2 closes the
+         BUTTON — "quiet-fill button in disabled ink" — and its sentence names
+         the fields still to fill; freezing the fieldset on `blocked` locked a
+         reader out of the very fields the sentence told them to go back to. */
+      disabled={disabled}
+      submitDisabled={blocked}
       loading={submitting}
       submitLabel={submitLabel}
       cancelLabel={cancelLabel}
@@ -386,12 +662,29 @@ function FormScreen({
         side={resolvedSide}
         closeLabel={closeLabel}
         aria-busy={submitting || undefined}
-        className={cn("flex flex-col", className)}
+        className={cn(
+          "flex flex-col",
+          /* The chapter's own measures, not CH20's generic 420 — ch27.2:
+             "the form enters as a 484px panel"; ch27.3: "a 512px panel". */
+          resolvedSide === "right" && PANEL_WIDTH[panelWidth],
+          className,
+        )}
       >
         <SheetHeader>
+          {eyebrow === undefined ? null : <Hint as="span">{eyebrow}</Hint>}
           <SheetTitle>{title}</SheetTitle>
           {description === undefined ? null : (
             <SheetDescription>{description}</SheetDescription>
+          )}
+          {/* ch27.3's edit header: the record's chips in a row under the
+              title — status, relation, owner, "Opened 13 Jun 2026". */}
+          {chips === undefined ? null : (
+            <div
+              data-slot="form-screen-chips"
+              className="flex min-w-0 flex-wrap items-center gap-2"
+            >
+              {chips}
+            </div>
           )}
         </SheetHeader>
 
@@ -399,31 +692,54 @@ function FormScreen({
             buttons to the panel's bottom edge, "where the scrolling ends". */}
         <div className="min-h-0 flex-1 overflow-y-auto">{formNode}</div>
 
-        <FormActions meta={footerMeta} hairline>
-          {actions ?? (
-            <React.Fragment>
-              {onCancel === undefined ? null : (
+        {/* THE PINNED FOOT — ch27.2: "a footer pinned to the panel's bottom
+            edge, same paper as the form, separated by one hairline — no
+            second tone … the hint or reference against the left edge, then
+            Cancel, then Create. On narrow the two buttons share a row at half
+            width each, primary on the right, with the hint above them." The
+            dirty band (ch27.3) sits inside the same pinned block, directly
+            above the buttons, so the warning and the decision it concerns
+            are never separated by a scroll. */}
+        <div
+          data-slot="form-screen-foot"
+          className="flex shrink-0 flex-col gap-[var(--space-3)] pt-[var(--space-3)] shadow-[var(--hairline-over)]"
+        >
+          {refusedCard}
+          {attentionCard}
+          {changedBand}
+          <div className="flex min-w-0 flex-wrap items-center gap-3 px-[var(--space-6)] pb-[var(--space-6)] pt-[var(--space-1)]">
+            {footerMeta === undefined ? null : (
+              <span className="w-full min-w-0 sm:me-auto sm:w-auto sm:max-w-[50%]">
+                {footerMeta}
+              </span>
+            )}
+            {actions ?? (
+              <React.Fragment>
+                {onCancel === undefined ? null : (
+                  <Button
+                    type="button"
+                    variant="cancel"
+                    disabled={disabled || submitting}
+                    onClick={onCancel}
+                    className="flex-1 sm:flex-initial"
+                  >
+                    {cancelLabel}
+                  </Button>
+                )}
                 <Button
-                  type="button"
-                  variant="cancel"
-                  disabled={disabled || submitting}
-                  onClick={onCancel}
+                  type="submit"
+                  form={formId}
+                  loading={submitting}
+                  disabled={disabled || blocked}
+                  aria-describedby={undefined}
+                  className="flex-1 sm:flex-initial"
                 >
-                  {cancelLabel}
+                  {submitLabel}
                 </Button>
-              )}
-              <Button
-                type="submit"
-                form={formId}
-                loading={submitting}
-                disabled={disabled || blocked}
-                aria-describedby={undefined}
-              >
-                {submitLabel}
-              </Button>
-            </React.Fragment>
-          )}
-        </FormActions>
+              </React.Fragment>
+            )}
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
   );

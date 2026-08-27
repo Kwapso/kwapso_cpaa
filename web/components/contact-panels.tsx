@@ -12,9 +12,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { ChevronRight } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
 import { content as contentApi } from "@/lib/api"

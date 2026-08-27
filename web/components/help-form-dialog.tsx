@@ -30,15 +30,15 @@ import * as React from "react"
 import {
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
-import { Button } from "@shared/ui/controls/button/button"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { Paperclip, X } from "@shared/ui/icons"
+} from "@shared/ui/components/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Paperclip, X } from "@shared/ui/foundations/icons"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content, tenancy } from "@/lib/api"

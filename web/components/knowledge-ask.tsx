@@ -48,11 +48,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "@shared/ui/foundations/icons"
 
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"

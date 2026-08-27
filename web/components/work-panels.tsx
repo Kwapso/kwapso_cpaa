@@ -19,11 +19,11 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Ban, ChevronRight } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Ban, ChevronRight } from "@shared/ui/foundations/icons"
 
 import { AppMark } from "@/components/app-tiles"
 import { LoadMore } from "@/components/load-more"

@@ -26,8 +26,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { ChevronRight } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"

@@ -2,7 +2,7 @@
 
 235 custom properties as of **v0.5.0**, grouped by the job they do.
 
-> The live figure is always `tokens/tokens.json → counts.declared`, and it
+> The live figure is always `foundations/tokens/tokens.json → counts.declared`, and it
 > moves as work lands — step 7 is adding a `--folder-*` geometry group as this
 > is written. Take the count as a marker, not a contract; take the *groups* as
 > the contract.
@@ -11,9 +11,9 @@ This is a lookup. Find the role you need, read what the group is *for*, then
 pick within it. Nothing here is alphabetical, because you never know a token's
 name before you know what you are trying to paint.
 
-**Source of truth:** `tokens/tokens.css`. It carries the reasoning inline and
+**Source of truth:** `foundations/tokens/tokens.css`. It carries the reasoning inline and
 is the only file in the system where a colour or a size is decided.
-`tokens/tokens.json` is **generated** from it — never hand-edit it.
+`foundations/tokens/tokens.json` is **generated** from it — never hand-edit it.
 
 **Unresolved values are flagged** in this file with a **⚠** and gathered again
 at the end. A reader must not discover those the hard way.
@@ -605,7 +605,7 @@ icon rescales with the text-size control like everything else.
 **⚠ All 96 icon exports are placeholder artwork** — a rounded frame with a
 per-name dot pattern, deliberately and visibly not final. The **names**, the
 React API, the five sizes and the `currentColor` wiring are **final**. Build
-against them; the swap is `icons/<Name>.svg` plus one generator run.
+against them; the swap is `foundations/icons/<Name>.svg` plus one generator run.
 
 ### Marks and avatars
 
@@ -666,7 +666,7 @@ not to any field.
 
 ## 15 · Motion
 
-Every duration and every curve in `motion/motion.css` is a `var()` onto these.
+Every duration and every curve in `foundations/motion/motion.css` is a `var()` onto these.
 Change the feel of the whole system here and nowhere else.
 
 ### Curves — four, and none of them overshoots
@@ -851,13 +851,13 @@ about ten seconds to run. Run it after touching anything in that block.
 ## Changing a token
 
 ```bash
-# 1 · edit tokens/tokens.css — the ONLY place a colour or size is decided
+# 1 · edit foundations/tokens/tokens.css — the ONLY place a colour or size is decided
 # 2 · if it is a dark value, paste it into BOTH dark blocks (§6 and §7)
 npm run build:tokens     # regenerates tokens.json
 npm run check            # all four gates
 ```
 
-The four guards in `tokens/build-tokens.mjs`, each of which catches a bug that
+The four guards in `foundations/tokens/build-tokens.mjs`, each of which catches a bug that
 is invisible in review:
 
 | Guard | Fails on | Because |
@@ -870,5 +870,5 @@ is invisible in review:
 The allowlist is exactly: `--shadow-*` geometry, `--focus-width`,
 `--focus-offset`, `--radius-pill`.
 
-Never edit `tokens/tokens.json`. It is generated, and a hand edit is
+Never edit `foundations/tokens/tokens.json`. It is generated, and a hand edit is
 overwritten by the next build.

@@ -17,12 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@shared/ui/controls/dialog/dialog"
-import { ScrollArea } from "@shared/ui/controls/scroll-area/scroll-area"
+} from "@shared/ui/components/dialog/dialog"
+import { ScrollArea } from "@shared/ui/components/scroll-area/scroll-area"
 import {
   ActivityFeed,
   type ActivityFeedItem,
-} from "@shared/ui/structures/activity-feed/activity-feed"
+} from "@shared/ui/components/activity-feed/activity-feed"
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"

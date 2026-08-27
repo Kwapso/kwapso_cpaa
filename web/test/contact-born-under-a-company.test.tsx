@@ -111,7 +111,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 // The toasts are the screen's honesty about a half-done write, so they are read
 // rather than silenced.
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-vi.mock("@shared/ui/controls/sonner/sonner", () => ({
+vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: toasts,
   Toaster: () => null,
 }))

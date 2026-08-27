@@ -22,16 +22,16 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Progress } from "@shared/ui/controls/progress/progress"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Progress } from "@shared/ui/components/progress/progress"
 import type {
   ScreenActionContext,
   ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { type CollectionConfig } from "@shared/web/screen-engine/config"
-import { Inbox } from "@shared/ui/icons"
+import { Inbox } from "@shared/ui/foundations/icons"
 
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 

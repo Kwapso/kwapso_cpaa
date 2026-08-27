@@ -23,10 +23,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Paperclip } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Paperclip } from "@shared/ui/foundations/icons"
 
 import { ApiFailure } from "@/lib/api"
 // No canvas re-encode: a certificate is a document, and a PDF put through an

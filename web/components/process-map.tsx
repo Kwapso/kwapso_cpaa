@@ -36,8 +36,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { ArrowDown } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { ArrowDown } from "@shared/ui/foundations/icons"
 
 import { useT } from "@shared/web/language"
 import { hoursText, minutesText } from "@shared/workers/savings"

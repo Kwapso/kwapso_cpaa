@@ -26,9 +26,9 @@
 import * as React from "react"
 import Link from "next/link"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { ArrowRight, Plus } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { ArrowRight, Plus } from "@shared/ui/foundations/icons"
 
 import { SAVINGS_CAPTION, hoursText } from "@shared/workers/savings"
 import { invalidate, useCached } from "@shared/web/store"

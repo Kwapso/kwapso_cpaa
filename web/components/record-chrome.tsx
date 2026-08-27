@@ -24,15 +24,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { MoreHorizontal } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { MoreHorizontal } from "@shared/ui/foundations/icons"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { formatRelative } from "@shared/web/format"

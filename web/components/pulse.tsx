@@ -42,9 +42,9 @@ import * as React from "react"
 
 import dynamic from "next/dynamic"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
-import { ChartNoAxesColumn } from "@shared/ui/icons"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
+import { ChartNoAxesColumn } from "@shared/ui/foundations/icons"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"

@@ -8,20 +8,20 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { cn } from "@shared/ui/lib/utils"
-import { Button, buttonVariants } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
+import { Button, buttonVariants } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "@shared/ui/icons"
+} from "@shared/ui/components/select/select"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "@shared/ui/foundations/icons"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"

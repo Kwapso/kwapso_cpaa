@@ -65,7 +65,7 @@ import {
   ViewColumns2,
   WarningTriangle,
   Wrench,
-} from "@shared/ui/icons"
+} from "@shared/ui/foundations/icons"
 
 import type * as React from "react"
 

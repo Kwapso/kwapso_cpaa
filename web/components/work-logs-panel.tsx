@@ -27,15 +27,15 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
-import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 
 import { CONCEPT_ICON } from "@/lib/pages"
-import { Pencil } from "@shared/ui/icons"
+import { Pencil } from "@shared/ui/foundations/icons"
 
 import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"

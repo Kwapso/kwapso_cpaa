@@ -7,7 +7,7 @@
 // survives the navigation (CACHING.md §11), so you can add an option and return to a
 // still-filled form.
 
-import { Settings2 } from "@shared/ui/icons"
+import { Settings2 } from "@shared/ui/foundations/icons"
 
 import { usePermissions } from "@/lib/perms"
 import { InAppLink } from "@/components/in-app-link"

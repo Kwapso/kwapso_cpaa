@@ -9,7 +9,7 @@
 
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "@shared/ui/icons"
+import { X } from "@shared/ui/foundations/icons"
 
 import {
   gateState,
@@ -35,40 +35,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Button, buttonVariants } from "@shared/ui/controls/button/button"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { DatePicker } from "@shared/ui/controls/date-picker/date-picker"
+} from "@shared/ui/components/select/select"
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 // The FIELD comes through the app's seam, not the kit directly — the seam
 // translates a config's words on the way to the screen (R33), and its import
 // ban is what keeps every renderer honest, this one included.
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { Input } from "@shared/ui/controls/input/input"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { Switch } from "@shared/ui/controls/switch/switch"
-import { ActivityFeed } from "@shared/ui/structures/activity-feed/activity-feed"
-import { CardGrid } from "@shared/ui/structures/card-grid/card-grid"
-import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/controls/card/card"
-import { MoreHorizontal } from "@shared/ui/icons"
+import { Switch } from "@shared/ui/components/switch/switch"
+import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
+import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/components/card/card"
+import { MoreHorizontal } from "@shared/ui/foundations/icons"
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
-import { DataTable, type DataTableColumn } from "@shared/ui/structures/data-table/data-table"
+import { DataTable, type DataTableColumn } from "@shared/ui/components/data-table/data-table"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 import { List } from "@shared/web/list-compat"
-import { RecordDetail } from "@shared/ui/structures/record-detail/record-detail"
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/controls/avatar/avatar"
+import { RecordDetail } from "@shared/ui/components/record-detail/record-detail"
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 
 /* ------------------------- host-injected contracts ------------------------- */
 

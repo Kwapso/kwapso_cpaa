@@ -24,14 +24,14 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
+import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"

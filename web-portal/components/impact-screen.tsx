@@ -37,11 +37,11 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@shared/ui/controls/accordion/accordion"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Comments } from "@shared/ui/structures/comments/comments"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/accordion/accordion"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Comments } from "@shared/ui/components/comments/comments"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"

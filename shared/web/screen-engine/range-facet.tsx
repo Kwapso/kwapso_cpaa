@@ -5,16 +5,16 @@
 // row that chooses between them.
 
 import * as React from "react"
-import { ChevronsUpDown, X } from "@shared/ui/icons"
+import { ChevronsUpDown, X } from "@shared/ui/foundations/icons"
 
 import { type FilterFacet } from "./config"
 import { formatRange, parseRange } from "./range"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Button } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@shared/ui/controls/popover/popover"
-import { Slider } from "@shared/ui/controls/slider/slider"
+import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@shared/ui/components/popover/popover"
+import { Slider } from "@shared/ui/components/slider/slider"
 
 /** A `control:"range"` facet: a compact trigger + a min/max editor in a popover.
  * With BOTH `min` and `max` bounds it's a two-thumb Slider; otherwise two number

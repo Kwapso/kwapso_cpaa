@@ -86,9 +86,9 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Checkbox } from "../../controls/checkbox/checkbox";
-import { Choice } from "../../controls/choice/choice";
+import { Button } from "../../components/button/button";
+import { Checkbox } from "../../components/checkbox/checkbox";
+import { Choice } from "../../components/choice/choice";
 import {
   Dialog,
   DialogContent,
@@ -96,8 +96,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../controls/dialog/dialog";
-import { RadioGroup, RadioGroupItem } from "../../controls/radio-group/radio-group";
+} from "../../components/dialog/dialog";
+import { RadioGroup, RadioGroupItem } from "../../components/radio-group/radio-group";
 import {
   Sheet,
   SheetContent,
@@ -105,12 +105,13 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "../../controls/sheet/sheet";
+} from "../../components/sheet/sheet";
 import {
   ToggleGroup,
   ToggleGroupItem,
-} from "../../controls/toggle-group/toggle-group";
-import { Hint } from "../../controls/typography/typography";
+} from "../../components/toggle-group/toggle-group";
+import { Hint } from "../../components/typography/typography";
+import { Download } from "../../foundations/icons";
 
 /** Which door. The portal has no internal notes and no Excel. */
 export type ExportDoor = "system" | "portal";
@@ -516,8 +517,10 @@ function ExportScreen({
       <Button variant="secondary" onClick={() => onOpenChange(false)}>
         {words.cancel}
       </Button>
-      {/* THE ONE MANGO, AND IT CARRIES THE NUMBER. */}
+      {/* THE ONE MANGO, AND IT CARRIES THE NUMBER — and p36's download
+          glyph, at both widths. */}
       <Button onClick={onExport}>
+        <Download aria-hidden="true" />
         {hasRoom ? formatCommit(count) : formatCommitNarrow(count)}
       </Button>
     </React.Fragment>

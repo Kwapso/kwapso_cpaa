@@ -21,8 +21,8 @@
 
 import * as React from "react"
 
-import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
-import { Progress } from "@shared/ui/controls/progress/progress"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
+import { Progress } from "@shared/ui/components/progress/progress"
 import {
   Table,
   TableBody,
@@ -30,9 +30,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@shared/ui/controls/table/table"
+} from "@shared/ui/components/table/table"
 
-import { ArrowDown, CornerDownRight } from "@shared/ui/icons"
+import { ArrowDown, CornerDownRight } from "@shared/ui/foundations/icons"
 
 import type { AgentBlock } from "@shared/agent-blocks"
 

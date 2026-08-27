@@ -22,10 +22,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { ChevronRight, Palette, Pencil } from "@shared/ui/icons"
+import { ChevronRight, Palette, Pencil } from "@shared/ui/foundations/icons"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"
 import { OverviewList } from "@/components/overview-list"

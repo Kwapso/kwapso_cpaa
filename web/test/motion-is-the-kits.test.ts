@@ -1,6 +1,6 @@
 // THE APP SPEAKS THE KIT'S MOTION, OR IT SPEAKS NOBODY'S.
 //
-// `shared/ui/motion/motion.css` ships a whole vocabulary — page and route
+// `shared/ui/foundations/motion/motion.css` ships a whole vocabulary — page and route
 // transitions, row enter/exit/move, hover, hover-lift, drag, disclosure,
 // dialog, sheet, scrim, pull-to-refresh, progress — and both front doors
 // import it. For a year the app used exactly ONE of its classes,

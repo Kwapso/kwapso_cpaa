@@ -17,12 +17,12 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Card, CardContent } from "@shared/ui/controls/card/card"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { RecordActionsMenu } from "@/components/record-chrome"

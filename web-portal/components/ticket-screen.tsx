@@ -73,18 +73,18 @@
 import * as React from "react"
 import Link from "next/link"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Card } from "@shared/ui/controls/card/card"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Card } from "@shared/ui/components/card/card"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   PortalApprovalBand,
   PortalConversation,
   type PortalMessage,
-} from "@shared/ui/structures/portal-conversation/portal-conversation"
-import { ArrowLeft, Send } from "@shared/ui/icons"
+} from "@shared/ui/components/portal-conversation/portal-conversation"
+import { ArrowLeft, Send } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpMessage } from "@shared/types"

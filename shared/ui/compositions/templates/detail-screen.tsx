@@ -1,66 +1,60 @@
 "use client";
 
 /* ============================================================================
-   DetailScreen — a screen that HAS BREADCRUMBS.
+   DetailScreen — a screen OPENED FROM a collection: one record, read.
 
-   THE NAME IS THE CLIENT'S AND IT IS NOT NEGOTIABLE
+   THE NAME IS THE CLIENT'S
    The kit calls this "04 Detail / record page". The client calls it a DETAIL
-   SCREEN, and their own test is the one written into this file's name:
+   SCREEN. Their original test — "a main screen is in the navbar; a detail
+   screen has breadcrumbs" — named the way you ARRIVE, and its second half is
+   now reversed by the client's own later ruling:
 
-       "a main screen is in the navbar; a detail screen has breadcrumbs."
+   THERE IS NO BREADCRUMB ON A DETAIL SCREEN — OVERRIDE 73 (2026-08-26).
+   The client, comparing the live "Tickets · Padelbase · 4182" record page
+   against a reference mockup, verbatim: "notice how the chips are directly
+   underneath the title. in the example that I put, there is no edit button
+   like yours, but the edit button should be aligned with the title and the
+   chips underneath it. also, detail pages do not need this bar that you have
+   on top where we have Padelbase and the number. these are chips, so the
+   black chip is always the ID. we always use black chips for IDs, and next
+   to it, add a chip for Padelbase like in the example. of course, translate
+   this to universal rules."
 
-   So the word in the export, in the props, in the comments and in the data
-   attributes is `detail`. "Detail page" appears in this file exactly once — in
-   the sentence above.
+   WHAT THAT REMOVED FROM THIS FILE, CONCRETELY. This template used to draw a
+   26.04 breadcrumb trail, a 27.39 `COLLECTION · 4182` eyebrow and the title
+   in `ScreenShell`'s header band, with `RecordChrome`'s identity row in the
+   body pane below — a region apart. That split is exactly what produced the
+   client's screenshot (a breadcrumb-plus-eyebrow bar, a gap, then the ID
+   chip far below), and register row 73 logged this file as the remaining
+   carrier of it. `breadcrumb`, `breadcrumbLabel`, `trailing` and `eyebrow`
+   are REMOVED from the API rather than kept unused — the same treatment
+   override 73 gave `RecordChrome`'s own breadcrumb props — and every caller
+   in the repo was moved off them in the same change. The header band is left
+   EMPTY: `RecordChrome` carries `title` itself now, draws the identity row —
+   the black ID chip first, then the NEW `collectionLabel` chip ("Padelbase
+   like in the example"), then `chips` — directly under it, and threads
+   `actions` into the title's own row, which is what puts Edit "aligned with
+   the title" (the client's words) with no extra markup here.
 
    WHAT IT IS
-   `ScreenShell` (the four levels) with the three things a detail screen puts
-   in them, and `RecordChrome` for the record itself. `SHELL.md`'s table is
+   `ScreenShell` (the page, the screen card, the rail — header slot empty)
+   with `RecordChrome` for the record itself. `SHELL.md`'s table is
    exhaustive: a main screen and a detail screen differ in EXACTLY THREE
    PLACES, and all three are here.
 
-       eyebrow    `COLLECTION · 4182` — the parent, then the number
-       tabs       plain UNDERLINE tabs, plus the identity chip row
-       mango      the `Edit` button, in the identity row. And the footer.
+       identity   the black ID chip, the collection chip, status chips —
+                  directly UNDER the title (override 73)
+       tabs       plain UNDERLINE tabs, never the folder shape
+       mango      the `Edit` button, in the title's row. And the footer.
 
    THE SHELL AND THE RAIL ARE IDENTICAL TO A MAIN SCREEN'S. Neither file draws
    either one: `ScreenShell` does, once, and both hand it the same rail.
 
-   TWO SPELLINGS OF THE BREADCRUMB, AND BOTH ARE THE KIT'S
-   `SHELL.md`: "The kit compresses the breadcrumb into the eyebrow on the
-   later compositions; 26.04 draws a full breadcrumb row. Both spellings
-   exist." So both are offered and neither is invented:
-
-     · `eyebrow` — 27.39's spelling, `COLLECTION · 4182`, one line.
-     · `breadcrumb` — 26.04's spelling, a real `Breadcrumbs` trail with
-       `Collection name · Record title`, plus `trailing` for the right-hand
-       `Record 03 of 12` p16 draws opposite it.
-
-   Pass whichever the screen wants. Passing both draws both, in 26.04's order
-   (trail first, eyebrow under it), because that is the only order either
-   chapter draws them in.
-
-   THE REGION ORDER, AND WHO OWNS EACH REGION
-
-       ScreenShell            page → screen card → rail + header band → body pane
-       ├ header band          breadcrumb · eyebrow · title · actions. NO mango.
-       └ body pane
-         └ RecordChrome       identity chip row → underline tabs → panel
-                              → the charcoal footer, last, in normal flow
-
-   The title is in the HEADER BAND, on the screen card's soft paper, and the
-   identity row is in the BODY PANE — that split is the kit's, read off 27.39,
-   and it is why this file does not simply hand `RecordChrome` a title. 26.04
-   draws everything in one column because 26.04 is an anatomy diagram with no
-   shell around it.
-
-   THE ONE MANGO IS `Edit`, AND IT IS NOT IN THE HEADER
+   THE ONE MANGO IS `Edit`, AND IT SITS IN THE TITLE'S ROW
    `SHELL.md`: a main screen's mango is the header's `+`; a detail screen's is
-   the `Edit` button. 27.39 draws it in the identity row — "this is where the
-   mango sits on a record page: on Edit, not on a create button" — so that is
-   where `onEdit` puts it, and the header band's `actions` slot takes paper
-   pills only. A route that wants a mango in both places is drawing two
-   mangos, which ruling 26 forbids, and there is no prop here that lets it.
+   the `Edit` button. Override 73 aligns it with the title. A route that wants
+   a second mango is drawing two mangos, which ruling 26 forbids, and there is
+   no prop here that lets it.
 
    `Edit` IS THE ONE LABELLED EXCEPTION TO THE GLYPH RULE, AND IT IS NOT AN
    EXCEPTION TO THE CREATE RULE. 26.01, verbatim: "Create is always the glyph,
@@ -93,25 +87,19 @@
 
 import * as React from "react";
 
-import {
-  Breadcrumbs,
-  type BreadcrumbsItem,
-} from "../../controls/breadcrumbs/breadcrumbs";
-import { Button } from "../../controls/button/button";
-import { Title } from "../../controls/title/title";
+import { Button } from "../../components/button/button";
 import type {
   ActivityFeedItem,
-} from "../../structures/activity-feed/activity-feed";
+} from "../../components/activity-feed/activity-feed";
 import type {
   RecordDetailAuditEntry,
   RecordDetailTab,
-} from "../../structures/record-detail/record-detail";
-import type { StatusStage } from "../../controls/status-stepper/status-stepper";
-import { Pencil } from "../../icons";
+} from "../../components/record-detail/record-detail";
+import type { StatusStage } from "../../components/status-stepper/status-stepper";
+import { Pencil } from "../../foundations/icons";
 import { RecordChrome, type RecordChromeProps } from "./record-chrome";
 import { ScreenShell, type ScreenSpine } from "./screen-shell";
 import {
-  SHAPE_HEADING_SIZE,
   type ScreenDensity,
   type ShapeState,
   type ShapeStateCopy,
@@ -139,48 +127,42 @@ export interface DetailScreenProps
   /** `false` when the document already paints the off-beige page. */
   page?: boolean;
 
-  /* ---- Difference 1 of 3 · the eyebrow, in both of the kit's spellings -- */
-
-  /** 27.39's spelling: `COLLECTION · 4182`, the parent then the number. */
-  eyebrow?: React.ReactNode;
-  /** 26.04's spelling: the real trail, `Collection name · Record title`. */
-  breadcrumb?: readonly BreadcrumbsItem[];
-  /** Accessible name for the trail. */
-  breadcrumbLabel?: string;
-  /** 26.04's right-hand line, opposite the trail: `Record 03 of 12`. */
-  trailing?: React.ReactNode;
-
-  /** The record's name. Sits in the header band, on soft paper. */
+  /** The record's name. Carries the actions in its own row (override 73). */
   title?: React.ReactNode;
 
   /**
-   * The header band's secondary controls. PAPER PILLS ONLY — the screen's one
-   * mango is `onEdit`, in the identity row, and there is no prop here that
-   * can put a second one in the band.
+   * The header cluster's secondary controls — paper pills only. Override 73
+   * puts them in the TITLE'S OWN ROW beside Edit; the screen's one mango is
+   * still `onEdit`, and there is no prop here that can add a second one.
    */
   actions?: React.ReactNode;
   /** The reader may act. `false` draws NO actions, never a disabled one. */
   actionsVisible?: boolean;
-  /** Whether the header's controls survive the narrow width. Off by default. */
+  /** Whether the title row's controls survive the narrow width. Off by default. */
   narrowActions?: boolean;
 
-  /* ---- Difference 2 of 3 · the identity row and the underline tabs ------ */
+  /* ---- Difference 1 of 3 · the identity row, UNDER the title ------------ */
 
   /**
-   * One node above the identity row, first thing inside the body pane —
-   * 27.43's header image. Ruling 35 puts the picture above every word on the
-   * page, which is one region higher than `hero` reaches. See
-   * `RecordChrome`'s note; not a fourth difference between the two screens.
+   * One node above everything, first thing inside the body pane — 27.43's
+   * header image. Ruling 35 puts the picture above every word on the page,
+   * and with override 73 the title lives in the body pane too, so the image
+   * genuinely precedes every word. See `RecordChrome`'s note.
    */
   banner?: React.ReactNode;
 
-  /** The record number. Drawn as the charcoal pill 27.8 names. */
+  /** The record number. The black ID chip, always FIRST (override 73). */
   recordNumber?: React.ReactNode;
-  /** Status, type, since — the rest of the identity row, after the number. */
+  /**
+   * The chip naming the record's collection — "add a chip for Padelbase like
+   * in the example" (override 73). Second, right after the ID chip.
+   */
+  collectionLabel?: React.ReactNode;
+  /** Status, type, since — the rest of the identity row, after those two. */
   chips?: React.ReactNode;
-  /** Tags. 27.8 puts them beneath the record's name, leading the meta line. */
+  /** Tags. 27.8 puts them beneath the identity row; override 73 keeps them. */
   tags?: React.ReactNode;
-  /** "In build since 21 Mar · Aurora owns it" — the line under the name. */
+  /** "In build since 21 Mar · Aurora owns it" — the line under the chips. */
   meta?: React.ReactNode;
   /** The overflow well and anything else that is not the mango. */
   identityActions?: React.ReactNode;
@@ -265,9 +247,9 @@ export interface DetailScreenProps
 }
 
 /**
- * A detail screen: the shell, a breadcrumb and a title in the header band,
- * the identity row and underline tabs on the body pane, and the charcoal
- * footer last.
+ * A detail screen: the shell with an empty header band, and the record in the
+ * body pane — title first, the identity chips directly under it (override
+ * 73), underline tabs, and the charcoal footer last.
  *
  * TEN STATES
  *  1. default        — as above.
@@ -277,8 +259,8 @@ export interface DetailScreenProps
  *  5. disabled       — does not apply. A reader who may not edit gets NO
  *                      Edit button (ch24.6 hides, never dims).
  *  6. loading        — `state="loading"`: the PANEL unfills. Law 4 — the
- *                      rail, the header band, the identity row and the tabs
- *                      stay drawn and stay put.
+ *                      rail, the title, the identity row and the tabs stay
+ *                      drawn and stay put.
  *  7. empty          — `state="empty"`, same mechanism.
  *  8. error          — `state="error"`, same mechanism.
  *  9. rtl            — every inset is logical; nothing here names a side.
@@ -286,8 +268,8 @@ export interface DetailScreenProps
  *                      they do in light, and the footer is charcoal in both.
  *
  * THREE BREAKPOINTS
- *  mobile  — no rail, no header controls, no mango Edit, no charcoal footer.
- *            The status chips and every count stay.
+ *  mobile  — no rail, no title-row controls, no mango Edit, no charcoal
+ *            footer. The status chips and every count stay.
  *  tablet  — the rail arrives; the controls and the footer come back.
  *  desktop — unchanged; only the shell's inset steps up.
  */
@@ -298,16 +280,13 @@ function DetailScreen({
   railLabel,
   spine,
   page,
-  eyebrow,
-  breadcrumb,
-  breadcrumbLabel,
-  trailing,
   title,
   actions,
   actionsVisible = true,
   narrowActions = false,
   banner,
   recordNumber,
+  collectionLabel,
   chips,
   tags,
   meta,
@@ -348,55 +327,39 @@ function DetailScreen({
 }: DetailScreenProps) {
   const measure: ScreenDensity = density ?? (door === "portal" ? "calm" : "comfortable");
 
-  /* 26.04's spelling of the eyebrow: the trail, and the count opposite it.
-     Rendered above 27.39's one-line spelling when a screen passes both. */
-  const trail =
-    breadcrumb === undefined && trailing === undefined ? null : (
-      <span
-        data-slot="detail-screen-trail"
-        className="flex min-w-0 flex-wrap items-baseline justify-between gap-3"
-      >
-        {breadcrumb === undefined ? (
-          <span />
-        ) : (
-          <Breadcrumbs items={[...breadcrumb]} label={breadcrumbLabel} />
-        )}
-        {trailing === undefined ? null : (
-          <span className="text-caption text-ink-tertiary">{trailing}</span>
-        )}
-      </span>
-    );
-
-
-  const headerActions =
-    !actionsVisible || actions === undefined ? undefined : (
-      <span
-        data-slot="detail-screen-actions"
-        className={narrowActions ? "flex items-center gap-3" : "hidden items-center gap-3 sm:flex"}
-      >
-        {actions}
-      </span>
-    );
-
-  /* THE ONE MANGO, IN THE IDENTITY ROW. The pencil AND the word — 26.01's
-     stated exception for a lone Edit. No control at all with no handler. */
+  /* THE ONE MANGO, IN THE TITLE'S ROW (override 73). The pencil AND the word
+     — 26.01's stated exception for a lone Edit. No control at all with no
+     handler. */
   const edit =
     !actionsVisible || onEdit === undefined ? null : (
-      <Button onClick={onEdit} className={narrowActions ? undefined : "hidden sm:inline-flex"}>
+      <Button onClick={onEdit}>
         <Pencil aria-hidden="true" />
         {editLabel}
       </Button>
     );
 
-  /* The identity row's trailing cluster: the overflow well, then the mango.
-     `RecordChrome` pins it to the inline end of the row it already draws. */
+  /* The title row's trailing cluster: the paper pills, the overflow well,
+     then the mango — commit furthest right, retreat beside it, the order
+     every bar in the kit keeps. `RecordChrome` hands it to `RecordDetail`,
+     which threads it into the same `Title` row as the heading, baseline-
+     aligned — Edit "aligned with the title", the client's own words.
+     CONTROLS DROP NARROW, COUNTS DO NOT — the whole cluster hides under `sm`
+     unless the screen asks for `narrowActions`. */
   const rowActions =
-    identityActions === undefined && edit === null ? undefined : (
-      <span className="flex items-center gap-3">
-        {identityActions}
-        {edit}
-      </span>
-    );
+    !actionsVisible || (actions === undefined && identityActions === undefined && edit === null)
+      ? undefined
+      : (
+          <span
+            data-slot="detail-screen-actions"
+            className={
+              narrowActions ? "flex items-center gap-3" : "hidden items-center gap-3 sm:flex"
+            }
+          >
+            {actions}
+            {identityActions}
+            {edit}
+          </span>
+        );
 
   return (
     <ScreenShell
@@ -409,43 +372,22 @@ function DetailScreen({
       spine={spine}
       page={page}
       className={className}
-      header={
-        /* NOT A CONTAINER — `rule={false}` keeps the hairline off the band.
-
-           THE TRAIL IS ABOVE `Title`, NOT INSIDE ITS EYEBROW SLOT, and that
-           is a fidelity fix rather than a layout preference. `Title`'s eyebrow
-           is 11/500/UPPERCASE with 0.08em tracking — the right treatment for
-           27.39's `COLLECTION · 4182`, and the wrong one for 26.04's trail,
-           which p16 draws in sentence case at the caption step with `Record 03
-           of 12` pushed to the opposite edge of its own row. Rendering the
-           trail inside the eyebrow shouted the record's name in small caps and
-           parked the count next to it instead of opposite it. Both spellings
-           now get their own treatment, in 26.04's order. */
-        <div className="flex min-w-0 flex-col gap-3">
-          {trail}
-          <Title
-            data-slot="detail-screen-heading"
-            eyebrow={eyebrow}
-            size={SHAPE_HEADING_SIZE[measure]}
-            rule={false}
-            actions={headerActions}
-          >
-            {title}
-          </Title>
-        </div>
-      }
+      /* THE HEADER BAND IS EMPTY — override 73. "detail pages do not need
+         this bar that you have on top where we have Padelbase and the
+         number." Everything the record needs to say lives in the body pane:
+         `RecordChrome` carries the title, and the identity chips sit
+         directly under it. */
       {...props}
     >
-      {/* THE BODY PANE'S CONTENTS. No `title` and no `breadcrumb` go down:
-          both are in the header band, one level up, which is the split 27.39
-          draws. `RecordChrome` therefore opens on the identity row. */}
       <RecordChrome
         data-slot="detail-screen-record"
         door={door}
         density={measure}
         banner={banner}
         recordNumber={recordNumber}
+        collectionLabel={collectionLabel}
         chips={chips}
+        title={title}
         tags={tags}
         meta={meta}
         actions={rowActions}
@@ -494,7 +436,3 @@ function DetailScreen({
 DetailScreen.displayName = "DetailScreen";
 
 export { DetailScreen };
-
-/* Re-exported so a route can type its own identity row without importing from
-   two tiers. Not a new type — the same one `RecordChrome` already takes. */
-export type { BreadcrumbsItem };

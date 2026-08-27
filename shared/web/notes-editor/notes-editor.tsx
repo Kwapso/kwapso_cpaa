@@ -17,12 +17,12 @@
 // can never smuggle in executable HTML — see ./logic.
 
 import * as React from "react"
-import { ListOrdered } from "@shared/ui/icons"
-import { Bold, FillColor, Italic, List as ListIcon, Minus } from "@shared/ui/icons"
+import { ListOrdered } from "@shared/ui/foundations/icons"
+import { Bold, FillColor, Italic, List as ListIcon, Minus } from "@shared/ui/foundations/icons"
 
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Toggle } from "@shared/ui/controls/toggle/toggle"
+import { Toggle } from "@shared/ui/components/toggle/toggle"
 import { sanitizeNotesHtml } from "./logic"
 
 function Notes({

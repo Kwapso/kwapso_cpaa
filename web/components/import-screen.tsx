@@ -13,12 +13,12 @@
 // recipe. Gated by the caller holding create on at least one import target.
 
 import * as React from "react"
-import { Download, FileSpreadsheet, Sparkles, Upload } from "@shared/ui/icons"
+import { Download, FileSpreadsheet, Sparkles, Upload } from "@shared/ui/foundations/icons"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { ImportableTarget, ImportBatchReport, ImportBatchSummary, ImportBatchView } from "@shared/types"
 import { ApiFailure, dataOps } from "@/lib/api"

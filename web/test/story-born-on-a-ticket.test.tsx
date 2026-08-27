@@ -85,7 +85,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 })
 
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-vi.mock("@shared/ui/controls/sonner/sonner", () => ({
+vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: toasts,
   Toaster: () => null,
 }))

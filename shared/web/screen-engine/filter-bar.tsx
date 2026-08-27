@@ -12,21 +12,21 @@
 // so each stays readable on its own.
 
 import * as React from "react"
-import { X } from "@shared/ui/icons"
-import { Filter } from "@shared/ui/icons"
+import { X } from "@shared/ui/foundations/icons"
+import { Filter } from "@shared/ui/foundations/icons"
 
 import { facetOptions } from "./collection"
 import { SEARCHABLE_THRESHOLD, type FilterFacet } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Badge } from "@shared/ui/controls/badge/badge"
+import { Badge } from "@shared/ui/components/badge/badge"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
+} from "@shared/ui/components/select/select"
 import { RangeFacet } from "./range-facet"
 import { SearchableFacet } from "./searchable-facet"
 

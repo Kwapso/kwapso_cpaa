@@ -22,12 +22,12 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Button } from "@shared/ui/controls/button/button"
+} from "@shared/ui/components/avatar/avatar"
+import { Button } from "@shared/ui/components/button/button"
 import { List } from "@shared/web/list-compat"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { ActivityFeed } from "@shared/ui/structures/activity-feed/activity-feed"
-import { Mail } from "@shared/ui/icons"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
+import { Mail } from "@shared/ui/foundations/icons"
 
 import { EmailChangeDialog } from "@/components/email-change-dialog"
 import { ProfileDialog } from "@/components/profile-dialog"

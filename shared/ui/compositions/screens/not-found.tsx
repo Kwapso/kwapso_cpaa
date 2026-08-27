@@ -106,9 +106,10 @@
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Headline, Text } from "../../controls/typography/typography";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Headline, Text } from "../../components/typography/typography";
+import { ClockRotateRight, List } from "../../foundations/icons";
 import { MainScreen } from "../templates";
 
 /** Which of the three cases. `missing` is the artifact's "never existed". */
@@ -359,8 +360,11 @@ function NotFoundScreen({
           data-slot="not-found-body"
           className="flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]"
         >
-          {/* THE NUMBER, FIRST. Said here and again in the sentence. */}
-          <Badge variant="outline" aria-label={words.recordLabel}>
+          {/* THE NUMBER, FIRST. Said here and again in the sentence. THE
+              BLACK CHIP IS ALWAYS THE ID — override 73, the client's
+              universal rule ("we always use black chips for IDs"); it was
+              `outline` per 27.23's lighter drawing and the ruling wins. */}
+          <Badge variant="inverse" aria-label={words.recordLabel}>
             {record}
           </Badge>
 
@@ -389,11 +393,18 @@ function NotFoundScreen({
             {variant === "moved" ? (
               <Button onClick={onOpenMoved}>{words.movedAction}</Button>
             ) : null}
+            {/* THE TWO PAPER ROUTES LEAD WITH THEIR GLYPHS — p31 draws a
+                list mark on "Back to Collection" and a clock on "Open the
+                log", both widths. They shipped as bare words while the
+                icon slots waited on the pack; the Iconoir set is on main
+                now and the drawing is honoured. */}
             <Button variant="secondary" onClick={onBack}>
+              <List aria-hidden="true" />
               {words.back}
             </Button>
             {words.log ? (
               <Button variant="secondary" onClick={onOpenLog}>
+                <ClockRotateRight aria-hidden="true" />
                 {words.log}
               </Button>
             ) : null}

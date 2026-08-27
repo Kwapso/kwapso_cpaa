@@ -43,10 +43,10 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Badge } from "@shared/ui/controls/badge/badge"
+} from "@shared/ui/components/avatar/avatar"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { ChevronRight } from "@shared/ui/icons"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import { AccessTokensSection } from "@/components/access-tokens"
 import { GoogleConnectionsSection } from "@/components/google-connections"

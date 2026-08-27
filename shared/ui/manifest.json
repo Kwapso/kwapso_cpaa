@@ -1,7 +1,7 @@
 {
   "name": "kwapso-design",
   "version": "1.0.8",
-  "status": "IN PROGRESS. Restructured 2026-08-24 to the four names the client uses: foundations (tokens/ icons/ motion/) · controls/ (67) · structures/ (42) · compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states). components/ no longer exists. Twenty-four files and 11,731 lines of example collection and detail routes were deleted — the kit ships the TEMPLATE and the application builds the page. docs/ is complete (all five). Icons are the Iconoir pack (MIT), vendored 2026-08-26 over the placeholder set. Outstanding: `foundations/` is not yet a folder (see foundationsFolder below).",
+  "status": "IN PROGRESS. Restructured 2026-08-24 to the four names the client uses: foundations/ (tokens/ icons/ motion/, moved in under D10-B on 2026-08-24) · controls/ (67) · structures/ (42) · compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states). Then restructured again 2026-08-26 — client ruling, verbatim: \"i still don't understand the difference between controls / structures. please merge them, and rename to components.\" controls/ and structures/ are now one flat components/ (108, after portal-conversation was also deleted this pass — client ruling: \"delete portal conversation\"). compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states) is unchanged by either 2026-08-26 ruling. Twenty-four files and 11,731 lines of example collection and detail routes were deleted on 2026-08-24 — the kit ships the TEMPLATE and the application builds the page. docs/ is complete (all five). Icons are the Iconoir pack (MIT, 1,383 glyphs), vendored 2026-08-27 over the placeholder set that was never drawn.",
   "tokens": {
     "declared": [
       "--accent",
@@ -246,7 +246,7 @@
   },
   "components": {
     "accordion": {
-      "file": "controls/accordion/accordion.tsx",
+      "file": "components/accordion/accordion.tsx",
       "exports": [
         "Accordion",
         "AccordionContent",
@@ -267,7 +267,7 @@
       ]
     },
     "action-row": {
-      "file": "controls/action-row/action-row.tsx",
+      "file": "components/action-row/action-row.tsx",
       "exports": [
         "ActionRow"
       ],
@@ -291,8 +291,26 @@
         "read-only"
       ]
     },
+    "activity-feed": {
+      "file": "components/activity-feed/activity-feed.tsx",
+      "exports": [
+        "ActivityFeed"
+      ]
+    },
+    "agenda": {
+      "file": "components/agenda/agenda.tsx",
+      "exports": [
+        "Agenda"
+      ]
+    },
+    "agent-chat": {
+      "file": "components/agent-chat/agent-chat.tsx",
+      "exports": [
+        "AgentChat"
+      ]
+    },
     "alert": {
-      "file": "controls/alert/alert.tsx",
+      "file": "components/alert/alert.tsx",
       "exports": [
         "Alert",
         "AlertDescription",
@@ -321,7 +339,7 @@
       ]
     },
     "alert-dialog": {
-      "file": "controls/alert-dialog/alert-dialog.tsx",
+      "file": "components/alert-dialog/alert-dialog.tsx",
       "exports": [
         "AlertDialog",
         "AlertDialogAction",
@@ -347,7 +365,7 @@
       ]
     },
     "ambient-background": {
-      "file": "controls/ambient-background/ambient-background.tsx",
+      "file": "components/ambient-background/ambient-background.tsx",
       "exports": [
         "AmbientBackground"
       ],
@@ -375,8 +393,14 @@
         "read-only"
       ]
     },
+    "article-body": {
+      "file": "components/article-body/article-body.tsx",
+      "exports": [
+        "ArticleBody"
+      ]
+    },
     "aspect-ratio": {
-      "file": "controls/aspect-ratio/aspect-ratio.tsx",
+      "file": "components/aspect-ratio/aspect-ratio.tsx",
       "exports": [
         "AspectRatio"
       ],
@@ -394,7 +418,7 @@
       ]
     },
     "avatar": {
-      "file": "controls/avatar/avatar.tsx",
+      "file": "components/avatar/avatar.tsx",
       "exports": [
         "Avatar",
         "AvatarFallback",
@@ -431,7 +455,7 @@
       ]
     },
     "badge": {
-      "file": "controls/badge/badge.tsx",
+      "file": "components/badge/badge.tsx",
       "exports": [
         "Badge"
       ],
@@ -461,7 +485,7 @@
       ]
     },
     "brand": {
-      "file": "controls/brand/brand.tsx",
+      "file": "components/brand/brand.tsx",
       "exports": [
         "Isotype",
         "Logotype",
@@ -470,7 +494,7 @@
       ]
     },
     "breadcrumb": {
-      "file": "controls/breadcrumb/breadcrumb.tsx",
+      "file": "components/breadcrumb/breadcrumb.tsx",
       "exports": [
         "Breadcrumb",
         "BreadcrumbEllipsis",
@@ -494,7 +518,7 @@
       ]
     },
     "breadcrumbs": {
-      "file": "controls/breadcrumbs/breadcrumbs.tsx",
+      "file": "components/breadcrumbs/breadcrumbs.tsx",
       "exports": [
         "Breadcrumbs"
       ],
@@ -512,7 +536,7 @@
       ]
     },
     "button": {
-      "file": "controls/button/button.tsx",
+      "file": "components/button/button.tsx",
       "exports": [
         "Button"
       ],
@@ -547,8 +571,14 @@
         "read-only"
       ]
     },
+    "calendar-view": {
+      "file": "components/calendar-view/calendar-view.tsx",
+      "exports": [
+        "CalendarView"
+      ]
+    },
     "card": {
-      "file": "controls/card/card.tsx",
+      "file": "components/card/card.tsx",
       "exports": [
         "Card",
         "CardContent",
@@ -579,8 +609,26 @@
         "read-only"
       ]
     },
+    "card-grid": {
+      "file": "components/card-grid/card-grid.tsx",
+      "exports": [
+        "CardGrid"
+      ]
+    },
+    "chart": {
+      "file": "components/chart/chart.tsx",
+      "exports": [
+        "Chart"
+      ]
+    },
+    "chat": {
+      "file": "components/chat/chat.tsx",
+      "exports": [
+        "Chat"
+      ]
+    },
     "checkbox": {
-      "file": "controls/checkbox/checkbox.tsx",
+      "file": "components/checkbox/checkbox.tsx",
       "exports": [
         "Checkbox"
       ],
@@ -603,8 +651,14 @@
         "read-only"
       ]
     },
+    "checklist": {
+      "file": "components/checklist/checklist.tsx",
+      "exports": [
+        "Checklist"
+      ]
+    },
     "choice": {
-      "file": "controls/choice/choice.tsx",
+      "file": "components/choice/choice.tsx",
       "exports": [
         "Choice"
       ],
@@ -622,7 +676,7 @@
       ]
     },
     "clamp": {
-      "file": "controls/clamp/clamp.tsx",
+      "file": "components/clamp/clamp.tsx",
       "exports": [
         "Clamp"
       ],
@@ -640,7 +694,7 @@
       ]
     },
     "collapsible": {
-      "file": "controls/collapsible/collapsible.tsx",
+      "file": "components/collapsible/collapsible.tsx",
       "exports": [
         "Collapsible",
         "CollapsibleContent",
@@ -659,8 +713,15 @@
         "read-only"
       ]
     },
+    "collection-frame": {
+      "file": "components/collection-frame/collection-frame.tsx",
+      "exports": [
+        "CollectionFrame",
+        "CollectionRegister"
+      ]
+    },
     "command": {
-      "file": "controls/command/command.tsx",
+      "file": "components/command/command.tsx",
       "exports": [
         "Command",
         "CommandDialog",
@@ -685,8 +746,22 @@
         "read-only"
       ]
     },
+    "comments": {
+      "file": "components/comments/comments.tsx",
+      "exports": [
+        "Comments"
+      ]
+    },
+    "compare": {
+      "file": "components/compare/compare.tsx",
+      "exports": [
+        "Compare",
+        "MAX_COMPARE_COLUMNS",
+        "MIN_COMPARE_COLUMNS"
+      ]
+    },
     "container": {
-      "file": "controls/container/container.tsx",
+      "file": "components/container/container.tsx",
       "exports": [
         "Container"
       ],
@@ -715,8 +790,29 @@
         "read-only"
       ]
     },
+    "copilot-overlay": {
+      "file": "components/copilot-overlay/copilot-overlay.tsx",
+      "exports": [
+        "CopilotOverlay",
+        "CopilotTouched"
+      ]
+    },
+    "data-preview-table": {
+      "file": "components/data-preview-table/data-preview-table.tsx",
+      "exports": [
+        "DataPreviewTable"
+      ]
+    },
+    "data-table": {
+      "file": "components/data-table/data-table.tsx",
+      "exports": [
+        "DataTable",
+        "SPACER_ATTR",
+        "VIRTUALIZE_THRESHOLD"
+      ]
+    },
     "date-picker": {
-      "file": "controls/date-picker/date-picker.tsx",
+      "file": "components/date-picker/date-picker.tsx",
       "exports": [
         "DatePicker"
       ],
@@ -747,8 +843,20 @@
         "read-only"
       ]
     },
+    "description-list": {
+      "file": "components/description-list/description-list.tsx",
+      "exports": [
+        "DescriptionList"
+      ]
+    },
+    "detail-view": {
+      "file": "components/detail-view/detail-view.tsx",
+      "exports": [
+        "DetailView"
+      ]
+    },
     "dialog": {
-      "file": "controls/dialog/dialog.tsx",
+      "file": "components/dialog/dialog.tsx",
       "exports": [
         "Dialog",
         "DialogClose",
@@ -773,7 +881,7 @@
       ]
     },
     "dropdown-menu": {
-      "file": "controls/dropdown-menu/dropdown-menu.tsx",
+      "file": "components/dropdown-menu/dropdown-menu.tsx",
       "exports": [
         "DropdownMenu",
         "DropdownMenuCheckboxItem",
@@ -802,7 +910,7 @@
       ]
     },
     "field": {
-      "file": "controls/field/field.tsx",
+      "file": "components/field/field.tsx",
       "exports": [
         "Field"
       ],
@@ -820,7 +928,7 @@
       ]
     },
     "file-upload": {
-      "file": "controls/file-upload/file-upload.tsx",
+      "file": "components/file-upload/file-upload.tsx",
       "exports": [
         "FileUpload"
       ],
@@ -845,7 +953,7 @@
       ]
     },
     "filter-bar": {
-      "file": "controls/filter-bar/filter-bar.tsx",
+      "file": "components/filter-bar/filter-bar.tsx",
       "exports": [
         "FilterBar",
         "RangeFacet",
@@ -872,16 +980,59 @@
         "read-only"
       ]
     },
+    "flowchart": {
+      "file": "components/flowchart/flowchart.tsx",
+      "exports": [
+        "Flowchart",
+        "KIND_ICON"
+      ]
+    },
+    "flowdetail": {
+      "file": "components/flowdetail/flowdetail.tsx",
+      "exports": [
+        "Flowdetail",
+        "FLOW_STEP_FIELDS"
+      ]
+    },
     "folder": {
-      "file": "controls/folder/folder.tsx",
+      "file": "components/folder/folder.tsx",
       "exports": [
         "FolderPanel",
         "FolderShape",
         "folderPanelVariants"
       ]
     },
+    "form": {
+      "file": "components/form/form.tsx",
+      "exports": [
+        "Form",
+        "FormActions",
+        "FormSection"
+      ]
+    },
+    "gallery": {
+      "file": "components/gallery/gallery.tsx",
+      "exports": [
+        "Gallery"
+      ]
+    },
+    "gantt": {
+      "file": "components/gantt/gantt.tsx",
+      "exports": [
+        "Gantt",
+        "GanttPeriodStepper"
+      ]
+    },
+    "heatmap": {
+      "file": "components/heatmap/heatmap.tsx",
+      "exports": [
+        "Heatmap",
+        "HEAT_FILL",
+        "HEAT_LEVELS"
+      ]
+    },
     "hover-card": {
-      "file": "controls/hover-card/hover-card.tsx",
+      "file": "components/hover-card/hover-card.tsx",
       "exports": [
         "HoverCard",
         "HoverCardContent",
@@ -901,7 +1052,7 @@
       ]
     },
     "image": {
-      "file": "controls/image/image.tsx",
+      "file": "components/image/image.tsx",
       "exports": [
         "Image"
       ],
@@ -924,8 +1075,14 @@
         "read-only"
       ]
     },
+    "import-wizard": {
+      "file": "components/import-wizard/import-wizard.tsx",
+      "exports": [
+        "ImportWizard"
+      ]
+    },
     "input": {
-      "file": "controls/input/input.tsx",
+      "file": "components/input/input.tsx",
       "exports": [
         "Input"
       ],
@@ -950,8 +1107,14 @@
         "read-only"
       ]
     },
+    "kanban": {
+      "file": "components/kanban/kanban.tsx",
+      "exports": [
+        "Kanban"
+      ]
+    },
     "label": {
-      "file": "controls/label/label.tsx",
+      "file": "components/label/label.tsx",
       "exports": [
         "Label"
       ],
@@ -968,8 +1131,28 @@
         "read-only"
       ]
     },
+    "list": {
+      "file": "components/list/list.tsx",
+      "exports": [
+        "List"
+      ]
+    },
+    "map": {
+      "file": "components/map/map.tsx",
+      "exports": [
+        "Map"
+      ],
+      "movedFrom": "components/primitives/map/map.tsx",
+      "note": "Client ruling 2026-08-24, and 27.29 agrees: a map is always paired with the records beside it, which is a collection view."
+    },
+    "matrix": {
+      "file": "components/matrix/matrix.tsx",
+      "exports": [
+        "Matrix"
+      ]
+    },
     "mode-toggle": {
-      "file": "controls/mode-toggle/mode-toggle.tsx",
+      "file": "components/mode-toggle/mode-toggle.tsx",
       "exports": [
         "ModeToggle"
       ],
@@ -987,7 +1170,7 @@
       ]
     },
     "notes": {
-      "file": "controls/notes/notes.tsx",
+      "file": "components/notes/notes.tsx",
       "exports": [
         "Notes"
       ],
@@ -1005,7 +1188,7 @@
       ]
     },
     "notifications": {
-      "file": "controls/notifications/notifications.tsx",
+      "file": "components/notifications/notifications.tsx",
       "exports": [
         "Notifications",
         "NOTIFICATION_FACETS",
@@ -1017,7 +1200,7 @@
       "note": "Was a 619-line screen. The client ruled it a component (2026-08-24); the PANEL branch is what became the control and the MainScreen page branch was deleted. Export renamed from NotificationsScreen."
     },
     "pagination": {
-      "file": "controls/pagination/pagination.tsx",
+      "file": "components/pagination/pagination.tsx",
       "exports": [
         "Pagination",
         "PaginationContent",
@@ -1040,8 +1223,18 @@
         "read-only"
       ]
     },
+    "permission-matrix": {
+      "file": "components/permission-matrix/permission-matrix.tsx",
+      "exports": [
+        "PermissionMatrix",
+        "PERMISSION_CAPABILITIES",
+        "PERMISSION_LEVELS",
+        "RIGHTS",
+        "WRITE_RIGHTS"
+      ]
+    },
     "popover": {
-      "file": "controls/popover/popover.tsx",
+      "file": "components/popover/popover.tsx",
       "exports": [
         "Popover",
         "PopoverAnchor",
@@ -1062,7 +1255,7 @@
       ]
     },
     "progress": {
-      "file": "controls/progress/progress.tsx",
+      "file": "components/progress/progress.tsx",
       "exports": [
         "Progress"
       ],
@@ -1079,8 +1272,14 @@
         "read-only"
       ]
     },
+    "progress-dashboard": {
+      "file": "components/progress-dashboard/progress-dashboard.tsx",
+      "exports": [
+        "ProgressDashboard"
+      ]
+    },
     "progress-toggle": {
-      "file": "controls/progress-toggle/progress-toggle.tsx",
+      "file": "components/progress-toggle/progress-toggle.tsx",
       "exports": [
         "ProgressToggle"
       ],
@@ -1097,8 +1296,21 @@
         "read-only"
       ]
     },
+    "pulse-band": {
+      "file": "components/pulse-band/pulse-band.tsx",
+      "exports": [
+        "PulseBand",
+        "DAYS_IN_WEEK"
+      ]
+    },
+    "queue": {
+      "file": "components/queue/queue.tsx",
+      "exports": [
+        "Queue"
+      ]
+    },
     "radio-group": {
-      "file": "controls/radio-group/radio-group.tsx",
+      "file": "components/radio-group/radio-group.tsx",
       "exports": [
         "RadioGroup",
         "RadioGroupItem"
@@ -1117,7 +1329,7 @@
       ]
     },
     "rating": {
-      "file": "controls/rating/rating.tsx",
+      "file": "components/rating/rating.tsx",
       "exports": [
         "Rating"
       ],
@@ -1134,8 +1346,29 @@
         "read-only"
       ]
     },
+    "record-detail": {
+      "file": "components/record-detail/record-detail.tsx",
+      "exports": [
+        "RecordDetail"
+      ]
+    },
+    "run-steps": {
+      "file": "components/run-steps/run-steps.tsx",
+      "exports": [
+        "RunSteps"
+      ]
+    },
+    "screen-renderer": {
+      "file": "components/screen-renderer/screen-renderer.tsx",
+      "exports": [
+        "ScreenRegister",
+        "ScreenRegistryProvider",
+        "ScreenRenderer",
+        "useScreenRegistry"
+      ]
+    },
     "scroll-area": {
-      "file": "controls/scroll-area/scroll-area.tsx",
+      "file": "components/scroll-area/scroll-area.tsx",
       "exports": [
         "ScrollArea",
         "ScrollBar"
@@ -1154,7 +1387,7 @@
       ]
     },
     "search-input": {
-      "file": "controls/search-input/search-input.tsx",
+      "file": "components/search-input/search-input.tsx",
       "exports": [
         "SearchInput"
       ],
@@ -1179,7 +1412,7 @@
       ]
     },
     "select": {
-      "file": "controls/select/select.tsx",
+      "file": "components/select/select.tsx",
       "exports": [
         "Select",
         "SelectContent",
@@ -1208,7 +1441,7 @@
       ]
     },
     "separator": {
-      "file": "controls/separator/separator.tsx",
+      "file": "components/separator/separator.tsx",
       "exports": [
         "Separator"
       ],
@@ -1236,7 +1469,7 @@
       ]
     },
     "sheet": {
-      "file": "controls/sheet/sheet.tsx",
+      "file": "components/sheet/sheet.tsx",
       "exports": [
         "Sheet",
         "SheetClose",
@@ -1269,7 +1502,7 @@
       ]
     },
     "signature": {
-      "file": "controls/signature/signature.tsx",
+      "file": "components/signature/signature.tsx",
       "exports": [
         "Signature"
       ],
@@ -1295,7 +1528,7 @@
       ]
     },
     "skeleton": {
-      "file": "controls/skeleton/skeleton.tsx",
+      "file": "components/skeleton/skeleton.tsx",
       "exports": [
         "Skeleton"
       ],
@@ -1313,7 +1546,7 @@
       ]
     },
     "slider": {
-      "file": "controls/slider/slider.tsx",
+      "file": "components/slider/slider.tsx",
       "exports": [
         "Slider"
       ],
@@ -1331,7 +1564,7 @@
       ]
     },
     "sonner": {
-      "file": "controls/sonner/sonner.tsx",
+      "file": "components/sonner/sonner.tsx",
       "exports": [
         "Toaster",
         "toast"
@@ -1350,7 +1583,7 @@
       ]
     },
     "sort-control": {
-      "file": "controls/sort-control/sort-control.tsx",
+      "file": "components/sort-control/sort-control.tsx",
       "exports": [
         "SortControl"
       ],
@@ -1379,7 +1612,7 @@
       ]
     },
     "spacer": {
-      "file": "controls/spacer/spacer.tsx",
+      "file": "components/spacer/spacer.tsx",
       "exports": [
         "Spacer"
       ],
@@ -1424,7 +1657,7 @@
       ]
     },
     "spinner": {
-      "file": "controls/spinner/spinner.tsx",
+      "file": "components/spinner/spinner.tsx",
       "exports": [
         "Spinner"
       ],
@@ -1447,8 +1680,20 @@
         "read-only"
       ]
     },
+    "split": {
+      "file": "components/split/split.tsx",
+      "exports": [
+        "Split"
+      ]
+    },
+    "stat-grid": {
+      "file": "components/stat-grid/stat-grid.tsx",
+      "exports": [
+        "StatGrid"
+      ]
+    },
     "status-stepper": {
-      "file": "controls/status-stepper/status-stepper.tsx",
+      "file": "components/status-stepper/status-stepper.tsx",
       "exports": [
         "StatusStepper"
       ],
@@ -1466,7 +1711,7 @@
       ]
     },
     "stopwatch": {
-      "file": "controls/stopwatch/stopwatch.tsx",
+      "file": "components/stopwatch/stopwatch.tsx",
       "exports": [
         "Stopwatch"
       ],
@@ -1483,8 +1728,14 @@
         "read-only"
       ]
     },
+    "swimlane": {
+      "file": "components/swimlane/swimlane.tsx",
+      "exports": [
+        "Swimlane"
+      ]
+    },
     "switch": {
-      "file": "controls/switch/switch.tsx",
+      "file": "components/switch/switch.tsx",
       "exports": [
         "Switch"
       ],
@@ -1502,7 +1753,7 @@
       ]
     },
     "table": {
-      "file": "controls/table/table.tsx",
+      "file": "components/table/table.tsx",
       "exports": [
         "Table",
         "TableBody",
@@ -1527,7 +1778,7 @@
       ]
     },
     "tabs": {
-      "file": "controls/tabs/tabs.tsx",
+      "file": "components/tabs/tabs.tsx",
       "exports": [
         "Tabs",
         "TabsContent",
@@ -1549,7 +1800,7 @@
       ]
     },
     "textarea": {
-      "file": "controls/textarea/textarea.tsx",
+      "file": "components/textarea/textarea.tsx",
       "exports": [
         "Textarea"
       ],
@@ -1574,8 +1825,26 @@
         "read-only"
       ]
     },
+    "ticket-thread": {
+      "file": "components/ticket-thread/ticket-thread.tsx",
+      "exports": [
+        "TicketThread"
+      ]
+    },
+    "tiles": {
+      "file": "components/tiles/tiles.tsx",
+      "exports": [
+        "Tiles"
+      ]
+    },
+    "timeline": {
+      "file": "components/timeline/timeline.tsx",
+      "exports": [
+        "Timeline"
+      ]
+    },
     "title": {
-      "file": "controls/title/title.tsx",
+      "file": "components/title/title.tsx",
       "exports": [
         "Title"
       ],
@@ -1593,7 +1862,7 @@
       ]
     },
     "toggle": {
-      "file": "controls/toggle/toggle.tsx",
+      "file": "components/toggle/toggle.tsx",
       "exports": [
         "Toggle"
       ],
@@ -1622,7 +1891,7 @@
       ]
     },
     "toggle-group": {
-      "file": "controls/toggle-group/toggle-group.tsx",
+      "file": "components/toggle-group/toggle-group.tsx",
       "exports": [
         "ToggleGroup",
         "ToggleGroupItem"
@@ -1641,7 +1910,7 @@
       ]
     },
     "tooltip": {
-      "file": "controls/tooltip/tooltip.tsx",
+      "file": "components/tooltip/tooltip.tsx",
       "exports": [
         "Tooltip",
         "TooltipContent",
@@ -1662,7 +1931,7 @@
       ]
     },
     "typography": {
-      "file": "controls/typography/typography.tsx",
+      "file": "components/typography/typography.tsx",
       "exports": [
         "Headline",
         "Hint",
@@ -1688,7 +1957,7 @@
       ]
     },
     "use-debounce": {
-      "file": "controls/use-debounce/use-debounce.ts",
+      "file": "components/use-debounce/use-debounce.ts",
       "exports": [
         "useDebouncedCallback"
       ],
@@ -1697,7 +1966,7 @@
       ]
     },
     "use-virtual-rows": {
-      "file": "controls/use-virtual-rows/use-virtual-rows.ts",
+      "file": "components/use-virtual-rows/use-virtual-rows.ts",
       "exports": [
         "SPACER_ATTR",
         "VIRTUALIZE_THRESHOLD",
@@ -1708,7 +1977,7 @@
       ]
     },
     "video": {
-      "file": "controls/video/video.tsx",
+      "file": "components/video/video.tsx",
       "exports": [
         "Video"
       ],
@@ -1726,7 +1995,7 @@
       ]
     },
     "visibility": {
-      "file": "controls/visibility/visibility.tsx",
+      "file": "components/visibility/visibility.tsx",
       "exports": [
         "VisibilityProvider",
         "Visible",
@@ -1747,7 +2016,7 @@
       ]
     },
     "web-embed": {
-      "file": "controls/web-embed/web-embed.tsx",
+      "file": "components/web-embed/web-embed.tsx",
       "exports": [
         "WebEmbed"
       ],
@@ -3519,7 +3788,7 @@
     {
       "item": "Icon artwork — all 93, plus the 3 added",
       "reason": "Placeholder art by instruction: a rounded frame with a per-name dot pattern, deliberately not final and visibly not final. The client is supplying the real icons. The NAMES, the React API, the five sizes and the currentColor wiring are FINAL.",
-      "swapProcedure": "Drop the real <Name>.svg over the placeholder in icons/, run `node icons/generate-icons.mjs`. No component and no call site changes. The generator reads each file's own viewBox, so incoming art may be drawn on any grid.",
+      "swapProcedure": "Drop the real <Name>.svg over the placeholder in foundations/icons/, run `node foundations/icons/generate-icons.mjs`. No component and no call site changes. The generator reads each file's own viewBox, so incoming art may be drawn on any grid.",
       "severity": "expected",
       "owner": "client"
     },
@@ -3534,304 +3803,13 @@
       "reason": "The kit designs three series colours (sky, forest, poppy) and says they cycle. 4 and 5 are placeholders repeating 1 and 2, so a five-series chart currently shows two indistinguishable pairs.",
       "recommendation": "Two dedicated data-safe hues need a kit ruling. Never mango (brand, not data) and never grey (reads as disabled).",
       "severity": "known-limitation"
-    },
-    {
-      "item": "Dark value for --accent, the neutral row/item hover wash",
-      "reason": "The kit states the light wash at rgba(26,25,24,.05) — the command palette's active row and the destructive menu item, ch12 — and draws no dark twin. Derived by the kit's own hairline method: carry the alpha, flip the ink, giving rgba(255,254,249,.05). Charcoal at 5% on unlit paper would be invisible, so holding the light value would have been a broken hover, not a cautious one.",
-      "recommendation": "Confirm or replace with a kit ruling. Tracked upstream as T12-3.",
-      "severity": "derived"
-    },
-    {
-      "item": "Font files — Saans and SerrifCondensed",
-      "reason": "Redistribution is an open licence question, not a technical one. Both families are named first in --font-sans / --font-serif with a real fallback stack behind them, so nothing renders blank if the files never land.",
-      "recommendation": "Resolve the licence, then add the files and an @font-face block.",
-      "severity": "blocked-externally"
     }
   ],
-  "collections": {
-    "activity-feed": {
-      "file": "structures/activity-feed/activity-feed.tsx",
-      "exports": [
-        "ActivityFeed"
-      ]
-    },
-    "agenda": {
-      "file": "structures/agenda/agenda.tsx",
-      "exports": [
-        "Agenda"
-      ]
-    },
-    "agent-chat": {
-      "file": "structures/agent-chat/agent-chat.tsx",
-      "exports": [
-        "AgentChat"
-      ]
-    },
-    "article-body": {
-      "file": "structures/article-body/article-body.tsx",
-      "exports": [
-        "ArticleBody"
-      ]
-    },
-    "calendar-view": {
-      "file": "structures/calendar-view/calendar-view.tsx",
-      "exports": [
-        "CalendarView"
-      ]
-    },
-    "card-grid": {
-      "file": "structures/card-grid/card-grid.tsx",
-      "exports": [
-        "CardGrid"
-      ]
-    },
-    "chart": {
-      "file": "structures/chart/chart.tsx",
-      "exports": [
-        "Chart"
-      ]
-    },
-    "chat": {
-      "file": "structures/chat/chat.tsx",
-      "exports": [
-        "Chat"
-      ]
-    },
-    "checklist": {
-      "file": "structures/checklist/checklist.tsx",
-      "exports": [
-        "Checklist"
-      ]
-    },
-    "collection-frame": {
-      "file": "structures/collection-frame/collection-frame.tsx",
-      "exports": [
-        "CollectionFrame",
-        "CollectionRegister"
-      ]
-    },
-    "comments": {
-      "file": "structures/comments/comments.tsx",
-      "exports": [
-        "Comments"
-      ]
-    },
-    "compare": {
-      "file": "structures/compare/compare.tsx",
-      "exports": [
-        "Compare",
-        "MAX_COMPARE_COLUMNS",
-        "MIN_COMPARE_COLUMNS"
-      ]
-    },
-    "copilot-overlay": {
-      "file": "structures/copilot-overlay/copilot-overlay.tsx",
-      "exports": [
-        "CopilotOverlay",
-        "CopilotTouched"
-      ]
-    },
-    "data-preview-table": {
-      "file": "structures/data-preview-table/data-preview-table.tsx",
-      "exports": [
-        "DataPreviewTable"
-      ]
-    },
-    "data-table": {
-      "file": "structures/data-table/data-table.tsx",
-      "exports": [
-        "DataTable",
-        "SPACER_ATTR",
-        "VIRTUALIZE_THRESHOLD"
-      ]
-    },
-    "description-list": {
-      "file": "structures/description-list/description-list.tsx",
-      "exports": [
-        "DescriptionList"
-      ]
-    },
-    "detail-view": {
-      "file": "structures/detail-view/detail-view.tsx",
-      "exports": [
-        "DetailView"
-      ]
-    },
-    "flowchart": {
-      "file": "structures/flowchart/flowchart.tsx",
-      "exports": [
-        "Flowchart",
-        "KIND_ICON"
-      ]
-    },
-    "flowdetail": {
-      "file": "structures/flowdetail/flowdetail.tsx",
-      "exports": [
-        "Flowdetail",
-        "FLOW_STEP_FIELDS"
-      ]
-    },
-    "form": {
-      "file": "structures/form/form.tsx",
-      "exports": [
-        "Form",
-        "FormActions",
-        "FormSection"
-      ]
-    },
-    "gallery": {
-      "file": "structures/gallery/gallery.tsx",
-      "exports": [
-        "Gallery"
-      ]
-    },
-    "gantt": {
-      "file": "structures/gantt/gantt.tsx",
-      "exports": [
-        "Gantt",
-        "GanttPeriodStepper"
-      ]
-    },
-    "heatmap": {
-      "file": "structures/heatmap/heatmap.tsx",
-      "exports": [
-        "Heatmap",
-        "HEAT_FILL",
-        "HEAT_LEVELS"
-      ]
-    },
-    "import-wizard": {
-      "file": "structures/import-wizard/import-wizard.tsx",
-      "exports": [
-        "ImportWizard"
-      ]
-    },
-    "kanban": {
-      "file": "structures/kanban/kanban.tsx",
-      "exports": [
-        "Kanban"
-      ]
-    },
-    "list": {
-      "file": "structures/list/list.tsx",
-      "exports": [
-        "List"
-      ]
-    },
-    "map": {
-      "file": "structures/map/map.tsx",
-      "exports": [
-        "Map"
-      ],
-      "movedFrom": "components/primitives/map/map.tsx",
-      "note": "Client ruling 2026-08-24, and 27.29 agrees: a map is always paired with the records beside it, which is a collection view."
-    },
-    "matrix": {
-      "file": "structures/matrix/matrix.tsx",
-      "exports": [
-        "Matrix"
-      ]
-    },
-    "permission-matrix": {
-      "file": "structures/permission-matrix/permission-matrix.tsx",
-      "exports": [
-        "PermissionMatrix",
-        "PERMISSION_CAPABILITIES",
-        "PERMISSION_LEVELS",
-        "RIGHTS",
-        "WRITE_RIGHTS"
-      ]
-    },
-    "portal-conversation": {
-      "file": "structures/portal-conversation/portal-conversation.tsx",
-      "exports": [
-        "PortalApprovalBand",
-        "PortalConversation"
-      ],
-      "movedFrom": "compositions/shapes/portal-conversation.tsx",
-      "note": "A thread of bubbles with a composer — the same category as chat and ticket-thread."
-    },
-    "progress-dashboard": {
-      "file": "structures/progress-dashboard/progress-dashboard.tsx",
-      "exports": [
-        "ProgressDashboard"
-      ]
-    },
-    "pulse-band": {
-      "file": "structures/pulse-band/pulse-band.tsx",
-      "exports": [
-        "PulseBand",
-        "DAYS_IN_WEEK"
-      ]
-    },
-    "queue": {
-      "file": "structures/queue/queue.tsx",
-      "exports": [
-        "Queue"
-      ]
-    },
-    "record-detail": {
-      "file": "structures/record-detail/record-detail.tsx",
-      "exports": [
-        "RecordDetail"
-      ]
-    },
-    "run-steps": {
-      "file": "structures/run-steps/run-steps.tsx",
-      "exports": [
-        "RunSteps"
-      ]
-    },
-    "screen-renderer": {
-      "file": "structures/screen-renderer/screen-renderer.tsx",
-      "exports": [
-        "ScreenRegister",
-        "ScreenRegistryProvider",
-        "ScreenRenderer",
-        "useScreenRegistry"
-      ]
-    },
-    "split": {
-      "file": "structures/split/split.tsx",
-      "exports": [
-        "Split"
-      ]
-    },
-    "stat-grid": {
-      "file": "structures/stat-grid/stat-grid.tsx",
-      "exports": [
-        "StatGrid"
-      ]
-    },
-    "swimlane": {
-      "file": "structures/swimlane/swimlane.tsx",
-      "exports": [
-        "Swimlane"
-      ]
-    },
-    "ticket-thread": {
-      "file": "structures/ticket-thread/ticket-thread.tsx",
-      "exports": [
-        "TicketThread"
-      ]
-    },
-    "tiles": {
-      "file": "structures/tiles/tiles.tsx",
-      "exports": [
-        "Tiles"
-      ]
-    },
-    "timeline": {
-      "file": "structures/timeline/timeline.tsx",
-      "exports": [
-        "Timeline"
-      ]
-    }
-  },
   "iconSizesNote": "28 is the sixth and was admitted by client ruling T2, 2026-08-23: 27.42 draws the module wall's icon at 28 and the ladder had five. Snapping the tile to 24 or 32 was the alternative and was declined.",
   "foundationsFolder": {
-    "status": "NOT DONE — needs a client decision, flagged rather than guessed.",
-    "reason": "The agreed structure groups tokens/, icons/ and motion/ under a foundations/ folder. Thirteen DECISION AND INDEX PAGES under verify/ link tokens/tokens.css and motion/motion.css by relative path, and those pages are the record of what the client was looking at when they ruled. Moving the folders means editing all thirteen. The three folders therefore stay at the repository root for now. The DEMO LABEL 'foundations' is applied regardless, which is the part the client actually asked for."
+    "status": "DONE — client ruled D10-B on 2026-08-24 after seeing the full cost drawn; tokens/, icons/ and motion/ now live under foundations/.",
+    "reason": "The agreed structure groups tokens/, icons/ and motion/ under a foundations/ folder, and the folder is now made. The count in the superseded note was low: eighty tracked files reach the three folders by relative path, not thirteen — 14 decision and index pages under verify/, 11 verify harnesses (10 Tailwind entry sheets and one .tsx), 42 kit source files, 7 demo and mini-app files, and 6 documentation files, plus package.json, tsconfig.json, vite.config.ts, README.md and this manifest naming them without a '../'. Two further references pointed OUT of the moved folders and were missed by that grep entirely: foundations/tokens/tokens.css reached ../assets/fonts/ for its three @font-face rules, and foundations/icons/icon-base.tsx reached ../lib/utils. All were repaired. Every one of the fourteen decision pages was reopened in a browser afterwards and asserted styled — stylesheet count, computed body font-family and computed background — because a missing stylesheet is not an error in HTML and checking that the file exists is not checking that the page has its paper.",
+    "consumingApps": "There is no exports map and no path alias — the kit is vendored source, so every import is a literal path. An app's two stylesheet imports each gain one segment (kwapso-design/foundations/tokens/tokens.css and kwapso-design/foundations/motion/motion.css) and every 'kwapso-design/icons' becomes 'kwapso-design/foundations/icons'. Nothing else moved by D10-B: controls/, structures/ (merged into components/ on 2026-08-26, a separate ruling), compositions/ and lib/ were all untouched by THIS move. The rows are in README.md's import table."
   },
   "iconArt": {
     "source": "iconoir",
@@ -3839,7 +3817,7 @@
     "upstream": "https://github.com/iconoir-icons/iconoir",
     "count": 1383,
     "style": "stroke, 24 grid, 1.5 default",
-    "vendored": "2026-08-26",
-    "note": "Replaced the placeholder set. The commission's 93 + 3 additive spellings survive as aliases in icons/aliases.json; icons/ATTRIBUTION.md records the four normalisations and the seven approximate mappings."
+    "vendored": "2026-08-27",
+    "note": "Replaced the 96 placeholders. The commission's 93 + 3 additive spellings survive as aliases in foundations/icons/aliases.json; ATTRIBUTION.md records the four normalisations and the seven approximate mappings. ICON-LANGUAGE.md describes the bespoke language that was specified and never drawn."
   }
 }

@@ -20,10 +20,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Check, Pencil, Undo2 } from "@shared/ui/icons"
+import { Check, Pencil, Undo2 } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
@@ -43,7 +43,7 @@ import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 

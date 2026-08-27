@@ -10,12 +10,12 @@
 import * as React from "react"
 import { usePathname } from "next/navigation"
 
-import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/icons"
+import { Breadcrumbs } from "@shared/ui/components/breadcrumbs/breadcrumbs"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/foundations/icons"
 // `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
-import { SeaWaves } from "@shared/ui/icons"
+import { SeaWaves } from "@shared/ui/foundations/icons"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
@@ -42,7 +42,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@shared/ui/controls/sheet/sheet"
+} from "@shared/ui/components/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 

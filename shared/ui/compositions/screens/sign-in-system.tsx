@@ -68,7 +68,7 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
+import { Button } from "../../components/button/button";
 import { SignIn, SignInSplash, type SignInProvider, type SignInStep, type SplashField } from "../templates";
 import { type ShapeState, type ShapeStateCopy } from "../states";
 

@@ -104,7 +104,7 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
+import { Button } from "../../components/button/button";
 import { SignInSplash } from "../templates";
 import { ShapeStateBody } from "../states";
 import type { SplashField } from "../templates";

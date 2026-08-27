@@ -11,8 +11,8 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { RotateCcw } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { RotateCcw } from "@shared/ui/foundations/icons"
 
 import { reportError } from "@shared/web/log"
 import { useT } from "@shared/web/language"

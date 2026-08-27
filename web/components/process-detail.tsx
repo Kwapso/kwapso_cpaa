@@ -1,5 +1,5 @@
 "use client"
-import { Ban, GitBranch, ListOrdered, Plus } from "@shared/ui/icons"
+import { Ban, GitBranch, ListOrdered, Plus } from "@shared/ui/foundations/icons"
 import { ApiFailure } from "@/lib/api"
 
 // Process detail — one map at /processes/<id>, as a tabbed record (Law R2):
@@ -49,14 +49,14 @@ import { ApiFailure } from "@/lib/api"
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { InAppLink } from "@/components/in-app-link"
 import { AuditDateDialog, ConnectProcessDialog } from "@/components/process/process-dialogs"
 import { StepsPanel, stepSecondsPerMonth, versionLabel } from "@/components/process/steps-panel"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,10 +66,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Comments } from "@shared/ui/structures/comments/comments"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Comments } from "@shared/ui/components/comments/comments"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type {
   ClientRole,

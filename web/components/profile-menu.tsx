@@ -10,7 +10,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
+} from "@shared/ui/components/avatar/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +18,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
-import { LogOut, Palette, Settings, UserRound } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
+import { LogOut, Palette, Settings, UserRound } from "@shared/ui/foundations/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"

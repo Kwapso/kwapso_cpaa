@@ -28,16 +28,16 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import { List } from "@shared/web/list-compat"
-import { ToggleGroup, ToggleGroupItem } from "@shared/ui/controls/toggle-group/toggle-group"
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/icons"
+import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"

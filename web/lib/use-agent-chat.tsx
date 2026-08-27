@@ -12,7 +12,7 @@ import * as React from "react"
 
 import { useT } from "@shared/web/language"
 
-import type { AgentChatMessage } from "@shared/ui/structures/agent-chat/agent-chat"
+import type { AgentChatMessage } from "@shared/ui/components/agent-chat/agent-chat"
 
 /** One chat row. The kit's message, or a TOOL STEP — the old library's chat
  * drew tool rows itself; the kit's does not, so the row is app data here and
@@ -20,8 +20,8 @@ import type { AgentChatMessage } from "@shared/ui/structures/agent-chat/agent-ch
 export type AgentChatItem =
   | AgentChatMessage
   | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed" }
-import type { RunStep } from "@shared/ui/structures/run-steps/run-steps"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, PendingCall } from "@shared/types"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"

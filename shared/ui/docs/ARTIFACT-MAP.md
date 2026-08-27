@@ -14,6 +14,13 @@ bridge.
 Generated against the artifact version published 2026-08-23 and the repo at
 the commit that added it. If a row here is wrong, the row is the defect.
 
+**Paths updated 2026-08-26.** `controls/` and `structures/` merged into one
+`components/` — client ruling, verbatim: "i still don't understand the
+difference between controls / structures. please merge them, and rename to
+components." Every `controls/x/` and `structures/x/` cell below now reads
+`components/x/`. See the chapter 19 section for the map correction that
+rode along with the same pass.
+
 ---
 
 ## The six parts
@@ -22,23 +29,23 @@ the commit that added it. If a row here is wrong, the row is the defect.
 
 | ch | the artifact's name | where it lives | what it is |
 |---|---|---|---|
-| 01 | **Colour & surfaces** | `tokens/tokens.css` | the raw palette and the semantic layer |
-| 02 | **Tokens — light & dark** | `tokens/tokens.css` | dark declared twice, drift-guarded |
-| 03 | **Typography** | `tokens/tokens.css` | 13 steps + micro/badge/caption, each with its own leading and tracking |
-| 04 | **Iconography** | `icons/` | 96 exports, six sizes |
-| 05 | **Space, radius, elevation, motion** | `tokens/tokens.css + motion/motion.css` | the scale, the four radii, 57 motion classes |
-| 06 | **Focus & keyboard** | `tokens/tokens.css §8` | one global :focus-visible rule; no component writes a ring |
+| 01 | **Colour & surfaces** | `foundations/tokens/tokens.css` | the raw palette and the semantic layer |
+| 02 | **Tokens — light & dark** | `foundations/tokens/tokens.css` | dark declared twice, drift-guarded |
+| 03 | **Typography** | `foundations/tokens/tokens.css` | 13 steps + micro/badge/caption, each with its own leading and tracking |
+| 04 | **Iconography** | `foundations/icons/` | 96 exports, six sizes |
+| 05 | **Space, radius, elevation, motion** | `foundations/tokens/tokens.css + foundations/motion/motion.css` | the scale, the four radii, 57 motion classes |
+| 06 | **Focus & keyboard** | `foundations/tokens/tokens.css §8` | one global :focus-visible rule; no component writes a ring |
 | 07 | **State matrix & do / don't** | `docs/RULES.md` | the ten states, as a convention every file carries |
 
 ### Part B · Controls
 
 | ch | the artifact's name | where it lives | what it is |
 |---|---|---|---|
-| 08 | **Buttons** | `controls/button/` | Button |
-| 09 | **Text inputs** | `controls/input|textarea|field/` | Input · Textarea · Field |
-| 10 | **Selection controls** | `controls/checkbox|radio-group|switch|choice|rating/` | Checkbox · RadioGroup · Switch · Choice · Rating |
-| 11 | **Chips, badges, avatars** | `controls/badge|avatar/` | Badge · Avatar |
-| 12 | **Tooltips, menus, palette** | `controls/tooltip|dropdown-menu|command/` | Tooltip · DropdownMenu · Command |
+| 08 | **Buttons** | `components/button/` | Button |
+| 09 | **Text inputs** | `components/input|textarea|field/` | Input · Textarea · Field |
+| 10 | **Selection controls** | `components/checkbox|radio-group|switch|choice|rating/` | Checkbox · RadioGroup · Switch · Choice · Rating |
+| 11 | **Chips, badges, avatars** | `components/badge|avatar/` | Badge · Avatar |
+| 12 | **Tooltips, menus, palette** | `components/tooltip|dropdown-menu|command/` | Tooltip · DropdownMenu · Command |
 
 CORRECTED 2026-08-23 — **Rating was filed under 11 and belongs to 10.** The
 artifact draws it in chapter 10, Selection controls ("Rating — used only in
@@ -51,26 +58,26 @@ renamed.
 
 | ch | the artifact's name | where it lives | what it is |
 |---|---|---|---|
-| 13 | **Cards & containers** | `controls/card|sheet|dialog/` | Card · Sheet · Dialog |
-| 14 | **Folder shapes** | `controls/folder/` | FolderShape · FolderPanel, and Tabs variant="folder" |
-| 15 | **Navigation** | `controls/tabs|breadcrumb|pagination/` | Tabs · Breadcrumb · Pagination |
-| 16 | **Filters, search, upload** | `controls/filter-bar|search-input|file-upload/` | FilterBar · SearchInput · FileUpload |
+| 13 | **Cards & containers** | `components/card|sheet|dialog/` | Card · Sheet · Dialog |
+| 14 | **Folder shapes** | `components/folder/` | FolderShape · FolderPanel, and Tabs variant="folder" |
+| 15 | **Navigation** | `components/tabs|breadcrumb|pagination/` | Tabs · Breadcrumb · Pagination |
+| 16 | **Filters, search, upload** | `components/filter-bar|search-input|file-upload/` | FilterBar · SearchInput · FileUpload |
 
 ### Part D · Data
 
 | ch | the artifact's name | where it lives | what it is |
 |---|---|---|---|
-| 17 | **Tables & lists** | `structures/data-table|list/` | DataTable · List |
-| 18 | **Data display** | `structures/chart|stat-grid|progress-dashboard/` | Chart · StatGrid · ProgressDashboard |
-| 19 | **Collection views · all 24** | `structures/` | the table below |
+| 17 | **Tables & lists** | `components/data-table|list/` | DataTable · List |
+| 18 | **Data display** | `components/chart|stat-grid|progress-dashboard/` | Chart · StatGrid · ProgressDashboard |
+| 19 | **Collection views · all 24** | `components/` | the table below |
 
 ### Part E · States & messages
 
 | ch | the artifact's name | where it lives | what it is |
 |---|---|---|---|
-| 20 | **Feedback & overlays** | `controls/sonner|dialog|sheet|alert/` | Toaster · Dialog · Sheet · Alert |
+| 20 | **Feedback & overlays** | `components/sonner|dialog|sheet|alert/` | Toaster · Dialog · Sheet · Alert |
 | 21 | **Empty & error states** | `compositions/templates/states.tsx` | ShapeStateBody — every register in the system |
-| 22 | **Notifications & threads** | `structures/comments|ticket-thread|activity-feed/` | Comments · TicketThread · ActivityFeed |
+| 22 | **Notifications & threads** | `components/comments|ticket-thread|activity-feed/` | Comments · TicketThread · ActivityFeed |
 | 23 | **Auth & account** | `compositions/templates/sign-in.tsx` | SignIn · SignInSplash |
 
 ### Part F · Screens
@@ -89,12 +96,27 @@ renamed.
 The artifact numbers these 01–24 inside the chapter and names them in one
 word each. **All 24 are built.**
 
-`structures/` holds **40** folders, which is a different count and
-not a discrepancy: **23 of the 24 views** — view 21, *map*, lives in
-`controls/` and is the one view that is not in this folder —
-**plus 17 supporting components** at the same tier (the collection frame,
-record detail, comments, the import wizard, the pulse band and so on) that
-the artifact draws inside other chapters. 23 + 17 = 40.
+The ex-`structures/` half of `components/` (see CORRECTED 2026-08-26, below)
+holds **42** folders, which is a different count and not a discrepancy: **all
+24 of the 24 views, map included,** plus **18 supporting components** at the
+same tier (the collection frame, record detail, comments, the import wizard,
+the pulse band and so on) that the artifact draws inside other chapters.
+24 + 18 = 42.
+
+CORRECTED 2026-08-26 — **map was wrongly filed as a control and this row
+said so.** Client ruling, verbatim: "about structures - map is a collection
+view. recategorize." Row 21 below used to read `controls/map/` (this
+document was written before the 2026-08-24 move and was never updated when
+map left the primitives), and demo/artifact.ts's own chapter table had the
+same mistake baked in — `map` was keyed in PRIMITIVE_CHAPTERS, with a
+comment asserting outright that it "is the one view that is NOT in this
+folder: it is a primitive." Both were wrong. Map has been a collection view
+since the component itself moved on 2026-08-24; only the documentation and
+one internal lookup table lagged. Both are corrected as of this pass, and
+`controls/` and `structures/` are now one folder, `components/`, per the
+same day's second ruling — "merge them, and rename to components" — so the
+count above is 42 rather than the pre-merge 40, with map's own row moving
+from 23-of-24-plus-17 to 24-of-24-plus-18.
 
 CORRECTED 2026-08-23. This paragraph said "the 24 views, plus 16 supporting
 components", which does add to 40 but counts `map` twice — once as a view in
@@ -106,30 +128,30 @@ record-detail, screen-renderer, stat-grid, ticket-thread.
 
 | # | the artifact's name | where it lives | export |
 |---|---|---|---|
-| 01 | **list** | `structures/list/` | `List` |
-| 02 | **kanban** | `structures/kanban/` | `Kanban` |
-| 03 | **grid** | `structures/card-grid/` | `CardGrid` |
-| 04 | **gantt** | `structures/gantt/` | `Gantt` |
-| 05 | **calendar** | `structures/calendar-view/` | `CalendarView` |
-| 06 | **table** | `structures/data-table/` | `DataTable` |
-| 07 | **matrix** | `structures/matrix/` | `Matrix` |
-| 08 | **swimlane** | `structures/swimlane/` | `Swimlane` |
-| 09 | **timeline** | `structures/timeline/` | `Timeline` |
-| 10 | **agenda** | `structures/agenda/` | `Agenda` |
-| 11 | **gallery** | `structures/gallery/` | `Gallery` |
-| 12 | **split** | `structures/split/` | `Split` |
-| 13 | **queue** | `structures/queue/` | `Queue` |
-| 14 | **feed** | `structures/activity-feed/` | `ActivityFeed` |
-| 15 | **checklist** | `structures/checklist/` | `Checklist` |
-| 16 | **heatmap** | `structures/heatmap/` | `Heatmap` |
-| 17 | **chat** | `structures/chat/` | `Chat` |
-| 18 | **steps** | `structures/run-steps/` | `RunSteps` |
-| 19 | **chart** | `structures/chart/` | `Chart` |
-| 20 | **tiles** | `structures/tiles/` | `Tiles` |
-| 21 | **map** | `controls/map/` | `Map` |
-| 22 | **compare** | `structures/compare/` | `Compare` |
-| 23 | **flowchart** | `structures/flowchart/` | `Flowchart` |
-| 24 | **flowdetail** | `structures/flowdetail/` | `Flowdetail` |
+| 01 | **list** | `components/list/` | `List` |
+| 02 | **kanban** | `components/kanban/` | `Kanban` |
+| 03 | **grid** | `components/card-grid/` | `CardGrid` |
+| 04 | **gantt** | `components/gantt/` | `Gantt` |
+| 05 | **calendar** | `components/calendar-view/` | `CalendarView` |
+| 06 | **table** | `components/data-table/` | `DataTable` |
+| 07 | **matrix** | `components/matrix/` | `Matrix` |
+| 08 | **swimlane** | `components/swimlane/` | `Swimlane` |
+| 09 | **timeline** | `components/timeline/` | `Timeline` |
+| 10 | **agenda** | `components/agenda/` | `Agenda` |
+| 11 | **gallery** | `components/gallery/` | `Gallery` |
+| 12 | **split** | `components/split/` | `Split` |
+| 13 | **queue** | `components/queue/` | `Queue` |
+| 14 | **feed** | `components/activity-feed/` | `ActivityFeed` |
+| 15 | **checklist** | `components/checklist/` | `Checklist` |
+| 16 | **heatmap** | `components/heatmap/` | `Heatmap` |
+| 17 | **chat** | `components/chat/` | `Chat` |
+| 18 | **steps** | `components/run-steps/` | `RunSteps` |
+| 19 | **chart** | `components/chart/` | `Chart` |
+| 20 | **tiles** | `components/tiles/` | `Tiles` |
+| 21 | **map** | `components/map/` | `Map` |
+| 22 | **compare** | `components/compare/` | `Compare` |
+| 23 | **flowchart** | `components/flowchart/` | `Flowchart` |
+| 24 | **flowdetail** | `components/flowdetail/` | `Flowdetail` |
 
 ---
 
@@ -150,16 +172,16 @@ the artifact's rules for it are written down and obeyed.
 | 27.1 | **Main page — a top-level collection** | `compositions/templates/collection-screen.tsx` | `CollectionScreen` |
 | 27.2 | **Add form** | `compositions/templates/form-screen.tsx` | `FormScreen` |
 | 27.3 | **Record edit** | `compositions/templates/form-screen.tsx` | `FormScreen` |
-| 27.4 | **Delete confirmation** | `controls/alert-dialog/alert-dialog.tsx` † | `AlertDialog` |
+| 27.4 | **Delete confirmation** | `components/alert-dialog/alert-dialog.tsx` † | `AlertDialog` |
 | 27.5 | **Archive** | `compositions/screens/archive.tsx` | `ArchiveScreen` |
 | 27.6 | **Loading** | `compositions/templates/states.tsx` | `ShapeStateBody` |
 | 27.7 | **Access denied** | `compositions/screens/access-denied.tsx` | `AccessDeniedScreen` |
 | 27.8 | **Record detail** | `compositions/templates/record-chrome.tsx` | `RecordChrome` |
-| 27.9 | **Activity log** | `structures/activity-feed/activity-feed.tsx` | `ActivityFeed` |
-| 27.10 | **Chat** | `structures/chat/chat.tsx` † | `Chat` |
+| 27.9 | **Activity log** | `components/activity-feed/activity-feed.tsx` | `ActivityFeed` |
+| 27.10 | **Chat** | `components/chat/chat.tsx` † | `Chat` |
 | 27.11 | **Dashboard** | `compositions/system/home.tsx` | `HomeRoute` |
-| 27.12 | **Permissions** | `structures/permission-matrix/permission-matrix.tsx` | `PermissionMatrix` |
-| 27.13 | **Tabs and sub-tabs** | `controls/tabs/tabs.tsx` † | `Tabs` |
+| 27.12 | **Permissions** | `components/permission-matrix/permission-matrix.tsx` | `PermissionMatrix` |
+| 27.13 | **Tabs and sub-tabs** | `components/tabs/tabs.tsx` † | `Tabs` |
 | 27.14 | **Onboarding** | `compositions/screens/onboarding.tsx` | `OnboardingOptionGroup` |
 | 27.15 | **Member profile** | `compositions/system/profile.tsx` | `ProfileRoute` |
 | 27.16 | **Sign in** | `compositions/screens/sign-in.tsx` | `AuthShell` |
@@ -170,12 +192,12 @@ the artifact's rules for it are written down and obeyed.
 | 27.21 | **Empty collection** | `compositions/screens/empty-collection.tsx` | `EmptyCollectionScreen` |
 | 27.22 | **No results** | `compositions/screens/no-results.tsx` | `NoResultsScreen` |
 | 27.23 | **Not found** | `compositions/screens/not-found.tsx` | `NotFoundScreen` |
-| 27.24 | **Board view** | `structures/kanban/kanban.tsx` † | `Kanban` |
-| 27.25 | **Calendar view** | `structures/calendar-view/calendar-view.tsx` † | `CalendarView` |
-| 27.26 | **Timeline view** ‡ | `structures/gantt/gantt.tsx` † | `Gantt` |
-| 27.27 | **Split list and preview** | `structures/split/split.tsx` | `Split` |
-| 27.28 | **Gallery** | `structures/gallery/gallery.tsx` | `Gallery` |
-| 27.29 | **Map** | `controls/map/map.tsx` | `Map` |
+| 27.24 | **Board view** | `components/kanban/kanban.tsx` † | `Kanban` |
+| 27.25 | **Calendar view** | `components/calendar-view/calendar-view.tsx` † | `CalendarView` |
+| 27.26 | **Timeline view** ‡ | `components/gantt/gantt.tsx` † | `Gantt` |
+| 27.27 | **Split list and preview** | `components/split/split.tsx` | `Split` |
+| 27.28 | **Gallery** | `components/gallery/gallery.tsx` | `Gallery` |
+| 27.29 | **Map** | `components/map/map.tsx` | `Map` |
 | 27.30 | **Import** | `compositions/screens/import.tsx` | `ImportScreen` |
 | 27.31 | **Export** | `compositions/screens/export.tsx` | `ExportScreen` |
 | 27.32 | **Bulk edit** | `compositions/screens/bulk-edit.tsx` | `BulkEditScreen` |

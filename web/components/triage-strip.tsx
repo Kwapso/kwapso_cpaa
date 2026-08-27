@@ -14,9 +14,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { AlarmClock, UserCheck } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { AlarmClock, UserCheck } from "@shared/ui/foundations/icons"
 
 import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"

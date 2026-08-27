@@ -1,0 +1,1720 @@
+/* ============================================================================
+   kwapso-design · tokens
+   "Work, structured."
+
+   THEIR NAMES, MY VALUES.
+   Every custom property named in commission section 4 exists here, spelled
+   exactly as the applications already read it. Nothing is renamed, so
+   manifest.json's `renamedFrom` is empty and no alias bridge is needed.
+
+   The VALUES are the kwapso design kit's ("Kwapso UI Kit.dc.html", v10 ·
+   27 chapters · 34 rulings numbered to 36) as carried by design-mothership
+   v0.3.0. The kit is the design source only; it is not the naming source.
+
+   ---------------------------------------------------------------------------
+   FOUR CONVENTIONS TO KNOW BEFORE EDITING
+   ---------------------------------------------------------------------------
+
+   1. THIS IS THE ONLY FILE WHERE A COLOUR OR A SIZE IS DECIDED.
+      No component may write a px, a hex, or a font-size. Commission rule 5
+      and 13.
+
+   2. REM BASE IS 16, ROOT RENDERS AT 15.
+      Every measurement is authored in rem against a 16px reference (kit
+      ruling 28). :root renders at 15px; data-scale moves it to 13/15/17.
+      The two apps deliberately sit on different steps — this file forces
+      neither, each app sets data-scale on <html> itself.
+
+   3. DARK IS A MECHANISM, NOT A SWATCH.
+      Light values live on bare :root. Dark is redefined TWICE — once under
+      prefers-color-scheme for viewers who never chose, once under
+      [data-theme="dark"] so an explicit choice wins in both directions.
+      The two blocks must declare an identical set of names with identical
+      values. build-tokens.mjs fails the build if they drift.
+
+   4. NO OPACITY FOR A STATE.
+      Disabled is a fill and an ink. Hover is a defined token. Where a value
+      below is an rgba(), it is a *colour* in the palette — a defined wash —
+      not an alpha applied to an element.
+
+   ---------------------------------------------------------------------------
+   UNRESOLVED
+   ---------------------------------------------------------------------------
+   Anything marked  ! GAP  is not settled kit law. It is recorded in
+   manifest.json -> notDelivered with a recommendation. Nothing was guessed
+   silently; derived values say so at the point of use.
+   ============================================================================ */
+/* ── WHAT TAILWIND MUST READ, SHIPPED BY THE KIT RATHER THAN COPIED ─────────
+ *
+ * A utility class exists only if Tailwind saw the source that writes it. This
+ * kit shipped no `@source`, because in its own repository Vite scans
+ * everything — so every CONSUMER reconstructed the list by hand, and a list
+ * maintained by hand is one maintained wrongly.
+ *
+ * It has failed the same way four times, three here and once in the kwapso app,
+ * whose globals.css listed controls, structures and icons and NOT compositions.
+ * The failure is silent and it is the worst shape available: a composition
+ * rendered without its classes is not broken, it is NAKED — which reads as
+ * "the kit's screen is wrong" rather than "the build could not see it". Nobody
+ * files that against the build.
+ *
+ * So the list ships with the thing it describes. Paths resolve relative to THIS
+ * file, so a consumer that imports tokens.css gets the scan for free and cannot
+ * forget half of it. A consumer that also lists them by hand is harmless —
+ * Tailwind unions its sources.
+ *
+ * A tier added to this kit is added HERE in the same commit, or it ships
+ * classless to everyone downstream. */
+@source "../../components";
+@source "../../compositions";
+@source "../icons";
+
+
+/* ============================================================================
+   1 · ROOT SCALE — the three text-size steps
+   ========================================================================= */
+
+:root {
+  font-size: 15px;                 /* kit ruling 18 */
+  /* Tell the browser which palette its OWN furniture should use. Without this,
+     scrollbars, native form controls, the default canvas and any UA-painted
+     surface answer to the machine's setting rather than to this system - so a
+     reader on a dark OS gets dark scrollbars on a light kwapso page.
+
+     That is not cosmetic. It is exactly the bug that made the sort menu render
+     dark in light mode: the menu was a native <select>, whose open list the
+     browser paints from the OS scheme, and no token here could reach it. The
+     control was replaced, but every other piece of UA furniture had the same
+     hole. Requested as SRT-5. */
+  color-scheme: light;
+}
+:root[data-scale="small"]  { font-size: 13px; }
+:root[data-scale="medium"] { font-size: 15px; }
+:root[data-scale="large"]  { font-size: 17px; }
+
+
+/* ============================================================================
+   2 · RAW PALETTE — internal
+   The seven official brand colours, the four unlit papers, the two lifted
+   accents. Never consumed by a component; §3 is the layer components read.
+   A new accent is admitted only if it carries charcoal type at both its
+   light and its dark value.
+   ========================================================================= */
+
+:root {
+  --kw-mango:        #FED069;   /* PRIMARY. A fill, never a data colour. */
+  --kw-sky:          #89BCE6;   /* informational                         */
+  --kw-off-beige:    #FFFEF9;   /* the kwapso "white"                    */
+  --kw-soft-paper:   #F7F2EB;   /* panels, the second paper tone         */
+  --kw-charcoal:     #1A1918;   /* the kwapso "black"                    */
+  /* RULED 2026-08-22 (4B, verify/open-decisions.html), with a CORRECTION.
+     Charcoal on #1F9259 measured 4.44:1, under AA's 4.5 for the 12px badge
+     label. The comparison page first proposed DARKENING to #1B7F4D — that was
+     backwards: a darker fill moves toward the charcoal label and drops the
+     ratio to 3.50, worse than the problem. The green has to get LIGHTER.
+     #20955B is the smallest step along the same hue that clears AA, at 4.61.
+     Light only — dark uses --kw-forest-lift, already passing at 6.74. */
+  --kw-forest:       #20955B;   /* shipped · healthy                     */
+  --kw-poppy:        #E94A32;   /* blocked · overdue · destructive       */
+  /* RULED 43, 2026-08-23 — POPPY AS AN INK, AND ONLY AS AN INK.
+     The same move override 9 made for forest, for the same reason and by the
+     same method. `--kw-poppy` as TEXT measured 3.79:1 on a card and 3.43:1 on
+     a panel in light, against AA's 4.5, on every destructive WORD in the
+     system. #C73F2B is the smallest step along the same hue (H 7.9, S 0.785)
+     that clears 4.5 on both light papers: 4.98 on the card, 4.52 on the
+     panel. Light only -- dark already lifts poppy to --kw-poppy-lift, which
+     measures 4.92 and passes.
+     A SEPARATE HEX, NOT A REPLACEMENT. `--kw-poppy` is untouched, so the
+     poppy FILL, the destructive button and every poppy pill keep the
+     artifact's own colour. Only --destructive-ink points here. */
+  --kw-poppy-ink:    #C73F2B;   /* the destructive WORD, light only      */
+
+  /* Unlit papers — dark surfaces. Never grey. */
+  --kw-unlit-page:   #141310;
+  --kw-unlit-panel:  #1C1B18;
+  --kw-unlit-raised: #26241F;
+  --kw-unlit-quiet:  #2F2D28;
+  /* RULED N2, 2026-08-23, verify/decisions.html N. A quiet badge measured
+     1.13:1 against the card it sat on in dark - the pill stopped existing and
+     only the label carried, while light read 1.34. #3A3833 was already in the
+     file as the dark --secondary, so the lift invents no hex: it names the
+     paper that was already there and points --surface-quiet at it, taking the
+     dark pill to 1.32 and matching light. */
+  --kw-unlit-secondary: #3A3833;
+
+  /* Lifted accents — dark only */
+  --kw-forest-lift:  #2FB673;
+  --kw-poppy-lift:   #F2634B;
+}
+
+
+/* ============================================================================
+   3 · SEMANTIC TOKENS — LIGHT
+   Commission section 4, in its order. Consume these.
+   ========================================================================= */
+
+:root {
+
+  /* ---- Surface and ink ------------------------------------------------- */
+  --background:           var(--kw-off-beige);
+  --foreground:           var(--kw-charcoal);
+
+  --card:                 var(--kw-off-beige);   /* card over sheet */
+  --card-foreground:      var(--foreground);
+  --popover:              var(--kw-off-beige);   /* kit ch12: raised paper,
+                                                    --shadow-overlay,
+                                                    --radius (24)          */
+  --popover-foreground:   var(--foreground);
+
+  --muted:                #FAF9F7;               /* inactive tabs, idle wells */
+  --muted-foreground:     #5f5d59;               /* kit ink tier 3 — labels,
+                                                    metadata, hints AND
+                                                    placeholders (ruling 27
+                                                    folded the hint tier in) */
+
+  --secondary:            var(--kw-soft-paper);  /* a secondary control is a
+                                                    FILLED control in the
+                                                    other paper tone         */
+  --secondary-foreground: var(--kw-charcoal);
+
+  /* --accent is the neutral row/item hover wash, NOT the brand fill.
+     Kit-stated at rgba(26,25,24,.05) — the command palette's active row
+     and the destructive menu item (ch12). The brand fill lives on
+     --primary / --surface-brand and must never reach a hover state, or
+     every menu row turns mango.                                           */
+  --accent:               rgba(26, 25, 24, .05);
+  --accent-foreground:    var(--foreground);
+
+  --border:               rgba(26, 25, 24, .08); /* fields, selection controls,
+                                                    same-tone card separation.
+                                                    NEVER on a button or a
+                                                    coloured pill.           */
+  --input:                var(--border);
+
+  --surface-inverse:      var(--kw-charcoal);
+  --ink-on-inverse:       var(--kw-off-beige);
+  /* RULED M2, 2026-08-23, verify/decisions.html M. The artifact writes
+     `color: var(--invfg2)` in eight places and quietens the same line on mango
+     with `opacity: .7`, but never states either value. An opacity is a
+     standing rejection (PATTERN 9) and --ink-secondary is the charcoal-on-paper
+     tier, unreadable on either accent - so a tile's meta and a flow node's
+     role were printing at full strength with nowhere to reach.
+     Both values are the accent's own ink carried toward its ground: the ink at
+     72% on charcoal, at 70% on mango, resolved to a solid hex rather than an
+     alpha so nothing depends on what is behind it. Measured: #BFBEBA on
+     charcoal 9.4:1, #5E5030 on mango 5.2:1 - each a clear step under its
+     primary ink and each still comfortably readable. */
+  /* CORRECTED 2026-08-23. This shipped as #BFBEBA, a value I DERIVED by
+     carrying the off-beige 72% toward the charcoal, on the belief -- written
+     into override 13 -- that "the artifact states neither value". It states
+     this one. The newer extract declares `--invfg2: #d5d1c9` and uses it 65
+     times, not the 8 the override claims. The artifact is the king and it had
+     the answer; the derivation was never needed. */
+  --ink-on-inverse-secondary: #d5d1c9;
+  --ink-on-accent-secondary:  #5E5030;
+  --surface-brand:        var(--kw-mango);
+  --surface-idle:         var(--muted);
+  --ink-secondary:        #4a4946;
+  --ink-disabled:         #a8a59f;               /* disabled means disabled and
+                                                    nothing else, and disabled
+                                                    is exempt from contrast   */
+  --hair-faint:           rgba(26, 25, 24, .06); /* ! GAP-4 role disputed */
+
+  /* ---- Brand and status ------------------------------------------------ */
+  --primary:              var(--kw-mango);
+  --primary-foreground:   var(--kw-charcoal);    /* charcoal on EVERY accent,
+                                                    both modes, no exceptions */
+
+  --destructive:            var(--kw-poppy);
+  --destructive-foreground: var(--kw-charcoal);  /* charcoal, not white — the
+                                                    accent law always wins    */
+  /* RULED 43 — THE DESTRUCTIVE WORD, AND NOTHING ELSE.
+     CH26.01 asks for "plain poppy-colored text (no fill, no icon needed)" and
+     override 19 gave it the `text` variant; neither settled the contrast.
+     This token is the ink half of --destructive and the ONLY thing that moved:
+     a destructive word takes it, a destructive fill still takes --destructive,
+     so no button, badge or pill changes colour. Consumed as
+     `text-destructive-ink`. */
+  --destructive-ink:        var(--kw-poppy-ink);
+
+  --success:              var(--kw-forest);
+  --success-foreground:   var(--kw-charcoal);
+
+  /* ! GAP — there is no warning colour in the kwapso palette. Seven brand
+     colours and none is amber; the kit assigns "overdue" to Poppy, and
+     ruling 26 states mango is the brand, not a status. Folded into danger
+     by decision, so <Badge variant="warning"> renders poppy. --warning-strong
+     has no distinct tone until a ruling admits one; it resolves identically
+     rather than inventing a deeper amber.  -> notDelivered                  */
+  /* RULED 2026-08-22 (3B) — PROVISIONAL, revisit when the new palette lands.
+     Folding warning into poppy (the J-2 ruling) put two different states in
+     one colour: "Blocked" and "Overdue" were the same chip. Seen side by side
+     that was worse than losing the colour, so warning drops to the quiet chip
+     and poppy now means blocked and nothing else.
+     This is a holding position. The client is adding colours; when an amber
+     or equivalent exists, --warning should take it and this block goes. */
+  --warning:              var(--surface-quiet);
+  --warning-foreground:   var(--ink-secondary);
+  --warning-strong:       var(--ink-primary);
+
+  /* ---- Charts — sky, forest, poppy, cycling ----------------------------
+     Never mango (brand, not data). Never grey (reads as disabled).
+     ! GAP — the kit designs three series and says they cycle. 4 and 5 are
+     placeholders repeating 1 and 2, so a five-series chart currently has two
+     indistinguishable pairs. Two dedicated hues need a kit ruling.
+     -> notDelivered                                                         */
+  --chart-1:              var(--kw-sky);
+  --chart-2:              var(--kw-forest);
+  --chart-3:              var(--kw-poppy);
+  --chart-4:              var(--chart-1);   /* ! GAP placeholder */
+  --chart-5:              var(--chart-2);   /* ! GAP placeholder */
+  --chart-negative:       var(--kw-poppy);
+
+  /* ---- Focus (kit ruling 24, reversed) ---------------------------------
+     ONE global rule for every control: a 1px --focus outline held 2px off
+     the edge, on :focus-visible only, following the control's own radius.
+     No component defines its own ring; nothing focusable may set
+     outline: none. The px are deliberate — a ring must stay 1px at every
+     text scale, and this is the file where a size is decided.
+     1px, not ruling 24's 2px: see override 4 on --focus-width below.      */
+  --ring:                 var(--focus);
+  --focus:                var(--kw-charcoal);
+  /* The ring on an inverse surface. --focus is charcoal, and --surface-inverse
+     IS charcoal, so a control on a charcoal panel was drawing a ring at
+     contrast 1.000 — invisible, in both palettes. Found by tabbing through the
+     rendered demo, not by reading the file. WCAG 1.4.11 wants 3:1. */
+  --focus-inverse:        var(--kw-off-beige);
+  /* RULED 2026-08-22 (B2, verify/decisions.html) — 1px, not 2px.
+     This OVERRIDES ruling 24, which states "a 2px ink outline held 2px off its
+     edge ... and the gap reads as the second ring". The client saw both and
+     chose the thinner line. Recorded as an override rather than a correction,
+     because the artifact is unambiguous here and the appendix should be
+     updated to match rather than left contradicting the build. */
+  --focus-width:          1px;
+  --focus-offset:         2px;
+
+  /* ---- Shape (kit ruling 03) -------------------------------------------
+     EXACTLY four radii exist: 24 on every box, 999 on every pill, 6 on
+     marks and selection controls, 4 on a bar, a heat cell or the rotated
+     decision node — "a bar is not a box". A third box radius is forbidden,
+     so the seven-step ladder flattens onto three values. Everything the
+     apps draw at rounded-lg today lands at 24.                            */
+  --radius:               1.5rem;      /* 24 · cards, panels, sections, rows */
+  --radius-sm:            0.25rem;     /* 4  · bars, heat cells, nodes       */
+  --radius-md:            0.375rem;    /* 6  · marks, selection controls     */
+  --radius-lg:            1.5rem;      /* 24 */
+  --radius-xl:            1.5rem;      /* 24 */
+  --radius-2xl:           1.5rem;      /* 24 */
+  --radius-3xl:           1.5rem;      /* 24 */
+  --radius-select:        0.375rem;    /* 6  */
+
+  /* ---- Elevation — paper shadows. Never blue, never inner. ------------- */
+  --shadow-rest:          0 1px 2px rgba(26, 25, 24, .05);
+  --shadow-lifted:        0 6px 20px -6px rgba(26, 25, 24, .14);
+  --shadow-overlay:       0 18px 48px -12px rgba(26, 25, 24, .22);
+
+  /* Tailwind aliases — three real elevations, seven names. These are var()
+     chains, so they follow the palette flip without being restated in dark. */
+  --shadow-2xs:           var(--shadow-rest);
+  --shadow-xs:            var(--shadow-rest);
+  --shadow-sm:            var(--shadow-rest);
+  --shadow-md:            var(--shadow-lifted);
+  --shadow-lg:            var(--shadow-lifted);
+  --shadow-xl:            var(--shadow-overlay);
+  --shadow-2xl:           var(--shadow-overlay);
+
+  /* ---- Motion — no bounce, no parallax --------------------------------- */
+  --ease:                 cubic-bezier(.16, 1, .3, 1);
+  --duration-colour:      120ms;   /* colour swaps                     */
+  --duration-entrance:    200ms;   /* entrances — fade + a 4-8px rise  */
+  --duration-overlay:     360ms;   /* overlays                         */
+  --default-transition-timing-function: var(--ease);
+  --default-transition-duration:        var(--duration-colour);
+
+  /* ---- Motion, ADDITIVE (commission §10) --------------------------------
+     The commission names one curve and three durations and says outright
+     that this is "a floor, not a design". motion/motion.css has to specify
+     fifteen cases; these are the values none of the three above can carry.
+     They are additions, not renames — nothing goes in manifest.renamedFrom.
+
+     Curves. --ease is an entrance curve (expo-out): it arrives fast and
+     settles. It is wrong for a dismissal, which should accelerate away, and
+     wrong for a move between two on-screen positions, which needs symmetry.
+     None of the three overshoots — ruling: no bounce.                      */
+  --ease-entrance:        var(--ease);              /* alias, reads better  */
+  --ease-exit:            cubic-bezier(.4, 0, 1, 1);/* accelerate away      */
+  --ease-move:            cubic-bezier(.4, 0, .2, 1);/* A to B on screen    */
+  --ease-linear:          linear;                   /* loops only — a
+                                                       rotation on any other
+                                                       curve visibly wobbles */
+
+  /* Durations. Ordered shortest first.                                     */
+  --duration-exit:         140ms;  /* every dismissal. Exits are shorter than
+                                      entrances; --duration-entrance run
+                                      backwards feels like a hesitation.    */
+  --duration-lift:          90ms;  /* drag pick-up. Must beat the pointer or
+                                      the card feels detached from the
+                                      finger; 120ms already lags.           */
+  --duration-settle:       280ms;  /* something travelling a real on-screen
+                                      distance and coming to rest: a drop, a
+                                      reordered row, a pull-to-refresh
+                                      snap-back. Longer than an 8px rise,
+                                      shorter than an overlay.              */
+  --duration-advance:      480ms;  /* a progress bar or a stepper moving to
+                                      a new value. The eye has to be able to
+                                      follow it, so it is the slowest
+                                      non-looping duration in the system.   */
+
+  /* Loops. These are NOT zeroed under prefers-reduced-motion (see §9) —
+     a zero-length infinite animation is a frozen spinner, which removes the
+     only signal that work is in progress. motion.css switches the ones that
+     are decoration rather than status off explicitly instead.              */
+  --duration-spin:         700ms;  /* one full rotation. KIT-STATED: the ch07
+                                      state matrix Loading row reads
+                                      "700ms spin / 1.4s bar".              */
+  --duration-bar:         1400ms;  /* the indeterminate progress sweep.
+                                      KIT-STATED, same sentence. It is not
+                                      the spinner's clock — a bar crossing
+                                      the full width needs twice the time a
+                                      rotation does.                        */
+  --duration-pulse:       1600ms;  /* ! GAP — skeleton breathe. The kit sets
+                                      the opacity pair and the stagger but
+                                      never a period; derived. Slow enough
+                                      to read as "waiting", not "broken".   */
+  --duration-caret:       1100ms;  /* streaming caret blink                 */
+
+  /* KIT-STATED: skeleton bars are "staggered 100ms down the list". */
+  --motion-stagger:        100ms;
+
+  /* Distances. The kit's entrance signature is "fade plus a 4-8px rise".
+     Held here so the signature has one definition. rem, so the rise grows
+     with the text-size control (commission rule 5).                        */
+  --motion-rise:          0.5rem;   /* 8 · panels, dialogs, pages          */
+  --motion-rise-tight:    0.25rem;  /* 4 · rows, menu items, chunks        */
+  --motion-lift-scale:    1.015;    /* drag pick-up. Not a bounce: no
+                                       overshoot, it holds while dragging. */
+
+  /* ---- Button internals ------------------------------------------------
+     Buttons carry NO border in any state — no outline, no hairline, no
+     stroke. A secondary button is a filled button in the other paper tone,
+     which is why a header band and the buttons inside it are never the same
+     paper tone. Keyboard focus adds the shared ring; that is the one
+     exception, and it is an outline at an offset, not a border.            */
+  --btn-primary-fill:      var(--primary);
+  --btn-primary-label:     var(--primary-foreground);
+  --btn-primary-hover:     #F4BE4B;
+  --btn-primary-pressed:   #EDB646;
+
+  /* SECONDARY IS A FILL, AND THE FILL IS THE AFFORDANCE.
+     Ruling 01, verbatim: "A secondary button is a filled paper button in the
+     other tone, so a band and its buttons are never the same tone."
+     ch26, verbatim: "Secondary — off-beige fill, no border."
+
+     Those two sentences are the same rule read from two bands. ch26 is
+     describing a toolbar sitting on a soft-paper panel, where the other tone
+     IS off-beige; ch08 draws its specimen on `var(--sheet)` and fills the
+     secondary with `var(--card)`, and the chapter-7 specimen inverts both.
+     What is fixed is the OPPOSITION, not either hex.
+
+     Review 1A · fix 1: this root default said `var(--card)`, which is
+     off-beige in light and the raised tone in dark — the SAME tone as the
+     page a button most often sits on. On the page it therefore painted
+     nothing and a secondary button read as a ghost, which is exactly what
+     the review reported. The root band is the page (off-beige), so the root
+     default is the other tone: the panel. A band that is itself panel-toned
+     re-resolves this back to the page tone — `CollectionFrame`'s `tone` prop
+     and `Card` / `Container` / `Sheet` / `Dialog` do it on their own fill, so
+     a button never matches the paper under it.                              */
+  /* RULED 2026-08-22. The client: "Secondary must carry a fill (the opposite
+     paper tone to its background: off-beige on a paper background, soft-paper
+     on an off-beige background). This fill is the affordance."
+     Ruling 01 says the same: "a filled paper button in the other tone, so a
+     band and its buttons are never the same tone."
+
+     That rule is RELATIONAL, so one flat value cannot satisfy it - and two
+     agents proved it by fighting over this line, leaving a #F7F2EB button on
+     a #F7F2EB panel: no fill, no edge, invisible.
+
+     Resolved the way --focus-inverse was: the DEFAULT is off-beige, correct on
+     a panel, which is where cards and forms live (PATTERN section 11). Inside
+     an off-beige region the token is rebound below to soft paper. Custom
+     properties inherit, so the button is always the other tone from whatever
+     it is standing on, and no component needs a prop. */
+  --btn-secondary-fill:    var(--card);
+  --btn-secondary-label:   var(--secondary-foreground);
+  --btn-secondary-hover:   #F1ECE4;
+
+  --btn-inverse-fill:      var(--surface-inverse);
+  --btn-inverse-label:     var(--ink-on-inverse);
+  --btn-inverse-hover:     #333230;
+
+  /* ch02: "Quiet fill · cancel buttons, disabled wells · #E2DDD4", and
+     "Cancel is one step darker with a secondary-ink label". */
+  --btn-cancel-fill:       #E2DDD4;
+  --btn-cancel-label:      var(--ink-secondary);
+  --btn-cancel-hover:      #D8D2C7;              /* ! GAP-9 not in kit */
+
+  --btn-destructive-fill:  var(--destructive);
+  --btn-destructive-label: var(--destructive-foreground);
+  --btn-destructive-hover: #D33E28;
+
+  --btn-disabled-fill:     var(--surface-quiet);
+  --btn-disabled-label:    var(--ink-disabled);
+}
+
+
+/* ============================================================================
+   4 · ADDITIVE TOKENS — LIGHT
+   kwapso values the commission does not name but the components need.
+   These are not renames of anything; they add. No manifest entry.
+   ========================================================================= */
+
+:root {
+
+  /* ---- Surfaces and ink the commission has no name for ------------------ */
+  --surface-page:    var(--background);
+  --surface-panel:   var(--kw-soft-paper);
+  --surface-raised:  var(--card);
+  --surface-quiet:   #E2DDD4;              /* cancel buttons, disabled wells */
+  /* RULED 44, 2026-08-23 — THE PAPER A SELECTED ROW TAKES.
+     Register row 40 logged this as OPEN when the K1 reversal moved the papers:
+     rows now sit INSIDE a soft-paper panel, so a selection at --surface-panel
+     paints the row the paper it is already standing on. Measured 1.000.
+     The artifact's own answer is `rowBg: on ? var(--card) : transparent` -- a
+     LIFT off the panel. In DARK that answer works and is taken as drawn. In
+     LIGHT it cannot be: `--card` is #FFFEF9, which is also the body pane and
+     the folder-tab band, so a selected row would measure 1.000 against the
+     band. So light takes the same step in the other direction -- the paper
+     ladder's next rung AWAY from the page, which is the direction light's own
+     papers already run (#FFFEF9 -> #F7F2EB -> here, by the same -8/-12/-14
+     deltas). Both palettes obey one rule: A SELECTED ROW IS ONE PAPER FURTHER
+     FROM THE PAGE THAN THE PANEL IT SITS ON.
+     Dark invents nothing: --kw-unlit-quiet was already the rung after
+     --kw-unlit-raised, and #26241F itself is unusable because a `raised` card
+     is already that paper and a selected card would measure 1.000 against it.
+     Measured, light: 1.107 vs the unselected neighbour on the panel, 1.221 vs
+     the band, 1.221 vs a raised card, 1.107 vs a default card -- which also
+     closes row 40's "selected paints nothing on a default card" limit.
+     Dark: 1.252 vs the neighbour, 1.351 vs the band, 1.127 vs a raised card. */
+  --surface-selected: #EFE6DD;             /* a chosen row, item or card     */
+
+  /* ---- THE THREE SPINES · only the four values that FLIP with the palette.
+     The spine MAPPING is palette-free and lives in section 7b; these are the
+     four halves of it that the two palettes disagree about.
+
+     26.02, verbatim, and it states both dark hexes so neither is derived:
+     "In dark mode ink becomes #1C1B18 and paper becomes #26241F; mango is
+     unchanged in both palettes." Both were already brand papers in this file
+     (--kw-unlit-panel, --kw-unlit-raised).
+
+     --spine-ink-quiet-label is the artifact's own --invfg2 in light (override
+     13 pinned that hex) and this file's own dark --muted-foreground in dark,
+     because in dark the ink spine is still a DARK ground and --invfg2 flips
+     to a dark ink there. --spine-paper-chip is the paper one rung off the
+     spine, which is what 27.1 itself draws (a var(--card) chip on a
+     var(--sheet) rail).                                                     */
+  --spine-ink-fill:        var(--kw-charcoal);
+  --spine-ink-quiet-label: var(--ink-on-inverse-secondary);
+  --spine-paper-fill:      var(--kw-soft-paper);
+  --spine-paper-chip:      var(--kw-off-beige);
+
+  --ink-primary:     var(--foreground);
+  --ink-tertiary:    var(--muted-foreground);
+  --ink-on-accent:   var(--kw-charcoal);   /* the accent law, as a token     */
+  --hair:            var(--border);
+  --hair-strong:     rgba(26, 25, 24, .20);/* section rules                  */
+  /* THE HAIRLINE ON AN INVERSE GROUND. The artifact states both values in its
+     own :root — `--invhair: rgba(255,254,249,.12)` and
+     `--invhair2: rgba(255,254,249,.24)`, flipping to `rgba(26,25,24,.12)` and
+     `rgba(26,25,24,.20)` in dark — and draws with them 20 times (16 as
+     `inset 0 -1px 0 var(--invhair)`, 4 as a divider background).
+
+     Nothing here was invented; what was MISSING was the flip. --hair is
+     charcoal-at-8% and --surface-inverse IS charcoal, so every hairline on a
+     charcoal panel composited to exactly its own ground: MEASURED at contrast
+     1.000 in light AND 1.000 in dark, on the built demo. Invisible, both
+     palettes, same bug --focus-inverse was found to have and fixed the same
+     way — the token flips, the rebind is by ground below, and no component
+     changes. Measured after: --hair 1.413 light / 1.273 dark, --hair-strong
+     2.180 light / 1.529 dark. */
+  --hair-inverse:        rgba(255, 254, 249, .12);
+  --hair-strong-inverse: rgba(255, 254, 249, .24);
+  --info:            var(--kw-sky);
+
+  /* ---- The hairline, drawn the way the artifact draws it -----------------
+     ch02, verbatim: "Hairline rgba(26,25,24,.08) — fields, selection controls,
+     same-tone card separation. Never a button."
+
+     A hairline is NOT a `border` in this system. The artifact draws every one
+     of them as an INSET BOX-SHADOW — `inset 0 0 0 1px var(--hair)` and
+     `inset 0 -1px 0 var(--hair)` appear 65 times in its drawn values against
+     9 uses of `border:`. Review 1A · fix 2 removes every `border` property
+     across the kit and expresses the carve-out here instead. Nothing new is
+     decided: these five strings are transcriptions of the artifact's own.
+
+     The shapes are named so the open client question — "should even the
+     hairline go?" — is one edit in this block rather than a sweep through
+     forty components. Set them all to `0 0` and every edge disappears.
+
+     `--hairline-start` is on the INLINE axis, so it mirrors in Arabic, Urdu
+     and Persian on its own; `--hairline-ink` is the drag-over edge, which is
+     a drag state and not a hairline — named here so no component writes a
+     px.                                                                     */
+  --hairline:            inset 0 0 0 1px var(--hair);
+  --hairline-under:      inset 0 -1px 0 var(--hair);
+  --hairline-over:       inset 0 1px 0 var(--hair);
+  --hairline-start:      inset 1px 0 0 var(--hair);
+  --hairline-strong:     inset 0 0 0 1px var(--hair-strong);
+  --hairline-under-strong: inset 0 -1px 0 var(--hair-strong);
+  --hairline-over-strong:  inset 0 1px 0 var(--hair-strong);
+  --hairline-ink:        inset 0 0 0 1px var(--foreground);
+  /* ch09's field error, and ch11's "Poppy 65% hairline", as the same shape. */
+  --hairline-error:      inset 0 0 0 1px color-mix(in srgb, var(--destructive) 65%, transparent);
+
+  /* ---- Spacing (kit ruling 28) -----------------------------------------
+     Eleven steps on the 4px grid plus four half-steps on a 2px sub-grid for
+     inside a component — "and there is no fifth". Only 1px and 2px live off
+     the scale, as grid lines and optical nudges, never as layout.
+
+     NOTE the numbering trap: Tailwind's numeric spacing ladder is linear 4n
+     and this one is not above step 7 (32 -> 48 -> 64 -> 96 -> 128). `p-8` is
+     32px, which is --space-7 here. Above 32px use the named token, not the
+     Tailwind numeric. docs/RULES.md restates this.                          */
+  --space-1:  0.25rem;    /* 4   dot to label, icon nudge     */
+  --space-2:  0.5rem;     /* 8   chip padding, icon to label  */
+  --space-3:  0.75rem;    /* 12  control gap, card grid gap   */
+  --space-4:  1rem;       /* 16  form rows, list rows         */
+  --space-5:  1.25rem;    /* 20  side padding, narrow         */
+  --space-6:  1.5rem;     /* 24  card inset, panel inset      */
+  --space-7:  2rem;       /* 32  card inset large, page pad   */
+  --space-8:  3rem;       /* 48  block gap inside a section   */
+  --space-9:  4rem;       /* 64  section gap                  */
+  --space-10: 6rem;       /* 96  section gap large            */
+  --space-11: 8rem;       /* 128 chapter break                */
+
+  --space-1h: 0.375rem;   /* 6   tight inline runs            */
+  --space-2h: 0.625rem;   /* 10  dense row gap                */
+  --space-3h: 0.875rem;   /* 14  panel row gap                */
+  --space-4h: 1.125rem;   /* 18  panel inset                  */
+
+  /* ---- Shape ------------------------------------------------------------ */
+  --radius-pill: 999px;   /* buttons, chips, tags, avatars    */
+  --radius-bar:  var(--radius-sm);
+  --radius-card: var(--radius);
+
+  /* ---- Leading aliases — the six named tiers behind the per-step values -- */
+  --leading-tight:  1.02;
+  --leading-snug:   1.18;
+  --leading-h3:     1.25;
+  --leading-h4:     1.3;
+  --leading-normal: 1.45;
+  --leading-loose:  1.60;
+
+  /* ---- Per-step tracking, reachable by name ----------------------------- */
+  --tracking-display-xl: -0.028em;
+  --tracking-display-l:  -0.026em;
+  --tracking-display-m:  -0.025em;
+  --tracking-h1:         -0.025em;
+  --tracking-h2:         -0.02em;
+  --tracking-h3:         -0.014em;
+  --tracking-h4:         -0.01em;
+  --tracking-normal:     0em;
+
+  /* RULED 2026-08-23, override 31 (verify/open.html C15-2) and CORRECTED by
+     override 37 (verify/open.html N5). CH03's prose says "never exceeds
+     sixty-eight characters a line" and CH03's own drawing says
+     `max-width: 66ch`; the token said 62 and carried `! GAP-8`.
+
+     66ch IS CH03'S OWN DRAWN VALUE, AND IT DOES NOT SATISFY CH03'S PROSE.
+     Override 31 said it satisfied both; that was wrong and this is the
+     correction. `ch` is the advance width of a ZERO, not of an average
+     letter, so the two halves of CH03 are in different units and no numeral
+     can meet both. MEASURED on the real specimen paragraph at the shipped
+     15px root: 62ch renders 81 characters on the longest line and 66ch
+     renders 88 — about 1.32 characters per `ch` in this face, so a genuine
+     68-character cap is roughly 52ch, a visibly narrower column.
+
+     RE-MEASURED 2026-08-24, THE REAL FACE. Every number in the paragraph
+     above was measured in the FALLBACK, because until today there was no
+     @font-face and Saans was a name with no file behind it (see §5.0). Saans
+     Light's zero is 0.628em against system-ui's 0.607, so a `ch` got 3.5%
+     WIDER — and its average letter got ~2.5% narrower at the same time. Both
+     effects push the same way. One specimen paragraph of real product prose
+     at the sm step and the shipped 15px root, measured line by line with
+     Ranges — longest line / average full line:
+
+                       48ch        62ch        66ch      chars per `ch`
+         fallback      67 / 63.4   88 / 84.2   92 / 88.8   1.35
+         Saans Light   72 / 68.0   95 / 88.8   95 / 94.3   1.43
+
+     So 66ch is no longer an ~88-character line, it is a ~94-character one,
+     and the distance to CH03's stated sixty-eight has widened by about six
+     characters. A genuine 68-character cap in the real face is 48ch — which
+     the first column measures at exactly 68.0 average — not the ~52ch
+     computed above, which in Saans now runs to 75.8.
+
+     THE VALUE IS NOT CHANGED HERE. 66 is CH03's own drawn number and the
+     ruling below chose the drawing on purpose; swapping it for 48 on the
+     strength of a font swap would be re-deciding someone else's decision
+     from the wrong seat. It is written up instead, and the correction owed
+     upstream is the same correction — only larger.
+
+     The drawing wins because it is the half with a number a stylesheet can
+     hold. GAP-8 stays closed. CH03's prose is owed a correction upstream
+     (KWAPSO-SPEC.md, ARTIFACT CORRECTIONS OWED 18) — one of its two
+     statements has to go, and it is not this one. */
+  --measure-body: 66ch;
+
+  /* ---- Control heights (kit ruling 28) ---------------------------------
+     "32 dense · 38 field inside a row · 40 control · 44 touch row, with 56
+     kept for the table row."                                              */
+  --control-height-dense:  2rem;      /* 32 */
+  --control-height-field:  2.375rem;  /* 38 */
+  --control-height-button: 2.5rem;    /* 40 */
+  --control-height-input:  2.75rem;   /* 44 — also the touch row */
+  --control-height-row:    3.5rem;    /* 56 — the table row      */
+  --control-height-pill:   1.625rem;  /* 26 */
+
+  /* The five icon delivery sizes. A component never writes the px — it asks
+     for a size and gets the token, so an icon rescales with the text-size
+     control like everything else.                                          */
+  --icon-16: 1rem;
+  --icon-20: 1.25rem;
+  --icon-22: 1.375rem;
+  --icon-24: 1.5rem;
+  --icon-28: 1.75rem;   /* RULED T2 - 27.42's module tile. The sixth size,
+                           admitted rather than snapped away. */
+  --icon-32: 2rem;
+
+  --icon-button: var(--icon-16);
+  --dot-status:  0.4375rem;  /* 7  */
+
+  /* Record marks and avatars (kit ruling 30): square for a thing, pill for
+     a person, at 24/32/48 with flex: none. Two initials, never three,
+     never a photograph.                                                    */
+  --avatar-sm: 1.5rem;    /* 24 */
+  --avatar-md: 2rem;      /* 32 */
+  --avatar-lg: 3rem;      /* 48 */
+
+  /* CH11's two stated avatar companions, so no composition re-invents them
+     (GAPS-KIT-BC AVA-B2). The ring is the artifact's
+     `box-shadow: 0 0 0 2.5px var(--sheet)` — the stack separator AND the
+     presence dot's own halo; the dot is its drawn 13. Sizes only — the ring's
+     COLOUR is the ground's (`--background`), taken at the point of use.     */
+  --avatar-ring:  0.15625rem;  /* 2.5 */
+  --dot-presence: 0.8125rem;   /* 13  */
+
+  /* ---- Status pill (kit ruling 26) -------------------------------------
+     Ruling 26, verbatim: "Neutral pill, charcoal label, coloured dot — the
+     dot names the state, the label always says it in words. Mango is the
+     brand, not a status: 'in build' and 'with us' take a charcoal dot. On
+     dark the pill takes the accent fill with a charcoal label and a charcoal
+     dot."
+
+     `--pill-fill` is ch11's drawn `background: var(--card)` — the OTHER
+     paper tone from the `var(--sheet)` panel the pill sits on. No border on
+     any coloured pill; colour is the whole treatment.
+
+     THE DARK CLAUSE. A charcoal dot cannot be seen on an unlit pill, so the
+     ONE pill whose dot is charcoal — "in build" / "with us" — is the pill the
+     last sentence of the ruling is about: on dark it takes the accent fill,
+     and its label and dot are charcoal against it. Every other stage keeps
+     the neutral pill and its own coloured dot, because voiding "coloured dot"
+     for the whole family in dark would void the ruling's own first sentence.
+     Which accent the fill is, and whether the clause is meant to reach every
+     stage rather than this one, is the open question in GAPS-TRACK1.md STA-1;
+     mango is used here because the sentence it follows is about mango and
+     because mango is the one accent that does not move between the two
+     palettes (ch02).                                                        */
+  --pill-fill:           var(--card);
+  --pill-label:          var(--foreground);
+  --pill-fill-building:  var(--pill-fill);   /* light: the same neutral pill */
+  --pill-label-building: var(--pill-label);
+  --dot-shipped:  var(--kw-forest);
+  --dot-building: var(--foreground);   /* "in build" / "with us" — charcoal */
+  --dot-review:   var(--info);
+  --dot-blocked:  var(--kw-poppy);
+  --dot-archived: var(--ink-disabled);
+  --dot-done:     var(--kw-forest);
+
+  /* ---- The mango heat ramp (kit CH17, "Pulse band", panel four) ---------
+     "Four steps and an empty. The mango ramp from the heat map, plus the
+      quiet fill for a day with nothing. No fifth step, no second hue, and
+      never an accent - colour here means quantity, not status."
+     Legend, drawn light to heavy: #FFF3D6 #FFE9B0 #FED069 #E8B244.
+
+     Ruling 26 and CH02 make mango a brand fill and never a data colour.
+     CH17 and CH19 are the two chapters that overrule that, by name and by
+     drawing, and they are the ONLY two: the heat map and the pulse band.
+     A third consumer of these tokens is a bug.
+
+     Dark: carried unchanged. The artifact draws no dark ramp, and mango does
+     not flip anywhere in this system, so inventing one would be a guess.
+     Only the empty step moves, because it IS --surface-idle.            */
+  --heat-1:     #FFF3D6;
+  --heat-2:     #FFE9B0;
+  --heat-3:     var(--kw-mango);   /* named, not repeated - the same colour */
+  --heat-4:     #E8B244;
+  --heat-empty: var(--surface-idle);
+
+
+  /* ---- Folder shape (kit ch14) -----------------------------------------
+     The brand silhouette. Chapter 14 assembles it from the six brand slices
+     "at a uniform 1.6x scale", and the slices' own coordinate system is the
+     source of truth. One BRAND UNIT is therefore 1.6px at the 16px authoring
+     base, which is to say:
+
+         1 brand unit  =  0.1rem, exactly.
+
+     Every figure below is a raw slice measurement times 0.1, and every one
+     reproduces the chapter's own stated pixel at the 16px base:
+
+       lip          19.05    -> 30.48   ch14 "tab shoulder 30.48px lip"
+       row-top      36.99    -> 59.18   ch14 "top row 59.18px"
+       row-bottom   39.96    -> 63.94   ch14 "bottom row 63.94px"
+       tab-height   29.6875  -> 47.5    ch24 "every tab is the same size, 47.5px"
+
+     (The corner slices' 100.67px width is the same relation, 62.92 x 1.6; it
+     is a slice measurement rather than a layout value, so it has no token.)
+
+     The component draws the outline as ONE SVG path whose user unit is the
+     brand unit, so these are the CSS side of the same numbers and not a
+     second, drifting set. Geometry, not colour: nothing here flips in dark. */
+  --folder-lip:            1.905rem;   /* 30.48  lip height = shoulder drop  */
+  --folder-shoulder:       1.845rem;   /* 29.52  the shoulder's own run,
+                                                 148.29 - 129.84             */
+  --folder-lip-width:     12.984rem;   /* 207.74 the slice's own flat lip    */
+  --folder-radius-lip:     0.66rem;    /* 10.56  top-left — the corner ch14
+                                                 says always survives        */
+  --folder-radius:         0.73rem;    /* 11.68  the other three corners     */
+  --folder-row-top:        3.699rem;   /* 59.18                              */
+  --folder-row-bottom:     3.996rem;   /* 63.94                              */
+  /* lip + top row + bottom row: the height at which both flat fillers are
+     zero. Any shorter and the shape would have to crop through a curve,
+     which ch14 forbids outright.                                            */
+  --folder-min-height:     calc(var(--folder-lip) + var(--folder-row-top) + var(--folder-row-bottom));
+  --folder-tab-height:     2.96875rem; /* 47.5                               */
+  /* tab height minus lip: how far the panel rides up over the tab's foot,
+     which is what makes the active tab look physically attached. The kit's
+     own markup writes -17px, which is this rounded to the pixel.            */
+  --folder-tab-overlap:    1.06375rem; /* 17.02                              */
+  --folder-tab-min-width:  8rem;       /* 128                                */
+  /* ch14 draws the panel body inset at 24 / 32 / 40. The 40 is off ruling
+     28's ladder, which steps 32 -> 48. Transcribed as drawn rather than
+     snapped, because ch14 settles it and this file is where a size is
+     decided; the divergence is written down in the folder shape's own log.  */
+  --folder-body-inset-end: 2.5rem;     /* 40                                 */
+
+  /* ---- Layout ----------------------------------------------------------- */
+  --container-marketing: 75rem;   /* 1200 */
+  --container-app:       77.5rem; /* 1240 */
+  --container-document:  60rem;   /* 960  */
+  --grid-columns: 12;
+}
+
+
+/* ============================================================================
+   5 · TYPE — the thirteen steps, transcribed from kit ch03
+   Two families. Saans ships Light 300 and Medium 500 only; Medium is the
+   "bold" of the system. Display sizes lean on scale and tight tracking
+   rather than heavier weight.
+
+   Each step carries its own line-height and letter-spacing as sibling
+   properties, so one Tailwind utility sets all three (commission section 4).
+
+   Kit weight per step, for reference when authoring:
+     500 — 7xl 6xl 5xl 4xl 3xl 2xl xl, badge, micro
+     300 — lg, base, sm, caption
+   ========================================================================= */
+
+/* ----------------------------------------------------------------------------
+   5.0 · THE FACES THEMSELVES                          added 2026-08-24
+
+   Until today `--font-sans` and `--font-serif` named Saans and
+   SerrifCondensed with no `@font-face` anywhere in the repo, so every screen
+   in this system was drawn, reviewed and MEASURED in the fallback — system-ui
+   on the reviewer's machine. The names were aspirational. These three rules
+   are what make them true.
+
+   WHY THIS FILE. Three things import type from here and only one of them is a
+   bundle: demo/demo.css and mini-app/mini.css both `@import` this file, and
+   verify/decide.html links it as plain CSS with no build step at all. A
+   separate fonts.css would have to be added to each of those by hand, and the
+   two apps that vendor this repo would each need to learn about it — the exact
+   kind of step that gets skipped and produces a silent fallback. `--font-sans`
+   lives here, so the face `--font-sans` names lives here. It is also
+   parse-safe: foundations/tokens/build-tokens.mjs collects `:root` blocks by name and
+   counts `--custom-property` declarations, and an at-rule that declares
+   neither is invisible to all five of its guards. Verified by running it.
+
+   WHY THIS URL FORM. `url("../../assets/fonts/…")` — relative to THIS
+   stylesheet, not to the document. That is the one form that survives all
+   three consumers: Vite rebases it and emits the file into the bundle, a
+   Next.js app's css-loader does the same when this folder sits inside it, and
+   a plain static server resolves /foundations/tokens/tokens.css → /assets/fonts/ on its
+   own. A root-absolute `/fonts/…` would have been the alternative and it
+   breaks in two of the three: it demands that every consuming app first copy
+   these files into its own `public/`, and until someone does, the request
+   404s and the page renders the fallback while looking approximately right.
+
+   WHY NO `local()`. A `local("Saans Light")` source would be picked up from
+   whatever cut happens to be installed on the reader's machine — a designer's
+   desktop OTF is often a different version from the web cut, and the failure
+   is invisible because it renders. It also makes verification lie: with
+   `local()` present, `document.fonts.check()` returns true whether or not the
+   file was ever fetched.
+
+   WHY `swap`. These faces are 55–63 KB each and self-hosted from the same
+   origin as the document, so the block period is short. `swap` accepts a
+   flash of the fallback rather than a flash of NOTHING, and this system's
+   fallback stack is a real one — system-ui, not a last-resort serif — so the
+   swapped-in first paint is legible and close in colour. `optional` was the
+   other candidate and is wrong here: it lets the browser abandon the face for
+   the whole navigation on a slow connection, which in an internal tool people
+   keep open all day means a session rendered entirely in the wrong type.
+
+   The weight numbers are not assumptions. Each file's OS/2 usWeightClass was
+   read off the binary: Saans-Light 300, Saans-Medium 500,
+   SerrifCondensed-Light 300 — matching `--font-weight-light` and
+   `--font-weight-medium` below exactly.
+
+   THE `.otf` SECOND LINK, AND WHAT IT COSTS. `.woff2` is the delivery; the
+   masters sit behind it in each `src` so the type still arrives if a consumer
+   somewhere cannot serve woff2. No browser in use needs that link — woff2 has
+   been universal since 2016 — and it is not free: naming the masters in CSS
+   makes a bundler emit them too, +536 KB of build output that no browser will
+   ever request, because the first supported format in an `src` list wins and
+   nothing after it is fetched. Zero runtime cost, real dist cost. Delete the
+   three `format("opentype")` lines if that trade stops being worth it; the
+   masters stay on disk either way, they simply stop being referenced.
+   ------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: "Saans";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("../../assets/fonts/Saans-Light.woff2") format("woff2"),
+       url("../../assets/fonts/Saans-Light.otf")   format("opentype");
+}
+
+@font-face {
+  font-family: "Saans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../../assets/fonts/Saans-Medium.woff2") format("woff2"),
+       url("../../assets/fonts/Saans-Medium.otf")   format("opentype");
+}
+
+@font-face {
+  font-family: "SerrifCondensed";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("../../assets/fonts/SerrifCondensed-Light.woff2") format("woff2"),
+       url("../../assets/fonts/SerrifCondensed-Light.otf")   format("opentype");
+}
+
+:root {
+  --font-sans:  "Saans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "SerrifCondensed", Georgia, "Times New Roman", serif;
+
+  /* Six commission weight names onto the two weights Saans actually ships. */
+  --font-weight-light:      300;
+  --font-weight-normal:     300;
+  --font-weight-medium:     500;
+  --font-weight-semibold:   500;
+  --font-weight-bold:       500;
+  --font-weight-extrabold:  500;
+
+  /* micro · 11 / 500 — UPPERCASE eyebrows only */
+  --text-micro:                  0.6875rem;
+  --text-micro--line-height:     1.3;
+  --text-micro--letter-spacing:  0.08em;
+
+  /* xs · 12 / 500 — same step as badge; the kit has one size here, and no
+     value was invented to separate the two commission names.               */
+  --text-xs:                     0.75rem;
+  --text-xs--line-height:        1.35;
+  --text-xs--letter-spacing:     0em;
+
+  /* sm · 14 / 300 — button and control labels */
+  --text-sm:                     0.875rem;
+  --text-sm--line-height:        1.45;
+  --text-sm--letter-spacing:     0em;
+
+  /* badge · 12 / 500 — badges, counts, status (kit ruling 02) */
+  --text-badge:                  0.75rem;
+  --text-badge--line-height:     1.35;
+  --text-badge--letter-spacing:  0em;
+
+  /* base · 16 / 300 */
+  --text-base:                   1rem;
+  --text-base--line-height:      1.45;
+  --text-base--letter-spacing:   0em;
+
+  /* lg · 18 / 300 */
+  --text-lg:                     1.125rem;
+  --text-lg--line-height:        1.4;
+  --text-lg--letter-spacing:     0em;
+
+  /* xl · 20 / 500 */
+  --text-xl:                     1.25rem;
+  --text-xl--line-height:        1.3;
+  --text-xl--letter-spacing:     -0.01em;
+
+  /* 2xl · 24 / 500 */
+  --text-2xl:                    1.5rem;
+  --text-2xl--line-height:       1.25;
+  --text-2xl--letter-spacing:    -0.014em;
+
+  /* 3xl · 32 / 500 */
+  --text-3xl:                    2rem;
+  --text-3xl--line-height:       1.18;
+  --text-3xl--letter-spacing:    -0.02em;
+
+  /* 4xl · 44 / 500 */
+  --text-4xl:                    2.75rem;
+  --text-4xl--line-height:       1.08;
+  --text-4xl--letter-spacing:    -0.025em;
+
+  /* 5xl · 56 / 500 */
+  --text-5xl:                    3.5rem;
+  --text-5xl--line-height:       1.06;
+  --text-5xl--letter-spacing:    -0.025em;
+
+  /* 6xl · 72 / 500 */
+  --text-6xl:                    4.5rem;
+  --text-6xl--line-height:       1.04;
+  --text-6xl--letter-spacing:    -0.026em;
+
+  /* 7xl · 96 / 500 */
+  --text-7xl:                    6rem;
+  --text-7xl--line-height:       1.02;
+  --text-7xl--letter-spacing:    -0.028em;
+
+  /* Additive: the kit's 13px caption step (timestamps, helper text). The
+     commission has no name for it, so it keeps the kit's.                  */
+  --text-caption:                0.8125rem;
+  --text-caption--line-height:   1.4;
+  --text-caption--letter-spacing: 0em;
+
+  --tracking-eyebrow: 0.08em;    /* kit ruling 16 */
+  --tracking-serif:   -0.005em;
+}
+
+
+/* ============================================================================
+   6 · SEMANTIC TOKENS — DARK  (block 1 of 2: system preference)
+   Byte-identical to block 2. build-tokens.mjs fails the build if they drift,
+   because a token defined in only one of them renders differently for
+   "system dark" than for "I picked dark", and that bug is miserable to find
+   by eye.
+   ========================================================================= */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background:           var(--kw-unlit-page);
+    --foreground:           var(--kw-off-beige);
+    --card:                 var(--kw-unlit-raised);
+    --popover:              var(--kw-unlit-raised);
+    --muted:                var(--kw-unlit-quiet);
+    --muted-foreground:     #bdb9b1;
+    /* RULED 2026-08-22 (F): inactive must read DARKER than the card in dark.
+       --surface-idle follows --muted, and --muted in dark is --kw-unlit-quiet
+       #2F2D28, which is LIGHTER than --card #26241F - so an inactive tab read
+       recessed in light and raised in dark, "quieter" running in opposite
+       directions in the two palettes. Decoupled here rather than moving
+       --muted, which carries skeletons and idle wells too.
+       --kw-unlit-panel #1C1B18 is an existing brand paper: nothing invented. */
+    --surface-idle:         var(--kw-unlit-page);
+    --secondary:            var(--kw-unlit-secondary);
+    --secondary-foreground: var(--kw-off-beige);
+
+    /* ! GAP T12-3 — the kit states the light wash and draws no dark twin.
+       Derived by the kit's own hairline method: carry the alpha, flip the
+       ink. Charcoal at 5% on unlit paper would be invisible, so leaving the
+       light value would be a broken hover, not a conservative one.
+       -> notDelivered                                                       */
+    --accent:               rgba(255, 254, 249, .05);
+
+    --border:               rgba(255, 254, 249, .12);
+    --surface-inverse:      var(--kw-off-beige);
+    --ink-on-inverse:       var(--kw-charcoal);
+    --ink-on-inverse-secondary: #4a4946;   /* the artifact's own --invfg2, dark. Was a derived #5A5957. */   /* RULED M2 - the inverse ground
+                                              flips to off-beige here, so the
+                                              quiet tier flips with it. Mango
+                                              does not flip, so
+                                              --ink-on-accent-secondary holds. */
+    --ink-secondary:        #d5d1c9;
+    --ink-disabled:         #76746f;
+    --hair-faint:           rgba(255, 254, 249, .08);
+
+    --destructive:          var(--kw-poppy-lift);
+    /* RULED 43. Dark needs no second hex: the dark palette already lifts
+       poppy, and the lift measures 4.92:1 on a raised card. The token exists
+       in both palettes so a component never has to ask which one it is in. */
+    --destructive-ink:      var(--kw-poppy-lift);
+    --success:              var(--kw-forest-lift);
+
+    --chart-2:              var(--kw-forest-lift);
+    --chart-3:              var(--kw-poppy-lift);
+    --chart-negative:       var(--kw-poppy-lift);
+
+    --focus:                var(--kw-off-beige);
+    --focus-inverse:        var(--kw-charcoal);
+
+    --shadow-rest:          0 1px 2px rgba(0, 0, 0, .40);
+    --shadow-lifted:        0 6px 20px -6px rgba(0, 0, 0, .55);
+    --shadow-overlay:       0 18px 48px -12px rgba(0, 0, 0, .70);
+
+    --btn-secondary-hover:  #454239;              /* ! GAP-9 not in kit */
+    --btn-inverse-hover:    #ECE8DF;              /* ! GAP-9 not in kit */
+    --btn-cancel-fill:      var(--kw-unlit-quiet);   /* ch02 dark quiet fill #2F2D28 */
+    --btn-disabled-fill:    var(--kw-unlit-quiet);   /* HELD at #2F2D28 while N2
+                                                        lifts --surface-quiet. Disabled
+                                                        must never end up lighter than
+                                                        an enabled secondary, which in
+                                                        dark is the panel tone #1C1B18. */
+    --btn-cancel-label:     var(--ink-secondary);
+    --btn-cancel-hover:     #322F29;              /* ! GAP-9 not in kit */
+    --btn-destructive-hover:#E05540;              /* ! GAP-9 not in kit */
+
+    --surface-panel:        var(--kw-unlit-panel);
+    --surface-quiet:        var(--kw-unlit-secondary);  /* RULED N2 */
+    /* RULED 44. Dark takes the artifact's own direction -- a selection LIFTS
+       off the panel -- but one rung further than #26241F, because #26241F is
+       what a `raised` card is already painted and a selected card there would
+       measure 1.000. --kw-unlit-quiet is the next rung and was already in the
+       file, so dark invents no hex. */
+    --surface-selected:     var(--kw-unlit-quiet);
+
+    /* THE THREE SPINES, dark. 26.02 states the two fills outright: "In dark
+       mode ink becomes #1C1B18 and paper becomes #26241F; mango is unchanged
+       in both palettes." Both spines are DARK grounds in dark, so the ink
+       spine's quiet label stops being --invfg2 (which flips dark) and becomes
+       this palette's own quiet ink; and the paper spine's chip moves one rung
+       on, to the paper the file already keeps after #26241F. */
+    --spine-ink-fill:        var(--kw-unlit-panel);
+    --spine-ink-quiet-label: var(--muted-foreground);
+    --spine-paper-fill:      var(--kw-unlit-raised);
+    --spine-paper-chip:      var(--kw-unlit-quiet);
+    --hair-strong:          rgba(255, 254, 249, .24);
+    /* The inverse ground flips to off-beige in dark, so its hairline flips
+       with it — the artifact's own dark --invhair / --invhair2. */
+    --hair-inverse:         rgba(26, 25, 24, .12);
+    --hair-strong-inverse:  rgba(26, 25, 24, .20);
+
+    --pill-fill:            var(--kw-unlit-raised);
+    --pill-fill-building:   var(--kw-mango);     /* ruling 26, dark clause */
+    --pill-label-building:  var(--kw-charcoal);
+    --dot-shipped:          var(--kw-forest-lift);
+    --dot-blocked:          var(--kw-poppy-lift);
+    --dot-done:             var(--kw-forest-lift);
+    --dot-building:         var(--kw-charcoal);
+  }
+}
+
+
+/* ============================================================================
+   7 · SEMANTIC TOKENS — DARK  (block 2 of 2: explicit choice)
+   Byte-identical to block 1. Keep them that way.
+   ========================================================================= */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background:           var(--kw-unlit-page);
+  --foreground:           var(--kw-off-beige);
+  --card:                 var(--kw-unlit-raised);
+  --popover:              var(--kw-unlit-raised);
+  --muted:                var(--kw-unlit-quiet);
+  --muted-foreground:     #bdb9b1;
+  /* RULED 2026-08-22 (F): inactive must read DARKER than the card in dark.
+     --surface-idle follows --muted, and --muted in dark is --kw-unlit-quiet
+     #2F2D28, which is LIGHTER than --card #26241F - so an inactive tab read
+     recessed in light and raised in dark, "quieter" running in opposite
+     directions in the two palettes. Decoupled here rather than moving
+     --muted, which carries skeletons and idle wells too.
+     --kw-unlit-panel #1C1B18 is an existing brand paper: nothing invented. */
+  --surface-idle:         var(--kw-unlit-page);
+  --secondary:            var(--kw-unlit-secondary);
+  --secondary-foreground: var(--kw-off-beige);
+
+  /* ! GAP T12-3 — the kit states the light wash and draws no dark twin.
+     Derived by the kit's own hairline method: carry the alpha, flip the
+     ink. Charcoal at 5% on unlit paper would be invisible, so leaving the
+     light value would be a broken hover, not a conservative one.
+     -> notDelivered                                                       */
+  --accent:               rgba(255, 254, 249, .05);
+
+  --border:               rgba(255, 254, 249, .12);
+  --surface-inverse:      var(--kw-off-beige);
+  --ink-on-inverse:       var(--kw-charcoal);
+    --ink-on-inverse-secondary: #4a4946;   /* the artifact's own --invfg2, dark. Was a derived #5A5957. */   /* RULED M2 - the inverse ground
+                                              flips to off-beige here, so the
+                                              quiet tier flips with it. Mango
+                                              does not flip, so
+                                              --ink-on-accent-secondary holds. */
+  --ink-secondary:        #d5d1c9;
+  --ink-disabled:         #76746f;
+  --hair-faint:           rgba(255, 254, 249, .08);
+
+  --destructive:          var(--kw-poppy-lift);
+  /* RULED 43. Dark needs no second hex: the dark palette already lifts
+     poppy, and the lift measures 4.92:1 on a raised card. The token exists
+     in both palettes so a component never has to ask which one it is in. */
+  --destructive-ink:      var(--kw-poppy-lift);
+  --success:              var(--kw-forest-lift);
+
+  --chart-2:              var(--kw-forest-lift);
+  --chart-3:              var(--kw-poppy-lift);
+  --chart-negative:       var(--kw-poppy-lift);
+
+  --focus:                var(--kw-off-beige);
+  --focus-inverse:        var(--kw-charcoal);
+
+  --shadow-rest:          0 1px 2px rgba(0, 0, 0, .40);
+  --shadow-lifted:        0 6px 20px -6px rgba(0, 0, 0, .55);
+  --shadow-overlay:       0 18px 48px -12px rgba(0, 0, 0, .70);
+
+  --btn-secondary-hover:  #454239;              /* ! GAP-9 not in kit */
+  --btn-inverse-hover:    #ECE8DF;              /* ! GAP-9 not in kit */
+  --btn-cancel-fill:      var(--kw-unlit-quiet);   /* ch02 dark quiet fill #2F2D28 */
+    --btn-disabled-fill:    var(--kw-unlit-quiet);   /* HELD at #2F2D28 while N2
+                                                        lifts --surface-quiet. Disabled
+                                                        must never end up lighter than
+                                                        an enabled secondary, which in
+                                                        dark is the panel tone #1C1B18. */
+  --btn-cancel-label:     var(--ink-secondary);
+  --btn-cancel-hover:     #322F29;              /* ! GAP-9 not in kit */
+  --btn-destructive-hover:#E05540;              /* ! GAP-9 not in kit */
+
+  --surface-panel:        var(--kw-unlit-panel);
+  --surface-quiet:        var(--kw-unlit-secondary);  /* RULED N2 */
+  /* RULED 44. Dark takes the artifact's own direction -- a selection LIFTS
+     off the panel -- but one rung further than #26241F, because #26241F is
+     what a `raised` card is already painted and a selected card there would
+     measure 1.000. --kw-unlit-quiet is the next rung and was already in the
+     file, so dark invents no hex. */
+  --surface-selected:     var(--kw-unlit-quiet);
+
+  /* THE THREE SPINES, dark. 26.02 states the two fills outright: "In dark
+     mode ink becomes #1C1B18 and paper becomes #26241F; mango is unchanged
+     in both palettes." Both spines are DARK grounds in dark, so the ink
+     spine's quiet label stops being --invfg2 (which flips dark) and becomes
+     this palette's own quiet ink; and the paper spine's chip moves one rung
+     on, to the paper the file already keeps after #26241F. */
+  --spine-ink-fill:        var(--kw-unlit-panel);
+  --spine-ink-quiet-label: var(--muted-foreground);
+  --spine-paper-fill:      var(--kw-unlit-raised);
+  --spine-paper-chip:      var(--kw-unlit-quiet);
+  --hair-strong:          rgba(255, 254, 249, .24);
+  /* The inverse ground flips to off-beige in dark, so its hairline flips
+     with it — the artifact's own dark --invhair / --invhair2. */
+  --hair-inverse:         rgba(26, 25, 24, .12);
+  --hair-strong-inverse:  rgba(26, 25, 24, .20);
+
+  --pill-fill:            var(--kw-unlit-raised);
+  --pill-fill-building:   var(--kw-mango);     /* ruling 26, dark clause */
+  --pill-label-building:  var(--kw-charcoal);
+  --dot-shipped:          var(--kw-forest-lift);
+  --dot-blocked:          var(--kw-poppy-lift);
+  --dot-done:             var(--kw-forest-lift);
+  --dot-building:         var(--kw-charcoal);
+}
+
+
+/* ============================================================================
+   7b · THE THREE SPINES — the rail's fills, as tokens
+
+   26.02, verbatim, twice: "Colors respond to the account's chosen
+   light/dark/colorful spine — build the sidebar's fills as tokens, not
+   literals" and "the rail's fills must be tokens, not literals, so a switch
+   re-paints without touching markup."
+
+   CLIENT RULING D3, 2026-08-24, verbatim: "d3 offer teh threee! but on mango
+   backgorund always baclk text!" So all three ship, as a per-member setting,
+   and A MANGO GROUND CARRIES CHARCOAL TYPE, ALWAYS.
+
+   `ScreenShell` stamps `data-spine` on the screen root; `paper` is the value
+   on bare `:root` so a rail rendered outside a shell still paints. Nothing in
+   `rail.tsx` names a colour: it reads these eight names and only these.
+
+   WHERE EVERY VALUE COMES FROM — 26.02's own three spine specimens:
+     ink    column `var(--inv)` #1A1918 · active row `#FED069` with `#1A1918`
+            · foot mark `#FED069` with `#1A1918`
+     paper  column `var(--sheet)` #F7F2EB · active row and foot mark the same
+            mango pair · 27.1's in-situ chip is `var(--card)`
+     mango  column `#FED069` with `color: #1A1918` · active row `var(--inv)`
+            with `var(--invfg)` · foot mark the same charcoal pair
+   and the caption law: "the active row is mango on the ink and paper spines,
+   charcoal on the mango one."
+
+   TWO VALUES THE ARTIFACT DOES NOT STATE, AND NEITHER IS INVENTED HERE:
+
+   1 · A QUIETENED LABEL ON A MANGO GROUND. The artifact puts type on a mango
+       ground 155 times and the ink is `#1A1918` all 155. It states no second,
+       quieter ink there, and `--ink-on-accent-secondary` (#5E5030) is a
+       DERIVED olive-brown that the client's own reference screenshots
+       contradict — they show the quiet labels on the mango spine as a
+       grey-charcoal, not a brown. An `opacity` is a standing rejection. So
+       the mango spine has NO quiet tier: a quiet label there is charcoal at
+       full strength, which invents nothing and obeys the client's law
+       exactly. LOGGED FOR A CLIENT RULING; `--ink-on-accent-secondary` itself
+       is untouched, because other components read it.
+   2 · A BLOCKED ROW'S INK ON A NON-PAPER SPINE. 27.7 says a blocked entry
+       "stays visible in disabled ink"; `--btn-disabled-label` is that ink and
+       it is tuned for a paper ground. The artifact draws no blocked row on a
+       charcoal or a mango rail, so the ink and mango spines point
+       `--spine-ink-disabled` at their own quiet ink rather than coin a third
+       tier — readable on both, charcoal on mango as the client's law
+       requires, and the row still says `disabled` to the machine and shows
+       `not-allowed` to the mouse. LOGGED AS OWED: on those two spines a
+       blocked row and a quiet one rest at the same ink.
+   ========================================================================= */
+
+:root,
+[data-spine="paper"] {
+  --spine-fill:        var(--spine-paper-fill);
+  --spine-ink:         var(--foreground);
+  --spine-ink-quiet:   var(--muted-foreground);
+  --spine-ink-disabled:var(--btn-disabled-label);
+  --spine-active-fill: var(--kw-mango);
+  --spine-active-ink:  var(--ink-on-accent);
+  --spine-active-hover:var(--btn-primary-hover);
+  --spine-chip-fill:   var(--spine-paper-chip);
+  --spine-mark-fill:   var(--surface-inverse);
+  --spine-mark-ink:    var(--ink-on-inverse);
+}
+
+[data-spine="ink"] {
+  --spine-fill:        var(--spine-ink-fill);
+  --spine-ink:         var(--kw-off-beige);
+  --spine-ink-quiet:   var(--spine-ink-quiet-label);
+  --spine-ink-disabled:var(--spine-ink-quiet-label);
+  --spine-active-fill: var(--kw-mango);
+  --spine-active-ink:  var(--ink-on-accent);
+  --spine-active-hover:var(--btn-primary-hover);
+  --spine-chip-fill:   var(--kw-unlit-raised);
+  --spine-mark-fill:   var(--kw-off-beige);
+  --spine-mark-ink:    var(--kw-charcoal);
+}
+
+/* A VALUE ON A GROUND THAT DOES NOT MOVE BETWEEN PALETTES MUST NOT MOVE
+   BETWEEN PALETTES EITHER. That is the whole rule, and this block is the
+   reason it is written down.
+
+   Every other value here is already palette-independent, because the mango
+   spine's ground is: `--kw-mango` is #FED069 in light and in dark, so the
+   charcoal active row on it, and the off-beige label on that, are the same
+   two colours in both. Nine of these ten names obey that without being told.
+
+   `--spine-active-hover` did not. It pointed at `--btn-inverse-hover`, which
+   flips #333230 -> #ECE8DF — correct for the inverse BUTTON, whose ground
+   inverts with the palette, and wrong here, whose ground does not. MEASURED
+   on the default spine (client ruling D3 makes mango the default, so this is
+   what every screen does), off-beige label on the hover fill:
+
+       light   #FFFEF9 on #333230   12.683  ✔
+       dark    #FFFEF9 on #ECE8DF    1.211  ✘   and the row itself only
+                                             1.189 against the mango rail,
+                                             so it vanished twice over
+
+   Pinned to #333230 — this file's own LIGHT `--btn-inverse-hover`, an
+   existing value, no new hex — because on this spine the value has to be
+   palette-independent, exactly like the nine names around it. Now 12.683 in
+   both. Found by the rail audit and routed here; `rail.tsx` §"ONE VALUE
+   GENUINELY BROKE THIS" carries the same note from the consuming end.
+
+   Before reaching for a `var()` in this block, check whether the token you
+   are reaching for flips. If it does, it does not belong here. */
+[data-spine="mango"] {
+  --spine-fill:        var(--kw-mango);
+  --spine-ink:         var(--ink-on-accent);
+  --spine-ink-quiet:   var(--ink-on-accent);
+  --spine-ink-disabled:var(--ink-on-accent);
+  --spine-active-fill: var(--kw-charcoal);
+  --spine-active-ink:  var(--kw-off-beige);
+  --spine-active-hover:#333230;          /* NOT var(--btn-inverse-hover) */
+  --spine-chip-fill:   var(--kw-off-beige);
+  --spine-mark-fill:   var(--kw-charcoal);
+  --spine-mark-ink:    var(--kw-off-beige);
+}
+
+
+/* ============================================================================
+   8 · THE ONE GLOBAL FOCUS RULE  (kit ruling 24, reversed)
+   Stated once, here, for the whole system. No component may define a ring
+   and nothing focusable may set outline: none. Keyboard shows it; a mouse
+   does not. It follows the control's own radius because an outline does.
+
+   THE RING IS THE SHAPE OF THE CONTROL, NOT ALWAYS A PILL — client ruling,
+   2026-08-24, verbatim: "matching the box". Chapter 6 of the artifact says
+   every ring is a pill; this rule has always drawn the control's own radius,
+   because an `outline` follows the border-box it is on, and `List` is the
+   divergence that made the difference visible. THE BUILT BEHAVIOUR IS
+   CORRECT AND CHAPTER 6 IS OVERRULED. Recorded here so that nobody "fixes"
+   this block back to a pill on the strength of the chapter: a square control
+   gets a square ring, a pill gets a pill, and the single line below is what
+   guarantees it for all 67 controls at once.
+   ========================================================================= */
+
+:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+/* Inverse surfaces flip the ring by rebinding the TOKEN, not by adding a
+   second rule. Custom properties inherit, so every descendant's
+   :focus-visible picks the flipped value up automatically — ruling 24's "one
+   ring spec for every control at once" still holds, and no component changes.
+   Both the utility class and the data attribute are honoured so a call site
+   can mark an inverse region either way. */
+/* THE FOCUS RING GOES ON THE DESCENDANTS, NOT ON THE ELEMENT ITSELF.
+
+   An outline is drawn at `--focus-offset` OUTSIDE its own border box, so the
+   ring of an inverse-filled CONTROL lands on whatever that control sits on --
+   the page -- not on its own fill. Rebinding `--focus` on the element made
+   `ModeToggle` and every other charcoal pill draw a charcoal ring on
+   off-beige paper: measured 1.000 in light, 1.058 in dark. It was an
+   over-correction of the ring fix, shipped the same day as the fix.
+
+   A control INSIDE an inverse panel is the opposite case: its ring does land
+   on the inverse fill, so it needs the flipped ring. Descendants get it;
+   the panel itself does not, because its own ring is outside it too.
+
+   The hairlines below stay on the element, because an inset shadow is drawn
+   ON the fill rather than outside it -- the exact reason the two split here.
+   Both cases are checked by verify/hairline-probe.html. */
+.bg-surface-inverse *,
+[data-surface="inverse"] * {
+  --focus: var(--focus-inverse);
+}
+
+.bg-surface-inverse,
+[data-surface="inverse"] {
+  /* The hairline flips on exactly the same mechanism, for exactly the same
+     reason. --hair is charcoal-at-8% and this ground IS charcoal, so every
+     `--hairline*` shape on a charcoal panel drew at contrast 1.000 — measured,
+     in BOTH palettes, because the ground flips to off-beige in dark and --hair
+     flips with it. The artifact's own :root carries the flipped pair as
+     --invhair / --invhair2 and draws with them 20 times; only the flip was
+     missing here. Rebinding the token rather than adding a rule keeps every
+     existing consumer of --hairline, --hairline-under, --hairline-over,
+     --hairline-start and --hairline-strong correct with no component change. */
+  --hair:        var(--hair-inverse);
+  --hair-strong: var(--hair-strong-inverse);
+
+  /* AND THE NINE SHAPES HAVE TO BE REDECLARED HERE TOO, or none of the above
+     reaches a single component.
+
+     A custom property's value is substituted at COMPUTED-VALUE TIME on the
+     element where it is DECLARED. `--hairline` is declared on `:root` as
+     `inset 0 0 0 1px var(--hair)`, so `:root`'s --hair is baked into it there
+     and the resolved string inherits down. Rebinding --hair on a descendant
+     changes --hair and nothing else: --hairline still carries the charcoal it
+     was born with.
+
+     Measured on a probe before this block existed: --hair on the inverse
+     element read rgba(255,254,249,.12) -- correctly flipped -- while
+     --hairline on the SAME element read inset 0 0 0 1px rgba(26,25,24,.08),
+     and the rule drew at contrast 1.000 on its charcoal ground. The rebind
+     above was inert on its own; every consumer takes a shape, not the ink. */
+  --hairline:              inset 0 0 0 1px var(--hair-inverse);
+  --hairline-under:        inset 0 -1px 0 var(--hair-inverse);
+  --hairline-over:         inset 0 1px 0 var(--hair-inverse);
+  --hairline-start:        inset 1px 0 0 var(--hair-inverse);
+  --hairline-strong:       inset 0 0 0 1px var(--hair-strong-inverse);
+  --hairline-under-strong: inset 0 -1px 0 var(--hair-strong-inverse);
+  --hairline-over-strong:  inset 0 1px 0 var(--hair-strong-inverse);
+  --hairline-ink:          inset 0 0 0 1px var(--ink-on-inverse);
+  --hair-strong: var(--hair-strong-inverse);
+}
+
+/* THE RELATIONAL SECONDARY FILL — both halves.
+   Ruling 01: "A secondary button is a filled paper button in the other tone,
+   so a band and its buttons are never the same tone." The rule is relational,
+   so a single flat token is wrong on half the grounds; the fill is rebound by
+   the GROUND instead, the same mechanism `--focus-inverse` uses above. Custom
+   properties inherit, so a button is always the other tone from the nearest
+   surface that declared one — no prop, no call site change.
+
+   Both halves have to be written. Declaring only the page half meant the
+   value inherited DOWN into a soft-paper card and painted a soft-paper button
+   on a soft-paper footer — invisible, and exactly what ruling 01 forbids
+   (found by rendering `Card` > `CardFooter` > `Button variant="secondary"`).
+
+   `--btn-secondary-hover` does not change with the ground: #F1ECE4 is the
+   artifact's own drawn hover and it is the only one it draws. Whether the
+   soft-paper fill wants a hover of its own is GAPS-REVIEW1A.md Q3.
+
+   IT USED TO BE RE-DECLARED IN BOTH BLOCKS BELOW, AND THAT WAS A BUG.
+   "Does not change with the GROUND" and "does not change with the PALETTE"
+   are two different axes, and writing the literal inside a ground-scoped
+   block asserted both. Only the first was meant. `:root` already carries
+   #F1ECE4 and the two dark blocks already carry #454239 — someone chose a
+   dark-palette hover deliberately and marked it `! GAP-9` — but a re-
+   declaration here shadowed it for any button inside a ground scope, which
+   in practice is every button in the system. MEASURED, secondary label on
+   its hover fill:
+
+                            light     dark
+       no ground scope      14.930    9.944  ✔  (the :root pair, as intended)
+       [data-ground=page]   14.930    1.165  ✘
+       [data-ground=panel]  14.930    1.165  ✘
+
+   In dark the button rested at #1C1B18 and hovered to a near-white #F1ECE4
+   while its label stayed #FFFEF9 — the label disappeared on hover on every
+   secondary button on a scoped ground. The fix is to delete the two lines,
+   not to add a value: with them gone the ground blocks rebind only the FILL,
+   which is the only relational half, and the hover falls through to the
+   palette pair that was always there. Light is byte-identical; only dark
+   changes, and only back to the value the dark blocks already declared.
+
+   This is the same rule as §7b's mango spine, running the other way: there,
+   a flipping value sat on a fixed ground; here, a fixed value sat on a
+   flipping one. Both are "the value and its ground must agree about whether
+   the palette moves them". */
+
+/* Off-beige grounds — the button takes soft paper.
+   `.bg-surface-page` joined the list 2026-08-23 with override 30, which
+   paints the folder-tab strip with it. It is `var(--background)` by
+   definition, so leaving it out would have meant one spelling of the page
+   ground rebinding and the other not. No colour is added by the line. */
+.bg-background,
+.bg-card,
+.bg-popover,
+.bg-surface-raised,
+.bg-surface-page,
+[data-ground="page"] {
+  --btn-secondary-fill:  var(--surface-panel);
+}
+
+/* Soft-paper grounds — the button takes off-beige. ch02: "Assign lifts off
+   the panel", which in dark is the raised tone rather than the page. */
+.bg-surface-panel,
+.bg-secondary,
+[data-ground="panel"] {
+  --btn-secondary-fill:  var(--surface-raised);
+}
+
+/* ---- The ring lands on the SHAPE the reader sees ------------------------
+   Review 1A · fix 4: "the focus indicator must match the shape of the control
+   it sits on ... focus shape always follows the control's own shape."
+
+   An `outline` already follows its own element's border-radius, so a plain
+   control needs nothing. A COMPOSITE control is the exception: its focusable
+   node is a bare `<input>` with no box, no fill and no radius, sitting inside
+   a shell that carries all three (the search pill, a facet's typed field, the
+   command palette's query line). The ring then drew a rectangle inside a
+   round shell — the reported bug.
+
+   So the shell takes the ring and the bare node hands it over. Same
+   --focus-width (1px, override 4) at the same 2px offset — only the box it is
+   drawn around changes. This
+   is one of only two places in the system that write `outline: none` — the
+   other is the read-only rule below — and it writes it on a node that is
+   guaranteed to have a visible ring drawn around it by the rule immediately
+   above. Both are paired: 5 `data-focus-proxy` nodes, 5 `data-focus-shell`
+   ancestors, no orphans. */
+[data-focus-shell]:has([data-focus-proxy]:focus-visible) {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+[data-focus-proxy]:focus-visible {
+  outline: none;
+}
+
+/* ---- A read-only control is not a focus target -------------------------
+   Review 1A · fix 5: "a read-only component takes no focus outline and cannot
+   be tabbed to. Being greyed is the whole affordance." The components also
+   set `tabIndex={-1}`, which takes it out of the tab order; this rule kills
+   the ring for the click-through case, where the browser focuses the node
+   anyway. Disabled controls are not focusable at all and need no rule. */
+[data-readonly]:focus,
+[data-readonly]:focus-visible,
+[data-readonly] :focus-visible {
+  outline: none;
+}
+
+
+/* ============================================================================
+   9 · REDUCED MOTION
+   Honoured at the token layer so no component has to remember.
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-colour:   0ms;
+    --duration-entrance: 0ms;
+    --duration-overlay:  0ms;
+    --duration-exit:     0ms;
+    --duration-lift:     0ms;
+    --duration-settle:   0ms;
+    --duration-advance:  0ms;
+    --default-transition-duration: 0ms;
+  }
+
+  /* Deliberately NOT zeroed: --duration-spin, --duration-pulse,
+     --duration-caret. An infinite animation with a zero duration does not
+     run at all, and a frozen spinner is worse than a moving one — it is the
+     only thing telling the reader that work is still happening. The loops
+     that are decoration rather than status (skeleton breathe, caret blink,
+     indeterminate sweep) are switched off in motion/motion.css instead,
+     where the thing being animated is known.
+
+     Also deliberately NOT handled here: transforms that persist as a STATE
+     rather than playing over a duration — the drag lift scale is the one
+     case. A zero duration makes it snap rather than removes it, so
+     motion/motion.css suppresses it explicitly.                            */
+}
+
+
+/* ============================================================================
+   10 · TAILWIND v4 BRIDGE
+   Everything above is plain CSS and works with no build step. This block
+   only teaches Tailwind's utility namespace where the tokens live, so
+   `bg-background`, `text-muted-foreground`, `rounded-lg`, `shadow-md`,
+   `p-6` and friends resolve to kwapso values.
+
+   `inline` matters: it makes the utilities reference the runtime custom
+   properties above rather than snapshotting a value, which is what lets a
+   single utility class flip with the palette.
+
+   Inert without Tailwind. Nothing here decides a value.
+   ========================================================================= */
+
+@theme inline {
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --color-card:                 var(--card);
+  --color-card-foreground:      var(--card-foreground);
+  --color-popover:              var(--popover);
+  --color-popover-foreground:   var(--popover-foreground);
+  --color-muted:                var(--muted);
+  --color-muted-foreground:     var(--muted-foreground);
+  --color-secondary:            var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent:               var(--accent);
+  --color-accent-foreground:    var(--accent-foreground);
+  --color-border:               var(--border);
+  --color-input:                var(--input);
+  --color-ring:                 var(--ring);
+
+  --color-surface-inverse:      var(--surface-inverse);
+  --color-ink-on-inverse:       var(--ink-on-inverse);
+  --color-ink-on-inverse-secondary: var(--ink-on-inverse-secondary);
+  --color-ink-on-accent-secondary:  var(--ink-on-accent-secondary);
+  --color-surface-brand:        var(--surface-brand);
+  --color-surface-idle:         var(--surface-idle);
+  --color-surface-panel:        var(--surface-panel);
+  --color-surface-quiet:        var(--surface-quiet);
+  /* RULED 44. Bridged so `bg-surface-selected` exists at all -- the DEAD
+     SELECTOR guard's whole subject: a class this stylesheet reasons about
+     that Tailwind never generates paints nothing while looking deliberate. */
+  --color-surface-selected:     var(--surface-selected);
+  /* Bridged because the relational rebind above keys on `.bg-surface-raised`,
+     and a selector cannot match a class Tailwind never generates. Without this
+     line the class emitted no background at all -- measured rgba(0,0,0,0) --
+     while the rebind it triggers fired anyway, so a screen asking for the
+     raised tone got a transparent box AND a rebound button. Found by Track 3A
+     hitting it live (T3A-33); `build-tokens.mjs` now fails on the whole class
+     of it. `--surface-page` rides along: same family, same risk. */
+  --color-surface-raised:       var(--surface-raised);
+  --color-surface-page:         var(--surface-page);
+  --color-ink-secondary:        var(--ink-secondary);
+  --color-ink-tertiary:         var(--ink-tertiary);
+  --color-ink-disabled:         var(--ink-disabled);
+  --color-ink-on-accent:        var(--ink-on-accent);
+  --color-hair-faint:           var(--hair-faint);
+  --color-hair-strong:          var(--hair-strong);
+
+  --color-primary:              var(--primary);
+  --color-primary-foreground:   var(--primary-foreground);
+  --color-destructive:          var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  /* RULED 43. `text-destructive-ink` is the destructive WORD; `bg-destructive`
+     and `text-destructive-foreground` are the destructive FILL and its label,
+     and neither moved. One bridge cannot serve both -- `--color-destructive`
+     generates the text utility and the background utility from one value,
+     which is exactly why the ink needed a token of its own. */
+  --color-destructive-ink:      var(--destructive-ink);
+  --color-success:              var(--success);
+  --color-success-foreground:   var(--success-foreground);
+  --color-warning:              var(--warning);
+  --color-warning-foreground:   var(--warning-foreground);
+  --color-warning-strong:       var(--warning-strong);
+  --color-info:                 var(--info);
+
+  --color-chart-1:              var(--chart-1);
+  --color-chart-2:              var(--chart-2);
+  --color-chart-3:              var(--chart-3);
+  --color-chart-4:              var(--chart-4);
+  --color-chart-5:              var(--chart-5);
+  --color-chart-negative:       var(--chart-negative);
+
+  /* Shape */
+  --radius-pill:                var(--radius-pill);
+  --radius-select:              var(--radius-select);
+  --radius-bar:                 var(--radius-bar);
+
+  /* Elevation. THIS BLOCK IS LOAD-BEARING, not tidiness. Tailwind v4 INLINES
+     its own default shadow values into the utility instead of referencing a
+     variable, so without these entries `shadow-md` renders a generic grey
+     drop shadow and — worse — does not flip in dark, no matter how the :root
+     token is defined. Re-pointing each key is what makes shadow-* carry the
+     kwapso paper shadows. Verified in a compiled bundle, not assumed.       */
+  --shadow-2xs:                 var(--shadow-2xs);
+  --shadow-xs:                  var(--shadow-xs);
+  --shadow-sm:                  var(--shadow-sm);
+  --shadow-md:                  var(--shadow-md);
+  --shadow-lg:                  var(--shadow-lg);
+  --shadow-xl:                  var(--shadow-xl);
+  --shadow-2xl:                 var(--shadow-2xl);
+
+  /* Type. Tailwind's own theme carries no letter-spacing sub-key for its size
+     steps, so without these the per-step tracking never reaches the utility —
+     only font-size and line-height do. Registering all three keeps one
+     `text-*` class setting all three, which is what section 4 asks for. The
+     three kwapso-only steps (micro, badge, caption) get real utilities at the
+     same time, instead of every component reaching for an arbitrary value.  */
+  --text-micro:                   var(--text-micro);
+  --text-micro--line-height:      var(--text-micro--line-height);
+  --text-micro--letter-spacing:   var(--text-micro--letter-spacing);
+  --text-badge:                   var(--text-badge);
+  --text-badge--line-height:      var(--text-badge--line-height);
+  --text-badge--letter-spacing:   var(--text-badge--letter-spacing);
+  --text-caption:                 var(--text-caption);
+  --text-caption--line-height:    var(--text-caption--line-height);
+  --text-caption--letter-spacing: var(--text-caption--letter-spacing);
+  --text-xs--letter-spacing:      var(--text-xs--letter-spacing);
+  --text-sm--letter-spacing:      var(--text-sm--letter-spacing);
+  --text-base--letter-spacing:    var(--text-base--letter-spacing);
+  --text-lg--letter-spacing:      var(--text-lg--letter-spacing);
+  --text-xl--letter-spacing:      var(--text-xl--letter-spacing);
+  --text-2xl--letter-spacing:     var(--text-2xl--letter-spacing);
+  --text-3xl--letter-spacing:     var(--text-3xl--letter-spacing);
+  --text-4xl--letter-spacing:     var(--text-4xl--letter-spacing);
+  --text-5xl--letter-spacing:     var(--text-5xl--letter-spacing);
+  --text-6xl--letter-spacing:     var(--text-6xl--letter-spacing);
+  --text-7xl--letter-spacing:     var(--text-7xl--letter-spacing);
+
+  --tracking-eyebrow:           var(--tracking-eyebrow);
+  --tracking-serif:             var(--tracking-serif);
+
+  /* Motion */
+  --ease-kwapso:                var(--ease);
+  --ease-kwapso-exit:           var(--ease-exit);
+  --ease-kwapso-move:           var(--ease-move);
+}
+
+@theme {
+  /* K-2 · the spacing base. Makes Tailwind's whole numeric ladder rem-based,
+     so p-4 / gap-6 / mt-2 scale with the text-size control and commission
+     rule 5 holds for every utility. 0.25rem = 4px at the 16px base, which is
+     ruling 28's grid.                                                       */
+  --spacing: 0.25rem;
+}

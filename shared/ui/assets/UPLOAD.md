@@ -31,16 +31,16 @@ looking at a screen can judge whether the icon reads at 16px, whether two
 icons in one row are distinguishable, or whether the set feels like one hand
 drew it. Those are the only questions icons have.
 
-**Where.** `icons/` — drop each SVG over the placeholder of the same name.
+**Where.** `foundations/icons/` — drop each SVG over the placeholder of the same name.
 
 ```
-icons/AlarmClock.svg     icons/AppWindow.svg     icons/Archive.svg
-icons/ArrowDown.svg      icons/ArrowLeft.svg     … 96 in total
+foundations/icons/AlarmClock.svg     foundations/icons/AppWindow.svg     foundations/icons/Archive.svg
+foundations/icons/ArrowDown.svg      foundations/icons/ArrowLeft.svg     … 96 in total
 ```
 
 **Filenames must match exactly** — PascalCase, and they are what the apps
-import (`import { ArrowRight } from "kwapso-design/icons"`). Run
-`ls icons/*.svg` for the list, or ask me for it as plain text.
+import (`import { ArrowRight } from "kwapso-design/foundations/icons"`). Run
+`ls foundations/icons/*.svg` for the list, or ask me for it as plain text.
 
 **Any grid.** The generator reads each file's own `viewBox`, so draw at 24,
 28.45 or anything else.
@@ -69,7 +69,7 @@ Each currently ships a substitute that is visibly wrong:
 | manual / automatic / AI actor | substitutions | flow nodes cannot be told apart |
 | zoom out | the character `−` | it is type, not an icon, and it shows |
 
-**Where.** `icons/`, named however you like — tell me the names and I will wire
+**Where.** `foundations/icons/`, named however you like — tell me the names and I will wire
 them. Same rules as §1.
 
 ---
@@ -80,7 +80,7 @@ them. Same rules as §1.
 
 The kit has three series colours (sky, forest, poppy) and says they cycle, so
 `--chart-4` and `--chart-5` currently repeat 1 and 2. Verified in
-`tokens/tokens.css` today, unchanged: `--chart-4: var(--chart-1)`.
+`foundations/tokens/tokens.css` today, unchanged: `--chart-4: var(--chart-1)`.
 
 **What breaks without it.** Measured: **chart-1 against chart-4 is 1.000.** A
 five-series chart draws two invisible pairs — two lines exactly on top of each
@@ -192,7 +192,7 @@ metrics, **66% fewer bytes** (523 KB of OTF becomes 180 KB). Every page load in
 both apps pays the smaller number. If you ever send an updated cut, drop the
 new `.otf` in and one command regenerates the rest.
 
-**Three `@font-face` rules are wired** in `tokens/tokens.css` §5.0 — Saans
+**Three `@font-face` rules are wired** in `foundations/tokens/tokens.css` §5.0 — Saans
 Light at 300, Saans Medium at 500, SerrifCondensed Light at 300. Those weights
 were read out of the files themselves rather than assumed. Verified in a
 browser: all three faces report `loaded`, the `.woff2` are fetched `200`, and

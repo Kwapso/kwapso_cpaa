@@ -104,14 +104,14 @@ import * as React from "react";
 import {
   Chart,
   type ChartSeries,
-} from "../../structures/chart/chart";
-import { Skeleton } from "../../controls/skeleton/skeleton";
+} from "../../components/chart/chart";
+import { Skeleton } from "../../components/skeleton/skeleton";
 import {
   StatGrid,
   type StatDeltaDirection,
   type StatItem,
   type StatTone,
-} from "../../structures/stat-grid/stat-grid";
+} from "../../components/stat-grid/stat-grid";
 import { cn } from "../../lib/utils";
 import {
   ShapeStateBody,
