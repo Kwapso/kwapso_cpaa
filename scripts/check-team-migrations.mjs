@@ -100,6 +100,11 @@
 //      between an exception and a hole.
 //
 // The list is empty today, and that is the point of it.
+//
+// The three derivations and the waiver rot check are EXPORTED and locked by
+// web/test/migration-gate.test.ts, which runs in `npm run check` and touches no
+// network. Everything this gate promises was once a manual proof somebody ran on
+// an afternoon; a proof nobody can re-run is a proof that decays.
 
 import { execSync } from "node:child_process"
 import { readFileSync } from "node:fs"
@@ -116,7 +121,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
  * top-level = production, `env.staging` = staging). They appear here only in the
  * remedy line, so a drift here misprints a URL — it can never turn a red run
  * green, which is why this one is a list and the version is not. */
-const ENVIRONMENTS = {
+export const ENVIRONMENTS = {
   staging: { db: "kwapso-core-staging", origin: "https://agency-staging.kwapso.app" },
   production: { db: "kwapso-core", origin: "https://agency.kwapso.app" },
 }
@@ -130,7 +135,7 @@ const ENVIRONMENTS = {
  * @type {{ env: "staging"|"production", teamId: string, name: string,
  *          stuckAt: string|null, until: string, why: string }[]}
  */
-const MIGRATION_WAIVERS = [
+export const MIGRATION_WAIVERS = [
   // {
   //   env: "staging",
   //   teamId: "01M0THFJC37525M1WD1PPWTPBY",
@@ -141,46 +146,42 @@ const MIGRATION_WAIVERS = [
   // },
 ]
 
-// ── The account guard ───────────────────────────────────────────────────────
+
+// ── The derivations ─────────────────────────────────────────────────────────
 //
-// The same guard, and the same reason, as `reset-all.mjs` and `backup.mjs`: no
-// worker pins `account_id`, so wrangler acts on whatever account the machine is
-// logged into, and on the machine this was written for that is a DIFFERENT
-// client's account. Being the first thing in the deploy, this refusal also
-// catches "you are about to ship to the wrong account" before the build starts.
-const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
-if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
-  console.error(
-    `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +
-      `and this script only ever reads ${KWAPSO_ACCOUNT_ID}.\n\n` +
-      `Run it through cf-exec, or set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN first.`
-  )
-  process.exit(2)
+// Exported, and the runner below only fires when this file is EXECUTED — so
+// web/test/migration-gate.test.ts can call them without reaching the network or
+// tripping the account guard. Every proof in this file's history was a manual
+// one somebody ran once; that suite is the part that survives.
+
+/** Parse TypeScript source into a syntax tree, for the two derivations below.
+ * They take SOURCE rather than a path so the suite can feed them a crafted file
+ * — including the one that reads like the real thing and is not. */
+function parse(source) {
+  return ts.createSourceFile("x.ts", source, ts.ScriptTarget.Latest, true)
 }
 
-const envName = process.argv[2]
-const target = ENVIRONMENTS[envName]
-if (!target) {
-  console.error("Usage: node scripts/check-team-migrations.mjs <staging|production>")
-  process.exit(2)
-}
-
-/** Parse a file into a syntax tree once, for the two derivations below. */
-function parse(relPath) {
-  const path = join(ROOT, relPath)
-  return ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true)
-}
+const read = (relPath) => readFileSync(join(ROOT, relPath), "utf8")
 
 /** THE LATEST TEAM-SCHEMA VERSION, read off `TEAM_MIGRATIONS` itself.
  *
  * Off the syntax tree rather than a regex: `version: "…"` appears once per
  * migration and the answer is the LAST one in that array, which a text match
  * cannot promise — a `version:` in a comment, a doc block or some later constant
- * would be picked up just as happily, and the wrong answer here is a gate that
- * passes while the estate is behind. Anything unexpected in the shape throws;
- * there is no fallback, because a fallback is how a gate goes quietly green. */
-function latestTeamMigration() {
-  const tree = parse("workers/tenancy/src/team-schema.ts")
+ * would be picked up just as happily. Both wrong answers are bad and they are
+ * bad in different ways: too old is a gate that goes green while the estate is
+ * behind, too new is a gate that goes red for a reason nobody can act on. (The
+ * planning session met the second one by accident on 27 Aug 2026 — a mutation
+ * pasted PAST the array's close, which a regex would have matched and this
+ * correctly did not see.) Anything unexpected in the shape throws; there is no
+ * fallback, because a fallback is how a gate goes quietly green. */
+export function latestTeamMigration() {
+  return latestMigrationIn(read("workers/tenancy/src/team-schema.ts"))
+}
+
+/** @see latestTeamMigration — the same derivation, over source you hand it. */
+export function latestMigrationIn(source) {
+  const tree = parse(source)
   let array = null
   ts.forEachChild(tree, (node) => {
     if (!ts.isVariableStatement(node)) return
@@ -216,8 +217,13 @@ function latestTeamMigration() {
  * gate nobody can satisfy, which is the whole trap this script is built around.
  * So the clause is read from the handler's own SQL rather than copied into a
  * second sentence that can drift away from the first. */
-function robotTeamFence() {
-  const tree = parse("workers/tenancy/src/routes/admin.ts")
+export function robotTeamFence() {
+  return robotFenceIn(read("workers/tenancy/src/routes/admin.ts"))
+}
+
+/** @see robotTeamFence — the same derivation, over source you hand it. */
+export function robotFenceIn(source) {
+  const tree = parse(source)
   let clause = null
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
@@ -236,6 +242,36 @@ function robotTeamFence() {
     )
   }
   return clause
+}
+
+/** THE WAIVER ROT CHECK, and the env filter with it — one pure seam so the four
+ * ways a waiver can be wrong are testable without an estate to point at.
+ *
+ * `behind` is the rows that are actually behind, `today` an ISO date. Returns
+ * the problems to refuse over and the teams a still-honest waiver excuses. */
+export function waiverProblems(envName, allWaivers, behind, today) {
+  const waivers = allWaivers.filter((w) => w.env === envName)
+  const problems = []
+  const waived = new Set()
+  for (const w of waivers) {
+    const row = behind.find((t) => t.id === w.teamId)
+    if (!row) {
+      problems.push(`${w.teamId} (${w.name}) — waived, but it is not behind. Delete the waiver.`)
+    } else if (row.schema_version !== w.stuckAt) {
+      problems.push(
+        `${w.teamId} (${w.name}) — the waiver says it is stuck at ${w.stuckAt ?? "(none)"}, ` +
+          `but it reads ${row.schema_version ?? "(none)"}. Correct or delete the waiver.`
+      )
+    } else if (w.until < today) {
+      problems.push(
+        `${w.teamId} (${w.name}) — the waiver expired on ${w.until}. ` +
+          `Migrate it, deactivate it, or renew the waiver with a fresh reason.`
+      )
+    } else {
+      waived.add(w.teamId)
+    }
+  }
+  return { problems, waived }
 }
 
 /** Read rows out of a core database. A failure here is a refusal, never a pass:
@@ -257,73 +293,84 @@ function query(db, sql) {
   return JSON.parse(out.slice(start))[0]?.results ?? []
 }
 
-// ── The check ───────────────────────────────────────────────────────────────
+// ── The run ─────────────────────────────────────────────────────────────────
 
-const latest = latestTeamMigration()
-const fence = robotTeamFence()
-
-const teams = query(
-  target.db,
-  `SELECT id, name, schema_version FROM teams ${fence} ORDER BY name`
-)
-
-const behind = teams.filter((t) => t.schema_version !== latest)
-const waivers = MIGRATION_WAIVERS.filter((w) => w.env === envName)
-
-// ROT CHECK, before the verdict. A waiver is a claim about the estate, and a
-// claim that has stopped being true is worse than no claim: it reads as a
-// handled exception while describing something that is not there any more.
-const today = new Date().toISOString().slice(0, 10)
-const stale = []
-for (const w of waivers) {
-  const row = behind.find((t) => t.id === w.teamId)
-  if (!row) {
-    stale.push(`${w.teamId} (${w.name}) — waived, but it is not behind. Delete the waiver.`)
-  } else if (row.schema_version !== w.stuckAt) {
-    stale.push(
-      `${w.teamId} (${w.name}) — the waiver says it is stuck at ${w.stuckAt ?? "(none)"}, ` +
-        `but it reads ${row.schema_version ?? "(none)"}. Correct or delete the waiver.`
+function main(argv) {
+  // THE ACCOUNT GUARD — the same guard, and the same reason, as `reset-all.mjs`
+  // and `backup.mjs`: no worker pins `account_id`, so wrangler acts on whatever
+  // account the machine is logged into, and on the machine this was written for
+  // that is a DIFFERENT client's account. Being the first thing in the deploy,
+  // this refusal also catches "you are about to ship eight workers to the wrong
+  // account" before the build starts. It is deliberately hard rather than a
+  // warning: every deploy here runs through `cf-exec`, so the correct path is
+  // never the one that trips it.
+  const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+  if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
+    console.error(
+      `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +
+        `and this script only ever reads ${KWAPSO_ACCOUNT_ID}.\n\n` +
+        `Run it through cf-exec, or set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN first.`
     )
-  } else if (w.until < today) {
-    stale.push(
-      `${w.teamId} (${w.name}) — the waiver expired on ${w.until}. ` +
-        `Migrate it, deactivate it, or renew the waiver with a fresh reason.`
+    return 2
+  }
+
+  const envName = argv[0]
+  const target = ENVIRONMENTS[envName]
+  if (!target) {
+    console.error("Usage: node scripts/check-team-migrations.mjs <staging|production>")
+    return 2
+  }
+
+  const latest = latestTeamMigration()
+  const teams = query(
+    target.db,
+    `SELECT id, name, schema_version FROM teams ${robotTeamFence()} ORDER BY name`
+  )
+  const behind = teams.filter((t) => t.schema_version !== latest)
+
+  // The rot check runs BEFORE the verdict. A waiver is a claim about the estate,
+  // and a claim that has stopped being true is worse than no claim: it reads as a
+  // handled exception while describing something that is not there any more.
+  const today = new Date().toISOString().slice(0, 10)
+  const { problems, waived } = waiverProblems(envName, MIGRATION_WAIVERS, behind, today)
+  if (problems.length) {
+    console.error(`MIGRATION WAIVERS out of date (${envName}):\n`)
+    for (const line of problems) console.error(`  • ${line}`)
+    console.error(`\n  They are data in scripts/check-team-migrations.mjs — read its header.`)
+    return 1
+  }
+
+  const blocking = behind.filter((t) => !waived.has(t.id))
+  if (blocking.length) {
+    console.error(
+      `TEAM DATABASES ARE BEHIND (${envName}). The code you are about to deploy may\n` +
+        `expect tables and columns these teams do not have yet.\n\n` +
+        `  latest team-schema migration: ${latest}\n` +
+        `  (workers/tenancy/src/team-schema.ts, last entry in TEAM_MIGRATIONS)\n`
     )
+    for (const t of blocking) {
+      console.error(`  • ${t.name} (${t.id}) is at ${t.schema_version ?? "(no version recorded)"}`)
+    }
+    console.error(
+      `\nRUN THIS FIRST — the migration robot, which rolls every missing migration\n` +
+        `to every ready team, and is safe to run again if it half-finishes:\n\n` +
+        `  curl -X POST ${target.origin}/api/tenancy/admin/migrate-teams \\\n` +
+        `    -H "x-admin-key: $ADMIN_KEY"\n\n` +
+        `Then re-run this check. If a team cannot be migrated at all, do NOT switch\n` +
+        `this off — read the header of scripts/check-team-migrations.mjs: deactivate\n` +
+        `the team, or add a dated waiver with a reason.`
+    )
+    return 1
   }
-}
-if (stale.length) {
-  console.error(`MIGRATION WAIVERS out of date (${envName}):\n`)
-  for (const line of stale) console.error(`  • ${line}`)
-  console.error(`\n  They are data in scripts/check-team-migrations.mjs — read its header.`)
-  process.exit(1)
-}
 
-const waived = new Set(waivers.map((w) => w.teamId))
-const blocking = behind.filter((t) => !waived.has(t.id))
-
-if (blocking.length) {
-  console.error(
-    `TEAM DATABASES ARE BEHIND (${envName}). The code you are about to deploy may\n` +
-      `expect tables and columns these teams do not have yet.\n\n` +
-      `  latest team-schema migration: ${latest}\n` +
-      `  (workers/tenancy/src/team-schema.ts, last entry in TEAM_MIGRATIONS)\n`
+  const alsoWaived = waived.size ? `, ${waived.size} waived` : ""
+  console.log(
+    `OK: ${teams.length} live team${teams.length === 1 ? "" : "s"} in ${target.db} at ${latest}${alsoWaived}.`
   )
-  for (const t of blocking) {
-    console.error(`  • ${t.name} (${t.id}) is at ${t.schema_version ?? "(no version recorded)"}`)
-  }
-  console.error(
-    `\nRUN THIS FIRST — the migration robot, which rolls every missing migration\n` +
-      `to every ready team, and is safe to run again if it half-finishes:\n\n` +
-      `  curl -X POST ${target.origin}/api/tenancy/admin/migrate-teams \\\n` +
-      `    -H "x-admin-key: $ADMIN_KEY"\n\n` +
-      `Then re-run this check. If a team cannot be migrated at all, do NOT switch\n` +
-      `this off — read the header of scripts/check-team-migrations.mjs: deactivate\n` +
-      `the team, or add a dated waiver with a reason.`
-  )
-  process.exit(1)
+  return 0
 }
 
-const skipped = waived.size ? `, ${waived.size} waived` : ""
-console.log(
-  `OK: ${teams.length} live team${teams.length === 1 ? "" : "s"} in ${target.db} at ${latest}${skipped}.`
-)
+// Only when RUN, never when imported — see the note above the derivations.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  process.exit(main(process.argv.slice(2)))
+}
