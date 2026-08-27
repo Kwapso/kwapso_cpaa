@@ -745,3 +745,72 @@ describe("the model having a bad minute costs the material, not the base", () =>
     expect(titles(answer)).toContain("Written while the model was down")
   })
 })
+
+// ── THE EXACT TERM, AND THE FLOOR IT IS ALLOWED PAST ────────────────────────
+//
+// `termFloor` is a PROPORTION of the question's length, and that arithmetic runs
+// backwards on the one thing the word match exists for. Measured on staging: a
+// question about ticket 3144 returned zero candidates, because the chunk that
+// says "3144 is pending gravity forms confirmation" holds the one token that
+// matters and three others, against a floor of eight. Phrasing the question more
+// fully made the reference HARDER to find, which is the opposite of what a person
+// doing it expects.
+//
+// So an exact token waives the proportion — and only a RARE one does, because a
+// year is a digit-bearing token too and there are hundreds of chunks with one in
+// them. Both halves are here: without the second, the sole-evidence path (where
+// the word match decides `found` on its own) would answer every question that
+// happens to contain a number.
+describe("an exact reference is found however long the question around it is", () => {
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Ticket 3144 handover note",
+      body: "3144 is pending gravity forms confirmation.",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Dispatch rota",
+      body: "The dispatch rota is published every Thursday and the weekend cover is agreed at the Wednesday stand-up before it goes out.",
+    })
+  })
+
+  const LONG_QUESTION =
+    "Could somebody remind me where things currently stand with ticket 3144, and whether anybody has replied about it since last week?"
+
+  it("returns the chunk holding the reference, though it holds almost nothing else", async () => {
+    const answer = await ask(IDS.staffUser, LONG_QUESTION, undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `refused with ${answer.candidates} candidates`).toBe(true)
+    expect(titles(answer)).toContain("Ticket 3144 handover note")
+  })
+
+  // The proportional floor is not softened for anything else. Same length, same
+  // sole-evidence path, no exact token — and the two words it shares with the
+  // rota note are a coincidence, which is what the floor is for.
+  it("and a question with no exact term in it is held to the proportion exactly as before", async () => {
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with the parental leave policy, and whether anybody has replied about it since last week?",
+      undefined,
+      NOTHING_CLOSE_ENOUGH
+    )
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
+
+  // RARITY IS THE WHOLE OF WHAT MAKES A TOKEN "EXACT". Twenty-one notes mention
+  // 2026; the token is in the question and in every one of them, and it may not
+  // buy a single one of them past the floor. Break EXACT_TERM_MAX_CHUNKS and this
+  // is what says so.
+  it("a token that is everywhere is not an exact term, whatever the digit says", async () => {
+    for (let i = 0; i < 21; i++)
+      await addSource(IDS.staffUser, {
+        title: `Planning note ${i}`,
+        body: `Budget 2026 planning for workstream ${i}, agreed with the delivery lead.`,
+      })
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me what the agreed parental leave arrangement is for 2026, and who signed it off?",
+      undefined,
+      NOTHING_CLOSE_ENOUGH
+    )
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
+})

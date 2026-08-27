@@ -87,6 +87,13 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     const KNOWN_SMALL: Record<string, string> = {
       "content/src/lib/knowledge.ts: terms":
         "a question's search terms, capped at MAX_QUESTION_TERMS (24)",
+      // The digit-bearing SUBSET of that same list, bound a second time so the
+      // exact-term bypass can name it. A subset of a list capped at 24 is capped
+      // at 24, so the lexical statement's worst case is 24 + 24 + 1 owner + the
+      // compartments — see the arithmetic asserted below, which is now a doubling
+      // rather than a single list.
+      "content/src/lib/knowledge.ts: rare":
+        "the question's exact (digit-bearing) terms — a subset of `terms`, so MAX_QUESTION_TERMS (24) bounds it too",
       "content/src/lib/knowledge.ts: compartments":
         "the compartments searched — the agency's plus at most one client",
       // NOT proven, ADMITTED — and now with the number that makes it survivable.
@@ -192,7 +199,13 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     const src = readFileSync(join(SRC, "lib", "knowledge.ts"), "utf8")
     const maxTerms = Number(/const MAX_QUESTION_TERMS = (\d+)/.exec(src)?.[1] ?? "0")
     expect(maxTerms, "MAX_QUESTION_TERMS must stay under D1's parameter cap").toBeGreaterThan(0)
-    expect(maxTerms).toBeLessThan(D1_MAX_BOUND_PARAMS)
+    // TWICE, because the lexical statement binds the term list AND its exact
+    // subset. It was one list until the exact-term bypass; asserting the single
+    // bound would now be asserting half the statement.
+    expect(
+      2 * maxTerms,
+      "the lexical arm binds MAX_QUESTION_TERMS twice — the terms and their exact subset"
+    ).toBeLessThan(D1_MAX_BOUND_PARAMS)
     expect(
       PORTAL_ROOTS_CAP,
       "PORTAL_ROOTS_CAP must stay under D1's parameter cap — the switcher binds one per root"
