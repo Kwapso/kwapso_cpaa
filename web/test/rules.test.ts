@@ -2313,6 +2313,7 @@ describe("RULES — the laws of the base", () => {
       "in-app-anchors", // R37: web/test/shell-nav.test.ts — every component's anchors, classified by where the href points
       "details-ask-the-door", // R38: the paged-detail census above — a find over a PAGE is not a lookup
       "kit-supplies-the-ui", // R39: the UI-package census below, derived from what the kit itself imports
+      "reachable-bytes", // R40: web/test/reachable-bytes.test.ts — the write census (off the wrangler bucket bindings) walked to the render
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
