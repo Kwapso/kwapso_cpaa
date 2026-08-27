@@ -9,16 +9,16 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
+} from "@shared/ui/components/avatar/avatar"
 import {
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { Input } from "@shared/ui/controls/input/input"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Input } from "@shared/ui/components/input/input"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { TeamSummary } from "@shared/types"

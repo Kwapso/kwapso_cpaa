@@ -24,24 +24,24 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { Input } from "@shared/ui/controls/input/input"
+import { Input } from "@shared/ui/components/input/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/select/select"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Paperclip, Upload } from "@shared/ui/icons"
+import { Paperclip, Upload } from "@shared/ui/foundations/icons"
 
 import { ApiFailure } from "@/lib/api"
 import { readFileAsDataUrl } from "@shared/web/file"
@@ -183,7 +183,7 @@ export function KnowledgeUploadDialog({
             setDragging(false)
             take(e.dataTransfer.files?.[0])
           }}
-          className={`flex flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center motion-hover ${
+          className={`flex flex-col items-center gap-2 rounded-[var(--radius)] border border-dashed p-6 text-center motion-hover ${
             dragging ? "border-primary bg-primary/5" : "border-muted-foreground/30"
           }`}
         >

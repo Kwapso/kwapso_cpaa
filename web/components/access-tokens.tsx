@@ -8,20 +8,20 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
 import { Field } from "@shared/web/field"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,8 +31,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Ban, ClipboardCopy, Copy } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Ban, ClipboardCopy, Copy } from "@shared/ui/foundations/icons"
 
 import type { McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
@@ -149,7 +149,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       ) : tokens.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No tokens yet.")}</p>
       ) : (
-        <div className="flex flex-col rounded-xl border">
+        <div className="flex flex-col rounded-[var(--radius)] border">
           {tokens.map((token) => (
             <div
               key={token.id}
@@ -243,7 +243,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 {teamName ?? t("this team")}. Treat it like a password. It works for{" "}
                 {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
               </DialogDescription>
-              <div className="bg-muted/60 flex items-center gap-2 rounded-xl border p-3">
+              <div className="bg-muted/60 flex items-center gap-2 rounded-[var(--radius)] border p-3">
                 <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
                 <Button
                   variant="secondary"

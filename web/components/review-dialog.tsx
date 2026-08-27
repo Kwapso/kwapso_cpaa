@@ -30,16 +30,16 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { ClipboardCheck, Link as LinkIcon, Paperclip, Plus, X } from "@shared/ui/icons"
+import { Input } from "@shared/ui/components/input/input"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { ClipboardCheck, Link as LinkIcon, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
+import { Button } from "@shared/ui/components/button/button"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import type { StoryAttachment } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -229,7 +229,7 @@ export function ReviewDialog({
           ) : shown.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nothing attached yet.")}</p>
           ) : (
-            <ul className="divide-border divide-y rounded-xl border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] border">
               {shown.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 px-3 py-2">
                   {a.kind === "file" ? (

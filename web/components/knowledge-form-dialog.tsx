@@ -25,14 +25,14 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
-import { Input } from "@shared/ui/controls/input/input"
+import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import {
   Select,
@@ -40,12 +40,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/select/select"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { isVideoLink } from "@shared/media-links"
 import { useT } from "@shared/web/language"
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
@@ -128,6 +129,21 @@ export function KnowledgeFormDialog({
   )
   const [busy, setBusy] = React.useState(false)
 
+  // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE.
+  //
+  // Every unreadable thing that ever reached this knowledge base was accepted,
+  // stored and quietly never read, and nobody was told. A link with nothing
+  // beside it is that shape exactly: a row that looks filed and holds nothing.
+  //
+  // THE GATE IS THE EMPTY BODY, NOT THE HOST. A list of video services is wrong
+  // the moment somebody uses one that is not on it — which is what happened, with
+  // a Tella recording behind a custom domain. `isVideoLink` still runs, but only
+  // to choose which sentence to show: "we can't watch a video" is the right thing
+  // to say about a recording and the wrong thing to say about a documentation
+  // page, and both are refused either way.
+  const link = values.sourceUrl.trim()
+  const nothingToRead = !!link && !richTextValue(values.body).trim()
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -175,7 +191,9 @@ export function KnowledgeFormDialog({
       }
       submit={{
         busy: busy,
-        disabled: !values.title.trim(),
+        // NOTHING PASTED MEANS NO SOURCE. The door says the same thing; this
+        // stops a person getting there and being told no.
+        disabled: !values.title.trim() || nothingToRead,
       }}
     >
       <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
@@ -205,6 +223,17 @@ export function KnowledgeFormDialog({
           placeholder="https://…"
           disabled={busy || textOwnedElsewhere}
         />
+        {nothingToRead ? (
+          <p className="text-warning mt-2 text-sm">
+            {isVideoLink(link)
+              ? t(
+                  "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go."
+                )
+              : t(
+                  "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
+                )}
+          </p>
+        ) : null}
       </Field>
       <Field config={filedField} htmlFor="knowledge-filed" className={fieldSpacing}>
         <RecordPicker

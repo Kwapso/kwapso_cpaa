@@ -39,10 +39,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,11 +52,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
@@ -81,7 +82,7 @@ import { AppFormDialog } from "@/components/app-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
-import { KnowledgeAsk } from "@/components/knowledge-ask"
+import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { RichText } from "@shared/web/rich-text-view"
 import { ImpactPanel } from "@/components/impact-panel"
 import { createAppFrom } from "@/components/apps-screen"
@@ -239,11 +240,19 @@ export function AccountDetailScreen({
   // "add or edit their roles and tools" link carries — the management surface
   // is a tab on this record, and a link that lands one tab away is a link that
   // makes the reader hunt. Read once, on mount; the strip owns it after that.
-  const [tab, setTab] = React.useState(() => {
-    if (typeof window === "undefined") return "overview"
-    const asked = new URLSearchParams(window.location.search).get("tab")
-    return asked === "organisation" ? asked : "overview"
-  })
+  //
+  // AND A LINK BEATS THE MEMORY. The open tab is otherwise remembered per record
+  // (web/lib/nav-memory.ts), but an address that NAMES a tab is somebody telling
+  // us where to go — the memory does not get to argue with it. That is the same
+  // ruling as the one in the shell: nothing about this feature rewrites a
+  // destination a person asked for.
+  const askedTab = () =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab")
+  const [tab, setTab] = useRemembered(
+    "tab",
+    () => (askedTab() === "organisation" ? "organisation" : "overview"),
+    (found) => (askedTab() ? undefined : typeof found === "string" ? found : undefined)
+  )
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
   const [newContactOpen, setNewContactOpen] = React.useState(false)
@@ -657,13 +666,14 @@ export function AccountDetailScreen({
       headerExtra={
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {parent ? (
-            <button
+            <Button
+              variant="link"
               type="button"
               onClick={() => openAccount(parent.id)}
-              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              className="hover:text-foreground"
             >
               {t("Part of")} {parent.name}
-            </button>
+            </Button>
           ) : (
             <span>{t("Sits on its own")}</span>
           )}
@@ -689,10 +699,10 @@ export function AccountDetailScreen({
                     pasted URL, and the pictures in it came from an account
                     being cancelled. `RecordCover` renders exactly what having
                     no cover renders when the picture will not load: nothing. */}
-                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-xl object-cover sm:h-40" />
+                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-[var(--radius)] object-cover sm:h-40" />
                 <OverviewList items={overviewItems} />
                 {account.about && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
                       {t("About")}
                     </p>
@@ -725,7 +735,7 @@ export function AccountDetailScreen({
                     a figure a client cannot account for is worse than no figure
                     at all. */}
                 {moneyBack && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
                     <p className="text-2xl font-medium tracking-tight tabular-nums">{moneyBack}</p>
                     <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
@@ -797,28 +807,24 @@ export function AccountDetailScreen({
               />
             )
           // THE KNOWLEDGE BASE, IN CONTEXT (7.15), THE SAME WAY AN APP DOES IT
-          // (8.9). Two things travel and they do different jobs. `accountId`
-          // names the COMPARTMENT, so a question typed here cannot be answered
-          // out of another client's material and R23's `reason` says which one
-          // it searched. `context` is the record's own details prepended to the
-          // question — and the panel SHOWS what it added, because a question
-          // quietly changed on the way to the server is an answer nobody can
-          // account for. It is written as a phrase that reads after the word
-          // "About", exactly as the app's does.
+          // (8.9). One thing travels now and it does both jobs: `context` is the
+          // record's own details prepended to the question, and it NAMES THE
+          // CLIENT, which is how the compartment is chosen — the assistant asks
+          // the same door and does not hold the account's id, so the door
+          // resolves the client from the question's own words and R23's `reason`
+          // still says which compartment it searched. The box SHOWS what it
+          // added, because a question quietly changed on the way is an answer
+          // nobody can account for. It is written as a phrase that reads after
+          // the word "About", exactly as the app's does.
           if (tabItem.value === "knowledge")
             return (
-              <KnowledgeAsk
-                accountId={accountId}
+              <AskTheAssistant
                 context={[
                   `the client ${account.name}`,
                   account.industry ? `in ${account.industry}` : null,
                 ]
                   .filter(Boolean)
                   .join(", ")}
-                onOpenSource={(sourceId) =>
-                  softNavigate(`${basePath.replace(/\/accounts$/, "")}/knowledge/${sourceId}`)
-                }
-                onOpenRecord={(path) => softNavigate(`${basePath.replace(/\/accounts$/, "")}/${path}`)}
               />
             )
 

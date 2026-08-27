@@ -158,16 +158,15 @@
 
 import * as React from "react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "../../controls/avatar/avatar";
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Image } from "../../controls/image/image";
-import { Text } from "../../controls/typography/typography";
-import type { BreadcrumbsItem } from "../../controls/breadcrumbs/breadcrumbs";
-import type { ActivityFeedItem } from "../../structures/activity-feed/activity-feed";
-import { CollectionFrame } from "../../structures/collection-frame/collection-frame";
-import { List, type ListRow } from "../../structures/list/list";
-import type { RecordDetailAuditEntry } from "../../structures/record-detail/record-detail";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/avatar/avatar";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Image } from "../../components/image/image";
+import { Text } from "../../components/typography/typography";
+import type { ActivityFeedItem } from "../../components/activity-feed/activity-feed";
+import { CollectionFrame } from "../../components/collection-frame/collection-frame";
+import { List, type ListRow } from "../../components/list/list";
+import type { RecordDetailAuditEntry } from "../../components/record-detail/record-detail";
 import { cn } from "../../lib/utils";
 import { DetailScreen, StatStrip, type StatStripFigure } from "../templates";
 import { type ShapeState, type ShapeStateCopy } from "../states";
@@ -194,7 +193,6 @@ export interface CompanyFigure {
 
 /** Every user-facing string this screen owns. */
 export interface CompanyHubLabels {
-  breadcrumbLabel: string;
   tabsLabel: string;
   /**
    * THE FIRST OF THREE TAB SLOTS, AND THE KIT SUPPLIES NO WORD FOR IT.
@@ -230,7 +228,6 @@ export interface CompanyHubLabels {
 }
 
 const DEFAULT_LABELS: CompanyHubLabels = {
-  breadcrumbLabel: "Breadcrumb",
   tabsLabel: "Company sections",
   /* N4, 2026-08-23 — THREE EMPTY SLOTS, ON PURPOSE. Override 35's
      Overview / Activity / Files is REVERTED: the client ruled the whole
@@ -337,8 +334,6 @@ export interface CompanyHubScreenProps
   /** The image failed. The page keeps its shape and says so in the box. */
   imageError?: boolean;
 
-  /** The trail above the identity row. */
-  breadcrumb?: BreadcrumbsItem[];
   /** Two initials for the square mark. A supplied logo goes in `logoSrc`. */
   logoInitials?: React.ReactNode;
   /** A supplied logo, placed INSIDE the square mark and never floated free. */
@@ -435,7 +430,6 @@ function CompanyHubScreen({
   imageRatio = "3 / 1",
   imageLoading = false,
   imageError = false,
-  breadcrumb,
   logoInitials = "PB",
   logoSrc,
   name = "Padelbase GmbH",
@@ -563,12 +557,13 @@ function CompanyHubScreen({
   );
 
   return (
-    /* A DETAIL SCREEN, and the file's own first line has always said so:
-       CH27.43 is "a record detail whose subject is a company". It draws a
-       breadcrumb, which is the client's whole test. Before this it reached
-       past the shell straight into `RecordChrome`, so the page, the screen
-       card, the rail and the OFF-BEIGE BODY PANE were all missing and the
-       record's title sat in the body instead of the header band. */
+    /* A DETAIL SCREEN — CH27.43 is "a record detail whose subject is a
+       company". NO BREADCRUMB (override 73, 2026-08-26): "detail pages do
+       not need this bar that you have on top". The image is genuinely the
+       first thing on the page now — `DetailScreen` puts the title in the
+       body pane UNDER `banner`, which is what ruling 35's "every word —
+       logo, name, figures — sits on the paper underneath" always asked for
+       and the old header-band title quietly violated. */
     <DetailScreen
       data-slot="screen-company-hub"
       className={className}
@@ -595,8 +590,6 @@ function CompanyHubScreen({
           />
         )
       }
-        breadcrumb={breadcrumb}
-        breadcrumbLabel={words.breadcrumbLabel}
         chips={chips ?? <Badge>Maintenance</Badge>}
         title={identity}
         meta={

@@ -16,9 +16,9 @@
 //     reason is worse than saying none.
 //   • Look like an error. Nothing is broken. Their login is fine.
 
-import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { LogOut } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { LogOut } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"

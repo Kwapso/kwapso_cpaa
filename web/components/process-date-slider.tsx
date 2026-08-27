@@ -24,9 +24,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Slider } from "@shared/ui/controls/slider/slider"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Slider } from "@shared/ui/components/slider/slider"
 import { useT } from "@shared/web/language"
 
 export function ProcessDateSlider({
@@ -94,7 +94,7 @@ export function ProcessDateSlider({
             <span
               key={stop ?? "today"}
               style={{ left: `calc(${(i / last) * 100}% )` }}
-              className={`absolute top-0 -translate-x-1/2 rounded-full ${
+              className={`absolute top-0 -translate-x-1/2 rounded-pill ${
                 stop === auditDate ? "bg-primary h-3 w-[3px]" : "bg-border h-2 w-px"
               } ${i === index ? "bg-foreground" : ""}`}
             />

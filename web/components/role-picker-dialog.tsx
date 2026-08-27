@@ -6,7 +6,7 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Dialog,
   DialogContent,
@@ -14,13 +14,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import {
   RadioGroup,
   RadioGroupItem,
-} from "@shared/ui/controls/radio-group/radio-group"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/radio-group/radio-group"
+import { Label } from "@shared/ui/components/label/label"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
@@ -103,10 +104,10 @@ export function RolePickerDialog({
           className="gap-2"
         >
           {choices.map((r) => (
-            <label
+            <Label
               key={r.id}
               htmlFor={`role-${r.id}`}
-              className="hover:bg-muted/50 flex cursor-pointer items-start gap-2 rounded-xl border p-3 motion-hover"
+              className="hover:bg-muted/50 flex items-start gap-2 rounded-[var(--radius)] border p-3 motion-hover"
             >
               <RadioGroupItem
                 id={`role-${r.id}`}
@@ -125,7 +126,7 @@ export function RolePickerDialog({
               <span className="text-muted-foreground shrink-0 text-xs">
                 {r.memberCount} {t("member")}{r.memberCount === 1 ? "" : "s"}
               </span>
-            </label>
+            </Label>
           ))}
         </RadioGroup>
 

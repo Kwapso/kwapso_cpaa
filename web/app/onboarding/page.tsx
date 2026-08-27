@@ -11,17 +11,17 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Button } from "@shared/ui/controls/button/button"
+} from "@shared/ui/components/avatar/avatar"
+import { Button } from "@shared/ui/components/button/button"
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { Input } from "@shared/ui/controls/input/input"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Input } from "@shared/ui/components/input/input"
+import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 // Still here for the SUBMIT button's busy state, which is a different thing from
 // a boot wait and stays a spinner: it says "this button is working", inside a
 // screen that is already drawn.
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, auth, tenancy } from "@/lib/api"

@@ -17,9 +17,9 @@
 // or write an account, which is what keeps the record's tabs (R2/R8) and its
 // counts (R16) in one place.
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Ban, KeyRound, Link2, Power, UserMinus } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Ban, KeyRound, Link2, Power, UserMinus } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
@@ -116,16 +116,25 @@ export function ContactsPanel({
       {links.length === 0 ? (
         <EmptyLine concept="contacts">{t("No contacts yet.")}</EmptyLine>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {links.map((l) => (
             <Row key={l.id} active={l.active}>
-              <button
+              {/* The kit's `link` variant: no box, inherited ink, underline on
+                  hover. The overrides are layout only — the name flexes and
+                  truncates in the row, against a `shrink-0 justify-center`
+                  base skin. */}
+              <Button
                 type="button"
+                variant="link"
                 onClick={() => onOpen(l.personAccountId)}
-                className="hover:text-primary min-w-0 flex-1 truncate text-left text-sm underline-offset-2 hover:underline"
+                className="hover:text-primary min-w-0 flex-1 shrink justify-start text-left underline-offset-2"
               >
-                {l.personName}
-              </button>
+                {/* Truncation on the SPAN, not the control: the kit's skin is
+                    `inline-flex`, and `text-overflow: ellipsis` does not apply
+                    to a flex container — the name would clip at the same width
+                    with no "…" to say it had. */}
+                <span className="min-w-0 truncate">{l.personName}</span>
+              </Button>
               {l.relationship && (
                 <span className="text-muted-foreground text-xs">{l.relationship}</span>
               )}
@@ -217,7 +226,7 @@ export function PortalAccessPanel({
           {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {portalUsers.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">

@@ -64,17 +64,17 @@
 
 import * as React from "react";
 
-import type { FileUploadItem } from "../../controls/file-upload/file-upload";
+import type { FileUploadItem } from "../../components/file-upload/file-upload";
 import type {
   DataPreviewColumn,
   DataPreviewRow,
-} from "../../structures/data-preview-table/data-preview-table";
+} from "../../components/data-preview-table/data-preview-table";
 import {
   ImportWizard,
   type ImportMapping,
   type ImportMappingOption,
   type ImportWizardStep,
-} from "../../structures/import-wizard/import-wizard";
+} from "../../components/import-wizard/import-wizard";
 import { cn } from "../../lib/utils";
 import {
   SHAPE_SHELL,

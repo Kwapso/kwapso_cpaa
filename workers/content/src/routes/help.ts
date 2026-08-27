@@ -651,6 +651,20 @@ export async function getHelpAttachments(request: Request, env: Env): Promise<Re
 /** POST /api/content/help/attachments — attach a file or a link (help:read; a
  * person who can see a ticket can show you what they mean).
  *
+ * THERE IS NO EDIT DOOR HERE, AND THAT IS A RULING RATHER THAN AN OMISSION.
+ * Stories have one (`POST /api/content/stories/attachments/update`, renames and
+ * replaces), and adding its twin here is the obvious next commit. Asked
+ * 27 Aug 2026 — "may a client login rename or replace a file agency staff
+ * attached?" — the owner answered "never". Not on `help:read`, not on any role
+ * a client login can hold.
+ *
+ * So if that door is ever written, the refusal belongs IN IT and not on the
+ * screen that calls it. `help:read` is held by clients, the agency gateway
+ * forwards `/api/content/*` by PREFIX, and a client login is an ordinary team
+ * member — which is how R21 was earned twice. A hidden button is not a fence.
+ * Attaching your own and reading your own back are untouched; the line is on
+ * somebody ELSE'S file.
+ *
  * TWO KINDS, ONE DOOR, because it is one act. `kind: "link"` carries a URL and
  * nothing else; `kind: "file"` carries a data URL, which is parsed, capped and
  * put in the SHARED media bucket — the one both gateways serve, so the client

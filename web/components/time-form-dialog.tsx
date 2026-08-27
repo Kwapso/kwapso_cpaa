@@ -20,12 +20,12 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Switch } from "@shared/ui/controls/switch/switch"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Input } from "@shared/ui/components/input/input"
+import { Switch } from "@shared/ui/components/switch/switch"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -169,7 +169,7 @@ export function TimeFormDialog({
           // row from a story to a ticket, so a picker here would offer a change
           // the server would quietly drop; on a new entry opened from a record
           // because the record IS the answer.
-          <p id="time-target" className="text-muted-foreground border-border/60 rounded-xl border px-3 py-2 text-sm">
+          <p id="time-target" className="text-muted-foreground border-border/60 rounded-[var(--radius)] border px-3 py-2 text-sm">
             {fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")}
           </p>
         ) : (

@@ -142,29 +142,29 @@
 
 import * as React from "react";
 
-import { ActionRow } from "../../controls/action-row/action-row";
-import { Button } from "../../controls/button/button";
+import { ActionRow } from "../../components/action-row/action-row";
+import { Button } from "../../components/button/button";
 import {
   FilterBar,
   type FilterChip,
-} from "../../controls/filter-bar/filter-bar";
-import { SearchInput } from "../../controls/search-input/search-input";
+} from "../../components/filter-bar/filter-bar";
+import { SearchInput } from "../../components/search-input/search-input";
 import {
   SortControl,
   type SortDirection,
   type SortOption,
-} from "../../controls/sort-control/sort-control";
-import type { CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
+} from "../../components/sort-control/sort-control";
+import type { CollectionFrameTab } from "../../components/collection-frame/collection-frame";
 import {
   ViewSwitch,
   type CollectionViewOption,
-} from "../../structures/collection-frame/view-switch";
+} from "../../components/collection-frame/view-switch";
 import {
   DataTable,
   type DataTableColumn,
-} from "../../structures/data-table/data-table";
-import { List, type ListRow } from "../../structures/list/list";
-import { Plus } from "../../icons";
+} from "../../components/data-table/data-table";
+import { List, type ListRow } from "../../components/list/list";
+import { Plus } from "../../foundations/icons";
 import { MainScreen } from "./main-screen";
 import {
   ShapeStateBody,

@@ -63,8 +63,8 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import type { ProgressRow } from "../../structures/progress-dashboard/progress-dashboard";
+import { Button } from "../../components/button/button";
+import type { ProgressRow } from "../../components/progress-dashboard/progress-dashboard";
 import { PortalHome } from "../templates";
 import type { PortalSavings } from "../templates";
 import type { ShapeState, ShapeStateCopy } from "../states";

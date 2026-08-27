@@ -6,11 +6,12 @@
 
 import { useRouter } from "next/navigation"
 
+import { Button } from "@shared/ui/components/button/button"
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
+} from "@shared/ui/components/avatar/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,14 +19,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
-import { LogOut, Palette, Settings, UserRound } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
+import { LogOut, Palette, Settings, UserRound } from "@shared/ui/foundations/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
+import { forgetEverything } from "@/lib/nav-memory"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
 
@@ -36,14 +38,14 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="rounded-full ring-offset-2">
+        <Button variant="ghost" size="icon" className="size-8 rounded-pill p-0">
           <Avatar className="size-8">
             {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={t("You")} />}
             <AvatarFallback className="text-xs">
               {personInitials(user?.firstName, user?.lastName)}
             </AvatarFallback>
           </Avatar>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">
@@ -90,6 +92,11 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
           onSelect={() =>
             void auth.logout().then(() => {
               clearAllFormDrafts() // one user's unsaved drafts never leak to the next
+              // …and neither do their places. Signing out is a client-side route
+              // change, not a reload, so the nav memory would otherwise still be
+              // in this document when the next person signs in and would hand
+              // them somebody else's trail. Same sentence as the line above it.
+              forgetEverything()
               router.replace("/login")
             })
           }

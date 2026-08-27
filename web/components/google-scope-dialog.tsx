@@ -38,14 +38,14 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Check, Search } from "@shared/ui/icons"
+import { Input } from "@shared/ui/components/input/input"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Check, Search } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import {
@@ -262,7 +262,7 @@ export function GoogleScopeDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, mode: m.value }))}
               disabled={busy}
-              className={`flex flex-col gap-1 rounded-xl border p-3 text-left ${
+              className={`flex flex-col gap-1 rounded-[var(--radius)] border p-3 text-left ${
                 values.mode === m.value ? "border-primary bg-muted" : ""
               }`}
             >
@@ -300,7 +300,7 @@ export function GoogleScopeDialog({
           </Field>
 
           {options !== null && (
-            <div className="flex max-h-56 flex-col overflow-y-auto rounded-xl border">
+            <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] border">
               {options.filter((o) => !alreadyNamed.some((s) => s.externalId === o.externalId)).length === 0 ? (
                 <p className="text-muted-foreground p-3 text-sm">
                   {t("Nothing else to add from your Google account.")}
@@ -341,7 +341,7 @@ export function GoogleScopeDialog({
                 {alreadyNamed.map((s) => (
                   <span
                     key={s.id}
-                    className="bg-muted flex items-center gap-1 rounded-xl px-2 py-1 text-xs"
+                    className="bg-muted flex items-center gap-1 rounded-[var(--radius)] px-2 py-1 text-xs"
                     title={t("Already in reach. Take it away on the card behind this one.")}
                   >
                     <span className="max-w-[16rem] truncate">{s.name}</span>
@@ -353,7 +353,7 @@ export function GoogleScopeDialog({
                     type="button"
                     onClick={() => toggle(i)}
                     disabled={busy}
-                    className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-xl px-2 py-1 text-xs"
+                    className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-[var(--radius)] px-2 py-1 text-xs"
                     title={t("Take it off the list")}
                   >
                     <span className="max-w-[16rem] truncate">{i.name}</span>
@@ -376,7 +376,7 @@ export function GoogleScopeDialog({
             {GOOGLE_EVENT_TYPES.map((kind) => (
               <label
                 key={kind}
-                className="flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-left"
+                className="flex cursor-pointer items-start gap-2 rounded-[var(--radius)] border p-3 text-left"
               >
                 <Checkbox
                   checked={kinds.includes(kind)}
@@ -405,7 +405,7 @@ export function GoogleScopeDialog({
        * otherwise. This is that sentence, and it is opt-in because it is not
        * free. */}
       <Field config={forgetField} shape="group" className={fieldSpacing}>
-        <label className="flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-left">
+        <label className="flex cursor-pointer items-start gap-2 rounded-[var(--radius)] border p-3 text-left">
           <Checkbox
             checked={values.forget === true}
             onCheckedChange={(on) => setValues((v) => ({ ...v, forget: on === true }))}

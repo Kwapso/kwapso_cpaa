@@ -43,7 +43,7 @@ vi.mock("@/lib/api", async () => {
     tenancy: { active: () => active(), bootstrap: () => bootstrap() },
   }
 })
-vi.mock("@shared/ui/controls/sonner/sonner", () => ({
+vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: { error: (m: string) => error(m) },
 }))
 

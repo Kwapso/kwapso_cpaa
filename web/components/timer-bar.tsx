@@ -17,9 +17,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { CircleStop, Play, Timer } from "@shared/ui/icons"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { CircleStop, Play, Timer } from "@shared/ui/foundations/icons"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
@@ -144,7 +144,7 @@ export function TimerBar({
         return (
           <div
             key={timer.id}
-            className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+            className={`flex items-center gap-1 rounded-pill border px-2 py-0.5 text-xs ${
               timer.runaway ? "border-destructive/40 text-destructive" : ""
             }`}
           >

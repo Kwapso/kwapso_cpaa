@@ -30,17 +30,17 @@
 
 import * as React from "react"
 
-import { Link2, Paperclip, X } from "@shared/ui/icons"
+import { Link2, Paperclip, X } from "@shared/ui/foundations/icons"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Label } from "@shared/ui/controls/label/label"
+import { Input } from "@shared/ui/components/input/input"
+import { Label } from "@shared/ui/components/label/label"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -493,7 +493,7 @@ export function StoryFormDialog({
       <Field config={fileField} htmlFor="story-files" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
           {attached.length > 0 && (
-            <ul className="divide-border divide-y rounded-xl border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] border">
               {attached.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 px-3 py-2">
                   {a.kind === "file" ? (
@@ -518,7 +518,7 @@ export function StoryFormDialog({
             </ul>
           )}
           {pending.length > 0 && (
-            <ul className="divide-border divide-y rounded-xl border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] border">
               {pending.map((file, i) => (
                 <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
                   <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
@@ -589,14 +589,14 @@ export function StoryFormDialog({
           list you have just said you are not using is noise. */}
       <Field config={processField} shape="group" htmlFor="story-processes" className={fieldSpacing}>
         <div className="flex flex-col gap-2" id="story-processes">
-          <label className="flex items-center gap-2 text-sm">
+          <Label className="flex">
             <Checkbox
               checked={values.changesNoStep}
               onCheckedChange={(c) => setValues((s) => ({ ...s, changesNoStep: c === true }))}
               disabled={busy}
             />
             {t("This changes no process")}
-          </label>
+          </Label>
           {!values.changesNoStep &&
             (processOptions.length === 0 ? (
               <p className="text-muted-foreground text-sm">
@@ -604,7 +604,7 @@ export function StoryFormDialog({
               </p>
             ) : (
               processOptions.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm">
+                <Label key={p.id} className="flex">
                   <Checkbox
                     checked={values.processIds.includes(p.id)}
                     onCheckedChange={(c) =>
@@ -619,7 +619,7 @@ export function StoryFormDialog({
                     disabled={busy}
                   />
                   {p.name}
-                </label>
+                </Label>
               ))
             ))}
         </div>

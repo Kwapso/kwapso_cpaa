@@ -24,10 +24,10 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Badge } from "@shared/ui/controls/badge/badge"
+} from "@shared/ui/components/avatar/avatar"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/icons"
+import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/foundations/icons"
 
 import { PulseBand } from "@/components/pulse"
 import { letterMark } from "@/lib/identity"
@@ -89,14 +89,14 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
 
       <List
         surface="none"
-        className="motion-panel-in rounded-xl border"
+        className="motion-panel-in rounded-[var(--radius)] border"
         onItemClick={(item) => softNavigate(item.id)}
         items={[...LINKS, ...ADMIN].map((l) => {
           const Icon = l.icon
           return {
             id: l.href,
             leading: (
-              <span className="bg-secondary text-secondary-foreground flex size-10 items-center justify-center rounded-xl">
+              <span className="bg-secondary text-secondary-foreground flex size-10 items-center justify-center rounded-[var(--radius)]">
                 <Icon className="size-5" />
               </span>
             ),

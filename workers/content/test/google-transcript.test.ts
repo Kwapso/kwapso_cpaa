@@ -56,7 +56,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
     driveList: async () => world.driveHits,
     driveFilesById: async (_t: string, ids: string[]) =>
       ids.map((id) => world.byId.get(id)).filter(Boolean),
-    driveFileText: async (_t: string, id: string) => world.text.get(id) ?? "",
+    driveFileText: async (_e: unknown, _t: string, id: string) => world.text.get(id) ?? "",
     gmailSearch: async () => world.notices,
     gmailMessage: async () => ({ text: world.noticeBody, snippet: "" }),
   }

@@ -29,7 +29,7 @@ import {
   type ScreenActionContext,
   type ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
-import { type ScreenRights } from "@shared/web/screen-engine/recipe"
+import { type ScreenQuery, type ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { useMarkHold } from "@shared/web/mark-loader"
@@ -40,6 +40,7 @@ import { useTrailNames } from "@/components/deep-link/trail-names"
 import { renderModuleContent } from "@/components/deep-link/module-content"
 import { ACCOUNT_MODULES, sectionFor, trailPath, type SectionKey } from "@/components/deep-link/route"
 import { useHostNav, useUrlRoute } from "@/components/deep-link/use-host-nav"
+import { useScrollMemory } from "@/components/deep-link/use-scroll-memory"
 import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
 import { WritePanels } from "@/components/deep-link/write-panels"
@@ -48,11 +49,13 @@ import { ProfileScreen } from "@/components/screens/profile-screen"
 import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
 import type { HelpScope, TaskView } from "@/lib/live-resources"
 import { registerHostGo } from "@/lib/nav"
+import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
+import { RememberedScreen } from "@shared/web/remembered"
 import { usePermissions } from "@/lib/perms"
 import { useScreenData } from "@/lib/use-screen-data"
 import { useScreenActions } from "@/lib/use-screen-actions"
@@ -212,7 +215,70 @@ export function DeepLinkScreen() {
   }
   const resolvedNames = useTrailNames(trail, (m, id) => !!namedByList(m, id, crumbRecords), enabled)
 
-  const { go, replace, closePanel } = useHostNav({ router, setRoute, currentPath })
+  const { go: routeTo, replace: routeToInPlace, closePanel } = useHostNav({
+    router,
+    setRoute,
+    currentPath,
+  })
+
+  // ── WHERE SHE WAS ──────────────────────────────────────────────────────────
+  //
+  // THE DESIGNER, 27 Aug 2026, on going four records deep into Apps, stepping
+  // into To-dos to jot something down, and coming back to the top of a list with
+  // her search, her filters and her place in it all gone: she multitasks
+  // constantly, so she pays that price a dozen times a day.
+  //
+  // Three lines here, because the architecture had already done the hard part.
+  // This shell mounts ONCE (R37), so there is somewhere for a memory to live;
+  // nesting already lives in the URL (`trailPath` above), so the whole trail is
+  // one string; and the per-screen state — the open tab, the search box, the
+  // filters — reaches its own screen through a context rather than being
+  // threaded down. `web/lib/nav-memory.ts` holds the store, its ceilings and the
+  // reasoning about both.
+  //
+  // NOTHING HERE REDIRECTS. This records the address it is given and hands the
+  // screen its own memory back; it never rewrites where somebody asked to go.
+  // That is what keeps a deep link pasted from outside sacred (a pasted link
+  // arrives in a NEW document, where this store is empty anyway) and it is why
+  // the recall lives on the rail, where a person clicks a SECTION rather than a
+  // destination — see `app-shell.tsx`.
+  //
+  // THE ADDRESS THE MEMORY IS KEYED BY is the path plus the ONE query parameter
+  // that is a screen state rather than a dialog. `?tab=` genuinely names a
+  // different collection on the accounts screen (companies · contacts · all);
+  // `?panel` / `?confirm` / `?id` are a dialog opened OVER this screen and
+  // closed by Back, and remembering one would mean re-opening somebody's
+  // half-finished edit form for them.
+  const memoryPath = currentPath + (query.tab ? `?tab=${encodeURIComponent(query.tab)}` : "")
+  const captureScroll = useScrollMemory(teamId, memoryPath)
+  // The scroll positions of the screen we are LEAVING have to be read while it
+  // is still on the page, so both movers capture first and then move. Every
+  // deliberate move in the app is one of these two (R37 sees to that), so there
+  // is no third place to remember.
+  const go = React.useCallback(
+    (path: string, q?: ScreenQuery) => {
+      captureScroll()
+      routeTo(path, q)
+    },
+    [captureScroll, routeTo]
+  )
+  const replace = React.useCallback(
+    (path: string) => {
+      captureScroll()
+      routeToInPlace(path)
+    },
+    [captureScroll, routeToInPlace]
+  )
+  React.useEffect(() => {
+    rememberPath(teamId, memoryPath)
+  }, [teamId, memoryPath])
+  const screenMemory = React.useMemo(
+    () => ({
+      read: (slot: string) => readSlot(teamId, memoryPath, slot),
+      write: (slot: string, value: unknown) => writeSlot(teamId, memoryPath, slot, value),
+    }),
+    [teamId, memoryPath]
+  )
 
   // Register THIS host's soft go() so deep components (the profile menu, team switcher,
   // invite inbox) navigate through the History API instead of router.push — no reload.
@@ -327,11 +393,15 @@ export function DeepLinkScreen() {
             : []
     return (
       <AppShell active={active} breadcrumbs={accountCrumbs} onNavigate={go} activePath={currentPath}>
+        {/* The account screens get a memory too — the Kwapso page is a record
+            with tabs, and it is a rail destination like any other. */}
+        <RememberedScreen memory={screenMemory}>
         {module === "home" && <HomeScreen active={active} />}
         {module === "kwapso" && <KwapsoScreen active={active} />}
         {module === "settings" && <SettingsScreen active={active} />}
         {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
+        </RememberedScreen>
       </AppShell>
     )
   }
@@ -398,12 +468,12 @@ export function DeepLinkScreen() {
        * own `px-4 sm:px-6 lg:px-8` gutters (S2, and exactly the brand site's own
        * 40px `--margin--m`) do the work at every width below it.
        *
-       * `rounded-xl transition-shadow` went with it: it rounded and animated a
+       * `rounded-[var(--radius)] transition-shadow` went with it: it rounded and animated a
        * container that has no surface of its own. */}
       <div
         data-trace={traceHighlight ?? undefined}
         className={`mx-auto flex w-full max-w-[1600px] flex-col gap-6 ${
-          traceHighlight ? "ring-primary/60 rounded-xl ring-2 ring-offset-2 ring-offset-background" : ""
+          traceHighlight ? "ring-primary/60 rounded-[var(--radius)] ring-2 ring-offset-2 ring-offset-background" : ""
         }`}
       >
         {showTabs && (
@@ -433,6 +503,15 @@ export function DeepLinkScreen() {
               away the panel's own state to play an animation, which is the wrong
               trade in both directions. */}
           <div key={`${module}:${recordId ?? ""}`} className="motion-page-in flex flex-col gap-6">
+          {/* THE SCREEN'S OWN MEMORY, scoped to this address. Everything the
+              routed content holds that a person would expect to find where they
+              left it — the open tab, a collection's search and filters, the
+              sub-tab on a ticket list — asks for it through `useRemembered` and
+              gets its own default when nothing is remembered. It wraps the
+              CONTENT rather than the whole shell on purpose: the write panels
+              below are opened by a URL and closed by Back, so they already
+              remember themselves, and the shell chrome has nothing to park. */}
+          <RememberedScreen memory={screenMemory}>
           {renderModuleContent({
             noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
@@ -447,6 +526,7 @@ export function DeepLinkScreen() {
             helpTypeOptions,
             taskView, setTaskView, t,
           })}
+          </RememberedScreen>
           </div>
         </CountedTabs>
       </div>

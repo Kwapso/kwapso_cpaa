@@ -34,6 +34,9 @@ const holder = vi.hoisted(() => ({
   /** Extra calendar entries one test wants and the others must not see. Empty by
    * default, so every count in this file stays what it was. */
   events: [] as Record<string, unknown>[],
+  /** What one Drive file's text comes back as, when a test needs to CHANGE it
+   * between sweeps. Empty by default, so every other test sees the fixture. */
+  driveText: new Map<string, string>(),
 }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
@@ -86,10 +89,11 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
               },
             ]
       ),
-    driveFileText: async (_t: string, fileId: string) =>
-      fileId === "FILE_1"
+    driveFileText: async (_e: unknown, _t: string, fileId: string) =>
+      holder.driveText.get(fileId) ??
+      (fileId === "FILE_1"
         ? "The dispatch screen keeps logging drivers out. Agreed to move the driver app forward."
-        : "Books I mean to read.",
+        : "Books I mean to read."),
     gmailSearch: async () =>
       holder.unlisted.has("MAIL_1")
         ? []
@@ -276,6 +280,7 @@ beforeEach(() => {
   holder.unlisted.clear()
   holder.binned.clear()
   holder.events = []
+  holder.driveText.clear()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
      INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m5', '${IDS.team}', '${OTHER_STAFF}', '${IDS.adminRole}', '2026-01-01');
@@ -877,5 +882,149 @@ describe("an empty calendar entry for a day that has not come is not material", 
     holder.events = [entry("SOON_1", "Week recap", PAST)]
     await sweep()
     expect(live(`${IDS.staffUser}:SOON_1`), "it happened — it is a record now").toBe(true)
+  })
+})
+
+// ── A FILE WE STOPPED BEING ABLE TO READ REPAIRS ITSELF ────────────────────
+//
+// The point this locks is not the guard — file-text.test.ts owns that — it is
+// what happens to the 1,012 chunks of PostScript and page geometry ALREADY in
+// the base once the guard starts refusing them. The answer is: nothing has to be
+// done to them, and that is why no prune was run.
+//
+// Every walk of the Drive lane re-hydrates each file (`slice(..., hydrate)`), and
+// hydration REPLACES the body. So the day the guard starts returning nothing, the
+// body empties, the content hash stops matching the one on the row, the hash-skip
+// declines to skip, and the source is re-chunked down to the one line it can
+// still honestly build — its own title.
+//
+// It matters that the row SURVIVES rather than being retired: it is the test set
+// for the PDF extraction work, and a retired row is one nobody can re-fill.
+describe("a Drive file that stops being readable collapses instead of lingering", () => {
+  const FILE = `${IDS.staffUser}:FILE_1`
+  const chunksOf = (originRowId: string) =>
+    (
+      db()
+        .prepare(
+          `SELECT chunk_count AS n FROM knowledge_sources WHERE origin_table = 'google_drive' AND origin_row_id = ?`
+        )
+        .get(originRowId) as { n: number } | undefined
+    )?.n ?? -1
+
+  it("its many chunks become one, and the row is still there", async () => {
+    // Before: the file read as prose and was indexed as prose.
+    await sweep()
+    expect(chunksOf(FILE), "the fixture file must index to begin with").toBeGreaterThan(0)
+    const before = sources().find((s) => s.origin_row_id === FILE)
+    expect(before?.body, "and its body is the text we could read").toContain("dispatch screen")
+
+    // The guard now refuses it — which is exactly what `driveFileText` returns for
+    // a logo or a template after this lane's fix.
+    holder.driveText.set("FILE_1", "")
+    await sweep()
+
+    expect(chunksOf(FILE), "it collapses to the one line it can honestly build").toBe(1)
+    expect(live(FILE), "and it is NOT retired — a retired row cannot be re-filled").toBe(true)
+    const after = sources().find((s) => s.origin_row_id === FILE)
+    expect(after?.body ?? "", "nothing of the unreadable text is left").not.toContain("dispatch screen")
+  })
+
+  // AND THE ONE CHUNK IT KEEPS LOSES TO ANYTHING THAT SAYS SOMETHING, because it
+  // adds no words to its own title — this afternoon's substance rule meeting this
+  // morning's ingest one.
+  //
+  // WHAT IT PROVES AND WHAT IT DOES NOT: it passes with the substance preference
+  // removed, because in a fixture this small the readable note outranks the bare
+  // one on score alone. It locks the OUTCOME, not the mechanism — the mechanism's
+  // own proof is in knowledge.test.ts, where three envelopes compete with one set
+  // of notes for the same slot. The test above is the one carrying this block's
+  // weight: it is the self-healing that made a prune unnecessary.
+  //
+  // NOT "never appears", and the first draft of this test asserted that and was
+  // wrong about the design rather than about the code. `diversify` prefers
+  // substance and never PAYS for it: what it sets aside comes back when the
+  // answer would otherwise be short, which in a fixture holding four sources is
+  // most of the time. The promise is an ORDER, not an exclusion — a bare row is
+  // quoted when a bare row is all there is, and quoted last when it is not.
+  it("and the line it keeps loses its place to anything that says something", async () => {
+    await sweep()
+    holder.driveText.set("FILE_1", "")
+    await sweep()
+    await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "Dispatch rollout note",
+      body: "The dispatch screen logs drivers out because the session cookie is dropped on the cutover.",
+    })
+    const answer = await call(
+      IDS.staffUser,
+      "GET /api/content/knowledge/ask",
+      undefined,
+      `?q=${encodeURIComponent("why does the dispatch screen log drivers out?")}`
+    )
+    const body = (await answer.json()) as { citations: { title: string }[] }
+    const cited = body.citations.map((c) => c.title)
+    expect(cited).toContain("Dispatch rollout note")
+    const said = cited.indexOf("Dispatch rollout note")
+    const bare = cited.indexOf("Bergman dispatch rollout")
+    expect(
+      bare === -1 || said < bare,
+      `the file that says nothing must not outrank the one that does — got ${cited.join(", ")}`
+    ).toBe(true)
+  })
+})
+
+// ── WHEN A GOOGLE SOURCE IS FROM ───────────────────────────────────────────
+//
+// Every lane already built this moment for its cursor and none of them wrote it
+// to the row. Measured on staging 27 Aug 2026: 799 of 4,026 live sources carried
+// no `record_date` at all — email 431, document 225, message 96, event 47, every
+// single one — while everything this app owns had one. Twenty percent of the
+// base, invisible to anything that reasons about "latest" or "since last week".
+//
+// The owner asked for the latest on a FluClinic integration and got last week's
+// meeting. The chat thread he meant was in the base, current, and dateless.
+//
+// IT ALSO REPAIRS WHAT IS ALREADY STORED, with no backfill: the sweep's upsert
+// writes `record_date = excluded.record_date` on EVERY visit, before the
+// hash-skip is even consulted — so a row keeps its text and gains its date the
+// next time the lane walks past it. Which is also why a backfill run BEFORE this
+// shipped would have been erased by the next sweep.
+describe("a Google source carries the date it is from", () => {
+  const dateOf = (table: string, originRowId: string) =>
+    (
+      db()
+        .prepare("SELECT record_date AS d FROM knowledge_sources WHERE origin_table = ? AND origin_row_id = ?")
+        .get(table, originRowId) as { d: string | null } | undefined
+    )?.d ?? null
+
+  it("every kind — a document, a mail, an entry and a conversation", async () => {
+    await sweep()
+    for (const [table, id] of [
+      ["google_drive", `${IDS.staffUser}:FILE_1`],
+      ["google_gmail", `${IDS.staffUser}:MAIL_1`],
+      ["google_calendar", `${IDS.staffUser}:EVENT_1`],
+      ["google_chat", `${IDS.staffUser}:spaces/AAA/threads/T1`],
+    ] as const)
+      expect(dateOf(table, id), `${table} must carry a date`).toBeTruthy()
+  })
+
+  // THE ROW'S OWN MOMENT, NOT TODAY'S. A date invented at sweep time would make
+  // every source look equally recent, which is worse than no date at all: the
+  // recency this unlocks would then rank on the day we happened to read it.
+  it("and it is the record's own moment, not the moment we read it", async () => {
+    await sweep()
+    const mail = dateOf("google_gmail", `${IDS.staffUser}:MAIL_1`)
+    expect(mail, "the mail was sent on 4 August 2026 and says so").toContain("2026-08-04")
+    const event = dateOf("google_calendar", `${IDS.staffUser}:EVENT_1`)
+    expect(event, "the meeting was on 5 August 2026").toContain("2026-08-05")
+  })
+
+  // AND IT IS NEVER GUESSED. A row whose moment cannot be read keeps NULL — a
+  // missing date is a fact and a wrong one is a ranking built on fiction.
+  it("and a row with no readable moment is left without one, not given today's", async () => {
+    holder.events = [
+      { id: "NO_WHEN", summary: "Undated", description: "", start: "", end: "", url: "", attendees: [] },
+    ]
+    await sweep()
+    expect(dateOf("google_calendar", `${IDS.staffUser}:NO_WHEN`)).toBeNull()
   })
 })

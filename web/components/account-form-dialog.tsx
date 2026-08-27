@@ -69,14 +69,15 @@
 
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/controls/avatar/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 import {
   DialogDescription,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { Input } from "@shared/ui/controls/input/input"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Image } from "@shared/ui/components/image/image"
+import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import {
   Select,
@@ -84,8 +85,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/select/select"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -417,12 +418,12 @@ export function AccountFormDialog({
       <Field config={coverField} htmlFor="account-cover" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
           {coverPreview && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverPreview}
-              alt={t("Cover image")}
-              className="h-20 w-full rounded-xl object-cover"
-            />
+            /* The kit's media well, which is what this box already was by hand:
+               the card radius, `object-cover`, the clip — and, new here, a
+               register for a cover URL that will not load, where a bare <img>
+               drew the browser's broken-picture glyph. `ratio={null}` because
+               the height is the form's (80), not the well's own 16/9. */
+            <Image src={coverPreview} alt={t("Cover image")} ratio={null} className="h-20 w-full" />
           )}
           <FileUpload accept="image/*" multiple={false} onFilesSelected={pickImage("coverUrl")} />
         </div>

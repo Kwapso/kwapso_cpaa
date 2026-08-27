@@ -22,10 +22,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { Button } from "@shared/ui/controls/button/button"
-import { Check } from "@shared/ui/icons"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { Button } from "@shared/ui/components/button/button"
+import { Check } from "@shared/ui/foundations/icons"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { LANGUAGES, translate, type Language } from "../i18n"
 import { useLanguage } from "./language"

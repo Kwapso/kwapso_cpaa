@@ -36,8 +36,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/select/select"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
 import { useLanguage } from "./language"
@@ -92,7 +92,7 @@ export function LanguageSection({
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
         {t("Language")}
       </h2>
-      <div className="flex flex-col gap-4 rounded-xl border p-4">
+      <div className="flex flex-col gap-4 rounded-[var(--radius)] border p-4">
         <p className="text-muted-foreground text-sm">
           {t("Choose the language you want kwapso in.")}{" "}
           {t("What people type stays in the language they typed it.")}

@@ -43,10 +43,10 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
-import { Badge } from "@shared/ui/controls/badge/badge"
+} from "@shared/ui/components/avatar/avatar"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { ChevronRight } from "@shared/ui/icons"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import { AccessTokensSection } from "@/components/access-tokens"
 import { GoogleConnectionsSection } from "@/components/google-connections"
@@ -121,7 +121,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           </h2>
           <List
             surface="none"
-            className="rounded-xl border"
+            className="rounded-[var(--radius)] border"
             onItemClick={(item) => softNavigate(`/t/${teamId}/${item.id}`)}
             items={adminSections.map((s) => ({
               id: s.segment,
@@ -147,7 +147,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Teams")}</h2>
           <List
             surface="none"
-            className="rounded-xl border"
+            className="rounded-[var(--radius)] border"
             onItemClick={(item) => void openTeam(item.id)}
             items={ctx.teams.map((team) => ({
               id: team.id,

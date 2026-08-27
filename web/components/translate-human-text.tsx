@@ -26,9 +26,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Languages } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Languages } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, dataOps } from "@/lib/api"
 import { usePermissions } from "@/lib/perms"

@@ -22,10 +22,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { ChevronRight, Palette, Pencil } from "@shared/ui/icons"
+import { useRemembered } from "@shared/web/remembered"
+import { ChevronRight, Palette, Pencil } from "@shared/ui/foundations/icons"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"
 import { OverviewList } from "@/components/overview-list"
@@ -48,7 +49,8 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
   const team = active.ctx?.team ?? null
   const teamId = team?.id ?? null
   const { can } = usePermissions(teamId)
-  const [tab, setTab] = React.useState("details")
+  // Remembered with the screen — see web/lib/nav-memory.ts.
+  const [tab, setTab] = useRemembered("tab", "details")
   const [editOpen, setEditOpen] = React.useState(false)
 
   if (!team || !teamId) return <Skeleton variant="list" lines={4} />

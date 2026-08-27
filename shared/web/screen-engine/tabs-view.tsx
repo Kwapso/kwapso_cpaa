@@ -31,7 +31,7 @@
 
 import * as React from "react"
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/controls/tabs/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/components/tabs/tabs"
 import { cn } from "@shared/ui/lib/utils"
 
 import { iconComponent } from "./icon"
@@ -148,6 +148,14 @@ export const TAB_ICONS: Record<string, IconName> = {
   roles: "user-cog",
   tools: "wrench",
   // collection filters that appear as strips
+  //
+  // `open` and `done` are the two piles a thing-to-be-finished sits in, and they
+  // are here rather than at a call site because two screens already draw them:
+  // the task strip's own List/Completed pair and the to-do panel's Open/Done.
+  // Same idea, same glyph, decided once — `open` is deliberately the same inbox
+  // the task strip had chosen for itself, so nothing moves by adding it.
+  open: "inbox",
+  done: "check",
   all: "asterisk",
   active: "circle-check",
   inactive: "circle-off",
@@ -195,9 +203,26 @@ export function TabsView({
   const variant = config.variant === "pill" ? "line" : config.variant
   const fallback = config.tabs[0]?.value
 
+  // A CONTROLLED VALUE NAMING A TAB THAT IS NOT HERE DRAWS NOTHING — no trigger
+  // selected and, worse, no panel, which is a blank screen where a record was.
+  // It can happen honestly: a tab gated by a right the viewer has just lost, a
+  // strip whose tabs are built from the team's own dropdown values, or (since
+  // the nav memory landed) a tab remembered a few minutes ago on a record whose
+  // tabs have changed underneath it. So the strip falls back to its FIRST tab
+  // rather than to nothing — the same "degrade to the top" every other part of
+  // that memory does.
+  //
+  // The caller is deliberately NOT told. `onValueChange` on the strip that
+  // navigates (team-section-nav) MOVES you, and a screen the viewer may not read
+  // must not be answered by yanking them somewhere else; every other strip in
+  // the app reads this state for nothing but this prop, so a stale value costs
+  // nothing while the tab it names is missing, and is correct again the moment
+  // it comes back.
+  const shown = config.tabs.some((t) => t.value === value) ? value : fallback
+
   return (
     <Tabs
-      value={value}
+      value={shown}
       defaultValue={defaultValue ?? fallback}
       onValueChange={onValueChange}
       variant={variant}

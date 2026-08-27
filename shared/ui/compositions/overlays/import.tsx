@@ -157,29 +157,29 @@
 
 import * as React from "react";
 
-import { ActionRow } from "../../controls/action-row/action-row";
-import { Alert } from "../../controls/alert/alert";
-import { Button } from "../../controls/button/button";
-import { Card, CardContent } from "../../controls/card/card";
+import { ActionRow } from "../../components/action-row/action-row";
+import { Alert } from "../../components/alert/alert";
+import { Button } from "../../components/button/button";
+import { Card, CardContent } from "../../components/card/card";
 import {
   DataPreviewTable,
   type DataPreviewColumn,
   type DataPreviewRow,
-} from "../../structures/data-preview-table/data-preview-table";
+} from "../../components/data-preview-table/data-preview-table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
+} from "../../components/select/select";
 import {
   StatusStepper,
   type StatusStage,
-} from "../../controls/status-stepper/status-stepper";
-import { Headline, Hint, Text } from "../../controls/typography/typography";
+} from "../../components/status-stepper/status-stepper";
+import { Headline, Hint, Text } from "../../components/typography/typography";
 import { cn } from "../../lib/utils";
-import { Plus } from "../../icons";
+import { Plus } from "../../foundations/icons";
 import { MainScreen } from "../templates";
 /* TYPE ONLY. This screen does not compose the shape — see the header — but a
    failed row is the same object on both sides and must stay one declaration. */

@@ -16,12 +16,13 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { ModulesPanel } from "@/components/modules-panel"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
@@ -41,7 +42,7 @@ import {
   sliceKey,
 } from "@/components/work-panels"
 import { DeliverablesPanel } from "@/components/deliverables-panel"
-import { KnowledgeAsk } from "@/components/knowledge-ask"
+import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -164,7 +165,10 @@ export function AppDetailScreen({
     () => tenancy.selectable().then((r) => r.values)
   )
 
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
   const [mapOpen, setMapOpen] = React.useState(false)
@@ -480,13 +484,14 @@ export function AppDetailScreen({
            its account is one tap away from every screen it appears on. */
         app.accountId ? (
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <button
+            <Button
+              variant="link"
               type="button"
               onClick={() => softNavigate(`${host.base}/accounts/${app.accountId}`)}
-              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              className="hover:text-foreground"
             >
               {t("Built for")} {accountName}
-            </button>
+            </Button>
           </p>
         ) : undefined
       }
@@ -562,8 +567,7 @@ export function AppDetailScreen({
           if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />
           if (panel.value === "knowledge")
             return (
-              <KnowledgeAsk
-                accountId={app.accountId}
+              <AskTheAssistant
                 context={[
                   `the app "${app.name}"`,
                   accountName ? `built for ${accountName}` : "one of our own systems",
@@ -571,8 +575,6 @@ export function AppDetailScreen({
                 ]
                   .filter(Boolean)
                   .join(", ")}
-                onOpenSource={(sourceId) => softNavigate(`${host.base}/knowledge/${sourceId}`)}
-                onOpenRecord={(path) => softNavigate(`${host.base}/${path}`)}
               />
             )
           if (panel.value === "activity")

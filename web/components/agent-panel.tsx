@@ -15,23 +15,24 @@
 // agent:create; the server re-gates every action AS the signed-in user.
 
 import * as React from "react"
-import { Check, History, Paperclip, Plus, X } from "@shared/ui/icons"
+import { Check, History, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { Button } from "@shared/ui/components/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@shared/ui/controls/sheet/sheet"
-import { AgentChat } from "@shared/ui/structures/agent-chat/agent-chat"
-import { CollectionRegister } from "@shared/ui/structures/collection-frame/collection-frame"
-import { RunSteps } from "@shared/ui/structures/run-steps/run-steps"
+} from "@shared/ui/components/sheet/sheet"
+import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
+import { CollectionRegister } from "@shared/ui/components/collection-frame/collection-frame"
+import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 
 import { AgentHistoryDialog } from "@/components/agent-history-dialog"
+import { citationPills, TurnSources } from "@/components/agent-sources"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
 import { useAgentChat } from "@/lib/use-agent-chat"
 import { usePermissions } from "@/lib/perms"
@@ -86,7 +87,7 @@ export function AgentPanel({
                   <button
                     type="button"
                     onClick={() => setUsageOpen(true)}
-                    className="rounded-full"
+                    className="rounded-pill"
                     title={t("See where your assistant credits went")}
                   >
                     <Badge
@@ -166,26 +167,47 @@ export function AgentPanel({
                 className="h-full rounded-none border-0 bg-transparent"
                 // The kit's chat knows user and assistant; a TOOL STEP renders
                 // as a quiet assistant-side chip carrying the step's outcome.
-                messages={chat.items.map((it) =>
-                  it.role === "tool"
-                    ? {
-                        id: it.id,
-                        role: "assistant" as const,
-                        content: (
-                          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-                            {it.status === "pending" ? (
-                              <Spinner size="sm" />
-                            ) : it.status === "failed" ? (
-                              <X className="text-destructive size-3.5" aria-hidden />
-                            ) : (
-                              <Check className="text-success size-3.5" aria-hidden />
-                            )}
-                            {it.actionLabel}
-                          </span>
-                        ),
-                      }
-                    : it
-                )}
+                messages={chat.items.map((it) => {
+                  if (it.role === "tool")
+                    return {
+                      id: it.id,
+                      role: "assistant" as const,
+                      content: (
+                        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                          {it.status === "pending" ? (
+                            <Spinner size="sm" />
+                          ) : it.status === "failed" ? (
+                            <X className="text-destructive size-3.5" aria-hidden />
+                          ) : (
+                            <Check className="text-success size-3.5" aria-hidden />
+                          )}
+                          {it.actionLabel}
+                        </span>
+                      ),
+                    }
+                  // WHAT THIS TURN READ (Law R23), in the kit's ruled shape.
+                  // `evidence` is app data — a knowledge citation with a kind, a
+                  // record path and the passage's own words — and the kit's
+                  // `sources` is two names and a link. The mapping is the whole
+                  // job of agent-sources.tsx; the numbering is the kit's, derived
+                  // from this array's order, so a mark in the prose and the pill
+                  // under it cannot disagree.
+                  const { evidence, ...message } = it
+                  if (!evidence || !teamId) return message
+                  return {
+                    ...message,
+                    sources: citationPills(evidence, t),
+                    // The passages, one press away, INSIDE the turn's own body —
+                    // see agent-sources.tsx for why it is here rather than in
+                    // the `actions` slot.
+                    content: (
+                      <>
+                        {message.content}
+                        <TurnSources evidence={evidence} teamId={teamId} />
+                      </>
+                    ),
+                  }
+                })}
                 streaming={chat.showTyping}
                 disabled={chat.busy || chat.quota?.blocked || !!chat.pending}
                 // THE EMPTY PANEL, THROUGH THE KIT'S OWN REGISTER RATHER THAN A

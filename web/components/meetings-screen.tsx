@@ -20,9 +20,11 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { useRemembered } from "@shared/web/remembered"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   ScreenRenderer,
   type ScreenActionContext,
@@ -167,7 +169,8 @@ export function MeetingsScreen({
   // "this week" is the week somebody is in rather than the days left of it; the
   // calendar is the library's month grid over the same rows; and All shows far
   // more columns, which is what makes it worth being a separate view at all.
-  const [view, setView] = React.useState<"week" | "calendar" | "all">("week")
+  // Remembered with the screen — see web/lib/nav-memory.ts.
+  const [view, setView] = useRemembered<"week" | "calendar" | "all">("view", "week")
   const weekTotal = useCachedValue<number>(totalKey("meetings-week", teamId))
   // THIS WEEK IS ITS OWN READ (19 Aug 2026) — the door's week, not a browser
   // filter over the meetings list's newest page. The comment that used to sit on that
@@ -483,7 +486,7 @@ export function MeetingsScreen({
        * card there would be wrong. Here it is the foot of a list, so it gets a
        * card. */}
       {canCreate && (
-        <div className="flex flex-col gap-3 rounded-xl border p-4">
+        <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
           <GoogleSyncButton
             teamId={teamId}
             scope="both"
@@ -532,14 +535,24 @@ export function MeetingsScreen({
           door's exact total through the ONE seam, and an unloaded total renders
           nothing rather than a "0" that reads as "there are none". */}
       {canReadPurposes ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={onPurposes}
-          className="text-muted-foreground hover:text-foreground w-fit text-sm underline-offset-4 hover:underline"
+          /* `ghost` IS this quiet tertiary action: `--ink-tertiary` is
+             `--muted-foreground` and its hover is the ink going to full, which
+             is what was hand-written here. The overrides are the box only (a
+             quiet text action occupies none) plus the hover underline `ghost`
+             does not carry and this line always has. NOT the weight: a
+             `font-normal` here measured 300, not the 400 it was replacing,
+             because `--font-weight-normal` is 300 in this palette — so the
+             neutralising class made it lighter than either side. The kit's own
+             control weight (500) stands instead. */
+          className="h-auto w-fit p-0 underline-offset-4 hover:underline"
         >
           {t("Meeting purposes")}
           {formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
-        </button>
+        </Button>
       ) : null}
 
       <MeetingFormDialog

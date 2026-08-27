@@ -85,8 +85,8 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import type { ListRow } from "../../structures/list/list";
+import { Button } from "../../components/button/button";
+import type { ListRow } from "../../components/list/list";
 import { PortalHome } from "../templates";
 import type { PortalSavings } from "../templates";
 import type { ShapeState, ShapeStateCopy } from "../states";

@@ -37,11 +37,11 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@shared/ui/controls/accordion/accordion"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Comments } from "@shared/ui/structures/comments/comments"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+} from "@shared/ui/components/accordion/accordion"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Comments } from "@shared/ui/components/comments/comments"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"
@@ -75,7 +75,7 @@ import { useT } from "@shared/web/language"
  * below it does not jump when the chunk lands. */
 const AppSavingsChart = dynamic(
   () => import("@/components/impact-chart").then((m) => m.AppSavingsChart),
-  { ssr: false, loading: () => <Skeleton className="h-[190px] w-full rounded-xl" /> }
+  { ssr: false, loading: () => <Skeleton className="h-[190px] w-full rounded-[var(--radius)]" /> }
 )
 
 /** One step, and the whole sum behind it. This line is the answer to the third
@@ -156,7 +156,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
     return (
       <div className="flex flex-col gap-4">
         <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-[var(--radius)]" />
       </div>
     )
   if (!data) return null
@@ -165,7 +165,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-3xl font-medium tracking-tight">{t("What this has been worth")}</h1>
-        <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
+        <p className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
           {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
         </p>
       </div>
@@ -209,7 +209,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
             </p>
           )}
           {data.prices.rates.length > 0 && (
-            <div className="rounded-xl border">
+            <div className="rounded-[var(--radius)] border">
               {data.prices.rates.map((r) => (
                 <div
                   key={r.label}
@@ -249,7 +249,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
           <AppSavingsChart rows={appChart} label={t("Hours a month")} />
         )}
 
-        <Accordion type="multiple" className="rounded-xl border px-4">
+        <Accordion type="multiple" className="rounded-[var(--radius)] border px-4">
           {data.apps.map((app) => (
             <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
               <AccordionTrigger>

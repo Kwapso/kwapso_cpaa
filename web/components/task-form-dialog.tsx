@@ -23,14 +23,14 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Label } from "@shared/ui/controls/label/label"
+import { Input } from "@shared/ui/components/input/input"
+import { Label } from "@shared/ui/components/label/label"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Plus } from "@shared/ui/icons"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Plus } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { FilePicker } from "@/components/file-picker"

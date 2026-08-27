@@ -84,11 +84,11 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Checkbox } from "../../controls/checkbox/checkbox";
-import { Choice } from "../../controls/choice/choice";
-import { Hint, Text } from "../../controls/typography/typography";
-import type { StatusStage } from "../../controls/status-stepper/status-stepper";
+import { Button } from "../../components/button/button";
+import { Checkbox } from "../../components/checkbox/checkbox";
+import { Choice } from "../../components/choice/choice";
+import { Hint, Text } from "../../components/typography/typography";
+import type { StatusStage } from "../../components/status-stepper/status-stepper";
 import { FormScreen } from "./form-screen";
 import { MainScreen } from "./main-screen";
 import { StepperHero } from "./stepper-hero";
@@ -207,8 +207,16 @@ export interface MultiStepFormProps
   /** The commit is in flight. */
   submitting?: boolean;
 
-  /** The screen's own heading, above the rail. */
+  /** The screen's own eyebrow, in the header band. CH27.38 draws "Build · W35". */
   eyebrow?: React.ReactNode;
+  /**
+   * The page heading, in the header band. CH27.38's own markup draws one —
+   * an `h4` at the heading step reading "Plan a sprint" beside the eyebrow —
+   * so the band carries a title exactly as every other main screen does. The
+   * step's own title stays in the form; the two are different headings and
+   * the chapter draws both.
+   */
+  title?: React.ReactNode;
 
   /** Loading, empty or error. */
   state?: ShapeState;
@@ -259,6 +267,7 @@ function MultiStepForm({
   onNext,
   submitting = false,
   eyebrow,
+  title,
   state = "ready",
   copy,
   labels,
@@ -328,9 +337,11 @@ function MultiStepForm({
 
        Of the two models it is a main screen on every one of `SHELL.md`'s
        three differences: an eyebrow, no identity chip row and no record
-       number, and NO FOOTER. There is no page heading and 27.38 draws none —
-       the step's own title is the heading, and it stays in the form where the
-       chapter puts it — so the header band carries the eyebrow alone.
+       number, and NO FOOTER. The header band carries the eyebrow AND the
+       page heading — 27.38's own markup draws "Build · W35" over a 34px
+       "Plan a sprint" — while the step's own title stays in the form where
+       the chapter puts it. (This block used to claim "27.38 draws none";
+       the artifact's markup says otherwise and the claim is corrected.)
 
        `panel={false}`: full content area, and no collection to put in a
        panel. The step rail and the form stand on the off-beige body pane. */
@@ -341,6 +352,7 @@ function MultiStepForm({
       rail={rail}
       railLabel={railLabel}
       eyebrow={eyebrow}
+      title={title}
       panel={false}
       state={state}
       body={

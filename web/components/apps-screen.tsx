@@ -25,11 +25,12 @@
 
 import * as React from "react"
 
-import { Input } from "@shared/ui/controls/input/input"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Input } from "@shared/ui/components/input/input"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Search } from "@shared/ui/icons"
+import { useRemembered } from "@shared/web/remembered"
+import { Search } from "@shared/ui/foundations/icons"
 import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
@@ -136,7 +137,9 @@ export function AppsScreen({
   // screens already fill.
   const members = useAssignableMembers(teamId)
   const [addOpen, setAddOpen] = React.useState(false)
-  const [tab, setTab] = React.useState("active")
+  // Which half of the collection she was in, remembered per screen with the
+  // rest of what she was looking at (web/lib/nav-memory.ts).
+  const [tab, setTab] = useRemembered("tab", "active")
   // THE SEARCH BOX (the owner, 24 Aug 2026: "I cannot search through any of my
   // apps, which is a weird thing to begin with"). It narrows the LOADED set
   // rather than asking the server, and that is the right shape here for the same
@@ -144,7 +147,7 @@ export function AppsScreen({
   // whole, and twenty-eight rows are already in the browser. Typing is instant
   // and costs nothing. The door takes a `q` as well, because the assistant and
   // an outside tool cannot hold a list in a browser (R19).
-  const [query, setQuery] = React.useState("")
+  const [query, setQuery] = useRemembered("search", "")
   // The engine recipe and its rights are still the contract this screen is
   // handed; the tiles below draw the rows themselves, and the row ACTIONS stay
   // the engine's so a permission change reaches them without a second edit.

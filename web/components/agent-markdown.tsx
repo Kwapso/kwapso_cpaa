@@ -5,9 +5,9 @@
 // real components instead of paragraphs of figures. So this splits the reply into
 // segments (web/lib/agent-segments) and renders each one the right way:
 //
-//   text  → the existing escape-first markdown path (@shared/web/markdown-html),
-//           injected with RichText's PROSE classes so a reply reads like any other
-//           rich text in the app.
+//   text  → the shared markdown grouping (@shared/web/markdown-html), rendered as
+//           REACT and injected with RichText's PROSE classes so a reply reads like
+//           any other rich text in the app.
 //   block → a real component (@/components/agent-blocks). React children, never
 //           injected HTML — the structured path never touches innerHTML at all.
 //   code  → a fence we closed and REFUSED (bad JSON, an unknown kind, a value that
@@ -19,13 +19,85 @@
 // through here (web/lib/use-agent-chat.tsx), and so does anything that answers from
 // the knowledge base — a knowledge panel gets blocks by using this component, with
 // no second renderer to keep in step.
+//
+// ════════════════════════════════════════════════════════════════════════════
+// WHY THE PROSE IS REACT NOW, AND NOT ONE INJECTED STRING.
+//
+// A citation mark is a `<Cite for="…">` — the design kit's own component (RULING
+// D7-2), which reads the turn's sources out of context and draws the source's
+// NUMBER. It has to sit inside the sentence it belongs to, and a component
+// cannot be injected into an HTML string.
+//
+// The obvious alternative was to render the string as before and split its
+// OUTPUT at each mark. That tears a paragraph in half: a `<p>` opened in one
+// injected fragment and closed in the next is two block elements to the browser,
+// so every citation would break its own line. So the BLOCK structure is built
+// here in React from the shared grouping (`mdBlocks`), and only the INLINE
+// markup of each line is still injected — the same escape-first subset, from the
+// same `inline` the string renderer uses. There is no second markdown
+// implementation and no widened HTML surface: what reaches `innerHTML` is
+// strictly less than it was.
 
 import * as React from "react"
 
-import { toHtml } from "@shared/web/markdown-html"
+import { Cite } from "@shared/ui/components/agent-chat/agent-chat"
+import { inline, mdBlocks, type MdBlock } from "@shared/web/markdown-html"
+import { splitCites } from "@shared/agent-cites"
 import { splitReply } from "@/lib/agent-segments"
 import { AgentBlockView } from "@/components/agent-blocks"
 import { PROSE } from "@shared/web/rich-text-view"
+
+/** One line of prose — the inline markup injected as before, with the kit's
+ * citation mark standing where the model put it. A line with no mark is one
+ * span, exactly as it always was. */
+function Line({ escaped }: { escaped: string }) {
+  const parts = splitCites(escaped)
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.t === "cite" ? (
+          // Renders NOTHING when this turn carries no such source — the kit's
+          // own behaviour, and the reason a model reaching back to an earlier
+          // question's passages cannot draw a mark with nothing under it.
+          <Cite key={i} for={part.sourceId} />
+        ) : (
+          <span key={i} dangerouslySetInnerHTML={{ __html: inline(part.text) }} />
+        )
+      )}
+    </>
+  )
+}
+
+function Block({ block }: { block: MdBlock }) {
+  // `"items" in block` rather than a test on `tag` — see the note in
+  // markdown-html.ts: a discriminant that is itself a union of literals cannot
+  // be narrowed away, so the paragraph branch below would not see its `lines`.
+  if ("items" in block) {
+    const List = block.tag
+    return (
+      <List>
+        {block.items.map((item, i) => (
+          <li key={i}>
+            <Line escaped={item} />
+          </li>
+        ))}
+      </List>
+    )
+  }
+  const Tag = block.tag
+  return (
+    <Tag>
+      {block.lines.map((l, i) => (
+        <React.Fragment key={i}>
+          {/* The soft line break the string renderer joins with — a newline
+              inside one paragraph, not a new one. */}
+          {i > 0 ? <br /> : null}
+          <Line escaped={l} />
+        </React.Fragment>
+      ))}
+    </Tag>
+  )
+}
 
 export function AgentMarkdown({ text }: { text: string }) {
   const segments = React.useMemo(() => splitReply(text), [text])
@@ -38,14 +110,20 @@ export function AgentMarkdown({ text }: { text: string }) {
           return (
             <pre
               key={i}
-              className="my-2 overflow-x-auto rounded-xl border bg-muted p-3 text-xs whitespace-pre-wrap text-muted-foreground"
+              className="my-2 overflow-x-auto rounded-[var(--radius)] border bg-muted p-3 text-xs whitespace-pre-wrap text-muted-foreground"
             >
               {seg.text}
             </pre>
           )
-        const html = toHtml(seg.text)
-        if (!html) return null
-        return <div key={i} className={PROSE} dangerouslySetInnerHTML={{ __html: html }} />
+        const blocks = mdBlocks(seg.text)
+        if (!blocks.length) return null
+        return (
+          <div key={i} className={PROSE}>
+            {blocks.map((b, j) => (
+              <Block key={j} block={b} />
+            ))}
+          </div>
+        )
       })}
     </div>
   )

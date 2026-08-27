@@ -665,6 +665,18 @@ export type StreamEvent =
   /** that tool finished — ok true, or false on failure (`error` = the door's short,
    * human reason, e.g. which permission was missing — shown on the failed step row). */
   | { t: "step_end"; tool: string; ok: boolean; summary: string; error?: string }
+  /** WHAT THE ASSISTANT JUST READ OUT OF THE KNOWLEDGE BASE — Law R23 on the wire.
+   *
+   * Until this existed, a retrieval's citations reached the MODEL and stopped
+   * there: the client is sent `step_start`/`step_end` and never a tool's result,
+   * so the panel could not have drawn a source under an answer if it had wanted
+   * to. This carries the answer seam's own two lists, unchanged and unassembled,
+   * so the turn's citation marks and the sources under it come from the same
+   * retrieval the answer was written from.
+   *
+   * It belongs to the turn that is streaming when it arrives, and it repeats: a
+   * turn that asks two questions retrieves twice. */
+  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
   /** TERMINAL: needs confirmation; the client shows the yes/no panel. Carries the
    * `threadId` so a FIRST-turn confirm (a brand-new conversation whose opening
    * message proposes a dangerous action) can be resolved — the thread is already
@@ -929,6 +941,11 @@ export type KnowledgePassage = {
   seq: number
   text: string
   score: number
+  /** WHEN THIS SOURCE IS FROM — the record's own moment, never the moment we read
+   * it. Null where the row genuinely has none, which is a fact rather than a gap
+   * to fill: the writer is told a source carries no date rather than being handed
+   * a guess it would then reason about. */
+  recordDate: string | null
 }
 
 /** Where an answer came from. Law R23: an answer with no citation is not an
@@ -1568,6 +1585,21 @@ export type Todo = {
   ticketId: string | null
   createdAt: string
 }
+
+/** THE TWO PILES OF A TO-DO, as SERVER views — the panel's own two words.
+ *
+ * Not a client filter, and not one list with a checkbox over it: the collection
+ * PAGES (R14), so sieving the loaded rows for the completed ones would show "the
+ * done among the newest fifty" under a badge counting all of them (R16). Each
+ * view is also its own ORDERING — open by when it is due, done by when it was
+ * done — which is what lets a single keyset cursor page either one.
+ *
+ * `all` USED TO BE THE SECOND WORD and is retired rather than renamed: the two
+ * views sort by different columns, so "everything, in one order" is a question
+ * with no honest keyset answer. A caller asking for the retired word gets the
+ * open list, which is what it got before `all` existed. */
+export const TODO_VIEWS = ["open", "done"] as const
+export type TodoViewName = (typeof TODO_VIEWS)[number]
 
 /** KWAPSO'S OWN INTERNAL ADMIN. Nobody outside the agency ever sees one. Work
  * logs DO attach — forty minutes on our own VAT return is real time and costs us

@@ -111,6 +111,7 @@ export const TOOL_GATES: Record<string, string> = {
   add_help_link: "help:read",
   list_story_attachments: "work:read",
   add_story_link: "work:edit",
+  update_story_attachment: "work:edit",
   remove_story_attachment: "work:edit",
   remove_help_attachment: "help:edit",
   reply_help_ticket: "help:read",

@@ -21,15 +21,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
-import { Palette } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
+import { Palette } from "@shared/ui/foundations/icons"
 
 import { useLanguage } from "./language"
 

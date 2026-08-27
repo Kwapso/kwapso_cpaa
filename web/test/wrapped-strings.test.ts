@@ -150,8 +150,26 @@ describe("R33 · every extracted position asks for its translation", () => {
     // nothing: a seam that stopped translating fails them whether it is listed
     // here or not.
     const SEAM = "shared/web/field.tsx"
+    const KIT_FIELD = "components/field/field"
+
+    /* A BLIND CHECK REPORTS ALL CLEAR EXACTLY LIKE A PASSING ONE, and this one
+       came within one commit of proving it. The filter below is a string
+       literal, and on 2026-08-27 the kit's layout changed under it —
+       `controls/` and `structures/` became `components/`. Every file stopped
+       containing the old spelling, `offenders` became `[]`, and the ban PASSED
+       WITHOUT READING ANYTHING. Nothing would have gone red; the seam would
+       simply have stopped being guarded.
+       So the literal is asserted to be LIVE before it is trusted: the seam
+       itself must import it. If the kit moves Field again, this fails here and
+       says so, instead of quietly reporting all clear. (registry.ts's R33 note
+       records that this exact thing had already happened once before.) */
+    expect(
+      readFileSync(join(ROOT, "shared", "web", "field.tsx"), "utf8"),
+      `the seam no longer imports "${KIT_FIELD}" — the kit moved it, and this ban is now reading for a string that exists nowhere. Update KIT_FIELD.`
+    ).toContain(KIT_FIELD)
+
     const offenders = appFiles()
-      .filter(({ path }: { path: string }) => readFileSync(path, "utf8").includes("controls/field/field"))
+      .filter(({ path }: { path: string }) => readFileSync(path, "utf8").includes(KIT_FIELD))
       .map(({ path }: { path: string }) => relative(ROOT, path))
       .filter((rel: string) => rel !== SEAM)
 

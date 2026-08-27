@@ -36,7 +36,7 @@ import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const ROOT = join(HERE, "..", "..")
-const CONTROLS = join(ROOT, "shared/ui/controls")
+const CONTROLS = join(ROOT, "shared/ui/components")
 
 /** Every `z-[N]` / `z-N` a file actually SETS, as numbers. Tailwind writes the
  * arbitrary form in brackets and the scale form bare; both are the same
@@ -92,7 +92,7 @@ describe("a portalled surface clears the dialog it opens from", () => {
        is 60 on purpose — they are peers ordering themselves, not controls
        opening over a form. Everything else that portals is anchored to a
        trigger, and a trigger can be inside a dialog. */
-    const stack = new Set(OVERLAY_FILES.map((rel) => `shared/ui/controls/${rel}`))
+    const stack = new Set(OVERLAY_FILES.map((rel) => `shared/ui/components/${rel}`))
     for (const file of controls) {
       if (stack.has(file.rel)) continue
       // Portalled = it renders through a Radix Portal, so it leaves the form's

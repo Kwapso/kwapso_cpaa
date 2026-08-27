@@ -28,16 +28,16 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@shared/ui/controls/dialog/dialog"
+} from "@shared/ui/components/dialog/dialog"
 import { List } from "@shared/web/list-compat"
-import { ToggleGroup, ToggleGroupItem } from "@shared/ui/controls/toggle-group/toggle-group"
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/icons"
+import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"
@@ -147,10 +147,10 @@ function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: (id: strin
       onClick={() => onOpen(entry.id)}
       title={entry.title}
       aria-label={t("Open {name}", { name: entry.title })}
-      className="bg-accent hover:bg-muted motion-hover flex w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-left text-xs"
+      className="bg-accent hover:bg-muted motion-hover flex w-full items-center gap-1 rounded-pill px-1.5 py-0.5 text-left text-xs"
     >
       {entry.accent ? (
-        <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${accentClass(entry.accent)}`} />
+        <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${accentClass(entry.accent)}`} />
       ) : null}
       <span className="truncate">{entry.title}</span>
     </button>
@@ -178,7 +178,7 @@ function DayRows({
         leading: e.accent ? (
           <span
             aria-hidden
-            className={`mt-1.5 block size-2.5 shrink-0 rounded-full ${accentClass(e.accent)}`}
+            className={`mt-1.5 block size-2.5 shrink-0 rounded-pill ${accentClass(e.accent)}`}
           />
         ) : undefined,
         title: e.title,
@@ -366,7 +366,7 @@ export function RecordCalendar({
                     // to, so a rebrand now reaches the calendar like everything
                     // else. Mango is still never a border, which is the rule this
                     // square was drawn to obey.
-                    "motion-hover flex min-h-20 flex-col gap-1 rounded-xl border p-1.5 hover:border-foreground/30 hover:bg-accent",
+                    "motion-hover flex min-h-20 flex-col gap-1 rounded-[var(--radius)] border p-1.5 hover:border-foreground/30 hover:bg-accent",
                     d.getMonth() === month.getMonth() ? "" : "opacity-40",
                     key === today ? "bg-secondary" : "",
                   ].join(" ")}
@@ -384,13 +384,14 @@ export function RecordCalendar({
                       // "+6 more" USED TO BE DEAD TEXT — a line naming six records
                       // with no way to reach any of them, which is worse than not
                       // mentioning them. It is a button now, and it opens the day.
-                      <button
+                      <Button
+                        variant="link"
                         type="button"
                         onClick={() => setOpenDay(key)}
-                        className="text-muted-foreground hover:text-foreground motion-hover rounded px-1 text-left text-xs underline-offset-2 hover:underline"
+                        className="text-muted-foreground hover:text-foreground text-xs"
                       >
                         {t("+{n} more", { n: hidden })}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

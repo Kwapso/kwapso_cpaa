@@ -1,7 +1,7 @@
 import { Inter } from "next/font/google"
 
-import { AmbientBackground } from "@shared/ui/controls/ambient-background/ambient-background"
-import { Toaster } from "@shared/ui/controls/sonner/sonner"
+import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
+import { Toaster } from "@shared/ui/components/sonner/sonner"
 import { ThemeProvider } from "@shared/web/theme-provider"
 import { MarkRuntime } from "@shared/web/mark-runtime"
 import { appMetadata, appViewport } from "@shared/web/pwa"

@@ -116,18 +116,18 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Headline, Text } from "../../controls/typography/typography";
-import { SearchInput } from "../../controls/search-input/search-input";
+import { Button } from "../../components/button/button";
+import { Headline, Text } from "../../components/typography/typography";
+import { SearchInput } from "../../components/search-input/search-input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
-import type { CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
-import { Plus } from "../../icons";
+} from "../../components/select/select";
+import type { CollectionFrameTab } from "../../components/collection-frame/collection-frame";
+import { Plus } from "../../foundations/icons";
 import { MainScreen, StatStrip, type StatStripFigure } from "../templates";
 
 /** Which door. The portal drops Import and asks for a request instead. */

@@ -15,7 +15,7 @@
 
 import * as React from "react"
 
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { content as contentApi, tenancy } from "@/lib/api"
 import {

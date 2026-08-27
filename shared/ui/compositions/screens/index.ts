@@ -138,6 +138,15 @@ export type {
 export { COMPANY_FIGURES, COMPANY_FIGURE_COUNT, CompanyHubScreen } from "./company-hub";
 export type { CompanyFigure, CompanyHubLabels, CompanyHubScreenProps } from "./company-hub";
 
+/* page-failure — chapter 21's 404 and 500, the whole-page case law 4 carves
+   out. Found MISSING by the 2026-08-26 fidelity re-audit and built that day. */
+export { PageFailureScreen } from "./page-failure";
+export type {
+  PageFailureLabels,
+  PageFailureScreenProps,
+  PageFailureVariant,
+} from "./page-failure";
+
 export { NotFoundScreen } from "./not-found";
 export type {
   NotFoundCase,

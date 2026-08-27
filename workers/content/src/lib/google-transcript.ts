@@ -296,7 +296,7 @@ async function withWords(
 ): Promise<FoundTranscript | null> {
   const fileId = file.targetId ?? file.id
   try {
-    const text = await driveFileText(await driveToken(env, cfg, guard), fileId)
+    const text = await driveFileText(env, await driveToken(env, cfg, guard), fileId)
     return text ? { ...found, fileId, text } : null
   } catch {
     return null

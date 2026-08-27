@@ -64,16 +64,16 @@
      Narrow, verbatim: "Narrow · the same sentences, one panel per screen
        width".
 
-   IT IS A DETAIL SCREEN, AND THE TEST IS THE CLIENT'S OWN
-   `SHELL.md`: "a main screen is in the navbar; a detail screen has
-   breadcrumbs." This screen has the trail and 27.39 draws the eyebrow
-   spelling of it too. So it is `DetailScreen`, and the four levels arrive
-   with the shape rather than being missing: off-beige page, soft-paper screen
-   card, the rail and the header band lying on it, and THE OFF-BEIGE BODY PANE
-   the panels stand on. The title moves up into the header band, which is the
-   split 27.39 itself draws, and 27.39's "same identity row … same charcoal
-   footer, same tabs" is untouched: every one of them is still drawn, in the
-   same order, by the same `RecordChrome` one level down.
+   IT IS A DETAIL SCREEN, AND THERE IS NO BREADCRUMB ON ONE — OVERRIDE 73
+   (2026-08-26). The client: "detail pages do not need this bar that you
+   have on top where we have Padelbase and the number." So it is
+   `DetailScreen` with the band empty, and the four levels arrive with the
+   shape rather than being missing: off-beige page, soft-paper screen card,
+   the rail, and THE OFF-BEIGE BODY PANE the panels stand on. The title
+   leads the body pane and the identity chips — the black ID chip first —
+   sit directly under it, and 27.39's "same identity row … same charcoal
+   footer, same tabs" is otherwise untouched: every one of them is still
+   drawn by the same `RecordChrome` one level down.
 
    THE LAW THIS FILE OBEYS
    · IT IS 27.8. `RecordChrome` is the whole composition. This file supplies
@@ -127,17 +127,16 @@
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Text } from "../../controls/typography/typography";
-import type { BreadcrumbsItem } from "../../controls/breadcrumbs/breadcrumbs";
-import type { ActivityFeedItem } from "../../structures/activity-feed/activity-feed";
-import { CollectionFrame } from "../../structures/collection-frame/collection-frame";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Text } from "../../components/typography/typography";
+import type { ActivityFeedItem } from "../../components/activity-feed/activity-feed";
+import { CollectionFrame } from "../../components/collection-frame/collection-frame";
 import {
   DescriptionList,
   type DescriptionListItem,
-} from "../../structures/description-list/description-list";
-import type { RecordDetailAuditEntry } from "../../structures/record-detail/record-detail";
+} from "../../components/description-list/description-list";
+import type { RecordDetailAuditEntry } from "../../components/record-detail/record-detail";
 import { DetailScreen } from "../templates";
 import { type ShapeState, type ShapeStateCopy } from ".";
 
@@ -169,7 +168,6 @@ export interface EmptyRecordPanel {
 
 /** Every user-facing string this screen owns that is not per-panel. */
 export interface NewEmptyRecordLabels {
-  breadcrumbLabel: string;
   tabsLabel: string;
   tabOverview: string;
   tabActivity: string;
@@ -207,7 +205,6 @@ export interface NewEmptyRecordLabels {
 }
 
 const DEFAULT_LABELS: NewEmptyRecordLabels = {
-  breadcrumbLabel: "Breadcrumb",
   tabsLabel: "Record sections",
   tabOverview: "Overview",
   tabActivity: "Activity",
@@ -305,10 +302,22 @@ export interface NewEmptyRecordScreenProps
   /** Accessible name for the rail. */
   railLabel?: string;
 
-  /** The trail above the identity row. */
-  breadcrumb?: BreadcrumbsItem[];
+  /**
+   * RETAINED, NO LONGER DRAWN. Override 73, the client's ruling: "detail
+   * pages do not need this bar that you have on top" — no breadcrumb renders
+   * above a record's title in any spelling, and `DetailScreen` no longer
+   * accepts one. Kept so an application passing it keeps compiling; remove
+   * at the next intentional break.
+   * @deprecated A record page draws no breadcrumb (override 73).
+   */
+  breadcrumb?: unknown;
   /** The record number, drawn in the charcoal pill by the shape. */
   recordNumber?: React.ReactNode;
+  /**
+   * The chip naming the record's collection — override 73's "add a chip for
+   * Padelbase like in the example". Second, right after the ID chip.
+   */
+  collectionLabel?: React.ReactNode;
   /** Status and "Created just now" — the rest of the identity row. */
   chips?: React.ReactNode;
   /** The record's name. */
@@ -393,11 +402,14 @@ export interface NewEmptyRecordScreenProps
  */
 function NewEmptyRecordScreen({
   className,
+  /* Accepted and ignored — override 73. Destructured so it cannot reach the
+     DOM as an unknown attribute. */
+  breadcrumb: _breadcrumb,
   door = "system",
   rail,
   railLabel,
-  breadcrumb,
   recordNumber,
+  collectionLabel,
   chips,
   title,
   facts = DEFAULT_FACTS,
@@ -536,9 +548,8 @@ function NewEmptyRecordScreen({
       door={door}
       rail={rail}
       railLabel={railLabel}
-      breadcrumb={breadcrumb}
-      breadcrumbLabel={words.breadcrumbLabel}
       recordNumber={recordNumber}
+      collectionLabel={collectionLabel}
       chips={chips}
       title={title}
       actionsVisible={actionsVisible}

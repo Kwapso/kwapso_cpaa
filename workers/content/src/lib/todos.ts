@@ -24,7 +24,10 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
-import type { Todo } from "@shared/types"
+import { countCollectionWith, reportedTotal } from "@shared/workers/count"
+import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting"
+import type { Todo, TodoViewName } from "@shared/types"
 
 import { nextRef, REF_KINDS } from "./refs"
 
@@ -84,57 +87,164 @@ function todoFence(scope: AccountScope): { sql: string; params: string[] } {
   return accountScopeClause(scope, "t.account_id")
 }
 
-/** Every to-do the caller may see. BOUNDED, not paged (R14): a to-do is a thing
- * we are WAITING on, so an account has a handful open at a time — this is a
- * collection that shrinks as fast as it grows, and a ceiling is an honest answer
- * rather than an eventual refusal. Open ones first, then the completed. */
+/** WHAT EACH VIEW IS ORDERED BY — and the reason this file pages at all.
+ *
+ * The old read ordered by FOUR terms: `(completed_at IS NOT NULL), due_on IS
+ * NULL, due_on, id DESC`. `keysetAfter` takes ONE expression, so that looks
+ * un-page-able and is not — it COLLAPSES, because the view fixes the first term
+ * and the middle two are a single value:
+ *
+ *   • OPEN — every row has `completed_at IS NULL`, so term one is a constant.
+ *     What is left is `COALESCE(due_on, '9999-12-31')` ascending, and that ONE
+ *     expression IS "no date last, then soonest first": the nulls-last flag and
+ *     the date are the same key, not two.
+ *   • DONE — `completed_at` descending, newest first. Naturally single, and the
+ *     column is NOT NULL for every row this view can return.
+ *
+ * TWO ORDERINGS MEANS TWO SIGNATURES, which is the property that matters more
+ * than either sort. `resolveOrdering` stamps `<name>:<dir>` into every cursor and
+ * `decodeCursor` refuses one minted under a different ordering (400, the same
+ * refusal a malformed cursor gets). Without that, a cursor from the open list
+ * handed to the done list would not fail — it would return a page that reads as
+ * an answer while skipping an arbitrary slice of the collection, which is the
+ * failure mode that ships. */
+export const TODO_SORTS: SortMenu<Todo> = {
+  due: {
+    expr: "COALESCE(t.due_on, '9999-12-31')",
+    dir: "asc",
+    // The SAME value, read back off a row — the sentinel included, or the cursor
+    // would be minted from a null the ORDER BY never sorted on.
+    key: (todo) => todo.dueOn ?? "9999-12-31",
+  },
+  completed: { expr: "t.completed_at", dir: "desc", key: (todo) => todo.completedAt },
+}
+
+/** The ordering a view is read in. One place, so the list, the keyset predicate
+ * and the minted cursor cannot disagree about which of the two this is. */
+function orderingFor(view: TodoViewName) {
+  return resolveOrdering(TODO_SORTS, view === "done" ? "completed" : "due", undefined, undefined)
+}
+
+type TodoFilter = { accountId?: string; view?: TodoViewName }
+
+/** The WHERE both the page and its counts are built from — the fence, the
+ * withdrawn, the client, and which pile. One function, because R16 is not "an
+ * exact count" but a count of the SAME collection the list showed. */
+function whereFor(scope: AccountScope, filter: TodoFilter): { sql: string; params: string[] } {
+  const fence = todoFence(scope)
+  const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : [])]
+  const params: string[] = [...fence.params]
+  clauses.push(filter.view === "done" ? "t.completed_at IS NOT NULL" : "t.completed_at IS NULL")
+  if (filter.accountId) {
+    clauses.push("t.account_id = ?")
+    params.push(filter.accountId)
+  }
+  return { sql: clauses.join(" AND "), params }
+}
+
+/** Every to-do the caller may see, ONE PAGE at a time (R14).
+ *
+ * IT USED TO BE BOUNDED, and the comment here used to say why: "a to-do shrinks
+ * as fast as it grows". That is true of the OPEN pile and false of the completed
+ * one, which accumulates for ever — and a completed to-do is the only kind that
+ * can carry the document a client sent us, because `completeTodo` writes
+ * `file_url` and `completed_at` in the same UPDATE. So the collection this file
+ * answers about GROWS the moment the done pile is visible at all, and a hard cap
+ * would eventually be a refusal to show somebody the invoice they were sent. */
 export async function listTodos(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  filter: { accountId?: string; view?: "open" | "all" }
-): Promise<Todo[]> {
-  const fence = todoFence(scope)
-  const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : [])]
-  const params: string[] = [...fence.params]
-  if (filter.view !== "all") clauses.push("t.completed_at IS NULL")
-  if (filter.accountId) {
-    clauses.push("t.account_id = ?")
-    params.push(filter.accountId)
-  }
+  filter: TodoFilter,
+  cursor: string | null
+): Promise<Page<Todo>> {
+  const base = whereFor(scope, filter)
+  // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
+  const ordering = orderingFor(filter.view ?? "open")
+  const after = keysetAfter(decodeCursor(cursor, ordering.sig), ordering.expr, ordering.dir, "t.id")
   const rows = await d1Query<TodoRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TODO_COLS} FROM todos t WHERE ${clauses.join(" AND ")}
-      ORDER BY (t.completed_at IS NOT NULL), t.due_on IS NULL, t.due_on, t.id DESC
-      LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
-    params
+    `SELECT ${TODO_COLS} FROM todos t
+      WHERE ${base.sql}${after.sql ? ` AND ${after.sql}` : ""}
+      ${orderBy(ordering, "t.id")} LIMIT ${PAGE_SIZE + 1}`,
+    [...base.params, ...after.params]
   )
-  return rows.map(toTodo)
+  return toPage(rows.map(toTodo), PAGE_SIZE, (todo) => [ordering.key(todo), todo.id], ordering.sig)
 }
 
-/** R16: the exact server COUNT(*), over the SAME question the list asked. */
+/** WHAT A TO-DO COLLECTION'S THREE NUMBERS ARE — open, done, and both — out of
+ * ONE read (R16, and the tasks door's reasoning one table along).
+ *
+ * Three because three badges ask: the panel's two view tabs each count their own
+ * pile, and the record tab ABOVE them counts what the panel reveals, which is
+ * both. A tab badge counting the open ones over a list showing the done ones is
+ * R16's failure in its quietest form, and it is one forgotten argument away in
+ * the version where each badge asks its own question.
+ *
+ * BOUNDED (R16 amended): counted exactly to TOTAL_COUNT_CAP, then "at least".
+ * `open` and `done` are DISPLAY tallies riding beside the display count, which is
+ * the only thing a SUM over a bounded set may ever be. */
+export type TodoCounts = { open: number; done: number; all: number }
+
 export async function countTodos(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  filter: { accountId?: string; view?: "open" | "all" }
-): Promise<number> {
+  filter: { accountId?: string }
+): Promise<TodoCounts> {
+  // The list's own WHERE minus the pile — the counts have to see both.
   const fence = todoFence(scope)
   const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : [])]
   const params: string[] = [...fence.params]
-  if (filter.view !== "all") clauses.push("t.completed_at IS NULL")
   if (filter.accountId) {
     clauses.push("t.account_id = ?")
     params.push(filter.accountId)
   }
-  const rows = await d1Query<{ n: number }>(
+  const row = await countCollectionWith<{ all_n: number; open_n: number | null }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM todos t WHERE ${clauses.join(" AND ")}`,
+    `SELECT (t.completed_at IS NULL) AS is_open FROM todos t WHERE ${clauses.join(" AND ")}`,
+    `COUNT(*) AS all_n, SUM(is_open) AS open_n`,
     params
   )
-  return rows[0]?.n ?? 0
+  const all = reportedTotal(row?.all_n ?? 0)
+  const open = reportedTotal(row?.open_n ?? 0)
+  return { open, done: Math.max(0, all - open), all }
+}
+
+/** One to-do the caller may see, by id — a LOOKUP, never a find over a page.
+ *
+ * R38's subject, and it activates the moment the list above starts paging: the
+ * live layer's `fetchOne` used to pull the WHOLE list with `?view=all` and
+ * `.find()` the row out of it, which resolves page one and nothing else. */
+export async function getTodo(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string
+): Promise<Todo | null> {
+  const row = await todoRow(cfg, guard, scope, id)
+  return row ? toTodo(row) : null
+}
+
+/** The row itself, fenced — what the writes need (the ref and the account for
+ * their history line) and what the two readers above are built from. */
+async function todoRow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string
+): Promise<TodoRow | undefined> {
+  const fence = todoFence(scope)
+  const rows = await d1Query<TodoRow>(
+    cfg,
+    guard.databaseId,
+    // R14: one row by primary key.
+    `SELECT ${TODO_COLS} FROM todos t WHERE t.id = ?${fence.sql ? ` AND ${fence.sql}` : ""} LIMIT 1`,
+    [id, ...fence.params]
+  )
+  return rows[0]
 }
 
 /** One to-do the caller may see, or a clean 404 — the shape every write resolves
@@ -145,15 +255,9 @@ export async function todoOrThrow(
   scope: AccountScope,
   id: string
 ): Promise<TodoRow> {
-  const fence = todoFence(scope)
-  const rows = await d1Query<TodoRow>(
-    cfg,
-    guard.databaseId,
-    `SELECT ${TODO_COLS} FROM todos t WHERE t.id = ?${fence.sql ? ` AND ${fence.sql}` : ""} LIMIT 1`,
-    [id, ...fence.params]
-  )
-  if (!rows[0]) throw new GuardError(404, "todo_not_found", "That to-do doesn't exist.")
-  return rows[0]
+  const row = await todoRow(cfg, guard, scope, id)
+  if (!row) throw new GuardError(404, "todo_not_found", "That to-do doesn't exist.")
+  return row
 }
 
 /** Ask a client for something. STAFF ONLY — the door refuses a portal caller, so

@@ -7,21 +7,22 @@
 // selectable_data module; the server re-checks every write. Library primitives only.
 
 import * as React from "react"
+import { useRemembered } from "@shared/web/remembered"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { cn } from "@shared/ui/lib/utils"
-import { Button, buttonVariants } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
+import { Button, buttonVariants } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "@shared/ui/icons"
+} from "@shared/ui/components/select/select"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "@shared/ui/foundations/icons"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -68,7 +69,8 @@ export function SelectableScreen({
   // Collection filter chrome — the SAME shape the other collections (roles,
   // learning, help) use: a text search + a status filter defaulting to Active, so
   // deactivated values hide until you ask for them (then show greyed with Activate).
-  const [query, setQuery] = React.useState("")
+  // Remembered with the screen — see web/lib/nav-memory.ts.
+  const [query, setQuery] = useRemembered("search", "")
   const [status, setStatus] = React.useState<"active" | "inactive" | "all">("active")
 
   const values = valuesQ.data ?? []
@@ -250,7 +252,7 @@ export function SelectableScreen({
           {grouped.map((g) => (
             <div key={g.type} className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">{g.type}</h2>
-              <ul className="divide-border divide-y rounded-xl border">
+              <ul className="divide-border divide-y rounded-[var(--radius)] border">
                 {g.items.map((v) => (
                   <li
                     key={v.id}

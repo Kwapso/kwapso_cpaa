@@ -25,11 +25,12 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Pencil, Plus, Power, RotateCcw, UserMinus } from "@shared/ui/icons"
+import { useRemembered } from "@shared/web/remembered"
+import { Pencil, Plus, Power, RotateCcw, UserMinus } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { OverviewList } from "@/components/overview-list"
@@ -95,7 +96,10 @@ export function WaveDetailScreen({
   const canCreate = can("work", "create")
   const canEdit = can("work", "edit")
 
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   const [planOpen, setPlanOpen] = React.useState(false)
   const [editOpen, setEditOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
@@ -233,13 +237,14 @@ export function WaveDetailScreen({
       headerExtra={
         wave.accountId && wave.accountName ? (
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <button
+            <Button
+              variant="link"
               type="button"
               onClick={() => softNavigate(`${basePath}/${waveId}/accounts/${wave.accountId}`)}
-              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              className="hover:text-foreground"
             >
               {t("For")} {wave.accountName}
-            </button>
+            </Button>
           </p>
         ) : undefined
       }
@@ -249,7 +254,7 @@ export function WaveDetailScreen({
           blocks anything: the sprints are in the package, and this says what
           somebody would otherwise have to work out from two date ranges. */}
       {overlaps.length > 0 && (
-        <div className="bg-warning/10 flex flex-col gap-1 rounded-xl p-3 text-sm">
+        <div className="bg-warning/10 flex flex-col gap-1 rounded-[var(--radius)] p-3 text-sm">
           <p className="font-medium text-warning">{t("Two sprints in this wave run over each other.")}</p>
           {overlaps.map((o) => (
             <p key={`${o.firstId}-${o.secondId}`} className="text-muted-foreground">
@@ -312,7 +317,7 @@ export function WaveDetailScreen({
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {sprints.map((s) => (
-                      <li key={s.id} className="bg-card flex items-center gap-3 rounded-xl border p-3">
+                      <li key={s.id} className="bg-card flex items-center gap-3 rounded-[var(--radius)] border p-3">
                         {/* R35 — a record row carries its face. */}
                         <RecordMark name={s.name} />
                         <div className="min-w-0 flex-1">

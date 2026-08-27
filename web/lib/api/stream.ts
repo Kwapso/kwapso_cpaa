@@ -5,7 +5,13 @@
 // the app's attack surface find nothing to walk in it — which is correct.
 
 import { ApiFailure } from "@shared/web/api"
-import type { ApiError, ChatOutcome, PendingCall } from "@shared/types"
+import type {
+  ApiError,
+  ChatOutcome,
+  KnowledgeCitation,
+  KnowledgePassage,
+  PendingCall,
+} from "@shared/types"
 
 /** One Server-Sent Event from an agent turn. `text` deltas + `step_*` may repeat any
  * number of times; exactly one TERMINAL event (`confirm` | `final` | `error`) ends the
@@ -15,6 +21,11 @@ export type AgentStreamEvent =
   | { t: "text"; d: string }
   | { t: "step_start"; tool: string; summary: string; ids?: Record<string, string> }
   | { t: "step_end"; tool: string; ok: boolean; summary: string; error?: string }
+  /** WHAT THE ASSISTANT JUST READ — the answer seam's own citations and passages
+   * (Law R23), for the turn that is streaming. The one tool result that reaches
+   * this side, because a citation mark in the reply has to have something under
+   * it to point at. Repeats: a turn that asks twice retrieves twice. */
+  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
   | { t: "confirm"; threadId: string; calls: PendingCall[]; text?: string }
   | { t: "final"; outcome: ChatOutcome }
   | { t: "error"; message: string }

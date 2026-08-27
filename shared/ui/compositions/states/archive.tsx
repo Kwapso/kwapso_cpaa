@@ -156,18 +156,18 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Text } from "../../controls/typography/typography";
-import { SearchInput } from "../../controls/search-input/search-input";
+import { Button } from "../../components/button/button";
+import { Text } from "../../components/typography/typography";
+import { SearchInput } from "../../components/search-input/search-input";
 import {
   FilterBar,
   type FilterChip,
-} from "../../controls/filter-bar/filter-bar";
-import type { CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
+} from "../../components/filter-bar/filter-bar";
+import type { CollectionFrameTab } from "../../components/collection-frame/collection-frame";
 import {
   DataTable,
   type DataTableColumn,
-} from "../../structures/data-table/data-table";
+} from "../../components/data-table/data-table";
 import { MainScreen } from "../templates";
 
 /** One tab over the collection. Archived is last and it is the open one. */

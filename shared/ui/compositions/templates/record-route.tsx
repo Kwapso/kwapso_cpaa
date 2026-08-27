@@ -5,9 +5,10 @@
    route, and the screen that proves the record chrome.
 
    THE SHAPES
-   `RecordChrome` (shape 1) with `StepperHero` (shape 4) in its hero slot.
-   `door="system"`, so the measure is `comfortable` and the progression is the
-   seven-stage vocabulary (ruling 04).
+   `ScreenShell` (the rail and the page frame, header slot left empty — see
+   override 73 below) wrapping `RecordChrome` (shape 1) with `StepperHero`
+   (shape 4) in its hero slot. `door="system"`, so the measure is
+   `comfortable` and the progression is the seven-stage vocabulary (ruling 04).
 
    WHY THIS ROUTE MATTERS MORE THAN THE OTHER TEN
    The record chrome applies to fourteen screens across the two doors. Every
@@ -28,6 +29,27 @@
         this is before you read what it's called; tags sit below because they
         describe it afterwards. Facts strip, the record's own text,
         attachments, then the ink footer. That order never changes."
+
+     REVERSED BY OVERRIDE 73 (2026-08-26) — SEE `record-chrome.tsx`'S HEADER
+     FOR THE CLIENT'S VERBATIM RULING. There is no breadcrumb on this route
+     any more, and the identity row moves BELOW the title instead of above
+     it. That override is what moved this route OFF `DetailScreen` and back
+     onto `ScreenShell` + `RecordChrome` directly, which is the second, load-
+     bearing change in this file: `DetailScreen` draws its own breadcrumb,
+     eyebrow and title in `ScreenShell`'s header band — a region entirely
+     apart from `RecordChrome`'s identity row in the body pane below — and
+     that split is what produced the exact bug the client's screenshot
+     showed: a breadcrumb-plus-eyebrow bar, a gap, then the ID chip and Edit
+     on their own row far below. `RecordChrome` now carries `title` itself
+     (see override 73's own comment for why that also puts Edit "aligned
+     with the title" for free), so this route no longer needs a separate
+     header band at all — `ScreenShell`'s `header` slot is left empty and
+     everything the record needs to say lives in `RecordChrome`'s body pane.
+     `segments`, `breadcrumb` and `breadcrumbLabel` are removed from this
+     route's own props with the same reasoning override 73 used for
+     `RecordChrome`'s API: nothing renders a breadcrumb on a record screen
+     any more, and the one caller of this route in the demo
+     (`demo/routes/system-s-t.tsx`) never passed them.
 
      ch27.8 on what the ink footer holds, verbatim: "Latest activity on the
        left — a short reverse-chronological feed with an add-a-note field —
@@ -73,9 +95,9 @@
    · NO FORM ON THIS PAGE (ch27.8). There is no field, no save and no dirty
      state in this file. Edit is a handler the route hands upward.
    · THE TAB SET IS THE UNDERLINE STRIP (ch27.13), and the counts are quiet.
-   · A STATE SWAPS THE PANEL, NEVER THE FRAME (ch27 law 4). The breadcrumb,
-     the identity row, the title, the hero and the strip stay drawn through
-     loading, empty and error, because the route already knows them.
+   · A STATE SWAPS THE PANEL, NEVER THE FRAME (ch27 law 4). The identity row,
+     the title, the hero and the strip stay drawn through loading, empty and
+     error, because the route already knows them.
    · DESTRUCTIVE NEVER GETS A BUTTON (ch27.8). Archive and delete are the
      route's overflow, not a control drawn here.
    · EVERY USER-FACING STRING IS A PROP (PATTERN §7), including all seven
@@ -89,23 +111,23 @@
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Text } from "../../controls/typography/typography";
-import type { BreadcrumbsItem } from "../../controls/breadcrumbs/breadcrumbs";
-import type { StatusStage } from "../../controls/status-stepper/status-stepper";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Text } from "../../components/typography/typography";
+import type { StatusStage } from "../../components/status-stepper/status-stepper";
 import {
   DescriptionList,
   type DescriptionListItem,
-} from "../../structures/description-list/description-list";
-import type { ActivityFeedItem } from "../../structures/activity-feed/activity-feed";
-import { List, type ListRow } from "../../structures/list/list";
+} from "../../components/description-list/description-list";
+import type { ActivityFeedItem } from "../../components/activity-feed/activity-feed";
+import { List, type ListRow } from "../../components/list/list";
 import type {
   RecordDetailAuditEntry,
   RecordDetailTab,
-} from "../../structures/record-detail/record-detail";
-import { Pencil } from "../../icons";
-import { DetailScreen } from "./detail-screen";
+} from "../../components/record-detail/record-detail";
+import { Pencil } from "../../foundations/icons";
+import { RecordChrome } from "./record-chrome";
+import { ScreenShell } from "./screen-shell";
 import { StepperHero } from "./stepper-hero";
 import type { ShapeState, ShapeStateCopy } from "../states/states";
 
@@ -133,7 +155,6 @@ export interface RecordLabels {
   edit: string;
   more: string;
   retry: string;
-  breadcrumbLabel: string;
   stagesLabel: string;
   tabsLabel: string;
   tabOverview: string;
@@ -160,7 +181,6 @@ const DEFAULT_LABELS: RecordLabels = {
   edit: "Edit",
   more: "More",
   retry: "Retry",
-  breadcrumbLabel: "Breadcrumb",
   stagesLabel: "Stage progression",
   tabsLabel: "Record sections",
   tabOverview: "Overview",
@@ -254,20 +274,19 @@ export interface RecordRouteProps {
   rail?: React.ReactNode;
   /** Accessible name for the rail. */
   railLabel?: string;
-  /**
-   * The path segments after `/t`. The first is the record kind and the rest
-   * identify it; the route turns them into the breadcrumb rather than
-   * inventing a trail. `["ticket", "3521"]`.
-   */
-  segments?: readonly string[];
-  /** The trail. Given, it wins over `segments`. */
-  breadcrumb?: BreadcrumbsItem[];
 
-  /** The number in the charcoal pill (ch27.8). */
+  /** The number in the charcoal pill (ch27.8), always the identity row's FIRST chip. */
   recordNumber?: React.ReactNode;
-  /** Status and relation — the rest of the identity row. */
+  /**
+   * The chip naming the record's collection or context — override 73's own
+   * example, "add a chip for Padelbase". Sits right after `recordNumber`, in
+   * the row directly under the title; there is no breadcrumb above it any
+   * more (override 73, reversing ch27.8's "breadcrumb, then the identity row").
+   */
+  collectionLabel?: React.ReactNode;
+  /** Status and relation — the rest of the identity row, after the collection chip. */
   chips?: React.ReactNode;
-  /** The record's name, on its own line. */
+  /** The record's name, on its own line. Carries Edit in its own row (override 73). */
   title?: React.ReactNode;
   /** Tags, beneath the title. */
   tags?: readonly string[];
@@ -334,15 +353,6 @@ export interface RecordRouteProps {
   onRetry?: () => void;
 }
 
-/** Turn `["ticket", "3521"]` into a trail without inventing a hierarchy. */
-function trailFrom(segments: readonly string[]): BreadcrumbsItem[] {
-  return segments.map((segment, index) => ({
-    key: `${index}-${segment}`,
-    label: segment,
-    href: index === segments.length - 1 ? undefined : `/t/${segments.slice(0, index + 1).join("/")}`,
-  }));
-}
-
 /**
  * A record, through the system door.
  *
@@ -361,9 +371,8 @@ function trailFrom(segments: readonly string[]): BreadcrumbsItem[] {
 function RecordRoute({
   rail,
   railLabel,
-  segments = ["ticket", "KW-3521"],
-  breadcrumb,
   recordNumber = "KW-3521",
+  collectionLabel = "Tickets",
   chips,
   title = "Booking confirmation lands in the spam folder",
   tags = ["Mail", "Deliverability"],
@@ -458,101 +467,108 @@ function RecordRoute({
     },
   ];
 
+  /* THE TITLE'S OWN ROW. `SHELL.md`: a detail screen's one mango is `Edit`.
+     Override 73 puts it on the title's row (via `RecordChrome`'s `actions`,
+     which `RecordDetail` threads into the same `Title` row as `title`) —
+     there is no separate header band any more for it to sit in. ch23's
+     step-down survives unchanged: while the hero's progression is holding
+     the screen's mango, Edit is the paper secondary instead, and the mango
+     slot is left empty rather than filled twice. */
+  const actions =
+    onEdit === undefined ? moreActions : (
+      <>
+        {moreActions}
+        <Button variant={stagesShown ? "secondary" : "default"} onClick={onEdit}>
+          <Pencil aria-hidden="true" />
+          {words.edit}
+        </Button>
+      </>
+    );
+
   return (
     /* A DETAIL SCREEN — the client's own test: "a main screen is in the
-       navbar; a detail screen has breadcrumbs", and this screen draws the
-       trail. `DetailScreen` is `ScreenShell`'s four levels with the three
-       things a record puts in them, so this file no longer reaches past the
-       shell into `RecordChrome`: the page, the screen card, the rail and the
-       off-beige body pane all arrive with it, and the title moves up into the
-       header band where 27.39 draws it. */
-    <DetailScreen
-      door="system"
-      rail={rail}
-      railLabel={railLabel}
-      breadcrumb={breadcrumb ?? trailFrom(segments)}
-      breadcrumbLabel={words.breadcrumbLabel}
-      recordNumber={recordNumber}
-      chips={chips ?? <Badge>{stages[currentStage] ?? stages[0]}</Badge>}
-      title={title}
-      tags={tags.map((tag) => (
-        <Badge key={tag}>{tag}</Badge>
-      ))}
-      meta={
-        meta === undefined ? undefined : (
-          <Text as="p" size="sm" tone="secondary">
-            {meta}
-          </Text>
-        )
-      }
-      /* THE IDENTITY ROW'S TRAILING CLUSTER. `SHELL.md`: a detail screen's
-         one mango is `Edit`, and 27.39 draws it in the identity row, not the
-         header band — so it is `onEdit` and `DetailScreen` draws it. ch23's
-         step-down survives: while the hero's progression is holding the
-         screen's mango, Edit is a paper pill instead, and the mango slot is
-         left empty rather than filled twice. */
-      identityActions={
-        onEdit === undefined || !stagesShown ? (
-          moreActions
-        ) : (
-          <>
-            {moreActions}
-            <Button variant="secondary" onClick={onEdit}>
-              <Pencil aria-hidden="true" />
-              {words.edit}
+       navbar; a detail screen has breadcrumbs" — but override 73 removes the
+       breadcrumb itself (see this file's header). `ScreenShell` gives the
+       page, the screen card and the rail; its `header` slot is left empty,
+       because `RecordChrome` now carries `title` and draws the identity row
+       directly under it, in the body pane, with no separate band above. This
+       route composes `RecordChrome` directly rather than through
+       `DetailScreen`, which independently draws a breadcrumb + eyebrow +
+       title in `ScreenShell`'s header band — a region apart from
+       `RecordChrome`'s own identity row that is exactly what produced the
+       client's screenshot. See override 73 in `record-chrome.tsx` and in
+       KWAPSO-SPEC.md's register. */
+    <ScreenShell rail={rail} railLabel={railLabel}>
+      <RecordChrome
+        door="system"
+        recordNumber={recordNumber}
+        collectionLabel={collectionLabel}
+        chips={chips ?? <Badge>{stages[currentStage] ?? stages[0]}</Badge>}
+        title={title}
+        tags={tags.map((tag) => (
+          <Badge key={tag}>{tag}</Badge>
+        ))}
+        meta={
+          meta === undefined ? undefined : (
+            <Text as="p" size="sm" tone="secondary">
+              {meta}
+            </Text>
+          )
+        }
+        actions={actions}
+        actionsVisible={actionsVisible}
+        /* The progression is `StepperHero`, in the hero slot. `RecordChrome`'s
+           own `stages` slot is deliberately left empty: passing both would
+           draw two steppers on one screen. */
+        hero={
+          <StepperHero
+            stages={stageObjects}
+            current={currentStage}
+            door="system"
+            visible={stagesVisible}
+            label={words.stagesLabel}
+            onStageSelect={
+              onStageSelect === undefined ? undefined : (index) => { onStageSelect(index); }
+            }
+            /* VERBATIM, NO TERNARY. This read
+               `state === "loading" ? "loading" : "ready"`, so `empty` and
+               `error` both drew a fully populated seven-stage hero — the same
+               suppression time.tsx carried on its strip. T3B-6/8. */
+            state={state}
+          />
+        }
+        tabs={tabs}
+        tab={tab}
+        defaultTab="overview"
+        onTabChange={onTabChange}
+        tabsLabel={words.tabsLabel}
+        /* ---- 27.8's ink footer, both columns ------------------------- */
+        audit={audit}
+        auditVisible={auditVisible}
+        auditLabel={words.recordHeading}
+        activity={latest}
+        activityLabel={words.latestHeading}
+        activityFeedLabel={words.latestLabel}
+        /* The system door, so 27.8's add-a-note field is drawn. It appends to
+           the log; it edits nothing, and this page still holds no form. */
+        onAddNote={onAddNote}
+        notePlaceholder={words.noteLabel}
+        /* CONTROLS DROP NARROW, COUNTS DO NOT — 27.39's own narrow rule,
+           carried over unchanged from `DetailScreen`'s default
+           (`narrowFooter={false}`): the charcoal footer is a control-dense
+           card, not a count, so it hides under `sm` and returns above it. */
+        className="[&_[data-record-region=footer]]:hidden sm:[&_[data-record-region=footer]]:flex"
+        state={state}
+        copy={{ ...DEFAULT_COPY, ...copy }}
+        errorAction={
+          onRetry === undefined ? undefined : (
+            <Button variant="secondary" onClick={onRetry}>
+              {words.retry}
             </Button>
-          </>
-        )
-      }
-      onEdit={stagesShown ? undefined : onEdit}
-      editLabel={words.edit}
-      actionsVisible={actionsVisible}
-      /* The progression is `StepperHero`, in the hero slot. `RecordChrome`'s
-         own `stages` slot is deliberately left empty: passing both would draw
-         two steppers on one screen. */
-      hero={
-        <StepperHero
-          stages={stageObjects}
-          current={currentStage}
-          door="system"
-          visible={stagesVisible}
-          label={words.stagesLabel}
-          onStageSelect={
-            onStageSelect === undefined ? undefined : (index) => { onStageSelect(index); }
-          }
-          /* VERBATIM, NO TERNARY. This read
-             `state === "loading" ? "loading" : "ready"`, so `empty` and
-             `error` both drew a fully populated seven-stage hero — the same
-             suppression time.tsx carried on its strip. T3B-6/8. */
-          state={state}
-        />
-      }
-      tabs={tabs}
-      tab={tab}
-      defaultTab="overview"
-      onTabChange={onTabChange}
-      tabsLabel={words.tabsLabel}
-      /* ---- 27.8's ink footer, both columns --------------------------- */
-      audit={audit}
-      auditVisible={auditVisible}
-      auditLabel={words.recordHeading}
-      activity={latest}
-      activityLabel={words.latestHeading}
-      activityFeedLabel={words.latestLabel}
-      /* The system door, so 27.8's add-a-note field is drawn. It appends to
-         the log; it edits nothing, and this page still holds no form. */
-      onAddNote={onAddNote}
-      notePlaceholder={words.noteLabel}
-      state={state}
-      copy={{ ...DEFAULT_COPY, ...copy }}
-      errorAction={
-        onRetry === undefined ? undefined : (
-          <Button variant="secondary" onClick={onRetry}>
-            {words.retry}
-          </Button>
-        )
-      }
-    />
+          )
+        }
+      />
+    </ScreenShell>
   );
 }
 

@@ -44,7 +44,7 @@ const walk = (d, out = []) => {
 
 /** Named exports of the kit's icon barrel, read off the generated file. */
 const iconNames = new Set(
-  [...readFileSync(join(KIT, "icons", "icons.generated.tsx"), "utf8").matchAll(/export (?:const|function) ([A-Za-z0-9_]+)/g)].map((m) => m[1])
+  [...readFileSync(join(KIT, "foundations", "icons", "icons.generated.tsx"), "utf8").matchAll(/export (?:const|function) ([A-Za-z0-9_]+)/g)].map((m) => m[1])
 )
 
 /** The symbols that live in the engine's config-driven TabsView, not the kit's. */
@@ -66,8 +66,8 @@ const mapSpec = (spec) => {
   if (spec === "@shared/ui/registry/tokens/theme-provider") return "@shared/web/theme-provider"
   if (spec === "@shared/ui/registry/primitives/notes/notes") return "@shared/web/notes-editor/notes-editor"
   if (spec === "@shared/ui/registry/collections/list/list") return "@shared/web/list-compat"
-  if ((m = spec.match(/^@shared\/ui\/registry\/primitives\/([^/]+)\/(.+)$/))) return probe(["controls", "structures"], m[1], m[2])
-  if ((m = spec.match(/^@shared\/ui\/registry\/collections\/([^/]+)\/(.+)$/))) return probe(["structures", "controls"], m[1], m[2])
+  if ((m = spec.match(/^@shared\/ui\/registry\/primitives\/([^/]+)\/(.+)$/))) return probe(["components"], m[1], m[2])
+  if ((m = spec.match(/^@shared\/ui\/registry\/collections\/([^/]+)\/(.+)$/))) return probe(["components"], m[1], m[2])
   return null // not ours to touch
 }
 
@@ -93,7 +93,7 @@ for (const file of targets) {
   if (ext === ".css") {
     src = src.replace(/@import\s+"([./]*)shared\/ui\/styles\.css";/g, (_, prefix) => {
       edits++
-      return `@import "${prefix}shared/ui/tokens/tokens.css";\n@import "${prefix}shared/ui/motion/motion.css";`
+      return `@import "${prefix}shared/ui/foundations/tokens/tokens.css";\n@import "${prefix}shared/ui/foundations/motion/motion.css";`
     })
   } else {
     // one pass over every import/export-from statement
@@ -134,7 +134,7 @@ for (const file of targets) {
               edits++
               const typePrefix = /^\s*import\s+type\s/.test(whole) ? "import type " : "import "
               const lines = [`${typePrefix}{ ${engine.join(", ")} } from "@shared/web/screen-engine/tabs-view"`]
-              if (kit.length) lines.push(`${typePrefix}{ ${kit.join(", ")} } from "@shared/ui/controls/tabs/tabs"`)
+              if (kit.length) lines.push(`${typePrefix}{ ${kit.join(", ")} } from "@shared/ui/components/tabs/tabs"`)
               return lines.join("\n")
             }
           }

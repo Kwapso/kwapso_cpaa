@@ -31,7 +31,7 @@
 // read" on the triage screen, and the resolve panel — and they live beside the
 // record, not on this strip.
 
-import { StatusStepper } from "@shared/ui/controls/status-stepper/status-stepper"
+import { StatusStepper } from "@shared/ui/components/status-stepper/status-stepper"
 
 import { HELP_STATUSES, type HelpStatus } from "@shared/types"
 import { HELP_STATUS } from "@/components/deep-link/shape"

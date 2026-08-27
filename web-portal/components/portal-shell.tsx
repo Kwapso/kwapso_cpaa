@@ -20,12 +20,12 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppearanceMenu } from "@shared/web/appearance-menu"
-import { AmbientBackground } from "@shared/ui/controls/ambient-background/ambient-background"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/icons"
+import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import { useRealtime } from "@shared/web/realtime"
@@ -203,9 +203,9 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         {switching ? (
           <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
             <span className="sr-only">{t("Switching company…")}</span>
-            <Skeleton className="h-8 w-56 rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-8 w-56 rounded-[var(--radius)]" />
+            <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+            <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
           </div>
         ) : (
           <div className="motion-page-in">{children(session)}</div>

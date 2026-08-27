@@ -12,7 +12,7 @@ export function BrandMark({
 }) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center overflow-hidden rounded-xl text-lg font-medium">
+      <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center overflow-hidden rounded-[var(--radius)] text-lg font-medium">
         {brand.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

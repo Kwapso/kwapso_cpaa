@@ -111,6 +111,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
+import { isVideoLink } from "@shared/media-links"
 import { numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
@@ -220,11 +221,72 @@ export const accountCompartment = (accountId: string): string => `account:${acco
 const LEXICAL_TOP_K = 10
 const LEXICAL_WEIGHT = 0.1
 
-/** Chunks the fused list hands on to be READ out of the database. Bounded
- * because every one is a row; comfortably more than one answer carries, so the
+/** WHAT A CHUNK IS WORTH WHEN IT LITERALLY CONTAINS THE REFERENCE SOMEBODY TYPED.
+ *
+ * `LEXICAL_WEIGHT` is a tenth of a vote, and it was measured: at parity the word
+ * match drags an ORDINARY question's answer down nine points. That measurement
+ * stands and this does not touch it — but it was taken on ordinary questions, and
+ * a question carrying a rare exact token is not one.
+ *
+ * MEASURED, 27 Aug 2026, and it is the same failure the proportional floor was
+ * blamed for and did not cause. "task 3144" answers perfectly: two words, so the
+ * embedding of the question is essentially the embedding of "3144" and the vector
+ * arm finds the right chunks by itself. Put that reference inside a sentence a
+ * person would actually say — "could somebody remind me where things currently
+ * stand with task 3144, and whether anybody has replied about it since last
+ * week?" — and the embedding is dominated by the polite framing, the vector arm
+ * returns three FluClinic meetings, and the word arm, which found the right chunk,
+ * is outvoted ten to one by construction. So the fuller and more courteous the
+ * question, the worse the answer: exactly backwards.
+ *
+ * 2, AND THE NUMBER IS DERIVED RATHER THAN CHOSEN. Parity (1) is not enough, and
+ * a test with six chatty near-misses around one short handover note is what
+ * showed it: a distractor that the vector arm ranks first AND the word arm also
+ * returns scores 1/(K+1) + LEXICAL_WEIGHT/(K+2), while the reference chunk scores
+ * EXACT_WEIGHT/(K+1) and nothing else, because it matched one term. So parity
+ * loses by exactly the tenth of a vote the distractor collects twice over. The
+ * break-even is
+ *
+ *     EXACT_WEIGHT > 1 + LEXICAL_WEIGHT × (K+1)/(K+2)  ≈  1.098
+ *
+ * and 2 is the next whole number, which leaves room for a distractor that ranks
+ * well in both arms rather than only the one that ranks first in each.
+ *
+ * It is safe above parity ONLY because the token had to be rare to get here
+ * (EXACT_TERM_MAX_CHUNKS): "2026" never reaches this line. */
+const EXACT_WEIGHT = 2
+
+/** Chunks the fused list hands on to be READ out of the database.
+ *
+ * IT IS A BUDGET FOR ATTRITION, and 24 was not enough of one. The sentence above
+ * this line used to say "comfortably more than one answer carries, so the
  * personal fence and the excluded-source filter can drop rows without the answer
- * running short. */
-const RANKING_POOL = 24
+ * running short". The intent was right and the number was measured against
+ * nothing.
+ *
+ * MEASURED, 27 Aug 2026, on the question the owner's complaint is clearest on.
+ * "What did we agree in the week recap?" returns 100 neighbours over the
+ * relevance floor, and FIFTEEN of them exist: the other 85 are vectors whose
+ * source is no longer in the database at all, and the first surviving one is at
+ * rank 17. So a pool of 24 was spending 16 of its 24 slots on rows that cannot
+ * come back, and what little got through was another person's private calendar
+ * material, dropped again by the reader clause. The base answered "we have
+ * nothing on that" about a meeting it holds two 96-chunk transcripts of.
+ *
+ * ATTRITION IS NORMAL, NOT AN OUTAGE, and that is why this is a budget rather
+ * than a bug to fix elsewhere. Three separate things thin the pool between the
+ * index and the answer, and two of them are permanent by design: the personal
+ * fence hides a colleague's own material, an excluded source stays excluded, and
+ * a re-index leaves the ids it replaced behind (R26 makes those safe to meet —
+ * they read back as no row — but safe is not the same as free, because a ghost is
+ * still a nearest neighbour and still takes a slot).
+ *
+ * 100 is the whole candidate list, so the pool no longer throws away evidence
+ * before finding out whether it survives. The cost is ONE read of at most 100
+ * rows by primary key — the same single statement, a longer id list — against an
+ * answer that carries six. R14 is satisfied by the LIMIT at the statement, which
+ * says the number out loud. */
+const RANKING_POOL = 100
 
 /** Passages one answer carries. Enough for a real answer with more than one
  * source behind it; small enough that the assistant's context stays cheap. */
@@ -677,10 +739,47 @@ function readInput(input: SourceInput): {
   visibleToAppId: string | null
 } {
   const privateToMe = input.visibility === "private"
+  const body = optionalDocument(input.body, "The material") ?? null
+  const sourceUrl = optionalText(input.sourceUrl, "Link", TEXT_LIMITS.link) ?? null
+  // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE, and this is the door refusing
+  // rather than the screen asking nicely. The form explains it while somebody is
+  // typing and points at the box; this is what holds when the request arrives
+  // from the assistant, from MCP, or from a screen that has drifted.
+  //
+  // THE GATE IS THE EMPTY BODY, NOT THE HOST, and that distinction was earned
+  // rather than designed. The first version of this refused a VIDEO link, on a
+  // list of fifteen hostnames — and the owner pasted a Tella recording behind his
+  // own domain, `content.kwapso.com/video/…`, which walked straight past all
+  // fifteen and became a source with a title, a link and no body. Exactly the
+  // shape the rule exists to prevent, produced by the rule meant to prevent it.
+  //
+  // A HOST LIST IS WRONG THE MOMENT SOMEBODY USES A SERVICE THAT IS NOT ON IT.
+  // "Has this anything for the assistant to read?" cannot go out of date, and it
+  // closes the custom domain, the service nobody has heard of, and the one that
+  // will exist next year. `isVideoLink` still runs — it chooses which SENTENCE
+  // the person reads, which is all a detector was ever fit to decide.
+  //
+  // WHY REFUSE AT ALL. Every unreadable thing that ever reached this base was
+  // ACCEPTED, stored, and quietly never read — 131 files of logo artwork, every
+  // PDF at 0.000 letter-shaped tokens, `image/*` opaque since the beginning — and
+  // nobody was told. Paste what it says and the source is welcome; paste nothing
+  // and there is no row pretending to hold an answer.
+  //
+  // NOTHING IS FETCHED. There is no reader for a web page yet, and a network call
+  // with a timeout on every paste would be a lot of machinery to decide something
+  // this line already decides correctly without it.
+  if (sourceUrl && !plainText(body ?? "").trim())
+    throw new GuardError(
+      400,
+      isVideoLink(sourceUrl) ? "video_needs_transcript" : "link_needs_material",
+      isVideoLink(sourceUrl)
+        ? "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript into the material and this source is good to go."
+        : "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
+    )
   return {
     title: requireText(input.title, "Title", TEXT_LIMITS.short),
-    body: optionalDocument(input.body, "The material") ?? null,
-    sourceUrl: optionalText(input.sourceUrl, "Link", TEXT_LIMITS.link) ?? null,
+    body,
+    sourceUrl,
     accountId: optionalText(input.accountId, "Account", TEXT_LIMITS.short) ?? null,
     privateToMe,
     // PRIVATE WINS, AND IT WINS HERE rather than in three write statements.
@@ -1687,7 +1786,14 @@ export function knowledgeAnswer(input: {
   }
 }
 
-type CandidateRow = { chunk_id: string; lex: number }
+type CandidateRow = {
+  chunk_id: string
+  lex: number
+  /** How many of the question's RARE exact tokens this chunk contains. Zero for
+   * every chunk of a question that had none, which is what keeps `fuse`'s
+   * measured behaviour on an ordinary question untouched. */
+  exact: number
+}
 
 /** How much of a question a chunk must actually CONTAIN before the word match
  * will call it evidence.
@@ -1767,17 +1873,38 @@ function termFloor(terms: number, role: LexicalRole): number {
 /** HOW MANY CHUNKS A TOKEN MAY APPEAR IN AND STILL BE "EXACT".
  *
  * `termFloor` says a chunk sharing one word out of eight is a coincidence. The
- * exact-term bypass below says THIS word is not a coincidence — and rarity is
- * the only honest way to tell those two apart, because both arrive as a token
- * with a digit in it. A ticket reference lives in a handful of places (the row
- * itself, its conversation, the two emails that argued about it); a year lives
- * in hundreds and would let every one of them through a floor built to stop
- * exactly that.
+ * exact-term bypass says THIS word is not a coincidence — and rarity is the only
+ * honest way to tell those two apart, because both arrive as a token with a digit
+ * in it. A reference identifies one thing; a year identifies a twelfth of the
+ * base.
  *
- * Counted INSIDE the reader's own fence and the chosen compartment, in the same
- * statement, so "rare" means rare in the material this person can actually see
- * and cannot be a second read of a different moment. */
-const EXACT_TERM_MAX_CHUNKS = 20
+ * 100 IS MEASURED, and the first number here (20) was not — it was a guess, and
+ * it was wrong in the direction that matters: it silently switched the bypass OFF
+ * for the very reference the bypass was built for. Ticket 3144 is discussed
+ * across a dozen records — the meetings about it, their Gemini notes, the
+ * calendar invitations — and lands in 56 chunks, so a cap of 20 excluded it and
+ * the fix shipped green while the case it was for still failed.
+ *
+ * The distribution, over the 6,372 digit-bearing terms in the agency's own base
+ * (27 Aug 2026), is why 100 rather than any nearby number:
+ *
+ *      1-20 chunks   6,321 terms      references, amounts, codes
+ *     21-60             31            3144 (56) sits here
+ *     61-100             5            almost nothing
+ *    101-200             9            2027 (170), 2025 (265)
+ *      200+              6            2026 (1,424), and format debris
+ *                                     ("000z", "30pm", "2fkolkata")
+ *
+ * The boundary sits in the sparsest band there is, so it is not balanced on a
+ * knife edge: moving it to 80 or to 120 changes which side five terms fall on.
+ *
+ * COUNTED IN CHUNKS RATHER THAN SOURCES, deliberately. Sources is the truer unit
+ * — 3144 is 27 sources against 2026's 1,062, an even cleaner separation — but it
+ * costs a join from the postings table to the chunks table inside the hot read,
+ * and the chunk count separates these two populations perfectly well. If a single
+ * enormous document ever makes a real reference look common, sources is the
+ * upgrade, and this comment is where to start. */
+const EXACT_TERM_MAX_CHUNKS = 100
 
 /** THE TOKENS SOMEBODY TYPED EXACTLY — the digit-bearing subset of the question,
  * which is the definition `questionTerms` itself already sorts by ("rarer-looking
@@ -1872,8 +1999,17 @@ async function lexicalArm(
     // saw it, by ten chunks that repeated one word. Deciding eligibility in the
     // statement makes the ten a page of chunks that already qualify. The number
     // is derived from the question's own term count and is an integer, so it is
-    // interpolated like every other server-owned value (CONVENTIONS); the ORDER
-    // BY is left exactly as it was measured.
+    // interpolated like every other server-owned value (CONVENTIONS).
+    //
+    // THE EXACT TOKEN LEADS THE ORDER, and without that the weight below buys
+    // nothing. `lex` is the SUM of term weights, so a chunk echoing a dozen of
+    // the question's ordinary words ("could", "somebody", "currently", "week")
+    // outranks the one chunk that holds the reference, which matched a single
+    // term. Fusion is by RANK, so losing the order loses the fight before the
+    // weight is ever applied — which is what a test with six chatty near-misses
+    // around one short handover note showed the moment it was written. On a
+    // question with no rare exact token `exact` is the literal 0 for every row,
+    // so this is `ORDER BY lex DESC` exactly as it was measured.
     `WITH scoped AS (
        SELECT chunk_id, term, weight FROM knowledge_terms WHERE ${where.join(" AND ")}
      )${
@@ -1884,9 +2020,11 @@ async function lexicalArm(
      )`
          : ""
      }
-     SELECT chunk_id, SUM(weight) AS lex FROM scoped
+     SELECT chunk_id, SUM(weight) AS lex, ${
+       rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END)" : "0"
+     } AS exact FROM scoped
       GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, role)} ${bypass}
-      ORDER BY lex DESC LIMIT ${LEXICAL_TOP_K}`,
+      ORDER BY exact DESC, lex DESC LIMIT ${LEXICAL_TOP_K}`,
     params
   )
   return rows
@@ -1903,6 +2041,7 @@ type ScoredRow = {
   compartment: string
   origin_table: string | null
   origin_row_id: string | null
+  record_date: string | null
 }
 
 /** WEIGHTED RECIPROCAL RANK FUSION. Two ranked lists whose scores mean entirely
@@ -1914,12 +2053,45 @@ type ScoredRow = {
  * at a tenth of a vote, gated to questions that contain something exact, it is
  * invisible on questions it has nothing to say about and decisive on the ones
  * it does. Nothing else is added here — no record hint, no recency, no
- * hand-tuned boost. Every one of those was tried and every one was worse. */
+ * hand-tuned boost. Every one of those was tried and every one was worse.
+ *
+ * ── RECENCY, CONSIDERED AGAIN ON 27 AUG 2026 AND LEFT OUT ──────────────────
+ *
+ * The measurement above was taken on seven novels, and this file's own note says
+ * the retest belongs on the agency's material. It got one, because the owner
+ * asked the question that would need it: "the latest news on the flu clinic
+ * stripe integration", and got the week before's meeting.
+ *
+ * THE CASE FOR ADDING A RECENCY TERM GOT WEAKER, NOT STRONGER. The newest source
+ * — a transcript from that morning — was ALREADY retrieved, at rank six of six.
+ * Nothing was missing from the ranking. What was missing is that the writer was
+ * never told when anything was from, or what day it is, so "latest" was a word
+ * with no referent. Giving it the dates answers the question with the ranking
+ * untouched (see knowledge-compose.ts), and a term here would have put a measured
+ * 20/20 at risk to fix something that was not broken.
+ *
+ * WHAT WOULD REOPEN IT, and it is deliberately a high bar: a question whose
+ * newest material is NOT RETRIEVED AT ALL. Not ranked low — absent. Ranked low is
+ * the writer's problem and it now has the dates to solve it. If the bench turns
+ * up an absent one, start with recency GATED ON INTENT — a term that applies only
+ * when the question itself says "latest", "recent", "today" — because that leaves
+ * every ordinary question at the behaviour these numbers were measured on.
+ *
+ * A rejection without its evidence gets re-tried by the next person who has the
+ * same good idea. This is the evidence. */
 function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; score: number }[] {
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
   lexical.forEach((row, rank) =>
-    fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + LEXICAL_WEIGHT / (RRF_K + rank + 1))
+    fused.set(
+      row.chunk_id,
+      // A TENTH OF A VOTE, UNLESS THE CHUNK HOLDS THE REFERENCE ITSELF. See
+      // EXACT_WEIGHT: the tenth was measured on ordinary questions and still
+      // stands for them, and `exact` is zero for every chunk of every question
+      // that carried no rare exact token — so nothing measured moves.
+      (fused.get(row.chunk_id) ?? 0) +
+        (row.exact > 0 ? EXACT_WEIGHT : LEXICAL_WEIGHT) / (RRF_K + rank + 1)
+    )
   )
   return [...fused.entries()]
     .map(([id, score]) => ({ id, score }))
@@ -2057,7 +2229,7 @@ export async function retrieve(
     // worker's own, read back out of its own table, so they are interpolated
     // (CONVENTIONS) and the statement stays under D1's 100-parameter ceiling.
     `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
-            s.origin_table, s.origin_row_id
+            s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
         AND s.deactivated_at IS NULL AND ${reader.sql}
@@ -2111,7 +2283,7 @@ export async function retrieve(
       // The SAME fence and the SAME columns as the read above — a second way in
       // may not be a wider one. R14: bounded by RANKING_POOL, said here.
       `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
-              s.origin_table, s.origin_row_id
+              s.origin_table, s.origin_row_id, s.record_date
          FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
         WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
           AND s.deactivated_at IS NULL AND ${reader.sql}
@@ -2138,6 +2310,7 @@ export async function retrieve(
     seq: row.seq,
     text: plainText(row.text),
     score: Math.round(score * 1000) / 1000,
+    recordDate: row.record_date ?? null,
   }))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
   const evidence = {
@@ -2214,6 +2387,67 @@ const PASSAGES_PER_TITLE = 2
  * capping those would make a fifty-page contract quotable twice. What is being
  * spread is the ANSWER across the things it is about.
  */
+/** WORDS OF ITS OWN — words the body has and the title does not — a passage must
+ * carry before it is worth a slot.
+ *
+ * LOW ON PURPOSE, and it was not low enough on the first attempt. At eight, a
+ * real handover note — "3144 is pending gravity forms confirmation." — was
+ * classed as an envelope and pushed down the answer, which is the same mistake
+ * this rule exists to correct, made in the other direction. Short is not empty. A
+ * note somebody typed in one line is exactly the material a knowledge base is
+ * for. */
+const SUBSTANTIVE_WORDS = 4
+
+/** THE SENTENCES THE MIRROR WRITES ROUND EVERY RECORD, which are not the record.
+ * A source's body opens with a line this app generated — "X is a meeting of ours,
+ * on 2026-08-19.", "Met on 2026-08-19." — and that line is the same for a
+ * ninety-six-chunk transcript and for a diary entry. Struck out before anything
+ * is counted, or the wrapper alone clears any threshold worth having. */
+const MIRROR_WRAPPER = /(is a meeting (of ours|with)[^.]*\.|^Met on[^.]*\.|is a way of working[^.]*\.)/gi
+
+/** DOES THIS PASSAGE SAY ANYTHING THE TITLE DID NOT?
+ *
+ * Some sources are envelopes. "Invitation: FluClinic : Task 3144 @ Tue Aug 25,
+ * 2026 12:30pm" is a calendar invitation, and its body is the same words again
+ * with a time on them. A bare meeting that has already happened — kept on
+ * purpose, because it is the record that it happened — says "X is a meeting of
+ * ours, on 2026-08-19." and nothing else. Both are perfectly RELEVANT: they are
+ * near-perfect matches for a question naming the thing they are about, which is
+ * exactly why they win slots.
+ *
+ * That is what makes this a different rule from a relevance floor, and why the
+ * obvious fix does not work. Measured on the agency's own material, 27 Aug 2026:
+ * a score cliff — keep what is close to the best hit, drop the rest — cuts
+ * nothing here, because these score at the TOP. Asked about task 3144 the base
+ * answered "Task 3144 is currently scheduled, and it was a meeting on August 25",
+ * out of the invitation, while the conversation about the task sat lower down.
+ *
+ * Take the text, strike out the title it already carries, the sentence the mirror
+ * wrapped it in and the dates, and count what is left. A paragraph survives
+ * easily; a one-line note survives; an envelope has nothing underneath. Digits
+ * are KEPT — a reference number is information, and stripping it was what made
+ * the handover note look empty. */
+function saysSomething(row: ScoredRow): boolean {
+  const words = (text: string) =>
+    text
+      .replace(MIRROR_WRAPPER, " ")
+      .replace(/\d{4}-\d{2}-\d{2}/g, " ")
+      .replace(/\b\w{3,}\s+\d{1,2},?\s*\d{4}\b/g, " ")
+      .replace(/\b\d{1,2}[:.]\d{2}\s*(am|pm)?\b/gi, " ")
+      .replace(/[^A-Za-z0-9À-ÿ]+/g, " ")
+      .toLowerCase()
+      .split(" ")
+      .filter((w) => w.length >= 3)
+  // BY WORD, NOT BY STRING. Striking out the title as a literal caught the
+  // mirrored records and missed the calendar invitations, whose title and body
+  // say the same thing in a different arrangement — "Invitation: Bergman dispatch
+  // review @ Tue Aug 25" over a body reading "Bergman dispatch review / Tue Aug
+  // 25". Asking which words the body has that the title did not is the question
+  // that was meant all along, and it answers both.
+  const named = new Set(words(row.title ?? ""))
+  return words(plainText(row.text ?? "")).filter((w) => !named.has(w)).length >= SUBSTANTIVE_WORDS
+}
+
 function diversify(
   ranked: { row: ScoredRow; score: number }[],
   want: number
@@ -2224,7 +2458,13 @@ function diversify(
   for (const item of ranked) {
     const key = (item.row.title ?? "").trim().toLowerCase()
     const used = seen.get(key) ?? 0
-    if (used < PASSAGES_PER_TITLE) {
+    // TWO PREFERENCES, ONE PASS, AND THE SAME BARGAIN FOR BOTH: spread the answer
+    // across the things it is about, and spend slots on passages that say
+    // something — but neither is PAID for. Anything set aside here comes back
+    // below if the answer would otherwise be short, so an answer can still be six
+    // passages from one document, and still quote a bare diary entry when a bare
+    // diary entry is genuinely all there is.
+    if (used < PASSAGES_PER_TITLE && saysSomething(item.row)) {
       seen.set(key, used + 1)
       kept.push(item)
     } else skipped.push(item)

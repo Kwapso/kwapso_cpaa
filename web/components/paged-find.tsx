@@ -55,8 +55,8 @@
 import * as React from "react"
 
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
-import { SearchInput } from "@shared/ui/controls/search-input/search-input"
-import { SortControl } from "@shared/ui/controls/sort-control/sort-control"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
@@ -64,6 +64,7 @@ import { cursorKey } from "@/lib/live-resources"
 import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useRemembered } from "@shared/web/remembered"
 
 /** One page of an answer from a list door: the rows, and where the next page
  * starts (null = that was the last one). `total` is the door's exact COUNT(*)
@@ -187,14 +188,65 @@ export function PagedFind<T>({
   fixed?: FindQuery
   children: (found: Found<T>) => React.ReactNode
 }) {
+  // ── WHAT SHE WAS ASKING THIS DOOR, WHEN SHE LEFT ───────────────────────────
+  //
+  // The same sentence CollectionFrame's header carries, one layer down: the
+  // search box, the filters and the order are ONE question and are remembered
+  // as one slot, keyed by the collection's own cache key — which is already
+  // unique per collection per team, so two paged lists on one screen can never
+  // read each other's.
+  //
+  // NO CURSOR IS REMEMBERED, and that is the R14 half of this. Paging here is
+  // `loadMore` appending into the shared store, and the store already survives
+  // navigation (shared/web/store.ts, bounded and LRU) — so what she had loaded
+  // is still loaded, without this file storing anything. A cursor is minted
+  // against an ordering at a moment in time; replaying one after the rows have
+  // moved is exactly the silent loss R14 exists to prevent. She comes back to
+  // her question, freshly answered.
+  //
   // Debounced upstream by SearchInput (200ms), so a keystroke is not a request.
-  const [text, setText] = React.useState("")
-  const [values, setValues] = React.useState<Record<string, string>>({})
-  // The ORDER, seeded from the door's own default so the control shows what is
-  // already true. `null` dir = "whatever that option lands on", which is what
-  // the door decides — so an untouched screen sends neither.
-  const [sortBy, setSortBy] = React.useState(defaultSort)
-  const [sortDir, setSortDir] = React.useState<"asc" | "desc" | null>(null)
+  const [question, remember] = useRemembered<{
+    text: string
+    values: Record<string, string>
+    sortBy: string
+    sortDir: "asc" | "desc" | null
+  }>(
+    `find:${listKey}`,
+    () => ({ text: "", values: {}, sortBy: defaultSort, sortDir: null }),
+    (found) => {
+      if (!found || typeof found !== "object") return undefined
+      const was = found as Record<string, unknown>
+      // A FILTER WHOSE OPTION HAS BEEN RETIRED is dropped, not restored: every
+      // facet here declares the vocabulary its DOOR knows, and a value outside
+      // it is a clean 400 the moment the screen asks. The rest of the question
+      // survives, which is the point — one retired dropdown value should not
+      // cost her the search she typed.
+      const kept: Record<string, string> = {}
+      for (const [field, value] of Object.entries(
+        (was.values as Record<string, string>) ?? {}
+      )) {
+        const facet = facets.find((f) => f.field === field)
+        if (facet?.options?.some((o) => o.value === value)) kept[field] = value
+      }
+      return {
+        text: typeof was.text === "string" ? was.text : "",
+        values: kept,
+        // Likewise an order this collection no longer offers: back to the
+        // door's own default, which asks the door nothing at all.
+        sortBy:
+          typeof was.sortBy === "string" &&
+          (was.sortBy === defaultSort || sorts.some((o) => o.value === was.sortBy))
+            ? was.sortBy
+            : defaultSort,
+        sortDir: was.sortDir === "asc" || was.sortDir === "desc" ? was.sortDir : null,
+      }
+    }
+  )
+  const { text, values, sortBy, sortDir } = question
+  const setText = (next: string) => remember((q) => ({ ...q, text: next }))
+  const setValues = (next: Record<string, string>) => remember((q) => ({ ...q, values: next }))
+  const setSortBy = (next: string) => remember((q) => ({ ...q, sortBy: next }))
+  const setSortDir = (next: "asc" | "desc" | null) => remember((q) => ({ ...q, sortDir: next }))
 
   const query: FindQuery = {}
   for (const [field, value] of Object.entries(values)) if (value) query[field] = value
@@ -243,11 +295,6 @@ export function PagedFind<T>({
   })
   const total = useCachedValue<number>(findKey ? `total:${findKey}` : null)
 
-  const clearAll = () => {
-    setText("")
-    setValues({})
-  }
-  const canClear = asked
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
 
@@ -259,10 +306,22 @@ export function PagedFind<T>({
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={text} onChange={(e) => setText(e.currentTarget.value)} placeholder={placeholder} className="w-56" />
-        {/* THE ORDER, beside the search box and the filters because it is the
-            third half of one question and belongs on the same row (the library's
-            own CollectionFrame places it exactly here). What it changes is what
+        {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
+            the filter row's "Clear all" — one control quietly owning two
+            questions — and the kit's bar says "Clear filters" and now means
+            only that. */}
+        <SearchInput
+          value={text}
+          onChange={(e) => setText(e.currentTarget.value)}
+          onClear={() => setText("")}
+          placeholder={placeholder}
+          className="w-56"
+        />
+        {/* THE ORDER, beside the search box because the two are asked with the
+            same gesture — you type, then you say what order. (The filters moved
+            to the row below when the kit's bar arrived: hers is a full-width
+            strip of chips, not a control that sits in a toolbar. All three are
+            still one question and still one cache key.) What it changes is what
             the DOOR is asked, so the answer spans the whole collection rather
             than the page in front of you. */}
         {showSort && (
@@ -272,26 +331,6 @@ export function PagedFind<T>({
             onValueChange={(by) => setSortBy(by)}
             direction={sortDir ?? landsOn}
             onDirectionChange={(dir) => setSortDir(dir)}
-          />
-        )}
-        {showFilters && (
-          <FilterBar
-            facets={facets}
-            values={values}
-            // Empty on purpose: every facet above carries its own options, so
-            // there is nothing for the bar to derive from the rows on screen.
-            data={[]}
-            onChange={(field, value) =>
-              setValues((s) => {
-                const next = { ...s }
-                if (value === "") delete next[field]
-                else next[field] = value
-                return next
-              })
-            }
-            onClearAll={clearAll}
-            canClear={canClear}
-            resultCount={total}
           />
         )}
         {/* THE FILTERED TOTAL — the exact server count of the question being
@@ -309,6 +348,29 @@ export function PagedFind<T>({
           </span>
         )}
       </div>
+
+      {/* THE FILTERS, ON THEIR OWN ROW. The kit's bar is a full-width strip of
+          chips above whatever they are narrowing: what is on stays visible and
+          removable in one press at every width, and the facet controls live
+          behind its own "+ filter" slot. Putting it back inside the row above
+          would be the first step of theming it into the row it replaced. */}
+      {showFilters && (
+        <FilterBar
+          facets={facets}
+          values={values}
+          // Empty on purpose: every facet above carries its own options, so
+          // there is nothing for the bar to derive from the rows on screen.
+          data={[]}
+          onChange={(field, value) => {
+            const next = { ...values }
+            if (value === "") delete next[field]
+            else next[field] = value
+            setValues(next)
+          }}
+          onClearFacets={() => setValues({})}
+          resultCount={total}
+        />
+      )}
 
       {children({
         active,

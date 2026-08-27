@@ -14,7 +14,7 @@
 // every file. It now looks for THIS component in the details, and for the feed
 // and the pager in here — same guarantee, one place to get it right.
 
-import { ActivityFeed } from "@shared/ui/structures/activity-feed/activity-feed"
+import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
 
 import { LoadMore } from "@/components/load-more"
 import type { ActivityFeedRow } from "@/lib/use-record-activity"

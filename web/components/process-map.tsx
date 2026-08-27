@@ -36,8 +36,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { ArrowDown } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { ArrowDown } from "@shared/ui/foundations/icons"
 
 import { useT } from "@shared/web/language"
 import { hoursText, minutesText } from "@shared/workers/savings"
@@ -124,16 +124,16 @@ function StepBox({
   // like the two columns had drifted.
   if (!step)
     return (
-      <div className="border-border/50 text-muted-foreground rounded-xl border border-dashed p-3 text-xs">
+      <div className="border-border/50 text-muted-foreground rounded-[var(--radius)] border border-dashed p-3 text-xs">
         {chip ? <span className="mr-2 font-medium">{chip}</span> : null}
         {t("Not in this version")}
       </div>
     )
   return (
-    <div className={`relative rounded-xl border p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
+    <div className={`relative rounded-[var(--radius)] border p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
       {chip ? (
         <span
-          className={`float-right ms-2 rounded-full px-2 py-0.5 text-[0.625rem] font-medium ${
+          className={`float-right ms-2 rounded-pill px-2 py-0.5 text-[0.625rem] font-medium ${
             side === "old" ? "bg-muted text-muted-foreground" : "bg-foreground text-background"
           }`}
         >
@@ -188,13 +188,13 @@ export function ProcessMap({
         // chip instead.
         <div className="text-muted-foreground flex flex-col gap-1 text-xs font-medium lg:grid lg:grid-cols-2 lg:gap-3">
           <span>
-            <span className="bg-muted text-muted-foreground me-1.5 rounded-full px-2 py-0.5 text-[0.625rem]">
+            <span className="bg-muted text-muted-foreground me-1.5 rounded-pill px-2 py-0.5 text-[0.625rem]">
               {leftShort}
             </span>
             {leftLabel}
           </span>
           <span>
-            <span className="bg-foreground text-background me-1.5 rounded-full px-2 py-0.5 text-[0.625rem]">
+            <span className="bg-foreground text-background me-1.5 rounded-pill px-2 py-0.5 text-[0.625rem]">
               {rightShort}
             </span>
             {rightLabel}

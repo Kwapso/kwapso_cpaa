@@ -21,13 +21,13 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Sparkles } from "@shared/ui/icons"
+import { Sparkles } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { DraftReviewDialog } from "@/components/draft-review"

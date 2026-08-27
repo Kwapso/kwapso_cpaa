@@ -15,7 +15,7 @@
 import * as React from "react"
 
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
+import { Input } from "@shared/ui/components/input/input"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { FormShell, fieldSpacing } from "@shared/web/form-shell"

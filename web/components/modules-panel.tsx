@@ -38,12 +38,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { InternalRecordDialog, moduleFields, type InternalRecordValues } from "@/components/internal-record-dialog"
@@ -99,7 +99,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     return (
       <div className="space-y-2">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          <Skeleton key={i} className="h-14 w-full rounded-[var(--radius)]" />
         ))}
       </div>
     )
@@ -121,7 +121,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
           {modules.map((m) => (
             <li
               key={m.id}
-              className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3"
+              className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3"
             >
               {/* THE EMOJI IS THE RECORD'S FACE (R35) — one glyph, and a quiet
                   dot where nobody has chosen one, so the names still line up. */}

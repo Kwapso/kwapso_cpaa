@@ -24,11 +24,12 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import {
   ScreenRenderer,
   type ScreenActionContext,
@@ -273,7 +274,8 @@ export function SprintsScreen({
   const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
     tenancy.selectable().then((r) => r.values)
   )
-  const [view, setView] = React.useState("overview")
+  // Remembered with the screen — see web/lib/nav-memory.ts.
+  const [view, setView] = useRemembered("view", "overview")
   const [addOpen, setAddOpen] = React.useState(false)
 
   if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>

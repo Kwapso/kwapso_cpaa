@@ -96,7 +96,7 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
+import { Button } from "../../components/button/button";
 import {
   Dialog,
   DialogContent,
@@ -104,19 +104,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../controls/dialog/dialog";
+} from "../../components/dialog/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
+} from "../../components/select/select";
 import {
   StatusStepper,
   type StatusStage,
-} from "../../controls/status-stepper/status-stepper";
-import { Headline, Hint, Text } from "../../controls/typography/typography";
+} from "../../components/status-stepper/status-stepper";
+import { Headline, Hint, Text } from "../../components/typography/typography";
 import { cn } from "../../lib/utils";
 
 /** The four steps, in the artifact's own words. */

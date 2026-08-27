@@ -14,7 +14,7 @@
 
 import * as React from "react"
 
-import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
+import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 
 export type DescriptionItem = { id?: string; label: string; value?: React.ReactNode }
 

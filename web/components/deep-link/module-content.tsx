@@ -17,7 +17,7 @@
 import * as React from "react"
 import { WaveDetailScreen } from "@/components/wave-detail"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import {
   ScreenRenderer,
   type ScreenActionContext,

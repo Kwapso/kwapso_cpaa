@@ -323,6 +323,12 @@ export function googleIngestKinds(
             items.map((item) => ({
               originRowId: rowId(item),
               sortAt: moment(item.updatedAt),
+              // WHEN THIS IS FROM. Every Google lane already builds this moment
+              // for its cursor and none of them wrote it to the row, so 799 of the
+              // agency's 4,026 sources — every email, document, chat thread and
+              // calendar entry, 20% of the base — carried no date at all. Nothing
+              // that reasons about "latest" or "since last week" can see them.
+              recordDate: moment(item.updatedAt) || null,
               title: item.title,
               // Empty until hydration — the listing has no text in it at all.
               body: "",
@@ -348,6 +354,8 @@ export function googleIngestKinds(
             items.map((item) => ({
               originRowId: rowId(item),
               sortAt: moment(item.updatedAt),
+              // WHEN THIS IS FROM — the mail's own date. See the drive lane above.
+              recordDate: moment(item.updatedAt) || null,
               title: item.title,
               // The snippet until hydration replaces it with the real body. It is
               // a hundred characters, which is enough to be worth having and not
@@ -412,6 +420,8 @@ export function googleIngestKinds(
             return {
               originRowId: rowId(item),
               sortAt: at,
+              // WHEN THIS IS FROM — the entry's own moment. See the drive lane.
+              recordDate: at || null,
               title: item.title,
               body: [`Met on ${(at || "an unknown date").slice(0, 10)}.`, item.text]
                 .filter(Boolean)
@@ -469,6 +479,10 @@ export function googleIngestKinds(
             // As recent as its last reply — `chatThreads` stamps the fold with
             // the newest message for exactly this.
             sortAt: moment(item.updatedAt),
+            // AND THAT SAME MOMENT IS WHEN THE CONVERSATION IS FROM. A chat thread
+            // dated by its newest reply is what makes "the latest on FluClinic"
+            // answerable — the question the owner asked that started this.
+            recordDate: moment(item.updatedAt) || null,
             title: item.title,
             // ALREADY ATTRIBUTED, line by line, by `chatThreads`. It used to be
             // re-attributed here from the title, which is why every line read

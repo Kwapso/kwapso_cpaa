@@ -812,6 +812,26 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Attach "${str(i, "label")}" to story ${str(i, "id")}` },
   },
   {
+    name: "update_story_attachment",
+    summary:
+      "Fix one that is already on a story: `id` is the story, `attachmentId` the one to fix (from `list_story_attachments`). Send `label` to rename it. Send `url` to point a LINK somewhere else — the old row is kept and deactivated, so a replaced link stays in the story's history and stops being listed. A FILE's bytes are swapped from the app rather than here, for the reason `add_story_link` gives; renaming a file works fine from here. Answers with the story's remaining `attachments` and their `total`.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments/update",
+    schema: obj({ id: S, attachmentId: S, label: S, url: S }, ["id", "attachmentId"]),
+    // The optionals are OMITTED when empty rather than sent blank: the door
+    // decides WHICH of the three acts this is by which fields arrived, so
+    // `url: ""` on a rename would ask it to point the link at nothing.
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      attachmentId: str(i, "attachmentId"),
+      ...(str(i, "label") ? { label: str(i, "label") } : {}),
+      ...(str(i, "url") ? { url: str(i, "url") } : {}),
+    }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => `Fix attachment ${str(i, "attachmentId")} on story ${str(i, "id")}`,
+    },
+  },
+  {
     name: "remove_story_attachment",
     summary:
       "Take a file or a link off a story: `id` is the story, `attachmentId` the one to remove (from list_story_attachments). Nothing is deleted, the row keeps its history and the file stays where it was stored; it simply stops being listed.",
@@ -1272,15 +1292,16 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_todos",
     summary:
-      "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks. Each carries the reference the client quotes, the due date, whether they have completed it and the file they sent if there is one. `view` is 'open' by default; pass 'all' to include the completed. `accountId` narrows to one client.",
+      "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks. Each carries the reference the client quotes, the `dueOn` date, `completedAt` and `completedByName` if it has come back, and `fileName` + `fileUrl` for the document they sent with it. `view` is 'open' by default — the ones still outstanding; pass 'done' for the ones that have come back, which are the only ones that can be carrying a file, because completing a to-do is what attaches it. `accountId` narrows to one client. Pass `id` to fetch just that one. Every answer carries `openTotal`, `doneTotal` and `allTotal` whichever view you asked for, so a count never has to be derived from the rows. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A cursor belongs to the view it was minted in: the two views are ordered by different columns, so one minted in 'open' is refused by 'done'.",
     binding: "CONTENT", method: "GET", path: "/api/content/todos",
-    schema: obj({ accountId: S, view: S }),
+    schema: obj({ accountId: S, view: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["accountId", "view"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      for (const k of ["accountId", "view", "id", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
-    agent: { write: false, summarize: () => "List what we're waiting on clients for" },
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one to-do" : "List what we're waiting on clients for") },
   },
   {
     name: "raise_todo",
@@ -1542,7 +1563,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "ask_knowledge",
     summary:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: answer from the passages, and mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports — the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
     schema: obj({ q: S, accountId: S, limit: N, compose: B }, ["q"]),
     buildQuery: (i) => {

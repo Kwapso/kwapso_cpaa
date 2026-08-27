@@ -37,6 +37,7 @@ import type {
   TaskViewName,
   TeamPulse,
   Todo,
+  TodoViewName,
   WorkLog,
   WorkLogSummary,
   Meeting,
@@ -386,6 +387,21 @@ export const content = {
     url?: string
     fileDataUrl?: string
   }) => api<{ attachments: StoryAttachment[]; total: number }>("/api/content/stories/attachments", post(input)),
+  /** Fix one that is already on the story. THREE ACTS AT ONE ADDRESS, because
+   * they are one act to the person doing them: a `label` on its own renames it,
+   * a `fileDataUrl` swaps a file's bytes, a `url` swaps a link's address. Send
+   * a `label` beside a replacement to do both in one press. */
+  updateStoryAttachment: (input: {
+    id: string
+    attachmentId: string
+    label?: string
+    url?: string
+    fileDataUrl?: string
+  }) =>
+    api<{ attachments: StoryAttachment[]; total: number }>(
+      "/api/content/stories/attachments/update",
+      post(input)
+    ),
   removeStoryAttachment: (id: string, attachmentId: string) =>
     api<{ attachments: StoryAttachment[]; total: number }>(
       "/api/content/stories/attachments/remove",
@@ -433,16 +449,27 @@ export const content = {
     api<RecordCounts>(`/api/content/record-counts?table=${enc(table)}&id=${enc(id)}`),
 
   /* ---------------------------- to-dos and tasks ---------------------------- */
-  /** What we are waiting on a client for. Fenced: a client login sees their own
-   * company's. Bounded rather than paged — a to-do is a thing we are WAITING on. */
-  todos: (opts: { accountId?: string; view?: "open" | "all" } = {}) =>
-    api<{ todos: Todo[]; total: number }>(
-      `/api/content/todos${opts.accountId || opts.view ? `?${new URLSearchParams({ ...(opts.accountId ? { accountId: opts.accountId } : {}), ...(opts.view ? { view: opts.view } : {}) }).toString()}` : ""}`
+  /** What we are waiting on a client for, and what has come back. Fenced: a
+   * client login sees their own company's. PAGED (R14) — the `done` view keeps
+   * every completed one for ever, and a completed one is the only kind that can
+   * be carrying the file a client sent. `total` counts the view that was asked
+   * for; the other two numbers ride along so a tab badge is never derived from
+   * the rows in front of it (R16). */
+  todos: (opts: { accountId?: string; view?: TodoViewName; cursor?: string } = {}) =>
+    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
+      `/api/content/todos${listQuery({ ...opts })}`
     ),
+  /** ONE to-do, asked of the DOOR (R38). It used to fetch the whole list with
+   * `?view=all` and `.find()` the row out of it — harmless only while the list
+   * was capped and nothing drew a single to-do, and a silent "that no longer
+   * exists" for every row past the cursor the moment either changed. */
   todoOne: (id: string) =>
-    api<{ todos: Todo[] }>("/api/content/todos?view=all").then((r) => r.todos.find((t) => t.id === id) ?? null),
+    api<{ todos: Todo[] }>(`/api/content/todos?id=${enc(id)}`).then((r) => r.todos[0] ?? null),
   raiseTodo: (input: { accountId: string; title: string; detail?: string; dueOn?: string; ticketId?: string }) =>
-    api<{ todos: Todo[]; total: number }>("/api/content/todos", post(input)),
+    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
+      "/api/content/todos",
+      post(input)
+    ),
   /** The client's own act — mark it done, and attach the one file they were asked
    * for. `fileDataUrl` is a base64 data URL; the door caps and parses it. */
   completeTodo: (id: string, file?: { dataUrl: string; name: string }) =>
@@ -450,7 +477,11 @@ export const content = {
       "/api/content/todos/complete",
       post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
     ),
-  cancelTodo: (id: string) => api<{ todos: Todo[]; total: number }>("/api/content/todos/cancel", post({ id })),
+  cancelTodo: (id: string) =>
+    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
+      "/api/content/todos/cancel",
+      post({ id })
+    ),
   /** Our own admin, in one of six views. Every view's count comes back whichever
    * one was asked for (R16) — the badge on a tab you are not looking at cannot be
    * derived from the rows on the one you are. `total` is the count over what was

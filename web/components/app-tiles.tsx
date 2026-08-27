@@ -20,7 +20,7 @@
 // the same tiles for one client's systems.
 
 import * as React from "react"
-import { ChevronRight, Lock } from "@shared/ui/icons"
+import { ChevronRight, Lock } from "@shared/ui/foundations/icons"
 
 import { softNavigate } from "@/lib/nav"
 import { safeHref } from "@shared/web/rich-text"
@@ -91,7 +91,7 @@ export function AppTiles({
             // `duration-200` went with the hand-rolled transition: the kit owns
             // the duration and the curve, which is the "house curve" the comment
             // at the top of this file was already asking for by hand.
-            className="bg-card hover:bg-muted motion-hover flex items-center gap-2 rounded-xl p-4"
+            className="bg-card hover:bg-muted motion-hover flex items-center gap-2 rounded-[var(--radius)] p-4"
           >
             {/* The mark is aria-hidden and the stage WORD is on the heading above
                 it, which is the pair UI-CONVENTIONS §5 requires of a type mark.

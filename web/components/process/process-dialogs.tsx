@@ -11,12 +11,12 @@
 // one place a split can be proved by the type checker alone.
 
 import * as React from "react"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
-import { Input } from "@shared/ui/controls/input/input"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
+import { Input } from "@shared/ui/components/input/input"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure } from "@/lib/api"
 import { useT } from "@shared/web/language"

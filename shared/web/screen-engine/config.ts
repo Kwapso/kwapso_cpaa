@@ -178,11 +178,6 @@ export interface FacetOption {
   count?: number
 }
 
-/** Past this many options a pick-a-value control searches itself, so a host
- * can't accidentally ship an unsearchable 200-item dropdown. Below it, a search
- * box is noise. One constant so every control agrees (FilterBar, SortControl). */
-export const SEARCHABLE_THRESHOLD = 8
-
 /** One field the user may sort by. `value` is the row field. */
 export interface SortOption {
   value: string
@@ -201,30 +196,28 @@ export interface SortOption {
 
 /** A user-facing filter control. A chosen value becomes an `is` Rule on `field`,
  * run through the SAME `evaluateRules` engine as the builder `filter` (no new
- * matching engine). `control` is just presentation: a dropdown or chips. When
- * `options` is omitted, the distinct values are derived from the data at render
- * (see `facetOptions` in lib/collection.ts). */
+ * matching engine). `control` is just presentation. When `options` is omitted,
+ * the distinct values are derived from the data at render (see `facetOptions`
+ * in lib/collection.ts). */
 export interface FilterFacet {
   field: string
   label: string
-  /** `select` = dropdown · `chips` = removable chips · `range` = numeric min/max.
-   * A `range` facet reports `"min..max"` (either side may be empty, e.g. `"10.."`)
-   * and compiles to inclusive `gte`/`lte` rules — see `selectRows`. */
-  control: "select" | "chips" | "range"
+  /** `select` = pick one of a list · `range` = numeric min/max. A `range` facet
+   * reports `"min..max"` (either side may be empty, e.g. `"10.."`) and compiles
+   * to inclusive `gte`/`lte` rules — see `selectRows`.
+   *
+   * `"chips"` WAS A THIRD VALUE AND IS GONE (2026-08-27). No recipe and no
+   * screen ever set it, and in the design kit's vocabulary — which the filter
+   * row now draws through — a CHIP is an active filter, not an option waiting
+   * to be picked. Two meanings of one word in one row is the drift the kit
+   * adoption exists to end, so the unused one went rather than being ported. */
+  control: "select" | "range"
   options?: FacetOption[]
-  /** `control:"range"` bounds. With BOTH `min` and `max` the facet renders a
-   * two-thumb slider; otherwise two number inputs. `step` defaults to 1. */
+  /** `control:"range"` bounds, passed to both number fields. `step` defaults
+   * to 1. */
   min?: number
   max?: number
   step?: number
-  /** Render a `control:"select"` facet as a searchable combobox instead of a
-   * plain dropdown. (No effect on `chips` / `range`.) */
-  searchable?: boolean
-  /** Async option provider for a `searchable` select facet. Called (debounced)
-   * as the user types; the resolved rows REPLACE the visible option list — so a
-   * facet with thousands of values is searchable without ever loading them all.
-   * `options` is shown before the user types. Requires `searchable`. */
-  onSearch?: (field: string, query: string) => Promise<FacetOption[]>
 }
 
 /** Collection components — data-bound views. `filter`/`sort`/`limit` are
@@ -247,8 +240,12 @@ export interface CollectionConfig extends BaseConfig {
    * on the same row as search and the filters. Separate from `sortBy`/`sortDir`,
    * which only declare where it starts. */
   sortable: boolean
-  /** The fields offered when `sortable` is on. Past SEARCHABLE_THRESHOLD the
-   * picker searches itself. Empty = no control even if `sortable` is true. */
+  /** The fields offered when `sortable` is on. Empty = no control even if
+   * `sortable` is true. (A `SEARCHABLE_THRESHOLD` constant used to live beside
+   * this, deciding when a pick-a-value control grew a search box of its own.
+   * Both controls that read it are the kit's now and each answers that for
+   * itself — the filter row's facets always search, the sort picker decides
+   * inside `sort-control` — so a constant nobody consulted went with them.) */
   sortOptions: SortOption[]
   /** Cap the TOTAL rows shown (null = no cap). Separate from itemsPerPage. */
   limit: number | null

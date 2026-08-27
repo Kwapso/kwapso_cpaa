@@ -10,16 +10,17 @@
 import * as React from "react"
 import { usePathname } from "next/navigation"
 
-import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/icons"
+import { Breadcrumbs } from "@shared/ui/components/breadcrumbs/breadcrumbs"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/foundations/icons"
 // `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
-import { SeaWaves } from "@shared/ui/icons"
+import { SeaWaves } from "@shared/ui/foundations/icons"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
 import { softNavigate } from "@/lib/nav"
+import { sectionClick } from "@/lib/nav-memory"
 import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // The row-level registry + coarse invalidations moved to lib (R15): they're DATA
 // the live-collections check imports, and the thread/help_threads + agent_usage
@@ -42,7 +43,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@shared/ui/controls/sheet/sheet"
+} from "@shared/ui/components/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 
@@ -145,6 +146,14 @@ export function AppShell({
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
+  /** CLICKING A SECTION, WHICH IS NOT THE SAME AS FOLLOWING A LINK — it is the
+   * one control in the app that names a section rather than a destination, so
+   * it is the one that asks the nav memory where she was, and the one where a
+   * second click on the section you are already in resets it. The whole of that
+   * decision (and why the reset is a second click rather than a double-click)
+   * lives in `sectionClick`; the rail just draws the button. */
+  const goToSection = (path: string) => navigate(sectionClick(teamId, path, here))
+
   // THE RAIL, IN TWO GROUPS WITH A DIVIDER (the owner's ruling — see NavGroup in
   // pages.ts for why neither "keep it under nine" nor "show everything flat"
   // was accepted). Every destination declares which half it belongs to, so this
@@ -191,10 +200,10 @@ export function AppShell({
       <button
         key={item.slug}
         type="button"
-        onClick={() => navigate(item.path)}
+        onClick={() => goToSection(item.path)}
         aria-current={activeNav ? "page" : undefined}
         title={collapsed ? item.title : undefined}
-        className={`motion-hover flex items-center rounded-xl text-sm font-medium ${
+        className={`motion-hover flex items-center rounded-[var(--radius)] text-sm font-medium ${
           collapsed ? "justify-center p-2" : "gap-2 px-3 py-2"
         } ${
           activeNav
@@ -377,7 +386,7 @@ export function AppShell({
             onClick={toggleCollapsed}
             aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
             title={collapsed ? t("Expand") : t("Collapse")}
-            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground motion-hover rounded-xl p-2"
+            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground motion-hover rounded-[var(--radius)] p-2"
           >
             {collapsed ? (
               <PanelLeftOpen className="size-4" />
@@ -478,13 +487,13 @@ export function AppShell({
               <button
                 key={item.slug}
                 type="button"
-                onClick={() => navigate(item.path)}
+                onClick={() => goToSection(item.path)}
                 aria-current={activeNav ? "page" : undefined}
                 /* `min-w-0` + a box for the label: this bar is up to six
                    `flex-1` slots on 375px, so a label like "Knowledge base"
                    has ~59px and overflows it. The portal's bar carries the
                    measured numbers for the same defect. */
-                className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
+                className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 text-badge font-medium ${
                   activeNav ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -505,7 +514,7 @@ export function AppShell({
               aria-current={
                 overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
               }
-              className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-badge font-medium ${
+              className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 text-badge font-medium ${
                 overflowNav.some((i) => isNavActive(i.path, here))
                   ? "text-foreground"
                   : "text-muted-foreground"
@@ -541,10 +550,10 @@ export function AppShell({
                         type="button"
                         onClick={() => {
                           setMoreOpen(false)
-                          navigate(item.path)
+                          goToSection(item.path)
                         }}
                         aria-current={activeNav ? "page" : undefined}
-                        className={`motion-hover flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                        className={`motion-hover flex items-center gap-2 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium ${
                           activeNav
                             ? "bg-muted text-foreground"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"

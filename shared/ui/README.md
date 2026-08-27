@@ -33,22 +33,30 @@ npm run dev        # the demo
 ```
 
 ```css
-@import "kwapso-design/tokens/tokens.css";
-@import "kwapso-design/motion/motion.css";
+@import "kwapso-design/foundations/tokens/tokens.css";
+@import "kwapso-design/foundations/motion/motion.css";
 ```
 
-The two CSS paths did **not** move. `tokens/`, `icons/` and `motion/` are the
-foundations and the agreed structure groups them under a `foundations/`
-folder; that move is not made yet, because thirteen decision pages under
-`verify/` link `tokens/tokens.css` directly and those pages are the record of
-what the client was looking at when they ruled.
+**The two CSS paths MOVED on 2026-08-24.** `tokens/`, `icons/` and `motion/`
+are the foundations, and the agreed structure groups them under a
+`foundations/` folder. The client ruled `D10-B` and the move is now made, so
+each of the two lines above gains one `foundations/` segment. There is no
+`exports` map and no path alias — the kit is vendored source, so every import
+is a literal path into this tree and nothing sits in front of it to absorb the
+rename. The three rows are at the foot of the table below.
 
 ```tsx
-import { Button } from "kwapso-design/controls/button/button";
-import { DataTable } from "kwapso-design/structures/data-table/data-table";
+import { Button } from "kwapso-design/components/button/button";
+import { DataTable } from "kwapso-design/components/data-table/data-table";
 import { MainScreen } from "kwapso-design/compositions/templates";
-import { Pencil } from "kwapso-design/icons";
+import { Pencil } from "kwapso-design/foundations/icons";
 ```
+
+**`controls/` and `structures/` MOVED AGAIN on 2026-08-26 — read the second
+import-path table below, after the 2026-08-24 one.** Both examples above are
+current as of today; if you are migrating from a version tagged before
+2026-08-26, `Button` was `kwapso-design/controls/button/button` and
+`DataTable` was `kwapso-design/structures/data-table/data-table`.
 
 ### THE IMPORT PATHS MOVED ON 2026-08-24 — the whole table
 
@@ -64,6 +72,19 @@ Rewrite an app's imports with these six rules and it compiles.
 | `compositions/shapes` · `compositions/shapes/<x>` | `compositions/templates` · `compositions/templates/<x>` |
 | `compositions/system/<x>` · `compositions/portal/<x>` | **gone.** Four of each survive as `compositions/screens/<x>` — see below |
 | `compositions/screens/<x>` | one of `compositions/screens/` · `compositions/overlays/` · `compositions/states/` |
+
+And on 2026-08-24 the three foundation folders moved too — ruling `D10-B`.
+These are the only three rows that touch an app's **CSS**, and the icons row
+is the only import specifier in the whole kit that changed:
+
+| was | is |
+|---|---|
+| `kwapso-design/tokens/tokens.css` | `kwapso-design/foundations/tokens/tokens.css` |
+| `kwapso-design/motion/motion.css` | `kwapso-design/foundations/motion/motion.css` |
+| `kwapso-design/icons` | `kwapso-design/foundations/icons` |
+
+Nothing else moved: `controls/`, `structures/`, `compositions/` and `lib/` are
+untouched by `D10-B`.
 
 Four moved ACROSS tiers rather than just down a path:
 
@@ -109,14 +130,48 @@ Light and dark come along automatically. Pin a theme with `data-theme="light"`
 or `"dark"` on `<html>`; leave it off to follow the system. Move the text size
 with `data-scale="small" | "medium" | "large"`.
 
+### THE IMPORT PATHS MOVED AGAIN ON 2026-08-26, second time in one day
+
+Client ruling, verbatim: *"i still don't understand the difference between
+controls / structures. please merge them, and rename to components."*
+`controls/` (67 folders) and `structures/` (42 folders) are now one flat
+`components/` (108, after the separate deletion below) — no
+`components/controls/` or `components/structures/` subfolder either, the
+client does not want the two-tier distinction to exist even as a nesting.
+This is the third time this repository's public import surface has changed
+in one day (the primitives/collections → controls/structures rename that
+morning, the foundations/ move under `D10-B`, and now this), and it is more
+consequential than the previous two: a consuming app's import goes from
+**two possible prefixes to one.**
+
+| was | is |
+|---|---|
+| `controls/<x>/<x>` | `components/<x>/<x>` |
+| `structures/<x>/<x>` | `components/<x>/<x>` |
+
+Every other folder — `compositions/`, `foundations/`, `lib/` — is untouched
+by this rename. No export was renamed and nothing changed what any component
+does; only the folder segment changed, and it collapsed two segments into
+one rather than renaming one to another.
+
+**One component was deleted outright, not renamed.** Client ruling,
+verbatim: *"delete portal conversation."* `structures/portal-conversation/
+portal-conversation.tsx` (`PortalConversation`, `PortalApprovalBand`) is
+gone and is not coming back under any path. It had no functional consumer
+anywhere in either consuming application's actual screens — it was a demo
+gallery specimen only — so if your app does not already import it, this
+changes nothing for you. If it does, there is no replacement; the ruling was
+to remove it.
+
 ## Layout
 
 ```
-tokens/       tokens.css is the ONLY file where a colour or a size is decided
-icons/        1,383 React exports — the Iconoir pack (MIT), drawn as
-              strokes on a 24 grid. The commission's 96 spellings are
-              aliases onto it; see icons/ATTRIBUTION.md
-motion/       100 rules, all 16 of the commission's motion cases
+foundations/   the three that everything else is built out of
+  tokens/      tokens.css is the ONLY file where a colour or a size is decided
+  icons/       1,383 React exports — the Iconoir pack (MIT), drawn as strokes
+             on a 24 grid. The commission's 96 spellings are aliases onto it;
+             see foundations/icons/ATTRIBUTION.md
+  motion/      100 rules, all 16 of the commission's motion cases
 assets/fonts/ Saans and SerrifCondensed — the client's real type, shipped
               here as .woff2 (what browsers fetch) with the .otf/.ttf masters
               beside them. `LicenseAgreement.pdf` is the paper record: the
@@ -124,11 +179,19 @@ assets/fonts/ Saans and SerrifCondensed — the client's real type, shipped
               permits redistribution inside this repo and that both consuming
               apps are internal. Nobody read the PDF and nobody needs to —
               that decision is the client's and it is made. The @font-face
-              block lives in tokens/tokens.css §5.0; `build-fonts.mjs`
+              block lives in foundations/tokens/tokens.css §5.0; `build-fonts.mjs`
               regenerates the .woff2 if a new cut ever arrives.
-controls/      67 components — the primitives. One folder each
-structures/    42 collection views — tables, boards, threads, gantt, heat,
-               timeline, map. The things that draw MANY records
+components/    108 — controls and structures merged into one flat folder on
+               2026-08-26 (client: "i still don't understand the difference
+               between controls / structures. please merge them, and rename
+               to components"). One folder each, no subfolder split. Was 67
+               single-purpose controls (buttons, fields, badges) plus 42
+               collection views (tables, boards, threads, gantt, heat,
+               timeline, map — the things that draw MANY records), minus
+               portal-conversation (deleted the same day, see above) — the
+               scope difference between the two kinds is real and still
+               worth thinking about when you write one, it just is not a
+               folder choice any more
 lib/           the cn helper and use-has-room
 compositions/  the client: "everything currently compositions/xyz is
                compositions (and then sections inside of it)"
@@ -140,9 +203,8 @@ compositions/  the client: "everything currently compositions/xyz is
                external doors
   overlays/    8 — what opens OVER a screen rather than replacing it
   states/      5 — the same screen with nothing in it
-docs/          RULES · BUILD-A-COMPONENT · BUILD-A-SCREEN · TOKENS ·
-               ARTIFACT-MAP — all five delivered
-demo/          four views: foundations · controls · structures · compositions
+docs/          RULES · BUILD-A-COMPONENT · TOKENS (BUILD-A-SCREEN pending)
+demo/          three views: foundations · components · compositions
 verify/        decision artefacts and a smoke build — NOT delivered
 KWAPSO-SPEC.md the artifact, verbatim. The king. Its OVERRIDE REGISTER lists
                every place a client decision beats the artifact text — read it
@@ -173,11 +235,10 @@ from it, everything else is superseded.
 | Tokens — 276, both palettes, three scales | done |
 | Icons — 1,383 exports, six sizes | done — Iconoir (MIT) |
 | Motion — 100 rules | done |
-| Controls — 67 | done |
-| Structures — 42 | done |
+| Components — 108 (controls + structures merged 2026-08-26; was 67 + 42, minus portal-conversation, deleted the same day) | done |
 | Compositions — 45: 15 templates · 17 screens · 8 overlays · 5 states | done |
-| Demo | four views: foundations · controls · structures · compositions |
-| Docs | 5 of 5 |
+| Demo | three views: foundations · components · compositions |
+| Docs | 3 of 4 — BUILD-A-SCREEN waits on the screens |
 
 **Where to look first.** `verify/decisions.html` is the record of every design
 question that has been settled and why — fifteen of them, each with the

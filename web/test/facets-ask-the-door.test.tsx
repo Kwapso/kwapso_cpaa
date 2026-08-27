@@ -22,14 +22,15 @@
 // reordered nothing at all. None of them asked whether anything moves when
 // somebody presses the thing. This file asks nothing else.
 //
-// THE TWO CONTROLS ARE DRIVEN DIFFERENTLY because the library draws them
-// differently: past eight options a `control:"select"` facet becomes a searchable
-// popover over cmdk, and under it a plain Radix Select. So `Type` (eighteen
-// kinds) opens on a click and `Filed under` on a pointerdown. Driving both is the
-// point rather than an inconvenience — they are two different code paths to one
-// `onChange`, and a screen can have one working and the other not.
+// THE CONTROL IS THE DESIGN KIT'S NOW (2026-08-27), and this file changed with
+// it in exactly one place: `pick` below. It used to drive two different code
+// paths — past eight options the old row drew a cmdk popover, under it a Radix
+// Select, so one facet opened on a click and the other on a pointerdown. The
+// kit draws ONE facet control, a heading over a search pill over a checkbox
+// list, and every facet in the app is that. What is asserted underneath has not
+// moved a line: operate the real control, read what the door was asked.
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
 import { PagedFind, type FindQuery } from "@/components/paged-find"
@@ -92,14 +93,20 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
   )
 }
 
-/** Open a facet and choose one of its words. The two controls open on different
- * events; `open` says which, and both end at the same `role="option"`. */
-async function pick(label: string, option: string, open: "click" | "pointer") {
-  const trigger = screen.getByLabelText(label)
-  if (open === "click") fireEvent.click(trigger)
-  else fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" })
-  await waitFor(() => expect(screen.getAllByRole("option").length).toBeGreaterThan(0))
-  fireEvent.click(screen.getByRole("option", { name: option }))
+/** Open the facet panel and choose one of a facet's words.
+ *
+ * Every facet lives in ONE panel behind the kit's own "+ filter" slot, so the
+ * panel is opened once and the second `pick` in a test finds it already open —
+ * pressing the slot again would TOGGLE it shut, which is the one way this
+ * helper could quietly stop operating anything. The facet is then addressed by
+ * its own heading, so a test cannot pass by clicking an identically-named word
+ * in the facet beside it. */
+async function pick(label: string, option: string) {
+  if (screen.queryAllByRole("listbox").length === 0)
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }))
+  const facet = await screen.findByRole("group", { name: label })
+  await waitFor(() => expect(within(facet).getAllByRole("option").length).toBeGreaterThan(0))
+  fireEvent.click(within(facet).getByRole("option", { name: option }))
 }
 
 const shownKey = () => screen.getByTestId("listkey").textContent as string
@@ -159,7 +166,7 @@ describe("a filter on a paged collection asks the door", () => {
     renderFind(listKey, door.fetchPage)
 
     // The owner's own filter, on the owner's own screen.
-    await pick("Type", "From a meeting", "click")
+    await pick("Type", "From a meeting")
 
     await waitFor(() => expect(door.asked.length).toBe(1))
     const first = door.asked[0]
@@ -183,9 +190,9 @@ describe("a filter on a paged collection asks the door", () => {
     const door = fakeDoor()
     renderFind(freshKey(), door.fetchPage)
 
-    await pick("Type", "From a meeting", "click")
+    await pick("Type", "From a meeting")
     await waitFor(() => expect(door.asked.length).toBe(1))
-    await pick("Filed under", "Bergman S.A.", "pointer")
+    await pick("Filed under", "Bergman S.A.")
 
     await waitFor(() => expect(door.asked.length).toBe(2))
     expect(door.asked[1].query).toEqual({ kind: "meeting", compartment: "account:A_1" })
@@ -200,7 +207,7 @@ describe("a filter on a paged collection asks the door", () => {
     // The find bar now says the second one, labelled.
     const door = fakeDoor()
     renderFind(freshKey(), door.fetchPage)
-    await pick("Type", "From a meeting", "click")
+    await pick("Type", "From a meeting")
     await waitFor(() => expect(screen.getByText("52 sources match")).toBeTruthy())
   })
 })

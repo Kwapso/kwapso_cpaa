@@ -6,7 +6,9 @@
 //   • title           — an optional header
 //   • filter / sort    — EXECUTED here (via selectRows) from the config's rules
 //   • searchable       — a debounced SearchInput that filters the named columns
-//   • userFilter       — a FilterBar of `filterFacets` (dropdowns / chips)
+//   • userFilter       — a FilterBar of `filterFacets` (the design kit's own
+//                        filter row: a chip per facet that is on, and the facet
+//                        controls behind its "+ filter" slot)
 //   • showCount        — a LIVE "Showing X of Y" that reacts to search + facets
 //   • limit            — caps the TOTAL rows (e.g. "only ever show 50")
 //   • itemsPerPage     — paginates the (filtered) rows, with a Prev/Next pager
@@ -18,24 +20,24 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/icons"
-import { Filter } from "@shared/ui/icons"
+import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/foundations/icons"
 import { kitIcon } from "./tabs-view"
 
-import { selectRows } from "./collection"
+import { facetOptions, selectRows } from "./collection"
+import { useRemembered } from "@shared/web/remembered"
 import { type CollectionConfig } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import { FilterBar } from "./filter-bar"
-import { SortControl } from "@shared/ui/controls/sort-control/sort-control"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@shared/ui/controls/popover/popover"
-import { SearchInput } from "@shared/ui/controls/search-input/search-input"
-import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
+} from "@shared/ui/components/popover/popover"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 
 function CollectionFrame<T>({
@@ -46,6 +48,7 @@ function CollectionFrame<T>({
   serverSide = false,
   onQueryChange,
   modal = false,
+  memoryKey,
   className,
 }: {
   config: CollectionConfig
@@ -70,21 +73,90 @@ function CollectionFrame<T>({
   /** Set `true` when the collection can render inside a Dialog/Sheet, so the
    *  filter/sort popovers stay scrollable under the dialog's scroll lock. */
   modal?: boolean
+  /** WHICH COLLECTION THIS IS, for the nav memory — the module a recipe binds
+   * to, where a caller knows it. Two collections on one screen need two names or
+   * they would hand each other their search box; a caller that says nothing gets
+   * one derived from the config, which is stable for as long as the screen is.
+   * Nothing is remembered at all where no host has provided a memory (the client
+   * portal), so this is inert there. */
+  memoryKey?: string
   className?: string
 }) {
   const t = useT()
-  const [query, setQuery] = React.useState("")
+  // ── WHAT THIS COLLECTION WAS BEING ASKED, WHEN SHE LEFT IT ─────────────────
+  //
+  // The four controls in this header are the "what she had typed" and "which
+  // filters were set" halves of the nav memory. They are remembered as ONE slot
+  // because they are one question: a search with the filters dropped off it is
+  // a different question, and restoring half of it would be worse than
+  // restoring none. `slot` names this collection within the screen — see the
+  // `memoryKey` prop.
+  //
+  // THE PAGE IS DELIBERATELY NOT IN IT. Two reasons, and they are the same
+  // reason twice. A GROWING collection (R14) does not have pages: it has a
+  // cursor, its rows accumulate in the shared store, and that store already
+  // survives navigation — so there is nothing here to remember and a cursor
+  // minted before the rows moved would be R14's silent loss, answering about a
+  // window that has shifted. A BOUNDED one is paged in memory over rows that
+  // are live (R15), so "page three" names a position in a list that may have
+  // re-sorted under her: the same number, a different three rows. The filter is
+  // the durable half of what she was doing; the offset into it is not. She
+  // comes back to the top of her filtered list.
+  const slot = `find:${memoryKey ?? (config.title || searchKeys.join(","))}`
+  const [asked, remember] = useRemembered<{
+    query: string
+    facetValues: Record<string, string>
+    sortBy: string
+    sortDir: "asc" | "desc"
+  }>(
+    slot,
+    () => ({ query: "", facetValues: {}, sortBy: config.sortBy, sortDir: config.sortDir }),
+    (found) => {
+      // A REMEMBERED FILTER WHOSE OPTION NO LONGER EXISTS. A dropdown value can
+      // be retired while she is away, and a facet's choices are often derived
+      // from the rows themselves — so a remembered selection is checked against
+      // what this collection can actually offer TODAY, and a selection nothing
+      // can satisfy is dropped rather than restored. The rest of the question
+      // survives: losing one retired filter should not throw away her search.
+      // A `range` facet has no option list to check against, so its value is
+      // syntax rather than vocabulary and is kept.
+      if (!found || typeof found !== "object") return undefined
+      const was = found as Record<string, unknown>
+      const facets: Record<string, string> = {}
+      for (const [field, value] of Object.entries(
+        (was.facetValues as Record<string, string>) ?? {}
+      )) {
+        const facet = config.filterFacets.find((f) => f.field === field)
+        if (!facet) continue
+        if (facet.control === "range") {
+          facets[field] = value
+          continue
+        }
+        const offered = facet.options ?? facetOptions(data, facet.field)
+        if (offered.some((o) => o.value === value)) facets[field] = value
+      }
+      return {
+        query: typeof was.query === "string" ? was.query : "",
+        facetValues: facets,
+        // A sort by a column this collection no longer offers falls back to the
+        // declared one, for the same reason a retired filter does.
+        sortBy:
+          typeof was.sortBy === "string" &&
+          (was.sortBy === config.sortBy ||
+            config.sortOptions.some((o) => o.value === was.sortBy))
+            ? was.sortBy
+            : config.sortBy,
+        sortDir: was.sortDir === "asc" || was.sortDir === "desc" ? was.sortDir : config.sortDir,
+      }
+    }
+  )
+  const { query, facetValues, sortBy, sortDir } = asked
+  const setQuery = (next: string) => remember((q) => ({ ...q, query: next }))
   // The OLD SearchInput debounced internally; the kit's is a plain input, so
   // the debounce lives here now — same 300ms the old control used.
   const debouncedSetQuery = useDebouncedCallback((next: string) => setQuery(next), 300)
-  const [facetValues, setFacetValues] = React.useState<Record<string, string>>(
-    {}
-  )
-  // The user's LIVE sort, seeded from the declared config sort. Config stays
-  // declarative (it says where sorting starts); this is the runtime choice —
-  // exactly the split between builder `filter` and user `facetValues`.
-  const [sortBy, setSortBy] = React.useState(config.sortBy)
-  const [sortDir, setSortDir] = React.useState<"asc" | "desc">(config.sortDir)
+  const setSortBy = (next: string) => remember((q) => ({ ...q, sortBy: next }))
+  const setSortDir = (next: "asc" | "desc") => remember((q) => ({ ...q, sortDir: next }))
   const [page, setPage] = React.useState(0)
   const rootRef = React.useRef<HTMLDivElement>(null)
 
@@ -133,21 +205,13 @@ function CollectionFrame<T>({
     config.searchable ||
     showFilterBar ||
     showSort
-  const canClear =
-    query !== "" || Object.values(facetValues).some((v) => v !== "")
-
   const setFacet = (field: string, value: string) =>
-    setFacetValues((s) => {
-      const next = { ...s }
+    remember((q) => {
+      const next = { ...q.facetValues }
       if (value === "") delete next[field]
       else next[field] = value
-      return next
+      return { ...q, facetValues: next }
     })
-
-  const clearAll = () => {
-    setQuery("")
-    setFacetValues({})
-  }
 
   // Page change: optionally scroll the collection's top back into view.
   const goTo = (p: number) => {
@@ -176,6 +240,13 @@ function CollectionFrame<T>({
             <SearchInput
               defaultValue={query}
               onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+              // THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be
+              // cleared by the filter row's "Clear all", which was one control
+              // quietly owning two questions; the kit's bar says "Clear
+              // filters" and now means only that. Cleared THROUGH the debounce
+              // rather than around it, so a keystroke still in flight cannot
+              // land after the ✕ and put the text back.
+              onClear={() => debouncedSetQuery("")}
               placeholder={config.searchPlaceholder}
               className="w-44"
             />
@@ -186,8 +257,7 @@ function CollectionFrame<T>({
               values={facetValues}
               data={data}
               onChange={setFacet}
-              onClearAll={clearAll}
-              canClear={canClear}
+              onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
               resultCount={filtered.length}
               modal={modal}
             />
@@ -212,74 +282,69 @@ function CollectionFrame<T>({
               )
             : config.searchPlaceholder
 
+          // THE FILTER ROW LEFT THE FUNNEL, AND THAT IS THE POINT OF THE SWAP.
+          // The phone header used to hide the filters behind a funnel because
+          // the old row was a strip of dropdown triggers that could not fit
+          // beside a search box. The kit's bar answers the same question itself
+          // and answers it the other way round — below `sm` its chips become a
+          // one-line horizontal SCROLLER, and its own file says why in as many
+          // words: "the moment they are hidden, people forget they are on and
+          // read a filtered list as an empty one". So the funnel now holds the
+          // SORT and nothing else, and what is narrowing the list is on screen
+          // at every width. It cost the dot the funnel used to wear, which was
+          // the app telling somebody a filter was on without telling them which.
           return (
             <>
               {/* Mobile (< sm): ONE compact row — a stretching search field + a
-                  funnel that opens the same FilterBar in a popover. Left-to-right,
-                  never wrapping into 2–3 stacked rows. */}
+                  sort funnel. Left-to-right, never wrapping into stacked rows.
+                  The filter bar is its own row below, at every width. */}
               <div className="flex items-center gap-2 sm:hidden">
                 {config.searchable ? (
                   <SearchInput
                     defaultValue={query}
                     onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+                    onClear={() => debouncedSetQuery("")}
                     placeholder={mobilePlaceholder}
                     className="min-w-0 flex-1"
                   />
                 ) : (
                   <div className="min-w-0 flex-1">{titleBlock}</div>
                 )}
-                {(showFilterBar || showSort) && (
+                {showSort && (
                   <Popover modal={modal}>
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
                         variant="secondary"
                         size="icon"
-                        aria-label={
-                          showFilterBar && showSort
-                            ? t("Filters and sort")
-                            : showSort
-                              ? t("Sort")
-                              : t("Filters")
-                        }
-                        className="relative size-8 shrink-0"
+                        aria-label={t("Sort")}
+                        className="size-8 shrink-0"
                       >
-                        {showFilterBar ? <Filter /> : <ArrowUpDown />}
-                        {canClear && (
-                          <span
-                            aria-hidden
-                            className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
-                          />
-                        )}
+                        <ArrowUpDown />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
                       align="end"
                       className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3"
                     >
-                      {/* The same controls the desktop layout renders (built
-                          once above) — just stacked into a popover, since the
+                      {/* The same control the desktop layout renders (built
+                          once above) — just moved into a popover, since the
                           phone header is ONE row: search + this trigger. */}
                       {sortControl}
-                      {filterBar}
                     </PopoverContent>
                   </Popover>
                 )}
               </div>
 
-              {/* ≥ sm: the desktop/tablet layout — UNCHANGED. "inline" = title +
-                  search + filters on one wrapping row; "stacked" (default) =
-                  title+search row with the filter bar on its own line below. */}
-              {/* ≥ sm: "inline" = title + search + filters + sort on one
-                  wrapping row; "stacked" (default) = title+search row with the
-                  filters and sort together on the row below — sort is IN the
-                  header, aligned with the filters, never a bolted-on strip. */}
+              {/* ≥ sm: "inline" = title + search + sort on one wrapping row;
+                  "stacked" (default) = a title+search row with the sort on the
+                  row below. Sort is IN the header either way, never a bolted-on
+                  strip. */}
               <div className="hidden sm:block">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {titleBlock}
                     {searchBox}
-                    {filterBar}
                     {sortControl}
                   </div>
                 ) : (
@@ -288,21 +353,23 @@ function CollectionFrame<T>({
                       {titleBlock}
                       {searchBox}
                     </div>
-                    {(filterBar || sortControl) && (
+                    {sortControl && (
                       <div className="flex flex-wrap items-center gap-2">
-                        {filterBar}
                         {sortControl}
                       </div>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* THE FILTERS, AT EVERY WIDTH, on their own full-width row. */}
+              {filterBar}
             </>
           )
         })()}
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[var(--radius)] border border-dashed p-8 text-center text-sm text-muted-foreground">
           {/* aria-hidden by construction: the sentence under it already says
               what this is. The icon comes from the kit's set by name; a name
               the kit lacks renders nothing, same contract as the old

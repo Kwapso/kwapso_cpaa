@@ -23,6 +23,7 @@
 // inline switch-off, and no engine block draws that.
 
 import * as React from "react"
+import { useRemembered } from "@shared/web/remembered"
 
 import {
   AlertDialog,
@@ -33,16 +34,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, Power, RotateCcw } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, Power, RotateCcw } from "@shared/ui/foundations/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import {
   EMPTY_WAVE_QUERY,
+  type WaveOrder,
   WaveFinder,
   selectWaves,
   waveQueryIsActive,
@@ -120,7 +122,39 @@ export function WaveCollection({
     tenancy.accounts({ type: "entity" }).then((r) => r.accounts)
   )
 
-  const [query, setQuery] = React.useState<WaveQuery>(EMPTY_WAVE_QUERY)
+  // WHAT SHE WAS ASKING THIS COLLECTION, remembered with the screen (see
+  // web/lib/nav-memory.ts). The search, the client, the on/off filter and the
+  // order are one question and are remembered as one slot.
+  //
+  // A REMEMBERED FILTER IS CHECKED AGAINST TODAY'S VOCABULARY. The two closed
+  // lists — the on/off filter and the sort — are validated outright. The CLIENT
+  // is validated only once the client list is actually loaded (it is a cached
+  // read and this runs at mount); a client switched off while she was away and
+  // not yet loaded therefore survives one render, and what she sees is her own
+  // filter matching nothing, with "Clear all" beside it. That is a degraded
+  // answer rather than a wrong one, and it is the honest limit of validating
+  // against a list that arrives asynchronously.
+  const [query, setQuery] = useRemembered<WaveQuery>("find", EMPTY_WAVE_QUERY, (found) => {
+    if (!found || typeof found !== "object") return undefined
+    const was = found as Record<string, unknown>
+    const known = clientsQ.data
+    const accountId =
+      typeof was.accountId === "string" &&
+      (!known || known.some((c) => c.id === was.accountId))
+        ? was.accountId
+        : ""
+    return {
+      q: typeof was.q === "string" ? was.q : "",
+      accountId,
+      status: was.status === "on" || was.status === "off" ? was.status : "",
+      sortBy: (["name", "runs", "sprints", "client", "newest"] as const).includes(
+        was.sortBy as WaveOrder
+      )
+        ? (was.sortBy as WaveOrder)
+        : EMPTY_WAVE_QUERY.sortBy,
+      dir: was.dir === "asc" || was.dir === "desc" ? was.dir : EMPTY_WAVE_QUERY.dir,
+    }
+  })
   const [addOpen, setAddOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Wave | null>(null)
   const [switchingOff, setSwitchingOff] = React.useState<Wave | null>(null)
@@ -185,7 +219,7 @@ export function WaveCollection({
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((w) => (
-              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
+              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
                 {/* R35 — a record never appears without its face. A wave has no
                     picture of its own, so this is its initial. */}
                 <RecordMark name={w.name} />

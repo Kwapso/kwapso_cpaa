@@ -29,15 +29,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Input } from "@shared/ui/components/input/input"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { ExternalLink, PenLine, Send } from "@shared/ui/icons"
+import { ExternalLink, PenLine, Send } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, content } from "@/lib/api"
 import { safeHref } from "@shared/web/rich-text"
@@ -208,7 +208,7 @@ export function MailReplyDialog({
           asked for — "I can just click inside of the kwapso app and it takes me
           to my Gmail". */}
       {gmailLink && (
-        <p className="border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+        <p className="border-border/60 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">{t("It is waiting in your Gmail drafts. Nothing is sent.")}</span>
           <a
             href={gmailLink}

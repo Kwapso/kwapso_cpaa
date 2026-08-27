@@ -1,5 +1,12 @@
 "use client"
 
+// WHAT A CLIENT MAY DO WITH A FILE ON THEIR TICKET: attach one, read their own
+// back, and take their own off. NOT rename or replace one the agency attached —
+// owner's ruling, 27 Aug 2026, answered "never" when asked. The reasoning and
+// the fence that would have to carry it live where the mistake would be made:
+// `web/components/help-attachments.tsx`'s header and the door in
+// `workers/content/src/routes/help.ts`.
+
 // FILES AND LINKS ON ONE TICKET (CHECKLIST 5.10) — "show us what you mean".
 //
 // A screenshot of the thing that is wrong is the client's half of a support
@@ -32,10 +39,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,11 +52,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Link2, Paperclip, Trash2 } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Link2, Paperclip, Trash2 } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpAttachment } from "@shared/types"
+import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
@@ -166,22 +174,25 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
       <CollectionHeading label={t("Files and links")} total={total} />
 
       {listQ.loading && !listQ.data ? (
-        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
       ) : attachments.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {t("Nothing attached yet. A screenshot often explains it faster than a paragraph.")}
         </p>
       ) : (
         // K5: one container, rows separated by a hairline — never a box each.
-        <ul className="divide-y rounded-xl border">
+        <ul className="divide-y rounded-[var(--radius)] border">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? Paperclip : Link2
+            // The row is `items-start` rather than centred: its column now
+            // carries a picture, and centring would hang the glyph and the
+            // remove button halfway down the preview.
             const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt, t), size]
               .filter(Boolean)
               .join(" · ")
             return (
-              <li key={a.id} className="flex items-center gap-2 p-4">
+              <li key={a.id} className="flex items-start gap-2 p-4">
                 <Glyph className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   {isFollowable(a.url) ? (
@@ -203,6 +214,24 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
                     </>
                   )}
                   <p className="text-muted-foreground truncate text-xs">{meta}</p>
+                  {/* THE CLIENT'S SIDE OF THE SAME ROWS, drawn by the same
+                    * component as the agency's — a picture they sent us should
+                    * look the same to them as it does to us, and a client
+                    * scanning their own ticket for "the screenshot I sent" has
+                    * exactly the problem the owner described. These files are in
+                    * the SHARED media bucket, which this front door's gateway
+                    * serves at /media/* (portal-gateway/src/index.ts) — there is
+                    * one media route here and it is bound to `env.MEDIA`, so
+                    * nothing internal can be reached through this. */}
+                  {hasPreview(a.kind, a.contentType) && (
+                    <div className="mt-2">
+                      <AttachmentPreview
+                        kind={a.kind}
+                        url={a.url}
+                        contentType={a.contentType}
+                      />
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant="ghost"

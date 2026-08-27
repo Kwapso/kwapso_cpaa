@@ -255,7 +255,7 @@ export function shapeKnowledgeList(
     rows: sources.map((s) => ({
       id: s.id,
       mark: (
-        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl">
+        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-[var(--radius)]">
           <Icon
             name={(KNOWLEDGE_KIND_ICON[s.kind] ?? "file") as IconName}
             aria-hidden
