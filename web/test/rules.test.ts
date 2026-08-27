@@ -2289,6 +2289,7 @@ describe("RULES — the laws of the base", () => {
 
   it("every enforced law has a known check", () => {
     const known = new Set([
+      "declared-readers", // R42: workers/content/test/source-readers.test.ts
       "publish-seam", // the 3 per-worker publish-seam.test.ts suites
       "gating-seam", // R10: the 3 per-worker gating-seam suites + the mcp identity-gate suite
       "fetch-timeout", // R11: the source-scan below

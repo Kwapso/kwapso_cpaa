@@ -373,6 +373,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "kit-supplies-the-ui",
     status: "enforced",
   },
+  {
+    id: "R42",
+    dimension: "arch",
+    law: "Every accepted source type resolves to a declared reader on EVERY door, or to an honest refusal — and no door chooses its own.",
+    checkId: "declared-readers",
+    status: "enforced",
+  },
 ]
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly
