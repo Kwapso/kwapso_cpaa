@@ -12,6 +12,28 @@
 // carries a ULID, and the fence on the door is what decides who is ever TOLD the
 // key. Rendered as a plain link: nothing here signs, proxies or re-uploads.
 //
+// A CLIENT MAY NEVER FIX SOMEBODY ELSE'S FILE. Owner's ruling, 27 Aug 2026,
+// asked as "may a client login rename or replace a file agency staff attached?"
+// and answered in one word: "never." Not on `help:read`, not on any role a
+// client login can hold.
+//
+// IT IS RECORDED HERE BECAUSE THIS IS WHERE THE MISTAKE WOULD BE MADE. The story
+// panel one record along has a rename and a replace (`updateStoryAttachment`),
+// and copying them onto this panel is the obvious next commit — the two files
+// are deliberately twins. The reason it is not a small copy is four lines below
+// this one: this panel's write right is `help:read`, which a CLIENT LOGIN HOLDS.
+// The story panel's is `work:edit`, which no client can reach. Same shape, and
+// the right underneath it is the whole difference.
+//
+// AND IF IT IS EVER EXTENDED: the fence goes on the DOOR, not here. R21 was
+// earned twice by exactly this — the agency gateway forwards `/api/content/*` by
+// PREFIX and a client login is an ordinary team member, so a door the portal's
+// allow-list withheld was being served to the same person at the other hostname.
+// A `canEdit` that renders no button is not a fence; a fence is
+// `refusePortalCaller` inside the handler. What a client may still do is
+// unchanged: attach their own file, and see what they sent. The line is drawn on
+// somebody ELSE'S file, never on their own.
+//
 // UI-RULEBOOK K5: one card around the whole collection, hairline between rows,
 // never a box per row.
 
@@ -68,7 +90,12 @@ export function HelpAttachmentsPanel({
 }: {
   ticketId: string
   /** `help:read` — the right that gates the doors. A person who can see a ticket
-   * can show you what they mean, which is the same bar the reply box uses. */
+   * can show you what they mean, which is the same bar the reply box uses.
+   *
+   * READ THE HEADER BEFORE WIDENING THIS. `help:read` is a right a CLIENT LOGIN
+   * holds, so this prop is true for a client, and "the right that gates the
+   * doors" is a sentence about ADDING and REMOVING your own — not about fixing
+   * anybody else's. The owner ruled "never" on that, 27 Aug 2026. */
   canEdit: boolean
 }) {
   const t = useT()
