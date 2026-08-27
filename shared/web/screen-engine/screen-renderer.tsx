@@ -549,24 +549,21 @@ function renderList(
     // never appears empty when every action is gated away.
     const rowActions = recipe.actions.filter((a) => gateState(rights, a.gate) !== "hidden")
     // The kit's rule (ch26 §3): "a row's name is always the first, widest
-    // column and always clickable" — so the OPEN affordance is the first
-    // cell, not the <tr>, and the engine draws it that way.
-    const columns: Array<DataTableColumn<Row>> = fields.map((f, colIndex) => ({
+    // column and always clickable". THE KIT'S OWN DataTable DRAWS THAT BUTTON
+    // — `onRowSelect` + `recordColumnKey` turn the record cell into the press
+    // target, filling the cell so the whole name is the hit area. The engine
+    // used to hand-roll one inside `cell`, and its hover was an underline on
+    // the name; the kit's is the whole row washing (`TableRow`'s
+    // `hover:bg-accent`), which is the client's own ruling of 2026-08-26 read
+    // off two live screenshots and written into data-table.tsx. So the row
+    // display had a hover the client ruled against, on every recipe-driven
+    // table in both front doors, while the `list` and `cards` displays below
+    // already let the kit own it (`List onItemClick`, `Card interactive`).
+    const columns: Array<DataTableColumn<Row>> = fields.map((f) => ({
       key: f.column,
       header: f.field.label,
       sortable: true,
-      cell: (row) =>
-        colIndex === 0 ? (
-          <button
-            type="button"
-            className="text-start underline-offset-2 hover:underline"
-            onClick={() => open(row)}
-          >
-            {asNode(row[f.column]) ?? String(row[f.column] ?? "")}
-          </button>
-        ) : (
-          (asNode(row[f.column]) ?? String(row[f.column] ?? ""))
-        ),
+      cell: (row) => asNode(row[f.column]) ?? String(row[f.column] ?? ""),
     }))
     if (rowActions.length > 0)
       // The old table had a row-actions config; the kit rules an actions
@@ -601,6 +598,13 @@ function renderList(
         columns={columns}
         rows={rows}
         getRowId={(row, i) => String(row.id ?? i)}
+        /* Omitted, not passed as a no-op, when there is nothing to open —
+           the kit draws a dead focusable control otherwise, and its own prop
+           note asks for exactly this. A recipe with no visible fields has no
+           record cell either, and `recordColumnKey` would then fall through
+           to the ⋯ actions column: a button inside a button. */
+        onRowSelect={fields.length > 0 && onIntent ? (row) => open(row) : undefined}
+        recordColumnKey={fields[0]?.column}
         className="w-full"
       />
     )

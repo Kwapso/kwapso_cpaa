@@ -33,7 +33,8 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 
 import { formatDate } from "@shared/web/format"
 import { useT } from "@shared/web/language"
-import { safeHref, safeSrc } from "@shared/web/rich-text"
+import { safeHref } from "@shared/web/rich-text"
+import { RecordMark } from "@shared/web/record-mark"
 import { useCached, useCachedValue, primeCache } from "@shared/web/store"
 import type { ClientDeliverable } from "@shared/types"
 
@@ -61,13 +62,6 @@ import { cacheKeys } from "@/lib/live-resources"
  * somebody else's host and is theirs to serve. */
 function reachableHere(url: string | null): boolean {
   return !!url && !url.startsWith("/media/internal/")
-}
-
-/** The initial shown where a deliverable has no picture — one glyph from the word
- * a person chose for it, so an empty shelf never looks broken. The same trick the
- * agency's own cards use. */
-function initial(d: ClientDeliverable): string {
-  return (d.kind || d.title).trim().slice(0, 1).toUpperCase()
 }
 
 /** One app's worth, in the order the door sent them (most recently shared first).
@@ -130,27 +124,28 @@ export function DeliverablesScreen() {
                 <ul className="flex flex-col gap-2">
                   {group.rows.map((d) => {
                     const href = safeHref(reachableHere(d.url) ? d.url : undefined) ?? null
-                    const picture = safeSrc(reachableHere(d.imageUrl) ? d.imageUrl : undefined) ?? null
                     return (
                       <li
                         key={d.id}
                         className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-4"
                       >
-                        {picture ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={picture}
-                            alt=""
-                            className="size-12 shrink-0 rounded-[var(--radius)] object-cover"
-                          />
-                        ) : (
-                          <span
-                            aria-hidden
-                            className="bg-muted text-muted-foreground grid size-12 shrink-0 place-items-center rounded-[var(--radius)] text-lg font-medium"
-                          >
-                            {initial(d)}
-                          </span>
-                        )}
+                        {/* An eighteenth hand-rolled answer to "what to draw
+                            when there is no picture" — the square, the radius,
+                            the initial and the `safeSrc` were all RecordMark's,
+                            written out again. It also had RecordMark's whole
+                            reason for existing missing: `safeSrc` proves the
+                            ADDRESS is well formed, never that the bytes are
+                            still there, and a handover still is one un-reclaimed
+                            object away from the browser's torn-paper glyph — on
+                            the client's own front door. `reachableHere` stays at
+                            the call site because it is this hostname's fence,
+                            not a property of a mark. */}
+                        <RecordMark
+                          picture={reachableHere(d.imageUrl) ? d.imageUrl : null}
+                          name={d.kind || d.title}
+                          size="tile"
+                          fit="cover"
+                        />
                         <div className="min-w-0 flex-1">
                           {d.kind && (
                             <p className="text-muted-foreground text-badge font-medium tracking-wide uppercase">
