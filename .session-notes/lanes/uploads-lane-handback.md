@@ -41,12 +41,38 @@ sees nothing at all — the row never renders once the file exists.**
 if (filter.view !== "all") clauses.push("t.completed_at IS NULL")
 ```
 
-`?view=all` exists on the door and **no caller in either front door has ever
-passed it** — three call sites, `work-panels.tsx:709`, `live-resources.ts:217`,
-and the account slice. Measured, not inferred: a to-do completed with a file
-through the real doors returns `fileUrl` on the write, and `GET
-/api/content/todos` then answers with zero rows; the account's To-dos tab renders
-"Nothing outstanding with a client."
+`?view=all` exists on the door. **CORRECTION (planner, verified):** an earlier
+draft of this note claimed no caller ever passes it. That was wrong — there is a
+fourth caller and it does: `contentApi.todoOne`
+(`web/lib/api/content.ts:443`) fetches `/api/content/todos?view=all` and finds
+one row by id client-side.
+
+The conclusion survives, and the real reason is better than the one I gave:
+`todoOne` is wired ONLY as the live layer's `fetchOne`
+(`web/lib/live-resources.ts:1054`), and **there is no to-do detail screen for it
+to draw** — no recipe in `web/lib/screens.ts`, no `todo-detail.tsx`, only
+`todo-form-dialog.tsx`. It patches a cached row and renders nothing. Of the three
+callers that DO feed a screen — `work-panels.tsx:709`, `live-resources.ts:217`
+and the account slice — none passes `view`. So a completed to-do reaches no
+screen, which is the claim that matters.
+
+That correction is worth keeping visible: "no caller passes view" was one grep
+from being checked, and had the fourth caller fed a screen the whole finding
+would have inverted. The render is not the reachability — which is the same
+sentence this lane is about.
+
+Measured, not inferred: a to-do completed with a file through the real doors
+returns `fileUrl` on the write, and `GET /api/content/todos` then answers with
+zero rows; the account's To-dos tab renders "Nothing outstanding with a client."
+
+Two things fall out, to note rather than fix here:
+
+- `todoOne` fetches the WHOLE list to find one row — the list-cache-as-detail
+  -source pattern EDGE-CASES.md warns about and R38's subject. It does not bite
+  today because no screen shows one to-do. It will bite the moment the completed
+  view exists.
+- the unreachable `Done` badge is now explained (below), and it is the clearest
+  evidence the open-only default was a later regression rather than a design.
 
 The tell was in the code all along. `work-panels.tsx` renders a `Done` badge for
 `todo.completedAt` and dims the row via `live={!todo.completedAt}`. Both are
@@ -114,6 +140,18 @@ Open questions the sweep still owns, none of them answered here:
 - `workers/tenancy/src/routes/processes.ts` writes an **APP's** logo
   (`AppRow.logoUrl`, rendered by `app-tiles.tsx:50`), not a process map's. The
   module is named for the permission, not for the record.
+
+## `DEV_API_ORIGIN` — the refusal, proved rather than claimed
+
+The flag's safety rests on writes being refused from localhost. Proved, both
+ways, against staging:
+
+- a real `POST /api/content/tasks` issued from the page through the proxy →
+  **HTTP 403 `foreign_origin`**, "That request didn't come from this site."
+  (`shared/workers/front-door.ts` — the browser sends `Origin:
+  http://localhost:3000` and the door compares it to its own);
+- and the write did not half-happen: a census of all 256 tasks afterwards finds
+  **zero** rows with that title.
 
 ## One for the doc-rot list
 
