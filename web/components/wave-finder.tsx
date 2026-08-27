@@ -128,9 +128,9 @@ export function WaveFinder({
             field: "accountId",
             label: t("Client"),
             control: "select" as const,
-            // Searchable because an agency has more clients than a dropdown
-            // should ask somebody to scroll — 131 on staging today.
-            searchable: true,
+            // No `searchable` flag any more: the kit's facet carries its own
+            // search field, which an agency with 131 clients on staging needs
+            // and a two-word one does not mind having.
             options: clients.map((a) => ({ value: a.id, label: a.name })),
           },
         ]
@@ -146,28 +146,39 @@ export function WaveFinder({
     },
   ]
 
+  // THE BAR IS ITS OWN ROW, at every width. The kit's filter row is a full-width
+  // strip of chips above whatever they are narrowing — that is the shape her
+  // component is drawn in and the reason it reads on a phone (a one-line
+  // scroller) without a second layout. Squeezing it back into the control row
+  // would be the first step of theming it into the row it replaced.
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <SearchInput
-        value={query.q}
-        onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
-        placeholder={t("Search waves…")}
-        className="w-full sm:w-56"
-      />
-      <SortControl
-        options={[
-          { value: "newest", label: t("Newest first") },
-          { value: "name", label: t("Name") },
-          { value: "client", label: t("Client") },
-          { value: "runs", label: t("When it runs") },
-          { value: "sprints", label: t("Sprints inside it") },
-        ]}
-        value={query.sortBy}
-        onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-        direction={query.dir}
-        onDirectionChange={(dir) => onChange({ ...query, dir })}
-        label={t("Sort by")}
-      />
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput
+          value={query.q}
+          onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
+          // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
+          // "Clear all", which was one control quietly owning two questions; the
+          // kit's bar says "Clear filters" and now means only that.
+          onClear={() => onChange({ ...query, q: "" })}
+          placeholder={t("Search waves…")}
+          className="w-full sm:w-56"
+        />
+        <SortControl
+          options={[
+            { value: "newest", label: t("Newest first") },
+            { value: "name", label: t("Name") },
+            { value: "client", label: t("Client") },
+            { value: "runs", label: t("When it runs") },
+            { value: "sprints", label: t("Sprints inside it") },
+          ]}
+          value={query.sortBy}
+          onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+          direction={query.dir}
+          onDirectionChange={(dir) => onChange({ ...query, dir })}
+          label={t("Sort by")}
+        />
+      </div>
       <FilterBar
         facets={facets}
         values={{ accountId: query.accountId, status: query.status }}
@@ -176,8 +187,9 @@ export function WaveFinder({
         // whose only wave is filtered out must not vanish from the filter.
         data={[]}
         onChange={(field, value) => onChange({ ...query, [field]: value })}
-        onClearAll={() => onChange({ ...EMPTY_WAVE_QUERY, sortBy: query.sortBy, dir: query.dir })}
-        canClear={waveQueryIsActive(query)}
+        onClearFacets={() =>
+          onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
+        }
         resultCount={resultCount}
       />
     </div>
