@@ -72,8 +72,14 @@ import type { Env } from "../env"
  * 200 vectors after a blip costs a fifth of re-sending a thousand. */
 const UPSERT_BATCH = 200
 
-/** Ids removed in one delete call. Same ceiling, same reasoning. */
-const DELETE_BATCH = 200
+/** Ids removed in one delete call. NOT the same ceiling as an upsert, which is
+ * what this line said for months: Vectorize takes 1,000 vectors per upsert and
+ * exactly 100 ids per delete. A source with 110 pieces went out in one call and
+ * came back `VECTOR_DELETE_ERROR (code = 40007): too many ids in payload; max id
+ * count is 100, got 110`, which aborts the whole sweep — so re-indexing died on
+ * the first big document rather than on the small ones nobody noticed. The two
+ * numbers are written apart, and separately, because they are separately true. */
+const DELETE_BATCH = 100
 
 /** Nearest neighbours one search asks for. Vectorize allows 100 when neither
  * values nor metadata come back — which is exactly the shape this seam uses, so
