@@ -234,27 +234,3 @@ So: convert the buttons and labels, and be conservative.
 Verify by opening a recipe-driven collection screen with filters and using
 them — not only by the gate.
 ```
-
-Same setup:
-  git worktree add -b lane/controls-d ~/Desktop/kwapso-ctrl-d lane/ui-swap
-
-YOUR FILES — these 5 and no others:
-  web-portal/components/ticket-attachments.tsx  (2 input)
-  web-portal/components/sign-in.tsx             (1 img, 1 form)
-  web-portal/components/waiting-on-you.tsx      (1 input)
-  web-portal/components/ticket-screen.tsx       (1 input)
-  web-portal/components/deliverables-screen.tsx (1 img)
-
-COORDINATE BEFORE YOU START: another lane (lane/portal-signin) has been working
-on the portal's sign-in screen and portal-shell.tsx. Check whether
-web-portal/components/sign-in.tsx has moved before you touch it, and if that
-lane is still open, skip that file and say so.
-
-Most of this lane is hidden file inputs, which the ruling says to LEAVE. It is
-entirely possible the honest output of this lane is "two conversions and three
-left alone, here is why". That is a good result, not a thin one.
-
-The portal is the client's front door and the narrow, calm one — its type is
-larger and its rhythm is different. Check it on a phone width as well as a
-desktop one.
-```
