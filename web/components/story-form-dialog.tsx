@@ -489,14 +489,14 @@ export function StoryFormDialog({
           list you have just said you are not using is noise. */}
       <Field config={processField} shape="group" htmlFor="story-processes" className={fieldSpacing}>
         <div className="flex flex-col gap-2" id="story-processes">
-          <label className="flex items-center gap-2 text-sm">
+          <Label className="flex">
             <Checkbox
               checked={values.changesNoStep}
               onCheckedChange={(c) => setValues((s) => ({ ...s, changesNoStep: c === true }))}
               disabled={busy}
             />
             {t("This changes no process")}
-          </label>
+          </Label>
           {!values.changesNoStep &&
             (processOptions.length === 0 ? (
               <p className="text-muted-foreground text-sm">
@@ -504,7 +504,7 @@ export function StoryFormDialog({
               </p>
             ) : (
               processOptions.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm">
+                <Label key={p.id} className="flex">
                   <Checkbox
                     checked={values.processIds.includes(p.id)}
                     onCheckedChange={(c) =>
@@ -519,7 +519,7 @@ export function StoryFormDialog({
                     disabled={busy}
                   />
                   {p.name}
-                </label>
+                </Label>
               ))
             ))}
         </div>

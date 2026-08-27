@@ -386,14 +386,16 @@ export function RecordPicker({
         // A SIBLING of the trigger, never nested inside it: Button's base class
         // carries `[&_svg]:pointer-events-none`, so an X drawn inside the trigger
         // is invisible to hit-testing and the click just opens the list.
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           aria-label={t("Clear")}
           onClick={clear}
-          className="text-muted-foreground hover:text-foreground size-9 shrink-0 rounded-pill"
+          className="text-muted-foreground hover:text-foreground size-9 shrink-0"
         >
-          <X className="mx-auto size-4" aria-hidden />
-        </button>
+          <X aria-hidden />
+        </Button>
       )}
     </div>
   )

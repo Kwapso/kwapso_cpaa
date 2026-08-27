@@ -76,6 +76,7 @@ import {
 } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Image } from "@shared/ui/components/image/image"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import {
@@ -417,12 +418,12 @@ export function AccountFormDialog({
       <Field config={coverField} htmlFor="account-cover" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
           {coverPreview && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverPreview}
-              alt={t("Cover image")}
-              className="h-20 w-full rounded-[var(--radius)] object-cover"
-            />
+            /* The kit's media well, which is what this box already was by hand:
+               the card radius, `object-cover`, the clip — and, new here, a
+               register for a cover URL that will not load, where a bare <img>
+               drew the browser's broken-picture glyph. `ratio={null}` because
+               the height is the form's (80), not the well's own 16/9. */
+            <Image src={coverPreview} alt={t("Cover image")} ratio={null} className="h-20 w-full" />
           )}
           <FileUpload accept="image/*" multiple={false} onFilesSelected={pickImage("coverUrl")} />
         </div>
