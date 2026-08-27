@@ -455,6 +455,11 @@ export const TRANSLATED_WHERE_READ: Record<
     via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope)"],
     why: "`SERVICE_COPY` — each Google service's name and the sentence saying WHAT CONNECTING IT LETS US SEE. It is keyed by the service the caller is drawing, so the words are looked up rather than written at the point of use, and all three reads go through `t`. The privacy sentence in particular is the one a person most needs in their own language.",
   },
+  "web/components/google-scope-dialog.tsx": {
+    kinds: ["property"],
+    via: ["t(m.title)", "t(m.description)", "t(EVENT_KINDS[kind].title)"],
+    why: "`MODES` and `EVENT_KINDS` — two closed vocabularies. MODES is keyed by SERVICE on purpose: the same two answers mean opposite things on the two connections (Gmail's 'only' takes mail away; Calendar's can hand more over, because kwapso reads only the primary calendar today), so the sentences cannot be shared and the table is what keeps them apart. EVENT_KINDS' `value` is Google's own event-type word, passed straight to events.list, so the table is a translation of an API constant and never a mapping. Every half is read through `t` in the same file.",
+  },
   "web/components/google-source-dialog.tsx": {
     kinds: ["property"],
     via: ["t(k.title)", "t(s.description)"],

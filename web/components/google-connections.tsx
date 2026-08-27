@@ -30,12 +30,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Ban, Plus, Power } from "@shared/ui/icons"
+import { Ban, Pencil, Plus, Power } from "@shared/ui/icons"
 
 import {
+  GOOGLE_SCOPED_SERVICES,
   GOOGLE_SERVICES,
   type Account,
   type GoogleConnection,
+  type GoogleScopedService,
   type GoogleService,
   type GoogleSource,
 } from "@shared/types"
@@ -44,6 +46,7 @@ import { formatActivityWhen } from "@shared/web/format"
 import { googleKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
+import { GoogleScopeDialog } from "@/components/google-scope-dialog"
 import { GoogleSourceDialog } from "@/components/google-source-dialog"
 import { GoogleSyncButton } from "@/components/google-sync"
 import { useT } from "@shared/web/language"
@@ -70,7 +73,7 @@ const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
   gmail: {
     label: "Gmail",
     scope:
-      "Mail to or from someone on one of your accounts, plus Google's own notices about shared documents and recordings.",
+      "Mail to or from someone on one of your accounts, plus Google's own notices about shared documents and recordings. Narrow it further to particular labels below.",
   },
   // READ ONLY, and the sentence says so because the grant now does. It read
   // "so meetings and sprints can be read and added" for six weeks after the
@@ -79,13 +82,27 @@ const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
   // somebody decides whether to hand over their calendar.
   calendar: {
     label: "Calendar",
-    scope: "Your own calendar, read only. kwapso never adds, changes or cancels anything in it.",
+    scope:
+      "Your main calendar, read only. kwapso never adds, changes or cancels anything in it. Name other calendars below to include them too.",
   },
   chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
 
-/** Which services are shared through NAMED folders or spaces. */
+/** Which services are SHARED through named folders or spaces. */
 const NAMED: GoogleService[] = ["drive", "chat"]
+
+/** And which are SCOPED — reached wholesale unless somebody narrows them. The
+ * two lists are different verbs on the same table of rows, which is why the card
+ * below reads one condition for the button and the other for the badge. */
+const SCOPED: GoogleService[] = [...GOOGLE_SCOPED_SERVICES]
+
+/** THE WORD ON THE BUTTON THAT TAKES A CONTAINER AWAY. "Stop sharing" is right
+ * for a folder somebody handed over and wrong for a calendar they never did —
+ * nobody shares their own calendar with themselves. Same act, same door, two
+ * true sentences. */
+function removeLabel(service: GoogleService, t: (s: string) => string): string {
+  return SCOPED.includes(service) ? t("Take it out") : t("Stop sharing")
+}
 
 export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) {
   const t = useT()
@@ -103,6 +120,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
   const [busy, setBusy] = React.useState(false)
   const [disconnecting, setDisconnecting] = React.useState<GoogleService | null>(null)
   const [sharing, setSharing] = React.useState<"drive" | "chat" | null>(null)
+  const [scoping, setScoping] = React.useState<GoogleScopedService | null>(null)
   const { can } = usePermissions(teamId)
 
   // THE OTHER HALF OF THE ROUND-TRIP. Google sends the browser back to the
@@ -262,6 +280,23 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         <span className="hidden sm:inline">{t("Share a")} {service === "drive" ? t("folder") : t("space")}</span>
                       </Button>
                     )}
+                    {/* THE SCOPE CONTROL, on the two services that have one.
+                      * Deliberately NOT called "share": nobody hands over their
+                      * own mailbox, they say how much of it may be read — and a
+                      * button borrowing the sharing word would make the two
+                      * decisions look like one. */}
+                    {live && SCOPED.includes(service) && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setScoping(service as GoogleScopedService)}
+                        className="gap-1"
+                        title={t("Choose what kwapso may read")}
+                      >
+                        <Pencil className="size-3.5" aria-hidden />
+                        <span className="hidden sm:inline">{t("What it may read")}</span>
+                      </Button>
+                    )}
                     {live ? (
                       <Button
                         variant="secondary"
@@ -338,9 +373,28 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   </p>
                 )}
 
-                {live && NAMED.includes(service) && (
+                {live && (NAMED.includes(service) || SCOPED.includes(service)) && (
                   <div className="flex flex-col gap-1 pl-1">
-                    {named.length === 0 ? (
+                    {/* WHAT IS ACTUALLY IN REACH, said in one line before the
+                      * rows. On a SCOPED service the answer depends on the mode
+                      * as well as the rows — 'everything' with three labels
+                      * named reads the whole mailbox, and a list of three
+                      * labels sitting there unexplained would say the opposite.
+                      * That is the state this line exists to prevent somebody
+                      * misreading. */}
+                    {SCOPED.includes(service) && live.scopeMode !== "only" && (
+                      <p className="text-muted-foreground text-xs">
+                        {t(SERVICE_COPY[service].scope)}
+                      </p>
+                    )}
+                    {SCOPED.includes(service) && live.scopeMode === "only" && named.length === 0 && (
+                      <p className="text-warning text-xs">
+                        {service === "gmail"
+                          ? t("No label is named, so no mail is read at all.")
+                          : t("No calendar is named, so no calendar is read at all.")}
+                      </p>
+                    )}
+                    {named.length === 0 && !SCOPED.includes(service) ? (
                       <p className="text-muted-foreground text-xs">
                         {t("Nothing shared yet — {scope}", {
                           scope: t(SERVICE_COPY[service].scope),
@@ -372,18 +426,28 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                               {t("One file")}
                             </Badge>
                           )}
-                          <Badge variant="secondary" className="text-badge">
-                            {s.shelf === "team" ? t("The team can read it") : t("Just you")}
-                          </Badge>
+                          {/* A SCOPED CONTAINER IS ALWAYS YOURS ALONE and has no
+                            * client, so neither badge is shown for one. Showing
+                            * "Just you" on a calendar would be true and useless;
+                            * showing "Ours" would suggest a decision the form
+                            * never asked for and the door never stores (R36's
+                            * sentence, one layer up). */}
+                          {!SCOPED.includes(service) && (
+                            <Badge variant="secondary" className="text-badge">
+                              {s.shelf === "team" ? t("The team can read it") : t("Just you")}
+                            </Badge>
+                          )}
                           {/* AND WHOSE MATERIAL IT IS. The second decision made
                            * at the moment of sharing, shown on the row for the
                            * same reason the first one is: six months later,
                            * "which client does the assistant think this is
                            * about?" is a question somebody has to be able to
                            * answer by looking. */}
-                          <Badge variant="secondary" className="text-badge">
-                            {s.accountName ? `Filed under ${s.accountName}` : t("Ours")}
-                          </Badge>
+                          {!SCOPED.includes(service) && (
+                            <Badge variant="secondary" className="text-badge">
+                              {s.accountName ? `Filed under ${s.accountName}` : t("Ours")}
+                            </Badge>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -394,7 +458,11 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                               try {
                                 const r = await content.googleSetSourceActive(s.id, false)
                                 primeCache(key, { ...(q.data as object), sources: r.sources } as typeof q.data)
-                                toast.success(t("Stopped sharing that."))
+                                toast.success(
+                                  SCOPED.includes(service)
+                                    ? t("Taken out.")
+                                    : t("Stopped sharing that.")
+                                )
                               } catch (err) {
                                 toast.error(
                                   err instanceof ApiFailure ? err.message : t("Couldn't stop sharing that.")
@@ -404,7 +472,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                               }
                             }}
                           >
-                            <Ban className="size-3" aria-hidden /> {t("Stop sharing")}
+                            <Ban className="size-3" aria-hidden /> {removeLabel(service, t)}
                           </Button>
                         </div>
                       ))
@@ -447,6 +515,58 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             {t("Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just yourself stays answerable to you alone.")}
           </p>
         </div>
+      )}
+
+      {scoping && (
+        <GoogleScopeDialog
+          open
+          onOpenChange={(o) => !o && setScoping(null)}
+          service={scoping}
+          draftKey={`google-scope:${scoping}`}
+          named={sources.filter((s) => s.service === scoping)}
+          current={{
+            mode: liveFor(scoping)?.scopeMode ?? "everything",
+            eventTypes: liveFor(scoping)?.scopeEventTypes ?? [],
+          }}
+          onSubmit={async (values) => {
+            // NAME THE CONTAINERS FIRST, then set the mode — in that order, and
+            // it matters. Switching to 'only' before the calendars exist is a
+            // moment in which the connection reads NOTHING, and a sweep landing
+            // in that moment would retire material this person is in the middle
+            // of keeping.
+            if (values.items.length)
+              await content.googleAddSources({
+                service: scoping,
+                items: values.items.map((i) => ({
+                  ...i,
+                  kind: scoping === "gmail" ? ("label" as const) : ("calendar" as const),
+                })),
+                // A SCOPED CONTAINER IS ALWAYS PRIVATE and has no client. Sent
+                // for the shape's sake; the door decides both from the service
+                // and never reads these (see postGoogleSource).
+                shelf: "private",
+                accountId: "",
+              })
+            const r = await content.googleSetScope({
+              service: scoping,
+              mode: values.mode,
+              eventTypes: scoping === "calendar" ? values.eventTypes : undefined,
+              forget: values.forget,
+            })
+            await refresh()
+            // WHAT ACTUALLY HAPPENED, including the expensive half. "Saved" over
+            // a pass that just dropped four hundred sources would be true and
+            // useless: the screen goes quiet afterwards while the sweep refills
+            // it, and somebody who was not told will read that as a fault.
+            toast.success(
+              r.forgotten > 0
+                ? t("Saved. {count} sources let go — the assistant will read them again from the start.", {
+                    count: r.forgotten,
+                  })
+                : t("Saved.")
+            )
+          }}
+        />
       )}
 
       {sharing && (

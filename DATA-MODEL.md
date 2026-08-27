@@ -1394,7 +1394,49 @@ tell them apart), `scopes` (**what Google actually granted**, not what we asked
 for, somebody can untick a box, and a connection that quietly works for less
 than it claims is how an assistant ends up saying "there is nothing in that
 folder" about a folder full of things), the two token columns, `last_used_at`,
-`last_error`, and the audit block.
+`last_error`, **`scope_mode` and `scope_event_types`** (below), and the audit
+block.
+
+- **`scope_mode`** (`everything` / `only`, migration
+  `0058_what_this_person_lets_us_read`) is **how much of this connection kwapso
+  may read**, and it exists because one table could not carry two opposite
+  meanings of silence. The containers themselves are rows in `google_sources` —
+  a calendar and a Gmail label sit beside the folder, the file and the space —
+  but "this person has named nothing" already means *read nothing* there, and on
+  Gmail and Calendar it has always meant *read everything*. Without the mode,
+  switching off a last named label would hand somebody their whole mailbox back
+  through a gesture that reads as a narrowing. `everything` is the default and is
+  bit-for-bit what every connection did before the column existed; `only` reads
+  the named containers and nothing else, and `only` with nothing named reads
+  **nothing**, which the screen says in those words.
+
+  It earned itself on **25 August 2026**: a live password was said out loud on a
+  call, transcribed into the meeting notes and indexed. The fix offered was a
+  credential SCANNER over transcripts and the owner refused it — "no it should
+  not scan anything.. give content as it is" — because a scanner tuned to catch a
+  spoken secret also silently drops real material. So the lever is scope: the
+  answer to "that should never have been read" is "that source was never in
+  scope".
+
+- **`scope_event_types`** is a space-separated allow-list in **Google's own
+  words** (`default`, `outOfOffice`, `focusTime`, `workingLocation`, `birthday`,
+  `fromGmail`), the same shape as `scopes` above it, passed straight to
+  `events.list` as repeated `eventTypes`. `''` means every kind and is the only
+  way to spell it — the door refuses an *empty list*, because "untick them all"
+  would otherwise round-trip back into "every kind" and be a second way for a
+  narrowing gesture to widen. It is a column rather than a `google_sources` row
+  because an event type is not a container: nobody shared it, it has no shelf, no
+  client and nothing to link to.
+
+- **The narrowing is applied by GOOGLE, never by us.** A label becomes `labelIds`
+  on the search, a calendar becomes the calendar in the URL, a kind becomes
+  `eventTypes` — so material out of scope is never fetched. A thing that was
+  fetched and then discarded has still been fetched, and has still been through
+  this worker's logs and memory on the way to being dropped. One seam reads the
+  decision (`googleScope`) and every mail and calendar read in the worker goes
+  through it — the knowledge sweep, the meetings sync, the events door and the
+  mail door alike — proved by a census in
+  `workers/content/test/google-scope.test.ts` rather than by convention.
 
 - **The tokens are ciphertext in the column**, not merely at rest under
   Cloudflare's disk encryption. A refresh token is a standing key to somebody's
@@ -1413,15 +1455,29 @@ folder" about a folder full of things), the two token columns, `last_used_at`,
   (CONCURRENCY rule 2). Partial, so disconnecting and connecting again, the
   ordinary way somebody fixes a broken grant, is still allowed.
 
-**`google_sources`**, the Drive FOLDERS, the individual Drive FILES, and the Chat
-SPACES one person named. Drive is not "your Drive" and Chat is not "your Chat":
-both are reached only through rows here, so the unnamed rest is out of reach by
-construction rather than by a filter somebody has to remember to write. Gmail and
-Calendar have no rows here because there is nothing to name, mail is narrowed to
-a **known contact** (an address on one of the team's `accounts`) and the calendar
-is the person's own calendar.
+**`google_sources`**, the containers one person named: the Drive FOLDERS, the
+individual Drive FILES, the Chat SPACES — and, since `0058`, the CALENDARS and
+the Gmail LABELS. Drive is not "your Drive" and Chat is not "your Chat": both are
+reached only through rows here, so the unnamed rest is out of reach by
+construction rather than by a filter somebody has to remember to write.
 
-- **`kind`** (`folder` / `file` / `space`, migration
+**The two newer kinds are the mirror image, and the verb is the difference.** A
+Drive folder is SHARED — nothing in a Drive is in reach until somebody hands it
+over. A calendar or a label is SCOPED — everything is in reach the moment the
+connection exists, and naming one is how a person says "this, and not the rest".
+Same table, same audit, same switch; which meaning applies is
+`google_connections.scope_mode`, above, and never the emptiness of this list.
+
+Mail also still carries a second, older fence on the interactive door: only mail
+to or from a **known contact** (an address on one of the team's `accounts`). That
+one is the PRODUCT's rule about what that door is for; `scope_mode` is the
+PERSON's rule about their own mailbox. They are different questions and both are
+passed to Gmail. (The knowledge SWEEP does not apply the contact fence — the
+owner opened his mailbox to it on 20 Aug 2026 — so the two doors disagree, which
+predates scope and is written down here rather than quietly reconciled.)
+
+- **`kind`** (`folder` / `file` / `space` / `calendar` / `label`, the last two
+  from `0058_what_this_person_lets_us_read`; the split of the first two by
   `0035_calendar_depth_and_file_shares`) splits what used to be one word. Sharing
   was folder-wise only, which meant sharing one contract meant sharing everything
   filed beside it. The fence does not change shape — what is named is the only
@@ -1431,6 +1487,9 @@ is the person's own calendar.
 
 - **`shelf`** (`private` / `team`) is the answer to the question the design round
   said we must answer at the moment of sharing: who will be able to read this?
+  A SCOPED row is always `private` and the form never asks: mail and a calendar
+  are filed as one person's material everywhere else in the module, and offering
+  a choice nothing downstream honours is the switch that decides nothing (R36).
   It is stored on the source rather than inferred later, because "I thought that
   folder was just mine" is the failure the column exists to prevent. It defaults
   to `private`, the safe answer is the one you get by not deciding, and it
@@ -1441,7 +1500,8 @@ is the person's own calendar.
   list.
 
 **Permissions: two modules. It was three.** `google` (read what you shared ·
-**create = connect an account** and name a folder or space · edit = write back
+**create = connect an account**, name a folder or space, and say how much of a
+mailbox or a calendar may be read · edit = write back
 through it · delete = disconnect or stop sharing), plus `google_mail`, which
 exists to carry ONE right: may kwapso send mail as you. Separate from `agent`, so
 granting somebody the assistant does not grant the assistant their outbox. A

@@ -22,7 +22,7 @@ import {
   knownContactQuery,
   GMAIL_CONTACT_CAP,
 } from "../src/lib/google-api"
-import { asService, asNamedService, asShelf } from "../src/lib/google"
+import { asScopedService, asService, asShelf } from "../src/lib/google"
 import { openToken, sealToken, tokenStorageReady } from "../src/lib/google-crypto"
 
 const realFetch = globalThis.fetch
@@ -256,16 +256,21 @@ describe("Gmail is known contacts, and nothing else", () => {
 })
 
 describe("the allow-lists are the check", () => {
-  it("only the four services, and only the two named ones", () => {
+  it("only the four services, and only the two that carry a scope", () => {
     expect(asService("drive")).toBe("drive")
     expect(asService("chat")).toBe("chat")
     expect(() => asService("mailbox")).toThrow(GuardError)
     expect(() => asService(123)).toThrow(GuardError)
-    expect(asNamedService("drive")).toBe("drive")
-    // Gmail and Calendar have nothing to NAME — mail is fenced by known contact
-    // and a calendar is the person's own — so they are refused here.
-    expect(() => asNamedService("gmail")).toThrow(GuardError)
-    expect(() => asNamedService("calendar")).toThrow(GuardError)
+    // SCOPE IS A QUESTION ABOUT GMAIL AND CALENDAR AND NOTHING ELSE. Drive and
+    // Chat are narrowed by what somebody SHARED — an unshared folder is out of
+    // reach already — so a scope on either would be a control with nothing
+    // behind it, and the door refuses the word rather than accepting and
+    // ignoring it.
+    expect(asScopedService("gmail")).toBe("gmail")
+    expect(asScopedService("calendar")).toBe("calendar")
+    expect(() => asScopedService("drive")).toThrow(GuardError)
+    expect(() => asScopedService("chat")).toThrow(GuardError)
+    expect(() => asScopedService(null)).toThrow(GuardError)
   })
 
   it("the shelf defaults to PRIVATE — the safe answer is the one you get by not deciding", () => {

@@ -34,8 +34,15 @@
 import { fail, json } from "@shared/workers/http"
 import { queryText, requireText, optionalText, TEXT_LIMITS } from "@shared/workers/validate"
 import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
-import { GOOGLE_SERVICES, type GoogleService } from "@shared/types"
-import { rewindGoogleLane } from "../lib/knowledge-google"
+import {
+  GOOGLE_EVENT_TYPES,
+  GOOGLE_SCOPED_SERVICES,
+  GOOGLE_SERVICES,
+  type GoogleEventType,
+  type GoogleService,
+  type GoogleSourceKind,
+} from "@shared/types"
+import { forgetGoogleKind, rewindGoogleLane } from "../lib/knowledge-google"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -45,7 +52,9 @@ import {
   rememberChatPeople,
   addNamedSource,
   asMailBinKind,
-  asNamedService,
+  asScopedService,
+  asScopeMode,
+  asService,
   asServiceOrAll,
   asShelf,
   disconnectAll,
@@ -55,6 +64,7 @@ import {
   ownSourceOrThrow,
   recordGoogleAct,
   saveConnection,
+  setGoogleScope,
   setNamedSourceActive,
 } from "../lib/google"
 import { tokenStorageReady } from "../lib/google-crypto"
@@ -68,8 +78,7 @@ import {
   readCookie,
 } from "../lib/google-oauth"
 import {
-  calendarGet,
-  calendarList,
+  calendarsList,
   chatDelete,
   chatMessages,
   chatPost,
@@ -86,11 +95,11 @@ import {
   driveUpload,
   gmailDraft,
   gmailLabelId,
+  gmailLabels,
   gmailLabelMessage,
   gmailMessage,
   gmailMessageLabelIds,
   gmailReply,
-  gmailSearch,
   gmailSend,
   gmailSendDraft,
   gmailThread,
@@ -98,7 +107,7 @@ import {
   knownContactQuery,
   type GoogleMailBinKind,
 } from "../lib/google-api"
-import { knownContactEmails } from "../lib/google-read"
+import { knownContactEmails, scopedCalendarEvent, scopedCalendarWindow, scopedGmailSearch } from "../lib/google-read"
 import { findTranscript } from "../lib/google-transcript"
 import type { Env } from "../env"
 import { brand } from "@shared/brand"
@@ -311,10 +320,18 @@ export async function getGooglePick(request: Request, env: Env): Promise<Respons
   const { cfg, guard } = await gated(request, env, "google", "create")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
-  const service = asNamedService(queryText(url.searchParams.get("service"), "Service"))
+  // EVERY SERVICE NOW, not only the two that are SHARED. Gmail and Calendar are
+  // scoped rather than shared (GOOGLE_SCOPE_KINDS), but the question a picker
+  // answers is the same one — "what could I name?" — and answering it behind a
+  // second door would be two doors, two gates and two places to forget
+  // `refusePortalCaller`. `asService` is still an allow-list and still refuses
+  // anything else at the boundary (R20).
+  const service = asService(queryText(url.searchParams.get("service"), "Service"))
   const q = queryText(url.searchParams.get("q"), "Search", TEXT_LIMITS.short)
   const kind = queryText(url.searchParams.get("kind"), "Type", TEXT_LIMITS.short)
   const { token } = await accessTokenFor(env, cfg, guard, service)
+  if (service === "calendar" || service === "gmail")
+    return json({ options: await scopeOptions(service, token) })
   const options =
     service === "chat"
       ? (await chatSpaces(token)).map((s) => ({
@@ -341,6 +358,113 @@ export async function getGooglePick(request: Request, env: Env): Promise<Respons
           hasThumbnail: f.hasThumbnail,
         }))
   return json({ options })
+}
+
+/** THE CALENDARS OR THE LABELS THIS PERSON COULD NAME, in the picker's own
+ * shape. No search term: a person has a handful of calendars and a page of
+ * labels, and both lists are read whole and shown whole — narrowing a picker
+ * that fits on one screen is a control with nothing to do. */
+async function scopeOptions(
+  service: "calendar" | "gmail",
+  token: string
+): Promise<{ externalId: string; name: string; named: boolean; iconUrl: null; mimeType: string; hasThumbnail: boolean }[]> {
+  const rows =
+    service === "calendar"
+      ? (await calendarsList(token)).map((c) => ({ externalId: c.id, name: c.name }))
+      : (await gmailLabels(token)).map((l) => ({ externalId: l.id, name: l.name }))
+  return rows.map((r) => ({ ...r, named: true, iconUrl: null, mimeType: "", hasThumbnail: false }))
+}
+
+/** POST /api/content/google/scope — HOW MUCH OF A CONNECTION KWAPSO MAY READ.
+ *
+ * THE DECISION THIS DOOR EXISTS FOR. On 25 August 2026 a live password was said
+ * out loud on a call, transcribed into the meeting notes and indexed. It was
+ * rotated. The fix offered was a credential scanner over transcripts and the
+ * owner refused it, in his words: "no it should not scan anything.. give content
+ * as it is." A scanner tuned to catch a spoken secret also silently drops real
+ * material, and silent dropping is a failure this knowledge base has already
+ * been bitten by twice. So the lever is scope, and this is where a person pulls
+ * it.
+ *
+ * TWO INDEPENDENT AXES, and they are separate on purpose. `mode` says which
+ * CONTAINERS (the calendars, the mail labels — rows this person names through
+ * the sources door beside this one). `eventTypes` says which KINDS of thing in a
+ * calendar. A person can narrow either without touching the other, and folding
+ * them into one word would make "only my work calendar" and "not my birthdays"
+ * the same decision.
+ *
+ * `eventTypes` MAY NOT BE EMPTY when it is sent. Storing an empty allow-list
+ * would round-trip back into "every kind" (see `eventTypeList`), so unticking
+ * every box would be a gesture that reads as a narrowing and acts as a
+ * widening — the same trap `scope_mode` exists to close on the other axis. Omit
+ * the field to leave the kinds alone; send a list to choose them.
+ *
+ * WHAT IT COSTS, and why the caller has to ask for it. A scope change reaches
+ * the future by itself, but everything already indexed through this connection
+ * was read under the OLD scope and stays answerable — which is precisely the
+ * material somebody narrowing is trying to be rid of. So `forget` retires this
+ * person's sources for that service and rewinds the lane, and the next sweep
+ * brings back exactly what is in scope. It is a re-read and a re-embed of one
+ * person's own mail or calendar, so the screen says so in words and the person
+ * confirms it; it is not done silently on their behalf.
+ */
+export async function postGoogleScope(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    service?: unknown
+    mode?: unknown
+    eventTypes?: unknown
+    forget?: unknown
+  }>(request, env, "google", "create")
+  await refusePortalCaller(cfg, guard)
+  // Through the text seam, then the module's own allow-list — the same order and
+  // the same reason as every other door in this file (R20 is positional).
+  const service = asScopedService(requireText(body.service, "Service", TEXT_LIMITS.short))
+  const mode = asScopeMode(requireText(body.mode, "How much", TEXT_LIMITS.short))
+  // R20, the array shape, exactly as `shareList` does it: `Array.isArray`
+  // decides it is a list, then every word inside goes through the text seam and
+  // then through Google's own allow-list. A list is not a way in for a value a
+  // scalar could not carry.
+  const eventTypes = Array.isArray(body.eventTypes)
+    ? body.eventTypes.map((raw) => asEventType(requireText(raw, "Kind of event", TEXT_LIMITS.short)))
+    : null
+  if (eventTypes && eventTypes.length === 0)
+    return fail(400, "invalid_input", "Pick at least one kind of event, or switch Calendar off.")
+  if (typeof body.forget !== "boolean")
+    return fail(400, "invalid_input", "Say whether to read it again from the start.")
+
+  const before = (await listConnections(cfg, guard)).find((c) => c.service === service && c.active)
+  const connectionId = await setGoogleScope(cfg, guard, actor, {
+    service,
+    mode,
+    // Left off = leave the kinds exactly as they were. A door that reset them to
+    // "every kind" because a client did not mention them would widen a scope
+    // through silence, which is the one thing this whole lane is against.
+    eventTypes: eventTypes ?? (before?.scopeEventTypes ?? []),
+  })
+  // ONLY WHEN SOMETHING MOVED. Forgetting is expensive and destructive-looking
+  // (a screen goes quiet until the sweep refills it), so a save that changed
+  // nothing must not trigger it — two tabs pressing the same button would
+  // otherwise drop the same person's mail twice.
+  const forgotten = connectionId && body.forget === true ? await forgetGoogleKind(env, cfg, guard, service) : 0
+  // R1 + R15: the row a screen is looking at, on the `google` channel the
+  // connections card already listens to.
+  if (connectionId) await publishChange(env, guard.teamId, "google", connectionId)
+  return json({
+    connections: await listConnections(cfg, guard),
+    changed: connectionId !== null,
+    forgotten,
+  })
+}
+
+/** One of Google's own event-type words, or a clean 400. The allow-list IS the
+ * check (R20), and it is Google's list rather than ours: the word is passed
+ * straight to `events.list` as `eventTypes`, and one Google does not recognise
+ * is a request it refuses outright — which would cost the whole calendar rather
+ * than the one kind. */
+function asEventType(value: unknown): GoogleEventType {
+  if (typeof value !== "string" || !(GOOGLE_EVENT_TYPES as readonly string[]).includes(value))
+    throw new GuardError(400, "invalid_input", "That isn't a kind of calendar entry.")
+  return value as GoogleEventType
 }
 
 /** POST /api/content/google/sources — name Drive folders, Drive FILES, or Chat
@@ -376,8 +500,23 @@ export async function postGoogleSource(request: Request, env: Env): Promise<Resp
   await refusePortalCaller(cfg, guard)
   // Through the text seam, then the module's own allow-list — see the note on
   // the disconnect door for why the order is not optional (R20 is positional).
-  const service = asNamedService(requireText(body.service, "Service", TEXT_LIMITS.short))
-  const shelf = asShelf(optionalText(body.shelf, "Shelf", TEXT_LIMITS.short))
+  //
+  // ALL FOUR SERVICES. Drive and Chat name a folder, a file or a space to SHARE;
+  // Gmail and Calendar name a label or a calendar to SCOPE to. Different verbs
+  // on the screen and the same act here — a row in `google_sources` saying "this
+  // container, and it is mine to say so" — so one door writes them all rather
+  // than two doors writing one table.
+  const service = asService(requireText(body.service, "Service", TEXT_LIMITS.short))
+  // A SCOPED CONTAINER IS ALWAYS PRIVATE, and it is decided here rather than
+  // asked. Mail and a calendar have no shelf anywhere else in this module
+  // (google-read.ts files both as `private` and says why: there is no screen on
+  // which somebody declares their inbox to be team material, and inventing one
+  // would be inventing a decision nobody made). Reading a `shelf` off the body
+  // for these two would offer a choice that nothing downstream honours — R36's
+  // sentence, about a switch that decides nothing.
+  const shelf = SCOPED.has(service)
+    ? "private"
+    : asShelf(optionalText(body.shelf, "Shelf", TEXT_LIMITS.short))
   // WHOSE MATERIAL IS IN IT — asked here, in the same breath as who may read
   // it, because both are decisions about where the contents end up and neither
   // can be read back off the contents. Left off = the agency's own.
@@ -396,10 +535,11 @@ export async function postGoogleSource(request: Request, env: Env): Promise<Resp
         service,
         externalId: item.externalId,
         name: item.name,
-        // A Chat share is always a space; a Drive share is a folder unless the
-        // caller said file. Decided HERE from the service rather than trusted off
-        // the request, so there is no way to spell a Chat "folder".
-        kind: service === "chat" ? "space" : item.kind === "file" ? "file" : "folder",
+        // WHAT KIND OF CONTAINER, decided HERE from the SERVICE rather than
+        // trusted off the request — so there is no way to spell a Chat "folder"
+        // or a calendar "file". Drive is the only service with two shapes, and
+        // it is the only one that reads the caller's word at all.
+        kind: SOURCE_KIND[service](item.kind),
         shelf,
         accountId,
       })
@@ -410,6 +550,22 @@ export async function postGoogleSource(request: Request, env: Env): Promise<Resp
   // One ping per row, because each is a row a screen is looking at (R1/R15).
   for (const id of ids) await publishChange(env, guard.teamId, "google", id)
   return json({ sources: await listNamedSources(cfg, guard), shared: ids.length })
+}
+
+/** The two services a person SCOPES rather than shares. Spelled as a set here
+ * because two lines in this door ask the same question of it. */
+const SCOPED = new Set<GoogleService>(GOOGLE_SCOPED_SERVICES)
+
+/** WHAT A ROW OF EACH SERVICE IS. Data rather than a ternary chain, for the
+ * reason the fourth branch of a ternary chain always eventually gives. Drive is
+ * the only entry that reads the caller's word, and it reads it as an allow-list
+ * of one: anything but `file` is a folder, which is what a caller who has never
+ * heard of the newer shape gets. */
+const SOURCE_KIND: Record<GoogleService, (kind: string) => GoogleSourceKind> = {
+  drive: (kind) => (kind === "file" ? "file" : "folder"),
+  chat: () => "space",
+  calendar: () => "calendar",
+  gmail: () => "label",
 }
 
 /** The things one share request may name: a bounded list, every field through
@@ -739,9 +895,17 @@ export async function postGoogleDriveTrash(request: Request, env: Env): Promise<
 // ── GMAIL ────────────────────────────────────────────────────────────────────
 
 /** GET /api/content/google/gmail/messages?q= — mail to or from a KNOWN CONTACT,
- * and only that. The contact fence is built server-side from the accounts table
- * and the caller's words are ANDed inside it, so `q` can narrow and can never
- * widen. No known contacts → nothing, said plainly. */
+ * and only that, and only inside the labels this person left in reach.
+ *
+ * TWO FENCES, AND THEY ARE DIFFERENT QUESTIONS. The contact fence is the
+ * PRODUCT's rule — this door is for mail with clients — and it is built
+ * server-side from the accounts table with the caller's words ANDed inside it,
+ * so `q` can narrow and can never widen. The label scope is the PERSON's rule,
+ * and it is theirs to set. Both are passed to Gmail rather than applied to what
+ * Gmail returns, so neither is a filter over material already fetched.
+ *
+ * No known contacts → nothing, said plainly. A scope of 'only' with no label
+ * named → also nothing, and `scopedGmailSearch` asks Gmail nothing at all. */
 export async function getGoogleMail(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "read")
   await refusePortalCaller(cfg, guard)
@@ -751,7 +915,10 @@ export async function getGoogleMail(request: Request, env: Env): Promise<Respons
   if (!fence)
     return json({ messages: [], contactsUsed: 0, note: "No contact on any account has an email address yet." })
   const { token } = await accessTokenFor(env, cfg, guard, "gmail")
-  return json({ messages: await gmailSearch(token, fence, q), contactsUsed: contacts.length })
+  return json({
+    messages: await scopedGmailSearch(cfg, guard, token, fence, q),
+    contactsUsed: contacts.length,
+  })
 }
 
 /** GET /api/content/google/gmail/message?messageId= — one message, with its text. */
@@ -1035,13 +1202,19 @@ const MAIL_BIN_SCOPE: Record<GoogleMailBinKind, string> = {
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
 
-/** GET /api/content/google/calendar/events?from=&to= — my own calendar, in a window. */
+/** GET /api/content/google/calendar/events?from=&to= — my own calendar, in a
+ * window, narrowed to the calendars and the kinds of event I let kwapso read.
+ *
+ * Through the SCOPED read like every other calendar path in this worker. A door
+ * that read the whole calendar while the sweep was fenced out of it would make
+ * the fence a preference: the assistant reaches this door as the signed-in
+ * person, so an unscoped door is an unscoped assistant. */
 export async function getGoogleEvents(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "google", "read")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   const { token } = await accessTokenFor(env, cfg, guard, "calendar")
-  const window = await calendarList(token, {
+  const window = await scopedCalendarWindow(cfg, guard, token, {
     from: queryText(url.searchParams.get("from"), "From", TEXT_LIMITS.short),
     to: queryText(url.searchParams.get("to"), "To", TEXT_LIMITS.short),
   })
@@ -1106,7 +1279,12 @@ export async function getGoogleEventTranscript(request: Request, env: Env): Prom
   const eventId = queryText(new URL(request.url).searchParams.get("eventId"), "Event", TEXT_LIMITS.short)
   if (!eventId) return fail(400, "invalid_input", "Say which event.")
   const { token: calendarToken } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarGet(calendarToken, eventId)
+  // ACROSS THE CALENDARS THIS PERSON NAMED. Pinned to `primary`, this would
+  // report "that event isn't there" about an entry on a calendar they
+  // deliberately put in reach.
+  const event = await scopedCalendarEvent(cfg, guard, calendarToken, eventId)
+  if (!event)
+    return fail(404, "not_found", "That calendar entry isn't in what Calendar is allowed to read.")
 
   const found = await findTranscript(env, cfg, guard, event)
   if (!found)

@@ -1960,11 +1960,45 @@ export type StaffCertificate = {
 export const GOOGLE_SERVICES = ["drive", "gmail", "calendar", "chat"] as const
 export type GoogleService = (typeof GOOGLE_SERVICES)[number]
 
-/** The two services whose material is reached through NAMED sources rather than
- * wholesale — Drive folders and Chat spaces. Gmail is narrowed by known contact
- * and Calendar is the person's own already, so neither has anything to name. */
+/** The two services whose material is reached through SHARED sources — Drive
+ * folders and Chat spaces. Sharing is the act: nothing in a Drive or a Chat is
+ * reachable until somebody hands it over, and what they hand over carries a
+ * shelf and a client with it. */
 export const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
 export type GoogleNamedService = (typeof GOOGLE_NAMED_SERVICES)[number]
+
+/** The two services that are reached WHOLESALE unless somebody narrows them —
+ * the mailbox and the calendar. There is nothing to hand over here: a person
+ * connects Gmail and every message is in reach, connects Calendar and their own
+ * calendar is. So the act on these two is the opposite one — SCOPE, which says
+ * which containers may be read and leaves the rest alone. */
+export const GOOGLE_SCOPED_SERVICES = ["gmail", "calendar"] as const
+export type GoogleScopedService = (typeof GOOGLE_SCOPED_SERVICES)[number]
+
+/** HOW MUCH OF A CONNECTION KWAPSO MAY READ.
+ *
+ * 'everything' is the default and is what every connection did before scope
+ * existed. 'only' means the containers this person named and nothing else — and
+ * 'only' with nothing named means NOTHING, which is the safe direction and the
+ * whole reason this is a mode rather than an empty list. Without it, switching
+ * off a last named label would hand somebody's whole mailbox back through a
+ * gesture that reads as a narrowing. */
+export const GOOGLE_SCOPE_MODES = ["everything", "only"] as const
+export type GoogleScopeMode = (typeof GOOGLE_SCOPE_MODES)[number]
+
+/** GOOGLE'S OWN WORDS for the kinds of thing that sit in a calendar, passed
+ * straight to events.list as repeated `eventTypes` — so a kind left out is never
+ * fetched rather than fetched and dropped. An empty allow-list means every kind,
+ * which is the untouched state and the only way to spell it. */
+export const GOOGLE_EVENT_TYPES = [
+  "default",
+  "outOfOffice",
+  "focusTime",
+  "workingLocation",
+  "birthday",
+  "fromGmail",
+] as const
+export type GoogleEventType = (typeof GOOGLE_EVENT_TYPES)[number]
 
 /** Who may read what you shared. Declared at the moment you share it, shown on
  * the row afterwards, and the only thing that decides whether a colleague's
@@ -2010,6 +2044,13 @@ export type GoogleConnection = {
    * their connection stopped working without waiting for an answer to be wrong. */
   lastUsedAt: string | null
   lastError: string | null
+  /** HOW MUCH OF IT KWAPSO MAY READ. Meaningful on Gmail and Calendar, where
+   * connecting alone puts everything in reach; Drive and Chat are already
+   * narrowed by what somebody chose to share, so this stays 'everything' on
+   * them and no screen offers to change it. */
+  scopeMode: GoogleScopeMode
+  /** WHICH KINDS OF EVENT, on a calendar connection. Empty means every kind. */
+  scopeEventTypes: GoogleEventType[]
   active: boolean
   createdAt: string
   creatorName: string | null
@@ -2027,16 +2068,27 @@ export type GoogleConnection = {
  * boolean on the Drive rows: three shapes, three names, and no row that has to
  * be read together with its service to know what it is. */
 export const GOOGLE_SHARE_KINDS = ["folder", "file", "space"] as const
-export type GoogleSourceKind = (typeof GOOGLE_SHARE_KINDS)[number]
 
-/** A Drive folder, a single Drive file, or a Chat space one person named for
- * kwapso. */
+/** AND THE TWO A PERSON SCOPES TO rather than shares. A calendar and a Gmail
+ * label are containers in the same sense a folder is — a place the read runs
+ * against — but nobody hands one over: they exist in reach already, and naming
+ * one is how somebody says "this, and not the rest". Same table, same audit,
+ * same switch; a different verb on the screen. */
+export const GOOGLE_SCOPE_KINDS = ["calendar", "label"] as const
+
+/** Every kind of container a `google_sources` row can be. */
+export const GOOGLE_SOURCE_KINDS = [...GOOGLE_SHARE_KINDS, ...GOOGLE_SCOPE_KINDS] as const
+export type GoogleSourceKind = (typeof GOOGLE_SOURCE_KINDS)[number]
+
+/** A Drive folder, a single Drive file, a Chat space one person shared — or a
+ * calendar or Gmail label they scoped kwapso to. */
 export type GoogleSource = {
   id: string
   connectionId: string
   userId: string
-  service: GoogleNamedService
-  /** Google's own id for it — a folder id, or a `spaces/AAAA…` space name. */
+  service: GoogleService
+  /** Google's own id for it — a folder id, a `spaces/AAAA…` space name, a
+   * calendar id, or a Gmail label id. */
   externalId: string
   name: string
   shelf: GoogleShelf

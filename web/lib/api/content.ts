@@ -17,6 +17,9 @@ import type {
   Deliverable,
   DriveFileRow,
   GoogleConnection,
+  GoogleEventType,
+  GoogleScopeMode,
+  GoogleScopedService,
   GoogleService,
   GoogleShelf,
   GoogleSource,
@@ -926,11 +929,13 @@ export const content = {
       sources: GoogleSource[]
     }>("/api/content/google/disconnect", post({ service })),
 
-  /** What could I name? Folders or FILES (Drive), or spaces (Chat), this person
-   * can see. `named` false on a Chat option means the label is one WE wrote from
-   * the space's type — Google leaves the name of a direct message empty — so the
-   * picker can say so rather than presenting our sentence as Google's. */
-  googlePick: (service: "drive" | "chat", q?: string, kind?: "folder" | "file") =>
+  /** What could I name? Folders or FILES (Drive), spaces (Chat), CALENDARS or
+   * mail LABELS — everything this person can see, whichever service they are
+   * deciding about. `named` false on a Chat option means the label is one WE
+   * wrote from the space's type — Google leaves the name of a direct message
+   * empty — so the picker can say so rather than presenting our sentence as
+   * Google's. */
+  googlePick: (service: GoogleService, q?: string, kind?: "folder" | "file") =>
     api<{
       options: {
         externalId: string
@@ -954,13 +959,35 @@ export const content = {
    * answer for every item in one act of sharing, which is why the list is in the
    * call rather than the call being made once per item. */
   googleAddSources: (input: {
-    service: "drive" | "chat"
+    service: GoogleService
     items: { externalId: string; name: string; kind: GoogleSourceKind }[]
     shelf: GoogleShelf
     accountId?: string | null
   }) => api<{ sources: GoogleSource[]; shared: number }>("/api/content/google/sources", post(input)),
   googleSetSourceActive: (id: string, active: boolean) =>
     api<{ sources: GoogleSource[] }>("/api/content/google/sources/active", post({ id, active })),
+
+  /** HOW MUCH OF A CONNECTION KWAPSO MAY READ — Gmail and Calendar only, the two
+   * services connecting alone puts wholly in reach.
+   *
+   * `mode` is about which CONTAINERS (the labels or calendars named through
+   * `googleAddSources`); `eventTypes` is about which KINDS of calendar entry, and
+   * leaving it off means "don't touch that decision" rather than "every kind".
+   *
+   * `forget` is the expensive half and the caller has to ask for it: scope
+   * narrows what will be READ, so material already indexed under the old scope
+   * stays answerable until somebody says otherwise. True retires it and reads the
+   * service again from the start. `forgotten` says how many sources that was. */
+  googleSetScope: (input: {
+    service: GoogleScopedService
+    mode: GoogleScopeMode
+    eventTypes?: GoogleEventType[]
+    forget: boolean
+  }) =>
+    api<{ connections: GoogleConnection[]; changed: boolean; forgotten: number }>(
+      "/api/content/google/scope",
+      post(input)
+    ),
 
   /** Files in the folders I named PLUS the files I named one by one. Each row
    * carries Google's own icon for its type — an unauthenticated static link,
