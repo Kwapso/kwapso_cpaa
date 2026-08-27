@@ -24,8 +24,11 @@ import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import {
   addStoryAttachment,
   countStoryAttachments,
+  getStoryAttachment,
   listStoryAttachments,
   removeStoryAttachment,
+  renameStoryAttachment,
+  replaceStoryAttachment,
 } from "../lib/story-attachments"
 import { resolveOrdering } from "@shared/workers/sorting"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -456,6 +459,112 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
     sizeBytes,
   })
   await publishChange(env, guard.teamId, "stories", id, "edit", story.account_id ?? undefined)
+  return json({ attachments, total: attachments.length })
+}
+
+/** POST /api/content/stories/attachments/update — FIX one that is already on the
+ * story: rename it, or swap it for the right file or the right link.
+ *
+ * THE DOOR THIS MODULE DID NOT HAVE. Attaching and removing were both built; the
+ * middle was not, so somebody who attached the wrong document could only take it
+ * off and put another one on — two acts, two lines of history, and a window
+ * where the story carried neither. The ask was the plain one: fix it "without
+ * the record showing both".
+ *
+ * ONE DOOR, THREE ACTS, because they are one act to the person doing them —
+ * "that is not right, here is the right one" — and splitting them would put
+ * three gates, three pings and three tools where the story only ever moves once.
+ * Which act it is comes off the BODY, and each branch is decided by a `typeof`
+ * rather than a truthiness test (R20: `if (body.url)` lets `{}`, `[]` and `123`
+ * through the door and calls them absent):
+ *
+ *   · `fileDataUrl` present  → new bytes on a file attachment
+ *   · `url` present          → a new address on a link attachment
+ *   · neither, `label` alone → a rename
+ *
+ * A rename is an UPDATE and a replace is a new row beside a deactivated one;
+ * lib/story-attachments.ts carries that argument, because it is a decision about
+ * what deactivate-never-delete is FOR rather than about this handler.
+ *
+ * `work:edit`, the same right the other two writes ask for and for the same
+ * reason: a story is ours. And the same `refusePortalCaller` (R21).
+ */
+export async function postStoryAttachmentUpdate(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    attachmentId?: unknown
+    label?: unknown
+    url?: unknown
+    fileDataUrl?: unknown
+  }>(request, env, "work", "edit")
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Story", TEXT_LIMITS.short)
+  const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)
+  const label = optionalText(body.label, "Name", TEXT_LIMITS.short)
+  // WHICH ACT, asked as a type question so the answer is a type answer.
+  const newBytes = typeof body.fileDataUrl === "string"
+  const newLink = typeof body.url === "string"
+  if (newBytes && newLink)
+    return fail(400, "invalid_input", "Send a new file or a new link, not both.")
+
+  const story = await storyOrThrow(cfg, guard, id) // the stamped ping's account
+  // READ THE ROW FIRST, and not only to 404. A replace carries the old row's
+  // KIND and LABEL onto the new one, and the kind is also what says whether the
+  // caller is asking for something coherent — bytes for a link, or a web address
+  // for a file, is a mistake worth a sentence rather than a silent half-write.
+  const current = await getStoryAttachment(cfg, guard, id, attachmentId)
+  if (!current) return fail(404, "not_found", "That isn't attached to this story.")
+
+  if (newBytes) {
+    if (current.kind !== "file")
+      return fail(400, "invalid_input", "That one is a link. Give it a new address instead.")
+    // The SAME binary validator, cap and storage rule the add door uses — one
+    // seam, so the two can never disagree about what may be attached to a story
+    // (shared/workers/image.ts carries the whole argument).
+    const parsed = parseUploadDataUrl(body.fileDataUrl, TICKET_FILE_MAX_BYTES, ANY_FILE_TYPE)
+    if (!parsed)
+      return fail(
+        400,
+        "invalid_input",
+        typeof body.fileDataUrl === "string" && dataUrlBytes(body.fileDataUrl) > TICKET_FILE_MAX_BYTES
+          ? "That file is over 10MB. Try a smaller one."
+          : "That file didn't come through. Try attaching it again."
+      )
+    // A NEW KEY, never the old one overwritten in place. The old row still
+    // points at the old object and still says who put it there, which is the
+    // whole reason the replace is two rows; and /media is served `immutable`,
+    // so a key written twice is a key somebody's browser answers from cache.
+    const key = mediaKey("story", guard.teamId)
+    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
+    const { moved, attachments } = await replaceStoryAttachment(cfg, guard, actor, id, current, {
+      label,
+      url: `/media/${key}`,
+      contentType: parsed.contentType,
+      sizeBytes: parsed.bytes.byteLength,
+    })
+    if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", story.account_id ?? undefined)
+    return json({ attachments, total: attachments.length })
+  }
+
+  if (newLink) {
+    if (current.kind !== "link")
+      return fail(400, "invalid_input", "That one is a file. Send a new file instead.")
+    const raw = requireText(body.url, "Link", TEXT_LIMITS.link)
+    const safe = safeExternalLink(raw)
+    if (!safe || !/^https?:\/\//i.test(safe))
+      return fail(400, "invalid_input", "A link has to start with http:// or https://.")
+    const { moved, attachments } = await replaceStoryAttachment(cfg, guard, actor, id, current, {
+      label,
+      url: safe,
+    })
+    if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", story.account_id ?? undefined)
+    return json({ attachments, total: attachments.length })
+  }
+
+  if (!label) return fail(400, "invalid_input", "Give it a name, a new file or a new link.")
+  // R17: renaming it to what it already says moves zero rows → no history, no ping.
+  const { moved, attachments } = await renameStoryAttachment(cfg, guard, actor, id, attachmentId, label)
+  if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", story.account_id ?? undefined)
   return json({ attachments, total: attachments.length })
 }
 

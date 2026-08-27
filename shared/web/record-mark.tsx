@@ -92,8 +92,15 @@ export function RecordMark({
    * a call site and to the census that proves no URL reaches one unchecked
    * (web/test/rich-text.test.ts), and this one reaches the seam instead. */
   picture?: string | null
-  /** The record type's glyph, when the type has one (a type mark, a stage mark). */
-  mark?: string | null
+  /** The record type's glyph, when the type has one (a type mark, a stage mark).
+   *
+   * A NODE, not only a character. A type mark is usually one printable glyph and
+   * that is what every caller here passes — but a type whose glyph is a DRAWN
+   * icon (an attachment's paperclip, the link beside it) had no way to say so,
+   * and the alternative was a second 36px box hand-styled beside this one, which
+   * is the seventeen-implementations problem this component was written to end.
+   * The box already centres whatever it is given. */
+  mark?: React.ReactNode
   /** The record's name — the last resort is its first letter. */
   name?: string | null
   /** The BOX. A person in their own right is a circle; a client, an app, an asset
@@ -116,7 +123,7 @@ export function RecordMark({
   // branch puts SOMETHING in the box: a record with no type, no picture and no
   // name is still a record, and an empty grey square reads as a screen that
   // failed to finish loading.
-  const fallback = mark || name?.trim()?.[0]?.toUpperCase() || "·"
+  const fallback: React.ReactNode = mark || name?.trim()?.[0]?.toUpperCase() || "·"
   return (
     <span
       aria-hidden

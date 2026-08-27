@@ -50,6 +50,7 @@ import { Link2, Paperclip, Trash2 } from "@shared/ui/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpAttachment } from "@shared/types"
+import { AttachmentMark } from "@shared/web/attachment-mark"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
@@ -176,13 +177,15 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
         <ul className="divide-y rounded-xl border">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
-            const Glyph = a.kind === "file" ? Paperclip : Link2
             const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt, t), size]
               .filter(Boolean)
               .join(" · ")
             return (
               <li key={a.id} className="flex items-center gap-2 p-4">
-                <Glyph className="text-muted-foreground size-4 shrink-0" />
+                {/* THE CLIENT'S SIDE OF THE SAME ROWS, drawn by the same
+                  * component as the agency's — a picture they sent us should
+                  * look the same to them as it does to us. */}
+                <AttachmentMark kind={a.kind} url={a.url} contentType={a.contentType} />
                 <div className="min-w-0 flex-1">
                   {isFollowable(a.url) ? (
                     <a

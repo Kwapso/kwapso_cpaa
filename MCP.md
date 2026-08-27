@@ -131,7 +131,7 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 65 of the 189 tools (counted from the live catalogue, 26 Aug 2026),
+- **Read** — 65 of the 190 tools (counted from the live catalogue, 26 Aug 2026),
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
   the write families proper are under **Write**:
@@ -151,7 +151,8 @@ Today it covers:
     account's world, a module is a division of the software we built.
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_impact`, `list_account_rates`,
-    `list_story_attachments`, `add_story_link`, `remove_story_attachment`,
+    `list_story_attachments`, `add_story_link`, `update_story_attachment`,
+    `remove_story_attachment`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
   - **the client's own organisation** — who does the work at a client, what an
     hour of them costs, and what they run on. `list_client_departments`,
@@ -212,7 +213,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **266 doors, 213 with a tool, 53 with a written reason**, the
+  red build. Today: **267 doors, 214 with a tool, 53 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -233,7 +234,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 213, **189 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 214, **190 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -576,6 +577,12 @@ Today it covers:
      forwards `kind` as the constant `"link"`, so the door's contract is honoured
      whole, and a story's file — a screenshot of the work — is a base64 data URL up
      to 10 MB, uploaded from the screen by the person who took it.
+   - **`update_story_attachment` takes `label` and `url`, not `fileDataUrl`.** The
+     door beside `add_story_link`, and the same objection to the same field: it
+     renames anything on a story and repoints a link, both of which are prose, and
+     it cannot send the replacement BYTES for a file, which are a base64 data URL
+     up to 10 MB. A file is swapped from the screen by the person holding the
+     right one.
    - **`agent_chat` takes `message`, not `files`.** Attaching up to 8 CSVs of 5 MB each
      is up to 40 MB on the same surface — and the capability is already here in a
      better machine shape: `start_import` → `add_import_file` → `plan_import` →
