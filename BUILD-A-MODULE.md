@@ -573,7 +573,7 @@ tab needs a reasoned `RECORD_TAB_COUNT_EXCEPTIONS` line.
 After an edit or (de)activate, prime the list cache with the returned rows and
 `invalidate(\`activity:record:<table>:<id>\`)` so the Activity tab reflects the new
 row (`saveInternalRecord` / `setInternalActive` in
-`web/lib/use-screen-actions.ts` do exactly this). Action buttons carry their lucide
+`web/lib/use-screen-actions.ts` do exactly this). Action buttons carry their kit
 icon (CLAUDE.md): edit = `Pencil`, deactivate = `Power`, destructive actions get the
 red colour + a confirm.
 
@@ -655,7 +655,7 @@ LAYER 5 — record detail  (a <module>.detail recipe, or web/components/<module>
 [ ] Activity via useRecordActivity("<module>", id) — the ONE generic path (R5); no new history SQL
 [ ] Every record tab badged from the collection it reveals — Activity = formatCount(activity.total) (R8/R16);
     a tab that shows no collection gets a reasoned RECORD_TAB_COUNT_EXCEPTIONS line
-[ ] Actions carry lucide icons (Pencil edit, Power deactivate); destructive = red + confirm
+[ ] Actions carry kit icons from `@shared/ui/icons` (Pencil edit, Power deactivate); destructive = red + confirm
 
 LAYER 6 — tests + ship
 [ ] (bespoke detail?) name the file "<module>-detail.tsx" — the R2/R8 census derives it off disk, nothing to register

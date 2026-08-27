@@ -511,7 +511,7 @@ both environments, 600 requests per caller per worker per minute
   source. It used to be the npm package `@kwapso/ui`, refreshed with
   `npm install github:Kwapso/kwapso_ui` — that command is now wrong and the package is gone
   from every `package.json`, from `node_modules` and from the lockfile. The library's own
-  dependencies (Radix, recharts, sonner, lucide-react and the rest) live in the ROOT
+  dependencies (Radix, recharts, sonner and the rest) live in the ROOT
   `package.json`, because `shared/` sits outside both npm
   workspaces and node resolution from a file in there walks up to the repo root.
   (This list said `cmdk` until 26 Aug 2026; nothing imports it any more.)

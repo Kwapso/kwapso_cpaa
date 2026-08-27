@@ -47,7 +47,7 @@ import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialo
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { Ban, CheckCheck, Undo2, UserRound } from "@shared/ui/icons"
-import { HelpCircle, ListChecks, Wrench } from "lucide-react"
+import { HelpCircle, TaskList, Wrench } from "@shared/ui/icons"
 
 import type {
   DraftDecisions,
@@ -436,7 +436,7 @@ function StepKind({
           with them rather than written here. These have not even been agreed
           yet, which makes it matter more rather than less. */}
       <p className="text-muted-foreground flex items-start gap-1 text-xs">
-        <ListChecks className="mt-0.5 size-3.5 shrink-0" />
+        <TaskList className="mt-0.5 size-3.5 shrink-0" />
         {caption}
       </p>
     </Groups>

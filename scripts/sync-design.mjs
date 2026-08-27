@@ -29,11 +29,10 @@ import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join, dirname, relative } from "node:path"
 import { fileURLToPath } from "node:url"
-import { substitute } from "./icon-art.mjs"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const TARGET = join(ROOT, "shared", "ui")
-const REPO = "https://alaap-kwapso@github.com/Kwapso/design.git"
+const REPO = "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git"
 
 /** The kit's deliverable surface. demo/, verify/, mini-app/ and the GAPS
  * paper trail stay upstream — they are the workshop, not the product. */
@@ -89,30 +88,24 @@ const main = async () => {
     for (const entry of DELIVERED)
       cpSync(join(tmp, "kit", entry), join(TARGET, entry), { recursive: true })
 
-    /* THE ART STAGE. The kit ships icon NAMES; at v1.0.0 it ships no icon
-       ART, and its own ICON-LANGUAGE.md says so. This stands lucide's glyphs
-       in front of any name still carrying the placeholder, using the kit's
-       own documented swap procedure, and it runs BEFORE the hash so the guard
-       covers the result and a real hand-edit still goes red. It is keyed on
-       the placeholder's signature, so the day the art is drawn it substitutes
-       nothing and `iconArt.substituted` lands at 0. See scripts/icon-art.mjs. */
-    const art = await substitute()
-    if (art.substituted.length)
-      execSync(`node ${join(TARGET, "icons", "generate-icons.mjs")}`, { stdio: "inherit" })
-    if (art.missing.length)
-      console.warn(`sync-design: ${art.missing.length} placeholder icons have no stand-in (${art.missing.join(", ")})`)
-
+    /* THE ART STAGE IS GONE, and its absence is the point. Until v1.0.8 the
+       kit shipped icon NAMES and no icon ART, so this script stood lucide's
+       glyphs in front of the placeholders on the way past. v1.0.8 ships the
+       Iconoir pack — 1,383 drawn glyphs — so there is nothing to stand in for,
+       and scripts/icon-art.mjs is deleted rather than left switched off. The
+       app imports no icon package at all now; web/test/icon-vocabulary.test.ts
+       keeps it that way. */
     const hash = contentHash(TARGET)
     writeFileSync(
       join(TARGET, "VERSION.json"),
       JSON.stringify(
         {
-          repo: "Kwapso/design",
+          repo: "Kwapso/kwapso-ui-ux",
           tag,
           sha,
           hash,
           syncedAt: new Date().toISOString().slice(0, 10),
-          iconArt: { stoodIn: art.substituted.length + art.stoodIn.length, drawn: art.drawn.length, source: "lucide-react" },
+          iconArt: { count: readdirSync(join(TARGET, "icons")).filter((f) => f.endsWith(".svg")).length, source: "kwapso-ui-ux" },
         },
         null,
         2

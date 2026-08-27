@@ -16,21 +16,26 @@
 //  · Counts and tags are QUIET TEXT, never badges — ch14: "counts are quiet,
 //    never badges". The old `badgeVariant` colour is therefore not drawn.
 //
-// Icons: a TabItem carries a lucide icon NAME as serialisable data, resolved
-// against the kit's own set first (the drawn art wins where it exists) and the
-// full lucide set second — the same fallback CollectionHeading and the nav
-// already use, so a tab and the heading beside it can never disagree about
-// what a name draws. Before the fallback, "info" and "user" resolved to
-// NOTHING here while rendering fine one component up, which is why Overview
-// tabs shipped bare while their headings carried art.
+// Icons: a TabItem carries an icon NAME as serialisable data, resolved against
+// the kit and nothing else. It used to resolve against the kit FIRST and the
+// full lucide set second, because the kit drew 96 glyphs and the app needed
+// more; the kit draws 1,383 now, so the second half is deleted rather than
+// left as a net. It was not a harmless net: when the art became Iconoir on
+// 2026-08-27 that fallback silently kept thirty-seven names rendering LUCIDE,
+// beside Iconoir art, on the same strip, with nothing going red. A name the
+// kit cannot draw now renders nothing here and fails the census in
+// web/test/icon-vocabulary.test.ts, which is the loud version of the same
+// safety. (The original bug the fallback fixed — "info" and "user" drawing
+// nothing on a tab while the heading beside it drew fine — stays fixed: both
+// resolve through the one shared alias table in ./icon-names.)
 
 import * as React from "react"
 
-import { DynamicIcon, type IconName } from "lucide-react/dynamic"
-
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/controls/tabs/tabs"
-import * as KitIcons from "@shared/ui/icons"
 import { cn } from "@shared/ui/lib/utils"
+
+import { iconComponent } from "./icon"
+import { type IconName } from "./icon-names"
 
 import { type BaseConfig, defaultBaseConfig } from "./config"
 import { useIsVisible } from "./visibility"
@@ -82,14 +87,11 @@ export const defaultTabsConfig: TabsConfig = {
   fullWidth: false,
 }
 
-/** kebab-case name → the kit's PascalCase icon component where one is drawn,
- * the full lucide set otherwise, and null only for a name neither knows. */
+/** kebab-case name → the kit's icon component, or null for a name it cannot
+ * draw. One resolution path, shared with `<Icon>` in ./icon. */
 export function kitIcon(name: string): React.ReactNode {
-  const pascal = name.replace(/(^|-)([a-z0-9])/g, (_, __, c: string) => c.toUpperCase())
-  const Icon = (KitIcons as Record<string, unknown>)[pascal]
-  if (typeof Icon === "function" || (typeof Icon === "object" && Icon !== null))
-    return React.createElement(Icon as React.ComponentType<{ size?: number }>, { size: 16 })
-  return React.createElement(DynamicIcon, { name: name as IconName, size: 16 })
+  const Glyph = iconComponent(name)
+  return Glyph ? React.createElement(Glyph, { size: 16 }) : null
 }
 
 /** THE TAB VOCABULARY — one icon per tab identity, wherever it appears.
@@ -105,8 +107,8 @@ export function kitIcon(name: string): React.ReactNode {
  * would otherwise render bare falls back to the folder glyph, so no strip can
  * ship half-dressed — and the census in web/test/rules.test.ts fails the
  * build when a NEW tab value reaches for that fallback, so the generic glyph
- * is a net under a decision, never the decision. Typed `IconName` so a name
- * lucide cannot draw refuses to compile. */
+ * is a net under a decision, never the decision. Every name in it is proved
+ * drawable by web/test/icon-vocabulary.test.ts. */
 export const TAB_ICONS: Record<string, IconName> = {
   overview: "info",
   activity: "history",

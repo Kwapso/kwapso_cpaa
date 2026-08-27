@@ -113,7 +113,9 @@ with `data-scale="small" | "medium" | "large"`.
 
 ```
 tokens/       tokens.css is the ONLY file where a colour or a size is decided
-icons/        96 React exports · ART IS PLACEHOLDER, names and API are final
+icons/        1,383 React exports — the Iconoir pack (MIT), drawn as
+              strokes on a 24 grid. The commission's 96 spellings are
+              aliases onto it; see icons/ATTRIBUTION.md
 motion/       100 rules, all 16 of the commission's motion cases
 assets/fonts/ Saans and SerrifCondensed — the client's real type, shipped
               here as .woff2 (what browsers fetch) with the .otf/.ttf masters
@@ -138,7 +140,8 @@ compositions/  the client: "everything currently compositions/xyz is
                external doors
   overlays/    8 — what opens OVER a screen rather than replacing it
   states/      5 — the same screen with nothing in it
-docs/          RULES · BUILD-A-COMPONENT · TOKENS (BUILD-A-SCREEN pending)
+docs/          RULES · BUILD-A-COMPONENT · BUILD-A-SCREEN · TOKENS ·
+               ARTIFACT-MAP — all five delivered
 demo/          four views: foundations · controls · structures · compositions
 verify/        decision artefacts and a smoke build — NOT delivered
 KWAPSO-SPEC.md the artifact, verbatim. The king. Its OVERRIDE REGISTER lists
@@ -168,13 +171,13 @@ from it, everything else is superseded.
 | | |
 |---|---|
 | Tokens — 276, both palettes, three scales | done |
-| Icons — 96 exports, five sizes | **placeholder art** |
+| Icons — 1,383 exports, six sizes | done — Iconoir (MIT) |
 | Motion — 100 rules | done |
 | Controls — 67 | done |
 | Structures — 42 | done |
 | Compositions — 45: 15 templates · 17 screens · 8 overlays · 5 states | done |
 | Demo | four views: foundations · controls · structures · compositions |
-| Docs | 3 of 4 — BUILD-A-SCREEN waits on the screens |
+| Docs | 5 of 5 |
 
 **Where to look first.** `verify/decisions.html` is the record of every design
 question that has been settled and why — fifteen of them, each with the

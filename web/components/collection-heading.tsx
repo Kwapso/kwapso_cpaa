@@ -19,7 +19,7 @@
 // gets no glyph rather than a wrong one.
 
 import * as React from "react"
-import { DynamicIcon, type IconName } from "lucide-react/dynamic"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 
 import { formatCount } from "@shared/web/format-count"
 import { CONCEPT_ICON, TEAM_SECTIONS } from "@/lib/pages"
@@ -53,7 +53,7 @@ export function CollectionHeading({
         // aria-hidden: the WORD beside it is the name of the page, and a screen
         // reader announcing "route, Processes" is one label read twice.
         <span aria-hidden className="text-muted-foreground shrink-0">
-          <DynamicIcon name={icon as IconName} className="size-5" fallback={() => null} />
+          <Icon name={icon as IconName} className="size-5" />
         </span>
       ) : null}
       {t(title)}

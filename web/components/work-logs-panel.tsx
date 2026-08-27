@@ -31,7 +31,7 @@ import { Badge } from "@shared/ui/controls/badge/badge"
 import { Button } from "@shared/ui/controls/button/button"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { toast } from "@shared/ui/controls/sonner/sonner"
-import { DynamicIcon, type IconName } from "lucide-react/dynamic"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
 
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -125,7 +125,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       id: "hours",
       label: t("Hours logged"),
       value: hoursSpoken(summary.totalSeconds),
-      icon: <DynamicIcon name={CONCEPT_ICON.time as IconName} className="size-4" aria-hidden />,
+      icon: <Icon name={CONCEPT_ICON.time as IconName} className="size-4" aria-hidden />,
       delta: "",
       trend: "flat" as const,
     },
@@ -133,7 +133,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       id: "entries",
       label: t("Entries"),
       value: formatCount(summary.total) || "0",
-      icon: <DynamicIcon name={CONCEPT_ICON.dropdowns as IconName} className="size-4" aria-hidden />,
+      icon: <Icon name={CONCEPT_ICON.dropdowns as IconName} className="size-4" aria-hidden />,
       delta: "",
       trend: "flat" as const,
     },
@@ -141,7 +141,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       id: "people",
       label: t("Members on it"),
       value: formatCount(summary.peopleTotal) || "0",
-      icon: <DynamicIcon name={CONCEPT_ICON.members as IconName} className="size-4" aria-hidden />,
+      icon: <Icon name={CONCEPT_ICON.members as IconName} className="size-4" aria-hidden />,
       delta: "",
       trend: "flat" as const,
     },

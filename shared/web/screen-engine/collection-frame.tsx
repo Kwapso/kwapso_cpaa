@@ -19,7 +19,7 @@
 
 import * as React from "react"
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/icons"
-import { Filter } from "lucide-react"
+import { Filter } from "@shared/ui/icons"
 import { kitIcon } from "./tabs-view"
 
 import { selectRows } from "./collection"
