@@ -1,10 +1,10 @@
-# The 93 hand-written controls — four lanes, four prompts
+# The 93 hand-written controls — three lanes, three prompts
 
 93 raw HTML control elements across 53 files, each with its padding, focus ring,
 disabled state and hover transition decided at the call site rather than by the
 kit. This is the last large piece of R39 becoming true rather than aspirational.
 
-The four lanes below touch **disjoint file sets**, so they can run at once
+The three lanes below touch **disjoint file sets**, so they can run at once
 without merge conflicts. Each prompt is self-contained: it makes its own
 worktree, so it can be pasted into a fresh session that knows nothing.
 
@@ -12,15 +12,37 @@ worktree, so it can be pasted into a fresh session that knows nothing.
 |---|---|---|---|
 | A | dialogs & components | 34 | 60 |
 | B | screens & panels | 8 | 12 |
-| C | shared seams | 6 | 14 |
-| D | client portal | 5 | 7 |
+| C | shared seams + the portal's remainder | 10 | 19 |
+
+**There is no lane D, and the reason is worth reading before you plan around
+these numbers.** The client portal was scoped as a fourth lane of 5 files and 7
+sites. Then two of its files were excluded — `sign-in.tsx` and
+`portal-shell.tsx` are owned by `lane/portal-signin`, and `sign-in.tsx` holds
+one `<form>` and one `<img>`, both already on the do-not-convert list. Of the
+four sites left, THREE are `<input type="file">` behind a kit button, which the
+ruling below says is a mechanism rather than a control. **The portal's honest
+output is ONE conversion** — a `type="text"` in `ticket-screen.tsx` — plus one
+user-supplied `<img>` that needs the failure-handling check before anyone
+touches it.
+
+One conversion is not a lane. It is folded into lane C, which is also small and
+also careful, and the two file sets do not overlap. Three lanes, not four.
 
 ---
 
 ## THE SHARED RULING — every lane obeys this, and it is why they agree
 
+**READ THIS FIRST, BEFORE THE FILE LIST. If you are unsure about an element, do
+NOT convert it — leave it and say so in your report. An honest "I left six and
+here is why" is worth more than six silent conversions that change behaviour.
+NOBODY IS COUNTING CONVERSIONS.** A lane handed a number will find the number,
+and the damage from converting something that should have stayed is silent —
+a broken file dialog fails no check we have. This paragraph is at the top
+deliberately: by the time a session reaches a closing caveat it already has a
+plan.
+
 Three patterns are **legitimately raw and must NOT be converted.** Without this
-written down, four lanes reach four different answers and the review is a mess.
+written down, three lanes reach three different answers and the review is a mess.
 
 **1 · A hidden file input.** `<input type="file" hidden>` sitting behind a kit
 `Button` or `FileUpload` is the correct shape — the browser's file dialog can
@@ -42,10 +64,6 @@ replacement for the element. **Leave it.**
 **What DOES convert:** every `<button>` that is a button, every `<label>` that
 labels a field, every `<img>` drawing static or branded art. Kit `Label` is
 already imported in three files, so the pattern exists to copy.
-
-**If you are unsure, do not convert it — say so in your report.** An honest
-"I left six and here is why" is worth more than six silent conversions that
-change behaviour. Nobody is counting conversions.
 
 ---
 
@@ -69,6 +87,11 @@ Each lane must, in order:
 ## LANE A · dialogs & components — 34 files, 60 sites
 
 ```
+BEFORE ANYTHING ELSE: nobody is counting conversions. If you are unsure about
+an element, leave it and say so in your report. Converting something that should
+have stayed is a SILENT break — a hidden file input turned into a kit Button
+stops the browser opening a file dialog, and no check we have catches it.
+
 You are converting hand-written HTML controls to the kwapso design kit's
 controls, in an isolated git worktree. Nothing else.
 
@@ -103,7 +126,7 @@ YOUR FILES — these 34 and no others:
   agent-history-dialog, account-form-dialog, account-detail,
   web/app/onboarding/page.tsx  (1 site each)
 
-THE RULING ON WHAT NOT TO CONVERT — obey it, it is why four lanes agree:
+THE RULING ON WHAT NOT TO CONVERT — obey it, it is why the lanes agree:
   · <input type="file" hidden> behind a Button or FileUpload is a MECHANISM,
     not a control. Converting it breaks the browser's file dialog. Leave it.
     (file-picker, help-attachments, knowledge-upload-dialog)
@@ -136,6 +159,10 @@ six" is worth more than six silent conversions. Nobody is counting conversions.
 ## LANE B · screens & panels — 8 files, 12 sites
 
 ```
+BEFORE ANYTHING ELSE: nobody is counting conversions. If you are unsure about an
+element, leave it and say so. Converting something that should have stayed is a
+SILENT break.
+
 Same setup, different branch and files:
   git worktree add -b lane/controls-b ~/Desktop/kwapso-ctrl-b lane/ui-swap
 
@@ -159,9 +186,12 @@ before converting; if it does not, leave it and say so.
 
 ---
 
-## LANE C · shared seams — 6 files, 14 sites
+## LANE C · shared seams + the portal's remainder — 10 files, 19 sites
 
 ```
+BEFORE ANYTHING ELSE: nobody is counting conversions. If you are unsure about an
+element, leave it and say so. This lane especially — see the warning below.
+
 Same setup:
   git worktree add -b lane/controls-c ~/Desktop/kwapso-ctrl-c lane/ui-swap
 
@@ -172,6 +202,20 @@ YOUR FILES — these 6 and no others:
   shared/web/screen-engine/searchable-facet.tsx (1 button)
   shared/web/screen-engine/screen-renderer.tsx  (1 button)
   shared/web/form-shell.tsx                     (1 form)
+
+AND THE CLIENT PORTAL'S REMAINDER — 4 files, 5 sites, of which the honest
+answer is probably ONE conversion:
+  web-portal/components/ticket-screen.tsx       (1 input type="text"  → CONVERT)
+  web-portal/components/ticket-attachments.tsx  (2 input type="file"  → LEAVE)
+  web-portal/components/waiting-on-you.tsx      (1 input type="file"  → LEAVE)
+  web-portal/components/deliverables-screen.tsx (1 img, user-supplied → CHECK)
+
+DO NOT TOUCH web-portal/components/sign-in.tsx OR portal-shell.tsx. They belong
+to lane/portal-signin, and sign-in.tsx holds one <form> and one <img> which are
+both on the do-not-convert list anyway. There is nothing there for you.
+
+The portal is the client's front door — narrow, calm, larger type. Check it at a
+phone width as well as a desktop one.
 
 THIS LANE IS THE RISKIEST AND THE SMALLEST — that is not a contradiction.
 Every file here is used by BOTH front doors and by every recipe-driven screen
@@ -191,11 +235,6 @@ Verify by opening a recipe-driven collection screen with filters and using
 them — not only by the gate.
 ```
 
----
-
-## LANE D · client portal — 5 files, 7 sites
-
-```
 Same setup:
   git worktree add -b lane/controls-d ~/Desktop/kwapso-ctrl-d lane/ui-swap
 
