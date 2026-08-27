@@ -45,6 +45,10 @@ const passage = (sourceId: string, text: string): KnowledgePassage => ({
   title: "t",
   kind: "note",
   url: null,
+  // The knowledge lane gave a passage its record's own date while this lane was
+  // building. Null here on purpose: a dateless source is the NORMAL case during
+  // the transition, so the fixture exercises the shape the app mostly sees.
+  recordDate: null,
   recordPath: null,
   compartment: "agency",
   seq: 1,
