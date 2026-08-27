@@ -741,27 +741,40 @@ function readInput(input: SourceInput): {
   const privateToMe = input.visibility === "private"
   const body = optionalDocument(input.body, "The material") ?? null
   const sourceUrl = optionalText(input.sourceUrl, "Link", TEXT_LIMITS.link) ?? null
-  // A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE, and this is the
-  // door refusing rather than the screen asking nicely. The form explains it
-  // while somebody is typing and offers the box; this is what holds when the
-  // request arrives from the assistant, from MCP, or from a screen that has
-  // drifted.
+  // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE, and this is the door refusing
+  // rather than the screen asking nicely. The form explains it while somebody is
+  // typing and points at the box; this is what holds when the request arrives
+  // from the assistant, from MCP, or from a screen that has drifted.
+  //
+  // THE GATE IS THE EMPTY BODY, NOT THE HOST, and that distinction was earned
+  // rather than designed. The first version of this refused a VIDEO link, on a
+  // list of fifteen hostnames — and the owner pasted a Tella recording behind his
+  // own domain, `content.kwapso.com/video/…`, which walked straight past all
+  // fifteen and became a source with a title, a link and no body. Exactly the
+  // shape the rule exists to prevent, produced by the rule meant to prevent it.
+  //
+  // A HOST LIST IS WRONG THE MOMENT SOMEBODY USES A SERVICE THAT IS NOT ON IT.
+  // "Has this anything for the assistant to read?" cannot go out of date, and it
+  // closes the custom domain, the service nobody has heard of, and the one that
+  // will exist next year. `isVideoLink` still runs — it chooses which SENTENCE
+  // the person reads, which is all a detector was ever fit to decide.
   //
   // WHY REFUSE AT ALL. Every unreadable thing that ever reached this base was
   // ACCEPTED, stored, and quietly never read — 131 files of logo artwork, every
-  // PDF at 0.000 letter-shaped tokens, `image/*` opaque since the beginning —
-  // and nobody was told. The owner's ruling ends that here: readable, or refused
-  // with the remedy attached. Paste the transcript and the source is welcome;
-  // paste nothing and there is no row pretending to hold an answer.
+  // PDF at 0.000 letter-shaped tokens, `image/*` opaque since the beginning — and
+  // nobody was told. Paste what it says and the source is welcome; paste nothing
+  // and there is no row pretending to hold an answer.
   //
-  // NOTHING IS FETCHED and nothing is guessed. An invented transcript would be
-  // worse than none, for R23's reason: everything else this app shows a person
-  // is true.
-  if (sourceUrl && isVideoLink(sourceUrl) && !plainText(body ?? "").trim())
+  // NOTHING IS FETCHED. There is no reader for a web page yet, and a network call
+  // with a timeout on every paste would be a lot of machinery to decide something
+  // this line already decides correctly without it.
+  if (sourceUrl && !plainText(body ?? "").trim())
     throw new GuardError(
       400,
-      "video_needs_transcript",
-      "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript into the material and this source is good to go."
+      isVideoLink(sourceUrl) ? "video_needs_transcript" : "link_needs_material",
+      isVideoLink(sourceUrl)
+        ? "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript into the material and this source is good to go."
+        : "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
     )
   return {
     title: requireText(input.title, "Title", TEXT_LIMITS.short),
@@ -2028,6 +2041,7 @@ type ScoredRow = {
   compartment: string
   origin_table: string | null
   origin_row_id: string | null
+  record_date: string | null
 }
 
 /** WEIGHTED RECIPROCAL RANK FUSION. Two ranked lists whose scores mean entirely
@@ -2039,7 +2053,32 @@ type ScoredRow = {
  * at a tenth of a vote, gated to questions that contain something exact, it is
  * invisible on questions it has nothing to say about and decisive on the ones
  * it does. Nothing else is added here — no record hint, no recency, no
- * hand-tuned boost. Every one of those was tried and every one was worse. */
+ * hand-tuned boost. Every one of those was tried and every one was worse.
+ *
+ * ── RECENCY, CONSIDERED AGAIN ON 27 AUG 2026 AND LEFT OUT ──────────────────
+ *
+ * The measurement above was taken on seven novels, and this file's own note says
+ * the retest belongs on the agency's material. It got one, because the owner
+ * asked the question that would need it: "the latest news on the flu clinic
+ * stripe integration", and got the week before's meeting.
+ *
+ * THE CASE FOR ADDING A RECENCY TERM GOT WEAKER, NOT STRONGER. The newest source
+ * — a transcript from that morning — was ALREADY retrieved, at rank six of six.
+ * Nothing was missing from the ranking. What was missing is that the writer was
+ * never told when anything was from, or what day it is, so "latest" was a word
+ * with no referent. Giving it the dates answers the question with the ranking
+ * untouched (see knowledge-compose.ts), and a term here would have put a measured
+ * 20/20 at risk to fix something that was not broken.
+ *
+ * WHAT WOULD REOPEN IT, and it is deliberately a high bar: a question whose
+ * newest material is NOT RETRIEVED AT ALL. Not ranked low — absent. Ranked low is
+ * the writer's problem and it now has the dates to solve it. If the bench turns
+ * up an absent one, start with recency GATED ON INTENT — a term that applies only
+ * when the question itself says "latest", "recent", "today" — because that leaves
+ * every ordinary question at the behaviour these numbers were measured on.
+ *
+ * A rejection without its evidence gets re-tried by the next person who has the
+ * same good idea. This is the evidence. */
 function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; score: number }[] {
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
@@ -2190,7 +2229,7 @@ export async function retrieve(
     // worker's own, read back out of its own table, so they are interpolated
     // (CONVENTIONS) and the statement stays under D1's 100-parameter ceiling.
     `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
-            s.origin_table, s.origin_row_id
+            s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
         AND s.deactivated_at IS NULL AND ${reader.sql}
@@ -2244,7 +2283,7 @@ export async function retrieve(
       // The SAME fence and the SAME columns as the read above — a second way in
       // may not be a wider one. R14: bounded by RANKING_POOL, said here.
       `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
-              s.origin_table, s.origin_row_id
+              s.origin_table, s.origin_row_id, s.record_date
          FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
         WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
           AND s.deactivated_at IS NULL AND ${reader.sql}
@@ -2271,6 +2310,7 @@ export async function retrieve(
     seq: row.seq,
     text: plainText(row.text),
     score: Math.round(score * 1000) / 1000,
+    recordDate: row.record_date ?? null,
   }))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
   const evidence = {

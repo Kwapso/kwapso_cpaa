@@ -929,6 +929,11 @@ export type KnowledgePassage = {
   seq: number
   text: string
   score: number
+  /** WHEN THIS SOURCE IS FROM — the record's own moment, never the moment we read
+   * it. Null where the row genuinely has none, which is a fact rather than a gap
+   * to fill: the writer is told a source carries no date rather than being handed
+   * a guess it would then reason about. */
+  recordDate: string | null
 }
 
 /** Where an answer came from. Law R23: an answer with no citation is not an

@@ -48,9 +48,20 @@ export const QUESTIONS = [
   {
     q: "What did we agree in the week recap?",
     cites: ["Week recap"],
-    // From the 14 and 21 August transcripts: Aurora on team horsepower and
-    // specialisation, Alexander on project status, AI workflows.
-    lead: ["horsepower", "specialis", "specializ", "workflow", "Aurora", "Alexander", "client deliver"],
+    // TWO RECAPS, BOTH VALID, and the key said so and then only listed one.
+    //
+    // The base holds a 96-chunk transcript from 14 August AND one from 21 August.
+    // Either is a correct answer, and every token here came from the 14th — so
+    // once the writer was given dates and began preferring the more RECENT
+    // meeting, a good answer about the 21st scored wrong. The key was measuring
+    // which meeting the model picked rather than whether it answered.
+    //
+    // 14 Aug: team horsepower and specialisation, project status, AI workflows.
+    // 21 Aug: restructuring project lifecycles and roles, Haiku cutting costs.
+    lead: [
+      "horsepower", "specialis", "specializ", "workflow", "Aurora", "Alexander", "client deliver",
+      "lifecycle", "Haiku", "restructur", "cost",
+    ],
     topic: ["Week recap"],
   },
   {
@@ -167,7 +178,11 @@ export const QUESTIONS = [
     q: "Summarise the week recap meeting",
     cites: ["Week recap"],
     spread: 2,
-    lead: ["horsepower", "specialis", "specializ", "workflow", "Aurora", "Alexander", "client deliver"],
+    // Both recaps — see the note on the earlier week-recap question.
+    lead: [
+      "horsepower", "specialis", "specializ", "workflow", "Aurora", "Alexander", "client deliver",
+      "lifecycle", "Haiku", "restructur", "cost",
+    ],
     topic: ["Week recap"],
   },
   {

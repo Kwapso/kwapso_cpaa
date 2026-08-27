@@ -426,6 +426,30 @@ presence of a flag.**
 
 ---
 
+### And the one that only applies to DATA changes
+
+**Ask what UNDOES a data change before you ask whether the data change is right.**
+
+Twice on 27 Aug 2026 a data operation was scoped, agreed and about to be
+approved, and both times the thing that killed it was asking what would happen to
+it AFTERWARDS:
+
+- the artwork prune would have been revived a row at a time by the sweep, because
+  it stamped a machine retirement and the app had just learned to undo its own;
+- a backfill of the 799 missing dates would have been overwritten with NULL by
+  the next pass of each lane, because `record_date = excluded.record_date` sits in
+  the upsert's SET list and the upsert runs before the hash-skip.
+
+Neither would have been visible afterwards. A prune that refills and a backfill
+that unwinds both do it slowly, silently, and only show up if somebody thinks to
+re-count. And in the second case the question did not merely kill the plan — it
+made the plan unnecessary, because the same line that would have erased a
+backfill fills the rows for free once the maker provides the value.
+
+The order matters: this question is cheap BEFORE and nearly unaskable after.
+
+---
+
 The lesson is not "check the code". It is: **when an instrument and a person
 disagree, measure the instrument.** Every one of these was found by asking what
 the check would say if the thing it guards were deleted — which is the only

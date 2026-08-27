@@ -41,7 +41,7 @@ const passage = (
   compartment: "agency",
   seq,
   text: "The dispatch rollout is paused until the invoice run is fixed.",
-  score: 0.9,
+  score: 0.9, recordDate: null,
 })
 
 describe("R23 — the answer seam decides `found` and `citations` together", () => {

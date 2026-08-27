@@ -129,15 +129,20 @@ export function KnowledgeFormDialog({
   )
   const [busy, setBusy] = React.useState(false)
 
-  // A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE.
+  // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE.
   //
   // Every unreadable thing that ever reached this knowledge base was accepted,
-  // stored and quietly never read, and nobody was told. The owner's ruling ends
-  // that here: a video link is refused unless its transcript comes with it — and
-  // the refusal is not a dead end, because the box that would fix it is the one
-  // already on this form. The door refuses on the same predicate; this is what
-  // says so while somebody is still typing, rather than after they press save.
-  const needsTranscript = isVideoLink(values.sourceUrl.trim()) && !richTextValue(values.body).trim()
+  // stored and quietly never read, and nobody was told. A link with nothing
+  // beside it is that shape exactly: a row that looks filed and holds nothing.
+  //
+  // THE GATE IS THE EMPTY BODY, NOT THE HOST. A list of video services is wrong
+  // the moment somebody uses one that is not on it — which is what happened, with
+  // a Tella recording behind a custom domain. `isVideoLink` still runs, but only
+  // to choose which sentence to show: "we can't watch a video" is the right thing
+  // to say about a recording and the wrong thing to say about a documentation
+  // page, and both are refused either way.
+  const link = values.sourceUrl.trim()
+  const nothingToRead = !!link && !richTextValue(values.body).trim()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -188,7 +193,7 @@ export function KnowledgeFormDialog({
         busy: busy,
         // NOTHING PASTED MEANS NO SOURCE. The door says the same thing; this
         // stops a person getting there and being told no.
-        disabled: !values.title.trim() || needsTranscript,
+        disabled: !values.title.trim() || nothingToRead,
       }}
     >
       <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
@@ -218,11 +223,15 @@ export function KnowledgeFormDialog({
           placeholder="https://…"
           disabled={busy || textOwnedElsewhere}
         />
-        {needsTranscript ? (
+        {nothingToRead ? (
           <p className="text-warning mt-2 text-sm">
-            {t(
-              "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go."
-            )}
+            {isVideoLink(link)
+              ? t(
+                  "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go."
+                )
+              : t(
+                  "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
+                )}
           </p>
         ) : null}
       </Field>
