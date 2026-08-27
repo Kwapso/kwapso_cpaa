@@ -133,7 +133,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
   return (
     <section className="motion-panel-in flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+        <h2 className="text-muted-foreground text-micro uppercase">
           {t("Access tokens")}
         </h2>
         <AddButton label={t("New token")} onClick={() => setCreateOpen(true)} />

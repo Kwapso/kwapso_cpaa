@@ -61,7 +61,7 @@ export function NeedsName({ onDone }: { onDone: () => void }) {
     // gutter at this level would double it on a phone.
     <main className="mx-auto flex min-h-[100svh] max-w-md flex-col justify-center">
       <FormShell
-        title={<h1 className="text-2xl font-medium tracking-tight">{t("What should we call you?")}</h1>}
+        title={<h1 className="text-2xl font-medium">{t("What should we call you?")}</h1>}
         subtitle={
           <p className="text-muted-foreground">
             {t("Your name goes on anything you send us, so we know who we're talking to.")}

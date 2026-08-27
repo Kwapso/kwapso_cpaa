@@ -274,13 +274,13 @@ export function RecordHeader({
         {leading ?? (mark ? <TypeMark mark={mark} size="band" /> : null)}
         <div className="min-w-0 flex-1">
           {eyebrow && (
-            <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
+            <p className="text-muted-foreground text-micro uppercase">
               {eyebrow}
             </p>
           )}
           {/* T5: a long title wraps to two lines and clamps. It never truncates
               on one, which hid the end of every real ticket title. */}
-          <h1 className="line-clamp-2 text-2xl font-medium tracking-tight">{title}</h1>
+          <h1 className="line-clamp-2 text-2xl font-medium">{title}</h1>
           {status && <p className="text-muted-foreground mt-1 text-sm">{status}</p>}
         </div>
         {actions && (

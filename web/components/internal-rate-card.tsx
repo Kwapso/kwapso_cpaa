@@ -139,7 +139,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-medium tracking-tight">{t("Internal rates")}</h1>
+          <h1 className="text-2xl font-medium">{t("Internal rates")}</h1>
           {/* The sentence that says who may read this, on the screen rather than
               in a doc. Somebody setting these numbers should know before they
               type them, not after. */}
@@ -367,7 +367,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
   return (
     <div className="flex flex-col gap-4 border-t pt-6">
       <div className="min-w-0">
-        <h2 className="text-lg font-medium tracking-tight">{t("Role rates")}</h2>
+        <h2 className="text-lg font-medium">{t("Role rates")}</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           {t("What an hour of each role is worth, the bookkeeper, the dispatcher, whoever actually does the work a process describes. This is what turns hours given back into money given back. Ours alone: it never appears in a client's portal.")}
         </p>

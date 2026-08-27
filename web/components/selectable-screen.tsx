@@ -150,7 +150,7 @@ export function SelectableScreen({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-medium tracking-tight">
+          <h1 className="text-2xl font-medium">
             {t("Dropdown values")}
             {/* HOW MANY, BESIDE THE HEADING — because a count is a RESULT and a
                 heading is where this app says how big a collection is. It used

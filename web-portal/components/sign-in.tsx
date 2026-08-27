@@ -71,7 +71,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           arrived. The heading below says what the screen is FOR; the lockup
           above says whose it is. */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-medium tracking-tight">{t("Sign in")}</h1>
+        <h1 className="text-2xl font-medium">{t("Sign in")}</h1>
         <p className="text-muted-foreground">
           {step === "email"
             ? t("We'll email you a six-digit code, or you can use Google. No password to remember.")

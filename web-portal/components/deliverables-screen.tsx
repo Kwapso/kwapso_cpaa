@@ -148,7 +148,7 @@ export function DeliverablesScreen() {
                         />
                         <div className="min-w-0 flex-1">
                           {d.kind && (
-                            <p className="text-muted-foreground text-badge font-medium tracking-wide uppercase">
+                            <p className="text-muted-foreground text-micro uppercase">
                               {d.kind}
                             </p>
                           )}

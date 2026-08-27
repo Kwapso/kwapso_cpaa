@@ -48,7 +48,7 @@ export function CollectionHeading({
   // should lose its glyph, not its heading.
   const icon = (CONCEPT_ICON as Record<string, string>)[sectionKey]
   return (
-    <h1 className="flex items-center gap-2 text-2xl font-medium tracking-tight">
+    <h1 className="flex items-center gap-2 text-2xl font-medium">
       {icon ? (
         // aria-hidden: the WORD beside it is the name of the page, and a screen
         // reader announcing "route, Processes" is one label read twice.

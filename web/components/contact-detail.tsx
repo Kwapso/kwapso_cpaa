@@ -498,7 +498,7 @@ export function ContactDetailScreen({
                     account outside the caller's fence. */}
                 {canEdit && (
                   <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
-                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                    <p className="text-muted-foreground text-micro uppercase">
                       {t("Parent account")}
                     </p>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -535,7 +535,7 @@ export function ContactDetailScreen({
                 )}
                 {account.about && (
                   <div className="rounded-[var(--radius)] border p-4">
-                    <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+                    <p className="text-muted-foreground mb-2 text-micro uppercase">
                       {t("About")}
                     </p>
                     <RichText html={account.about} />

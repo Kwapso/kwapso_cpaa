@@ -11,7 +11,7 @@ export function InvitationsScreen({ active }: { active: ActiveTeam }) {
   const t = useT()
   return (
     <div className="flex w-full flex-col gap-6">
-      <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+      <h2 className="text-muted-foreground text-micro uppercase">
         {t("Invites waiting for you")}
       </h2>
       <InvitationsPanel refresh={active.refresh} />
