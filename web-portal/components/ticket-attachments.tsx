@@ -50,6 +50,7 @@ import { Link2, Paperclip, Trash2 } from "@shared/ui/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpAttachment } from "@shared/types"
+import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
@@ -177,11 +178,14 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? Paperclip : Link2
+            // The row is `items-start` rather than centred: its column now
+            // carries a picture, and centring would hang the glyph and the
+            // remove button halfway down the preview.
             const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt, t), size]
               .filter(Boolean)
               .join(" · ")
             return (
-              <li key={a.id} className="flex items-center gap-2 p-4">
+              <li key={a.id} className="flex items-start gap-2 p-4">
                 <Glyph className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   {isFollowable(a.url) ? (
@@ -203,6 +207,24 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
                     </>
                   )}
                   <p className="text-muted-foreground truncate text-xs">{meta}</p>
+                  {/* THE CLIENT'S SIDE OF THE SAME ROWS, drawn by the same
+                    * component as the agency's — a picture they sent us should
+                    * look the same to them as it does to us, and a client
+                    * scanning their own ticket for "the screenshot I sent" has
+                    * exactly the problem the owner described. These files are in
+                    * the SHARED media bucket, which this front door's gateway
+                    * serves at /media/* (portal-gateway/src/index.ts) — there is
+                    * one media route here and it is bound to `env.MEDIA`, so
+                    * nothing internal can be reached through this. */}
+                  {hasPreview(a.kind, a.contentType) && (
+                    <div className="mt-2">
+                      <AttachmentPreview
+                        kind={a.kind}
+                        url={a.url}
+                        contentType={a.contentType}
+                      />
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant="ghost"

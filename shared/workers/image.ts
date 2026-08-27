@@ -267,6 +267,26 @@ export function storedContentType(declared: string): string {
   return INLINE_SAFE_UPLOAD.test(declared) ? declared : NEUTRALISED_CONTENT_TYPE
 }
 
+/** WILL THE BROWSER DRAW THIS ONE? — asked HERE, one line under the function
+ * that decided how the bytes were labelled, because those two questions have to
+ * give the same answer and there is exactly one place that can guarantee it.
+ *
+ * "It is an image" is the tempting test and it is wrong by one type. An SVG is
+ * `image/svg+xml`, it is not `INLINE_SAFE_UPLOAD` (it is a script-capable
+ * document wearing a picture's mime), so `storedContentType` writes it into R2
+ * as `application/octet-stream` — and an `<img src>` at an octet-stream is the
+ * browser's torn-paper glyph, or a download. The row's `content_type` remembers
+ * what the caller DECLARED, which is a label for a person to read and not an
+ * instruction to a renderer; this is the narrower question a renderer may ask.
+ *
+ * So: an image the storage rule let keep its own type. Both halves, always
+ * together — a second copy of this that only tested `image/` is precisely how
+ * the two would drift, and the drift would be invisible until somebody attached
+ * an SVG. */
+export function isRenderableImage(contentType: string | null | undefined): boolean {
+  return typeof contentType === "string" && contentType.startsWith("image/") && INLINE_SAFE_UPLOAD.test(contentType)
+}
+
 /** General data-URL parser for uploaded attachments: base64-decodes, enforces a
  * caller-supplied byte cap, and — critically — accepts ONLY an inline-safe media mime
  * (`INLINE_SAFE_UPLOAD`; never text/html or svg). Returns null if the input isn't a

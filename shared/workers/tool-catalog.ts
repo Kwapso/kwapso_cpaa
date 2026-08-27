@@ -812,6 +812,26 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Attach "${str(i, "label")}" to story ${str(i, "id")}` },
   },
   {
+    name: "update_story_attachment",
+    summary:
+      "Fix one that is already on a story: `id` is the story, `attachmentId` the one to fix (from `list_story_attachments`). Send `label` to rename it. Send `url` to point a LINK somewhere else — the old row is kept and deactivated, so a replaced link stays in the story's history and stops being listed. A FILE's bytes are swapped from the app rather than here, for the reason `add_story_link` gives; renaming a file works fine from here. Answers with the story's remaining `attachments` and their `total`.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments/update",
+    schema: obj({ id: S, attachmentId: S, label: S, url: S }, ["id", "attachmentId"]),
+    // The optionals are OMITTED when empty rather than sent blank: the door
+    // decides WHICH of the three acts this is by which fields arrived, so
+    // `url: ""` on a rename would ask it to point the link at nothing.
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      attachmentId: str(i, "attachmentId"),
+      ...(str(i, "label") ? { label: str(i, "label") } : {}),
+      ...(str(i, "url") ? { url: str(i, "url") } : {}),
+    }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => `Fix attachment ${str(i, "attachmentId")} on story ${str(i, "id")}`,
+    },
+  },
+  {
     name: "remove_story_attachment",
     summary:
       "Take a file or a link off a story: `id` is the story, `attachmentId` the one to remove (from list_story_attachments). Nothing is deleted, the row keeps its history and the file stays where it was stored; it simply stops being listed.",

@@ -30,6 +30,10 @@ function env(userId: string) {
     INTERNAL_KEY: "k",
     PUBLIC_APP_URL: "https://kwapso.example",
     REALTIME: { fetch: async () => new Response("{}") },
+    // The shared media bucket. A no-op is enough: what a replace has to prove is
+    // that the ROW ends up pointing at a NEW key, and the row is in the database
+    // this suite already reads.
+    MEDIA: { put: async () => {} },
   } as never
 }
 
@@ -569,5 +573,175 @@ describe("the Ready flip", () => {
     expect((JSON.parse(body) as { tickets: { draftResolution: string | null }[] }).tickets[0].draftResolution).toBe(
       null
     )
+  })
+})
+
+// FIXING WHAT IS ALREADY ATTACHED — the door the module did not have, and the
+// one decision inside it that a reader has to be able to check rather than take
+// on trust: a RENAME edits the row and a REPLACE writes a new one beside a
+// deactivated old one. The distinction is invisible from the outside (both leave
+// the story showing exactly one attachment, which is the whole point), so it is
+// asserted here against the table itself.
+describe("a story's attachments can be fixed, not only added and taken off", () => {
+  /** Attach a link and hand back its id, through the shipped door. */
+  async function attachLink(storyId: string, label: string, url: string): Promise<string> {
+    const res = await call(IDS.staffUser, "POST /api/content/stories/attachments", {
+      id: storyId,
+      kind: "link",
+      label,
+      url,
+    })
+    expect(res.status, "attaching must work, or the case under it measures nothing").toBe(200)
+    const { attachments } = JSON.parse(await res.text()) as { attachments: { id: string; label: string }[] }
+    return attachments.find((a) => a.label === label)!.id
+  }
+
+  /** Attach a real file the same way, so a replace has real bytes to replace. */
+  async function attachFile(storyId: string, label: string): Promise<string> {
+    const res = await call(IDS.staffUser, "POST /api/content/stories/attachments", {
+      id: storyId,
+      kind: "file",
+      label,
+      // A one-pixel PNG is a whole, well-formed, inline-safe upload — the door's
+      // binary validator is the same one the app's uploads go through, so a
+      // stand-in string would be testing the refusal path by accident.
+      fileDataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    })
+    expect(res.status, "attaching a file must work, or the case under it measures nothing").toBe(200)
+    const { attachments } = JSON.parse(await res.text()) as { attachments: { id: string; label: string }[] }
+    return attachments.find((a) => a.label === label)!.id
+  }
+
+  const rows = (storyId: string) =>
+    db()
+      .prepare(`SELECT label, url, deactivated_at FROM story_attachments WHERE story_id = ? ORDER BY created_at`)
+      .all(storyId) as { label: string; url: string; deactivated_at: string | null }[]
+
+  it("renames in place — one row, the new name, and nothing new in the bucket", async () => {
+    const story = await addStory({ title: "Rename what I attached" })
+    const attachmentId = await attachLink(story, "Untitled", "https://example.test/a")
+
+    const res = await call(IDS.staffUser, "POST /api/content/stories/attachments/update", {
+      id: story,
+      attachmentId,
+      label: "The before and after",
+    })
+    expect(res.status).toBe(200)
+    // ONE row, still. A rename is not a replace, and the difference has to be
+    // visible in the table or the distinction is only a comment.
+    expect(rows(story)).toEqual([
+      { label: "The before and after", url: "https://example.test/a", deactivated_at: null },
+    ])
+    expect(historyFor(story)).toContain("Story attachment renamed")
+  })
+
+  it("renaming it to what it already says moves nothing (R17)", async () => {
+    const story = await addStory({ title: "Say the same thing twice" })
+    const attachmentId = await attachLink(story, "The plan", "https://example.test/plan")
+    const before = historyFor(story).length
+
+    for (let i = 0; i < 2; i++) {
+      const res = await call(IDS.staffUser, "POST /api/content/stories/attachments/update", {
+        id: story,
+        attachmentId,
+        label: "The plan",
+      })
+      expect(res.status).toBe(200)
+    }
+    // Two presses, zero rows moved, zero lines of history.
+    expect(historyFor(story).length).toBe(before)
+    expect(historyFor(story)).not.toContain("Story attachment renamed")
+  })
+
+  it("replacing a file leaves ONE attachment listed and TWO rows in the table", async () => {
+    const story = await addStory({ title: "I attached the wrong screenshot" })
+    const attachmentId = await attachFile(story, "wrong.png")
+    const wasUrl = rows(story)[0].url
+
+    const res = await call(IDS.staffUser, "POST /api/content/stories/attachments/update", {
+      id: story,
+      attachmentId,
+      label: "right.png",
+      fileDataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    })
+    expect(res.status).toBe(200)
+    const { attachments, total } = JSON.parse(await res.text()) as {
+      attachments: { label: string; url: string }[]
+      total: number
+    }
+    // WHAT THE ASK ASKED FOR: the record does not show both.
+    expect(attachments.map((a) => a.label)).toEqual(["right.png"])
+    expect(total).toBe(1)
+
+    // …and what deactivate-never-delete asked for: the wrong one is still on
+    // record, still pointing at the object somebody actually uploaded, with the
+    // deactivation stamped on it.
+    const all = rows(story)
+    expect(all.length).toBe(2)
+    expect(all[0]).toMatchObject({ label: "wrong.png", url: wasUrl })
+    expect(all[0].deactivated_at, "the old row must be deactivated, not deleted").not.toBe(null)
+    expect(all[1].deactivated_at).toBe(null)
+    // A NEW KEY. Overwriting the old one in place would leave the audit row
+    // pointing at bytes that are no longer the bytes it names — and /media is
+    // served immutable, so a rewritten key is a stale picture in a cache.
+    expect(all[1].url).not.toBe(wasUrl)
+    expect(all[1].url.startsWith("/media/story/")).toBe(true)
+
+    // ONE line of history, saying what it was. A remove plus an add would read
+    // as somebody deleting the evidence and then thinking better of it.
+    expect(historyFor(story).filter((h) => h === "Story file replaced").length).toBe(1)
+    expect(historyFor(story)).not.toContain("Story attachment removed")
+  })
+
+  it("keeps the old name when a replacement arrives without one", async () => {
+    const story = await addStory({ title: "Swap the file, keep the name" })
+    const attachmentId = await attachFile(story, "The signed contract")
+    const res = await call(IDS.staffUser, "POST /api/content/stories/attachments/update", {
+      id: story,
+      attachmentId,
+      fileDataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    })
+    expect(res.status).toBe(200)
+    const { attachments } = JSON.parse(await res.text()) as { attachments: { label: string }[] }
+    expect(attachments.map((a) => a.label)).toEqual(["The signed contract"])
+  })
+
+  it("refuses the incoherent shapes rather than half-writing them", async () => {
+    const story = await addStory({ title: "Ask for nonsense" })
+    const link = await attachLink(story, "A link", "https://example.test/l")
+    const file = await attachFile(story, "A file")
+    const png =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+
+    // Bytes for a link, and a web address for a file: both are somebody's
+    // mistake about WHICH row, and a silent half-write is the worst answer.
+    for (const body of [
+      { id: story, attachmentId: link, fileDataUrl: png },
+      { id: story, attachmentId: file, url: "https://example.test/nope" },
+      // Both at once — the door cannot know which one was meant.
+      { id: story, attachmentId: file, url: "https://example.test/nope", fileDataUrl: png },
+      // Nothing to do at all.
+      { id: story, attachmentId: file },
+      // A link that is not a link.
+      { id: story, attachmentId: link, url: "javascript:alert(1)" },
+    ])
+      expect((await call(IDS.staffUser, "POST /api/content/stories/attachments/update", body)).status).toBe(400)
+
+    // An id that is not on this story is a 404, not a 400 and not a silent 200.
+    expect(
+      (
+        await call(IDS.staffUser, "POST /api/content/stories/attachments/update", {
+          id: story,
+          attachmentId: "01ZZZZZZZZZZZZZZZZZZZZZZZZ",
+          label: "Nowhere",
+        })
+      ).status
+    ).toBe(404)
+
+    // Nothing moved through any of that.
+    expect(rows(story).filter((r) => r.deactivated_at === null).length).toBe(2)
   })
 })

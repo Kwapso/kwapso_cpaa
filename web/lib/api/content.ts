@@ -386,6 +386,21 @@ export const content = {
     url?: string
     fileDataUrl?: string
   }) => api<{ attachments: StoryAttachment[]; total: number }>("/api/content/stories/attachments", post(input)),
+  /** Fix one that is already on the story. THREE ACTS AT ONE ADDRESS, because
+   * they are one act to the person doing them: a `label` on its own renames it,
+   * a `fileDataUrl` swaps a file's bytes, a `url` swaps a link's address. Send
+   * a `label` beside a replacement to do both in one press. */
+  updateStoryAttachment: (input: {
+    id: string
+    attachmentId: string
+    label?: string
+    url?: string
+    fileDataUrl?: string
+  }) =>
+    api<{ attachments: StoryAttachment[]; total: number }>(
+      "/api/content/stories/attachments/update",
+      post(input)
+    ),
   removeStoryAttachment: (id: string, attachmentId: string) =>
     api<{ attachments: StoryAttachment[]; total: number }>(
       "/api/content/stories/attachments/remove",

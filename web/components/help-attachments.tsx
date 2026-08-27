@@ -25,6 +25,7 @@ import { Link2, Paperclip, Plus, Trash2, Upload } from "@shared/ui/icons"
 
 import type { HelpAttachment } from "@shared/types"
 import { ApiFailure, content as contentApi } from "@/lib/api"
+import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { safeHref } from "@shared/web/rich-text"
 import { formatRelative } from "@shared/web/format"
@@ -183,7 +184,9 @@ export function HelpAttachmentsPanel({
                   {a.label} <span className="text-muted-foreground">({a.url})</span>
                 </span>
               )}
-              <span className="text-muted-foreground text-xs tabular-nums">
+              {/* Wraps below `sm` so the filename keeps its width — the story
+                * panel's note carries the whole reason. */}
+              <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
                 {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t)]
                   .filter(Boolean)
                   .join(" · ")}
@@ -199,6 +202,21 @@ export function HelpAttachmentsPanel({
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
+              )}
+              {/* A SCREENSHOT LOOKS LIKE A SCREENSHOT. Half of what lands on a
+                * ticket is a picture of the thing somebody is describing, and a
+                * paperclip beside `Screenshot 2026-08-27 at 14.02.11.png` is the
+                * one shape a person cannot scan. The same well the story panel
+                * draws, from the same component, so a picture attached to a
+                * ticket and a picture attached to a story look alike. */}
+              {hasPreview(a.kind, a.contentType) && (
+                <div className="w-full pl-6">
+                  <AttachmentPreview
+                    kind={a.kind}
+                    url={a.url}
+                    contentType={a.contentType}
+                  />
+                </div>
               )}
             </li>
           ))}
