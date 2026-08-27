@@ -260,6 +260,10 @@ export function StoryFormDialog({
   // R2 storage is addressed by story id, and on a create that id does not exist
   // until the door answers.
   const [pending, setPending] = React.useState<File[]>([])
+  /** A pick that is in flight. Separate from `busy` (which means "the form is
+   * submitting") because these are now two different waits and the person is
+   * allowed to keep typing through this one. */
+  const [uploading, setUploading] = React.useState(false)
 
   // …AND WHAT IT ALREADY CARRIES. The owner attached two screenshots here, saved,
   // reopened the form and saw an empty field — this form only ever ADDED, so on
@@ -318,6 +322,35 @@ export function StoryFormDialog({
       } catch (err) {
         toast.error(err instanceof ApiFailure ? err.message : t("Couldn't attach that."))
       }
+    }
+  }
+
+  /** WHAT HAPPENS THE MOMENT SOMEBODY PICKS A FILE.
+   *
+   * ON AN EDIT, IT UPLOADS NOW. The story exists, so there is nothing to wait
+   * for — and waiting was actively losing files. The old shape deferred every
+   * upload to the submit, which ran AFTER `onSubmit` had already fired its
+   * "Story updated." toast, and held the dialog open until 4 MB of base64 had
+   * gone up. The owner read the toast, saw a form still sitting there, and
+   * force-reloaded three times; a reload during that window kills the request,
+   * so there is no row, no bytes and no error — the success message was
+   * literally causing the data loss it denied. Uploading on pick removes the
+   * window rather than narrowing it. `review-dialog.tsx` has always done it this
+   * way; this is the same shape, not a second one.
+   *
+   * ON A CREATE THERE IS STILL NOTHING TO HANG IT ON, so those files wait for
+   * the id the submit hands back (R41). That half cannot be fixed here — R2 is
+   * addressed by the story's id and the story does not exist yet. */
+  async function pick(files: File[]) {
+    if (!storyId) {
+      setPending((f) => [...f, ...files])
+      return
+    }
+    setUploading(true)
+    try {
+      await attach(storyId, files)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -475,7 +508,7 @@ export function StoryFormDialog({
                     size="icon"
                     className="size-6"
                     aria-label={t("Take it off")}
-                    disabled={busy}
+                    disabled={busy || uploading}
                     onClick={() => void detach(a.id)}
                   >
                     <X className="size-3.5" />
@@ -507,8 +540,8 @@ export function StoryFormDialog({
           )}
           <FileUpload
             multiple
-            onFilesSelected={(files) => setPending((f) => [...f, ...files])}
-            className={busy ? "pointer-events-none opacity-60" : undefined}
+            onFilesSelected={(files) => void pick(files)}
+            className={busy || uploading ? "pointer-events-none opacity-60" : undefined}
           />
         </div>
       </Field>

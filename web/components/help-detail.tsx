@@ -791,8 +791,12 @@ export function HelpDetailScreen({
         storyTypes={options.storyTypes}
         draftKey={`story:add:ticket:${helpId}`}
         onSubmit={async (v) => {
-          await createStoryFrom(teamId, { ...v, ticketId: helpId }, t)
+          // The id goes back so the dialog can hang the picked files on it —
+          // see the note at the sprint's copy of this call. Discarding it drops
+          // the file silently.
+          const madeId = await createStoryFrom(teamId, { ...v, ticketId: helpId }, t)
           invalidate(sliceKey("stories-ticket", helpId))
+          return madeId
         }}
       />
 

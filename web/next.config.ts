@@ -21,10 +21,24 @@ const staticExport = process.env.BUILD_STATIC
         // environment instead, so a branch can be LOOKED at before it is merged.
         //
         // Dev only, by construction: this whole branch is the non-BUILD_STATIC
-        // one, so nothing here can reach the shipped build. Reads are ordinary
-        // GETs; a WRITE from here is refused by the CSRF check at the far door
-        // (shared/workers/front-door.ts — the Origin will be localhost), which
-        // is the correct answer and worth knowing before you try.
+        // one, so nothing here can reach the shipped build.
+        //
+        // AND HERE IS ITS BLIND SPOT, named beside the benefit rather than
+        // discovered later. Reads are ordinary GETs and work. A WRITE does not:
+        // the far door's CSRF check refuses it 403 `foreign_origin`, because the
+        // browser sends `Origin: http://localhost:3000` and
+        // `shared/workers/front-door.ts` compares it to its own. Proved, both
+        // ways — a real POST came back 403 and a census of every row afterwards
+        // showed nothing had been written.
+        //
+        // That refusal is the property that makes this safe to have, and it is
+        // also exactly what this tool CANNOT verify: any path whose bug lives in
+        // a browser write is invisible here. On the lane that added this, the
+        // story edit dialog's upload path was precisely such a path — it was
+        // verified by reading rows out of the door with curl instead, and the
+        // one defect this tool could not have caught was found by a person. Use
+        // it to see what a screen SHOWS; do not mistake it for coverage of what
+        // a screen DOES.
         if (process.env.DEV_API_ORIGIN)
           return [
             { source: "/api/:path*", destination: `${process.env.DEV_API_ORIGIN}/api/:path*` },

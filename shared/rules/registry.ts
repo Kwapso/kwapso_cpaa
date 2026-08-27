@@ -381,6 +381,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "reachable-bytes",
     status: "enforced",
   },
+  {
+    id: "R41",
+    dimension: "arch",
+    law: "A FILE SOMEBODY PICKED IS EITHER SENT OR REFUSED, NEVER DROPPED. R40's sibling, and the boundary is the point: R40 asks whether a STORED file reaches a person, so where nothing is stored it is silent by construction. A create dialog cannot upload while somebody types — R2 is addressed by the record's id and on a create that id does not exist yet — so the picked files wait and are hung on whatever `onSubmit` HANDS BACK. Every dialog that defers an upload that way is a line in `DEFERRED_UPLOAD_FORMS` naming the maker whose id it needs, rot-checked against the dialog still deferring; and every CREATE call site of it, censused off the disk, must actually return that id — either as a concise arrow whose body IS the maker call, or as a named value that is returned. A site passing the record's id is an EDIT and is skipped, read from the same prop the dialog itself switches on. Deliberately NARROW: the fault is a DISCARDED RESULT rather than a missing call, so there is no absent function to census, only a value that goes nowhere — an honest small law that can be checked beats a general one that cannot.",
+    why: "Three of the four `<StoryFormDialog>` create sites did `await createStoryFrom(...)` and threw the id away, so `target` was null, the guarded upload never ran, and every file picked in those forms was dropped in silence: story created, success toast, no error, no row, no object, nothing to recover from. `createStoryFrom` had returned the id since the day the upload was written — the callers simply did not pass it on, and a discarded value looks exactly like correct code. It is the worse half of the class R40 names: R40's failures at least leave the bytes in the bucket. Found 2026-08-27 while answering a different question about the same dialog, which is the third time in one day this class was found by pulling on a thread rather than by any check.",
+    checkId: "picked-files-are-sent",
+    status: "enforced",
+  },
 ]
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly
