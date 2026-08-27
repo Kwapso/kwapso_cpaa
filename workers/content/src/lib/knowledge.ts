@@ -220,6 +220,41 @@ export const accountCompartment = (accountId: string): string => `account:${acco
 const LEXICAL_TOP_K = 10
 const LEXICAL_WEIGHT = 0.1
 
+/** WHAT A CHUNK IS WORTH WHEN IT LITERALLY CONTAINS THE REFERENCE SOMEBODY TYPED.
+ *
+ * `LEXICAL_WEIGHT` is a tenth of a vote, and it was measured: at parity the word
+ * match drags an ORDINARY question's answer down nine points. That measurement
+ * stands and this does not touch it — but it was taken on ordinary questions, and
+ * a question carrying a rare exact token is not one.
+ *
+ * MEASURED, 27 Aug 2026, and it is the same failure the proportional floor was
+ * blamed for and did not cause. "task 3144" answers perfectly: two words, so the
+ * embedding of the question is essentially the embedding of "3144" and the vector
+ * arm finds the right chunks by itself. Put that reference inside a sentence a
+ * person would actually say — "could somebody remind me where things currently
+ * stand with task 3144, and whether anybody has replied about it since last
+ * week?" — and the embedding is dominated by the polite framing, the vector arm
+ * returns three FluClinic meetings, and the word arm, which found the right chunk,
+ * is outvoted ten to one by construction. So the fuller and more courteous the
+ * question, the worse the answer: exactly backwards.
+ *
+ * 2, AND THE NUMBER IS DERIVED RATHER THAN CHOSEN. Parity (1) is not enough, and
+ * a test with six chatty near-misses around one short handover note is what
+ * showed it: a distractor that the vector arm ranks first AND the word arm also
+ * returns scores 1/(K+1) + LEXICAL_WEIGHT/(K+2), while the reference chunk scores
+ * EXACT_WEIGHT/(K+1) and nothing else, because it matched one term. So parity
+ * loses by exactly the tenth of a vote the distractor collects twice over. The
+ * break-even is
+ *
+ *     EXACT_WEIGHT > 1 + LEXICAL_WEIGHT × (K+1)/(K+2)  ≈  1.098
+ *
+ * and 2 is the next whole number, which leaves room for a distractor that ranks
+ * well in both arms rather than only the one that ranks first in each.
+ *
+ * It is safe above parity ONLY because the token had to be rare to get here
+ * (EXACT_TERM_MAX_CHUNKS): "2026" never reaches this line. */
+const EXACT_WEIGHT = 2
+
 /** Chunks the fused list hands on to be READ out of the database. Bounded
  * because every one is a row; comfortably more than one answer carries, so the
  * personal fence and the excluded-source filter can drop rows without the answer
@@ -1687,7 +1722,14 @@ export function knowledgeAnswer(input: {
   }
 }
 
-type CandidateRow = { chunk_id: string; lex: number }
+type CandidateRow = {
+  chunk_id: string
+  lex: number
+  /** How many of the question's RARE exact tokens this chunk contains. Zero for
+   * every chunk of a question that had none, which is what keeps `fuse`'s
+   * measured behaviour on an ordinary question untouched. */
+  exact: number
+}
 
 /** How much of a question a chunk must actually CONTAIN before the word match
  * will call it evidence.
@@ -1767,17 +1809,38 @@ function termFloor(terms: number, role: LexicalRole): number {
 /** HOW MANY CHUNKS A TOKEN MAY APPEAR IN AND STILL BE "EXACT".
  *
  * `termFloor` says a chunk sharing one word out of eight is a coincidence. The
- * exact-term bypass below says THIS word is not a coincidence — and rarity is
- * the only honest way to tell those two apart, because both arrive as a token
- * with a digit in it. A ticket reference lives in a handful of places (the row
- * itself, its conversation, the two emails that argued about it); a year lives
- * in hundreds and would let every one of them through a floor built to stop
- * exactly that.
+ * exact-term bypass says THIS word is not a coincidence — and rarity is the only
+ * honest way to tell those two apart, because both arrive as a token with a digit
+ * in it. A reference identifies one thing; a year identifies a twelfth of the
+ * base.
  *
- * Counted INSIDE the reader's own fence and the chosen compartment, in the same
- * statement, so "rare" means rare in the material this person can actually see
- * and cannot be a second read of a different moment. */
-const EXACT_TERM_MAX_CHUNKS = 20
+ * 100 IS MEASURED, and the first number here (20) was not — it was a guess, and
+ * it was wrong in the direction that matters: it silently switched the bypass OFF
+ * for the very reference the bypass was built for. Ticket 3144 is discussed
+ * across a dozen records — the meetings about it, their Gemini notes, the
+ * calendar invitations — and lands in 56 chunks, so a cap of 20 excluded it and
+ * the fix shipped green while the case it was for still failed.
+ *
+ * The distribution, over the 6,372 digit-bearing terms in the agency's own base
+ * (27 Aug 2026), is why 100 rather than any nearby number:
+ *
+ *      1-20 chunks   6,321 terms      references, amounts, codes
+ *     21-60             31            3144 (56) sits here
+ *     61-100             5            almost nothing
+ *    101-200             9            2027 (170), 2025 (265)
+ *      200+              6            2026 (1,424), and format debris
+ *                                     ("000z", "30pm", "2fkolkata")
+ *
+ * The boundary sits in the sparsest band there is, so it is not balanced on a
+ * knife edge: moving it to 80 or to 120 changes which side five terms fall on.
+ *
+ * COUNTED IN CHUNKS RATHER THAN SOURCES, deliberately. Sources is the truer unit
+ * — 3144 is 27 sources against 2026's 1,062, an even cleaner separation — but it
+ * costs a join from the postings table to the chunks table inside the hot read,
+ * and the chunk count separates these two populations perfectly well. If a single
+ * enormous document ever makes a real reference look common, sources is the
+ * upgrade, and this comment is where to start. */
+const EXACT_TERM_MAX_CHUNKS = 100
 
 /** THE TOKENS SOMEBODY TYPED EXACTLY — the digit-bearing subset of the question,
  * which is the definition `questionTerms` itself already sorts by ("rarer-looking
@@ -1872,8 +1935,17 @@ async function lexicalArm(
     // saw it, by ten chunks that repeated one word. Deciding eligibility in the
     // statement makes the ten a page of chunks that already qualify. The number
     // is derived from the question's own term count and is an integer, so it is
-    // interpolated like every other server-owned value (CONVENTIONS); the ORDER
-    // BY is left exactly as it was measured.
+    // interpolated like every other server-owned value (CONVENTIONS).
+    //
+    // THE EXACT TOKEN LEADS THE ORDER, and without that the weight below buys
+    // nothing. `lex` is the SUM of term weights, so a chunk echoing a dozen of
+    // the question's ordinary words ("could", "somebody", "currently", "week")
+    // outranks the one chunk that holds the reference, which matched a single
+    // term. Fusion is by RANK, so losing the order loses the fight before the
+    // weight is ever applied — which is what a test with six chatty near-misses
+    // around one short handover note showed the moment it was written. On a
+    // question with no rare exact token `exact` is the literal 0 for every row,
+    // so this is `ORDER BY lex DESC` exactly as it was measured.
     `WITH scoped AS (
        SELECT chunk_id, term, weight FROM knowledge_terms WHERE ${where.join(" AND ")}
      )${
@@ -1884,9 +1956,11 @@ async function lexicalArm(
      )`
          : ""
      }
-     SELECT chunk_id, SUM(weight) AS lex FROM scoped
+     SELECT chunk_id, SUM(weight) AS lex, ${
+       rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END)" : "0"
+     } AS exact FROM scoped
       GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, role)} ${bypass}
-      ORDER BY lex DESC LIMIT ${LEXICAL_TOP_K}`,
+      ORDER BY exact DESC, lex DESC LIMIT ${LEXICAL_TOP_K}`,
     params
   )
   return rows
@@ -1919,7 +1993,15 @@ function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; 
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
   lexical.forEach((row, rank) =>
-    fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + LEXICAL_WEIGHT / (RRF_K + rank + 1))
+    fused.set(
+      row.chunk_id,
+      // A TENTH OF A VOTE, UNLESS THE CHUNK HOLDS THE REFERENCE ITSELF. See
+      // EXACT_WEIGHT: the tenth was measured on ordinary questions and still
+      // stands for them, and `exact` is zero for every chunk of every question
+      // that carried no rare exact token — so nothing measured moves.
+      (fused.get(row.chunk_id) ?? 0) +
+        (row.exact > 0 ? EXACT_WEIGHT : LEXICAL_WEIGHT) / (RRF_K + rank + 1)
+    )
   )
   return [...fused.entries()]
     .map(([id, score]) => ({ id, score }))

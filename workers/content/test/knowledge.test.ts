@@ -20,6 +20,8 @@
 //   • taking a source away really takes it away — and the sweep does not quietly
 //     put it back.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -798,16 +800,32 @@ describe("an exact reference is found however long the question around it is", (
     expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
   })
 
-  // RARITY IS THE WHOLE OF WHAT MAKES A TOKEN "EXACT". Twenty-one notes mention
-  // 2026; the token is in the question and in every one of them, and it may not
-  // buy a single one of them past the floor. Break EXACT_TERM_MAX_CHUNKS and this
-  // is what says so.
+  // RARITY IS THE WHOLE OF WHAT MAKES A TOKEN "EXACT", and the threshold has to
+  // be crossed for real rather than described. A year is a digit-bearing token
+  // too, and if one could waive the floor the sole-evidence path would answer any
+  // question that happened to contain a number.
+  //
+  // The cap is read from the source rather than repeated here, because the number
+  // MOVED once already and moved for a good reason: it was first guessed at 20,
+  // which silently switched the bypass off for ticket 3144 (56 chunks) — the very
+  // reference it was built for — and shipped green while that case still failed.
+  // A test carrying its own copy of the number would have kept passing.
   it("a token that is everywhere is not an exact term, whatever the digit says", async () => {
-    for (let i = 0; i < 21; i++)
-      await addSource(IDS.staffUser, {
-        title: `Planning note ${i}`,
-        body: `Budget 2026 planning for workstream ${i}, agreed with the delivery lead.`,
-      })
+    const cap = Number(
+      /const EXACT_TERM_MAX_CHUNKS = (\d+)/.exec(
+        readFileSync(join(__dirname, "..", "src", "lib", "knowledge.ts"), "utf8")
+      )?.[1]
+    )
+    expect(cap, "the rarity cap has gone — this test is measuring nothing").toBeGreaterThan(0)
+    // One long note, cut into more pieces than the cap allows, every piece saying
+    // 2026. Cheaper than the same number of separate sources and the same fact:
+    // this token is not rare.
+    const paragraph = (i: number) =>
+      `Planning note ${i} for the 2026 delivery year. ` + `Workstream ${i} detail. `.repeat(60)
+    await addSource(IDS.staffUser, {
+      title: "Budget planning notes",
+      body: Array.from({ length: cap + 20 }, (_, i) => paragraph(i)).join("\n\n"),
+    })
     const answer = await ask(
       IDS.staffUser,
       "Could somebody remind me what the agreed parental leave arrangement is for 2026, and who signed it off?",
@@ -834,6 +852,92 @@ describe("an exact reference is found however long the question around it is", (
 // overturn a search that has already answered, a chunk must now hold the WHOLE
 // question — with the one exception the word match exists for, a rare exact
 // token, which bypasses every floor here.
+// ── AND WHAT A CHUNK HOLDING THE REFERENCE IS WORTH ─────────────────────────
+//
+// The word arm runs beside the vector arm at a tenth of a vote, which was
+// measured and is right for an ordinary question. A question carrying a rare
+// exact token is not one, and at a tenth it loses by construction: "task 3144"
+// answers perfectly because the whole question embeds to "3144", while the same
+// reference inside a natural sentence is drowned by the polite framing and the
+// word arm's correct answer is outvoted ten to one.
+describe("a chunk holding the reference is not worth a tenth of a vote", () => {
+  beforeEach(async () => {
+    // The reference lives in ONE short note. Six longer notes are about the
+    // client and the sprint the question is phrased around, so the vector arm has
+    // plenty to prefer — which is the situation on staging exactly.
+    await addSource(IDS.staffUser, {
+      title: "Handover note",
+      body: "3144 is pending gravity forms confirmation.",
+    })
+    for (let i = 0; i < 6; i++)
+      await addSource(IDS.staffUser, {
+        title: `Bergman sprint sync ${i}`,
+        body:
+          "Could somebody remind the team where things currently stand this week. " +
+          "We walked the sprint, agreed what anybody still owes, and Ana replied about the rest.",
+      })
+  })
+
+  it("finds the reference inside a sentence a person would actually say", async () => {
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?"
+    )
+    expect(answer.found).toBe(true)
+    expect(titles(answer), "the note holding the reference must be cited").toContain("Handover note")
+  })
+
+  it("and the bare reference still works, which is the case that never broke", async () => {
+    const answer = await ask(IDS.staffUser, "task 3144")
+    expect(titles(answer)).toContain("Handover note")
+  })
+
+  // A REFERENCE THAT IS DISCUSSED A LOT IS STILL A REFERENCE, and this is the
+  // regression that shipped green: the rarity cap was guessed at 20 chunks, and
+  // ticket 3144 is in 56 of them on staging — the meetings about it, their Gemini
+  // notes, the calendar invitations — so the bypass was silently off for the very
+  // case it was built for, and every test passed.
+  it("a reference discussed across a whole record is still rare enough to speak", async () => {
+    const paragraph = (i: number) =>
+      `Task 3144 update ${i}. ` + `The team walked through the remaining checks. `.repeat(60)
+    await addSource(IDS.staffUser, {
+      title: "Task 3144 log",
+      body: Array.from({ length: 30 }, (_, i) => paragraph(i)).join("\n\n"),
+    })
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?"
+    )
+    expect(answer.found).toBe(true)
+    expect(
+      titles(answer).some((t) => t.includes("3144")),
+      `nothing about 3144 was cited — got ${titles(answer).join(", ")}`
+    ).toBe(true)
+  })
+
+  // AND IT MUST LEAD THE WORD ARM'S OWN LIST, not merely be on it. That list is
+  // capped at LEXICAL_TOP_K, and it used to be ordered by the SUM of term
+  // weights — so a dozen chunks echoing the question's ordinary words ("could",
+  // "somebody", "currently", "week") fill the ten slots and push the one chunk
+  // holding the reference off the end, where no fusion weight can reach it.
+  it("and it is not pushed off the word arm's list by chatter that echoes the question", async () => {
+    for (let i = 6; i < 18; i++)
+      await addSource(IDS.staffUser, {
+        title: `Bergman weekly note ${i}`,
+        body:
+          "Could somebody remind the team where things currently stand this week. " +
+          "We walked the sprint, agreed what anybody still owes, and Ana replied about the rest.",
+      })
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?"
+    )
+    expect(titles(answer), "eighteen chatty near-misses must not bury one reference").toContain(
+      "Handover note"
+    )
+  })
+})
+
 describe("overruling a search that already answered takes the whole question", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {

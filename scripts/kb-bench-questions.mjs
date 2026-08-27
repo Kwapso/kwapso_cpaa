@@ -114,9 +114,19 @@ export const QUESTIONS = [
   },
 
   // ── AN EXACT REFERENCE, INSIDE A LONG QUESTION ───────────────────────────
-  // The measured failure that fix 1 is about: the proportional term floor made
-  // a reference number HARDER to find the more fully somebody phrased the
-  // question around it.
+  //
+  // The pair matters more than either question. "task 3144" always answered,
+  // because a two-word question embeds to essentially the embedding of "3144".
+  // The same reference inside a sentence a person would actually say was cited to
+  // three FluClinic meetings and missed the task — so the fuller and more
+  // courteous the question, the worse the answer.
+  //
+  // It was blamed on the proportional term floor and that was wrong twice over:
+  // the floor's bypass was already there, and it was switched off for this exact
+  // reference by a rarity cap somebody guessed at (20 chunks; 3144 is in 56).
+  // With the cap measured, the word arm finds the chunk — and then loses it, ten
+  // to one, to a fusion weight set for ordinary questions. Both had to move. See
+  // EXACT_TERM_MAX_CHUNKS and EXACT_WEIGHT in knowledge.ts.
   {
     q: "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?",
     cites: ["3144"],
