@@ -47,6 +47,8 @@ export const QUESTIONS = [
   // ── FINDING WHAT IS THERE ────────────────────────────────────────────────
   {
     q: "What did we agree in the week recap?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Week recap"],
     // TWO RECAPS, BOTH VALID, and the key said so and then only listed one.
     //
@@ -66,6 +68,8 @@ export const QUESTIONS = [
   },
   {
     q: "What came out of the Team Assembly?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Team Assembly"],
     // From the 19 August transcript: a recurring monthly remote assembly, with
     // the organising rotated between people.
@@ -74,6 +78,8 @@ export const QUESTIONS = [
   },
   {
     q: "What was the feedback on Kwapso CPAA?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Kwapso CPAA"],
     // From the 19 August transcript: the UI Kit, spacing and components, the
     // standardised timer, a template-based structure.
@@ -82,6 +88,8 @@ export const QUESTIONS = [
   },
   {
     q: "What was discussed on the HOGO sync?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["HOGO", "Hogo"],
     lead: ["HOGO", "Hogo", "import", "website", "blog", "workflow", "data"],
     topic: ["HOGO", "Hogo", "Requirements"],
@@ -113,12 +121,16 @@ export const QUESTIONS = [
   },
   {
     q: "What was covered in the FluClinic sprint sync?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["FluClinic", "Flu clinic"],
     lead: ["sprint", "task", "Stripe", "FluClinic", "phase", "test"],
     topic: ["FluClinic", "Flu clinic"],
   },
   {
     q: "What did the strategy session with kwapso cover?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Strategy Session"],
     lead: ["strategy", "kwapso", "client", "plan", "grow", "product"],
     topic: ["Strategy Session"],
@@ -176,6 +188,8 @@ export const QUESTIONS = [
   // from six of them has told the reader one thing.
   {
     q: "Summarise the week recap meeting",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Week recap"],
     spread: 2,
     // Both recaps — see the note on the earlier week-recap question.
@@ -187,6 +201,8 @@ export const QUESTIONS = [
   },
   {
     q: "What happened at the Team Assembly meeting in August?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Team Assembly"],
     spread: 2,
     lead: ["monthly", "bonding", "rotat", "remote", "culture"],
@@ -200,6 +216,8 @@ export const QUESTIONS = [
   },
   {
     q: "What has been agreed with Assecuranz about their file import?",
+    // A conversation somebody had, so it has speakers to name (see `attributes`).
+    conversation: true,
     cites: ["Assecuranz"],
     lead: ["import", "folder", "file", "Marco", "hold", "feedback", "Assecuranz"],
     topic: ["Assecuranz"],
