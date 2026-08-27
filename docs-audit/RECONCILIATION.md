@@ -111,7 +111,7 @@ Each of these says something the kit says differently. Ours is wrong.
 |---|---|---|---|
 | **C1** | *"Two surfaces only… **There is no third tone**, no tinted panel."* Names `bg-card` as `#f7f2ea`. | Eight surface tokens. §2.6: a card takes **the other paper tone from the band it sits in**. `--card` is `#FFFEF9`; `#F7F2EB` is `--surface-panel`. | C1 forbids the third tone the kit's whole card rule **requires**, and swaps the two names. This is the root of Finding 1. |
 | **C2/N5** | the card **keeps its border**; `shadow-none` stands | `Card` default `bg-surface-panel`, `raised` = `bg-card shadow-sm`. `hairline` is an opt-in prop for **one** case: two cards of the *same* tone adjacent. | Same defect diagnosed (contrast 1.000 in light — the kit calls it CRD-7), two different fixes. The kit's is the paper tone; ours is a stroke the kit reserves. |
-| **C3/C4/D2** | the ambient field is translucent and must be scoped away from cards | The kit **ships `components/ambient-background/`**: two neutral washes (`--accent`, `--hair-faint`), `aria-hidden`, `pointer-events-none`, no parallax, no scroll listener. | Ours is a workaround for a translucency the kit's own component does not have. |
+| **C3/C4/D2** | the ambient field is translucent and must be scoped away from cards | The kit ships `components/ambient-background/` — two palette washes, `aria-hidden`, no parallax, no scroll listener — **and the app already imports it**, both doors. | Ours is a workaround, written against the old library, for a translucency the current component does not have. Stale, not hand-rolled. See CENSUS-UNUSED-KIT §5. |
 | **C6** | sky/forest/poppy *"never fill a section, a row or a card"*; `--success` is `#1f9259` | `bg-success` / `bg-destructive` are **bridged fill utilities**; a destructive button is charcoal **on poppy**. `--kw-forest` was lightened to `#20955B` because charcoal on `#1F9259` measured 4.44:1, under AA. | C6 forbids fills the kit mandates, contradicts its own C7 two lines later, and quotes the **pre-correction** hex. |
 | **C8** | a warning band is amber, `--warning` = `#e8b244`, `bg-warning/10` | *"**There is no amber in the kwapso palette.**"* `--warning: var(--surface-quiet)`. And §2.2: an alpha on a token is a rejection. | Wrong colour, a hex literal (R32), and an opacity used as a fill. |
 | **C10** | *"one ink, stepped by **opacity**"*, `text-foreground/30`; hexes `#6b6965`, `#e8e4dc` | Four **solid** ink tokens. §2.3: an alpha of a token is *"a colour the palette does not contain… whatever falls out of compositing"*. Kit values are `#5f5d59`, `rgba(26,25,24,.08)`. | The mechanism is the exact one §2.3 rejects, and the three hexes are the old library's. |
@@ -486,8 +486,8 @@ The reconciliation decided four things about the censuses that follow:
    against a screen's own kind (main vs detail). That census is now written from the kit's
    rule rather than ours.
 2. **"What does the kit ship that the app never imports?"** is confirmed as the highest-yield
-   census, and it has already returned three before the sweep even ran: `Container`
-   (0 call sites, and the answer to §6), `ambient-background`, and `Choice`.
+   census. Run in full it returns **104 of 160**, and the real finding inside it is that
+   the app imports **zero** kit compositions — see `CENSUS-UNUSED-KIT.md`.
 3. **Token-level censuses have a real target list** — off-ladder spacing (40), off-ladder
    type (`tracking-tight`, 32 sites), off-ladder icons (`size-3.5`, 195 sites, against a
    ladder of 16/20/22/24/28/32 where `--icon-button` is 16), and `--warning`'s amber.
