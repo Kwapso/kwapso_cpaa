@@ -464,11 +464,39 @@ Everything needed is below. Applying it is four edits and one command.
    known check* — add `"declared-readers", // R42: workers/content/test/source-readers.test.ts`.
 
 3. **`RULES.md`** — one row after R39, id `R42`, dimension `arch`, check
-   `declared-readers`, status `enforced`. The earned-by paragraph is the one
-   worth keeping: the app had both readers, no table, and the reader was picked
-   at the call site — so a PDF somebody uploaded was searchable and the same PDF
-   in a Drive folder was 46 chunks of page geometry, and every PDF in the base
-   scored 0.000 on letter-shaped tokens. Nobody decided that.
+   `declared-readers`, status `enforced`, with the paragraph below. It is
+   deliberately written for somebody who was not here: the owner authorised this
+   law with the words *"I don't know what this means, but if you've done it and
+   it makes sense, then go ahead"*, and a law waved through on trust owes its
+   reader a plainer explanation than one argued over, not a more technical one.
+
+   > **Earned 27 Aug 2026.** The app had two different pieces of code for reading
+   > a file and nothing saying which to use, so the answer depended on which way
+   > the file came in. A PDF uploaded through the app was read properly. The same
+   > PDF sitting in a Drive folder came out as gibberish — every PDF in the
+   > agency's own knowledge base scored zero on any test of whether it held
+   > words, the powers of attorney exactly like the logo artwork. Nobody chose
+   > that. Each door had picked a reader at the moment it needed one, and the two
+   > moments were months apart. Asking one table instead also gave the upload
+   > door PowerPoint, which the other reader could always handle, without a line
+   > of new reading code.
+   >
+   > **Why it is a law and not a tidy-up:** *reusability*, which is one of the
+   > three standpoints this base is judged on. Adding the next file format is one
+   > entry in one table, rather than an archaeology exercise across two doors to
+   > find out what each already does — and that is the difference between a base
+   > you can fork for a different product and one you can only inherit.
+   >
+   > **The load-bearing clause is the last one** — *no door chooses its own*. The
+   > check censuses both doors off the disk and fails if either names a reader
+   > the table did not give it, because a predicate nobody calls is not a guard
+   > and a table nobody asks is not a registry.
+   >
+   > **Provenance.** Written by the session that found the defect, enforced by
+   > its own check before it was registered, and held UNREGISTERED until the
+   > owner authorised it in his own words. A Law of the Base carrying a session's
+   > signature on the constitution it is bound by would be the wrong precedent,
+   > and the record of that not happening is worth more than the law.
 
 4. **The `R1–R39` range**, which `doc-claims` will name for you the moment the
    registry moves: `CLAUDE.md`, `README.md`, and BUILD-1/2/3 in this folder.
