@@ -243,11 +243,6 @@ export function PagedFind<T>({
   })
   const total = useCachedValue<number>(findKey ? `total:${findKey}` : null)
 
-  const clearAll = () => {
-    setText("")
-    setValues({})
-  }
-  const canClear = asked
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
 
@@ -259,10 +254,22 @@ export function PagedFind<T>({
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={text} onChange={(e) => setText(e.currentTarget.value)} placeholder={placeholder} className="w-56" />
-        {/* THE ORDER, beside the search box and the filters because it is the
-            third half of one question and belongs on the same row (the library's
-            own CollectionFrame places it exactly here). What it changes is what
+        {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
+            the filter row's "Clear all" — one control quietly owning two
+            questions — and the kit's bar says "Clear filters" and now means
+            only that. */}
+        <SearchInput
+          value={text}
+          onChange={(e) => setText(e.currentTarget.value)}
+          onClear={() => setText("")}
+          placeholder={placeholder}
+          className="w-56"
+        />
+        {/* THE ORDER, beside the search box because the two are asked with the
+            same gesture — you type, then you say what order. (The filters moved
+            to the row below when the kit's bar arrived: hers is a full-width
+            strip of chips, not a control that sits in a toolbar. All three are
+            still one question and still one cache key.) What it changes is what
             the DOOR is asked, so the answer spans the whole collection rather
             than the page in front of you. */}
         {showSort && (
@@ -272,26 +279,6 @@ export function PagedFind<T>({
             onValueChange={(by) => setSortBy(by)}
             direction={sortDir ?? landsOn}
             onDirectionChange={(dir) => setSortDir(dir)}
-          />
-        )}
-        {showFilters && (
-          <FilterBar
-            facets={facets}
-            values={values}
-            // Empty on purpose: every facet above carries its own options, so
-            // there is nothing for the bar to derive from the rows on screen.
-            data={[]}
-            onChange={(field, value) =>
-              setValues((s) => {
-                const next = { ...s }
-                if (value === "") delete next[field]
-                else next[field] = value
-                return next
-              })
-            }
-            onClearAll={clearAll}
-            canClear={canClear}
-            resultCount={total}
           />
         )}
         {/* THE FILTERED TOTAL — the exact server count of the question being
@@ -309,6 +296,31 @@ export function PagedFind<T>({
           </span>
         )}
       </div>
+
+      {/* THE FILTERS, ON THEIR OWN ROW. The kit's bar is a full-width strip of
+          chips above whatever they are narrowing: what is on stays visible and
+          removable in one press at every width, and the facet controls live
+          behind its own "+ filter" slot. Putting it back inside the row above
+          would be the first step of theming it into the row it replaced. */}
+      {showFilters && (
+        <FilterBar
+          facets={facets}
+          values={values}
+          // Empty on purpose: every facet above carries its own options, so
+          // there is nothing for the bar to derive from the rows on screen.
+          data={[]}
+          onChange={(field, value) =>
+            setValues((s) => {
+              const next = { ...s }
+              if (value === "") delete next[field]
+              else next[field] = value
+              return next
+            })
+          }
+          onClearFacets={() => setValues({})}
+          resultCount={total}
+        />
+      )}
 
       {children({
         active,
