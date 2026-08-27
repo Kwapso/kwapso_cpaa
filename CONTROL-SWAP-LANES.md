@@ -210,9 +210,19 @@ answer is probably ONE conversion:
   web-portal/components/waiting-on-you.tsx      (1 input type="file"  → LEAVE)
   web-portal/components/deliverables-screen.tsx (1 img, user-supplied → CHECK)
 
-DO NOT TOUCH web-portal/components/sign-in.tsx OR portal-shell.tsx. They belong
-to lane/portal-signin, and sign-in.tsx holds one <form> and one <img> which are
-both on the do-not-convert list anyway. There is nothing there for you.
+DO NOT TOUCH web-portal/components/sign-in.tsx OR portal-shell.tsx, and the
+reason has CHANGED — read it, because the old one is no longer true.
+
+lane/portal-signin has LANDED on main, so those files are no longer contested.
+They are excluded now because:
+  · sign-in.tsx holds one <form> and one <img>, both on the do-not-convert
+    list. There was never anything there for you.
+  · portal-shell.tsx carries a hand-drawn copy of the kit's AuthShell, drawn
+    because the kit's own screen could not be imported under Next. That is
+    fixed upstream (kit v1.2.0) and the file is scheduled for DELETION —
+    UI-GAPS row 23 says deleted, not revisited. Converting controls inside a
+    file with a deletion date on it is work thrown away twice: once when you do
+    it, once when someone reviews it.
 
 The portal is the client's front door — narrow, calm, larger type. Check it at a
 phone width as well as a desktop one.
