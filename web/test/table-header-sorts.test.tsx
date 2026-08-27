@@ -422,8 +422,21 @@ describe("every table in the agency app is one whose headers work", () => {
       join(__dirname, "..", "..", "shared", "web", "screen-engine", "collection-frame.tsx"),
       "utf8"
     )
+    // THE DEFECT IS "SEEDED ONCE, NEVER RE-READ", not one spelling of it. This
+    // used to grep for `useState(config.sortBy)`, which went red on 27 Aug 2026
+    // when the nav memory replaced that `useState` with a remembered value —
+    // seeded from `config.sortBy` at mount and ignoring the prop from then on,
+    // which is the SAME broken seam under a different name. A rot-check that
+    // matches the shape of the bug rather than its characters would not have
+    // moved, so it is written that way now: the seed is still there, and
+    // nothing re-syncs it when the prop changes. Fix the seam (make the frame
+    // follow `config.sortBy`) and both halves go red together, which is the
+    // signal `RecordTable` is free to collapse onto `DataTable`.
+    const seedsOnceFromConfig =
+      /useState\(config\.sortBy\)/.test(frame) || /sortBy:\s*config\.sortBy/.test(frame)
+    const resyncsFromTheProp = /useEffect\([\s\S]{0,400}config\.sortBy/.test(frame)
     expect(
-      /useState\(config\.sortBy\)/.test(frame),
+      seedsOnceFromConfig && !resyncsFromTheProp,
       "CollectionFrame no longer seeds its sort once from config — re-check UI-GAPS #22(b), the host table may be able to go"
     ).toBe(true)
   })

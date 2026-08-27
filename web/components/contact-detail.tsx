@@ -60,6 +60,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { KeyRound, Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
@@ -146,7 +147,10 @@ export function ContactDetailScreen({
   const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-account", accountId))
   const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-account", accountId))
 
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [busy, setBusy] = React.useState(false)

@@ -23,6 +23,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   ScreenRenderer,
@@ -168,7 +169,8 @@ export function MeetingsScreen({
   // "this week" is the week somebody is in rather than the days left of it; the
   // calendar is the library's month grid over the same rows; and All shows far
   // more columns, which is what makes it worth being a separate view at all.
-  const [view, setView] = React.useState<"week" | "calendar" | "all">("week")
+  // Remembered with the screen — see web/lib/nav-memory.ts.
+  const [view, setView] = useRemembered<"week" | "calendar" | "all">("view", "week")
   const weekTotal = useCachedValue<number>(totalKey("meetings-week", teamId))
   // THIS WEEK IS ITS OWN READ (19 Aug 2026) — the door's week, not a browser
   // filter over the meetings list's newest page. The comment that used to sit on that

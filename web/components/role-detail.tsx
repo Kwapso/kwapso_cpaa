@@ -31,6 +31,7 @@ import {
   type PermissionRight,
 } from "@shared/ui/components/permission-matrix/permission-matrix"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { PermissionValue, RightSet, RolePermissions, TeamRole } from "@shared/types"
@@ -62,7 +63,10 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
   const [busyActive, setBusyActive] = React.useState(false)
   const [editingOpen, setEditingOpen] = React.useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = React.useState(false)
-  const [tab, setTab] = React.useState("permissions")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "permissions".
+  const [tab, setTab] = useRemembered("tab", "permissions")
 
   // The generic record feed (Law R5): every role action lands here — created,
   // details edited, permissions changed, deactivated — including imported roles.

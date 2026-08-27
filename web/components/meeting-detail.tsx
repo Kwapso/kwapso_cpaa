@@ -40,6 +40,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { ExternalLink, FileText, Pencil, Power, Video } from "@shared/ui/foundations/icons"
@@ -145,7 +146,10 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     listFetch.purposes(teamId)
   )
 
-  const [tab, setTab] = React.useState("notes")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "notes".
+  const [tab, setTab] = useRemembered("tab", "notes")
   const [editing, setEditing] = React.useState(false)
   const [busy, setBusy] = React.useState<"held" | "active" | "calendar" | "transcript" | "notes" | null>(null)
   // 9.6 — the notes are an OPEN FIELD on this screen until the meeting is held or

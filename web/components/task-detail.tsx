@@ -23,6 +23,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { Check, Pencil, Undo2 } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
@@ -79,7 +80,10 @@ export function TaskDetailScreen({
   // exactly when it is being read (shared/record-counts.ts).
   useRecordCounts("tasks", taskId)
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("tasks", taskId))
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   // CORRECTING THE TASK. The pickers come from the same hook the create form
   // uses, so the two forms cannot offer different clients or a different
   // department list; they are read only when this person could open the form at

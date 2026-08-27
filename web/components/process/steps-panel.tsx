@@ -36,6 +36,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
 import type { ProcessSaving } from "@shared/workers/savings"
 import { tenancy } from "@/lib/api"
@@ -140,7 +141,10 @@ export function StepsPanel({
   // OWNED HERE, because nothing outside this panel reads it: which of the three
   // ways to look at the steps is showing. It was host state only because the
   // block used to live there.
-  const [stepView, setStepView] = React.useState("list")
+  // Remembered with the screen — see web/lib/nav-memory.ts. Which way she was
+  // reading a process (the list, the flow, or two versions side by side) is
+  // as much "where she was" as which record she had open.
+  const [stepView, setStepView] = useRemembered("step-view", "list")
   const {
     process, versions, current, shownVersion, shownSteps, shownTotalSeconds,
     isCurrent, auditDate, revisionDates, saving, savingsCaption, againstQ, meetingsQ,

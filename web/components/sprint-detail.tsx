@@ -19,6 +19,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { CheckCheck, Pencil, RotateCcw } from "@shared/ui/foundations/icons"
 
 import {
@@ -103,7 +104,10 @@ export function SprintDetailScreen({
   const canEdit = can("work", "edit")
   const canCreate = can("work", "create")
 
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   const [storyOpen, setStoryOpen] = React.useState(false)
   const [editOpen, setEditOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)

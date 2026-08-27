@@ -22,7 +22,8 @@ import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/foundations/i
 import { Filter } from "@shared/ui/foundations/icons"
 import { kitIcon } from "./tabs-view"
 
-import { selectRows } from "./collection"
+import { facetOptions, selectRows } from "./collection"
+import { useRemembered } from "@shared/web/remembered"
 import { type CollectionConfig } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
@@ -46,6 +47,7 @@ function CollectionFrame<T>({
   serverSide = false,
   onQueryChange,
   modal = false,
+  memoryKey,
   className,
 }: {
   config: CollectionConfig
@@ -70,21 +72,90 @@ function CollectionFrame<T>({
   /** Set `true` when the collection can render inside a Dialog/Sheet, so the
    *  filter/sort popovers stay scrollable under the dialog's scroll lock. */
   modal?: boolean
+  /** WHICH COLLECTION THIS IS, for the nav memory — the module a recipe binds
+   * to, where a caller knows it. Two collections on one screen need two names or
+   * they would hand each other their search box; a caller that says nothing gets
+   * one derived from the config, which is stable for as long as the screen is.
+   * Nothing is remembered at all where no host has provided a memory (the client
+   * portal), so this is inert there. */
+  memoryKey?: string
   className?: string
 }) {
   const t = useT()
-  const [query, setQuery] = React.useState("")
+  // ── WHAT THIS COLLECTION WAS BEING ASKED, WHEN SHE LEFT IT ─────────────────
+  //
+  // The four controls in this header are the "what she had typed" and "which
+  // filters were set" halves of the nav memory. They are remembered as ONE slot
+  // because they are one question: a search with the filters dropped off it is
+  // a different question, and restoring half of it would be worse than
+  // restoring none. `slot` names this collection within the screen — see the
+  // `memoryKey` prop.
+  //
+  // THE PAGE IS DELIBERATELY NOT IN IT. Two reasons, and they are the same
+  // reason twice. A GROWING collection (R14) does not have pages: it has a
+  // cursor, its rows accumulate in the shared store, and that store already
+  // survives navigation — so there is nothing here to remember and a cursor
+  // minted before the rows moved would be R14's silent loss, answering about a
+  // window that has shifted. A BOUNDED one is paged in memory over rows that
+  // are live (R15), so "page three" names a position in a list that may have
+  // re-sorted under her: the same number, a different three rows. The filter is
+  // the durable half of what she was doing; the offset into it is not. She
+  // comes back to the top of her filtered list.
+  const slot = `find:${memoryKey ?? (config.title || searchKeys.join(","))}`
+  const [asked, remember] = useRemembered<{
+    query: string
+    facetValues: Record<string, string>
+    sortBy: string
+    sortDir: "asc" | "desc"
+  }>(
+    slot,
+    () => ({ query: "", facetValues: {}, sortBy: config.sortBy, sortDir: config.sortDir }),
+    (found) => {
+      // A REMEMBERED FILTER WHOSE OPTION NO LONGER EXISTS. A dropdown value can
+      // be retired while she is away, and a facet's choices are often derived
+      // from the rows themselves — so a remembered selection is checked against
+      // what this collection can actually offer TODAY, and a selection nothing
+      // can satisfy is dropped rather than restored. The rest of the question
+      // survives: losing one retired filter should not throw away her search.
+      // A `range` facet has no option list to check against, so its value is
+      // syntax rather than vocabulary and is kept.
+      if (!found || typeof found !== "object") return undefined
+      const was = found as Record<string, unknown>
+      const facets: Record<string, string> = {}
+      for (const [field, value] of Object.entries(
+        (was.facetValues as Record<string, string>) ?? {}
+      )) {
+        const facet = config.filterFacets.find((f) => f.field === field)
+        if (!facet) continue
+        if (facet.control === "range") {
+          facets[field] = value
+          continue
+        }
+        const offered = facet.options ?? facetOptions(data, facet.field)
+        if (offered.some((o) => o.value === value)) facets[field] = value
+      }
+      return {
+        query: typeof was.query === "string" ? was.query : "",
+        facetValues: facets,
+        // A sort by a column this collection no longer offers falls back to the
+        // declared one, for the same reason a retired filter does.
+        sortBy:
+          typeof was.sortBy === "string" &&
+          (was.sortBy === config.sortBy ||
+            config.sortOptions.some((o) => o.value === was.sortBy))
+            ? was.sortBy
+            : config.sortBy,
+        sortDir: was.sortDir === "asc" || was.sortDir === "desc" ? was.sortDir : config.sortDir,
+      }
+    }
+  )
+  const { query, facetValues, sortBy, sortDir } = asked
+  const setQuery = (next: string) => remember((q) => ({ ...q, query: next }))
   // The OLD SearchInput debounced internally; the kit's is a plain input, so
   // the debounce lives here now — same 300ms the old control used.
   const debouncedSetQuery = useDebouncedCallback((next: string) => setQuery(next), 300)
-  const [facetValues, setFacetValues] = React.useState<Record<string, string>>(
-    {}
-  )
-  // The user's LIVE sort, seeded from the declared config sort. Config stays
-  // declarative (it says where sorting starts); this is the runtime choice —
-  // exactly the split between builder `filter` and user `facetValues`.
-  const [sortBy, setSortBy] = React.useState(config.sortBy)
-  const [sortDir, setSortDir] = React.useState<"asc" | "desc">(config.sortDir)
+  const setSortBy = (next: string) => remember((q) => ({ ...q, sortBy: next }))
+  const setSortDir = (next: "asc" | "desc") => remember((q) => ({ ...q, sortDir: next }))
   const [page, setPage] = React.useState(0)
   const rootRef = React.useRef<HTMLDivElement>(null)
 
@@ -137,17 +208,14 @@ function CollectionFrame<T>({
     query !== "" || Object.values(facetValues).some((v) => v !== "")
 
   const setFacet = (field: string, value: string) =>
-    setFacetValues((s) => {
-      const next = { ...s }
+    remember((q) => {
+      const next = { ...q.facetValues }
       if (value === "") delete next[field]
       else next[field] = value
-      return next
+      return { ...q, facetValues: next }
     })
 
-  const clearAll = () => {
-    setQuery("")
-    setFacetValues({})
-  }
+  const clearAll = () => remember((q) => ({ ...q, query: "", facetValues: {} }))
 
   // Page change: optionally scroll the collection's top back into view.
   const goTo = (p: number) => {
