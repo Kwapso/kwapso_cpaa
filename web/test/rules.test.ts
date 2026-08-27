@@ -46,6 +46,19 @@ import { COLLECTION_FILTERS } from "../lib/collection-filters"
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const WEB = join(HERE, "..") // web/
 const ROOT = join(WEB, "..") // repo root
+/** RAW SOURCE. Anything that then asserts an identifier is PRESENT must strip
+ * comments first — `stripComments(read(f))` — because a comment naming the thing
+ * keeps the check green after the code doing it is deleted.
+ *
+ * Found on 27 Aug 2026 by mutation, in a census written that same hour: it looked
+ * for `readsLikeWords` inside a branch whose own comment explained why
+ * `readsLikeWords` was there, so removing the call changed nothing. Four checks
+ * here had the same shape — R2's Activity panel, R4's FormShell, R7's draft hook
+ * and the one-record-picker lock — and a form that dropped its FormShell import
+ * while keeping a comment about it would have passed all of them.
+ *
+ * Reading raw is still right where the assertion is about ABSENCE, or about the
+ * file's literal bytes. It is only presence that a comment can fake. */
 const read = (p: string) => readFileSync(p, "utf8")
 
 /** The READ functions in a lib — `count*` / `list*` / `search*` — each as its own
@@ -218,7 +231,7 @@ describe("RULES — the laws of the base", () => {
     // R2 meets R14: the feed is a PAGE of a growing collection under a badge
     // counting ALL of it — the gap that let a record with 143 events truthfully
     // badge 143 over its newest 50, forever.
-    const panel = read(join(WEB, "components", "activity-panel.tsx"))
+    const panel = stripComments(read(join(WEB, "components", "activity-panel.tsx")))
     expect(panel, "the Activity panel must render the library ActivityFeed").toContain("ActivityFeed")
     expect(panel, "the Activity panel must carry a <LoadMore> — its badge counts rows it can't reach (R14)").toContain(
       "<LoadMore"
@@ -283,7 +296,7 @@ describe("RULES — the laws of the base", () => {
   // R4 — every form dialog renders through the shared FormShell.
   it("forms-use-formshell: every form dialog imports FormShell", () => {
     for (const d of FORM_DIALOGS) {
-      const src = read(join(WEB, "components", `${d}.tsx`))
+      const src = stripComments(read(join(WEB, "components", `${d}.tsx`)))
       expect(src, `${d} must use FormShell (one shared form layout)`).toContain("form-shell")
     }
   })
@@ -292,7 +305,7 @@ describe("RULES — the laws of the base", () => {
   // navigating away (CACHING.md §11). The draft hook is the single seam.
   it("forms-persist-drafts: every form dialog persists its draft via useFormDraft", () => {
     for (const d of FORM_DIALOGS) {
-      const src = read(join(WEB, "components", `${d}.tsx`))
+      const src = stripComments(read(join(WEB, "components", `${d}.tsx`)))
       expect(src, `${d} must persist its draft (useFormDraft — CACHING.md §11)`).toContain("useFormDraft")
     }
   })
@@ -304,7 +317,7 @@ describe("RULES — the laws of the base", () => {
   // came to behave nine different ways, reported from a phone as "any drop-downs
   // are becoming impossible to search through".
   it("one-record-picker: only record-picker.tsx composes the library Command", () => {
-    const picker = read(join(WEB, "components", "record-picker.tsx"))
+    const picker = stripComments(read(join(WEB, "components", "record-picker.tsx")))
     // A blind check reports "all clear" exactly like a passing one.
     expect(picker, "the record picker must be the library Command + Popover").toContain(
       "controls/command/command"
@@ -651,7 +664,7 @@ describe("RULES — the laws of the base", () => {
     }
     // Anti-regression: the host derives the badges by iterating countCacheKey — no
     // hand-listed per-section literal can creep back in.
-    const src = read(join(WEB, "components", "deep-link-screen.tsx"))
+    const src = stripComments(read(join(WEB, "components", "deep-link-screen.tsx")))
     expect(src, "deep-link-screen must derive tab counts from countCacheKey").toContain("s.countCacheKey")
   })
 
@@ -823,7 +836,9 @@ describe("RULES — the laws of the base", () => {
     // 1 · THE PICKER'S OPTION TYPE. Thirty-three pickers pass through it, and
     // until 19 Aug 2026 it had no field for a picture at all — so none of them
     // COULD have drawn one.
-    const picker = read(join(WEB, "components", "record-picker.tsx"))
+    // Stripped: the field probe is `\n\s*picture:`, which a commented-out line
+    // matches exactly as well as a declared one.
+    const picker = stripComments(read(join(WEB, "components", "record-picker.tsx")))
     for (const field of ["picture", "mark", "shape"])
       expect(
         new RegExp(`\\n\\s*${field}\\??:`).test(picker),
@@ -2274,6 +2289,7 @@ describe("RULES — the laws of the base", () => {
 
   it("every enforced law has a known check", () => {
     const known = new Set([
+      "declared-readers", // R42: workers/content/test/source-readers.test.ts
       "publish-seam", // the 3 per-worker publish-seam.test.ts suites
       "gating-seam", // R10: the 3 per-worker gating-seam suites + the mcp identity-gate suite
       "fetch-timeout", // R11: the source-scan below
@@ -2485,7 +2501,7 @@ describe("required-ring: a group says it is a group", () => {
 // hand-listed, which is the point — a fourth host-composed collection is
 // caught by the same walk on the day it is added.
 describe("a sidebar section can draw its collection", () => {
-  const src = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
+  const src = stripComments(read(join(WEB, "components", "deep-link", "collection-content.tsx")))
   const GUARD = "const recipe = resolveRecipe(`${module}.list`"
 
   it("collection-screens: the guard this rule is about still exists", () => {

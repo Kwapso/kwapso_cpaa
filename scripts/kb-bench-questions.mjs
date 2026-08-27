@@ -19,28 +19,134 @@
 //           "Notes:") are stripped back to the meeting they are about.
 //
 // A question may carry more than one; all of them must hold for it to pass.
+//
+// ── AND A SECOND KEY, FOR THE HALF A PERSON READS (--compose) ───────────────
+//
+// The three above grade RETRIEVAL. `--compose` grades the ANSWER, against the
+// three things the owner actually named when he called the answers poor:
+// "beating around the bush, unnecessary references to files that were not
+// important, and the big juicy files it should have touched, it didn't".
+//
+//   lead   BEATING AROUND THE BUSH. At least one of these must appear in the
+//          answer's FIRST SENTENCE. Authored off the material — these are things
+//          the meeting or the document actually says, so a first sentence
+//          carrying one of them is a first sentence that answered, and a first
+//          sentence carrying none is a preamble however fluent it reads.
+//   topic  FILES THAT WERE NOT IMPORTANT. A cited title must contain one of
+//          these to have earned its place. Defaults to `cites` where a question
+//          does not need a wider set.
+//
+// The third thing he named — the big juicy file it should have touched — needs
+// no key at all, and that is the point: a passage whose whole text is its own
+// title and a date cannot have earned a citation slot for ANY question, so the
+// bench detects it from the material rather than from a list (see `hollow` in
+// kb-bench.mjs). It had to be measured that way because a title key cannot see
+// it: an empty placeholder for a meeting and the 92-chunk transcript of that
+// meeting have exactly the same title.
 export const QUESTIONS = [
   // ── FINDING WHAT IS THERE ────────────────────────────────────────────────
-  { q: "What did we agree in the week recap?", cites: ["Week recap"] },
-  { q: "What came out of the Team Assembly?", cites: ["Team Assembly"] },
-  { q: "What was the feedback on Kwapso CPAA?", cites: ["Kwapso CPAA"] },
-  { q: "What was discussed on the HOGO sync?", cites: ["HOGO", "Hogo"] },
-  { q: "What is the process for taking on a new insurance client?", cites: ["insurance client"] },
-  { q: "How do we record a damage case?", cites: ["damage", "Schaden"] },
-  { q: "What happens when a vehicle is handed to a new driver?", cites: ["vehicle", "driver"] },
-  { q: "How are vouchers issued to a pharmacy?", cites: ["voucher", "pharmacy"] },
-  { q: "What was covered in the FluClinic sprint sync?", cites: ["FluClinic", "Flu clinic"] },
-  { q: "What did the strategy session with kwapso cover?", cites: ["Strategy Session"] },
+  {
+    q: "What did we agree in the week recap?",
+    cites: ["Week recap"],
+    // From the 14 and 21 August transcripts: Aurora on team horsepower and
+    // specialisation, Alexander on project status, AI workflows.
+    lead: ["horsepower", "specialis", "specializ", "workflow", "Aurora", "Alexander", "client deliver"],
+    topic: ["Week recap"],
+  },
+  {
+    q: "What came out of the Team Assembly?",
+    cites: ["Team Assembly"],
+    // From the 19 August transcript: a recurring monthly remote assembly, with
+    // the organising rotated between people.
+    lead: ["monthly", "bonding", "rotat", "remote", "culture"],
+    topic: ["Team Assembly"],
+  },
+  {
+    q: "What was the feedback on Kwapso CPAA?",
+    cites: ["Kwapso CPAA"],
+    // From the 19 August transcript: the UI Kit, spacing and components, the
+    // standardised timer, a template-based structure.
+    lead: ["UI Kit", "spacing", "timer", "template", "component", "workflow"],
+    topic: ["Kwapso CPAA", "Feedback"],
+  },
+  {
+    q: "What was discussed on the HOGO sync?",
+    cites: ["HOGO", "Hogo"],
+    lead: ["HOGO", "Hogo", "import", "website", "blog", "workflow", "data"],
+    topic: ["HOGO", "Hogo", "Requirements"],
+  },
+  {
+    q: "What is the process for taking on a new insurance client?",
+    cites: ["insurance client"],
+    // The process map's own first steps, in its own words.
+    lead: ["document", "email", "Confia", "details", "step"],
+    topic: ["insurance client"],
+  },
+  {
+    q: "How do we record a damage case?",
+    cites: ["damage", "Schaden"],
+    lead: ["phone", "policy", "report", "Confia", "step", "write"],
+    topic: ["damage", "Schaden"],
+  },
+  {
+    q: "What happens when a vehicle is handed to a new driver?",
+    cites: ["vehicle", "driver"],
+    lead: ["spreadsheet", "handover", "paper", "Ontime", "row", "step"],
+    topic: ["vehicle", "driver", "Ontime"],
+  },
+  {
+    q: "How are vouchers issued to a pharmacy?",
+    cites: ["voucher", "pharmacy"],
+    lead: ["request", "email", "entitled", "issue", "record", "FluClinic"],
+    topic: ["voucher", "pharmacy"],
+  },
+  {
+    q: "What was covered in the FluClinic sprint sync?",
+    cites: ["FluClinic", "Flu clinic"],
+    lead: ["sprint", "task", "Stripe", "FluClinic", "phase", "test"],
+    topic: ["FluClinic", "Flu clinic"],
+  },
+  {
+    q: "What did the strategy session with kwapso cover?",
+    cites: ["Strategy Session"],
+    lead: ["strategy", "kwapso", "client", "plan", "grow", "product"],
+    topic: ["Strategy Session"],
+  },
 
   // ── AN EXACT REFERENCE, INSIDE A LONG QUESTION ───────────────────────────
-  // The measured failure that fix 1 is about: the proportional term floor made
-  // a reference number HARDER to find the more fully somebody phrased the
-  // question around it.
+  //
+  // The pair matters more than either question. "task 3144" always answered,
+  // because a two-word question embeds to essentially the embedding of "3144".
+  // The same reference inside a sentence a person would actually say was cited to
+  // three FluClinic meetings and missed the task — so the fuller and more
+  // courteous the question, the worse the answer.
+  //
+  // It was blamed on the proportional term floor and that was wrong twice over:
+  // the floor's bypass was already there, and it was switched off for this exact
+  // reference by a rarity cap somebody guessed at (20 chunks; 3144 is in 56).
+  // With the cap measured, the word arm finds the chunk — and then loses it, ten
+  // to one, to a fusion weight set for ordinary questions. Both had to move. See
+  // EXACT_TERM_MAX_CHUNKS and EXACT_WEIGHT in knowledge.ts.
   {
     q: "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?",
-    cites: ["3144"],
+    // NO `cites`, AND THAT IS THE CORRECTION. A title key is the wrong instrument
+    // for a reference: the sources that actually discuss ticket 3144 are the
+    // FluClinic Stripe-webhook meetings, their notes and the chat where Chilavert
+    // asks about it, and not one of those carries the number in its title. The
+    // only titles that do are the calendar envelopes — "Invitation: FluClinic :
+    // Task 3144 @ Tue Aug 25" — whose bodies are the same words again with a time
+    // on them. So a title key was scoring this question PASS for citing the two
+    // sources that say least about it, and FAIL the moment retrieval started
+    // finding the material. `lead` is the honest test: the passages must contain
+    // the reference itself.
+    lead: ["3144"],
+    topic: ["3144", "FluClinic", "Stripe", "webhook"],
   },
-  { q: "task 3144", cites: ["3144"] },
+  {
+    q: "task 3144",
+    lead: ["3144"],
+    topic: ["3144", "FluClinic", "Stripe", "webhook"],
+  },
 
   // ── SAYING NOTHING, WHEN THERE IS NOTHING ────────────────────────────────
   // R23. Each of these names something the base genuinely does not hold: no
@@ -57,10 +163,30 @@ export const QUESTIONS = [
   // meeting itself, its Gemini notes in Drive, the calendar event and the
   // invitation and notes emails — five titles, one subject — and an answer built
   // from six of them has told the reader one thing.
-  { q: "Summarise the week recap meeting", cites: ["Week recap"], spread: 2 },
-  { q: "What happened at the Team Assembly meeting in August?", cites: ["Team Assembly"], spread: 2 },
+  {
+    q: "Summarise the week recap meeting",
+    cites: ["Week recap"],
+    spread: 2,
+    lead: ["horsepower", "specialis", "specializ", "workflow", "Aurora", "Alexander", "client deliver"],
+    topic: ["Week recap"],
+  },
+  {
+    q: "What happened at the Team Assembly meeting in August?",
+    cites: ["Team Assembly"],
+    spread: 2,
+    lead: ["monthly", "bonding", "rotat", "remote", "culture"],
+    topic: ["Team Assembly"],
+  },
 
   // ── QUESTIONS THAT CROSS SOURCES ─────────────────────────────────────────
-  { q: "What is the plan for importing HOGO's existing data?", cites: ["HOGO", "Hogo", "Import"] },
-  { q: "What has been agreed with Assecuranz about their file import?", cites: ["Assecuranz"] },
+  { q: "What is the plan for importing HOGO's existing data?", cites: ["HOGO", "Hogo", "Import"],
+    lead: ["import", "data", "HOGO", "Hogo", "file", "structure"],
+    topic: ["HOGO", "Hogo", "Import", "import"],
+  },
+  {
+    q: "What has been agreed with Assecuranz about their file import?",
+    cites: ["Assecuranz"],
+    lead: ["import", "folder", "file", "Marco", "hold", "feedback", "Assecuranz"],
+    topic: ["Assecuranz"],
+  },
 ]

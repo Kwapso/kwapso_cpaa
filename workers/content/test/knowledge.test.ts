@@ -20,6 +20,8 @@
 //   • taking a source away really takes it away — and the sweep does not quietly
 //     put it back.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -798,16 +800,32 @@ describe("an exact reference is found however long the question around it is", (
     expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
   })
 
-  // RARITY IS THE WHOLE OF WHAT MAKES A TOKEN "EXACT". Twenty-one notes mention
-  // 2026; the token is in the question and in every one of them, and it may not
-  // buy a single one of them past the floor. Break EXACT_TERM_MAX_CHUNKS and this
-  // is what says so.
+  // RARITY IS THE WHOLE OF WHAT MAKES A TOKEN "EXACT", and the threshold has to
+  // be crossed for real rather than described. A year is a digit-bearing token
+  // too, and if one could waive the floor the sole-evidence path would answer any
+  // question that happened to contain a number.
+  //
+  // The cap is read from the source rather than repeated here, because the number
+  // MOVED once already and moved for a good reason: it was first guessed at 20,
+  // which silently switched the bypass off for ticket 3144 (56 chunks) — the very
+  // reference it was built for — and shipped green while that case still failed.
+  // A test carrying its own copy of the number would have kept passing.
   it("a token that is everywhere is not an exact term, whatever the digit says", async () => {
-    for (let i = 0; i < 21; i++)
-      await addSource(IDS.staffUser, {
-        title: `Planning note ${i}`,
-        body: `Budget 2026 planning for workstream ${i}, agreed with the delivery lead.`,
-      })
+    const cap = Number(
+      /const EXACT_TERM_MAX_CHUNKS = (\d+)/.exec(
+        readFileSync(join(__dirname, "..", "src", "lib", "knowledge.ts"), "utf8")
+      )?.[1]
+    )
+    expect(cap, "the rarity cap has gone — this test is measuring nothing").toBeGreaterThan(0)
+    // One long note, cut into more pieces than the cap allows, every piece saying
+    // 2026. Cheaper than the same number of separate sources and the same fact:
+    // this token is not rare.
+    const paragraph = (i: number) =>
+      `Planning note ${i} for the 2026 delivery year. ` + `Workstream ${i} detail. `.repeat(60)
+    await addSource(IDS.staffUser, {
+      title: "Budget planning notes",
+      body: Array.from({ length: cap + 20 }, (_, i) => paragraph(i)).join("\n\n"),
+    })
     const answer = await ask(
       IDS.staffUser,
       "Could somebody remind me what the agreed parental leave arrangement is for 2026, and who signed it off?",
@@ -834,6 +852,92 @@ describe("an exact reference is found however long the question around it is", (
 // overturn a search that has already answered, a chunk must now hold the WHOLE
 // question — with the one exception the word match exists for, a rare exact
 // token, which bypasses every floor here.
+// ── AND WHAT A CHUNK HOLDING THE REFERENCE IS WORTH ─────────────────────────
+//
+// The word arm runs beside the vector arm at a tenth of a vote, which was
+// measured and is right for an ordinary question. A question carrying a rare
+// exact token is not one, and at a tenth it loses by construction: "task 3144"
+// answers perfectly because the whole question embeds to "3144", while the same
+// reference inside a natural sentence is drowned by the polite framing and the
+// word arm's correct answer is outvoted ten to one.
+describe("a chunk holding the reference is not worth a tenth of a vote", () => {
+  beforeEach(async () => {
+    // The reference lives in ONE short note. Six longer notes are about the
+    // client and the sprint the question is phrased around, so the vector arm has
+    // plenty to prefer — which is the situation on staging exactly.
+    await addSource(IDS.staffUser, {
+      title: "Handover note",
+      body: "3144 is pending gravity forms confirmation.",
+    })
+    for (let i = 0; i < 6; i++)
+      await addSource(IDS.staffUser, {
+        title: `Bergman sprint sync ${i}`,
+        body:
+          "Could somebody remind the team where things currently stand this week. " +
+          "We walked the sprint, agreed what anybody still owes, and Ana replied about the rest.",
+      })
+  })
+
+  it("finds the reference inside a sentence a person would actually say", async () => {
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?"
+    )
+    expect(answer.found).toBe(true)
+    expect(titles(answer), "the note holding the reference must be cited").toContain("Handover note")
+  })
+
+  it("and the bare reference still works, which is the case that never broke", async () => {
+    const answer = await ask(IDS.staffUser, "task 3144")
+    expect(titles(answer)).toContain("Handover note")
+  })
+
+  // A REFERENCE THAT IS DISCUSSED A LOT IS STILL A REFERENCE, and this is the
+  // regression that shipped green: the rarity cap was guessed at 20 chunks, and
+  // ticket 3144 is in 56 of them on staging — the meetings about it, their Gemini
+  // notes, the calendar invitations — so the bypass was silently off for the very
+  // case it was built for, and every test passed.
+  it("a reference discussed across a whole record is still rare enough to speak", async () => {
+    const paragraph = (i: number) =>
+      `Task 3144 update ${i}. ` + `The team walked through the remaining checks. `.repeat(60)
+    await addSource(IDS.staffUser, {
+      title: "Task 3144 log",
+      body: Array.from({ length: 30 }, (_, i) => paragraph(i)).join("\n\n"),
+    })
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?"
+    )
+    expect(answer.found).toBe(true)
+    expect(
+      titles(answer).some((t) => t.includes("3144")),
+      `nothing about 3144 was cited — got ${titles(answer).join(", ")}`
+    ).toBe(true)
+  })
+
+  // AND IT MUST LEAD THE WORD ARM'S OWN LIST, not merely be on it. That list is
+  // capped at LEXICAL_TOP_K, and it used to be ordered by the SUM of term
+  // weights — so a dozen chunks echoing the question's ordinary words ("could",
+  // "somebody", "currently", "week") fill the ten slots and push the one chunk
+  // holding the reference off the end, where no fusion weight can reach it.
+  it("and it is not pushed off the word arm's list by chatter that echoes the question", async () => {
+    for (let i = 6; i < 18; i++)
+      await addSource(IDS.staffUser, {
+        title: `Bergman weekly note ${i}`,
+        body:
+          "Could somebody remind the team where things currently stand this week. " +
+          "We walked the sprint, agreed what anybody still owes, and Ana replied about the rest.",
+      })
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?"
+    )
+    expect(titles(answer), "eighteen chatty near-misses must not bury one reference").toContain(
+      "Handover note"
+    )
+  })
+})
+
 describe("overruling a search that already answered takes the whole question", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {
@@ -901,5 +1005,189 @@ describe("overruling a search that already answered takes the whole question", (
   it("and the SAME question is refused when the search looked and found nothing", async () => {
     const answer = await ask(IDS.staffUser, SCATTERED, undefined, NOTHING_CLOSE_ENOUGH)
     expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
+})
+
+// ── THE POOL IS A BUDGET FOR ATTRITION ──────────────────────────────────────
+//
+// Three things thin the candidate list between the index and the answer, and two
+// are permanent by design: the personal fence hides a colleague's own material,
+// an excluded source stays excluded, and a re-index leaves behind the ids it
+// replaced. R26 makes a stale id SAFE to meet — it reads back as no row, never as
+// somebody else's paragraph — but safe is not free: it is still a nearest
+// neighbour and still takes a slot.
+//
+// MEASURED on staging: "what did we agree in the week recap?" returns 100
+// neighbours over the floor and fifteen of them exist, the first at rank 17. A
+// pool of 24 spent sixteen slots on rows that cannot come back, and the base
+// answered "we have nothing on that" about a meeting it holds two 96-chunk
+// transcripts of.
+//
+// WHAT THIS TEST PROVES, AND WHAT IT DOES NOT. It locks the PROPERTY — a wall of
+// a colleague's private material must neither leak nor starve the answer — and it
+// passes with the pool at 24 as well as at 100, because a second mechanism also
+// covers this case: when nothing at all survives the read, the last-resort record
+// fallback opens the router's own best records by source id. That is defence in
+// depth and worth having. It also means this test is not the evidence for the
+// pool size; the evidence for that is the staging measurement in RANKING_POOL's
+// own comment, and the bench going 18/20 to 20/20 on the strength of it.
+describe("material a colleague cannot see must not starve the answer", () => {
+  const QUESTION = "is the dispatch rollout cutover paused?"
+
+  it("reaches the team's own material past a wall of somebody else's", async () => {
+    // MORE OF THEM THAN THE OLD POOL HELD, which is the whole point: with a pool
+    // of 24 these fill it entirely and the team's own note is cut before anyone
+    // finds out it was readable. Each one echoes the question word for word, so
+    // it outranks the team's note on both arms — and every one is invisible to
+    // the person asking.
+    for (let i = 0; i < 30; i++)
+      await addSource(OTHER_STAFF, {
+        title: `Aurora's private dispatch note ${i}`,
+        body: `dispatch rollout cutover paused. ${QUESTION} dispatch rollout cutover paused.`,
+        visibility: "private",
+      })
+    // The answer, in a colleague's words rather than the question's — which is
+    // what real material looks like, and why it ranks below the echoes.
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch rollout",
+      body: "The dispatch rollout is on hold until March while Bergman finish their own migration.",
+    })
+    const answer = await ask(IDS.staffUser, QUESTION)
+    expect(answer.found, "the team's own note is right there").toBe(true)
+    expect(titles(answer)).toContain("Bergman dispatch rollout")
+    expect(
+      titles(answer).some((t) => t.includes("private")),
+      "and none of the colleague's private material leaked"
+    ).toBe(false)
+  })
+})
+
+// ── A SLOT SPENT ON A PASSAGE THAT SAYS NOTHING ─────────────────────────────
+//
+// Some sources are envelopes. A calendar invitation's body is its own subject
+// line again with a time on it; a bare meeting that has already happened — kept
+// on purpose, because it is the record that it happened — says "X is a meeting of
+// ours, on 2026-08-19." and stops. Both are perfectly RELEVANT, which is exactly
+// why they win slots: they are near-perfect matches for a question naming the
+// thing they are about.
+//
+// AND A SCORE CLIFF DOES NOT REACH THEM, which is why this is not a relevance
+// rule. Measured on the agency's own material: these score at the TOP, so
+// dropping what is far below the best hit cuts nothing. Asked about task 3144 the
+// base answered "Task 3144 is currently scheduled, and it was a meeting on August
+// 25" — out of the invitation — while the conversation about the task sat lower.
+describe("an envelope does not take a slot from something that says more", () => {
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Invitation: Bergman dispatch review @ Tue Aug 25, 2026 12:30pm",
+      body: "Bergman dispatch review\nTue Aug 25, 2026 12:30pm",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch review",
+      body: "Bergman dispatch review is a meeting of ours, on 2026-08-25.",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch review notes",
+      body:
+        "Bergman dispatch review is a meeting of ours, on 2026-08-25. What was said in the meeting: " +
+        "Marta agreed the cutover moves to the first Monday of April, and Ana will send the supplier " +
+        "list before the invoice run so the desk can check it against the board.",
+    })
+  })
+
+  it("the passage carrying the answer is cited, and the two envelopes beside it are not", async () => {
+    const answer = await ask(IDS.staffUser, "what was said at the Bergman dispatch review?")
+    const cited = titles(answer)
+    expect(cited, `cited ${cited.join(", ")}`).toContain("Bergman dispatch review notes")
+    // The two that say nothing share the subject and the words and would score at
+    // the top. Neither may spend a slot while the notes are available.
+    expect(cited).not.toContain("Bergman dispatch review")
+    expect(cited.some((t) => t.startsWith("Invitation:"))).toBe(false)
+  })
+
+  // NEVER PAID FOR — the same bargain the title cap makes. When a bare diary entry
+  // is genuinely all there is, it is still the answer.
+  it("but an envelope is still quoted when an envelope is all there is", async () => {
+    db().exec("DELETE FROM knowledge_terms; DELETE FROM knowledge_chunks; DELETE FROM knowledge_sources;")
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch review",
+      body: "Bergman dispatch review is a meeting of ours, on 2026-08-25.",
+    })
+    const answer = await ask(IDS.staffUser, "when was the Bergman dispatch review?")
+    expect(answer.found, "a diary entry is a poor answer and a better one than silence").toBe(true)
+    expect(titles(answer)).toContain("Bergman dispatch review")
+  })
+})
+
+// ── A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE ────────────────
+//
+// Every unreadable thing that ever reached this knowledge base failed the same
+// way: accepted, stored, quietly never read, and the person never told. 131
+// files of logo artwork got in that way; every PDF scored 0.000 on letter-shaped
+// tokens that way; `image/*` has been opaque since the beginning that way.
+//
+// The owner ruled on 27 Aug 2026 that a video link is REFUSED instead, and that
+// the refusal carries the fix: paste the transcript and the source is welcome.
+// The form says so while somebody is typing; this is the door, which is what
+// holds when the request comes from the assistant, from MCP, or from a screen
+// that has drifted.
+describe("a video link is refused unless its transcript comes with it", () => {
+  const video = (body?: string) =>
+    call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "Bergman cutover walkthrough",
+      sourceUrl: "https://www.youtube.com/watch?v=abc123",
+      ...(body ? { body } : {}),
+    })
+
+  it("refuses it, and says what would fix it", async () => {
+    const res = await video()
+    expect(res.status).toBe(400)
+    const out = (await res.json()) as { error: string; message: string }
+    expect(out.error).toBe("video_needs_transcript")
+    expect(out.message, "the refusal must carry the remedy, not just the no").toMatch(/transcript/i)
+  })
+
+  it("and stores NOTHING — a refused source is not a row that answers nothing", async () => {
+    await video()
+    const rows = db()
+      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?")
+      .get("Bergman cutover walkthrough") as { n: number }
+    expect(rows.n).toBe(0)
+  })
+
+  it("accepts it the moment the transcript is pasted, and indexes what was said", async () => {
+    const res = await video(
+      "Marta walked the cutover: the invoice run moves to the first Monday of April and Ana sends the supplier list."
+    )
+    expect(res.status).toBe(200)
+    // The transcript is the MATERIAL, not a note beside the link — so it is
+    // chunked and searchable like any other source. Asserted on the index rather
+    // than on an answer: what a stand-in embedding model ranks is a different
+    // subject, and this one is about the row existing with its words in it.
+    const row = db()
+      .prepare(
+        `SELECT chunk_count AS n FROM knowledge_sources WHERE title = ? AND body LIKE '%first Monday of April%'`
+      )
+      .get("Bergman cutover walkthrough") as { n: number } | undefined
+    expect(row?.n, "the pasted transcript must be indexed, not merely stored").toBeGreaterThan(0)
+  })
+
+  // NOT A GATE ON A DOMAIN LIST. An ordinary link with no body is exactly as
+  // acceptable as it has always been — this rule is about a link we cannot
+  // FOLLOW into words, and widening it would refuse half the notes in the base.
+  it("and an ordinary link with no material is untouched", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "The dispatch runbook",
+      sourceUrl: "https://docs.example.com/runbook",
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it("a direct link to an .mp4 is refused too, wherever it is hosted", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "Standup recording",
+      sourceUrl: "https://files.bergman.example/standup-2026-03-04.mp4",
+    })
+    expect(res.status).toBe(400)
   })
 })

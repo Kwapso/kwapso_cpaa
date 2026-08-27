@@ -39,6 +39,7 @@ import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
 import type { ChatMessage } from "./google-api"
+import type { ReaderEnv } from "./source-readers"
 import {
   chatMessages,
   driveFileText,
@@ -399,7 +400,7 @@ export async function scopedCalendarEvent(
 }
 
 export async function readGoogleMaterial(
-  env: GoogleEnv,
+  env: GoogleEnv & ReaderEnv,
   cfg: D1Rest,
   guard: MemberGuard,
   request: GoogleReadRequest = {}
@@ -444,7 +445,7 @@ export async function readGoogleMaterial(
           externalId: file.id,
           title: file.name,
           url: file.webViewLink,
-          text: request.withText ? await driveFileText(token, file.id) : "",
+          text: request.withText ? await driveFileText(env, token, file.id) : "",
           updatedAt: file.modifiedTime,
           shelf: source?.shelf ?? "private",
           ownerUserId: guard.userId,
@@ -603,7 +604,7 @@ export async function readGoogleMaterial(
  * is a file with nothing in it to answer questions from.
  */
 export async function hydrateText(
-  env: GoogleEnv,
+  env: GoogleEnv & ReaderEnv,
   cfg: D1Rest,
   guard: MemberGuard,
   items: GoogleItem[]
@@ -628,7 +629,7 @@ export async function hydrateText(
     }
     const text =
       item.service === "drive"
-        ? await driveFileText(token, item.externalId)
+        ? await driveFileText(env, token, item.externalId)
         : (await gmailMessage(token, item.externalId)).text
     out.push({ ...item, text: text || item.text })
   }
@@ -640,7 +641,7 @@ export async function hydrateText(
  * token or a Google outage still throws, because those are things somebody needs
  * to be told about rather than an empty answer that looks like an empty Drive. */
 async function tokenOrNull(
-  env: GoogleEnv,
+  env: GoogleEnv & ReaderEnv,
   cfg: D1Rest,
   guard: MemberGuard,
   service: GoogleService

@@ -692,7 +692,7 @@ export async function getGoogleDriveFile(request: Request, env: Env): Promise<Re
   const fileId = queryText(new URL(request.url).searchParams.get("fileId"), "File", TEXT_LIMITS.short)
   if (!fileId) return fail(400, "invalid_input", "Say which file.")
   const { token } = await accessTokenFor(env, cfg, guard, "drive")
-  return json({ fileId, text: await driveFileText(token, fileId) })
+  return json({ fileId, text: await driveFileText(env, token, fileId) })
 }
 
 /** POST /api/content/google/drive/upload — put a file INTO a folder I named.

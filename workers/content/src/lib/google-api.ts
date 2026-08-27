@@ -39,7 +39,8 @@ import {
   DRIVE_WALK_MAX_DEPTH,
   DRIVE_WALK_MAX_FILES,
 } from "@shared/workers/limits"
-import { DRIVE_BYTES_CAP, boundedBytes, extractFileText, fileShape } from "./file-text"
+import { DRIVE_BYTES_CAP, boundedBytes, looksLikeProse } from "./file-text"
+import { readSource, readersFor, type ReaderEnv } from "./source-readers"
 import { GuardError } from "@shared/workers/gating"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
@@ -631,7 +632,7 @@ const DRIVE_TEXT_CAP = 100_000
 /** One file's readable text. A Google Doc/Sheet/Slide is EXPORTED as plain text
  * (its bytes are not a document); anything else is downloaded as-is, and a
  * binary that has no text is honestly empty rather than mojibake. */
-export async function driveFileText(token: string, fileId: string): Promise<string> {
+export async function driveFileText(env: ReaderEnv, token: string, fileId: string): Promise<string> {
   // A SHORTCUT IS FOLLOWED BEFORE ANYTHING IS READ, and this is the whole reason
   // the metadata call asks for a third field.
   //
@@ -681,8 +682,12 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   // ZIP and the decoder stopped at the first byte that was not text.
   if (!isGoogleDoc) {
     const meta = await driveFileMeta(token, id)
-    const shape = fileShape(meta.name, meta.mime)
-    if (shape !== "text") {
+    // R42: WHICH READER IS THE TABLE'S DECISION, NOT THIS DOOR'S. It used to be
+    // `fileShape` here and a different reader in `extractFile` — which is how the
+    // same PDF was searchable through one door and page geometry through the
+    // other. This branch now only asks whether the bytes are wanted at all.
+    const readers = readersFor(meta.name, meta.mime)
+    if (!readers.includes("plain") || readers.length > 1) {
       // BOUNDED, for the same reason the text read below is — and this is the
       // half that was still unbounded. `arrayBuffer()` takes the whole file
       // whatever it weighs; `boundedBytes` stops at the cap and tells Google to
@@ -690,10 +695,11 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
       // and it lets an enormous file be skipped without transferring any of it,
       // but it is absent for some files and wrong for others, so the read is
       // capped as well. A guess and a guard, not a guess instead of one.
+      if (!readers.length) return ""
       if (meta.size > DRIVE_BYTES_CAP) return ""
       const bytes = await boundedBytes(res)
       if (bytes === null) return ""
-      return extractFileText(bytes, meta.name, meta.mime)
+      return readSource(env, { bytes, name: meta.name, mime: meta.mime })
     }
   }
   // A BOUNDED READ, NOT A BOUNDED SLICE, and the difference is a dead worker.
@@ -729,7 +735,22 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
     // crosses the wire while nothing reads it.
     await reader.cancel().catch(() => undefined)
   }
-  return text.slice(0, DRIVE_TEXT_CAP)
+  // AND THE GUARD THIS PATH NEVER APPLIED. `fileShape` says of an unknown mime
+  // with an unknown extension that it "is READ, not refused: the old behaviour
+  // for plain files, and `looksLikeProse` below is what stops the result being
+  // garbage". That was true of `extractFileText` and false here: a file whose
+  // shape came back "text" skipped that function entirely and its bytes were
+  // decoded straight into a knowledge source, with nothing checking them.
+  //
+  // MEASURED ON STAGING, 27 Aug 2026. `.eps` and `.oft` are neither a known text
+  // extension nor a known opaque one, so they took this path — and four Adobe
+  // Illustrator logos and two Outlook templates went into the index as 106, 106,
+  // 106, 107, 92 and 26 chunks of PostScript and OLE headers. They were the
+  // LARGEST documents the team had, so they carried weight in every neighbourhood
+  // while saying nothing. `looksLikeProse` rejects every one of them; it was
+  // simply never asked.
+  const read = text.slice(0, DRIVE_TEXT_CAP)
+  return looksLikeProse(read) ? read : ""
 }
 
 /** Google's own mime type for a POINTER to a file. Named beside the folder one

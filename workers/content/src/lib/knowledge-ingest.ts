@@ -1029,7 +1029,11 @@ export const INGEST_KINDS: IngestKind[] = [
     label: "meetings",
     // v2: the summary says whether it has happened from the START TIME, where it
     // used to quote the retired status column.
-    textVersion: 2,
+    // v3 SINCE 27 AUG 2026: a meeting that has not happened and has nothing
+    // written on it is no longer filed (see `retired` below). The 348 rows
+    // already filed sit behind this lane's cursor, and the bump is what makes the
+    // sweep walk back and re-decide every one of them.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -1110,7 +1114,43 @@ export const INGEST_KINDS: IngestKind[] = [
         // The transcript where it lives, or the calendar event. Either is somewhere
         // a person can go and check what the assistant just quoted.
         sourceUrl: r.transcript_url ?? r.google_event_url,
-        retired: r.deactivated_at !== null,
+        // ── A MEETING THAT HAS NOT HAPPENED, WITH NOTHING WRITTEN ON IT ──────
+        //
+        // The same rule the calendar lane already applies to Google's own
+        // entries (knowledge-google.ts), on the table THIS app owns — and it had
+        // to be both, because a recurring series lands in both places and fixing
+        // one left the flood untouched.
+        //
+        // WITH NOTHING WRITTEN ON IT, the whole body such a row can build is its
+        // own first line: "🧡 Team Assembly is a meeting of ours, on 2027-05-19."
+        // That is not a thin record of a meeting, it is a diary entry — and about
+        // a day that has not arrived, which makes the sentence untrue as well as
+        // empty.
+        //
+        // MEASURED ON STAGING, 27 Aug 2026. 458 meeting sources; 377 hold one
+        // chunk or fewer; 232 are both contentless and future-dated. They are not
+        // 232 subjects — "Week planning" 51 times, "Pickleball" 51, "Jourfix" 50,
+        // "Week recap" 50, "Team Assembly" 12.
+        //
+        // WHAT IT COST, and this is the whole of the owner's complaint in one
+        // mechanism. Asked "what came out of the Team Assembly?", the base
+        // returned six passages and six citations, and every one of them was a
+        // 2027 placeholder saying only that a meeting is in the diary. The
+        // 92-chunk transcript of the real August meeting was not among them. The
+        // retrieval bench scored that question PASS, because a placeholder and the
+        // transcript HAVE THE SAME TITLE. No ranking can separate them either:
+        // "Team Assembly is a meeting of ours" is a near-perfect semantic match
+        // for a question about the Team Assembly. Only the maker can.
+        //
+        // NARROW IN BOTH DIRECTIONS, and both are tested. An agenda, notes or a
+        // transcript is words, and words are material whatever the date. A bare
+        // meeting that has ALREADY happened is kept too — that one is the record
+        // that it took place, which is the only thing some meetings ever leave.
+        // And because this retires rather than skips, the day it happens the
+        // condition stops being true and the sweep revives it.
+        retired:
+          r.deactivated_at !== null ||
+          (!r.agenda && !r.notes && !r.transcript_text && Date.parse(r.starts_at) > Date.now()),
       }))
     },
   },

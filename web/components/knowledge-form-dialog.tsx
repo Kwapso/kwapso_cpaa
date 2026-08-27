@@ -46,6 +46,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { isVideoLink } from "@shared/media-links"
 import { useT } from "@shared/web/language"
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
@@ -128,6 +129,16 @@ export function KnowledgeFormDialog({
   )
   const [busy, setBusy] = React.useState(false)
 
+  // A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE.
+  //
+  // Every unreadable thing that ever reached this knowledge base was accepted,
+  // stored and quietly never read, and nobody was told. The owner's ruling ends
+  // that here: a video link is refused unless its transcript comes with it — and
+  // the refusal is not a dead end, because the box that would fix it is the one
+  // already on this form. The door refuses on the same predicate; this is what
+  // says so while somebody is still typing, rather than after they press save.
+  const needsTranscript = isVideoLink(values.sourceUrl.trim()) && !richTextValue(values.body).trim()
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -175,7 +186,9 @@ export function KnowledgeFormDialog({
       }
       submit={{
         busy: busy,
-        disabled: !values.title.trim(),
+        // NOTHING PASTED MEANS NO SOURCE. The door says the same thing; this
+        // stops a person getting there and being told no.
+        disabled: !values.title.trim() || needsTranscript,
       }}
     >
       <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
@@ -205,6 +218,13 @@ export function KnowledgeFormDialog({
           placeholder="https://…"
           disabled={busy || textOwnedElsewhere}
         />
+        {needsTranscript ? (
+          <p className="text-warning mt-2 text-sm">
+            {t(
+              "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go."
+            )}
+          </p>
+        ) : null}
       </Field>
       <Field config={filedField} htmlFor="knowledge-filed" className={fieldSpacing}>
         <RecordPicker

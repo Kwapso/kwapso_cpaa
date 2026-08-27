@@ -98,7 +98,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
     driveList: async () => world.folderHits,
     driveFilesById: async (_t: string, ids: string[]) =>
       ids.map((id) => world.files.get(id)).filter(Boolean),
-    driveFileText: async (_t: string, id: string) => world.text.get(id) ?? "",
+    driveFileText: async (_e: unknown, _t: string, id: string) => world.text.get(id) ?? "",
     gmailSearch: async () => world.notices,
     gmailMessage: async () => ({ text: world.noticeBody, snippet: "" }),
     // `documentIdInText` and `googleNoticeQuery` are NOT stubbed: the first is

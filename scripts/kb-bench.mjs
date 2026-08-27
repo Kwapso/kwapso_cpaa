@@ -53,6 +53,9 @@ import { fileURLToPath } from "node:url"
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
 const VERBOSE = process.argv.includes("--verbose")
+/** GRADE THE ANSWER TOO — off by default, because it is the half that costs.
+ * See "WHAT IT COSTS" above and `composeScore` below. */
+const COMPOSE = process.argv.includes("--compose")
 
 const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
 const TOKEN =
@@ -63,6 +66,7 @@ const INDEX = process.env.KB_INDEX || "kwapso-knowledge-staging"
 const TEAM_NAME = process.env.KB_TEAM || "Kwapso"
 
 const { retrieve } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
+const { writeAnswer } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts"))
 
 /* ------------------------------ the REST doors ----------------------------- */
 
@@ -160,7 +164,14 @@ const guard = {
   databaseId: TEAM_DB,
 }
 const cfg = { accountId: ACCOUNT, apiToken: TOKEN }
-const env = { AI, KNOWLEDGE_INDEX: vectorizeStandIn() }
+// `writeAnswer` logs a model failure to the one error seam (ERROR-HANDLING) and
+// needs somewhere to put it. Loud rather than silent: a bench that swallowed the
+// writer's failures would report a bad answer as a bad PROMPT.
+const env = {
+  AI,
+  KNOWLEDGE_INDEX: vectorizeStandIn(),
+  DB: { prepare: () => ({ bind: () => ({ run: async () => {}, all: async () => ({ results: [] }) }) }) },
+}
 
 /* -------------------------------- the questions ---------------------------- */
 
@@ -186,6 +197,19 @@ function judge(q, answer) {
     const hit = q.cites.some((want) => titles.some((t) => t.toLowerCase().includes(want.toLowerCase())))
     if (!hit) reasons.push(`wanted ${q.cites.join(" or ")}, cited ${titles.join(" / ") || "nothing"}`)
   }
+  // AND THE MATERIAL, NOT ONLY THE NAME OF IT. A title key was passing questions
+  // whose every passage said nothing — six 2027 placeholders all correctly titled
+  // "🧡 Team Assembly", and a calendar invitation correctly titled "Invitation:
+  // FluClinic : Task 3144" — because a placeholder and the transcript of the
+  // meeting it stands for HAVE THE SAME TITLE. So where a question carries an
+  // authored `lead` (things the material actually says), at least one passage must
+  // contain one of them. That is the same key, read against the text instead of
+  // the label, and it is what makes a hollow pass impossible rather than unlikely.
+  if (q.lead) {
+    const body = answer.passages.map((p) => p.text).join(" \n ").toLowerCase()
+    if (!q.lead.some((w) => body.includes(String(w).toLowerCase())))
+      reasons.push(`no passage says any of ${q.lead.slice(0, 4).join(" / ")} — the titles matched, the material did not`)
+  }
   if (q.spread) {
     const subjects = new Set(titles.map((t) => t.toLowerCase().replace(/^(invitation|accepted|declined|notes|updated invitation|canceled|cancelled):\s*/i, "").replace(/[“”"]/g, "").trim()))
     if (subjects.size < q.spread) reasons.push(`only ${subjects.size} distinct subjects among ${titles.length} citations`)
@@ -193,25 +217,113 @@ function judge(q, answer) {
   return reasons
 }
 
+/* ----------------------------- grading the ANSWER --------------------------- */
+
+/** A PASSAGE THAT SAYS NOTHING BUT ITS OWN NAME AND A DATE.
+ *
+ * Detected off the MATERIAL rather than off a key, and it had to be: an empty
+ * placeholder for a meeting and the 92-chunk transcript of that same meeting have
+ * exactly the same title, so no title-based key can tell them apart. That is how
+ * the retrieval half scored these questions PASS while the reader was being handed
+ * six sentences that between them said only that a meeting is in the diary.
+ *
+ * Measured on staging 27 Aug 2026: 232 of 458 meeting sources — 51% — are one
+ * chunk, dated in the future and contentless. Asked "what came out of the Team
+ * Assembly?", all six passages were 2027 placeholders and the 92-chunk transcript
+ * of the real August meeting was not among them.
+ *
+ * The test is deliberately blunt: take the passage, strike out its own title, the
+ * dates, and the sentence the mirror wraps every record in, and count what is
+ * left. A real chunk is a paragraph; this leaves nothing. */
+function hollow(passage) {
+  const title = (passage.title ?? "").trim()
+  let rest = passage.text ?? ""
+  if (title) rest = rest.split(title).join(" ")
+  const words = rest
+    .replace(/\d{4}-\d{2}-\d{2}/g, " ")
+    .replace(/\b\d{1,2}\s+\w+\s+\d{4}\b/g, " ")
+    .replace(/\b\w{3,}\s+\d{1,2},\s*\d{4}\b/g, " ")
+    .replace(/is a meeting (of ours|with)[^.]*\./gi, " ")
+    .replace(/^Met on[^.]*\./i, " ")
+    .replace(/[^A-Za-zÀ-ÿ]+/g, " ")
+    .split(" ")
+    .filter((w) => w.length >= 3)
+  return words.length < HOLLOW_WORDS
+}
+/** Informative words a passage must carry before it counts as material at all.
+ * A real chunk is a paragraph — hundreds. The placeholders leave zero. Eight is
+ * far below anything genuine and far above anything hollow. */
+const HOLLOW_WORDS = 8
+
+/** OPENERS THAT ARE NOT ANSWERS. The compose prompt already forbids the first
+ * two by name — "Both of these are wrong: opening with 'the material does not
+ * directly answer this' and then answering it anyway" — so this measures whether
+ * the instruction is being FOLLOWED rather than whether it was written. */
+const PREAMBLE =
+  /^\s*(the (material|passages|sources|knowledge base|documents|records)\b|based on\b|according to the (material|sources|passages)\b|from the (material|passages|sources)\b|i (could not|couldn't|was unable|looked|searched|found)\b|there (is|are) (no|nothing|not)\b|unfortunately\b|it (appears|seems) (that )?\b|while the\b|although the\b|here('| i)s (a|an|the)? ?(summary|overview|rundown)\b)/i
+
+/** The answer's first sentence — the only one the owner's "beating around the
+ * bush" is about. Bulleted or headed answers count their first line. */
+function firstSentence(answer) {
+  const line = answer
+    .split("\n")
+    .map((l) => l.replace(/^[#*\->\s]+/, "").trim())
+    .find((l) => l.length > 20)
+  if (!line) return answer.trim().slice(0, 300)
+  const stop = line.search(/[.!?](\s|$)/)
+  return stop === -1 ? line : line.slice(0, stop + 1)
+}
+
+/** THE THREE THINGS HE NAMED, one function, all authored or measured off the
+ * material — never off the pipeline's own output. */
+function composeScore(q, answer, written) {
+  const lead = firstSentence(written)
+  const titles = answer.citations.map((c) => c.title ?? "")
+  const wanted = q.topic ?? q.cites ?? []
+  const offTopic = titles.filter(
+    (t) => !wanted.some((w) => t.toLowerCase().includes(String(w).toLowerCase()))
+  )
+  const empty = answer.passages.filter(hollow)
+  return {
+    // BEATING AROUND THE BUSH — the first sentence answers, or it preambles.
+    leads: !PREAMBLE.test(lead) && (q.lead ?? []).some((w) => lead.toLowerCase().includes(w.toLowerCase())),
+    // FILES THAT WERE NOT IMPORTANT — every citation is on the question's subject.
+    onTopic: offTopic.length === 0,
+    // THE BIG JUICY FILE IT SHOULD HAVE TOUCHED — no slot spent on a placeholder.
+    earned: empty.length === 0,
+    lead,
+    offTopic,
+    empty: empty.length,
+    passages: answer.passages.length,
+  }
+}
+
 /* ---------------------------------- the run -------------------------------- */
 
-console.log(`kb-bench — ${QUESTIONS.length} questions against ${INDEX} (team ${team.id})\n`)
+console.log(
+  `kb-bench — ${QUESTIONS.length} questions against ${INDEX} (team ${team.id})` +
+    `${COMPOSE ? ", grading the ANSWER too" : ""}\n`
+)
 let passed = 0
-const rows = []
+const graded = []
 for (const [i, q] of QUESTIONS.entries()) {
   const label = `Q${String(i + 1).padStart(2, "0")}`
   let answer
   try {
-    answer = await retrieve(env, cfg, guard, { question: q.q })
+    answer = await retrieve(env, cfg, guard, {
+      question: q.q,
+      // Only where there is an answer to write. `retrieve` reaches the writer
+      // after `found` is settled, so a question the base refuses costs nothing
+      // — which is also why the four refusals here are free.
+      compose: COMPOSE ? (material, sources) => writeAnswer(env, q.q, material, sources) : undefined,
+    })
   } catch (e) {
-    rows.push({ label, ok: false, why: [`threw: ${String(e).slice(0, 120)}`], q })
-    console.log(`${label} FAIL  ${q.q.slice(0, 68)}`)
+    console.log(`${label} FAIL  ${q.q.slice(0, 68)}  — threw: ${String(e).slice(0, 100)}`)
     continue
   }
   const why = judge(q, answer)
   const ok = why.length === 0
   if (ok) passed++
-  rows.push({ label, ok, why, q, answer })
   console.log(
     `${label} ${ok ? "PASS" : "FAIL"}  ${q.q.slice(0, 62).padEnd(64)} ` +
       `${answer.found ? `${answer.passages.length}p/${answer.citations.length}c` : "refused"}` +
@@ -219,9 +331,50 @@ for (const [i, q] of QUESTIONS.entries()) {
   )
   if (VERBOSE && answer.citations.length)
     for (const c of answer.citations) console.log(`      · ${c.title}`)
+  if (COMPOSE && answer.found && q.lead) {
+    const written = answer.answer
+    if (!written) {
+      console.log(`     ANSWER  (the writer returned nothing — model unreachable or empty)`)
+      graded.push({ label, leads: false, onTopic: false, earned: false })
+      continue
+    }
+    const g = composeScore(q, answer, written)
+    graded.push({ label, ...g })
+    console.log(
+      `     ANSWER  leads:${g.leads ? "yes" : "NO "}  on-topic:${g.onTopic ? "yes" : `NO (${g.offTopic.length}/${answer.citations.length})`}` +
+        `  earned:${g.earned ? "yes" : `NO (${g.empty}/${g.passages} say nothing)`}`
+    )
+    if (VERBOSE) {
+      console.log(`       first sentence: ${g.lead.slice(0, 150)}`)
+      if (g.offTopic.length) console.log(`       off topic: ${g.offTopic.join(" / ").slice(0, 140)}`)
+    }
+  }
 }
 
-console.log(`\nSCORE ${passed}/${QUESTIONS.length}`)
-if (!VERBOSE && passed < QUESTIONS.length)
-  console.log("re-run with --verbose to see every citation behind a failure")
+console.log(`\nRETRIEVAL ${passed}/${QUESTIONS.length}`)
+if (COMPOSE && graded.length) {
+  const pct = (n) => `${Math.round((100 * n) / graded.length)}%`
+  const leads = graded.filter((g) => g.leads).length
+  const onTopic = graded.filter((g) => g.onTopic).length
+  const earned = graded.filter((g) => g.earned).length
+  const all = graded.filter((g) => g.leads && g.onTopic && g.earned).length
+  console.log(`ANSWER    ${all}/${graded.length}  — every one of the three below, on the same question`)
+  console.log(`  leads with the answer      ${String(leads).padStart(2)}/${graded.length}  ${pct(leads)}   "beating around the bush"`)
+  console.log(`  every citation on topic    ${String(onTopic).padStart(2)}/${graded.length}  ${pct(onTopic)}   "files that were not important"`)
+  console.log(`  no slot spent on nothing   ${String(earned).padStart(2)}/${graded.length}  ${pct(earned)}   "the big juicy files it didn't touch"`)
+  // ONE RUN IS NOT A SCORE, for the top line and the first row only. Measured over
+  // three consecutive runs of the same code against the same material on 27 Aug
+  // 2026: the two rows decided by RETRIEVAL — on topic, and no slot spent on
+  // nothing — were identical every time (63% and 88%), because the passages are
+  // the same passages. `leads` moved 69/81/81, and the combined line with it
+  // (5/16, 7/16, 7/16), because it is the only row that depends on the words the
+  // writer chose. So read a change in the bottom two rows as a change in the code,
+  // and a change of one or two questions in `leads` as weather.
+  console.log(
+    "\n  (leads — and the combined line above — vary by a question or two between runs;\n" +
+      "   the other two rows are decided by retrieval and do not.)"
+  )
+}
+if (!VERBOSE) console.log("\nre-run with --verbose to see every citation, and every first sentence")
+if (!COMPOSE) console.log("re-run with --compose to grade the answer a person actually reads")
 process.exit(0)

@@ -55,13 +55,21 @@ describe("readability: which files we can read, and how", () => {
 
   // The case the owner will meet first, and the one that must never be a
   // refusal: toMarkdown does not read PowerPoint.
-  it("calls a deck, an archive and a design file unreadable — never refused", () => {
+  // A DECK IS READ NOW, and it is the first thing the reader table bought.
+  //
+  // It used to be unreadable HERE and readable through the Drive lane, because
+  // the converter does not list PowerPoint while `file-text.ts` unzips one
+  // correctly, in slide order — and each door kept its own list of what it could
+  // manage. Neither door was wrong about its own reader; the arrangement was
+  // wrong. Asking one table means the upload door gained `.pptx` without a line
+  // of reading code being written for it.
+  it("reads a deck with the unzip reader, and still refuses an archive or a design file", () => {
     expect(
       readability(
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "pitch.pptx"
       )
-    ).toBe("unreadable")
+    ).toBe("convert")
     expect(readability("application/zip", "assets.zip")).toBe("unreadable")
     expect(readability("application/octet-stream", "logo.sketch")).toBe("unreadable")
   })

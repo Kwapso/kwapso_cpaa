@@ -693,7 +693,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   story: { version: 1, digest: "0809d2076e8ddfab" },
   // v2: the summary says "already happened" / "still to come" from the start
   // time, where it used to quote the retired status column.
-  meeting: { version: 2, digest: "28f85e3e9586ea4d" },
+  // v3: a meeting that has not happened and carries no agenda, notes or
+  // transcript is RETIRED rather than filed — 232 of 458 meeting sources on
+  // staging were exactly that, and six of them were the whole answer to "what
+  // came out of the Team Assembly?" while the 92-chunk transcript was not. The
+  // bump is not cosmetic: those rows sit behind this lane's cursor and only a
+  // rewind re-decides them.
+  meeting: { version: 3, digest: "b8ef95c2a14fb5f8" },
   todo: { version: 1, digest: "e00d2b0c6bb86edb" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
@@ -723,3 +729,76 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // textVersion moves — and a bump here would be actively wrong: it would re-index
 // every row of every kind to fix nothing.
 const SHARED_DIGEST = "ab9427cec860b31b"
+
+// ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
+//
+// The same rule the calendar lane applies to Google's own entries, on the table
+// THIS app owns — and it had to be both, because a recurring series lands in
+// both places and fixing one left the flood untouched.
+//
+// MEASURED ON STAGING, 27 Aug 2026: 458 meeting sources, 377 holding one chunk
+// or fewer, 232 both contentless and future-dated. Not 232 subjects — "Week
+// planning" 51 times, "Pickleball" 51, "Jourfix" 50, "Week recap" 50.
+//
+// WHAT IT COST. Asked "what came out of the Team Assembly?" the base returned
+// six passages and six citations, every one a 2027 placeholder reading "🧡 Team
+// Assembly is a meeting of ours, on 2027-05-19.", and the 92-chunk transcript of
+// the real August meeting was not among them. The retrieval bench scored that
+// PASS, because a placeholder and the transcript HAVE THE SAME TITLE. No ranking
+// separates them either — "Team Assembly is a meeting of ours" is a near-perfect
+// semantic match for a question about the Team Assembly. Only the maker can.
+describe("a meeting nobody has held and nobody has written on is not material", () => {
+  /** Far enough ahead that this suite does not rot into a past date. */
+  const AHEAD = new Date(Date.now() + 400 * 86_400_000).toISOString()
+  const BEHIND = new Date(Date.now() - 400 * 86_400_000).toISOString()
+  const meeting = (id: string, startsAt: string, extra = "") =>
+    db().exec(
+      `INSERT INTO meetings (id, account_id, title, starts_at, status, created_at, creator_id${extra ? ", agenda" : ""})
+         VALUES ('${id}', '${IDS.victimAccount}', 'Week recap', '${startsAt}', 'scheduled', '2026-03-01',
+                 '${IDS.staffUser}'${extra ? `, '${extra}'` : ""});`
+    )
+
+  const live = (id: string) =>
+    (
+      db()
+        .prepare("SELECT deactivated_at AS d FROM knowledge_sources WHERE origin_table = 'meetings' AND origin_row_id = ?")
+        .get(id) as { d: string | null } | undefined
+    )?.d === null
+
+  it("is not filed, however many occurrences the series has", async () => {
+    for (const id of ["MTG_F1", "MTG_F2", "MTG_F3"]) meeting(id, AHEAD)
+    await sweepUntilCaughtUp()
+    for (const id of ["MTG_F1", "MTG_F2", "MTG_F3"])
+      expect(live(id), `${id} has not happened and says nothing`).toBe(false)
+  })
+
+  it("but one somebody WROTE an agenda on is kept, whatever its date", async () => {
+    meeting("MTG_AGENDA", AHEAD, "Walk the invoice run and agree the cutover.")
+    await sweepUntilCaughtUp()
+    expect(live("MTG_AGENDA"), "an agenda is words, and words are material").toBe(true)
+  })
+
+  it("and a bare meeting that HAS happened is kept — that is the record that it did", async () => {
+    meeting("MTG_PAST", BEHIND)
+    await sweepUntilCaughtUp()
+    expect(live("MTG_PAST"), "when did we meet? is a question only this can answer").toBe(true)
+  })
+
+  // AND THE TRANSCRIPT WINS THE SLOT IT WAS LOSING. The whole point, asserted on
+  // the answer rather than on the row: with the placeholders gone, a question
+  // about the meeting reaches the meeting that happened.
+  it("so a question about the series reaches the one that actually took place", async () => {
+    for (const id of ["MTG_N1", "MTG_N2", "MTG_N3", "MTG_N4"]) meeting(id, AHEAD)
+    db().exec(
+      `INSERT INTO meetings (id, account_id, title, starts_at, status, transcript_text, created_at, creator_id)
+         VALUES ('MTG_REAL', '${IDS.victimAccount}', 'Week recap', '${BEHIND}', 'held',
+                 'Aurora observed increased team horsepower and specialisation, so client deliveries land faster.',
+                 '2026-03-01', '${IDS.staffUser}');`
+    )
+    await sweepUntilCaughtUp()
+    const answer = await ask("What did we agree in the week recap?")
+    expect(answer.found, "the transcript is right there").toBe(true)
+    const bodies = answer.passages.map((p) => p.text).join(" ")
+    expect(bodies, "the answer must reach the transcript, not the diary entries").toMatch(/horsepower/i)
+  })
+})
