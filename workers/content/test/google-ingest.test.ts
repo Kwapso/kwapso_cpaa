@@ -740,3 +740,70 @@ describe("Google material that has GONE stops being quoted", () => {
     expect(left.n, "a retired source must leave nothing quotable behind").toBe(0)
   })
 })
+
+// ── AND WHEN THE REASON GOES AWAY ────────────────────────────────────────────
+//
+// Retiring was only ever half a rule. Every path above retires correctly and
+// none of them could be undone: `sweepKind` skipped any deactivated source, so
+// a source the APP retired stayed retired after the row came back — un-archive
+// a ticket and it never answered again.
+//
+// MEASURED ON STAGING, 26 Aug 2026. Switching off a Google connection switches
+// off its named spaces too (`disconnect`, deliberately). Every named Chat space
+// went off at 18:59; the replacements were written at 04:39:54 the next
+// morning. A pass ran at 04:38, in the gap, and retired all 67 conversations —
+// right, at that instant. Seventy-four seconds later the same eight spaces were
+// shared again and not one conversation could come back: 81% of the team's Chat
+// counted on screen, looked synced, and was unquotable for good.
+//
+// The seam is WHO retired it, read structurally rather than off a name:
+// `setSourceActive` stamps the actor's id, and both machine paths leave it null.
+describe("what the app retired comes back; what a person excluded does not", () => {
+  const SPACE_SOURCE = `S_SPACE_${IDS.staffUser}`
+  const THREAD = `${IDS.staffUser}:spaces/AAA/threads/T1`
+
+  /** Switch the named space off, sweep (which retires the conversation), then
+   * share it again — the staging incident, at fixture scale. */
+  const unshareThenReshare = async () => {
+    db().exec(`UPDATE google_sources SET deactivated_at = '2026-08-25' WHERE id = '${SPACE_SOURCE}';`)
+    await sweep()
+    expect(live(THREAD), "the gap really must retire it, or this proves nothing").toBe(false)
+    db().exec(`UPDATE google_sources SET deactivated_at = NULL WHERE id = '${SPACE_SOURCE}';`)
+  }
+
+  it("a conversation retired while nothing was shared answers again once it is", async () => {
+    await sweep()
+    await unshareThenReshare()
+    await sweep()
+    expect(live(THREAD), "the space is shared again — the conversation must come back").toBe(true)
+  })
+
+  it("and it comes back with its CHUNKS, not just its row", async () => {
+    await sweep()
+    await unshareThenReshare()
+    await sweep()
+    const back = db()
+      .prepare(
+        `SELECT count(*) AS n FROM knowledge_chunks
+          WHERE source_id = (SELECT id FROM knowledge_sources WHERE origin_row_id = ?)`
+      )
+      .get(THREAD) as { n: number }
+    // THE HALF A ROW-ONLY REVIVAL WOULD HAVE MISSED, and the reason the revival
+    // forces its re-index: retiring drops the chunks and leaves chunk_count and
+    // indexed_chunks both at zero, where the sweep's ordinary hash-skip reads
+    // `0 >= 0` as "already fully indexed". A source back on screen with nothing
+    // behind it is the exact state this whole block exists to end.
+    expect(back.n, "a revived source with no chunks is still unquotable").toBeGreaterThan(0)
+  })
+
+  it("but a source a PERSON took away stays away, however often the sweep runs", async () => {
+    await sweep()
+    const id = (db().prepare("SELECT id FROM knowledge_sources WHERE origin_row_id = ?").get(THREAD) as { id: string }).id
+    const off = await call(IDS.staffUser, "POST /api/content/knowledge/active", { id, active: false })
+    expect(off.status).toBe(200)
+    expect(live(THREAD)).toBe(false)
+    await sweep()
+    await sweep()
+    expect(live(THREAD), "taking the assistant's sight of something means taking it").toBe(false)
+  })
+})

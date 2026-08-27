@@ -716,4 +716,10 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // textVersion moves. Later the same day: the machine-actor attribution
 // literals ('kwapso' as creator/deactivator) moved onto the brand seam —
 // column VALUES, not words any kind says.
-const SHARED_DIGEST = "2e61e3d70b2fdd3d"
+// 27 Aug 2026: the loop learned to UNDO a retirement it made itself — a source
+// the app retired is revived and rebuilt when its row comes back, while one a
+// person excluded stays excluded (`deactivator_id` is the seam). That decides
+// WHETHER a source is indexed, never a word of what any kind says, so again no
+// textVersion moves — and a bump here would be actively wrong: it would re-index
+// every row of every kind to fix nothing.
+const SHARED_DIGEST = "ab9427cec860b31b"

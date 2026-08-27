@@ -1392,6 +1392,10 @@ async function sweepKind(
       id: string
       content_hash: string | null
       deactivated_at: string | null
+      /** NULL when the APP retired this source and not a person — see the
+       * revival below. `setSourceActive` stamps the actor's id; the two retire
+       * paths here stamp only the brand's name. */
+      deactivator_id: string | null
       chunk_count: number
       indexed_chunks: number
     }>(
@@ -1412,7 +1416,7 @@ async function sweepKind(
                      content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
                                          THEN knowledge_sources.content_hash ELSE NULL END,
                      updated_at = ?
-       RETURNING id, content_hash, deactivated_at, chunk_count, indexed_chunks`,
+       RETURNING id, content_hash, deactivated_at, deactivator_id, chunk_count, indexed_chunks`,
       [
         ulid(),
         kind.kind,
@@ -1466,8 +1470,60 @@ async function sweepKind(
       }
       continue
     }
-    // A source somebody EXCLUDED by hand stays excluded.
-    if (source.deactivated_at !== null) continue
+    // ── RETIRED, BY WHOM? The row is live again, and the two answers to that
+    // question want opposite things.
+    //
+    // A source somebody EXCLUDED BY HAND stays excluded. That is what taking the
+    // assistant's sight of something means, and no amount of sweeping may give
+    // it back.
+    //
+    // A source THE APP ITSELF retired is a different sentence: it was retired
+    // because the row had left — archived, switched off, a Google space no longer
+    // shared — and the row is here, so it has not. Until now both were the same
+    // `continue`, which made every retirement in this app PERMANENT: un-archive a
+    // ticket and its source never returned, because a retired source is never
+    // visited again.
+    //
+    // MEASURED ON STAGING, 26 Aug 2026, in the worst form this takes. Switching
+    // off a Google connection switches off the named folders and spaces with it
+    // (`disconnect`, google.ts — deliberately, so a share cannot silently come
+    // back). At 18:59 on the 25th every named Chat space went off that way; the
+    // replacements were written at 04:39:54 the next morning. A housekeeping pass
+    // ran at 04:38, in the gap, and retired all 67 Chat conversations the base
+    // held — correctly, at that instant, because nothing was shared. Seventy-four
+    // seconds later the same eight spaces were shared again, and not one of those
+    // conversations could come back. 81% of the team's Chat sat in the list, was
+    // counted on screen, looked synced, and could never be quoted again. The
+    // retirement was right; only its permanence was wrong.
+    //
+    // `deactivator_id` is what separates them, structurally rather than by
+    // reading a name: `setSourceActive` stamps the actor's id, and both machine
+    // retirements leave it null.
+    if (source.deactivated_at !== null) {
+      if (source.deactivator_id !== null) continue
+      await d1Query(
+        cfg,
+        guard.databaseId,
+        // R17: the predicate rides the UPDATE — a source a PERSON excluded in the
+        // meantime moves zero rows here, and two ticks racing do this once.
+        `UPDATE knowledge_sources SET deactivated_at = NULL, deactivator_name = NULL, updated_at = ?
+          WHERE id = ? AND deactivated_at IS NOT NULL AND deactivator_id IS NULL`,
+        [now, source.id]
+      )
+      // REVIVE, THEN REBUILD — the same two steps, in the same order, as the
+      // `retired` branch above.
+      //
+      // FORCED, because everything the hash-skip below would read describes a
+      // CLEARED index: retiring a source drops its chunks, and `chunk_count` and
+      // `indexed_chunks` both sit at zero, where `0 >= 0` reads as "already fully
+      // indexed". Today `clearIndex` also nulls the content hash, so the skip
+      // happens not to bite — but that is a second fact in another file, and a
+      // row put back on screen with nothing behind it is precisely the state this
+      // branch exists to end. It does not depend on which path retired the row.
+      await indexSource(env, cfg, guard, source.id, { force: true })
+      indexed++
+      continue
+    }
     // THE SKIP THAT PAYS FOR THE SWEEP: unchanged text is not re-chunked, so it
     // costs no embedding call and no writes. Both halves are needed — a source
     // whose hash matches but whose indexing did not FINISH (a big document, a
