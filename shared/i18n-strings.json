@@ -16,6 +16,7 @@
   "A conversation, with what you mean to cover. It is kept here — kwapso reads your calendar and never writes to it.",
   "A folder",
   "A job in their company. Leave the cost empty if nobody knows it yet.",
+  "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go.",
   "A meeting we already hold",
   "A message on the ticket. It does not resolve it.",
   "A new version of the app is ready.",

@@ -1172,13 +1172,41 @@ describe("a video link is refused unless its transcript comes with it", () => {
     expect(row?.n, "the pasted transcript must be indexed, not merely stored").toBeGreaterThan(0)
   })
 
-  // NOT A GATE ON A DOMAIN LIST. An ordinary link with no body is exactly as
-  // acceptable as it has always been — this rule is about a link we cannot
-  // FOLLOW into words, and widening it would refuse half the notes in the base.
-  it("and an ordinary link with no material is untouched", async () => {
+  // THE GATE IS THE EMPTY BODY, NOT THE HOST — and this is the case that moved
+  // it. The owner pasted a Tella recording behind his OWN domain,
+  // `content.kwapso.com/video/…`, which walked past all fifteen hostnames and
+  // became a source with a title, a link and no body: the exact shape the rule
+  // exists to prevent, produced by the rule meant to prevent it.
+  it("refuses ANY link with nothing to read, including one no list could name", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "Tella 1",
+      sourceUrl: "https://content.kwapso.com/video/testing-application-loading-speed-cbfo",
+    })
+    expect(res.status).toBe(400)
+    const rows = db().prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?").get("Tella 1") as {
+      n: number
+    }
+    expect(rows.n, "and stores nothing — a row that looks filed and holds nothing is the defect").toBe(0)
+  })
+
+  it("and an ordinary link with nothing to read is refused too, in different words", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "The dispatch runbook",
       sourceUrl: "https://docs.example.com/runbook",
+    })
+    expect(res.status).toBe(400)
+    const out = (await res.json()) as { error: string; message: string }
+    // The DETECTOR still runs — it just chooses the sentence now rather than the
+    // outcome. A person who pasted a document link is not told we cannot watch it.
+    expect(out.error).toBe("link_needs_material")
+    expect(out.message).not.toMatch(/watch a video/i)
+  })
+
+  it("and a link is welcome the moment there is something to read beside it", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "The dispatch runbook",
+      sourceUrl: "https://docs.example.com/runbook",
+      body: "The runbook says to check the session cookie before restarting the dispatch worker.",
     })
     expect(res.status).toBe(200)
   })

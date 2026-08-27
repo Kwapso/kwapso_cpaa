@@ -70,3 +70,37 @@ describe("and what must NOT be taken for one", () => {
       expect(isVideoLink(value), JSON.stringify(value)).toBe(false)
   })
 })
+
+// ── THE CASE THAT MOVED THE GATE ────────────────────────────────────────────
+//
+// The owner pasted `content.kwapso.com/video/testing-application-loading-speed`
+// — a Tella recording behind his OWN domain. It walked past all fifteen hostnames
+// and became a source with a title, a link and no body: the exact shape the rule
+// exists to prevent, produced by the rule meant to prevent it.
+//
+// The gate is the empty body now, and this predicate only chooses which SENTENCE
+// a person reads. That is what makes it safe to be looser here than it could ever
+// have been while it decided the outcome.
+describe("a custom domain in front of a video", () => {
+  it("is recognised by its path, which is the only thing a custom host leaves", () => {
+    expect(isVideoLink("https://content.kwapso.com/video/testing-application-loading-speed-cbfo")).toBe(true)
+  })
+
+  it("and Tella by name, which was simply missing", () => {
+    expect(isVideoLink("https://www.tella.tv/video/abc123")).toBe(true)
+  })
+
+  // MEASURED, not assumed: `/video/` appears in 1 of the 891 links already in the
+  // agency's base, and that one is the Tella link above. These are the shapes
+  // that would have been false positives if it were common — and they matter less
+  // than they used to, because a wrong guess here costs a slightly-off sentence
+  // about a source that was being refused anyway.
+  it("without taking an ordinary page for one", () => {
+    for (const url of [
+      "https://docs.example.com/runbook",
+      "https://example.com/videography/portfolio",
+      "https://example.com/services/video-production-pricing",
+    ])
+      expect(isVideoLink(url), url).toBe(false)
+  })
+})

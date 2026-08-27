@@ -21,10 +21,17 @@
 //
 // ── WHAT THIS IS NOT ───────────────────────────────────────────────────────
 //
-// It is NOT a gate on a domain list, and the difference matters. Recognising a
-// URL as video buys a better sentence and the transcript box; failing to
-// recognise one is not permission to store something unreadable. The honest
-// refusal is the floor and this is the courtesy on top of it.
+// IT IS NOT THE GATE, and after 27 Aug 2026 it is not even close to it. The gate
+// is that a source whose only content is a LINK has nothing for the assistant to
+// read, whatever the link points at — that rule closes a custom domain, a service
+// nobody has heard of, and the one somebody will use next year, none of which a
+// list can do. This predicate only chooses which SENTENCE the person reads.
+//
+// The distinction was earned. The first version made this the gate, and a Tella
+// recording behind the owner's own domain walked straight past fifteen hostnames
+// and became a source with a title, a link and no body — precisely the shape the
+// whole ruling exists to prevent. A detector is a list that is wrong the moment
+// somebody uses a service not on it. An empty body cannot be out of date.
 //
 // And it fetches NOTHING. There is no scrape here, on purpose: the owner ruled
 // against depending on endpoints nobody promises us — not YouTube's `timedtext`,
@@ -47,6 +54,10 @@ const VIDEO_HOSTS = [
   "wistia.com",
   "wistia.net",
   "vidyard.com",
+  // Named by the owner in the original ask and missed from the brief. The link
+  // that found this whole gap was a Tella one.
+  "tella.tv",
+  "tella.video",
   "dailymotion.com",
   "twitch.tv",
   "streamable.com",
@@ -83,5 +94,18 @@ export function isVideoLink(url: string): boolean {
   const host = parsed.hostname.toLowerCase().replace(/^www\./, "")
   if (VIDEO_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return true
   const path = parsed.pathname.toLowerCase()
-  return MEDIA_EXTENSIONS.some((ext) => path.endsWith(ext))
+  if (MEDIA_EXTENSIONS.some((ext) => path.endsWith(ext))) return true
+  // A `/video/` SEGMENT, which is the only thing that catches a custom domain.
+  //
+  // The link that exposed all of this was `content.kwapso.com/video/…` — the
+  // owner's OWN domain in front of a Tella recording, which no host list can ever
+  // see. Measured against the 891 links already in his base: `/video/` appears in
+  // exactly one of them, and it is that link. Zero false positives.
+  //
+  // IT IS SAFE TO BE LOOSE HERE NOW, and it would not have been before. This
+  // predicate no longer decides whether a source is REFUSED — the empty-body rule
+  // does that, and it does not care what the host is. All this decides is which
+  // sentence the person reads. A wrong guess costs a slightly-off sentence about
+  // a source that was being refused anyway.
+  return path.split("/").includes("video")
 }
