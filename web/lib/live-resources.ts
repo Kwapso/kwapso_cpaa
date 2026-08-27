@@ -210,12 +210,17 @@ export const listFetch = {
       primeCache(cursorKey(workLogsKey(teamId)), r.nextCursor)
       return r.logs
     }),
-  // Both BOUNDED (R14): a to-do is a thing we are WAITING on and a task is admin,
-  // so each shrinks as fast as it grows — a ceiling is an honest answer rather
-  // than an eventual refusal, and neither has a cursor sidecar to prime.
+  // R14: to-dos PAGE now — the done pile keeps every completed one for ever, and
+  // a completed one is the only kind that can be carrying a client's document.
+  // This is the OPEN view (the panel's landing tab and the key every listener,
+  // sidecar and prewarm already names); the done view is fetched by the panel
+  // that shows it. Both counts ride the answer whichever view asked (R16).
+  // Tasks stay BOUNDED beside it: admin is ticked off as fast as it arrives.
   todos: (teamId: string) =>
     contentApi.todos().then((r) => {
-      primeCache(totalKey("todos", teamId), r.total)
+      primeCache(totalKey("todos", teamId), r.openTotal)
+      primeCache(totalKey("todos-done", teamId), r.doneTotal)
+      primeCache(cursorKey(todosKey(teamId)), r.nextCursor)
       return r.todos
     }),
   // EVERY count comes back from ANY view's fetch (R16), because the badge on a
@@ -345,9 +350,27 @@ export function workLogsKey(teamId: string): string {
   return `work-logs:${teamId}`
 }
 /** What we are waiting on clients for, and our own admin. Two keys, because they
- * are two collections with two audiences — the same reason they are two tables. */
+ * are two collections with two audiences — the same reason they are two tables.
+ *
+ * `todosKey` is the OPEN pile, and it keeps the bare name it has always had so
+ * every listener, sidecar and prewarm that says `todos:<team>` still lands on the
+ * list the panel opens on. The done pile and the per-client slices are keyed
+ * through `todosListKey` below, INSIDE the `todos-` family the live registry
+ * drops on every ping. */
 export function todosKey(teamId: string): string {
   return `todos:${teamId}`
+}
+
+/** EVERY OTHER VIEW OF THE SAME TABLE SHARES ONE PREFIX, on purpose: a `todos`
+ * ping carries the to-do's id and nothing else, so a listener cannot name which
+ * client's slice or which pile went stale. It drops the family and whatever is on
+ * screen re-reads (TEAM_RESOURCES.todos below). Deliberately NOT covering
+ * `todos:<team>` itself, which is patched row-level. */
+export const TODO_SLICE_PREFIX = "todos-"
+
+/** The DONE pile, team-wide. Inside the family above, so a ping drops it. */
+export function todosDoneKey(teamId: string): string {
+  return `${TODO_SLICE_PREFIX}done:${teamId}`
 }
 /** Which pile of our own admin a screen is showing. A SERVER view, not a client
  * filter: the list is capped (R14), so sieving the loaded rows for the done ones
@@ -1076,6 +1099,15 @@ export const TEAM_RESOURCES: Record<
     // …and the To-dos badge on whichever client's record is open (R15) — the one
     // of these a CLIENT can move, from their own portal, while we are looking.
     deps: (_t, id) => [`activity:record:todos:${id}`, ...recordCountDeps("todos")],
+    // A COMPLETED TO-DO CHANGES WHICH LIST IT IS IN, and "patch the row in place"
+    // has no answer for that (the task registry entry says the same thing about
+    // its other five views). The row-level patch keeps the open list honest for
+    // the person who moved it; every other view of the same table — the done
+    // pile, each client's slice, both of those per client — is dropped and
+    // re-read. This also closes a gap that predates the done pile: the account
+    // slice reached no listener at all, so a client completing a to-do in their
+    // portal left that client's To-dos tab showing yesterday.
+    slicePrefix: TODO_SLICE_PREFIX,
   },
   // TASKS — our own admin, agency-side only. The row-level patch lands on the
   // OPEN list; the OTHER FIVE views are dropped instead, because a task that has

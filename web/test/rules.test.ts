@@ -1095,7 +1095,16 @@ describe("RULES — the laws of the base", () => {
       // The door must hand the WHOLE contract back, through the one pagedJson
       // seam — a door assembling its own response literal can (and did) ship with
       // half the contract, and the client then silently loses page two.
-      const routes = read(join(ROOT, c.routes))
+      // COMMENTS STRIPPED FIRST, like every other census here (R20's note says
+      // why): this file comments heavily and its comments discuss the very rows
+      // being scanned. It bit in both directions on 27 Aug 2026, when `todos`
+      // joined this table — the to-do routes carry `(todos:delete)` in a
+      // doc-comment naming the PERMISSION, three lines under an unrelated
+      // `json({ todo })`, and the census read it as a hand-built page. A law
+      // that a truthful comment can break is a law people learn to write around;
+      // and the same strip closes the other direction, where a comment
+      // mentioning `pagedJson` would have satisfied the clause above.
+      const routes = stripComments(read(join(ROOT, c.routes)))
       expect(routes, `${c.routes} must answer ${name} through the pagedJson seam`).toContain("pagedJson")
       // …and NOTHING may hand these rows back any other way: a response built by
       // hand is how a door ships half the contract (rows + total, no cursor).
@@ -2723,6 +2732,12 @@ describe("a tab strip's shape is decided in one place", () => {
       // It moved out of `process-detail.tsx` with the panel it belongs to on
       // 26 Aug 2026; the reason above is unchanged, only the address.
       "web/components/process/steps-panel.tsx",
+      // The to-do panel's Open / Done pair, and the same sentence as the two
+      // above: it is a strip filtering WITHIN a collection, and the panel it
+      // sits in has no card of its own to attach a folder to. It is also
+      // routinely mounted INSIDE a record's folder strip (a client's To-dos
+      // tab), which is exactly the stacking the steps-panel line describes.
+      "web/components/work-panels.tsx",
     ])
     const offenders: string[] = []
     let scanned = 0

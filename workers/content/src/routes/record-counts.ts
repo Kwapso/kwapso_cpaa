@@ -44,7 +44,11 @@ import type { Env } from "../env"
 const COUNTERS: Record<string, RecordCounter> = {
   // A client's record.
   "sprints-account": (cfg, guard, _s, id) => countSprints(cfg, guard, { accountId: id }),
-  "todos-account": (cfg, guard, scope, id) => countTodos(cfg, guard, scope, { accountId: id }),
+  // BOTH PILES, because the To-dos tab reveals both: the panel behind it has an
+  // Open view and a Done view, and each of those badges its OWN number inside.
+  // A tab counting only the open ones would be a number the panel can leave
+  // behind the moment somebody presses Done — R16 in its quietest form.
+  "todos-account": (cfg, guard, scope, id) => countTodos(cfg, guard, scope, { accountId: id }).then((c) => c.all),
   "tickets-account": (cfg, guard, scope, id) =>
     countTickets(cfg, guard, scope, { tab: "all", view: "live", accountId: id }).then((r) => r.total),
   "meetings-account": (cfg, guard, _s, id) => countMeetings(cfg, guard, { view: "all", accountId: id }),

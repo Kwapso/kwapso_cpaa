@@ -17,15 +17,16 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Check, Paperclip } from "@shared/ui/foundations/icons"
 
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatDate } from "@shared/web/format"
-import { invalidate, useCached } from "@shared/web/store"
+import { invalidate } from "@shared/web/store"
 import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
-import type { Todo } from "@shared/types"
+import { usePortalTodos } from "@/lib/todos"
 import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 
@@ -35,11 +36,16 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024
 
 export function WaitingOnYou() {
   const t = useT()
-  const todosQ = useCached<Todo[]>(cacheKeys.todos, () => delivery.todos().then((r) => r.todos))
+  // THE DOOR ANSWERS THE NARROWER QUESTION NOW, and that is not a tidy-up.
+  // This used to fetch the to-do list and keep the rows with no `completedAt`,
+  // which was honest while the door handed back every row it had. The list PAGES
+  // now (R14), so a filter here would be a filter over page one — quietly
+  // answering "nothing outstanding" about everything past the cursor.
+  const { todos, hasMore, loadingMore, loadMore } = usePortalTodos("open")
   const [busy, setBusy] = React.useState<string | null>(null)
   const pickers = React.useRef<Record<string, HTMLInputElement | null>>({})
 
-  const open = (todosQ.data ?? []).filter((todo) => !todo.completedAt)
+  const open = todos ?? []
   if (open.length === 0) return null
 
   async function complete(id: string, file?: File) {
@@ -51,7 +57,12 @@ export function WaitingOnYou() {
       }
       const attachment = file ? { dataUrl: await readFileAsDataUrl(file), name: file.name } : undefined
       await delivery.completeTodo(id, attachment)
+      // BOTH LISTS MOVE: the item leaves this one and joins "What you've sent
+      // us" below, with the file on it. Their counts go with them (R16).
       invalidate(cacheKeys.todos)
+      invalidate(cacheKeys.todosTotal)
+      invalidate(cacheKeys.todosDone)
+      invalidate(cacheKeys.todosDoneTotal)
       toast.success(t("Thank you, that's off your list."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't mark that done."))
@@ -121,6 +132,16 @@ export function WaitingOnYou() {
           </li>
         ))}
       </ul>
+      {/* R14: the door pages, so this is how the rest is reached. Rare here —
+          the open pile is short by nature — and present because "rare" is not
+          "never", and a list that silently stops at fifty is the bug this whole
+          lane is about. */}
+      {hasMore ? (
+        <Button variant="secondary" onClick={() => void loadMore()} disabled={loadingMore}>
+          {loadingMore ? <Spinner /> : null}
+          {t("Show older")}
+        </Button>
+      ) : null}
     </section>
   )
 }

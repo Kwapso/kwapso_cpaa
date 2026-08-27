@@ -1334,6 +1334,16 @@ export const GROWING_COLLECTIONS: Record<
     pagerKey: "meetingsKey(",
     why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
   },
+  todos: {
+    lib: "workers/content/src/lib/todos.ts",
+    fn: "listTodos",
+    routes: "workers/content/src/routes/todos.ts",
+    rowsKey: "todos",
+    webKey: "todosKey(",
+    pagerFile: "components/work-panels.tsx",
+    pagerKey: "todosListKey(",
+    why: "a to-do SHRINKS as fast as it grows while it is open, which is why this collection was capped for a year — and the moment the DONE pile is visible it stops being true, because a completed to-do is kept for ever. It has to be visible: `completeTodo` writes `file_url` and `completed_at` in the SAME UPDATE, so a to-do carries the document a client sent us if and ONLY if it is completed, and the open-only default meant the only rows that could hold a client's file were exactly the rows nobody could see, on either front door. NOT one list with both piles in it: the two views sort by different columns (due date ascending; completed descending), so each is its own ordering with its own cursor signature, and a cursor minted under one is refused by the other rather than silently skipping rows at the page boundary",
+  },
   stories: {
     lib: "workers/content/src/lib/stories.ts",
     fn: "listStories",

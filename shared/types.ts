@@ -1569,6 +1569,21 @@ export type Todo = {
   createdAt: string
 }
 
+/** THE TWO PILES OF A TO-DO, as SERVER views — the panel's own two words.
+ *
+ * Not a client filter, and not one list with a checkbox over it: the collection
+ * PAGES (R14), so sieving the loaded rows for the completed ones would show "the
+ * done among the newest fifty" under a badge counting all of them (R16). Each
+ * view is also its own ORDERING — open by when it is due, done by when it was
+ * done — which is what lets a single keyset cursor page either one.
+ *
+ * `all` USED TO BE THE SECOND WORD and is retired rather than renamed: the two
+ * views sort by different columns, so "everything, in one order" is a question
+ * with no honest keyset answer. A caller asking for the retired word gets the
+ * open list, which is what it got before `all` existed. */
+export const TODO_VIEWS = ["open", "done"] as const
+export type TodoViewName = (typeof TODO_VIEWS)[number]
+
 /** KWAPSO'S OWN INTERNAL ADMIN. Nobody outside the agency ever sees one. Work
  * logs DO attach — forty minutes on our own VAT return is real time and costs us
  * the same as forty minutes of delivery. */

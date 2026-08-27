@@ -148,6 +148,14 @@ export const TAB_ICONS: Record<string, IconName> = {
   roles: "user-cog",
   tools: "wrench",
   // collection filters that appear as strips
+  //
+  // `open` and `done` are the two piles a thing-to-be-finished sits in, and they
+  // are here rather than at a call site because two screens already draw them:
+  // the task strip's own List/Completed pair and the to-do panel's Open/Done.
+  // Same idea, same glyph, decided once — `open` is deliberately the same inbox
+  // the task strip had chosen for itself, so nothing moves by adding it.
+  open: "inbox",
+  done: "check",
   all: "asterisk",
   active: "circle-check",
   inactive: "circle-off",

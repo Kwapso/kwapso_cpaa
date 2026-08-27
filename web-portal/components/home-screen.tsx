@@ -39,6 +39,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import { WaitingOnYou } from "@/components/waiting-on-you"
+import { SentToUs } from "@/components/sent-to-us"
 import { DeliveryBlock } from "@/components/delivery-block"
 import type { PortalReady } from "@/components/portal-shell"
 import { useT } from "@shared/web/language"
@@ -116,6 +117,12 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
           empty, so a client with nothing outstanding sees the screen they saw
           before this shipped. */}
       <WaitingOnYou />
+
+      {/* …AND WHAT THEY HAVE ALREADY SENT, directly under it, because it is the
+          other half of the same question and the two lists trade rows: pressing
+          "Done" above moves an item down here with the document on it. Renders
+          nothing when the pile is empty. */}
+      <SentToUs />
 
       <TimeGivenBack />
 

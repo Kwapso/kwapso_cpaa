@@ -28,15 +28,17 @@ import { Ban, ChevronRight } from "@shared/ui/foundations/icons"
 import { AppMark } from "@/components/app-tiles"
 import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
-import { cursorKey, todosKey, totalKey } from "@/lib/live-resources"
+import { cursorKey, todosDoneKey, todosKey, totalKey } from "@/lib/live-resources"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
-import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
+import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo, TodoViewName } from "@shared/types"
 import { formatDate } from "@shared/web/format"
-import { invalidate, primeCache, useCached } from "@shared/web/store"
+import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
+import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { formatCount } from "@shared/web/format-count"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -707,13 +709,54 @@ export function AppTicketsPanel({
 
 /* -------------------------------- the to-dos ------------------------------- */
 
-/** WHAT WE ARE WAITING ON A CLIENT FOR. The one collection in the work engine a
- * client login writes to — they complete it and upload a file in their own
- * portal — so this panel only ever WITHDRAWS one: we stop needing it. Bounded
- * (R14): a to-do shrinks as fast as it grows.
+/** WHICH LIST THIS PANEL IS HOLDING — one key per (client, pile).
+ *
+ * FOUR KEYS AND NOT ONE, because each is a separate paged read with its own
+ * cursor sidecar and its own ordering. Sharing a key between the open pile and
+ * the done pile would park a cursor minted under one ordering beside rows from
+ * the other, and `<LoadMore>` would hand it back to a door that (correctly)
+ * refuses it — or, before the two orderings carried different signatures, would
+ * have been answered with a page that read as an answer and skipped rows.
+ *
+ * Every key but the plain open one sits inside `TODO_SLICE_PREFIX`, which the
+ * live registry drops on any `todos` ping. */
+export function todosListKey(teamId: string, accountId: string | undefined, view: TodoViewName): string {
+  if (accountId) return sliceKey(view === "done" ? "todos-account-done" : "todos-account", accountId)
+  return view === "done" ? todosDoneKey(teamId) : todosKey(teamId)
+}
+
+/** The count sidecar each of this panel's two tabs badges (R16) — the exact
+ * server number for THAT pile, over the same narrowing the rows came from.
+ *
+ * The record tab ABOVE the panel badges `todos-account`, which is BOTH piles:
+ * the tab reveals a panel that shows either, so a badge counting one of them is
+ * a number the list can walk away from. Three keys, three questions, no number
+ * said twice. */
+function todoTotalKey(teamId: string, accountId: string | undefined, view: TodoViewName): string {
+  if (accountId) return totalKey(view === "done" ? "todos-account-done" : "todos-account-open", accountId)
+  return view === "done" ? totalKey("todos-done", teamId) : totalKey("todos", teamId)
+}
+
+/** WHAT WE ARE WAITING ON A CLIENT FOR — and WHAT HAS COME BACK.
+ *
+ * The one collection in the work engine a client login writes to: they complete
+ * it and upload a file in their own portal, so this panel only ever WITHDRAWS
+ * one — we stop needing it.
+ *
+ * IT HAS TWO VIEWS NOW, and the second one is the whole point of this file
+ * changing. `completeTodo` writes `file_url` and `completed_at` in the SAME
+ * UPDATE, so a to-do carries the document a client sent us if and only if it is
+ * completed — and every list on both front doors filtered the completed out. The
+ * only rows that could hold a client's file were exactly the rows nobody could
+ * see. The `Done` badge below has been in this file since it was written and was
+ * unreachable the whole time, which is the tell that the open-only default was a
+ * later regression rather than a design.
+ *
+ * R14: the done pile accumulates for ever, so the collection PAGES — keyset
+ * cursor, exact totals, and the `<LoadMore>` at the bottom that reaches page two.
  *
  * `accountId` narrows it to one client (the account record's own tab); without
- * it, it is everything outstanding anywhere. */
+ * it, it is everything anywhere. */
 export function TodosPanel({
   teamId,
   accountId,
@@ -726,10 +769,20 @@ export function TodosPanel({
   onNew?: () => void
 }) {
   const t = useT()
-  const key = accountId ? sliceKey("todos-account", accountId) : todosKey(teamId)
+  const [view, setView] = React.useState<TodoViewName>("open")
+  const key = todosListKey(teamId, accountId, view)
+  const openTotal = useCachedValue<number | null>(todoTotalKey(teamId, accountId, "open"))
+  const doneTotal = useCachedValue<number | null>(todoTotalKey(teamId, accountId, "done"))
+
   const q = useCached<Todo[]>(key, () =>
-    contentApi.todos(accountId ? { accountId } : {}).then((r) => {
-      primeCache(accountId ? totalKey("todos-account", accountId) : totalKey("todos", teamId), r.total)
+    contentApi.todos({ ...(accountId ? { accountId } : {}), view }).then((r) => {
+      // EVERY NUMBER OFF ONE READ, whichever pile was asked for (R16): the badge
+      // on the tab you are not looking at cannot be counted from the rows you
+      // are, and the record tab above wants both piles added up.
+      primeCache(todoTotalKey(teamId, accountId, "open"), r.openTotal)
+      primeCache(todoTotalKey(teamId, accountId, "done"), r.doneTotal)
+      if (accountId) primeCache(totalKey("todos-account", accountId), r.allTotal)
+      primeCache(cursorKey(key), r.nextCursor)
       return r.todos
     })
   )
@@ -744,22 +797,57 @@ export function TodosPanel({
     }
   }
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the to-dos.")}</p>
-  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
+  // The two piles, as the library's own strip (R3 — never a hand-rolled toggle).
+  // `line` rather than the folder shape, for the reason tickets-collection.tsx
+  // gives at its own: the kit's folder tab is drawn to be attached to the card
+  // below it, and this panel's list has no card of its own.
+  const tabs = (
+    <TabsView
+      config={{
+        ...defaultTabsConfig,
+        variant: "line",
+        tabs: [
+          {
+            value: "open",
+            label: t("Open"),
+            icon: "inbox",
+            badge: formatCount(openTotal),
+            badgeVariant: "" as const,
+          },
+          {
+            value: "done",
+            label: t("Done"),
+            icon: "check",
+            badge: formatCount(doneTotal),
+            badgeVariant: "" as const,
+          },
+        ],
+      }}
+      value={view}
+      onValueChange={(v) => setView(v as TodoViewName)}
+    />
+  )
 
   return (
     <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Ask for something")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <EmptyLine concept="todos">{t("Nothing outstanding with a client.")}</EmptyLine>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {tabs}
+        {onNew && <AddButton label={t("Ask for something")} onClick={onNew} />}
+      </div>
+
+      {q.error ? (
+        <p className="text-destructive text-sm">{t("Couldn't load the to-dos.")}</p>
+      ) : q.data === undefined ? (
+        <Skeleton variant="list" lines={3} />
+      ) : q.data.length === 0 ? (
+        <EmptyLine concept="todos">
+          {view === "done"
+            ? t("Nothing has come back from a client yet.")
+            : t("Nothing outstanding with a client.")}
+        </EmptyLine>
       ) : (
         <RowList>
-          {rows.map((todo) => {
+          {q.data.map((todo) => {
             // WHAT THE CLIENT ACTUALLY SENT US, as a thing you can open.
             //
             // The filename used to be a third item in the ` · ` join below — a
@@ -769,7 +857,8 @@ export function TodosPanel({
             // portal's "Send a file", the door wrote the bytes to the bucket and
             // the row, and a member of staff was shown the word "invoice.pdf"
             // that they could not click. The upload worked every time; nothing
-            // ever led back to it.
+            // ever led back to it — and then the row itself stopped rendering,
+            // because attaching the file is what completes the to-do.
             //
             // Through `safeHref` like every other file on a screen, even though
             // this path is one THIS app minted (/media/…): the seam decides, not
@@ -777,54 +866,94 @@ export function TodosPanel({
             // text it always was — the same fallback `staff-panel.tsx` gives a
             // certificate, whose shape this copies rather than inventing a third.
             const fileLink = safeHref(todo.fileUrl)
+            // WHAT EACH PILE'S QUIET LINE SAYS. An open to-do is about a DATE we
+            // are waiting on; a done one is about who sent it back and when —
+            // the same row answering the two different questions each tab asks.
+            //
+            // WHOLE SENTENCES WITH A HOLE IN THEM, never a word joined to a
+            // date: `t("due")` declares a three-letter fragment to be copy, and
+            // `isUserVisible` refuses it — so it would be translated NOWHERE
+            // while looking translated (R28). A `{date}` hole is also the only
+            // shape a translator can reorder.
+            const meta =
+              view === "done"
+                ? [
+                    todo.accountName,
+                    todo.completedAt
+                      ? t("done {date}", { date: formatDate(todo.completedAt) })
+                      : null,
+                    todo.completedByName,
+                  ]
+                : [
+                    todo.accountName,
+                    todo.dueOn ? t("due {date}", { date: formatDate(todo.dueOn) }) : t("no date"),
+                  ]
             return (
-            <Row key={todo.id} live={!todo.completedAt && !todo.cancelled} mark={<RecordMark name={todo.title} />}>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
-                <p className="text-muted-foreground truncate text-xs">
-                  {[todo.accountName, todo.dueOn ? `due ${formatDate(todo.dueOn)}` : "no date"]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  {todo.fileName && (
-                    <>
-                      {" · "}
-                      {fileLink ? (
-                        <a
-                          href={fileLink}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="text-primary underline-offset-2 hover:underline"
-                        >
-                          {todo.fileName}
-                        </a>
-                      ) : (
-                        todo.fileName
-                      )}
-                    </>
-                  )}
-                </p>
-              </div>
-              {todo.completedAt && (
-                <Badge variant="secondary" className="text-badge">
-                  {t("Done")}
-                </Badge>
-              )}
-              {canCancel && !todo.completedAt && !todo.cancelled && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  aria-label={t("Withdraw this to-do")}
-                  onClick={() => void cancel(todo.id)}
-                >
-                  <Ban className="size-3.5" />
-                </Button>
-              )}
-            </Row>
+              <Row
+                key={todo.id}
+                live={!todo.completedAt && !todo.cancelled}
+                mark={<RecordMark name={todo.title} />}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {meta.filter(Boolean).join(" · ")}
+                    {todo.fileName && (
+                      <>
+                        {" · "}
+                        {fileLink ? (
+                          <a
+                            href={fileLink}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="text-primary underline-offset-2 hover:underline"
+                          >
+                            {todo.fileName}
+                          </a>
+                        ) : (
+                          todo.fileName
+                        )}
+                      </>
+                    )}
+                  </p>
+                </div>
+                {/* Only where it SAYS something: in the done pile every row is
+                    done and the tab above already said so. On the open pile it
+                    is the row that has just been completed under the reader's
+                    eyes, patched in place by the live layer. */}
+                {todo.completedAt && view === "open" && (
+                  <Badge variant="secondary" className="text-badge">
+                    {t("Done")}
+                  </Badge>
+                )}
+                {canCancel && !todo.completedAt && !todo.cancelled && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    aria-label={t("Withdraw this to-do")}
+                    onClick={() => void cancel(todo.id)}
+                  >
+                    <Ban className="size-3.5" />
+                  </Button>
+                )}
+              </Row>
             )
           })}
         </RowList>
       )}
+
+      {/* R14: page two. The key carries the view, so each pile walks its own
+          cursor under its own ordering. */}
+      <LoadMore
+        listKey={todosListKey(teamId, accountId, view)}
+        label={t("Load more to-dos")}
+        fetchPage={(c: string) =>
+          contentApi
+            .todos({ ...(accountId ? { accountId } : {}), view, cursor: c })
+            .then((r) => ({ rows: r.todos, nextCursor: r.nextCursor }))
+        }
+      />
     </div>
   )
 }
