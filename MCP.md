@@ -212,7 +212,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **265 doors, 213 with a tool, 52 with a written reason**, the
+  red build. Today: **266 doors, 213 with a tool, 53 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -221,9 +221,10 @@ Today it covers:
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down, plus the ONE streamed door with no
   buffered twin (the bytes behind a deliverable, written after that pair stopped
-  being worth shipping) which is the second of those two reasons on its own, the eight
+  being worth shipping) which is the second of those two reasons on its own, the nine
   Google doors that are a person's own decision (three consent steps, four
-  sharing decisions, and a Drive thumbnail that answers with an image), the timesheet correction, the two doors
+  sharing decisions, the door that says how much of a mailbox or a calendar
+  kwapso may read at all, and a Drive thumbnail that answers with an image), the timesheet correction, the two doors
   that spend the team's AI allowance outside a chat turn (translating a ticket's
   title, and translating a screen's human-typed text for the reader looking at
   it), one

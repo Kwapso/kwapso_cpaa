@@ -1464,12 +1464,20 @@ CREATE UNIQUE INDEX idx_google_connections_live
   ON google_connections (user_id, service) WHERE deactivated_at IS NULL;
 CREATE INDEX idx_google_connections_user ON google_connections (user_id);
 
--- THE FOLDERS AND SPACES SOMEBODY NAMED. Drive is not "your Drive" and Chat is
--- not "your Chat": both are reached only through rows in this table, so the
--- unnamed rest of a person's Drive is out of reach by construction rather than
--- by a filter somebody has to remember to write. Gmail and Calendar have no rows
--- here because there is nothing to name — mail is narrowed to known contacts and
--- the calendar is the person's own.
+-- THE CONTAINERS SOMEBODY NAMED. Drive is not "your Drive" and Chat is not "your
+-- Chat": both are reached only through rows in this table, so the unnamed rest of
+-- a person's Drive is out of reach by construction rather than by a filter
+-- somebody has to remember to write.
+--
+-- SINCE 0058 GMAIL AND CALENDAR HAVE ROWS HERE TOO, and they mean the mirror
+-- image. A Drive folder is SHARED — nothing in a Drive is in reach until somebody
+-- hands it over. A calendar or a Gmail label is SCOPED — everything is in reach
+-- the moment the connection exists, and naming one is how a person says "this,
+-- and not the rest". Same table, same audit, same switch, opposite verb.
+--
+-- WHICH IS WHY THE MEANING OF "NO ROWS" CANNOT LIVE HERE. For Drive it is "read
+-- nothing"; for Gmail it is "read everything". \`google_connections.scope_mode\`
+-- carries that decision instead — see 0058's own header for the trap it closes.
 --
 -- \`shelf\` is the answer to the question the design round said we must answer at
 -- the moment of sharing: who will be able to read this? 'private' means this
@@ -3744,6 +3752,67 @@ CREATE TABLE sync_leases (
   lease_key TEXT PRIMARY KEY,
   expires_at TEXT NOT NULL
 );
+`,
+  },
+  {
+    // WHAT THIS PERSON LETS US READ — the two columns that turn a Google
+    // connection from all-or-nothing into a decision somebody made.
+    //
+    // WHY IT EXISTS. On 25 August 2026 a live password was said out loud on a
+    // call, transcribed into the meeting notes and indexed. It was rotated. The
+    // fix offered was a scanner over transcripts and the owner refused it, in
+    // his words: "no it should not scan anything.. give content as it is." He is
+    // right — a scanner tuned to catch a spoken secret also silently drops real
+    // material, and silent dropping is the failure this knowledge base has
+    // already been bitten by twice. So the lever is SCOPE instead: the answer to
+    // "that should never have been read" is "that source was never in scope",
+    // decided by the person whose connection it is.
+    //
+    // ── scope_mode: WHY A MODE AND NOT JUST A LIST ──────────────────────────
+    //
+    // The containers themselves are rows in \`google_sources\` — a calendar and a
+    // Gmail label join the folder, the file and the space already in there, and
+    // no new table is needed for them. But that table already carries a MEANING
+    // for "this person has named nothing", and it is the opposite of the one
+    // Gmail and Calendar need: an unnamed Drive is read NOWHERE, an unscoped
+    // mailbox is read ENTIRELY.
+    //
+    // One table cannot hold both meanings silently. Without a mode, a person who
+    // switches off their last named label gets their whole mailbox back — a
+    // WIDENING caused by an act that reads as a narrowing, which is exactly the
+    // shape of bug this column exists to prevent. So the mode is the fact and
+    // the rows are the detail:
+    //
+    //   'everything' — the default, and bit-for-bit what every existing
+    //                  connection does today. Named rows are ignored.
+    //   'only'       — read the named containers and nothing else. Nothing
+    //                  named means NOTHING READ, which is the safe direction
+    //                  and is said on screen in those words.
+    //
+    // Defaulting to 'everything' is what makes this migration invisible to every
+    // team it lands on: nobody's sweep changes until somebody decides it should.
+    //
+    // ── scope_event_types: WHICH KINDS OF EVENT ────────────────────────────
+    //
+    // A space-separated allow-list, the same shape as \`scopes\` fourteen lines
+    // above it, holding Google's OWN event-type words (default, outOfOffice,
+    // focusTime, workingLocation, birthday, fromGmail). It is passed straight to
+    // events.list as repeated \`eventTypes\`, so an excluded kind is never
+    // fetched rather than fetched and dropped.
+    //
+    // '' means every kind — the untouched state, and the only way to spell it.
+    // The door refuses an EMPTY list rather than storing one, because "untick
+    // them all" would otherwise round-trip back into "every kind" and be a
+    // second way for a narrowing gesture to widen.
+    //
+    // It sits on the connection rather than in \`google_sources\` because an event
+    // type is not a container: it is not a thing anybody shared, it has no
+    // shelf, no client and nothing to link to, and putting a filter in a table
+    // of sources would be the overloading the rest of this schema avoids.
+    version: "0058_what_this_person_lets_us_read",
+    sql: `
+ALTER TABLE google_connections ADD COLUMN scope_mode TEXT NOT NULL DEFAULT 'everything';
+ALTER TABLE google_connections ADD COLUMN scope_event_types TEXT NOT NULL DEFAULT '';
 `,
   },
 ]

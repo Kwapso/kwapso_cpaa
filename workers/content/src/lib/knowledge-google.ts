@@ -47,9 +47,9 @@
 
 import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
-import { GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
+import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
 import type { Env } from "../env"
-import { accessTokenFor, listConnections, listNamedSources } from "./google"
+import { accessTokenFor, googleScope, listConnections, listNamedSources } from "./google"
 import { googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
 import { indexSource } from "./knowledge"
@@ -123,6 +123,76 @@ export async function rewindGoogleLane(
     [googleStateKey(service, guard.userId)]
   )
 }
+
+/**
+ * STOP ANSWERING FROM ONE GOOGLE KIND ALTOGETHER, and read it again from the
+ * start — what a person's SCOPE change means for material already brought in.
+ *
+ * THE PROBLEM IT SOLVES, said plainly. Scope narrows what is READ, which is the
+ * right shape and is the whole design (lib/google.ts's SCOPE essay). But a
+ * person who narrows their mail on Tuesday has already had six months of it
+ * indexed on Monday, and "that source was never in scope" is false for every
+ * one of those rows. A narrowing that only reaches the future is a narrowing
+ * that leaves the thing somebody was trying to get rid of exactly where it was.
+ *
+ * WHY IT IS THIS BLUNT. A `knowledge_sources` row does not record WHICH calendar
+ * or WHICH label it came through — the origin id is Google's event or message
+ * id and nothing else — so the rows that are now out of scope cannot be
+ * identified after the fact. They could be, with a column and a migration and a
+ * backfill that would still know nothing about the rows written before it. So
+ * the honest move is to let go of the whole kind and let the next sweep bring
+ * back exactly what is in scope, which is a computation the code already knows
+ * how to do correctly.
+ *
+ * IT IS THE SAME ARGUMENT `rewindGoogleLane` ALREADY MAKES, in the other
+ * direction: sharing something is the one event that means "read this again",
+ * because it is rare, deliberate, and the moment a person expects the material
+ * to move. Changing scope is its mirror and earns the same treatment. The cost
+ * is one re-read and one re-embed of that person's own mail or calendar, paid
+ * only when somebody deliberately changes their mind, and the screen says so
+ * before they confirm.
+ *
+ * AND THE THING THAT HOLDS AFTERWARDS IS THE SCOPE, NOT THE RETIREMENT — which
+ * is what makes it safe to retire with the MACHINE's hand (`retire` below leaves
+ * `deactivator_id` null, so `sweepKind` may revive these rows, and that is
+ * deliberate). Everything still in scope is read again on the next tick and
+ * comes back. Everything OUT of scope is never read again, so there is nothing
+ * for a revival to act on: the sweep cannot revive a row it is never handed.
+ *
+ * That is the distinction the retirement seam turns on, applied to its mirror. A
+ * person's decision is not enforced by a deactivated_at that must survive every
+ * future housekeeping pass — it is enforced by the read never happening. A flag
+ * can be flipped back by a pass nobody thought about; a read that does not occur
+ * cannot be undone.
+ */
+export async function forgetGoogleKind(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  service: GoogleService
+): Promise<number> {
+  let dropped = 0
+  // `heldSources` is capped (R14, RETIRE_SCAN_CAP) and randomised, so one call
+  // cannot promise to have seen everything. Walked until a pass finds nothing
+  // left rather than once — with a hard ceiling, because a loop whose exit
+  // depends on a write succeeding is a loop that can fail to exit.
+  for (let pass = 0; pass < FORGET_PASSES; pass++) {
+    const held = await heldSources(cfg, guard, `google_${service}`)
+    if (held.length === 0) break
+    for (const source of held) {
+      await retire(env, cfg, guard, source.id)
+      dropped++
+    }
+  }
+  await rewindGoogleLane(cfg, guard, service)
+  return dropped
+}
+
+/** How many capped scans `forgetGoogleKind` will walk. RETIRE_SCAN_CAP is 500,
+ * so this reaches five thousand of one person's sources for one service — an
+ * order of magnitude past any mailbox this app has met, and a ceiling rather
+ * than a number anybody will touch. */
+const FORGET_PASSES = 10
 
 /** Every state key one person could have — what the sync screen asks for. */
 export function googleStateKeys(userId: string): string[] {
@@ -460,9 +530,24 @@ export async function sweepGoogle(
   // in the same breath, so the flag can never disagree with the behaviour.
   const connectedServices = [...connected]
   const seen = new Map<GoogleService, Set<string>>()
-  const kinds = googleIngestKinds(env, cfg, guard, seen).filter((k) =>
-    connected.has(serviceOfStateKey(k.stateKey as string, guard.userId))
-  )
+  // A KIND SCOPE HAS CLOSED DOES NOT RUN AT ALL, and that is not merely an
+  // economy. A closed kind reads nothing, so its `seen` set would be empty —
+  // and an empty `seen` is the input `retireVanished` reads as "Google returned
+  // none of these", which would send it probing every source this person holds.
+  // Not running is the honest state: nothing was asked, so nothing is known.
+  const closed = new Set<GoogleService>()
+  for (const service of GOOGLE_SCOPED_SERVICES) {
+    // Only a service this person actually connected — `googleScope` answers
+    // "everything" for one they have not, which is right and is a database read
+    // spent learning nothing.
+    if (!connected.has(service)) continue
+    const scope = await googleScope(cfg, guard, service)
+    if (scope.mode === "only" && scope.containers.length === 0) closed.add(service)
+  }
+  const kinds = googleIngestKinds(env, cfg, guard, seen).filter((k) => {
+    const service = serviceOfStateKey(k.stateKey as string, guard.userId)
+    return connected.has(service) && !closed.has(service)
+  })
   if (kinds.length === 0) return { results: [], skipped: false, connectedServices, busy: false }
 
   // THE FLOOR (14.12). This door now fires by itself when somebody opens the
@@ -704,6 +789,16 @@ function spaceOfThread(threadName: string): string {
   return m ? m[1] : threadName
 }
 
+/** The calendars this person's scope names, or `primary` when they have not
+ * narrowed — the same answer `scopedCalendarWindow` reads a window from, so the
+ * pass that RETIRES an event can never be asking a different calendar from the
+ * one that FILED it. */
+async function scopedCalendarIds(cfg: D1Rest, guard: MemberGuard): Promise<string[]> {
+  const scope = await googleScope(cfg, guard, "calendar")
+  if (scope.mode !== "only" || scope.containers.length === 0) return ["primary"]
+  return scope.containers.map((c) => c.externalId)
+}
+
 async function retireVanished(
   env: Env,
   cfg: D1Rest,
@@ -749,8 +844,15 @@ async function retireVanished(
     } catch {
       continue
     }
+    // WHICH CALENDARS TO ASK. Scope made "the calendar" a list, and an event on
+    // a named secondary calendar is a 404 on `primary` — which this pass reads
+    // as "gone" and acts on. Asking the calendars the person actually named is
+    // what keeps that from retiring live material and recording it as
+    // housekeeping. Every other service ignores the argument.
+    const calendarIds =
+      service === "calendar" ? await scopedCalendarIds(cfg, guard) : ["primary"]
     for (const held of candidates)
-      if ((await googlePresence(service, token, held.externalId)) === "gone")
+      if ((await googlePresence(service, token, held.externalId, calendarIds)) === "gone")
         await retire(env, cfg, guard, held.id)
   }
 }

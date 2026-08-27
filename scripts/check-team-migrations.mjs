@@ -4,10 +4,11 @@
 //   node scripts/check-team-migrations.mjs production
 //
 // A PIPELINE GATE, not a Law of the Base: it asks a question about the LIVE
-// ESTATE, so it has no RULES.md entry, no registry row and no rule test. It is
-// modelled on `lang:check`, which is the other check both deploy commands open
-// with, and it opens first for the same reason that one does — it is a second's
-// read and it must fail BEFORE the two-minute build, not after it.
+// ESTATE, so it has no RULES.md entry, no registry row and no rule test.
+//
+// It runs in both deploy chains IMMEDIATELY AFTER TENANCY IS DEPLOYED and before
+// any other worker. That position is the whole design and it is not negotiable;
+// the section "WHERE IT SITS, AND WHY IT MOVED" below is the reason.
 //
 // ── WHY THIS EXISTS (26-27 Aug 2026) ────────────────────────────────────────
 //
@@ -50,6 +51,57 @@
 // that is deliberate: those go through the D1 REST door on `CF_D1_TOKEN`, which
 // is the credential that was rotated on 27 Aug — a gate that needs the broken
 // thing to tell you something is broken is not a gate.
+//
+// ── WHERE IT SITS, AND WHY IT MOVED (27 Aug 2026, hours after it shipped) ───
+//
+// It first shipped as the FIRST thing in both deploy chains, ahead of even
+// `lang:check`, so that it would fail in a second rather than after a two-minute
+// build. That position deadlocked the next schema change, which is every schema
+// change from here on:
+//
+//   · lane/google-scope wrote migration 0058. Local TEAM_MIGRATIONS ends at
+//     0058; both live teams read 0057. The gate refused. So far correct.
+//   · The remedy said "run the robot". The robot answered HTTP 200,
+//     {"teamsChecked":2,"teamsMigrated":0}, and changed nothing.
+//   · The gate refused again, identically, forever.
+//
+// BECAUSE THE ROBOT IS NOT A TOOL, IT IS A DEPLOYED WORKER. `migrateTeams`
+// applies `TEAM_MIGRATIONS` AS BUNDLED INTO THE RUNNING TENANCY WORKER. That
+// worker was built from main and had never heard of 0058, so it correctly found
+// nothing missing and correctly reported success. Teams could not reach 0058
+// until a tenancy carrying 0058 was deployed; nothing could be deployed until
+// teams reached 0058; and the gate stood in front of the deploy. Closed loop.
+//
+// The gate had been asking "is the estate current with my working tree?" at a
+// moment when the answer NO has two completely different causes and only one
+// remedy printed:
+//
+//   A. the migration is DEPLOYED and not rolled out — the 26-27 Aug incident,
+//      the fault this exists for. The estate is broken right now. Refuse.
+//   B. the migration is merely WRITTEN — the ordinary state of every branch that
+//      adds one. Nothing is broken; the deploy IS the remedy. Refusing here is
+//      the deadlock.
+//
+// Nothing in the core database can tell A from B: `schema_version` records how
+// far the robot has carried each team and says nothing about what the deployed
+// worker knows. So the fix is not a cleverer question, it is a better MOMENT to
+// ask it. Deploying tenancy collapses B into A — once the running worker carries
+// the new list, "behind" means one thing and the printed remedy always works.
+//
+// Hence: lang:check → build → realtime, auth, TENANCY → **this check** → content,
+// data-ops, mcp, both gateways → smoke. The gate now guards exactly the workers
+// that READ the new columns, which is precisely who broke on the 27th (content's
+// sync-lease writer), and the three-phase sequence OPERATIONS.md always described
+// in prose — tenancy, then migrate, then the rest — is finally the sequence the
+// command actually runs. As a bonus it makes that prose POSSIBLE: taken
+// literally, "roll it out first, then deploy" could never work for a new
+// migration, because the thing that rolls it out ships inside the deploy.
+//
+// WHAT THAT COSTS, said plainly: it no longer fails before the build. A deploy
+// carrying a new migration now takes two runs — build, three workers, refusal,
+// robot, run again. That is a real price and it buys a gate that can always be
+// satisfied. A gate that cannot be is one somebody deletes, and a fast failure
+// nobody can clear is not faster, it is just earlier.
 //
 // ── THE TRAP THIS IS BUILT AROUND ───────────────────────────────────────────
 //
@@ -101,7 +153,8 @@
 //
 // The list is empty today, and that is the point of it.
 //
-// The three derivations and the waiver rot check are EXPORTED and locked by
+// The three derivations, the waiver rot check and the whole verdict are EXPORTED
+// and locked by
 // web/test/migration-gate.test.ts, which runs in `npm run check` and touches no
 // network. Everything this gate promises was once a manual proof somebody ran on
 // an afternoon; a proof nobody can re-run is a proof that decays.
@@ -293,15 +346,76 @@ function query(db, sql) {
   return JSON.parse(out.slice(start))[0]?.results ?? []
 }
 
+// ── The verdict ─────────────────────────────────────────────────────────────
+
+/** THE WHOLE DECISION, over rows somebody hands it — so the suite can walk a
+ * team from behind to current and watch the answer change, without an estate.
+ *
+ * Returns `{ code, message }`: 0 and a line to print, or 1 and the refusal.
+ */
+export function verdict({ envName, origin, db, latest, teams, waivers, today }) {
+  const behind = teams.filter((t) => t.schema_version !== latest)
+
+  // The rot check runs BEFORE the verdict. A waiver is a claim about the estate,
+  // and a claim that has stopped being true is worse than no claim: it reads as a
+  // handled exception while describing something that is not there any more.
+  const { problems, waived } = waiverProblems(envName, waivers, behind, today)
+  if (problems.length) {
+    return {
+      code: 1,
+      message:
+        `MIGRATION WAIVERS out of date (${envName}):\n\n` +
+        problems.map((line) => `  • ${line}`).join("\n") +
+        `\n\n  They are data in scripts/check-team-migrations.mjs — read its header.`,
+    }
+  }
+
+  const blocking = behind.filter((t) => !waived.has(t.id))
+  if (blocking.length) {
+    return {
+      code: 1,
+      message:
+        `TEAM DATABASES ARE BEHIND (${envName}). The workers about to be deployed\n` +
+        `may expect tables and columns these teams do not have yet.\n\n` +
+        `  latest team-schema migration (this working tree): ${latest}\n` +
+        `  (workers/tenancy/src/team-schema.ts, last entry in TEAM_MIGRATIONS)\n\n` +
+        blocking
+          .map((t) => `  • ${t.name} (${t.id}) is at ${t.schema_version ?? "(no version recorded)"}`)
+          .join("\n") +
+        `\n\n` +
+        `RUN THE MIGRATION ROBOT, then re-run the deploy. It rolls every missing\n` +
+        `migration to every ready team and is safe to run again if it half-finishes:\n\n` +
+        `  curl -X POST ${origin}/api/tenancy/admin/migrate-teams \\\n` +
+        `    -H "x-admin-key: $ADMIN_KEY"\n\n` +
+        `IF IT ANSWERS {"teamsMigrated":0} AND NOTHING CHANGES, read this next\n` +
+        `paragraph rather than running it again. The robot applies the migration\n` +
+        `list bundled into the DEPLOYED tenancy worker, so it cannot roll out a\n` +
+        `migration that exists only in your working tree — it looks, finds nothing\n` +
+        `missing, and cheerfully reports success. Inside \`npm run deploy:${envName}\`\n` +
+        `that cannot happen: this check runs AFTER tenancy is deployed, so the\n` +
+        `robot always knows every migration named above. Running this check BY HAND\n` +
+        `before a deploy can hit it, and the answer is to deploy rather than to\n` +
+        `keep pressing: \`npm run deploy:${envName}\` sequences the two correctly.\n\n` +
+        `If a team cannot be migrated at all, do NOT switch this off — read the\n` +
+        `header of scripts/check-team-migrations.mjs: deactivate the team, or add\n` +
+        `a dated waiver with a reason.`,
+    }
+  }
+
+  const alsoWaived = waived.size ? `, ${waived.size} waived` : ""
+  return {
+    code: 0,
+    message: `OK: ${teams.length} live team${teams.length === 1 ? "" : "s"} in ${db} at ${latest}${alsoWaived}.`,
+  }
+}
+
 // ── The run ─────────────────────────────────────────────────────────────────
 
 function main(argv) {
   // THE ACCOUNT GUARD — the same guard, and the same reason, as `reset-all.mjs`
   // and `backup.mjs`: no worker pins `account_id`, so wrangler acts on whatever
   // account the machine is logged into, and on the machine this was written for
-  // that is a DIFFERENT client's account. Being the first thing in the deploy,
-  // this refusal also catches "you are about to ship eight workers to the wrong
-  // account" before the build starts. It is deliberately hard rather than a
+  // that is a DIFFERENT client's account. It is deliberately hard rather than a
   // warning: every deploy here runs through `cf-exec`, so the correct path is
   // never the one that trips it.
   const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
@@ -321,53 +435,20 @@ function main(argv) {
     return 2
   }
 
-  const latest = latestTeamMigration()
-  const teams = query(
-    target.db,
-    `SELECT id, name, schema_version FROM teams ${robotTeamFence()} ORDER BY name`
-  )
-  const behind = teams.filter((t) => t.schema_version !== latest)
-
-  // The rot check runs BEFORE the verdict. A waiver is a claim about the estate,
-  // and a claim that has stopped being true is worse than no claim: it reads as a
-  // handled exception while describing something that is not there any more.
-  const today = new Date().toISOString().slice(0, 10)
-  const { problems, waived } = waiverProblems(envName, MIGRATION_WAIVERS, behind, today)
-  if (problems.length) {
-    console.error(`MIGRATION WAIVERS out of date (${envName}):\n`)
-    for (const line of problems) console.error(`  • ${line}`)
-    console.error(`\n  They are data in scripts/check-team-migrations.mjs — read its header.`)
-    return 1
-  }
-
-  const blocking = behind.filter((t) => !waived.has(t.id))
-  if (blocking.length) {
-    console.error(
-      `TEAM DATABASES ARE BEHIND (${envName}). The code you are about to deploy may\n` +
-        `expect tables and columns these teams do not have yet.\n\n` +
-        `  latest team-schema migration: ${latest}\n` +
-        `  (workers/tenancy/src/team-schema.ts, last entry in TEAM_MIGRATIONS)\n`
-    )
-    for (const t of blocking) {
-      console.error(`  • ${t.name} (${t.id}) is at ${t.schema_version ?? "(no version recorded)"}`)
-    }
-    console.error(
-      `\nRUN THIS FIRST — the migration robot, which rolls every missing migration\n` +
-        `to every ready team, and is safe to run again if it half-finishes:\n\n` +
-        `  curl -X POST ${target.origin}/api/tenancy/admin/migrate-teams \\\n` +
-        `    -H "x-admin-key: $ADMIN_KEY"\n\n` +
-        `Then re-run this check. If a team cannot be migrated at all, do NOT switch\n` +
-        `this off — read the header of scripts/check-team-migrations.mjs: deactivate\n` +
-        `the team, or add a dated waiver with a reason.`
-    )
-    return 1
-  }
-
-  const alsoWaived = waived.size ? `, ${waived.size} waived` : ""
-  console.log(
-    `OK: ${teams.length} live team${teams.length === 1 ? "" : "s"} in ${target.db} at ${latest}${alsoWaived}.`
-  )
-  return 0
+  const { code, message } = verdict({
+    envName,
+    origin: target.origin,
+    db: target.db,
+    latest: latestTeamMigration(),
+    teams: query(
+      target.db,
+      `SELECT id, name, schema_version FROM teams ${robotTeamFence()} ORDER BY name`
+    ),
+    waivers: MIGRATION_WAIVERS,
+    today: new Date().toISOString().slice(0, 10),
+  })
+  ;(code === 0 ? console.log : console.error)(message)
+  return code
 }
 
 // Only when RUN, never when imported — see the note above the derivations.

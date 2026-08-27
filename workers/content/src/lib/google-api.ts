@@ -958,6 +958,28 @@ export function knownContactQuery(contacts: string[]): string | null {
  * by the knowledge sweep — which read through `knownContactQuery` and are
  * unchanged.
  */
+/* SCOPE DELIBERATELY DOES NOT APPLY HERE, and this is the note that stops the
+ * next person closing it as an oversight.
+ *
+ * A person's mail SCOPE (lib/google.ts's SCOPE essay) narrows every other read
+ * of their mailbox to the labels they named. This one query is exempt, ruled so
+ * on 27 August 2026, for two reasons that hold together and would not hold
+ * apart:
+ *
+ *   • THERE IS NOTHING TO PROTECT. The four senders below are Google's own
+ *     robots, spelled out in this file, unreachable from any request parameter.
+ *     A mail from a colleague, a client or a supplier cannot match them. So
+ *     narrowing this query buys no privacy — it only decides whether we can find
+ *     a notice about a document the person already owns.
+ *   • AND IT WOULD COST A FEATURE. A notice arrives with whatever label Gmail
+ *     gives it, which is almost never one somebody scoped kwapso to. Applying
+ *     scope here would silently stop transcripts being found for exactly the
+ *     people careful enough to have set a scope — a real loss traded for no
+ *     gain, and a silent one, which is the failure this whole lane exists to
+ *     avoid.
+ *
+ * If a fifth sender is ever added, or if this query is ever reached by a second
+ * caller, that trade has to be made again rather than inherited. */
 export function googleNoticeQuery(): string {
   return `{${GOOGLE_NOTICE_SENDERS.map((s) => `from:${s}`).join(" ")}}`
 }
@@ -987,11 +1009,40 @@ export function documentIdInText(text: string): string | null {
   return hit?.[1] ?? null
 }
 
+/**
+ * SEARCH THE MAILBOX — or the part of it a person has left in reach.
+ *
+ * `labelIds` IS THE SCOPE, and it is a parameter Gmail applies rather than a
+ * filter we apply afterwards. A message outside every named label is not
+ * fetched, not parsed and never in this worker's memory — which is the whole
+ * point of scoping a read instead of scrubbing a result (lib/google.ts's SCOPE
+ * essay).
+ *
+ * ONE CALL PER LABEL, MERGED. Gmail's `labelIds` is an AND — a message must
+ * carry every id listed — and a person naming two labels means "either", not
+ * "both". Spelling that as `q` instead (`{label:"Clients" label:"Suppliers"}`)
+ * would work today and break silently the day somebody renames a label in
+ * Gmail, because we would still be holding the old NAME while the ID stayed
+ * good. So the ids stay the key and the loop pays for it, bounded by the label
+ * cap the caller applies before it gets here.
+ *
+ * A message in two named labels comes back twice and is deduplicated by id
+ * before the headers are read, so the merge costs one pass and no extra call.
+ */
 export async function gmailSearch(
   token: string,
   contactQuery: string,
-  search?: string
+  search?: string,
+  labelIds: string[] = []
 ): Promise<MailMessage[]> {
+  if (labelIds.length > 1) {
+    const seen = new Set<string>()
+    const out: MailMessage[] = []
+    for (const label of labelIds)
+      for (const m of await gmailSearch(token, contactQuery, search, [label]))
+        if (!seen.has(m.id)) { seen.add(m.id); out.push(m) }
+    return out
+  }
   const terms = [contactQuery, search ? `(${search})` : ""].filter(Boolean).join(" ")
   const ids: string[] = []
   let pageToken = ""
@@ -1007,6 +1058,9 @@ export async function gmailSearch(
     // omitting the parameter rather than by sending an empty filter that could
     // be mistaken for a narrowing.
     if (terms) url.searchParams.set("q", terms)
+    // THE SCOPE, said to Gmail. Repeated ids would AND; the caller never sends
+    // more than one because of the merge above.
+    for (const label of labelIds) url.searchParams.append("labelIds", label)
     url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
     if (pageToken) url.searchParams.set("pageToken", pageToken)
     const data = (await googleFetch(url.toString(), token)) as {
@@ -1292,8 +1346,12 @@ export type MailLabel = { id: string; name: string }
 
 /** Every label on the mailbox — the person's own, and Gmail's built-in ones.
  * R14's spirit: one page, and a mailbox with more labels than this has a
- * filing problem no list length will fix. */
-async function gmailLabels(token: string): Promise<MailLabel[]> {
+ * filing problem no list length will fix.
+ *
+ * EXPORTED since scope landed: a person narrowing what kwapso may read from
+ * their mail picks from this same list, so the picker and the label writer can
+ * never disagree about what a label is called. */
+export async function gmailLabels(token: string): Promise<MailLabel[]> {
   const data = (await googleFetch("https://gmail.googleapis.com/gmail/v1/users/me/labels", token)) as {
     labels?: unknown
   }
@@ -1624,14 +1682,30 @@ const EVENT_ATTENDEE_CAP = 50
  */
 export async function calendarList(
   token: string,
-  range: { from?: string; to?: string; showDeleted?: boolean }
+  range: {
+    from?: string
+    to?: string
+    showDeleted?: boolean
+    /** WHICH CALENDAR. `primary` when nobody has said otherwise, which is what
+     * this read did unconditionally until scope landed — so an unscoped person's
+     * behaviour is unchanged to the character. */
+    calendarId?: string
+    /** WHICH KINDS OF EVENT, in Google's own words, passed straight through as
+     * repeated `eventTypes`. Empty means every kind, which is Google's own
+     * default and the reason this is spelled by sending nothing rather than by
+     * sending all six. A kind left out is never fetched. */
+    eventTypes?: string[]
+  }
 ): Promise<CalendarWindow> {
   const out: CalendarEvent[] = []
   let pageToken = ""
   for (let page = 0; page < CALENDAR_MAX_PAGES; page++) {
-    const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+    const url = new URL(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(range.calendarId ?? "primary")}/events`
+    )
     if (range.from) url.searchParams.set("timeMin", range.from)
     if (range.to) url.searchParams.set("timeMax", range.to)
+    for (const kind of range.eventTypes ?? []) url.searchParams.append("eventTypes", kind)
     url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
     url.searchParams.set("singleEvents", "true")
     url.searchParams.set("orderBy", "startTime")
@@ -1653,7 +1727,7 @@ export async function calendarList(
   // behind it for ever. `truncated` is what lets the walk stop at the last entry
   // it really read instead of at the date it hoped to reach.
   console.error(
-    `[google] calendar window truncated at ${CALENDAR_MAX_PAGES * GOOGLE_PAGE_SIZE} events (${range.from ?? "any"} → ${range.to ?? "any"})`
+    `[google] calendar window truncated at ${CALENDAR_MAX_PAGES * GOOGLE_PAGE_SIZE} events on ${range.calendarId ?? "primary"} (${range.from ?? "any"} → ${range.to ?? "any"})`
   )
   return { events: out, truncated: true }
 }
@@ -1684,13 +1758,47 @@ const CALENDAR_MAX_PAGES = 5
 /** ONE event, by its id — the read behind the transcript hunt, which starts at a
  * calendar event and needs that entry's own attachments. Nothing here writes: the
  * calendar is READ-ONLY in this product (see the note above `calendarList`). */
-export async function calendarGet(token: string, eventId: string): Promise<CalendarEvent> {
+export async function calendarGet(
+  token: string,
+  eventId: string,
+  calendarId = "primary"
+): Promise<CalendarEvent> {
   return toEvent(
     await googleFetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
       token
     )
   )
+}
+
+/** ONE CALENDAR A PERSON COULD NAME — the picker, exactly as Drive and Chat have
+ * one. `primary` is in the list like any other, under whatever Google calls it,
+ * because a person scoping to their work calendar should not have to know that
+ * the default they are leaving is spelled with a magic word. */
+export type CalendarChoice = { id: string; name: string; primary: boolean }
+
+/** THE CALENDARS THIS PERSON CAN SEE. R14's spirit: one page, and somebody with
+ * more than fifty calendars is subscribed to a public holiday feed per country
+ * rather than keeping fifty diaries. */
+export async function calendarsList(token: string): Promise<CalendarChoice[]> {
+  const url = new URL("https://www.googleapis.com/calendar/v3/users/me/calendarList")
+  url.searchParams.set("maxResults", String(GOOGLE_PAGE_SIZE))
+  // THE ONES THIS PERSON CAN ACTUALLY READ. A calendar somebody has been given
+  // free/busy sight of carries no titles at all, so naming one would scope
+  // kwapso to a stream of blank events — an answer that looks like an empty
+  // calendar rather than like a permission somebody does not hold.
+  url.searchParams.set("minAccessRole", "reader")
+  const data = (await googleFetch(url.toString(), token)) as { items?: unknown }
+  return (Array.isArray(data.items) ? data.items : [])
+    .map((raw) => {
+      const c = raw as Record<string, unknown>
+      return {
+        id: str(c.id),
+        name: str(c.summaryOverride) || str(c.summary) || str(c.id),
+        primary: c.primary === true,
+      }
+    })
+    .filter((c) => c.id)
 }
 
 /** THE VIDEO LINK OFF `conferenceData`, when there is no plain `hangoutLink`.
@@ -2278,7 +2386,7 @@ export type ProbableService = "drive" | "gmail" | "calendar"
  * as one decision and a fourth cannot be added without stating both halves. */
 const PRESENCE_PROBES: Record<
   ProbableService,
-  { url: (id: string) => string; goneWhen: (body: Record<string, unknown>) => boolean }
+  { url: (id: string, calendarId: string) => string; goneWhen: (body: Record<string, unknown>) => boolean }
 > = {
   // Drive's bin is a flag on the file, not a different place: a trashed file is
   // still fetchable, still named, and still emphatically not something the owner
@@ -2301,8 +2409,8 @@ const PRESENCE_PROBES: Record<
   // keeps it and marks it off, which is exactly what `showDeleted` on the calendar
   // sweep exists to see. Same fact, asked one event at a time.
   calendar: {
-    url: (id) =>
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`,
+    url: (id, calendarId) =>
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(id)}`,
     goneWhen: (b) => str(b.status) === "cancelled",
   },
 }
@@ -2324,11 +2432,28 @@ const PRESENCE_PROBES: Record<
 export async function googlePresence(
   service: ProbableService,
   token: string,
-  externalId: string
+  externalId: string,
+  /** WHICH CALENDARS TO ASK — calendar only, and it exists because scope made
+   * "the calendar" a list. An event that lives on a named secondary calendar is
+   * a 404 on `primary`, and a 404 is the one status this function reads as an
+   * answer, so probing the wrong calendar would RETIRE a live event and record
+   * it as housekeeping. Every named calendar is asked, and the item is only gone
+   * when every one of them says so: an "unknown" from any of them means we do
+   * not know, which is the only conservative reading. */
+  calendarIds: string[] = ["primary"]
 ): Promise<GooglePresence> {
+  if (service === "calendar" && calendarIds.length > 1) {
+    let worst: GooglePresence = "gone"
+    for (const calendarId of calendarIds) {
+      const answer = await googlePresence(service, token, externalId, [calendarId])
+      if (answer === "there") return "there"
+      if (answer === "unknown") worst = "unknown"
+    }
+    return worst
+  }
   const probe = PRESENCE_PROBES[service]
   try {
-    const res = await fetch(probe.url(externalId), {
+    const res = await fetch(probe.url(externalId, calendarIds[0] ?? "primary"), {
       // R11 — a hung Google socket must not stall the sweep.
       signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${token}` },

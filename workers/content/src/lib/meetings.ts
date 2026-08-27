@@ -24,7 +24,9 @@ import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { accessTokenFor } from "./google"
-import { calendarGet, calendarList, type CalendarEvent } from "./google-api"
+import { type CalendarEvent } from "./google-api"
+import { scopedCalendarEvent, scopedCalendarWindow } from "./google-read"
+import { googleScope } from "./google"
 import { capToRow } from "./knowledge-files"
 import { findTranscript, type TranscriptRoute } from "./google-transcript"
 import { withSyncLease } from "./sync-lease"
@@ -762,7 +764,13 @@ export async function captureTranscript(
     return nothing("The transcript for this meeting has already been read.")
 
   const { token: calendarToken } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarGet(calendarToken, meeting.googleEventId)
+  // ACROSS THE CALENDARS THIS PERSON NAMED, not `primary` alone: a meeting made
+  // from an event on a named secondary calendar would otherwise be a 404 here,
+  // and the hunt would report "no transcript" about a lookup that never found
+  // the entry.
+  const event = await scopedCalendarEvent(cfg, guard, calendarToken, meeting.googleEventId)
+  if (!event)
+    return nothing("That calendar entry isn't in reach any more — check what Calendar is allowed to read.")
   const found = await findTranscript(env, cfg, guard, event)
   if (!found)
     return nothing(
@@ -1087,16 +1095,33 @@ async function runCalendarSync(
   // The fourth read is what to SHOW rather than what to make — the instances
   // beyond the live horizon. Deliberately short: "there is a stand-up every
   // Monday for ever" is not information.
+  //
+  // ALL FOUR GO THROUGH THE SCOPED READ. This lane is the OTHER large consumer
+  // of a person's calendar — it reads a year of it, in both directions — so a
+  // fence that bit only on the knowledge sweep would leave the meetings sweep
+  // walking straight past it and filing the very events somebody said not to
+  // read. `scopedCalendarWindow` reads the person's own scope and asks Google
+  // only the calendars and only the kinds of event it names.
+  // READ ONCE FOR ALL FOUR WINDOWS. The answer is the same for every one of
+  // them, and asking four times would be six database round trips spent
+  // re-learning a fact that cannot change mid-sweep.
+  const scope = await googleScope(cfg, guard, "calendar")
   const [past, future, slice, beyond] = await Promise.all([
-    calendarList(token, { from: since.toISOString(), to: now.toISOString(), showDeleted: true }),
-    calendarList(token, { from: now.toISOString(), to: horizon.toISOString(), showDeleted: true }),
+    scopedCalendarWindow(cfg, guard, token, { from: since.toISOString(), to: now.toISOString(), showDeleted: true }, scope),
+    scopedCalendarWindow(cfg, guard, token, { from: now.toISOString(), to: horizon.toISOString(), showDeleted: true }, scope),
     cursor
-      ? calendarList(token, { from: cursor.from, to: cursor.to, showDeleted: true })
+      ? scopedCalendarWindow(cfg, guard, token, { from: cursor.from, to: cursor.to, showDeleted: true }, scope)
       : Promise.resolve({ events: [], truncated: false }),
-    calendarList(token, {
-      from: horizon.toISOString(),
-      to: new Date(horizon.getTime() + SERIES_HORIZON_DAYS * 2 * 24 * 60 * 60 * 1000).toISOString(),
-    }),
+    scopedCalendarWindow(
+      cfg,
+      guard,
+      token,
+      {
+        from: horizon.toISOString(),
+        to: new Date(horizon.getTime() + SERIES_HORIZON_DAYS * 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      scope
+    ),
   ])
   // ONE PASS OVER ALL THREE, de-duplicated by event id: the backfill slice can
   // overlap the live window (it walks through today on its way to the ceiling),

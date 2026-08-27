@@ -145,9 +145,11 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/google/disconnect":
     "takes somebody's Google connection away and asks Google to revoke the grant. A person disconnects their own account, from their own settings, having decided to — it is not an errand, and an assistant able to end the connection it is working through is a strange thing to have built.",
   "GET /api/content/google/pick":
-    "lists the Drive folders or Chat spaces a person COULD share, so a form can offer them. Its answer is only useful to the sharing door, which is deliberately toolless below — a picker for a form no machine fills in is a capability with nowhere to go.",
+    "lists the Drive folders, Chat spaces, calendars or mail labels a person COULD name, so a form can offer them. Its answer is only useful to the sharing and scope doors, both deliberately toolless below — a picker for a form no machine fills in is a capability with nowhere to go.",
   "POST /api/content/google/sources":
     "shares a Drive folder or a Chat space, and in the same call decides WHO MAY READ IT — just this person, or the whole team. That is the decision the module is built around, asked in words at the moment of sharing, and it is not one an assistant should be able to make on somebody's behalf: an assistant that can widen what it is allowed to see is not fenced by anything.",
+  "POST /api/content/google/scope":
+    "decides HOW MUCH of somebody's Gmail or Calendar kwapso may read. It is the sharpest form of the decision the four doors around it are kept off this surface for, and it cuts both ways: the same call that narrows a mailbox to two labels can widen a calendar connection to every calendar the person owns. An assistant able to call it could enlarge its own sight of somebody's mail, which is the one act that would make act-as-user stop meaning anything. It also carries `forget`, which drops what the knowledge base already holds for that service — a destructive step a person is shown the cost of and ticks. Neither half is an errand.",
   "POST /api/content/google/sources/active":
     "stops sharing a folder or space, or shares it again. The same decision as the door above, in reverse, and out of the assistant's hands for the same reason — re-sharing something a person deliberately withdrew is exactly the act nobody should be able to delegate by accident.",
   "GET /api/content/google/drive/thumbnail":

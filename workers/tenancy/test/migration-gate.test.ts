@@ -13,6 +13,12 @@
 // the comparison worth anything — a test that re-derived it the same way would
 // only prove the parser agrees with itself.
 //
+// It also holds the deploy chain's OTHER positional property — the account gate
+// (`scripts/check-cloudflare-account.mjs`) must run before the first upload —
+// because that check derives its answer from the same worker's wrangler config,
+// and because a positional property has now been silently falsified twice. They
+// belong where the next person will find them together.
+//
 // The four properties, and what each one is standing in front of:
 //
 //   1. THE LATEST VERSION the gate computes is the one the ROBOT computes. If
@@ -39,6 +45,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { TEAM_MIGRATIONS } from "../src/team-schema"
+// @ts-expect-error — as below: a plain .mjs script, no types, only read here.
+import * as accountGate from "../../../scripts/check-cloudflare-account.mjs"
 // @ts-expect-error — the gate is a plain .mjs script; it ships no types and the
 // suite is the only thing that imports it.
 import * as gate from "../../../scripts/check-team-migrations.mjs"
@@ -207,37 +215,206 @@ describe("a waiver cannot rot", () => {
   })
 })
 
+describe("a path THROUGH the gate, not only a refusal", () => {
+  // The gate's first version was proved only to REFUSE. It was never asked "and
+  // can the operator then proceed?", and the answer for four hours was no: it
+  // stood in front of the deploy demanding a migration that only a deploy could
+  // deliver. A refusal nobody can clear is not a strict gate, it is a broken one.
+  const ENV = { envName: "staging", origin: "https://agency-staging.kwapso.app", db: "core" }
+  const call = (teams: unknown[], latest: string) =>
+    gate.verdict({
+      ...ENV,
+      latest,
+      teams,
+      waivers: [],
+      today: "2026-08-27",
+    }) as { code: number; message: string }
+
+  const behind = [{ id: "T1", name: "Kwapso", schema_version: "0057_previous" }]
+  const rolled = [{ id: "T1", name: "Kwapso", schema_version: "0058_new" }]
+
+  it("refuses while the team is behind, and passes once the robot has rolled it", () => {
+    // The whole sequence in two lines: the gate refuses, tenancy deploys, the
+    // robot carries the team forward, the gate lets the rest of the app through.
+    expect(call(behind, "0058_new").code).toBe(1)
+    expect(call(rolled, "0058_new").code).toBe(0)
+    expect(call(rolled, "0058_new").message).toMatch(/^OK: 1 live team /)
+  })
+
+  it("names the teams and the version each is actually at", () => {
+    const { message } = call(behind, "0058_new")
+    expect(message).toContain("Kwapso (T1) is at 0057_previous")
+    expect(message).toContain("0058_new")
+  })
+
+  it("gives the remedy as something to RUN", () => {
+    const { message } = call(behind, "0058_new")
+    expect(message).toContain("/api/tenancy/admin/migrate-teams")
+    expect(message).toContain("x-admin-key")
+  })
+
+  it("explains the answer that looks like success and is not", () => {
+    // `{"teamsMigrated":0}` on a team that is plainly behind is the exact
+    // symptom of the deadlock, and it reads as "already fine". Somebody meeting
+    // it must not have to rediscover that the robot ships INSIDE the deployed
+    // worker and cannot roll a migration that is only in their working tree.
+    const { message } = call(behind, "0058_new")
+    expect(message).toContain('{"teamsMigrated":0}')
+    expect(message).toMatch(/DEPLOYED tenancy worker/)
+    expect(message).toMatch(/deploy:staging/)
+  })
+
+  it("says a team with no version at all is behind, rather than skipping it", () => {
+    const { code, message } = call([{ id: "T1", name: "Kwapso", schema_version: null }], "0058_new")
+    expect(code).toBe(1)
+    expect(message).toContain("(no version recorded)")
+  })
+
+  it("an estate with no teams is not a failure", () => {
+    // Production held zero teams the day this was written. A gate that crashed
+    // or refused on an empty estate would have blocked the first real ship.
+    expect(call([], "0058_new").code).toBe(0)
+  })
+})
+
 describe("where it sits in the pipeline", () => {
   const scripts = JSON.parse(read("package.json")).scripts as Record<string, string>
+  const source = read("scripts/check-team-migrations.mjs")
 
-  it("both deploy commands open with it", () => {
-    // FIRST, ahead of lang:check and ahead of the build, for lang:check's own
-    // stated reason (OPERATIONS.md): it is one read, and it must fail in a second
-    // rather than after two minutes of building something that cannot ship.
-    for (const [name, env] of [
-      ["deploy:staging", "staging"],
-      ["deploy:production", "production"],
-    ]) {
-      const cmd = scripts[name]
-      expect(cmd, `${name} must run the migration gate`).toContain(`migrations:check -- ${env}`)
-      expect(
-        cmd.indexOf("migrations:check"),
-        `${name} must check migrations before lang:check`
-      ).toBeLessThan(cmd.indexOf("lang:check"))
-      expect(
-        cmd.indexOf("migrations:check"),
-        `${name} must check migrations before the build`
-      ).toBeLessThan(cmd.indexOf("check:built"))
-    }
+  /** WHICH WORKER OWNS THE MIGRATION LIST — derived from the file the gate
+   * parses, not typed here. The ordering law below is really a statement about
+   * that worker, and it must follow the list if the list ever moves. */
+  const OWNER = source.match(/workers\/([^/"]+)\/src\/team-schema\.ts/)?.[1]
+
+  it("knows which worker bundles TEAM_MIGRATIONS", () => {
+    expect(OWNER, "the gate must parse the migration list out of some worker").toBeTruthy()
   })
+
+  for (const [name, env] of [
+    ["deploy:staging", "staging"],
+    ["deploy:production", "production"],
+  ]) {
+    describe(name, () => {
+      const cmd = () => scripts[name]
+      const at = (needle: string) => cmd().indexOf(needle)
+      const gateAt = () => at(`migrations:check -- ${env}`)
+
+      it("runs the gate at all", () => {
+        expect(gateAt(), `${name} must run the migration gate`).toBeGreaterThan(-1)
+      })
+
+      it("runs it AFTER the worker that carries the migration list — the deadlock", () => {
+        // THE FIX OF 27 Aug 2026, nailed down. The robot applies the list bundled
+        // into the DEPLOYED worker, so a gate standing in front of that worker's
+        // deploy demands a migration only that deploy can deliver, and answers its
+        // own remedy with {"teamsMigrated":0} forever. Moving it earlier "so it
+        // fails fast" re-closes the loop; that is why this is a test and not a
+        // sentence in a header.
+        const owner = at(`--workspace=kwapso-${OWNER}`)
+        expect(owner, `${name} must deploy kwapso-${OWNER}`).toBeGreaterThan(-1)
+        expect(
+          gateAt(),
+          `${name} must check migrations AFTER deploying kwapso-${OWNER}, or the ` +
+            `robot cannot roll a migration this branch adds and the gate deadlocks`
+        ).toBeGreaterThan(owner)
+      })
+
+      it("runs it BEFORE every worker that reads the new columns", () => {
+        // The other half. Content's sync-lease writer is what actually 500'd on
+        // 26-27 Aug; the gate exists to stand between a new migration and the
+        // workers that assume it. Both gateways are last for their own reason and
+        // are covered by the same line.
+        for (const w of ["content", "data-ops", "mcp", "gateway", "portal-gateway"]) {
+          const reader = at(`--workspace=kwapso-${w}`)
+          expect(reader, `${name} must deploy kwapso-${w}`).toBeGreaterThan(-1)
+          expect(
+            gateAt(),
+            `${name} must check migrations before deploying kwapso-${w}`
+          ).toBeLessThan(reader)
+        }
+      })
+
+      it("still fails before the smoke tests spend time on a broken estate", () => {
+        if (at("smoke") > -1) expect(gateAt()).toBeLessThan(at("smoke"))
+      })
+    })
+  }
 
   it("has no way to be switched off", () => {
     // Deliberate, and the header says why: an env-var escape hatch is the only
-    // option that can disable this forever without leaving a mark in a diff.
-    const source = read("scripts/check-team-migrations.mjs")
+    // option that can disable this forever without leaving a mark in a diff. The
+    // deadlock was exactly the pressure that produces one, and it did not.
     const envReads = [...new Set(source.match(/process\.env\.\w+/g) ?? [])].sort()
     expect(envReads, "the only environment variable this reads is the account guard").toEqual([
       "process.env.CLOUDFLARE_ACCOUNT_ID",
     ])
+  })
+})
+
+describe("the account gate runs before anything is uploaded", () => {
+  // THE SECOND POSITIONAL PROPERTY, and the second one to be falsified by a
+  // later edit rather than by a disagreement. The migration gate carried this
+  // guard while it happened to stand first in the chain; moving it to its correct
+  // place (after tenancy, so the robot knows the migration) put it three uploads
+  // too late, and nothing said so. Hence a check of its own, and hence this.
+  //
+  // What it is standing in front of: no worker pins `account_id`, so wrangler
+  // uploads to whatever account the machine is signed in to. Every other gate in
+  // this chain refuses before anything has happened; this one guards the moment
+  // after which something has, and a worker left running in another client's
+  // account is not an error anybody sees.
+  const scripts = JSON.parse(read("package.json")).scripts as Record<string, string>
+
+  for (const name of ["deploy:staging", "deploy:production"]) {
+    it(`${name} checks the account before its first upload`, () => {
+      const cmd = scripts[name]
+      const gate = cmd.indexOf("account:check")
+      // DERIVED — the first worker deployed, whichever it is. Naming realtime
+      // here would survive the reorder that matters.
+      const firstUpload = cmd.indexOf("--workspace=")
+      expect(gate, `${name} must run the account gate`).toBeGreaterThan(-1)
+      expect(firstUpload, `${name} must deploy some worker`).toBeGreaterThan(-1)
+      expect(
+        gate,
+        `${name} must check the Cloudflare account BEFORE uploading anything — ` +
+          `the first upload in that chain is ` +
+          `${cmd.slice(firstUpload).split(/\s/)[0]}`
+      ).toBeLessThan(firstUpload)
+    })
+
+    it(`${name} checks it first of all — before the build, which cannot undo an upload`, () => {
+      expect(scripts[name].startsWith("npm run account:check")).toBe(true)
+    })
+  }
+
+  it("derives the account from the configs, and they all agree", () => {
+    // Every worker config that names one, and one disagreeing config means
+    // nobody knows which account is right, which is a refusal and not a default.
+    const declared = accountGate.declaredAccounts() as Map<string, string[]>
+    expect(declared.size, "the worker configs must name exactly one account").toBe(1)
+    expect(accountGate.expectedAccount()).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it("refuses rather than guessing when the configs cannot answer", () => {
+    // No fallback, for the same reason the migration gate has none: a fallback is
+    // how a gate goes quietly green. Both ways of not knowing are a throw.
+    expect(() => accountGate.expectedAccount(new Map())).toThrow(/CF_ACCOUNT_ID/)
+    expect(() =>
+      accountGate.expectedAccount(
+        new Map([
+          ["a".repeat(32), ["workers/one/wrangler.jsonc"]],
+          ["b".repeat(32), ["workers/two/wrangler.jsonc"]],
+        ])
+      )
+    ).toThrow(/more than one Cloudflare account/)
+  })
+
+  it("nothing in the deploy chain names the account as a literal", () => {
+    // A hard-coded id would be a client's account number welded into a base meant
+    // to be forked. The two destructive scripts carry one for their own reasons
+    // and are not part of a deploy; nothing added here may.
+    const source = read("scripts/check-cloudflare-account.mjs")
+    const literals = source.match(/["'][0-9a-f]{32}["']/g) ?? []
+    expect(literals, "the account gate must DERIVE the account, never carry it").toEqual([])
   })
 })
