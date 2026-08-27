@@ -139,6 +139,15 @@ export const SEED: Catalogue = {
   "Stop timer": { de: "Zeit stoppen", es: "Detener temporizador", ca: "Aturar temporitzador" },
   "Send for review": { de: "Zur Prüfung senden", es: "Enviar a revisión", ca: "Enviar a revisió" },
   Resolve: { de: "Abschließen", es: "Resolver", ca: "Resoldre" },
+  /* The portal's sign-in heading, which is now the whole sentence rather than
+   * "Sign in to" + the brand name — the lockup above it says whose door this
+   * is, so the heading only has to say what the screen is for. Written here
+   * rather than left for the generator: all three are the second half of the
+   * generated "Sign in to" (`Anmelden bei` / `Iniciar sesión en` /
+   * `Iniciar sessió a`) with the preposition dropped, and they match the
+   * "Sign out" already in the catalogue (`Abmelden` / `Cerrar sesión` /
+   * `Tancar sessió`) verb for verb. Nothing was spent to know that. */
+  "Sign in": { de: "Anmelden", es: "Iniciar sesión", ca: "Iniciar sessió" },
 
   /* ── The language switcher itself ────────────────────────────────────────── */
   Language: { de: "Sprache", es: "Idioma", ca: "Idioma" },

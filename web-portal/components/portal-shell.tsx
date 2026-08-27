@@ -23,7 +23,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@shared/ui/controls/button/button"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { AppearanceMenu } from "@shared/web/appearance-menu"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
+import { AmbientBackground } from "@shared/ui/controls/ambient-background/ambient-background"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/icons"
 
@@ -41,6 +41,7 @@ import { usePortalSession, type PortalSession } from "@/lib/session"
 import { NeedsName } from "@/components/needs-name"
 import { NoAccess } from "@/components/no-access"
 import { AccountSwitcher } from "@/components/account-switcher"
+import { AuthLogotype, AuthPhotograph } from "@/components/auth-artwork"
 
 /** The five places. Three was the rule — a client can hold three in their head —
  * and Value earned the fourth, because it is the one screen that answers the
@@ -266,15 +267,84 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
 }
 
 /** The signed-out frame — the sign-in door and nothing else. Exported so /login
- * and the shell agree on what "not yet" looks like. */
+ * and the shell agree on what "not yet" looks like.
+ *
+ * IT IS THE KIT'S SHELL, DRAWN HERE BECAUSE THE KIT'S OWN COPY WILL NOT
+ * COMPILE IN THIS APP — and that sentence is the whole of what is bespoke about
+ * this file. The arrangement below is composition ch27.16 exactly: "photography
+ * left, one column of content right … with the isotype sitting directly above
+ * the title where an eyebrow would otherwise go". Every class is copied from
+ * `compositions/screens/sign-in.tsx`'s `AuthShell`, token for token — the two
+ * halves, the ambient field, the contained photograph at radius 24, the drop to
+ * one column below `md`, the body measure on the content column and the fact
+ * that the column is centred on the BLOCK axis only. Nothing here was chosen.
+ *
+ * WHY IT IS NOT SIMPLY `import { AuthShell }`. Tried first, and it fails to
+ * BUILD, not to look right: `AuthShell` imports `AuthPhotograph` from
+ * `compositions/templates/sign-in.tsx` at module scope, and that file hands a
+ * static image import straight to `Image`'s `src`. Under Vite — the kit's own
+ * bundler — such an import is a URL string. Under Next it is a
+ * `StaticImageData` object, so `npx tsc --noEmit -p web-portal` stops on
+ * `templates/sign-in.tsx(208,7): Type 'StaticImageData' is not assignable to
+ * type 'string | Blob'`, whether or not the photograph is ever rendered; and
+ * the same file's `srcSet` template, plus the two <img> elements in
+ * `controls/brand/brand.tsx`, bind that object straight to an image source and
+ * would have written "[object Object]" into it if they had run. `auth-artwork.tsx` beside this file carries the
+ * evidence and passes the same artwork through `.src`.
+ *
+ * SO THIS IS A STAND-IN WITH A DELETION DATE. Reported upstream to
+ * Kwapso/kwapso-ui-ux rather than patched here, because `shared/ui/` is pinned
+ * and a hand-edit turns the build red. The day the kit reads `.src` (or types
+ * its asset imports as URLs), this whole function becomes
+ * `<AuthShell>{children}</AuthShell>` and `auth-artwork.tsx` goes with it.
+ *
+ * THERE IS NO THEME CONTROL HERE ANY MORE, and that is the point rather than a
+ * removal. A `ModeToggle` used to sit pinned in the top corner of the one
+ * screen a client meets before they are anyone — a three-way choice about a
+ * preference, in front of somebody who has not yet said who they are, on a page
+ * whose whole job is one field and one button. Appearance now follows the
+ * reader's own machine, through the token overrides that already do exactly
+ * that: `tokens.css` reads `@media (prefers-color-scheme: dark)` on
+ * `:root:not([data-theme="light"])`, which is the state where no attribute has
+ * been written — and no attribute is what a person who has never chosen has.
+ * Nothing here writes one. A client who HAS chosen inside the app keeps their
+ * choice (the boot script in `shared/web/theme-provider.tsx` applies it before
+ * first paint, on this screen as on every other), and the place to change it
+ * stays where a preference belongs: the header of the signed-in app. */
 export function PortalDoor({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-[100svh] flex-col items-center justify-center gap-6 p-6">
-      <div className="fixed right-4 top-4 z-30">
-        <ModeToggle />
+    <main
+      className="bg-background relative grid min-h-dvh w-full min-w-0 gap-[var(--space-6)] p-[var(--space-6)] md:grid-cols-2 lg:gap-[var(--space-7)] lg:p-[var(--space-7)]"
+    >
+      {/* Ruling 05 · 06: "The mango ambient field stays, scoped to auth, splash
+          and portal home." This is auth. */}
+      <AmbientBackground variant="brand" />
+
+      {/* THE PICTURE, ON THE INLINE START — half the door, contained at radius
+          24, never full-bleed and never behind the type (ch14, ruling 35).
+          `hidden` rather than unmounted below `md` on purpose, and it is the
+          phone that benefits: the <img> inside is lazy, and a lazy image with
+          no layout box is never fetched, so ch27.16's "the image drops" costs a
+          phone nothing to obey.
+
+          THE GROUND UNDER IT IS NOT DECORATION. The box is its final size on
+          the first frame and the photograph arrives a moment later, so without
+          a tone here the door opens on half a page of nothing — which reads as
+          a broken screen rather than a loading one. It is the same quiet ground
+          the kit's own `Image` primitive holds a picture's place with. */}
+      <div className="bg-muted relative hidden min-w-0 overflow-hidden rounded-[var(--radius)] md:block">
+        <AuthPhotograph />
       </div>
-      {children}
-      <p className="text-muted-foreground text-xs">{brand.motto}</p>
+
+      {/* THE OTHER HALF — one column of content, centred on the BLOCK axis and
+          on no other. Every line inside it ranges left. */}
+      <div className="relative flex min-w-0 flex-col justify-center">
+        <div className="flex w-full min-w-0 max-w-[var(--measure-body)] flex-col gap-[var(--space-6)]">
+          <AuthLogotype />
+          {children}
+          <p className="text-muted-foreground text-xs">{brand.motto}</p>
+        </div>
+      </div>
     </main>
   )
 }

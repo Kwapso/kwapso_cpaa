@@ -251,6 +251,16 @@ const NOT_USER_TYPED: Record<string, string> = {
   // The portal's bottom nav — five route literals declared in the same file,
   // nothing a user or a row ever supplies.
   "dest.href": "the portal shell's own DESTINATIONS table of route literals",
+  // THE SIGN-IN DOOR'S ARTWORK. Three static imports of files that ship in the
+  // vendored design kit (`shared/ui/assets/`), so the string is written by the
+  // BUNDLER — Next emits `/_next/static/media/<name>.<hash>.<ext>` — and there
+  // is no path from a request body, a row or a person to any of them. `.src` is
+  // there because Next resolves an asset import to a `StaticImageData` object
+  // where the kit's own bundler gives a URL string; see
+  // web-portal/components/auth-artwork.tsx, which records why.
+  "logotypeBlack.src": "a bundler-emitted URL for a file in the design kit",
+  "logotypeWhite.src": "a bundler-emitted URL for a file in the design kit",
+  "photo1440.src": "a bundler-emitted URL for a file in the design kit",
 }
 
 describe("no screen binds an unchecked URL to an attribute", () => {

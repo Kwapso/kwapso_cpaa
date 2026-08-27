@@ -29,7 +29,6 @@ import { Spinner } from "@shared/ui/controls/spinner/spinner"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
-import { brand } from "@shared/brand"
 import { CodeInput } from "@shared/web/code-input"
 import { GoogleMark, useSignInError } from "@shared/web/google-sign-in"
 import { invalidate } from "@shared/web/store"
@@ -37,7 +36,6 @@ import { useEmailSignIn } from "@shared/web/use-email-sign-in"
 import { auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useT } from "@shared/web/language"
-import { safeSrc } from "@shared/web/rich-text"
 
 const emailConfig = { ...defaultFieldConfig, label: "Your email", required: true }
 
@@ -59,11 +57,21 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const googleError = useSignInError()
 
   return (
-    <div className="w-full max-w-sm">
-      <div className="flex flex-col items-center gap-2 text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={safeSrc(brand.logoUrl) ?? "/icons/icon.svg"} alt="" className="size-12 rounded-xl" />
-        <h1 className="text-2xl font-medium tracking-tight">{t("Sign in to")} {brand.name}</h1>
+    // NO WIDTH AND NO CENTRING. `AuthShell` owns both: it caps its content
+    // column at the kit's body measure and centres that column on the BLOCK
+    // axis only. ch27.16, verbatim: "Nothing on an auth screen is centred. The
+    // title, the field label, the helper line and the button label all range
+    // left … A centred auth card is the most common way this brand gets
+    // misdrawn." This used to be a centred card 24rem wide.
+    <div className="flex w-full min-w-0 flex-col">
+      {/* THE MARK IS NOT DRAWN HERE. It is the shell's `mark` slot, one level
+          up, which is the position the chapter puts it in. What stood here was
+          a 48px app icon over "Sign in to kwapso" — the app's own favicon
+          doing a logo's job, and the product named twice once the real lockup
+          arrived. The heading below says what the screen is FOR; the lockup
+          above says whose it is. */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-medium tracking-tight">{t("Sign in")}</h1>
         <p className="text-muted-foreground">
           {step === "email"
             ? t("We'll email you a six-digit code, or you can use Google. No password to remember.")
@@ -116,13 +124,13 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
               {t("Continue with Google")}
             </Button>
             {googleError ? (
-              <p className="text-destructive text-center text-sm">{googleError}</p>
+              <p className="text-destructive text-sm">{googleError}</p>
             ) : null}
           </form>
         ) : (
           <>
             <CodeInput value={code} disabled={busy} onChange={enterCode} />
-            {error ? <p className="text-destructive text-center text-sm">{error}</p> : null}
+            {error ? <p className="text-destructive text-sm">{error}</p> : null}
             {busy ? (
               <div className="flex justify-center">
                 <Spinner />
