@@ -55,7 +55,7 @@
 
 import * as React from "react"
 
-import { Image } from "@shared/ui/controls/image/image"
+import { Image } from "@shared/ui/components/image/image"
 
 import { isRenderableImage } from "@shared/workers/image"
 import { safeHref } from "./rich-text"

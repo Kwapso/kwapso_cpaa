@@ -46,11 +46,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Check, Link2, Paperclip, Pencil, Plus, Trash2, Upload, Xmark } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Check, Link2, Paperclip, Pencil, Plus, Trash2, Upload, Xmark } from "@shared/ui/foundations/icons"
 
 import type { StoryAttachment } from "@shared/types"
 import { ApiFailure, content as contentApi } from "@/lib/api"

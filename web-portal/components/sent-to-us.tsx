@@ -23,9 +23,9 @@
 // `/media/internal/`. So reading it back is the account fence answering yes, not
 // a hole being opened.
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { Paperclip } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { Paperclip } from "@shared/ui/foundations/icons"
 
 import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
@@ -51,7 +51,7 @@ export function SentToUs() {
           // the origin of the string. A URL it refuses prints as plain text.
           const fileLink = safeHref(todo.fileUrl)
           return (
-            <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
+            <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border p-4">
               <div className="min-w-0">
                 <p className="font-medium">{todo.title}</p>
                 <p className="text-muted-foreground text-sm">

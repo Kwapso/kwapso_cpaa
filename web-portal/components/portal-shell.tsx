@@ -24,7 +24,6 @@ import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppearanceMenu } from "@shared/web/appearance-menu"
 import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
-import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/foundations/icons"
 

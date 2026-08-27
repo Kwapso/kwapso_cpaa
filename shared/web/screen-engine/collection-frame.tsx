@@ -213,11 +213,6 @@ function CollectionFrame<T>({
       return { ...q, facetValues: next }
     })
 
-<<<<<<< HEAD
-=======
-  const clearAll = () => remember((q) => ({ ...q, query: "", facetValues: {} }))
-
->>>>>>> lane/nav-memory
   // Page change: optionally scroll the collection's top back into view.
   const goTo = (p: number) => {
     setPage(p)
@@ -262,7 +257,7 @@ function CollectionFrame<T>({
               values={facetValues}
               data={data}
               onChange={setFacet}
-              onClearFacets={() => setFacetValues({})}
+              onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
               resultCount={filtered.length}
               modal={modal}
             />

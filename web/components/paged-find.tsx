@@ -295,11 +295,6 @@ export function PagedFind<T>({
   })
   const total = useCachedValue<number>(findKey ? `total:${findKey}` : null)
 
-<<<<<<< HEAD
-=======
-  const clearAll = () => remember((q) => ({ ...q, text: "", values: {} }))
-  const canClear = asked
->>>>>>> lane/nav-memory
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
 
@@ -338,31 +333,6 @@ export function PagedFind<T>({
             onDirectionChange={(dir) => setSortDir(dir)}
           />
         )}
-<<<<<<< HEAD
-=======
-        {showFilters && (
-          <FilterBar
-            facets={facets}
-            values={values}
-            // Empty on purpose: every facet above carries its own options, so
-            // there is nothing for the bar to derive from the rows on screen.
-            data={[]}
-            onChange={(field, value) =>
-              setValues(
-                (() => {
-                  const next = { ...values }
-                  if (value === "") delete next[field]
-                  else next[field] = value
-                  return next
-                })()
-              )
-            }
-            onClearAll={clearAll}
-            canClear={canClear}
-            resultCount={total}
-          />
-        )}
->>>>>>> lane/nav-memory
         {/* THE FILTERED TOTAL — the exact server count of the question being
             asked, through the one seam allowed to end in a "+" (the collection's
             own count above is exact and never does). It appears only while
@@ -391,14 +361,12 @@ export function PagedFind<T>({
           // Empty on purpose: every facet above carries its own options, so
           // there is nothing for the bar to derive from the rows on screen.
           data={[]}
-          onChange={(field, value) =>
-            setValues((s) => {
-              const next = { ...s }
-              if (value === "") delete next[field]
-              else next[field] = value
-              return next
-            })
-          }
+          onChange={(field, value) => {
+            const next = { ...values }
+            if (value === "") delete next[field]
+            else next[field] = value
+            setValues(next)
+          }}
           onClearFacets={() => setValues({})}
           resultCount={total}
         />

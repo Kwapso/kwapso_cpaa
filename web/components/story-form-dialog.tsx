@@ -493,7 +493,7 @@ export function StoryFormDialog({
       <Field config={fileField} htmlFor="story-files" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
           {attached.length > 0 && (
-            <ul className="divide-border divide-y rounded-xl border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] border">
               {attached.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 px-3 py-2">
                   {a.kind === "file" ? (
