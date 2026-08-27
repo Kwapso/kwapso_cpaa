@@ -17,16 +17,21 @@
 //   • google-read    — the neutral seam the retrieval lane reads through.
 
 import { logActivity, type Actor } from "@shared/workers/activity"
+import { brand } from "@shared/brand"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import {
-  GOOGLE_NAMED_SERVICES,
+  GOOGLE_EVENT_TYPES,
+  GOOGLE_SCOPE_MODES,
+  GOOGLE_SCOPED_SERVICES,
   GOOGLE_SERVICES,
   GOOGLE_SHELVES,
   type GoogleConnection,
-  type GoogleNamedService,
+  type GoogleEventType,
+  type GoogleScopedService,
+  type GoogleScopeMode,
   type GoogleService,
   type GoogleShelf,
   type GoogleSourceKind,
@@ -52,6 +57,7 @@ export type GoogleEnv = TokenKeyEnv & ConnectEnv
  * detail and every response body physically cannot carry a token, so no future
  * edit can leak one by forgetting to strip a field. */
 const PUBLIC_COLUMNS = `id, user_id, service, google_email, scopes, last_used_at, last_error,
+                        scope_mode, scope_event_types,
                         deactivated_at, created_at, creator_name, updated_at, editor_name`
 
 type ConnectionRow = {
@@ -62,6 +68,8 @@ type ConnectionRow = {
   scopes: string
   last_used_at: string | null
   last_error: string | null
+  scope_mode: string
+  scope_event_types: string
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -96,6 +104,14 @@ function toConnection(r: ConnectionRow): GoogleConnection {
     missingScopes: missingScopes(service, r.scopes),
     lastUsedAt: r.last_used_at,
     lastError: r.last_error,
+    // ANYTHING WE DO NOT RECOGNISE IS 'everything'. That is not laxity, it is
+    // the only reading that cannot silently blind somebody: a mode column
+    // holding a word this build has never heard of would otherwise mean "read
+    // nothing", and a connection that quietly stops answering looks exactly like
+    // an empty Drive. A wrong 'everything' is visible on the screen and fixable
+    // in one click; a wrong 'only' is invisible.
+    scopeMode: r.scope_mode === "only" ? "only" : "everything",
+    scopeEventTypes: eventTypeList(r.scope_event_types),
     active: r.deactivated_at === null,
     createdAt: r.created_at,
     creatorName: r.creator_name,
@@ -126,13 +142,6 @@ export function asServiceOrAll(value: unknown): GoogleService | "all" {
   return asService(value)
 }
 
-/** The two services that are reached through NAMED sources. */
-export function asNamedService(value: unknown): GoogleNamedService {
-  if (typeof value !== "string" || !(GOOGLE_NAMED_SERVICES as readonly string[]).includes(value))
-    throw new GuardError(400, "invalid_input", "Only Drive folders and Chat spaces are named this way.")
-  return value as GoogleNamedService
-}
-
 /** A draft, one message, or a whole conversation? The allow-list IS the check
  * (R20), same as `asService` above and for the same reason: this word chooses
  * which Gmail endpoint is called, so an unknown one is refused at the boundary
@@ -150,6 +159,40 @@ export function asShelf(value: unknown): GoogleShelf {
   if (typeof value !== "string" || !(GOOGLE_SHELVES as readonly string[]).includes(value))
     throw new GuardError(400, "invalid_input", "Say who may read it: just you, or the team.")
   return value as GoogleShelf
+}
+
+/** The two services SCOPE is a question about. Drive and Chat are narrowed by
+ * what somebody shared and have nothing to scope, so they are refused here
+ * rather than accepted and ignored — a door that takes a word it will not act on
+ * is a door that tells somebody they decided something. The allow-list IS the
+ * check (R20), same as `asService` above. */
+export function asScopedService(value: unknown): GoogleScopedService {
+  if (typeof value !== "string" || !(GOOGLE_SCOPED_SERVICES as readonly string[]).includes(value))
+    throw new GuardError(400, "invalid_input", "Only Gmail and Calendar are narrowed this way.")
+  return value as GoogleScopedService
+}
+
+/** Everything, or only what was named? Allow-list, and no default: unlike a
+ * shelf there is no answer that is safe by omission here, because the two words
+ * differ in which DIRECTION the mistake goes. A caller that forgot to say must
+ * be told so. */
+export function asScopeMode(value: unknown): GoogleScopeMode {
+  if (typeof value !== "string" || !(GOOGLE_SCOPE_MODES as readonly string[]).includes(value))
+    throw new GuardError(400, "invalid_input", "Say how much to read: everything, or only what you name.")
+  return value as GoogleScopeMode
+}
+
+/** THE STORED ALLOW-LIST OF EVENT KINDS, read back off the column.
+ *
+ * Space-separated, exactly as `scopes` is. Anything the build does not
+ * recognise is DROPPED rather than carried — the list is passed to Google as
+ * repeated `eventTypes` and an unknown word there is a request Google refuses
+ * outright, which would cost the whole calendar rather than the one kind. An
+ * empty result means every kind, which is what the untouched default '' means
+ * and the reason no caller has to tell the two apart. */
+export function eventTypeList(raw: string): GoogleEventType[] {
+  const known = new Set<string>(GOOGLE_EVENT_TYPES)
+  return raw.split(" ").filter((w) => known.has(w)) as GoogleEventType[]
 }
 
 // ── reading the rows ─────────────────────────────────────────────────────────
@@ -220,7 +263,7 @@ function toSource(r: SourceRow): GoogleSource {
     id: r.id,
     connectionId: r.connection_id,
     userId: r.user_id,
-    service: r.service as GoogleNamedService,
+    service: r.service as GoogleService,
     externalId: r.external_id,
     name: r.name,
     shelf: r.shelf as GoogleShelf,
@@ -245,7 +288,7 @@ function toSource(r: SourceRow): GoogleSource {
 export async function listNamedSources(
   cfg: D1Rest,
   guard: MemberGuard,
-  service?: GoogleNamedService
+  service?: GoogleService
 ): Promise<GoogleSource[]> {
   const rows = await d1Query<SourceRow>(
     cfg,
@@ -460,16 +503,31 @@ export async function disconnect(
 
 /** Name a Drive folder or a Chat space. The connection is resolved from the
  * CALLER's own live row, so a source can never be hung off a colleague's. */
+/** The history line each kind of container earns when it is named. Data rather
+ * than a nested ternary, because there are five of them now and the fifth is the
+ * one a ternary chain gets wrong. */
+const SHARE_ACTIVITY: Record<GoogleSourceKind, string> = {
+  folder: "Drive folder shared",
+  file: "Drive file shared",
+  space: "Chat space shared",
+  calendar: "Calendar named",
+  label: "Mail label named",
+}
+
+/** The kinds that are SCOPED to rather than shared — see GOOGLE_SCOPE_KINDS. */
+const SCOPE_KIND = new Set<GoogleSourceKind>(["calendar", "label"])
+
 export async function addNamedSource(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
   input: {
-    service: GoogleNamedService
+    service: GoogleService
     externalId: string
     name: string
     shelf: GoogleShelf
-    /** a Drive FOLDER or a single Drive FILE; a Chat share is always a space. */
+    /** a Drive FOLDER or a single Drive FILE; a Chat share is always a space; a
+     * scoped service names a `calendar` or a Gmail `label`. */
     kind: GoogleSourceKind
     /** which client this folder or space is about — null for the agency's own.
      * It is the COMPARTMENT everything inside it is filed under when the
@@ -483,7 +541,7 @@ export async function addNamedSource(
     throw new GuardError(
       409,
       "google_not_connected",
-      `Connect ${serviceLabel(input.service)} first, then choose what to share.`
+      `Connect ${serviceLabel(input.service)} first, then choose what to read.`
     )
   const existing = await d1Query<{ id: string }>(
     cfg,
@@ -532,15 +590,163 @@ export async function addNamedSource(
         ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
-    type: input.kind === "file" ? "Drive file shared" : input.kind === "space" ? "Chat space shared" : "Drive folder shared",
+    type: SHARE_ACTIVITY[input.kind],
     // The shelf is IN the history sentence, not just in the row. "Who could read
     // this?" is the question somebody asks six months later, and an activity feed
     // that only says "shared" cannot answer it.
-    description: `${actor.name} shared "${input.name}" with ${input.shelf === "team" ? "the team" : "just themselves"}`,
+    //
+    // A SCOPED container is a different sentence, because it is a different act:
+    // nobody hands their own calendar over, they say which of it may be read.
+    description: SCOPE_KIND.has(input.kind)
+      ? `${actor.name} let ${brand.name} read "${input.name}"`
+      : `${actor.name} shared "${input.name}" with ${input.shelf === "team" ? "the team" : "just themselves"}`,
     relatedTable: "google_sources",
     relatedRowId: id,
   })
   return id
+}
+
+// ── SCOPE: WHAT THIS PERSON LETS US READ ─────────────────────────────────────
+//
+// THE EVENT THIS EXISTS BECAUSE OF. On 25 August 2026 a live password was said
+// out loud on a call, transcribed into the meeting notes by Gemini, and indexed
+// into the knowledge base. It was rotated. The fix offered was a credential
+// SCANNER over transcripts and the owner refused it, in his words: "no it should
+// not scan anything.. give content as it is." He is right. A scanner tuned to
+// catch a spoken secret also silently drops real material, and silent dropping
+// is a failure this knowledge base has already been bitten by twice.
+//
+// SO THE LEVER IS SCOPE, and the whole design follows from one sentence: the
+// answer to "that should never have been read" is "that source was never in
+// scope". Which means it must narrow what is READ and never filter what was
+// read — a thing that was fetched and then discarded has still been fetched, and
+// has still been through our logs, our runtime and our memory on the way to
+// being dropped. Every narrowing in this module is therefore passed to Google
+// itself: a Gmail label becomes `labelIds` on the search, a calendar becomes the
+// calendar in the URL, an event kind becomes `eventTypes`. Nothing that is out
+// of scope ever arrives.
+//
+// ONE SEAM, AND WHY. `googleScope` is the only place that answers "what may I
+// read?", and every calendar and mail read in this worker goes through it — the
+// knowledge sweep, the meetings sync, the events door and the mail door alike.
+// The alternative, which was written first and thrown away, was to apply scope
+// in the knowledge sweep where it was easiest: that would have left the
+// assistant's own mail tool reading the whole mailbox through a door the sweep
+// was fenced out of, which is not a fence, it is a preference.
+
+/** One container a person's scope names, and nothing else about it: the read
+ * needs Google's id, and a screen needs the word beside it. */
+export type ScopeContainer = { externalId: string; name: string }
+
+/** WHAT THIS PERSON LETS US READ from one service. */
+export type GoogleScope = {
+  mode: GoogleScopeMode
+  /** the calendars or labels named, when the mode is 'only'. EMPTY UNDER 'only'
+   * IS A REAL ANSWER and it means nothing may be read — see the migration's own
+   * header for why that is the safe direction rather than an oversight. */
+  containers: ScopeContainer[]
+  /** which kinds of event may be read; empty means every kind. Calendar only. */
+  eventTypes: GoogleEventType[]
+}
+
+/** READ EVERYTHING — what an unconnected, unscoped or unrecognised connection
+ * means, spelled once so no caller invents its own version of "no narrowing". */
+const UNSCOPED: GoogleScope = { mode: "everything", containers: [], eventTypes: [] }
+
+/**
+ * WHAT THIS PERSON LETS US READ from one service — the one seam.
+ *
+ * Whose scope it is comes from the GUARD, exactly as every other read in this
+ * file does, so there is nowhere to put a `?userId=` and no way to read through
+ * somebody else's decision.
+ *
+ * A service with no live connection answers `UNSCOPED`, and that is deliberate:
+ * this function's job is to narrow a read, not to authorise one. Whether the
+ * caller may read at all is `accessTokenFor`'s question and it is asked
+ * separately — folding the two together would make a missing connection look
+ * like a narrow scope, which is the same confusion `tokenOrNull` already refuses
+ * to create.
+ */
+export async function googleScope(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  service: GoogleService
+): Promise<GoogleScope> {
+  const connection = await activeConnection(cfg, guard, service)
+  if (!connection) return UNSCOPED
+  if (connection.scopeMode !== "only")
+    // Still carry the event kinds: they are a SECOND axis and they narrow the
+    // primary calendar just as they narrow a named one. A person who said "not
+    // my birthdays" without naming a calendar has decided something, and a mode
+    // of 'everything' is an answer about which CONTAINERS, not about which
+    // kinds.
+    return { ...UNSCOPED, eventTypes: connection.scopeEventTypes }
+  return {
+    mode: "only",
+    containers: (await listNamedSources(cfg, guard, service))
+      .filter((s) => s.active)
+      .map((s) => ({ externalId: s.externalId, name: s.name })),
+    eventTypes: connection.scopeEventTypes,
+  }
+}
+
+/**
+ * DECIDE HOW MUCH OF A CONNECTION KWAPSO MAY READ.
+ *
+ * Returns whether anything actually moved, so the door can stay quiet when a
+ * person presses save on the answer they already had (R17: the current-state
+ * predicate rides the UPDATE, zero rows moved = no history row and no ping).
+ *
+ * The event kinds are stored space-separated in Google's own words, so the read
+ * path can hand them to `eventTypes` without translating. `[]` is stored as ''
+ * and means every kind; the DOOR is what refuses an empty list, because "every
+ * kind" and "no kinds" are the two things a person must not be able to confuse
+ * and only one of them is spellable here.
+ */
+export async function setGoogleScope(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  input: { service: GoogleScopedService; mode: GoogleScopeMode; eventTypes: GoogleEventType[] }
+  /** the connection that changed, or null when nothing moved. The ID rather
+   * than a boolean, because R1's ping needs a ROW to name and the caller would
+   * otherwise have to look up what this function already had in its hand. */
+): Promise<string | null> {
+  const connection = await activeConnection(cfg, guard, input.service)
+  if (!connection)
+    throw new GuardError(
+      409,
+      "google_not_connected",
+      `Connect ${serviceLabel(input.service)} first, then say how much of it to read.`
+    )
+  const kinds = input.eventTypes.join(" ")
+  const now = new Date().toISOString()
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R17. `NOT (mode = ? AND kinds = ?)` rather than a read-then-compare: two
+    // tabs saving the same decision must produce one history line, not two.
+    `UPDATE google_connections SET scope_mode = ?, scope_event_types = ?, updated_at = ?,
+        editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)},
+        editor_name = ${sqlString(actor.name)}
+      WHERE id = ? AND user_id = ? AND deactivated_at IS NULL
+        AND NOT (scope_mode = ? AND scope_event_types = ?) RETURNING id`,
+    [input.mode, kinds, now, connection.id, guard.userId, input.mode, kinds]
+  )
+  if (!changed[0]) return null
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Google reading narrowed",
+    // WHAT CHANGED, in the sentence, not just that something did. "Who could
+    // kwapso read for?" is the question somebody asks after an incident, and a
+    // history line saying "scope changed" cannot answer it.
+    description:
+      `${actor.name} set ${serviceLabel(input.service)} to ` +
+      (input.mode === "only" ? "only what they named" : "everything") +
+      (input.service === "calendar" && kinds ? `, kinds: ${kinds}` : ""),
+    relatedTable: "google_connections",
+    relatedRowId: connection.id,
+  })
+  return connection.id
 }
 
 /** Take a folder or space away again, or put it back. R17: the current-status

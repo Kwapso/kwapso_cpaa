@@ -44,13 +44,18 @@ import {
   driveFileText,
   driveFilesById,
   driveList,
+  calendarGet,
   calendarList,
   gmailMessage,
   gmailSearch,
   GMAIL_CONTACT_CAP,
+  type CalendarWindow,
+  type MailMessage,
 } from "./google-api"
 import {
   accessTokenFor,
+  googleScope,
+  type GoogleScope,
   knownChatPeople,
   listNamedSources,
   rememberChatPeople,
@@ -267,6 +272,132 @@ function chatThreads(messages: ChatMessage[]): ChatMessage[] {
   return out
 }
 
+
+// ── THE TWO SCOPED READS ─────────────────────────────────────────────────────
+//
+// Gmail and Calendar are the two services a person reaches WHOLESALE — connect
+// them and everything in them is in reach — so they are the two that carry a
+// scope. Every read of either, anywhere in this worker, goes through one of
+// these two functions: the knowledge sweep, the meetings sync, the events door
+// and the mail door alike.
+//
+// THAT UNIFORMITY IS THE POINT AND IT IS THE HALF THAT IS EASY TO GET WRONG.
+// Applying scope only where it was easiest — inside the knowledge sweep — would
+// have left the assistant's own mail tool reading the whole mailbox through a
+// door the sweep was fenced out of. Which is not a fence. It is a preference.
+//
+// NEITHER OF THEM FILTERS ANYTHING. The narrowing is a parameter Google applies
+// (`labelIds`, the calendar in the URL, `eventTypes`), so material out of scope
+// is never fetched. A thing that was fetched and then discarded has still been
+// fetched, and has still passed through this worker's logs and memory on its way
+// to being dropped.
+
+/** How many containers one scoped read will walk. Both reads cost one round trip
+ * per named container, so this is R14 on the axis that actually spends money —
+ * and it is generous, because naming twelve calendars or twelve labels is a
+ * person being careful rather than a script. Anything past it is DROPPED
+ * LOUDLY: the caller is told, because a silently ignored label is a source
+ * somebody believes is in scope and is not. */
+const SCOPE_CONTAINER_CAP = 12
+
+/** THIS PERSON'S MAIL, narrowed to the labels they left in reach.
+ *
+ * 'only' with nothing named answers with NOTHING and asks Gmail nothing, which
+ * is the safe reading of an empty allow-list and the whole reason scope carries
+ * a mode (see the SCOPE essay in lib/google.ts). */
+export async function scopedGmailSearch(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  token: string,
+  contactQuery: string,
+  search?: string
+): Promise<MailMessage[]> {
+  const scope = await googleScope(cfg, guard, "gmail")
+  if (scope.mode !== "only") return gmailSearch(token, contactQuery, search)
+  if (scope.containers.length === 0) return []
+  const labels = scope.containers.slice(0, SCOPE_CONTAINER_CAP).map((c) => c.externalId)
+  if (scope.containers.length > labels.length)
+    console.error(
+      `[google] mail scope walked ${labels.length} of ${scope.containers.length} labels for ${guard.userId}`
+    )
+  return gmailSearch(token, contactQuery, search, labels)
+}
+
+/** THIS PERSON'S CALENDAR, narrowed to the calendars and the kinds of event they
+ * left in reach.
+ *
+ * `truncated` is OR-ed across the calendars read, because a half answer from any
+ * one of them makes the whole window a half answer — and the meetings backfill
+ * moves a cursor on the strength of that word (see `calendarList`). */
+export async function scopedCalendarWindow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  token: string,
+  range: { from?: string; to?: string; showDeleted?: boolean },
+  /** THE SCOPE, ALREADY READ. A caller taking four windows in one breath — the
+   * meetings sync does exactly that — would otherwise pay for the same two
+   * database round trips four times over, and the REST door is the expensive
+   * thing in this worker (EDGE-CASES). Optional rather than required, so a
+   * caller reading ONE window is not made to do the bookkeeping. */
+  known?: GoogleScope
+): Promise<CalendarWindow> {
+  const scope = known ?? (await googleScope(cfg, guard, "calendar"))
+  const eventTypes = scope.eventTypes
+  if (scope.mode !== "only") return calendarList(token, { ...range, eventTypes })
+  if (scope.containers.length === 0) return { events: [], truncated: false }
+  const calendars = scope.containers.slice(0, SCOPE_CONTAINER_CAP)
+  if (scope.containers.length > calendars.length)
+    console.error(
+      `[google] calendar scope walked ${calendars.length} of ${scope.containers.length} calendars for ${guard.userId}`
+    )
+  const events: CalendarEventRow[] = []
+  let truncated = false
+  for (const calendar of calendars) {
+    const window = await calendarList(token, { ...range, eventTypes, calendarId: calendar.externalId })
+    events.push(...window.events)
+    truncated = truncated || window.truncated
+  }
+  return { events, truncated }
+}
+
+/** The event shape `calendarList` hands back, named here so the merge above can
+ * hold one without this file importing a type it otherwise has no use for. */
+type CalendarEventRow = CalendarWindow["events"][number]
+
+/** ONE EVENT, from whichever of this person's calendars actually holds it.
+ *
+ * Scope turned "the calendar" into a list, and `events.get` needs to be told
+ * which one. An id that is not on the calendar asked is a 404, so a lookup
+ * pinned to `primary` would report "not there" about an event sitting on a
+ * calendar the person deliberately named. The calendars are walked in the order
+ * they were named and the first hit wins; null means no calendar in reach holds
+ * it, which is a different sentence from "it does not exist" and is the one the
+ * caller has to say.
+ *
+ * `calendarGet` throws on a 404 (it goes through `googleFetch`, which maps every
+ * failure onto the product's own words), so the miss is caught rather than
+ * tested for — there is nothing else on that path to swallow. */
+export async function scopedCalendarEvent(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  token: string,
+  eventId: string
+): Promise<CalendarEventRow | null> {
+  const scope = await googleScope(cfg, guard, "calendar")
+  const calendars =
+    scope.mode === "only" && scope.containers.length
+      ? scope.containers.slice(0, SCOPE_CONTAINER_CAP).map((c) => c.externalId)
+      : ["primary"]
+  for (const calendarId of calendars) {
+    try {
+      return await calendarGet(token, eventId, calendarId)
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
 export async function readGoogleMaterial(
   env: GoogleEnv,
   cfg: D1Rest,
@@ -350,7 +481,10 @@ export async function readGoogleMaterial(
       //
       // The contacts are still read, and still do the OTHER job below: deciding
       // which client a message belongs to. Losing the fence does not lose that.
-      for (const mail of await gmailSearch(token, "", request.search))
+      // THROUGH THE SCOPED READ, never `gmailSearch` directly — the sweep is the
+      // largest consumer of a person's mailbox and would be the worst place for
+      // the fence to be missing.
+      for (const mail of await scopedGmailSearch(cfg, guard, token, "", request.search))
         items.push({
           service: "gmail",
           sourceId: null,
@@ -378,7 +512,9 @@ export async function readGoogleMaterial(
     // See `meetingEventIds` for the measurement that made this necessary.
     const alreadyMeetings = token ? await meetingEventIds(cfg, guard) : new Set<string>()
     if (token)
-      for (const event of (await calendarList(token, { from: request.from, to: request.to })).events) {
+      for (const event of (
+        await scopedCalendarWindow(cfg, guard, token, { from: request.from, to: request.to })
+      ).events) {
         if (alreadyMeetings.has(event.id)) continue
         items.push({
           service: "calendar",

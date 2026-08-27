@@ -234,6 +234,7 @@ import {
   postGoogleMailSend,
   postGoogleMailTrash,
   postGoogleSource,
+  postGoogleScope,
   postGoogleSourceActive,
 } from "./routes/google"
 import { googleAutopilot } from "./lib/google-autopilot"
@@ -543,6 +544,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // What a connection shares: the picker, and the named folders and spaces.
   "GET /api/content/google/pick": { handler: getGooglePick, kind: "read" },
   "POST /api/content/google/sources": { handler: postGoogleSource, kind: "mutation" },
+  // HOW MUCH OF A CONNECTION KWAPSO MAY READ — the Gmail and Calendar half of
+  // the same question the sources door asks about Drive and Chat. routes/google.ts
+  // carries the whole note, including the 25 August incident that earned it.
+  "POST /api/content/google/scope": { handler: postGoogleScope, kind: "mutation" },
   "POST /api/content/google/sources/active": { handler: postGoogleSourceActive, kind: "mutation" },
   // READING and WRITING, for all four. Every write publishes because every write
   // moves the connection's own row: `last_used_at`, plus a history row saying
