@@ -250,7 +250,7 @@ export function SelectableScreen({
           {grouped.map((g) => (
             <div key={g.type} className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">{g.type}</h2>
-              <ul className="divide-border divide-y rounded-xl border">
+              <ul className="divide-border divide-y rounded-[var(--radius)] border">
                 {g.items.map((v) => (
                   <li
                     key={v.id}

@@ -58,7 +58,7 @@ export function CollectionHeading({
       ) : null}
       {t(title)}
       {badge ? (
-        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+        <span className="bg-muted text-muted-foreground rounded-pill px-2 py-0.5 text-xs font-medium">
           {badge}
         </span>
       ) : null}

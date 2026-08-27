@@ -56,7 +56,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
         <section className="motion-panel-in flex flex-col gap-4">
           <List
             surface="none"
-            className="rounded-xl border"
+            className="rounded-[var(--radius)] border"
             items={[
               {
                 id: "profile",

@@ -89,7 +89,7 @@ function Row({
  * collection of two or more rows". Written once so seven panels cannot drift
  * into seven spellings of one list. */
 function RowList({ children }: { children: React.ReactNode }) {
-  return <ul className="divide-border divide-y rounded-xl border">{children}</ul>
+  return <ul className="divide-border divide-y rounded-[var(--radius)] border">{children}</ul>
 }
 
 /** The clickable name of a record, in the URL form the caller arrived through. */

@@ -105,7 +105,7 @@ export function FormShell({
     // 24px inset. That is also why the height cap can be trusted — 85dvh is the
     // dialog's height, not 85dvh plus somebody else's padding.
     <form
-      className="grid max-h-[85dvh] grid-rows-[auto_1fr_auto] overflow-hidden rounded-xl"
+      className="grid max-h-[85dvh] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[var(--radius)]"
       onSubmit={onSubmit}
     >
       <div className="flex flex-col gap-2 px-6 pt-6 pb-4">

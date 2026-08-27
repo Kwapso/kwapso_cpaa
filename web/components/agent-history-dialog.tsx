@@ -79,7 +79,7 @@ export function AgentHistoryDialog({
                       onPick(thread.id)
                     }}
                     disabled={busy}
-                    className="hover:bg-muted flex w-full flex-col items-start gap-1 rounded-xl p-2 text-left disabled:text-ink-disabled"
+                    className="hover:bg-muted flex w-full flex-col items-start gap-1 rounded-[var(--radius)] p-2 text-left disabled:text-ink-disabled"
                   >
                     <span className="line-clamp-1 text-sm font-medium">
                       {thread.id === currentThreadId

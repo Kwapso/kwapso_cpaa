@@ -421,7 +421,7 @@ export function AccountFormDialog({
             <img
               src={coverPreview}
               alt={t("Cover image")}
-              className="h-20 w-full rounded-xl object-cover"
+              className="h-20 w-full rounded-[var(--radius)] object-cover"
             />
           )}
           <FileUpload accept="image/*" multiple={false} onFilesSelected={pickImage("coverUrl")} />

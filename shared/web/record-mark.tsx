@@ -121,7 +121,7 @@ export function RecordMark({
     <span
       aria-hidden
       className={`bg-muted text-muted-foreground grid shrink-0 place-items-center overflow-hidden leading-none ${
-        round ? "rounded-full" : "rounded-xl"
+        round ? "rounded-pill" : "rounded-[var(--radius)]"
       } ${BOX[size]} ${className}`}
     >
       {picture && !broken ? (

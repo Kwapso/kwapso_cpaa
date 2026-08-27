@@ -206,10 +206,10 @@ function ActionButton({
 // force one. Built on the same Radix dialog the library's Dialog/Sheet use.
 const layerContent: Record<ScreenPresentation, string> = {
   responsive:
-    "inset-x-0 bottom-0 max-h-[90svh] rounded-t-xl sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl",
+    "inset-x-0 bottom-0 max-h-[90svh] rounded-t-[var(--radius)] sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[var(--radius)]",
   overlay:
-    "top-1/2 left-1/2 w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-xl",
-  sheet: "inset-x-0 bottom-0 max-h-[90svh] rounded-t-xl",
+    "top-1/2 left-1/2 w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius)]",
+  sheet: "inset-x-0 bottom-0 max-h-[90svh] rounded-t-[var(--radius)]",
   fullscreen: "inset-0 rounded-none",
 }
 
@@ -251,7 +251,7 @@ function ScreenLayer({
                  else. Not an opacity" — an alpha of a token is a colour the
                  palette does not contain. This faded the whole glyph from 70%
                  to 100%; it moves the INK now, between two named tones. */
-              className="text-ink-secondary motion-hover hover:text-foreground rounded-full"
+              className="text-ink-secondary motion-hover hover:text-foreground rounded-pill"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>
@@ -736,7 +736,7 @@ function renderDetail(
   // title in a circle.
   const mark =
     avatarSrc || header?.avatar ? (
-      <Avatar className={header?.avatarShape === "square" ? "rounded-xl" : undefined}>
+      <Avatar className={header?.avatarShape === "square" ? "rounded-[var(--radius)]" : undefined}>
         {avatarSrc ? <AvatarImage src={safeSrc(avatarSrc)} alt="" /> : null}
         {header?.avatar ? <AvatarFallback>{initials(title)}</AvatarFallback> : null}
       </Avatar>

@@ -343,7 +343,7 @@ export function WorkLogsPanel({
       {rows.length === 0 ? (
         <EmptyLine concept="time">{t("No time logged against this yet.")}</EmptyLine>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {rows.map((l) => (
             <li
               key={l.id}

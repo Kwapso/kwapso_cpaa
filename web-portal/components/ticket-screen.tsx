@@ -233,11 +233,11 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       <div className="flex flex-col gap-6">
         {back}
         {oneQ.loading || threadQ.loading ? (
-          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
         ) : (
           // Outside the fence a real id and a made-up one are the same sentence —
           // the door answers null either way, and so do we.
-          <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
+          <p className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
             {t("We can't find that ticket.")}
           </p>
         )}

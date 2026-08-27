@@ -201,7 +201,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         * one button to just sync everything instead of selecting one thing" —
         * which turned out to describe the fix as well as the feature. */}
       {q.data?.ready && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border p-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
           <Button
             onClick={() => {
               window.location.href = "/api/content/google/start?service=all"
@@ -225,7 +225,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           {t("Google connections aren't set up on this environment yet.")}
         </p>
       ) : (
-        <div className="flex flex-col rounded-xl border">
+        <div className="flex flex-col rounded-[var(--radius)] border">
           {GOOGLE_SERVICES.map((service) => {
             const live = liveFor(service)
             const named = sources.filter((s) => s.service === service)
@@ -430,7 +430,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
        * on a not-ready environment the button works until the first token expires
        * and then fails with a message about something the person cannot fix. */}
       {q.data?.ready && connections.length > 0 && can("knowledge", "create") && can("google", "read") && (
-        <div className="flex flex-col gap-2 rounded-xl border p-3">
+        <div className="flex flex-col gap-2 rounded-[var(--radius)] border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">{t("Let the assistant read what you have shared")}</span>
             {/* THE SAME CONTROL THAT IS NOW ON EVERY GOOGLE SCREEN. It used to be

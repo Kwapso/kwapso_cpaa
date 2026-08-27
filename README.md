@@ -198,6 +198,14 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    built vs. to build, and the cross-cutting model resolutions.
 9. **[SCREEN-ENGINE-PLAN.md](SCREEN-ENGINE-PLAN.md)**, the screen-recipe engine and
    the `/t/<teamId>/<module>/<id>` deep-link grammar the team area runs on.
+    **[LAW-RECONCILIATION.md](LAW-RECONCILIATION.md)** sits beside them and is a
+    PROPOSAL rather than a record: the base's seventeen UI laws read against the
+    kit's own rulebook, after the owner ruled on 2026-08-27 that the kit is
+    canon. Its finding is that fourteen of them have no kit counterpart at all —
+    they are product and correctness rules a design kit has no view on — and
+    that nothing in the list deserves deleting. Delete the file once its three
+    proposed edits have landed and its marks are in.
+
 10. **[UI-GAPS.md](UI-GAPS.md)**, the running list of things the component library
     still cannot do (a gap is fixed in the library, once, not worked around on
     each screen that hits it). Its twin pointing the other way is

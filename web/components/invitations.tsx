@@ -80,7 +80,7 @@ export function InvitationsPanel({ refresh }: { refresh: () => Promise<void> }) 
   return (
     <List
       surface="none"
-      className="rounded-xl border"
+      className="rounded-[var(--radius)] border"
       empty={t("No invites waiting for you.")}
       items={invites.map((inv) => ({
         id: inv.id,

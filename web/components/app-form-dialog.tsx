@@ -370,7 +370,7 @@ export function AppFormDialog({
         <div className="flex items-center gap-2">
           <span
             aria-hidden
-            className="bg-muted grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl text-2xl leading-none"
+            className="bg-muted grid size-12 shrink-0 place-items-center overflow-hidden rounded-[var(--radius)] text-2xl leading-none"
           >
             {logoPreview ? (
               // eslint-disable-next-line @next/next/no-img-element

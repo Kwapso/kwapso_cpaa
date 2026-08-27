@@ -81,7 +81,7 @@ export function TeamSwitcher({
       <DropdownMenuTrigger asChild>
         {collapsed ? (
           <button
-            className="rounded-xl ring-offset-2"
+            className="rounded-[var(--radius)] ring-offset-2"
             title={name}
             aria-label={t("Switch team")}
           >

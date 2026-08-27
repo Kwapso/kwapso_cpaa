@@ -70,12 +70,12 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
 
       {loading && !tickets ? (
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+          <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+          <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
         </div>
       ) : (tickets ?? []).length === 0 ? (
-        <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
+        <div className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
           <p>{t("Nothing here yet.")}</p>
           <p className="mt-1 text-sm">
             {t("Anything you ask us, a question, a problem, a change, lives on this page.")}

@@ -153,7 +153,7 @@ function RunawayPrompts({
       {runaways.map((timer) => (
         <div
           key={timer.id}
-          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm"
+          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm"
         >
           <span>
             <AlarmClockOff className="mr-1.5 inline size-3.5" />
@@ -276,7 +276,7 @@ export function TimePanel({
       {logs.length === 0 ? (
         <EmptyLine concept="time">{t("No time logged yet.")}</EmptyLine>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {logs.map((l) => (
             <li key={l.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
               <div className="min-w-0 flex-1">

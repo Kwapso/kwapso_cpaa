@@ -99,7 +99,7 @@ export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
 
   if (view.apps.length === 0)
     return (
-      <div className="rounded-xl border p-4">
+      <div className="rounded-[var(--radius)] border p-4">
         <p className="text-sm font-medium">{t("No value to show yet.")}</p>
         <p className="text-muted-foreground mt-1 text-sm">
           {t("Map a process, write down how long each step took before, and the saving appears here as soon as a step gets faster.")}
@@ -109,7 +109,7 @@ export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border p-4">
+      <div className="rounded-[var(--radius)] border p-4">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-2xl font-medium tracking-tight">
           {hoursText(view.savedSecondsPerMonth)}
@@ -127,7 +127,7 @@ export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
         )}
       </div>
 
-      <Accordion type="multiple" className="rounded-xl border px-4">
+      <Accordion type="multiple" className="rounded-[var(--radius)] border px-4">
         {view.apps.map((app) => (
           <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
             <AccordionTrigger>

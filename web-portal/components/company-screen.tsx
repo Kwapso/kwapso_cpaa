@@ -41,7 +41,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
     return (
       <div className="flex flex-col gap-4">
         <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-[var(--radius)]" />
       </div>
     )
   if (!data) return null

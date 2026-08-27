@@ -185,7 +185,7 @@ export function WaveCollection({
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((w) => (
-              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
+              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
                 {/* R35 — a record never appears without its face. A wave has no
                     picture of its own, so this is its initial. */}
                 <RecordMark name={w.name} />

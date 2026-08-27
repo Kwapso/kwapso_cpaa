@@ -116,7 +116,7 @@ export function ContactsPanel({
       {links.length === 0 ? (
         <EmptyLine concept="contacts">{t("No contacts yet.")}</EmptyLine>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {links.map((l) => (
             <Row key={l.id} active={l.active}>
               <button
@@ -217,7 +217,7 @@ export function PortalAccessPanel({
           {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {portalUsers.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">

@@ -68,7 +68,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 function StaleShell() {
   const t = useT()
   return (
-    <div className="text-muted-foreground flex flex-col items-start gap-2 rounded-xl border p-4 text-sm">
+    <div className="text-muted-foreground flex flex-col items-start gap-2 rounded-[var(--radius)] border p-4 text-sm">
       <p>{t("A new version of the app is ready.")}</p>
       <Button variant="secondary" size="sm" onClick={() => location.reload()}>
         {t("Reload")}
@@ -88,7 +88,7 @@ function Broken({
 }) {
   const t = useT()
   return (
-    <div className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-xl border p-4 text-sm">
+    <div className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-[var(--radius)] border p-4 text-sm">
       {/* ONE SENTENCE PER BRANCH, not "Something broke" plus a tail. The tail was
           a template naming the panel, so the sentence a German reader got was
           half-translated at best and could not be reordered at all. */}

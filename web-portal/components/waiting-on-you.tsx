@@ -77,7 +77,7 @@ export function WaitingOnYou() {
        * short meta, no wrap needed. */}
       <ul className="flex flex-col gap-2">
         {open.map((todo) => (
-          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
+          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border p-4">
             <div className="min-w-0">
               <p className="font-medium">{todo.title}</p>
               {todo.detail && <RichText html={todo.detail} className="text-muted-foreground" />}

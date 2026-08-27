@@ -99,7 +99,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     return (
       <div className="space-y-2">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          <Skeleton key={i} className="h-14 w-full rounded-[var(--radius)]" />
         ))}
       </div>
     )
@@ -121,7 +121,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
           {modules.map((m) => (
             <li
               key={m.id}
-              className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3"
+              className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3"
             >
               {/* THE EMOJI IS THE RECORD'S FACE (R35) — one glyph, and a quiet
                   dot where nobody has chosen one, so the names still line up. */}

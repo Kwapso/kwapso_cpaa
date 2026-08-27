@@ -62,7 +62,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
     <div className="w-full max-w-sm">
       <div className="flex flex-col items-center gap-2 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={safeSrc(brand.logoUrl) ?? "/icons/icon.svg"} alt="" className="size-12 rounded-xl" />
+        <img src={safeSrc(brand.logoUrl) ?? "/icons/icon.svg"} alt="" className="size-12 rounded-[var(--radius)]" />
         <h1 className="text-2xl font-medium tracking-tight">{t("Sign in to")} {brand.name}</h1>
         <p className="text-muted-foreground">
           {step === "email"

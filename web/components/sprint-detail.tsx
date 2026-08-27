@@ -296,7 +296,7 @@ export function SprintDetailScreen({
           two questions on one band is N4's fault. The cross-links stay in the
           header, because they ARE who and what. */}
       {canEdit && !sprint.completedAt && (
-        <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-sm">
+        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] border p-3 text-sm">
           {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
         </p>
       )}

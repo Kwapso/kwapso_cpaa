@@ -144,7 +144,7 @@ export function TimerBar({
         return (
           <div
             key={timer.id}
-            className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+            className={`flex items-center gap-1 rounded-pill border px-2 py-0.5 text-xs ${
               timer.runaway ? "border-destructive/40 text-destructive" : ""
             }`}
           >

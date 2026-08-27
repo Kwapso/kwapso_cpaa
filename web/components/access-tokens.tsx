@@ -149,7 +149,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       ) : tokens.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No tokens yet.")}</p>
       ) : (
-        <div className="flex flex-col rounded-xl border">
+        <div className="flex flex-col rounded-[var(--radius)] border">
           {tokens.map((token) => (
             <div
               key={token.id}
@@ -243,7 +243,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 {teamName ?? t("this team")}. Treat it like a password. It works for{" "}
                 {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
               </DialogDescription>
-              <div className="bg-muted/60 flex items-center gap-2 rounded-xl border p-3">
+              <div className="bg-muted/60 flex items-center gap-2 rounded-[var(--radius)] border p-3">
                 <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
                 <Button
                   variant="secondary"

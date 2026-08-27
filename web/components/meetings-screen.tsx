@@ -483,7 +483,7 @@ export function MeetingsScreen({
        * card there would be wrong. Here it is the foot of a list, so it gets a
        * card. */}
       {canCreate && (
-        <div className="flex flex-col gap-3 rounded-xl border p-4">
+        <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
           <GoogleSyncButton
             teamId={teamId}
             scope="both"

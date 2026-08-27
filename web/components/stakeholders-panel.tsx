@@ -71,7 +71,7 @@ function Group({ title, people, empty, mainLabel }: { title: string; people: Sid
       {people.length === 0 ? (
         <p className="text-muted-foreground text-sm">{empty}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {people.map((p) => (
             <PersonRow key={p.id} p={p} mainLabel={mainLabel} />
           ))}

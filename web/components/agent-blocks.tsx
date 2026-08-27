@@ -150,7 +150,7 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
 function TableBlock({ block }: { block: Extract<AgentBlock, { kind: "table" }> }) {
   return (
     <BlockFrame title={block.title}>
-      <div className="rounded-xl border">
+      <div className="rounded-[var(--radius)] border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -203,7 +203,7 @@ function StepsBlock({ block }: { block: Extract<AgentBlock, { kind: "steps" }> }
             {/* The number and the rule under it are one column, so the line joins
                 consecutive steps and stops at the last one. */}
             <div className="flex flex-col items-center">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground tabular-nums">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-secondary text-xs font-medium text-secondary-foreground tabular-nums">
                 {i + 1}
               </span>
               {i < block.steps.length - 1 && <span className="w-px grow bg-border" aria-hidden="true" />}
@@ -253,7 +253,7 @@ function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) 
           const jumps = block.edges.filter((e) => e.from === node.id && e !== onward)
           return (
             <div key={node.id} className="flex min-w-0 flex-col">
-              <div className="rounded-xl border px-3 py-2">
+              <div className="rounded-[var(--radius)] border px-3 py-2">
                 <div className="text-sm text-foreground">{node.label}</div>
                 {node.note && <div className="text-xs text-muted-foreground">{node.note}</div>}
               </div>

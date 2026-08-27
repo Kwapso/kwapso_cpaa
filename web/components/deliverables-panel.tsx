@@ -177,7 +177,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
             return (
               <li
                 key={d.id}
-                className={`bg-card flex flex-col overflow-hidden rounded-xl ${d.active ? "" : "opacity-60"}`}
+                className={`bg-card flex flex-col overflow-hidden rounded-[var(--radius)] ${d.active ? "" : "opacity-60"}`}
               >
                 <RecordCover
                   picture={d.imageUrl}

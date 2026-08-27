@@ -36,7 +36,7 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="rounded-full ring-offset-2">
+        <button className="rounded-pill ring-offset-2">
           <Avatar className="size-8">
             {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={t("You")} />}
             <AvatarFallback className="text-xs">

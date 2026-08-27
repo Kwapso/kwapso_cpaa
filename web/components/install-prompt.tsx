@@ -109,10 +109,10 @@ export function InstallPrompt() {
 
   return (
     <Sheet open={open} onOpenChange={(o) => (o ? setOpen(true) : dismiss())}>
-      <SheetContent side="bottom" className="rounded-t-xl">
+      <SheetContent side="bottom" className="rounded-t-[var(--radius)]">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4">
           <SheetHeader className="flex flex-row items-center gap-2">
-            <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
+            <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-[var(--radius)]">
               <Download className="size-5" />
             </span>
             <div className="min-w-0">

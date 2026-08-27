@@ -104,7 +104,7 @@ export function MarginPanel({
   const nothingYet = m.revenueCents === 0 && m.timeCostCents === 0 && m.toolCostCents === 0
   if (nothingYet)
     return (
-      <div className="rounded-xl border p-4">
+      <div className="rounded-[var(--radius)] border p-4">
         <p className="text-sm font-medium">{t("Nothing to weigh up yet.")}</p>
         <p className="text-muted-foreground mt-1 text-sm">
           {t("Sell")} {accountName} {t("a sprint and log some time against it, and what the work leaves us appears here.")}
@@ -116,7 +116,7 @@ export function MarginPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border p-4">
+      <div className="rounded-[var(--radius)] border p-4">
         <p className="text-muted-foreground text-sm">{t("What this account leaves us")}</p>
         <p
           className={`text-2xl font-medium tracking-tight tabular-nums ${down ? "text-destructive" : ""}`}
@@ -155,7 +155,7 @@ export function MarginPanel({
         )}
       </div>
 
-      <div className="rounded-xl border px-4 py-1">
+      <div className="rounded-[var(--radius)] border px-4 py-1">
         <Line label={t("Sold")} detail="Everything priced on this account's sprints" cents={m.revenueCents} />
         {m.lines.map((l) => (
           <Line

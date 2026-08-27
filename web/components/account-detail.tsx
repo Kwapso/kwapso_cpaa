@@ -689,10 +689,10 @@ export function AccountDetailScreen({
                     pasted URL, and the pictures in it came from an account
                     being cancelled. `RecordCover` renders exactly what having
                     no cover renders when the picture will not load: nothing. */}
-                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-xl object-cover sm:h-40" />
+                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-[var(--radius)] object-cover sm:h-40" />
                 <OverviewList items={overviewItems} />
                 {account.about && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
                       {t("About")}
                     </p>
@@ -725,7 +725,7 @@ export function AccountDetailScreen({
                     a figure a client cannot account for is worse than no figure
                     at all. */}
                 {moneyBack && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
                     <p className="text-2xl font-medium tracking-tight tabular-nums">{moneyBack}</p>
                     <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>

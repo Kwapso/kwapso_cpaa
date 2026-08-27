@@ -114,7 +114,7 @@ export function DeliverablesScreen() {
       <section>
         <CollectionHeading label={t("What we handed over")} total={total} />
         {rows.length === 0 ? (
-          <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
+          <div className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
             <p>{t("Nothing here yet.")}</p>
             <p className="mt-1 text-sm">
               {t("When we hand something over and share it with you, it turns up here.")}
@@ -134,19 +134,19 @@ export function DeliverablesScreen() {
                     return (
                       <li
                         key={d.id}
-                        className="flex flex-wrap items-center gap-3 rounded-xl border p-4"
+                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-4"
                       >
                         {picture ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={picture}
                             alt=""
-                            className="size-12 shrink-0 rounded-xl object-cover"
+                            className="size-12 shrink-0 rounded-[var(--radius)] object-cover"
                           />
                         ) : (
                           <span
                             aria-hidden
-                            className="bg-muted text-muted-foreground grid size-12 shrink-0 place-items-center rounded-xl text-lg font-medium"
+                            className="bg-muted text-muted-foreground grid size-12 shrink-0 place-items-center rounded-[var(--radius)] text-lg font-medium"
                           >
                             {initial(d)}
                           </span>

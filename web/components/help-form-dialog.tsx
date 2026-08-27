@@ -348,7 +348,7 @@ export function HelpFormDialog({
         <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
           <div className="flex flex-col gap-2">
             {pending.length > 0 && (
-              <ul className="divide-border divide-y rounded-xl border">
+              <ul className="divide-border divide-y rounded-[var(--radius)] border">
                 {pending.map((file, i) => (
                   <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
                     <Paperclip className="text-muted-foreground size-3.5 shrink-0" />

@@ -158,7 +158,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -377,7 +377,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
           {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {rates.map((r) => (
             <li
               key={r.id}

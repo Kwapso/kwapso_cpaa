@@ -169,7 +169,7 @@ export function TimeFormDialog({
           // row from a story to a ticket, so a picker here would offer a change
           // the server would quietly drop; on a new entry opened from a record
           // because the record IS the answer.
-          <p id="time-target" className="text-muted-foreground border-border/60 rounded-xl border px-3 py-2 text-sm">
+          <p id="time-target" className="text-muted-foreground border-border/60 rounded-[var(--radius)] border px-3 py-2 text-sm">
             {fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")}
           </p>
         ) : (

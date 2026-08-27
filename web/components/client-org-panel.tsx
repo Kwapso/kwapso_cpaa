@@ -207,7 +207,7 @@ export function ClientOrgPanel({
     return (
       <div className="space-y-2">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          <Skeleton key={i} className="h-14 w-full rounded-[var(--radius)]" />
         ))}
       </div>
     )
@@ -229,7 +229,7 @@ export function ClientOrgPanel({
         ) : (
           <ul className="flex flex-col gap-2">
             {departments.map((d) => (
-              <li key={d.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
+              <li key={d.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
                 <div className="min-w-0 flex-1 basis-[12rem]">
                   <p className="truncate text-sm font-medium">{d.name}</p>
                   <p className="text-muted-foreground text-xs">
@@ -273,7 +273,7 @@ export function ClientOrgPanel({
         ) : (
           <ul className="flex flex-col gap-2">
             {roles.map((r) => (
-              <li key={r.id} className="bg-card flex flex-col gap-2 rounded-xl border p-3">
+              <li key={r.id} className="bg-card flex flex-col gap-2 rounded-[var(--radius)] border p-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1 basis-[12rem]">
                     <p className="truncate text-sm font-medium">{r.name}</p>
@@ -321,7 +321,7 @@ export function ClientOrgPanel({
                           size="sm"
                           variant={on ? "secondary" : "ghost"}
                           disabled={!canEdit}
-                          className="h-7 rounded-full px-3 text-xs"
+                          className="h-7 rounded-pill px-3 text-xs"
                           onClick={() => void toggleDepartment(r, d.id)}
                         >
                           {d.name}
@@ -345,7 +345,7 @@ export function ClientOrgPanel({
                           size="sm"
                           variant={on ? "secondary" : "ghost"}
                           disabled={!canEdit}
-                          className="h-7 rounded-full px-3 text-xs"
+                          className="h-7 rounded-pill px-3 text-xs"
                           onClick={() => void togglePerson(r, c.personAccountId)}
                         >
                           {c.personName}
@@ -387,7 +387,7 @@ export function ClientOrgPanel({
         ) : (
           <ul className="flex flex-col gap-2">
             {tools.map((x) => (
-              <li key={x.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
+              <li key={x.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
                 <span aria-hidden className="w-6 shrink-0 text-center text-lg">
                   {x.mark || "·"}
                 </span>

@@ -248,7 +248,7 @@ function CollectionFrame<T>({
                         {canClear && (
                           <span
                             aria-hidden
-                            className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
+                            className="absolute top-1 right-1 size-1.5 rounded-pill bg-primary"
                           />
                         )}
                       </Button>
@@ -302,7 +302,7 @@ function CollectionFrame<T>({
         })()}
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[var(--radius)] border border-dashed p-8 text-center text-sm text-muted-foreground">
           {/* aria-hidden by construction: the sentence under it already says
               what this is. The icon comes from the kit's set by name; a name
               the kit lacks renders nothing, same contract as the old

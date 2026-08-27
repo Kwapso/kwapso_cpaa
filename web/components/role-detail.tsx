@@ -231,7 +231,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           // Permissions — the main tab.
           return !role.active ? (
             // Deactivated: permissions frozen (holders keep access); offer reactivate.
-            <div className="border-border/60 flex flex-col gap-4 rounded-xl border p-6">
+            <div className="border-border/60 flex flex-col gap-4 rounded-[var(--radius)] border p-6">
               <p className="text-muted-foreground text-sm">
                 {t("This role is deactivated. Members who have it keep their access, but you can't give it to anyone new until you activate it again.")}
               </p>
@@ -247,7 +247,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
               )}
             </div>
           ) : permsQ.loading || !matrixModules || !draft ? (
-            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

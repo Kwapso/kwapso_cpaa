@@ -86,7 +86,7 @@ export function AgentPanel({
                   <button
                     type="button"
                     onClick={() => setUsageOpen(true)}
-                    className="rounded-full"
+                    className="rounded-pill"
                     title={t("See where your assistant credits went")}
                   >
                     <Badge

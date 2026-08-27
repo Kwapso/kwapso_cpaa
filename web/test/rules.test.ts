@@ -2174,7 +2174,7 @@ describe("RULES — the laws of the base", () => {
   // thumbnail it is a genuinely different value doing a genuinely different job.
   // Folding it into the vocabulary would put a lozenge round every highlighted
   // word, which is a redesign wearing a sweep's clothes.
-  it("two-radii: only rounded-xl, rounded-t-xl and rounded-full ship (R31)", () => {
+  it("two-radii: only rounded-[var(--radius)] and rounded-pill ship (R31)", () => {
     // `shared/rules/` is the LAW BOOK — prose ABOUT the code, not code that
     // renders. R31's own sentence names the steps it forbids, so a scan that
     // read it would go red on the rule's own text.
@@ -2192,7 +2192,23 @@ describe("RULES — the laws of the base", () => {
     for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
       if (f.path.startsWith(lawBook)) continue
       for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)*(?:\[[^\]]+\]|[a-z0-9]+)/g) ?? []) {
-        if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
+        // THE TAILWIND STEP NAMES ARE FORBIDDEN NOW, not merely tolerated —
+        // kit RULES.md §4.2, adopted 2026-08-27 when the kit became canon.
+        // `rounded-xl` and `rounded-lg` DO render at 24, but only because
+        // tokens.css happens to load after Tailwind's theme: Tailwind emits
+        // `--radius-lg: 0.5rem`, tokens.css emits `1.5rem`, and the kit wins by
+        // cascade order alone. 184 corners across both front doors were correct
+        // by IMPORT ORDER rather than by declaration, and nothing here stood
+        // under that — reorder globals.css and every card silently becomes 12px
+        // with the suite still green. `rounded-pill` and
+        // `rounded-[var(--radius)]` say the value instead of inheriting it.
+        if (/^rounded-(?:[tbse]-)?(?:xl|lg|2xl|3xl|md|sm|full)$/.test(hit))
+          offenders.push(
+            `${f.rel}: ${hit} — kit §4.2 forbids the Tailwind step names. ` +
+              `Write rounded-[var(--radius)] for a box, rounded-pill for a pill.`
+          )
+        if (/^rounded-(?:[tbse]-)?(?:xl|lg|2xl|3xl|md|sm|full)$/.test(hit) || hit === "rounded-none") continue
+        if (hit === "rounded-pill") continue // the kit's pill word, now the primary spelling
         // The kit's one-edge spellings of the SAME two radii, through its
         // tokens: the `rounded-t-xl` move in token clothing (R31's law text).
         // …and any bracket spelling that RESOLVES THROUGH A RADIUS TOKEN

@@ -74,7 +74,7 @@ export function CodeInput({
           // because the cell is built from the library `Input`, and an input IS
           // a pill in this system — so without the override the six cells
           // render as six circles. 44 x 52 and tabular, per the kit's spec.
-          className="h-13 w-11 rounded-xl px-0 text-center text-lg font-medium tabular-nums"
+          className="h-13 w-11 rounded-[var(--radius)] px-0 text-center text-lg font-medium tabular-nums"
         />
       ))}
     </div>

@@ -492,7 +492,7 @@ export function ContactDetailScreen({
                     it. The remaining refusals belong to the door: a ring, and an
                     account outside the caller's fence. */}
                 {canEdit && (
-                  <div className="flex flex-col gap-3 rounded-xl border p-4">
+                  <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       {t("Parent account")}
                     </p>
@@ -529,7 +529,7 @@ export function ContactDetailScreen({
                   </div>
                 )}
                 {account.about && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
                       {t("About")}
                     </p>

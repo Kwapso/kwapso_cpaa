@@ -214,7 +214,7 @@ export function RecordTable<T extends TableRowData>({
       searchKeys={columns.map((c) => c.key) as (keyof T)[]}
       className={className}
       renderItems={(page) => (
-        <div className="overflow-hidden rounded-xl border">
+        <div className="overflow-hidden rounded-[var(--radius)] border">
           <Table>
             <TableHeader>
               <TableRow>

@@ -533,7 +533,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                     <Skeleton variant="list" lines={3} />
                   ) : transcriptQ.data.text ? (
                     <>
-                      <div className="max-h-96 overflow-y-auto rounded-xl border p-3">
+                      <div className="max-h-96 overflow-y-auto rounded-[var(--radius)] border p-3">
                         <p className="text-sm whitespace-pre-wrap">{transcriptQ.data.text}</p>
                       </div>
                       {/* NEVER SILENTLY TRIMMED. A transcript longer than one
@@ -680,7 +680,7 @@ function CalendarPanel({
         {people.length === 0 ? (
           <EmptyLine concept="members">{t("Nobody else is on the invitation.")}</EmptyLine>
         ) : (
-          <div className="flex flex-col rounded-xl border">
+          <div className="flex flex-col rounded-[var(--radius)] border">
             {people.map((g) => {
               const known = linkFor.get(g.email)
               return (
@@ -734,7 +734,7 @@ function CalendarPanel({
       {meeting.googleAttachments.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-muted-foreground text-sm font-medium">{t("Attached to the entry")}</h2>
-          <div className="flex flex-col rounded-xl border">
+          <div className="flex flex-col rounded-[var(--radius)] border">
             {meeting.googleAttachments.map((a) => (
               <a
                 key={a.fileId || a.url || a.title}

@@ -166,14 +166,14 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
       <CollectionHeading label={t("Files and links")} total={total} />
 
       {listQ.loading && !listQ.data ? (
-        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
       ) : attachments.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {t("Nothing attached yet. A screenshot often explains it faster than a paragraph.")}
         </p>
       ) : (
         // K5: one container, rows separated by a hairline — never a box each.
-        <ul className="divide-y rounded-xl border">
+        <ul className="divide-y rounded-[var(--radius)] border">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? Paperclip : Link2

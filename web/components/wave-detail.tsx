@@ -249,7 +249,7 @@ export function WaveDetailScreen({
           blocks anything: the sprints are in the package, and this says what
           somebody would otherwise have to work out from two date ranges. */}
       {overlaps.length > 0 && (
-        <div className="bg-warning/10 flex flex-col gap-1 rounded-xl p-3 text-sm">
+        <div className="bg-warning/10 flex flex-col gap-1 rounded-[var(--radius)] p-3 text-sm">
           <p className="font-medium text-warning">{t("Two sprints in this wave run over each other.")}</p>
           {overlaps.map((o) => (
             <p key={`${o.firstId}-${o.secondId}`} className="text-muted-foreground">
@@ -312,7 +312,7 @@ export function WaveDetailScreen({
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {sprints.map((s) => (
-                      <li key={s.id} className="bg-card flex items-center gap-3 rounded-xl border p-3">
+                      <li key={s.id} className="bg-card flex items-center gap-3 rounded-[var(--radius)] border p-3">
                         {/* R35 — a record row carries its face. */}
                         <RecordMark name={s.name} />
                         <div className="min-w-0 flex-1">
