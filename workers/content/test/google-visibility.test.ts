@@ -41,6 +41,9 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { calendarList, chatMessages, driveFileText, driveList } from "../src/lib/google-api"
 
+/** The reader env, reduced to the one binding a reader may touch. */
+const readerEnv = { AI: { toMarkdown: async () => ({ data: "" }) } } as never
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -145,7 +148,7 @@ describe("a shortcut is not a document, and the words say which", () => {
       return new Response("", { status: 403 })
     })
 
-    expect(await driveFileText("tok", "SHORTCUT_ID")).toBe("what was said")
+    expect(await driveFileText(readerEnv, "tok", "SHORTCUT_ID")).toBe("what was said")
     // It read the TARGET, and asked Google about it rather than guessing.
     expect(urls.some((u) => u.includes("REAL_DOC") && u.includes("export"))).toBe(true)
   })
@@ -160,7 +163,7 @@ describe("a shortcut is not a document, and the words say which", () => {
           ? { mimeType: "application/vnd.google-apps.document" }
           : SHORTCUT
     )
-    await expect(driveFileText("tok", "SHORTCUT_ID")).resolves.toBe("")
+    await expect(driveFileText(readerEnv, "tok", "SHORTCUT_ID")).resolves.toBe("")
   })
 })
 

@@ -182,7 +182,7 @@ function xmlText(xml: string): string {
     .trim()
 }
 
-async function officeText(bytes: Uint8Array): Promise<string> {
+export async function officeText(bytes: Uint8Array): Promise<string> {
   const parts = await unzip(bytes, officeParts(""))
   if (!parts.length) return ""
   // Slides in order, then everything else — a deck read out of order is a deck

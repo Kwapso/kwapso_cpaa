@@ -89,7 +89,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
               },
             ]
       ),
-    driveFileText: async (_t: string, fileId: string) =>
+    driveFileText: async (_e: unknown, _t: string, fileId: string) =>
       holder.driveText.get(fileId) ??
       (fileId === "FILE_1"
         ? "The dispatch screen keeps logging drivers out. Agreed to move the driver app forward."

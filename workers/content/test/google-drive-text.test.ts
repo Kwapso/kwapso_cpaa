@@ -25,6 +25,11 @@ import { describe, expect, it, vi } from "vitest"
 
 import { driveFileText } from "../src/lib/google-api"
 
+/** The reader env, reduced to the one binding a reader may touch. `toMarkdown`
+ * answers nothing here on purpose: these tests are about Google's side of the
+ * call, and a converter that returned text would hide a download that failed. */
+const env = { AI: { toMarkdown: async () => ({ data: "" }) } } as never
+
 /** Google, reduced to the two calls this function makes: metadata, then bytes.
  * `download` decides what the SECOND call answers — the whole point of the
  * suite is that its failures are graded, so each test states one. */
@@ -51,7 +56,7 @@ describe("driveFileText — one file's refusal is not the folder's", () => {
       download: { status: 200, body: "the minutes" },
     })
 
-    expect(await driveFileText("tok", "file1")).toBe("the minutes")
+    expect(await driveFileText(env, "tok", "file1")).toBe("the minutes")
 
     const exportUrl = urls.find((u) => u.includes("/export"))
     expect(exportUrl, "a Google Doc is exported, not downloaded").toBeDefined()
@@ -62,29 +67,29 @@ describe("driveFileText — one file's refusal is not the folder's", () => {
 
   it("downloads an ordinary file as-is", async () => {
     stubGoogle({ mimeType: "text/plain", download: { status: 200, body: "plain words" } })
-    expect(await driveFileText("tok", "file2")).toBe("plain words")
+    expect(await driveFileText(env, "tok", "file2")).toBe("plain words")
   })
 
   it("treats a file Google won't hand over as EMPTY, not as a lost connection", async () => {
     stubGoogle({ mimeType: "text/plain", download: { status: 403 } })
     // The regression. This threw, and the throw escaped the caller's loop.
-    await expect(driveFileText("tok", "locked")).resolves.toBe("")
+    await expect(driveFileText(env, "tok", "locked")).resolves.toBe("")
   })
 
   it("still refuses loudly when the TOKEN is rejected mid-read", async () => {
     stubGoogle({ mimeType: "text/plain", download: { status: 401 } })
-    await expect(driveFileText("tok", "file3")).rejects.toMatchObject({
+    await expect(driveFileText(env, "tok", "file3")).rejects.toMatchObject({
       code: "google_access_lost",
     })
   })
 
   it("keeps treating a file with no text representation as empty", async () => {
     stubGoogle({ mimeType: "image/png", download: { status: 415 } })
-    expect(await driveFileText("tok", "picture")).toBe("")
+    expect(await driveFileText(env, "tok", "picture")).toBe("")
   })
 
   it("caps one file's text so a 400-page document is not a worker's memory budget", async () => {
     stubGoogle({ mimeType: "text/plain", download: { status: 200, body: "x".repeat(250_000) } })
-    expect((await driveFileText("tok", "huge")).length).toBe(100_000)
+    expect((await driveFileText(env, "tok", "huge")).length).toBe(100_000)
   })
 })

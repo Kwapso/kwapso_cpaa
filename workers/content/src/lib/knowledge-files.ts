@@ -44,73 +44,17 @@
 // round-trip to be told what we already have.
 
 import { GuardError } from "@shared/workers/gating"
+import { readersFor, runReader } from "./source-readers"
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import type { Env } from "../env"
 
-/** WHAT `toMarkdown` CAN READ TODAY — Cloudflare's own published table
- * (developers.cloudflare.com/workers-ai/features/markdown-conversion/supported-formats),
- * read on 2026-08-14 and written down here rather than linked, because a
- * capability we depend on has to be visible at the code that depends on it.
- *
- * Matched on the DECLARED mime first and the file's EXTENSION second: a browser
- * that has never met `.numbers` sends `application/octet-stream`, and the name
- * is then the only thing that knows. Neither is trusted for anything but this
- * choice — a wrong guess costs one conversion attempt, whose failure is already
- * handled below.
- *
- * If this list is stale, the failure is soft and honest in both directions: a
- * newly-supported format we have not listed is stored and labelled unreadable
- * (a person can re-upload it once the list catches up), and a format dropped
- * from the service comes back as a conversion error, which is the same
- * "stored, not searchable" ending by the other road. Nothing silently claims to
- * have been read. */
-const CONVERTIBLE_MIMES = new Set([
-  "application/pdf",
-  // Images: object detection + a description, on Workers AI. The one family
-  // here that is a JUDGEMENT rather than a reading — see `convert`.
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/svg+xml",
-  "image/gif",
-  "image/bmp",
-  "text/html",
-  "application/xml",
-  // Microsoft Office — spreadsheets and Word. NOT PowerPoint: the service does
-  // not list it, and a deck is one of the likeliest things to be dropped here.
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel.sheet.macroenabled.12",
-  "application/vnd.ms-excel.sheet.binary.macroenabled.12",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  // Open Document
-  "application/vnd.oasis.opendocument.spreadsheet",
-  "application/vnd.oasis.opendocument.text",
-  "text/csv",
-  "application/vnd.apple.numbers",
-])
+/* THE FORMAT LISTS THAT USED TO LIVE HERE ARE GONE, and their absence is the
+ * point of R42. This door kept its own idea of what could be read and the Drive
+ * lane kept a different one, so the same PDF was searchable through one door and
+ * page geometry through the other. Both now ask `source-readers.ts`, which is the
+ * only file that decides. Deleting these three lists is what the registry bought;
+ * nothing was added to replace them here. */
 
-/** The same list by file extension, for the case where the browser declared
- * nothing useful. Kept beside the mimes rather than derived from them: the
- * service's own table lists extensions the mime set does not name one-to-one
- * (`.htm`, `.et`, `.xls`), and a derivation would quietly drop them. */
-const CONVERTIBLE_EXTENSIONS = new Set([
-  "pdf",
-  "jpeg", "jpg", "png", "webp", "svg", "gif", "bmp",
-  "html", "htm",
-  "xml",
-  "xlsx", "xlsm", "xlsb", "xls", "et", "docx",
-  "ods", "odt",
-  "csv",
-  "numbers",
-])
-
-/** FILES THAT ARE ALREADY THEIR OWN WORDS. Decoded here, never converted. The
- * extension list is what a person's desktop actually holds; `text/*` catches the
- * rest, because anything a browser is willing to call text is text. */
-const PLAIN_TEXT_EXTENSIONS = new Set([
-  "txt", "md", "markdown", "log", "json", "yaml", "yml", "rtf", "tsv",
-])
 
 /** WHAT WE CAN SAY ABOUT A FILE WE COULD NOT READ, by the family it belongs to.
  * A person who is told "we can't read this" wants to know whether that is a
@@ -138,21 +82,10 @@ export type ExtractedFile = {
   note: string | null
 }
 
-/** How long we will wait for one document to be converted.
- *
- * R11 EXEMPTS THIS AND IT IS WRITTEN ANYWAY. The law's own sentence is that a
- * BINDING call is Cloudflare-bounded and therefore exempt, and `env.AI` is a
- * binding — the same reason `env.AI.run` on the embedding path carries no
- * signal. But a conversion is not an embedding: it is a variable amount of work
- * on a file whose size a person chose, on a service marked Beta, and the thing
- * R11 exists to prevent (one slow sub-request holding a worker open while a
- * person watches a spinner) is exactly the failure available here. So the
- * ceiling is written, and what happens past it is the same honest ending as any
- * other conversion failure: the file is kept, and it says it could not be read.
- *
- * Twenty seconds is roughly a large scanned PDF's real conversion time with
- * room to spare, and well inside the request the caller is waiting on. */
-const CONVERT_TIMEOUT_MS = 20_000
+/* The conversion ceiling moved to source-readers.ts with the conversion itself.
+ * It was twenty seconds because that is a large scanned PDF's real conversion
+ * time with room to spare and well inside the request a person is waiting on —
+ * and the sweep, which was never given it, wants it for the same reason. */
 
 /** The file's extension, lowercased, or "". */
 function extensionOf(fileName: string): string {
@@ -167,12 +100,15 @@ export function readability(
   contentType: string,
   fileName: string
 ): "text" | "convert" | "unreadable" {
-  const ext = extensionOf(fileName)
-  if (contentType.startsWith("text/") && !CONVERTIBLE_MIMES.has(contentType)) return "text"
-  if (PLAIN_TEXT_EXTENSIONS.has(ext)) return "text"
-  if (CONVERTIBLE_MIMES.has(contentType)) return "convert"
-  if (CONVERTIBLE_EXTENSIONS.has(ext)) return "convert"
-  return "unreadable"
+  // R42: DERIVED FROM THE TABLE, not from lists this door keeps. It kept its own
+  // until 27 Aug 2026, and the Drive lane kept different ones, which is how the
+  // same PDF was searchable through one door and page geometry through the other.
+  // The three words this returns are the DOOR's vocabulary — what it says to the
+  // person before anything is stored — and they are now a reading of the one
+  // table rather than a second opinion about it.
+  const readers = readersFor(fileName, contentType)
+  if (!readers.length) return "unreadable"
+  return readers[0] === "plain" ? "text" : "convert"
 }
 
 /** The sentence for a file whose words we cannot get at. */
@@ -229,10 +165,13 @@ export async function extractFile(
 ): Promise<ExtractedFile> {
   if (!file.bytes.length) throw new GuardError(400, "invalid_input", "That file is empty.")
 
-  const how = readability(file.contentType, file.fileName)
-  if (how === "unreadable") return { text: null, note: unreadableNote(file.fileName) }
+  // R42: WHICH READERS, AND IN WHAT ORDER, IS THE TABLE'S ANSWER. This door still
+  // owns what it SAYS about each ending — it has a person waiting and the sweep
+  // does not — but it no longer owns the choosing.
+  const readers = readersFor(file.fileName, file.contentType)
+  if (!readers.length) return { text: null, note: unreadableNote(file.fileName) }
 
-  if (how === "text") {
+  if (readers[0] === "plain") {
     // `fatal: false` on purpose: a log file with one bad byte in it is still a
     // log file, and the replacement character is a truer answer than refusing.
     const decoded = new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(file.bytes).trim()
@@ -242,36 +181,26 @@ export async function extractFile(
   }
 
   try {
-    const converted = await withTimeout(
-      env.AI.toMarkdown(
-        {
-          name: file.fileName,
-          // The type the browser declared, handed on so the converter can pick a
-          // reader. It is not trusted anywhere else — the stored object is
-          // labelled application/octet-stream regardless (shared/workers/image.ts).
-          blob: new Blob([file.bytes as unknown as ArrayBuffer], { type: file.contentType }),
-        },
-        // NO PDF METADATA, and this is a MEASURED decision rather than a
-        // preference. The converter's default prepends the file's producer,
-        // creation date, PDF version and half a dozen `IsSomethingPresent=false`
-        // lines to the markdown. On the first real document put through this
-        // door — a one-page runbook — that preamble was 80% of the 834 bytes
-        // extracted, and it was what came back as the PASSAGE when the runbook
-        // was asked about: an answer quoting "PDFFormatVersion=1.3" at somebody
-        // who asked about a dispatch window. It also poisons the embedding,
-        // because every PDF in the base then shares four hundred identical
-        // characters and therefore resembles every other PDF more than it
-        // resembles any question.
-        { conversionOptions: { pdf: { metadata: false } } }
-      ),
-      CONVERT_TIMEOUT_MS
-    )
-    if (converted.format === "error")
+    // EACH DECLARED READER IN ORDER — which is what buys `.docx` and `.xlsx` a
+    // free fallback when the converter is unavailable, and what will buy the next
+    // format one without editing this door.
+    let text = ""
+    let why = ""
+    for (const reader of readers) {
+      const out = await runReader(reader, env, {
+        bytes: file.bytes,
+        name: file.fileName,
+        mime: file.contentType,
+      })
+      why = out.error ?? why
+      text = out.text
+      if (text) break
+    }
+    if (!text && why)
       return {
         text: null,
-        note: `We couldn't read this file (${converted.error}). It is kept here, but the assistant can't answer from it.`,
+        note: `We couldn't read this file (${why}). It is kept here, but the assistant can't answer from it.`,
       }
-    const text = (converted.data ?? "").trim()
     return text
       ? capToRow(text)
       : {
@@ -290,14 +219,7 @@ export async function extractFile(
   }
 }
 
-/** The R11-shaped ceiling on a binding call that has no AbortSignal of its own.
- * The conversion keeps running in the background if it is slow; what this bounds
- * is how long the PERSON waits, which is the thing that was at risk. */
-function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    work,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`conversion timed out after ${ms}ms`)), ms)
-    ),
-  ])
-}
+/* `CONVERT_TIMEOUT_MS` and `withTimeout` moved to source-readers.ts with the
+ * conversion itself: the ceiling belongs to the reader, so the sweep gets it too
+ * rather than only the door that happened to be written first. */
+

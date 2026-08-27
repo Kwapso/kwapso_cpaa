@@ -430,3 +430,58 @@ The lesson is not "check the code". It is: **when an instrument and a person
 disagree, measure the instrument.** Every one of these was found by asking what
 the check would say if the thing it guards were deleted — which is the only
 question that distinguishes a passing check from a blind one.
+
+
+---
+
+## R42 — BUILT AND ENFORCED, NOT YET REGISTERED (27 Aug 2026)
+
+**The law: every accepted source type resolves to a declared reader on EVERY
+door, or to an honest refusal — and no door chooses its own.**
+
+The table is `workers/content/src/lib/source-readers.ts`; the check is
+`workers/content/test/source-readers.test.ts` and it runs in `npm run check`
+today. What is NOT done is the ceremony that makes it a Law of the Base, and it
+is left undone deliberately: registering it edits **CLAUDE.md**, and that file is
+the owner's. A session should not add itself to the law-book on a colleague's
+say-so.
+
+Everything needed is below. Applying it is four edits and one command.
+
+1. **`shared/rules/registry.ts`** — after the R39 entry:
+
+   ```ts
+   {
+     id: "R42",
+     dimension: "arch",
+     law: "Every accepted source type resolves to a declared reader on EVERY door, or to an honest refusal — and no door chooses its own.",
+     checkId: "declared-readers",
+     status: "enforced",
+   },
+   ```
+
+2. **`web/test/rules.test.ts`**, the `known` set in *every enforced law has a
+   known check* — add `"declared-readers", // R42: workers/content/test/source-readers.test.ts`.
+
+3. **`RULES.md`** — one row after R39, id `R42`, dimension `arch`, check
+   `declared-readers`, status `enforced`. The earned-by paragraph is the one
+   worth keeping: the app had both readers, no table, and the reader was picked
+   at the call site — so a PDF somebody uploaded was searchable and the same PDF
+   in a Drive folder was 46 chunks of page geometry, and every PDF in the base
+   scored 0.000 on letter-shaped tokens. Nobody decided that.
+
+4. **The `R1–R39` range**, which `doc-claims` will name for you the moment the
+   registry moves: `CLAUDE.md`, `README.md`, and BUILD-1/2/3 in this folder.
+
+Then `npm run check`. The check is what fails if any of it is missed — which is
+the point of the keystone rule, and the reason this handover is safe to leave
+half-applied: the LAW is enforced now; only its entry in the book is pending.
+
+### Why the last clause is the load-bearing one
+
+Two readers existed for years and both were correct. The defect was that neither
+door asked anything — each picked at the call site — so the same file got a
+different answer depending on which way it came in. The check therefore censuses
+both doors off the disk, with comments stripped, and fails if either names a
+reader the table did not give it. *A predicate nobody calls is not a guard, and a
+table nobody asks is not a registry.*
