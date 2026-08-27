@@ -38,6 +38,20 @@ BOOTSTRAP.md stands the whole thing up from zero.
   and answers 400 at the workers.dev alias BY DESIGN (an open-redirect defence;
   the comment above `scripts/smoke-portal.mjs`'s own default says so). Export
   them to run against other hosts.)
+- account_gate: `npm run account:check` (`scripts/check-cloudflare-account.mjs`).
+  FIRST in both deploy chains, ahead of everything. **Not one of the eight workers
+  pins `account_id`**, so wrangler uploads to whatever account the machine is
+  signed in to — which on the machine this is developed on is a different client's.
+  The `cf-exec` convention at the top of this page has always been the fix; until
+  27 Aug 2026 nothing enforced it for a deploy. It is first because it is the only
+  gate here whose failure is not recoverable by re-running: the others refuse
+  before anything has happened, this one guards the moment after which something
+  has, and a worker left running in the wrong account is not an error anybody
+  sees. The account is DERIVED from every `CF_ACCOUNT_ID` in the workers' own
+  wrangler configs — every worker whose config names one, and they must agree — no
+  literal, so a fork of the base follows its own configs instead of carrying
+  kwapso's account number. `workers/tenancy/test/migration-gate.test.ts` holds its
+  position down against the first `--workspace=` deploy, derived rather than named.
 - migration_gate: `npm run migrations:check -- <staging|production>`
   (`scripts/check-team-migrations.mjs`). Reads the environment's core database and
   refuses if any live team's `schema_version` is behind the last entry in
@@ -69,8 +83,8 @@ BOOTSTRAP.md stands the whole thing up from zero.
   commands now open with `npm run lang:check` and REFUSE on a stale catalogue, so a
   ship can no longer carry a sentence nobody translated or a language nobody speaks.
   The check is a second apart and fails before the two-minute build rather than after it.
-- deploy_staging_command: npm run deploy:staging (root; runs `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → **migrations:check** → content → data-ops → mcp → gateway → portal-gateway, staging names)
-- deploy_production_command: npm run deploy:production (root; `lang:check` first, then the same eight-worker realtime-first order with `migrations:check` between tenancy and content, production names)
+- deploy_staging_command: npm run deploy:staging (root; runs `account:check`, then `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → **migrations:check** → content → data-ops → mcp → gateway → portal-gateway, staging names)
+- deploy_production_command: npm run deploy:production (root; `account:check` then `lang:check` first, then the same eight-worker realtime-first order with `migrations:check` between tenancy and content, production names)
 - github_remote: origin (https://github.com/Kwapso/kwapso_system.git — renamed from
   `kwapso_cpaa` on 2026-08-26; GitHub redirects the old URL, but the remote and every
   reference below point at the live name directly)

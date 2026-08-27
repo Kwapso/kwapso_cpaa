@@ -13,6 +13,12 @@
 // the comparison worth anything — a test that re-derived it the same way would
 // only prove the parser agrees with itself.
 //
+// It also holds the deploy chain's OTHER positional property — the account gate
+// (`scripts/check-cloudflare-account.mjs`) must run before the first upload —
+// because that check derives its answer from the same worker's wrangler config,
+// and because a positional property has now been silently falsified twice. They
+// belong where the next person will find them together.
+//
 // The four properties, and what each one is standing in front of:
 //
 //   1. THE LATEST VERSION the gate computes is the one the ROBOT computes. If
@@ -39,6 +45,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { TEAM_MIGRATIONS } from "../src/team-schema"
+// @ts-expect-error — as below: a plain .mjs script, no types, only read here.
+import * as accountGate from "../../../scripts/check-cloudflare-account.mjs"
 // @ts-expect-error — the gate is a plain .mjs script; it ships no types and the
 // suite is the only thing that imports it.
 import * as gate from "../../../scripts/check-team-migrations.mjs"
@@ -340,5 +348,73 @@ describe("where it sits in the pipeline", () => {
     expect(envReads, "the only environment variable this reads is the account guard").toEqual([
       "process.env.CLOUDFLARE_ACCOUNT_ID",
     ])
+  })
+})
+
+describe("the account gate runs before anything is uploaded", () => {
+  // THE SECOND POSITIONAL PROPERTY, and the second one to be falsified by a
+  // later edit rather than by a disagreement. The migration gate carried this
+  // guard while it happened to stand first in the chain; moving it to its correct
+  // place (after tenancy, so the robot knows the migration) put it three uploads
+  // too late, and nothing said so. Hence a check of its own, and hence this.
+  //
+  // What it is standing in front of: no worker pins `account_id`, so wrangler
+  // uploads to whatever account the machine is signed in to. Every other gate in
+  // this chain refuses before anything has happened; this one guards the moment
+  // after which something has, and a worker left running in another client's
+  // account is not an error anybody sees.
+  const scripts = JSON.parse(read("package.json")).scripts as Record<string, string>
+
+  for (const name of ["deploy:staging", "deploy:production"]) {
+    it(`${name} checks the account before its first upload`, () => {
+      const cmd = scripts[name]
+      const gate = cmd.indexOf("account:check")
+      // DERIVED — the first worker deployed, whichever it is. Naming realtime
+      // here would survive the reorder that matters.
+      const firstUpload = cmd.indexOf("--workspace=")
+      expect(gate, `${name} must run the account gate`).toBeGreaterThan(-1)
+      expect(firstUpload, `${name} must deploy some worker`).toBeGreaterThan(-1)
+      expect(
+        gate,
+        `${name} must check the Cloudflare account BEFORE uploading anything — ` +
+          `the first upload in that chain is ` +
+          `${cmd.slice(firstUpload).split(/\s/)[0]}`
+      ).toBeLessThan(firstUpload)
+    })
+
+    it(`${name} checks it first of all — before the build, which cannot undo an upload`, () => {
+      expect(scripts[name].startsWith("npm run account:check")).toBe(true)
+    })
+  }
+
+  it("derives the account from the configs, and they all agree", () => {
+    // Every worker config that names one, and one disagreeing config means
+    // nobody knows which account is right, which is a refusal and not a default.
+    const declared = accountGate.declaredAccounts() as Map<string, string[]>
+    expect(declared.size, "the worker configs must name exactly one account").toBe(1)
+    expect(accountGate.expectedAccount()).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it("refuses rather than guessing when the configs cannot answer", () => {
+    // No fallback, for the same reason the migration gate has none: a fallback is
+    // how a gate goes quietly green. Both ways of not knowing are a throw.
+    expect(() => accountGate.expectedAccount(new Map())).toThrow(/CF_ACCOUNT_ID/)
+    expect(() =>
+      accountGate.expectedAccount(
+        new Map([
+          ["a".repeat(32), ["workers/one/wrangler.jsonc"]],
+          ["b".repeat(32), ["workers/two/wrangler.jsonc"]],
+        ])
+      )
+    ).toThrow(/more than one Cloudflare account/)
+  })
+
+  it("nothing in the deploy chain names the account as a literal", () => {
+    // A hard-coded id would be a client's account number welded into a base meant
+    // to be forked. The two destructive scripts carry one for their own reasons
+    // and are not part of a deploy; nothing added here may.
+    const source = read("scripts/check-cloudflare-account.mjs")
+    const literals = source.match(/["'][0-9a-f]{32}["']/g) ?? []
+    expect(literals, "the account gate must DERIVE the account, never carry it").toEqual([])
   })
 })
