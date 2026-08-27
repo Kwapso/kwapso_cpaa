@@ -95,13 +95,27 @@ function RowList({ children }: { children: React.ReactNode }) {
 /** The clickable name of a record, in the URL form the caller arrived through. */
 function OpenLink({ label, onOpen }: { label: string; onOpen: () => void }) {
   return (
-    <button
+    // The kit's `link` variant IS this control: no box, inherited ink, an
+    // underline that arrives on hover. Everything overridden below is LAYOUT,
+    // not look — the name has to flex and truncate inside a row, and the base
+    // skin is `shrink-0 justify-center`. `shrink` is spelled out rather than
+    // left to `flex-1`, because `flex-1` and `shrink-0` are different
+    // tailwind-merge groups and both would survive, leaving which one paints
+    // to stylesheet order.
+    <Button
       type="button"
+      variant="link"
       onClick={onOpen}
-      className="hover:text-primary min-w-0 flex-1 truncate text-left text-sm underline-offset-2 hover:underline"
+      className="hover:text-primary min-w-0 flex-1 shrink justify-start text-left underline-offset-2"
     >
-      {label}
-    </button>
+      {/* The truncation lives on a SPAN inside, not on the control. `truncate`
+          is `text-overflow: ellipsis`, and that applies to a block container's
+          line box — the kit's skin is `inline-flex`, so the label becomes an
+          anonymous flex item and the ellipsis is silently dropped: the name
+          still clips at exactly the same width, with no "…" to say it did.
+          Measured, both at 283.71px. */}
+      <span className="min-w-0 truncate">{label}</span>
+    </Button>
   )
 }
 
@@ -119,16 +133,24 @@ function OpenLink({ label, onOpen }: { label: string; onOpen: () => void }) {
 function OpenChevron({ label, onOpen }: { label: string; onOpen: () => void }) {
   const t = useT()
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon"
       onClick={onOpen}
       aria-label={t("Open {name}", { name: label })}
-      // 44px touch floor (UI-RULEBOOK S6) without growing the row: the box is
-      // padding, the glyph stays the size it was.
-      className="text-muted-foreground hover:text-foreground -m-2 shrink-0 p-2"
+      // `ghost` IS this treatment — `--ink-tertiary` is `--muted-foreground`
+      // and its hover is the ink going to full, which is what was written by
+      // hand here. The overrides are the touch box only: `size="icon"` is a
+      // 40-square, and this one is touch padding (UI-RULEBOOK S6) taken back
+      // out of the row with the negative margin, so the box measures the same
+      // 30 it did before and the row does not grow. The glyph is untouched:
+      // `--icon-button` is 1rem, which is what `size-4` already was — measured,
+      // 15x15 on both sides of the swap.
+      className="-m-2 size-auto shrink-0 p-2"
     >
       <ChevronRight className="size-4" />
-    </button>
+    </Button>
   )
 }
 
