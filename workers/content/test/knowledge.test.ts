@@ -144,7 +144,10 @@ async function ask(
   userId: string,
   question: string,
   accountId?: string,
-  opts: { minScore?: string } = {}
+  // `noVectorStore` is not a variant of `minScore`: one is a search that looked
+  // and found nothing, the other is nobody looking. The word match is held to a
+  // different floor in each (see `termFloor`), so both have to be reachable here.
+  opts: { minScore?: string; noVectorStore?: boolean } = {}
 ): Promise<KnowledgeAnswer> {
   const query = `?q=${encodeURIComponent(question)}${accountId ? `&accountId=${accountId}` : ""}`
   const res = await call(userId, "GET /api/content/knowledge/ask", undefined, query, opts)
@@ -811,6 +814,92 @@ describe("an exact reference is found however long the question around it is", (
       undefined,
       NOTHING_CLOSE_ENOUGH
     )
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
+})
+
+// ── AN EMPTY VECTOR ARM IS TWO OPPOSITE SENTENCES ───────────────────────────
+//
+// `!vector.length` used to be one condition covering four situations it treated
+// as identical. Three of them are IGNORANCE — no store bound, the question could
+// not be embedded, the index holds no neighbours at all — and there the word
+// match really is everything we have. The fourth is an ANSWER: a semantic search
+// ran over the whole compartment and reported that nothing in it is about this.
+//
+// MEASURED 27 Aug 2026 on the agency's own material. "What is our parental leave
+// policy and how much notice does it need?" — a policy nobody has ever written
+// down — put the vector arm's best neighbour at 0.451 against a floor of 0.5, so
+// it correctly found nothing. The word match then cleared a PROPORTIONAL floor on
+// "policy", "notice" and "leave" and answered out of a page of meeting notes. To
+// overturn a search that has already answered, a chunk must now hold the WHOLE
+// question — with the one exception the word match exists for, a rare exact
+// token, which bypasses every floor here.
+describe("overruling a search that already answered takes the whole question", () => {
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Notes from the delivery catch-up",
+      body: "We agreed a notice period on the dispatch policy, and Aurora will leave the rollout dates as they are until the client replies.",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch rollout",
+      body: "The dispatch rollout is paused until March while the client finishes their own migration.",
+    })
+  })
+
+  it("refuses a question whose words are merely scattered through what we hold", async () => {
+    // "notice", "policy" and "leave" are all in the catch-up note and the
+    // question is not about it. A proportion is three words wide.
+    const answer = await ask(
+      IDS.staffUser,
+      "What is our parental leave policy and how much notice does it need?",
+      undefined,
+      NOTHING_CLOSE_ENOUGH
+    )
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
+
+  it("but answers when a chunk really does hold the whole question", async () => {
+    const answer = await ask(IDS.staffUser, "is the dispatch rollout paused?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Bergman dispatch rollout")
+  })
+
+  // AND THE EXACT TERM STILL GETS THROUGH THE STRICTEST OF THE THREE. This is
+  // the case the word match exists for: an embedding is indifferent to "3144"
+  // and the inverted index is not, so a reference may still overturn a refusal
+  // even though nothing else may.
+  it("and a rare exact reference still speaks, though nothing else may", async () => {
+    await addSource(IDS.staffUser, {
+      title: "Handover note",
+      body: "3144 is pending gravity forms confirmation.",
+    })
+    const answer = await ask(
+      IDS.staffUser,
+      "Could somebody tell me where things stand with ticket 3144 and whether anyone replied?",
+      undefined,
+      NOTHING_CLOSE_ENOUGH
+    )
+    expect(answer.found, `refused with ${answer.candidates} candidates`).toBe(true)
+    expect(titles(answer)).toContain("Handover note")
+  })
+
+  // NOBODY LOOKED IS NOT THE SAME SENTENCE, and this is the whole distinction in
+  // one pair: ONE question, one base, two reasons the vector arm is empty, two
+  // different answers. With no store bound the word match is the only reader the
+  // material has and a share is enough — which is what keeps a note written while
+  // the model was down findable by its words alone. With the store bound and the
+  // search having positively found nothing, the same share is a coincidence and
+  // the same question is refused.
+  const SCATTERED = "what is currently happening with the Bergman dispatch rollout?"
+
+  it("when nothing looked at all, a share of the question is enough", async () => {
+    const answer = await ask(IDS.staffUser, SCATTERED, undefined, { noVectorStore: true })
+    expect(answer.found, "an outage must not make the base mute").toBe(true)
+    expect(titles(answer)).toContain("Bergman dispatch rollout")
+  })
+
+  it("and the SAME question is refused when the search looked and found nothing", async () => {
+    const answer = await ask(IDS.staffUser, SCATTERED, undefined, NOTHING_CLOSE_ENOUGH)
     expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
   })
 })
