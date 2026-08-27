@@ -159,14 +159,20 @@ function RangeFacet({
         </PopoverContent>
       </Popover>
       {value !== "" && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           aria-label={`Clear ${label}`}
           onClick={() => onChange("")}
-          className="shrink-0 rounded-pill p-0.5 text-muted-foreground motion-hover hover:text-foreground"
+          // The kit's icon size is the STANDING control height (40). This sits
+          // beside an `h-8` facet trigger, so it takes the kit's OTHER stated
+          // height — `--control-height-dense`, the 32 the trigger itself is —
+          // rather than a number picked to look right. Nothing else moves.
+          className="size-[var(--control-height-dense)] shrink-0"
         >
-          <X className="size-3.5" aria-hidden />
-        </button>
+          <X aria-hidden />
+        </Button>
       )}
     </div>
   )

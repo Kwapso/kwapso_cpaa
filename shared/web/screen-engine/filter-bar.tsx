@@ -20,6 +20,7 @@ import { SEARCHABLE_THRESHOLD, type FilterFacet } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Select,
   SelectContent,
@@ -108,7 +109,13 @@ function FilterBar<T>({
                     aria-pressed={selected}
                     aria-label={`${f.label}: ${o.label}`}
                     onClick={() => onChange(f.field, selected ? "" : o.value)}
-                    className="rounded-[var(--radius)]"
+                    // The ring follows the control's own radius (tokens.css §8),
+                    // and the control here is a PILL — the Badge inside it. At
+                    // `--radius` the outline rang a 24-corner box around a 26
+                    // pill. The element stays a bare <button>: a kit Button
+                    // would put a second fill and a second height around a chip
+                    // that already draws both.
+                    className="rounded-pill"
                   >
                     <Badge
                       variant={selected ? "default" : "secondary"}
@@ -177,27 +184,38 @@ function FilterBar<T>({
               </SelectContent>
             </Select>
             {val !== "" && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 aria-label={`Clear ${f.label}`}
                 onClick={() => onChange(f.field, "")}
-                className="shrink-0 rounded-pill p-0.5 text-muted-foreground motion-hover hover:text-foreground"
+                // 32, not the kit's standing 40: `--control-height-dense` is
+                // the height the SelectTrigger beside it already is. Same
+                // control, same token, in all three facet files.
+                className="size-[var(--control-height-dense)] shrink-0"
               >
-                <X className="size-3.5" aria-hidden />
-              </button>
+                <X aria-hidden />
+              </Button>
             )}
           </div>
         )
       })}
 
       {canClear && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={onClearAll}
-          className="inline-flex items-center gap-1 rounded-[var(--radius)] px-1.5 py-1 text-xs text-muted-foreground motion-hover hover:text-foreground"
+          // `ghost` IS this treatment — tertiary ink that goes to full ink on
+          // hover, no fill — and `sm` is the same 32 the facets beside it are.
+          // The radius comes with the control: the hand-rolled one rang at
+          // `--radius` around a 32-tall box, which is not the shape it is.
+          className="shrink-0"
         >
-          <X className="size-3.5" aria-hidden /> {t("Clear all")}
-        </button>
+          <X aria-hidden /> {t("Clear all")}
+        </Button>
       )}
 
       <span aria-live="polite" className="sr-only">

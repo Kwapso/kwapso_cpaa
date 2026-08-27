@@ -54,6 +54,36 @@
 // thing this component exists to prevent. `AppMark` learned this first
 // (web/test/app-mark.test.tsx); it is now every record's, not one screen's.
 //
+// AND FOR A YEAR IT DID NOT DO THAT, EITHER TIME, under a green suite. Both
+// halves were found by MEASURING one on a page rather than by reading the file,
+// which is the only way either could have been found: a mark that has quietly
+// stopped falling back looks like a mark for a record with no picture.
+//
+//   1 · `onError` NEVER FIRES ON A COLD LOAD. The screens are prerendered, so
+//       the browser has the `<img>` in the first HTML and starts fetching it
+//       long before React hydrates and attaches a handler. A fetch that has
+//       already failed by then fires its error event at nobody, `broken` stays
+//       false, and the box renders EMPTY — the grey square this file's own
+//       fallback note calls "a screen that failed to finish loading". Measured:
+//       `complete === true`, `naturalWidth === 0`, and no fallback. The kit's
+//       own `Image` documents exactly this race for the SUCCESS case and reads
+//       `complete` after paint to close it; the failure case is its mirror and
+//       is read the same way, off a callback ref that runs when the node
+//       attaches.
+//
+//   2 · A CORRECTED PICTURE WAS WRITTEN OFF FOREVER — the thing the `key` here
+//       carried a comment saying it prevented. It could not: once `broken` is
+//       true the `<img>` is not rendered AT ALL, so a changed `key` has no
+//       element to remount and the state it was meant to reset is the state
+//       keeping the element off the page. Measured: good → bad gave the mark
+//       correctly, and bad → good stayed on the mark.
+//
+// SO THE FAILURE IS REMEMBERED AGAINST THE PICTURE IT BELONGS TO, not as a bare
+// boolean. `failed` holds the src that broke; `broken` is that src still being
+// the one we are asked to draw. A new picture is therefore not broken because
+// nothing says it is — there is no reset to remember to perform, which is the
+// same reason R24 prefers a missing import to a condition somebody can invert.
+//
 // THROUGH `safeSrc`, ALWAYS. A stored path is a value out of a database that a
 // machine caller can write, so what reaches `src` is checked here — R20's
 // render-side twin — rather than trusted because we happen to have written it.
@@ -107,8 +137,10 @@ export function RecordMark({
   size?: keyof typeof BOX
   className?: string
 }) {
-  const [broken, setBroken] = React.useState(false)
+  const [failed, setFailed] = React.useState<string | null>(null)
   const picture = safeSrc(stored ?? undefined)
+  // The failure belongs to a SRC, not to the component. See the header.
+  const broken = failed !== null && failed === picture
   const round = shape === "round"
   // The fit follows the box unless the caller separates them.
   const cover = (fit ?? (round ? "cover" : "contain")) === "cover"
@@ -127,13 +159,21 @@ export function RecordMark({
       {picture && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          // `key` on the src resets the failure when the picture CHANGES, so a
-          // corrected logo is not permanently written off by one bad load.
+          // `key` on the src gives the NEW picture a new element, so the ref
+          // below runs again for it — which is what it was always for and
+          // could never do while the failure was a bare boolean.
           key={picture}
+          // A ref rather than `onLoad`, because the question is not "did it
+          // load" but "had it already finished before React got here". Runs
+          // once when the node attaches; a fetch still in flight answers
+          // `complete === false` and is left to `onError` as before.
+          ref={(node) => {
+            if (node && node.complete && node.naturalWidth === 0) setFailed(picture)
+          }}
           src={picture}
           alt=""
           className={`size-full ${cover ? "object-cover" : "object-contain"}`}
-          onError={() => setBroken(true)}
+          onError={() => setFailed(picture)}
         />
       ) : (
         fallback
@@ -165,11 +205,22 @@ export function RecordCover({
   fallback?: React.ReactNode
   className?: string
 }) {
-  const [broken, setBroken] = React.useState(false)
+  const [failed, setFailed] = React.useState<string | null>(null)
   const picture = safeSrc(stored ?? undefined)
-  if (!picture || broken) return <>{fallback}</>
+  // Both failures above are this component's too, and for the same reason: it
+  // is the same three lines over a wider box.
+  if (!picture || failed === picture) return <>{fallback}</>
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img key={picture} src={picture} alt="" className={className} onError={() => setBroken(true)} />
+    <img
+      key={picture}
+      ref={(node) => {
+        if (node && node.complete && node.naturalWidth === 0) setFailed(picture)
+      }}
+      src={picture}
+      alt=""
+      className={className}
+      onError={() => setFailed(picture)}
+    />
   )
 }
