@@ -240,6 +240,77 @@ Roughly 150–250 lines of parsing beside what is there, no dependency, no WASM,
 and it runs in a Worker exactly as the inflate already does. The alternative — a
 vendored PDF library — is megabytes of WASM for a job that is this specific.
 
+### What RE-INGESTS, and what does not
+
+The question that decides whether this is a lane or a lane plus a migration. It
+is a lane.
+
+**Nothing is re-uploaded and nothing is re-filed by hand.** Every walk of the
+Drive lane re-hydrates each file through `driveFileText`, and hydration REPLACES
+the body — so the walk after this ships reads the same PDF, gets sentences where
+it used to get glyph indices, computes a different content hash, and the
+hash-skip stops skipping. `indexSource` then re-chunks it from the new text. The
+row keeps its id, its compartment, its fence and its history.
+
+**But only for files the walk still reaches**, and that is the one thing to get
+right. The lane is `windowed` with a cursor over `modifiedTime`: a PDF nobody has
+touched since it was filed sits behind the cursor. The windowed rewind re-walks
+from the start when it catches up, so it is reached eventually — but the honest
+mechanism, and the one every other change in this round used, is to BUMP
+`textVersion` on the drive lane. That invalidates the stored cursor, the sweep
+walks the window from the beginning, and every file is re-decided once. It is one
+line and it is the difference between "the good ones drift back over days" and
+"all of them, on the next tick".
+
+**The cost of that bump** is one re-download of every file in the window, each
+bounded by `DRIVE_BYTES_CAP` (8 MB) and the per-tick slice. 339 files were in the
+owner's window on 20 Aug. That is a real, one-off cost paid over several ticks,
+and it is the same cost the calendar and meeting bumps in this round already
+paid.
+
+**The rows are still there to re-fill**, which is why no prune was run — see the
+self-healing note below. A retired row is one this work cannot reach.
+
+### What happens when the CMap is absent or malformed
+
+Three cases, and the rule is the same in all three: **fall back, never throw.**
+
+- **No `/ToUnicode` at all.** Common for a font with a standard encoding, where
+  the literal bytes ARE the characters and today's behaviour is already correct.
+  So: no CMap means decode as now (Latin-1), which is exactly what the working
+  path does today.
+- **A `/ToUnicode` that does not parse**, or covers only part of the font. Decode
+  every glyph the map covers and leave the rest as they are. A partial decode is
+  a better answer than none, and the guard downstream is what decides whether the
+  result is worth keeping — which is the point of having `readsLikeWords` in
+  front of it: a half-decoded page that still reads as geometry is refused on its
+  own merits rather than by this layer guessing.
+- **A CMap stream that will not inflate.** Same as a content stream that will not
+  inflate today: skip it, keep going. `pdfText` already has that shape and it
+  should not gain a second one.
+
+The failure mode this must NOT have is throwing: `driveFileText` runs inside an
+uncaught loop over a whole named folder, and one awkward file taking the sweep
+down with it is a bug this codebase has already had once and fixed (the 403 note
+in `driveFileText` records it).
+
+### The scanned page, stated rather than discovered
+
+A scanned document has NO text layer — it is an image of a page. There is nothing
+to decode, no CMap to read, and no amount of this work reaches it. `pdfText`'s
+own comment already says an empty result there is the true one, and after this
+change it stays true: the file will still score zero on `readsLikeWords` and will
+still be refused.
+
+**That is the boundary of this lane, and it should be said to the owner in
+advance rather than found afterwards.** Two of his PDFs are the test: if
+`Confia-Vollmacht_Unternehmen.pdf` and `Confia-Vollmacht_privat.pdf` read as
+German after the change, they were digital documents and the work is done. If
+they still read as nothing, they are scans of signed paper — which is entirely
+likely for a signed power of attorney — and answering from them is an OCR
+question with a different cost, a different provider and a different privacy
+conversation, because the page would have to leave Cloudflare.
+
 ### What it costs and where it belongs
 
 At INGEST, where extraction already happens: once per file, inside the same
@@ -288,6 +359,31 @@ looked for an identifier in a file **without stripping comments**, so the commen
 explaining why the call was there kept it green after the call was deleted. Seven
 checks in `web/test/rules.test.ts` had that shape, three of them standing on Laws
 of the Base.
+
+### A principle this codebase has now reached twice, by different routes
+
+`knowledge-google.ts` (the `forgetGoogleKind` note) puts it like this: *"A
+person's decision is not enforced by a `deactivated_at` that must survive every
+future housekeeping pass — it is enforced by the read never happening. A flag can
+be flipped back by a pass nobody thought about; a read that does not occur cannot
+be undone."*
+
+R24 arrived at the same thing from the other end, about money: an internal rate
+is kept off the client's side by an IMPORT that does not exist, not by a
+condition that could be inverted or a permission that could be granted. *"A
+condition can be inverted and a permission can be granted, an import cannot be
+forgotten."*
+
+Two laws now rest on it independently, and it was nearly broken a third time on
+27 Aug: a prune that switched 131 rows off would have been undone by the next
+walk, because the flag it set was one the sweep is entitled to flip back. What
+made the artwork harmless in the end was not a flag at all — it was the read
+returning nothing.
+
+**Name it when the next rule needs it: prefer the absence of a read to the
+presence of a flag.**
+
+---
 
 The lesson is not "check the code". It is: **when an instrument and a person
 disagree, measure the instrument.** Every one of these was found by asking what
