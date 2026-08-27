@@ -30,7 +30,7 @@
 
 import * as React from "react"
 
-import { Paperclip, X } from "@shared/ui/icons"
+import { Link2, Paperclip, X } from "@shared/ui/icons"
 
 import { Button } from "@shared/ui/controls/button/button"
 import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
@@ -44,12 +44,15 @@ import { toast } from "@shared/ui/controls/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
+import { storyAttachmentsKey } from "@/lib/live-resources"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { readFileAsDataUrl } from "@shared/web/file"
+import { primeCache, useCached } from "@shared/web/store"
+import type { StoryAttachment } from "@shared/types"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
@@ -258,6 +261,42 @@ export function StoryFormDialog({
   // until the door answers.
   const [pending, setPending] = React.useState<File[]>([])
 
+  // …AND WHAT IT ALREADY CARRIES. The owner attached two screenshots here, saved,
+  // reopened the form and saw an empty field — this form only ever ADDED, so on
+  // an edit it described the story as having nothing on it. Half of his report is
+  // that sentence; the other half is the Files and links tab beside this dialog.
+  //
+  // THROUGH THE PANEL'S OWN CACHE KEY, not a fetch of its own. One key means the
+  // tab behind this dialog and the list inside it are the same list: attach here
+  // and the tab has it when the dialog closes, take one off there and this field
+  // never shows it. `null` on a create — there is no story to read yet, which is
+  // the same reason `pending` exists at all.
+  const attachedQ = useCached<StoryAttachment[]>(
+    storyId ? storyAttachmentsKey(storyId) : null,
+    () => contentApi.storyAttachments(storyId as string).then((r) => {
+      primeCache(`total:${storyAttachmentsKey(storyId as string)}`, r.total)
+      return r.attachments
+    })
+  )
+  const attached = attachedQ.data ?? []
+
+  /** Keep the one cache both this field and the tab read. */
+  function keepAttached(target: string, r: { attachments: StoryAttachment[]; total: number }) {
+    primeCache(storyAttachmentsKey(target), r.attachments)
+    primeCache(`total:${storyAttachmentsKey(target)}`, r.total)
+  }
+
+  /** Take one off from in here. `work:edit` gates the door, and this dialog is
+   * only ever opened by somebody who holds it. */
+  async function detach(attachmentId: string) {
+    if (!storyId) return
+    try {
+      keepAttached(storyId, await contentApi.removeStoryAttachment(storyId, attachmentId))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't take that off."))
+    }
+  }
+
   /** ONE FILE AT A TIME, and a failure here never fails the story.
    *
    * The story is already written by the time this runs. Turning a rejected
@@ -267,12 +306,15 @@ export function StoryFormDialog({
   async function attach(target: string, files: File[]) {
     for (const file of files) {
       try {
-        await contentApi.addStoryAttachment({
-          id: target,
-          kind: "file",
-          label: file.name,
-          fileDataUrl: await readFileAsDataUrl(file),
-        })
+        keepAttached(
+          target,
+          await contentApi.addStoryAttachment({
+            id: target,
+            kind: "file",
+            label: file.name,
+            fileDataUrl: await readFileAsDataUrl(file),
+          })
+        )
       } catch (err) {
         toast.error(err instanceof ApiFailure ? err.message : t("Couldn't attach that."))
       }
@@ -417,6 +459,31 @@ export function StoryFormDialog({
           path, and the upload simply knows a different id on an edit. */}
       <Field config={fileField} htmlFor="story-files" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
+          {attached.length > 0 && (
+            <ul className="divide-border divide-y rounded-xl border">
+              {attached.map((a) => (
+                <li key={a.id} className="flex items-center gap-2 px-3 py-2">
+                  {a.kind === "file" ? (
+                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
+                  ) : (
+                    <Link2 className="text-muted-foreground size-3.5 shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    aria-label={t("Take it off")}
+                    disabled={busy}
+                    onClick={() => void detach(a.id)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
           {pending.length > 0 && (
             <ul className="divide-border divide-y rounded-xl border">
               {pending.map((file, i) => (

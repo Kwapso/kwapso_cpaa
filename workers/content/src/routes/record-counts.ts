@@ -26,6 +26,7 @@ import { recordTimeCountKey } from "@shared/record-counts"
 import { countTickets } from "../lib/help"
 import { countAttachments } from "../lib/help-attachments"
 import { countSprints, countStories } from "../lib/stories"
+import { countStoryAttachments } from "../lib/story-attachments"
 import { countTodos } from "../lib/todos"
 import { countMeetings } from "../lib/meetings"
 import { countWorkLogs, WORK_LOG_TARGETS } from "../lib/work-logs"
@@ -60,6 +61,10 @@ const COUNTERS: Record<string, RecordCounter> = {
   "stories-ticket": (cfg, guard, _s, id) =>
     countStories(cfg, guard, { ticketId: id, view: "all" }).then((r) => r.total),
   "help-attachments": (cfg, guard, scope, id) => countAttachments(cfg, guard, scope, id),
+  // …and what a STORY shows for itself. Same shape as the ticket's line above,
+  // one record along: the panel lists exactly what this counts, so the badge and
+  // the rows it reveals are one question (R16).
+  "story-attachments": (cfg, guard, _s, id) => countStoryAttachments(cfg, guard, id),
   // A sprint's record.
   "stories-sprint": (cfg, guard, _s, id) =>
     countStories(cfg, guard, { sprintId: id, view: "all" }).then((r) => r.total),
