@@ -39,6 +39,19 @@ const REPO = "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git"
 const DELIVERED = [
   "tokens", "icons", "motion", "controls", "structures", "compositions",
   "lib", "assets", "manifest.json", "README.md", "CHANGELOG.md",
+  /* docs/ ARRIVES TOO, since 2026-08-27, and its absence was the quietest
+     hole in this whole arrangement. The kit ships five rulebooks — RULES,
+     BUILD-A-COMPONENT, BUILD-A-SCREEN, TOKENS, ARTIFACT-MAP, about 150 KB —
+     and BUILD-A-SCREEN is the one the commission calls "a required
+     deliverable, not a nicety … it must be possible for someone who has never
+     seen the system to build a new screen that looks native, by following that
+     document, without asking a designer."
+     None of it was on this list, so none of it ever reached this repository,
+     so nobody building here could read a word of it. That is why the app grew
+     its own 1,879-line UI-RULEBOOK.md: not defiance, just people who could not
+     see the original. The kit is the canon now (the owner, 2026-08-27: "the ui
+     ux kit wins eveytime"), and canon you cannot read is not canon. */
+  "docs",
 ]
 
 /** One hash over every delivered file's path + bytes, path-sorted, so the
