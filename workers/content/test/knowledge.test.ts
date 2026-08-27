@@ -1118,3 +1118,76 @@ describe("an envelope does not take a slot from something that says more", () =>
     expect(titles(answer)).toContain("Bergman dispatch review")
   })
 })
+
+// ── A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE ────────────────
+//
+// Every unreadable thing that ever reached this knowledge base failed the same
+// way: accepted, stored, quietly never read, and the person never told. 131
+// files of logo artwork got in that way; every PDF scored 0.000 on letter-shaped
+// tokens that way; `image/*` has been opaque since the beginning that way.
+//
+// The owner ruled on 27 Aug 2026 that a video link is REFUSED instead, and that
+// the refusal carries the fix: paste the transcript and the source is welcome.
+// The form says so while somebody is typing; this is the door, which is what
+// holds when the request comes from the assistant, from MCP, or from a screen
+// that has drifted.
+describe("a video link is refused unless its transcript comes with it", () => {
+  const video = (body?: string) =>
+    call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "Bergman cutover walkthrough",
+      sourceUrl: "https://www.youtube.com/watch?v=abc123",
+      ...(body ? { body } : {}),
+    })
+
+  it("refuses it, and says what would fix it", async () => {
+    const res = await video()
+    expect(res.status).toBe(400)
+    const out = (await res.json()) as { error: string; message: string }
+    expect(out.error).toBe("video_needs_transcript")
+    expect(out.message, "the refusal must carry the remedy, not just the no").toMatch(/transcript/i)
+  })
+
+  it("and stores NOTHING — a refused source is not a row that answers nothing", async () => {
+    await video()
+    const rows = db()
+      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?")
+      .get("Bergman cutover walkthrough") as { n: number }
+    expect(rows.n).toBe(0)
+  })
+
+  it("accepts it the moment the transcript is pasted, and indexes what was said", async () => {
+    const res = await video(
+      "Marta walked the cutover: the invoice run moves to the first Monday of April and Ana sends the supplier list."
+    )
+    expect(res.status).toBe(200)
+    // The transcript is the MATERIAL, not a note beside the link — so it is
+    // chunked and searchable like any other source. Asserted on the index rather
+    // than on an answer: what a stand-in embedding model ranks is a different
+    // subject, and this one is about the row existing with its words in it.
+    const row = db()
+      .prepare(
+        `SELECT chunk_count AS n FROM knowledge_sources WHERE title = ? AND body LIKE '%first Monday of April%'`
+      )
+      .get("Bergman cutover walkthrough") as { n: number } | undefined
+    expect(row?.n, "the pasted transcript must be indexed, not merely stored").toBeGreaterThan(0)
+  })
+
+  // NOT A GATE ON A DOMAIN LIST. An ordinary link with no body is exactly as
+  // acceptable as it has always been — this rule is about a link we cannot
+  // FOLLOW into words, and widening it would refuse half the notes in the base.
+  it("and an ordinary link with no material is untouched", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "The dispatch runbook",
+      sourceUrl: "https://docs.example.com/runbook",
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it("a direct link to an .mp4 is refused too, wherever it is hosted", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "Standup recording",
+      sourceUrl: "https://files.bergman.example/standup-2026-03-04.mp4",
+    })
+    expect(res.status).toBe(400)
+  })
+})

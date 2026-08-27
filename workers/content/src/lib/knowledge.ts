@@ -111,6 +111,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
+import { isVideoLink } from "@shared/media-links"
 import { numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
@@ -738,10 +739,34 @@ function readInput(input: SourceInput): {
   visibleToAppId: string | null
 } {
   const privateToMe = input.visibility === "private"
+  const body = optionalDocument(input.body, "The material") ?? null
+  const sourceUrl = optionalText(input.sourceUrl, "Link", TEXT_LIMITS.link) ?? null
+  // A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE, and this is the
+  // door refusing rather than the screen asking nicely. The form explains it
+  // while somebody is typing and offers the box; this is what holds when the
+  // request arrives from the assistant, from MCP, or from a screen that has
+  // drifted.
+  //
+  // WHY REFUSE AT ALL. Every unreadable thing that ever reached this base was
+  // ACCEPTED, stored, and quietly never read — 131 files of logo artwork, every
+  // PDF at 0.000 letter-shaped tokens, `image/*` opaque since the beginning —
+  // and nobody was told. The owner's ruling ends that here: readable, or refused
+  // with the remedy attached. Paste the transcript and the source is welcome;
+  // paste nothing and there is no row pretending to hold an answer.
+  //
+  // NOTHING IS FETCHED and nothing is guessed. An invented transcript would be
+  // worse than none, for R23's reason: everything else this app shows a person
+  // is true.
+  if (sourceUrl && isVideoLink(sourceUrl) && !plainText(body ?? "").trim())
+    throw new GuardError(
+      400,
+      "video_needs_transcript",
+      "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript into the material and this source is good to go."
+    )
   return {
     title: requireText(input.title, "Title", TEXT_LIMITS.short),
-    body: optionalDocument(input.body, "The material") ?? null,
-    sourceUrl: optionalText(input.sourceUrl, "Link", TEXT_LIMITS.link) ?? null,
+    body,
+    sourceUrl,
     accountId: optionalText(input.accountId, "Account", TEXT_LIMITS.short) ?? null,
     privateToMe,
     // PRIVATE WINS, AND IT WINS HERE rather than in three write statements.

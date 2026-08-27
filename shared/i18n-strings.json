@@ -1401,6 +1401,7 @@
   "We can't find that ticket.",
   "We can't reach your account",
   "We can't show this right now",
+  "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go.",
   "We couldn't check what you're allowed to see. Refresh the page, and tell us if it keeps happening.",
   "We couldn't load any more. Try again in a moment.",
   "We couldn't sign you out. Check your connection and try again.",
