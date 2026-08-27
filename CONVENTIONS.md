@@ -834,7 +834,7 @@ the *why*. Add the least code that does the job, and keep `npm run check` green.
 
 ## Reading config, and writing a check that can fail
 
-Three conventions that look like trivia and are not, each one shipped as a real
+Four conventions that look like trivia and are not, each one shipped as a real
 defect first.
 
 - **A SHIPPED STRING MUST NOT INTERPOLATE A COMPILE-TIME CONSTANT.** If a string
@@ -893,6 +893,46 @@ defect first.
   And give every scan a **tripwire**: assert it matched something. A scan that
   silently finds nothing reports an empty offender list, which looks exactly like
   a pass.
+
+- **WHEN A TEST DOUBLES SOMEBODY ELSE'S RUNTIME, THE DOUBLE HAS TO BE BUILT FROM
+  WHAT THAT RUNTIME ACTUALLY RETURNS, NOT FROM THE INTERFACE WE WROTE FOR IT.**
+  A stub written from our own type can only ever confirm us.
+
+  Why: `/media/*` answered `content-range: bytes NaN-NaN/2810365` to every ranged
+  read, of every shape, for as long as ranges had existed — under a four-case
+  suite that passed. The stub echoed back the very object `byteRange` had just
+  built, a clean union carrying only the keys we set, so every case was our own
+  parser round-tripping through a mirror. **It could not have failed.** The door
+  read R2's answer with `"suffix" in sent`, and `in` tests whether a KEY EXISTS,
+  not whether it holds anything; the object R2 really returns carries all three
+  keys with `undefined` values, so the suffix branch was taken every time and
+  `size - undefined` is `NaN`.
+
+  ```ts
+  // The mirror: whatever we asked for is what we are told was sent.
+  range: options?.range                      // ← can only agree with us
+  // What the runtime measurably answers instead:
+  range: { offset: undefined, length: undefined, suffix: undefined }
+  ```
+
+  Two things make it checkable by the next person rather than a story. **Identify
+  the shape by reproducing the STRING**, not by picking the hypothesis that fits:
+  the rival here (accessors on a prototype, which `in` also finds) reproduced
+  three of the four request shapes and left the suffix case correct — three of
+  four is what a wrong hypothesis looks like, and the request least expected to
+  matter is the one that ruled it out. Then **prove the new double goes RED
+  against the old code**, with the production string in the failure message; a
+  stub that is merely more realistic is still unverified.
+
+  And write the fix so it does not rest on the diagnosis. A diagnosis is a belief
+  about somebody else's runtime, which is free to change: read fields as finite
+  NUMBERS rather than by key presence, and put every plausible answer — the
+  measured one, the union we used to assume, an empty object, nulls, garbage —
+  through one request demanding the same true output from all of them
+  (`workers/gateway/test/media-range.test.ts`). That case earned a rule nobody
+  reasons their way to: an ask is a **ceiling** on what a report may claim was
+  sent, because a player told there are more bytes than arrived stalls waiting
+  for them and one told there are fewer throws away what it has.
 
 ## Scale + idempotency + filter patterns (R14 · R17 · R19)
 These three are machine-checked; write them the house way so the build stays green.
