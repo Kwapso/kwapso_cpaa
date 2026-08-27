@@ -1061,3 +1061,60 @@ describe("material a colleague cannot see must not starve the answer", () => {
     ).toBe(false)
   })
 })
+
+// ── A SLOT SPENT ON A PASSAGE THAT SAYS NOTHING ─────────────────────────────
+//
+// Some sources are envelopes. A calendar invitation's body is its own subject
+// line again with a time on it; a bare meeting that has already happened — kept
+// on purpose, because it is the record that it happened — says "X is a meeting of
+// ours, on 2026-08-19." and stops. Both are perfectly RELEVANT, which is exactly
+// why they win slots: they are near-perfect matches for a question naming the
+// thing they are about.
+//
+// AND A SCORE CLIFF DOES NOT REACH THEM, which is why this is not a relevance
+// rule. Measured on the agency's own material: these score at the TOP, so
+// dropping what is far below the best hit cuts nothing. Asked about task 3144 the
+// base answered "Task 3144 is currently scheduled, and it was a meeting on August
+// 25" — out of the invitation — while the conversation about the task sat lower.
+describe("an envelope does not take a slot from something that says more", () => {
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Invitation: Bergman dispatch review @ Tue Aug 25, 2026 12:30pm",
+      body: "Bergman dispatch review\nTue Aug 25, 2026 12:30pm",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch review",
+      body: "Bergman dispatch review is a meeting of ours, on 2026-08-25.",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch review notes",
+      body:
+        "Bergman dispatch review is a meeting of ours, on 2026-08-25. What was said in the meeting: " +
+        "Marta agreed the cutover moves to the first Monday of April, and Ana will send the supplier " +
+        "list before the invoice run so the desk can check it against the board.",
+    })
+  })
+
+  it("the passage carrying the answer is cited, and the two envelopes beside it are not", async () => {
+    const answer = await ask(IDS.staffUser, "what was said at the Bergman dispatch review?")
+    const cited = titles(answer)
+    expect(cited, `cited ${cited.join(", ")}`).toContain("Bergman dispatch review notes")
+    // The two that say nothing share the subject and the words and would score at
+    // the top. Neither may spend a slot while the notes are available.
+    expect(cited).not.toContain("Bergman dispatch review")
+    expect(cited.some((t) => t.startsWith("Invitation:"))).toBe(false)
+  })
+
+  // NEVER PAID FOR — the same bargain the title cap makes. When a bare diary entry
+  // is genuinely all there is, it is still the answer.
+  it("but an envelope is still quoted when an envelope is all there is", async () => {
+    db().exec("DELETE FROM knowledge_terms; DELETE FROM knowledge_chunks; DELETE FROM knowledge_sources;")
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch review",
+      body: "Bergman dispatch review is a meeting of ours, on 2026-08-25.",
+    })
+    const answer = await ask(IDS.staffUser, "when was the Bergman dispatch review?")
+    expect(answer.found, "a diary entry is a poor answer and a better one than silence").toBe(true)
+    expect(titles(answer)).toContain("Bergman dispatch review")
+  })
+})

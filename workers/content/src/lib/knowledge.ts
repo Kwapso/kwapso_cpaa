@@ -2322,6 +2322,67 @@ const PASSAGES_PER_TITLE = 2
  * capping those would make a fifty-page contract quotable twice. What is being
  * spread is the ANSWER across the things it is about.
  */
+/** WORDS OF ITS OWN — words the body has and the title does not — a passage must
+ * carry before it is worth a slot.
+ *
+ * LOW ON PURPOSE, and it was not low enough on the first attempt. At eight, a
+ * real handover note — "3144 is pending gravity forms confirmation." — was
+ * classed as an envelope and pushed down the answer, which is the same mistake
+ * this rule exists to correct, made in the other direction. Short is not empty. A
+ * note somebody typed in one line is exactly the material a knowledge base is
+ * for. */
+const SUBSTANTIVE_WORDS = 4
+
+/** THE SENTENCES THE MIRROR WRITES ROUND EVERY RECORD, which are not the record.
+ * A source's body opens with a line this app generated — "X is a meeting of ours,
+ * on 2026-08-19.", "Met on 2026-08-19." — and that line is the same for a
+ * ninety-six-chunk transcript and for a diary entry. Struck out before anything
+ * is counted, or the wrapper alone clears any threshold worth having. */
+const MIRROR_WRAPPER = /(is a meeting (of ours|with)[^.]*\.|^Met on[^.]*\.|is a way of working[^.]*\.)/gi
+
+/** DOES THIS PASSAGE SAY ANYTHING THE TITLE DID NOT?
+ *
+ * Some sources are envelopes. "Invitation: FluClinic : Task 3144 @ Tue Aug 25,
+ * 2026 12:30pm" is a calendar invitation, and its body is the same words again
+ * with a time on them. A bare meeting that has already happened — kept on
+ * purpose, because it is the record that it happened — says "X is a meeting of
+ * ours, on 2026-08-19." and nothing else. Both are perfectly RELEVANT: they are
+ * near-perfect matches for a question naming the thing they are about, which is
+ * exactly why they win slots.
+ *
+ * That is what makes this a different rule from a relevance floor, and why the
+ * obvious fix does not work. Measured on the agency's own material, 27 Aug 2026:
+ * a score cliff — keep what is close to the best hit, drop the rest — cuts
+ * nothing here, because these score at the TOP. Asked about task 3144 the base
+ * answered "Task 3144 is currently scheduled, and it was a meeting on August 25",
+ * out of the invitation, while the conversation about the task sat lower down.
+ *
+ * Take the text, strike out the title it already carries, the sentence the mirror
+ * wrapped it in and the dates, and count what is left. A paragraph survives
+ * easily; a one-line note survives; an envelope has nothing underneath. Digits
+ * are KEPT — a reference number is information, and stripping it was what made
+ * the handover note look empty. */
+function saysSomething(row: ScoredRow): boolean {
+  const words = (text: string) =>
+    text
+      .replace(MIRROR_WRAPPER, " ")
+      .replace(/\d{4}-\d{2}-\d{2}/g, " ")
+      .replace(/\b\w{3,}\s+\d{1,2},?\s*\d{4}\b/g, " ")
+      .replace(/\b\d{1,2}[:.]\d{2}\s*(am|pm)?\b/gi, " ")
+      .replace(/[^A-Za-z0-9À-ÿ]+/g, " ")
+      .toLowerCase()
+      .split(" ")
+      .filter((w) => w.length >= 3)
+  // BY WORD, NOT BY STRING. Striking out the title as a literal caught the
+  // mirrored records and missed the calendar invitations, whose title and body
+  // say the same thing in a different arrangement — "Invitation: Bergman dispatch
+  // review @ Tue Aug 25" over a body reading "Bergman dispatch review / Tue Aug
+  // 25". Asking which words the body has that the title did not is the question
+  // that was meant all along, and it answers both.
+  const named = new Set(words(row.title ?? ""))
+  return words(plainText(row.text ?? "")).filter((w) => !named.has(w)).length >= SUBSTANTIVE_WORDS
+}
+
 function diversify(
   ranked: { row: ScoredRow; score: number }[],
   want: number
@@ -2332,7 +2393,13 @@ function diversify(
   for (const item of ranked) {
     const key = (item.row.title ?? "").trim().toLowerCase()
     const used = seen.get(key) ?? 0
-    if (used < PASSAGES_PER_TITLE) {
+    // TWO PREFERENCES, ONE PASS, AND THE SAME BARGAIN FOR BOTH: spread the answer
+    // across the things it is about, and spend slots on passages that say
+    // something — but neither is PAID for. Anything set aside here comes back
+    // below if the answer would otherwise be short, so an answer can still be six
+    // passages from one document, and still quote a bare diary entry when a bare
+    // diary entry is genuinely all there is.
+    if (used < PASSAGES_PER_TITLE && saysSomething(item.row)) {
       seen.set(key, used + 1)
       kept.push(item)
     } else skipped.push(item)

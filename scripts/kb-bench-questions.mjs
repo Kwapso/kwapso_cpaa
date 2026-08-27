@@ -129,15 +129,23 @@ export const QUESTIONS = [
   // EXACT_TERM_MAX_CHUNKS and EXACT_WEIGHT in knowledge.ts.
   {
     q: "Could somebody remind me where things currently stand with task 3144, and whether anybody has replied about it since last week?",
-    cites: ["3144"],
-    lead: ["3144", "pending", "gravity", "query", "FluClinic"],
-    topic: ["3144"],
+    // NO `cites`, AND THAT IS THE CORRECTION. A title key is the wrong instrument
+    // for a reference: the sources that actually discuss ticket 3144 are the
+    // FluClinic Stripe-webhook meetings, their notes and the chat where Chilavert
+    // asks about it, and not one of those carries the number in its title. The
+    // only titles that do are the calendar envelopes — "Invitation: FluClinic :
+    // Task 3144 @ Tue Aug 25" — whose bodies are the same words again with a time
+    // on them. So a title key was scoring this question PASS for citing the two
+    // sources that say least about it, and FAIL the moment retrieval started
+    // finding the material. `lead` is the honest test: the passages must contain
+    // the reference itself.
+    lead: ["3144"],
+    topic: ["3144", "FluClinic", "Stripe", "webhook"],
   },
   {
     q: "task 3144",
-    cites: ["3144"],
-    lead: ["3144", "pending", "gravity", "query", "FluClinic"],
-    topic: ["3144"],
+    lead: ["3144"],
+    topic: ["3144", "FluClinic", "Stripe", "webhook"],
   },
 
   // ── SAYING NOTHING, WHEN THERE IS NOTHING ────────────────────────────────

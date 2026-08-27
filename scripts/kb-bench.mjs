@@ -197,6 +197,19 @@ function judge(q, answer) {
     const hit = q.cites.some((want) => titles.some((t) => t.toLowerCase().includes(want.toLowerCase())))
     if (!hit) reasons.push(`wanted ${q.cites.join(" or ")}, cited ${titles.join(" / ") || "nothing"}`)
   }
+  // AND THE MATERIAL, NOT ONLY THE NAME OF IT. A title key was passing questions
+  // whose every passage said nothing — six 2027 placeholders all correctly titled
+  // "🧡 Team Assembly", and a calendar invitation correctly titled "Invitation:
+  // FluClinic : Task 3144" — because a placeholder and the transcript of the
+  // meeting it stands for HAVE THE SAME TITLE. So where a question carries an
+  // authored `lead` (things the material actually says), at least one passage must
+  // contain one of them. That is the same key, read against the text instead of
+  // the label, and it is what makes a hollow pass impossible rather than unlikely.
+  if (q.lead) {
+    const body = answer.passages.map((p) => p.text).join(" \n ").toLowerCase()
+    if (!q.lead.some((w) => body.includes(String(w).toLowerCase())))
+      reasons.push(`no passage says any of ${q.lead.slice(0, 4).join(" / ")} — the titles matched, the material did not`)
+  }
   if (q.spread) {
     const subjects = new Set(titles.map((t) => t.toLowerCase().replace(/^(invitation|accepted|declined|notes|updated invitation|canceled|cancelled):\s*/i, "").replace(/[“”"]/g, "").trim()))
     if (subjects.size < q.spread) reasons.push(`only ${subjects.size} distinct subjects among ${titles.length} citations`)
