@@ -56,10 +56,24 @@ const DEFERRED_UPLOAD_FORMS: { component: string; maker: string; why: string }[]
   },
 ]
 
-/** The JSX attribute's whole expression, brace-balanced. A regex cannot do this:
- * `onSubmit={async (v) => { … { … } … }}` nests, and a lazy match stops at the
- * first `}` — which is inside the body, so a naive scan reads every one of these
- * as empty and passes. */
+/** The JSX attribute's whole expression, brace-balanced.
+ *
+ * A REGEX CANNOT DO THIS, and it is worth being exact about why, because the
+ * first version of this note got the direction wrong and was believed. The real
+ * call sites nest — `createStoryFrom(teamId, { ...v, sprintId }, t)` — so a lazy
+ * `onSubmit=\{([\s\S]*?)\}` stops at the OBJECT LITERAL's brace, three lines
+ * before the `return`. Measured on the real source, not reasoned about:
+ *
+ *   captures → "async (v) => { const madeId = await createStoryFrom(teamId, { ...v, sprintId "
+ *   sees `return madeId` → false
+ *
+ * So the failure it causes is a FALSE FAILURE — every correct call site reported
+ * as dropping files — not a vacuous pass. That is the noisy kind of wrong, which
+ * gets noticed and then gets the check deleted, and a deleted check is a vacuous
+ * pass with extra steps. Fail-closed either way: an `onSubmit` this cannot read
+ * is pushed as an offender below rather than skipped.
+ *
+ * Pinned by a case in the suite, so swapping this for a regex goes red. */
 function propExpression(block: string, prop: string): string | null {
   const at = block.indexOf(`${prop}={`)
   if (at === -1) return null
@@ -153,6 +167,24 @@ describe("R41 — a picked file is either sent or refused, never dropped", () =>
       offenders,
       `R41 — a file somebody picked is either sent or refused, never dropped:\n  ${offenders.join("\n  ")}`
     ).toEqual([])
+  })
+
+  // THE READER ITSELF, pinned. `propExpression` is the only reason this law can
+  // see a `return` at all, and the temptation to "simplify" it to a regex is
+  // exactly what would break it — silently to whoever makes the change, loudly
+  // and wrongly to everybody else.
+  it("picked-files-are-sent: the prop reader survives a nested body", () => {
+    const real = `<StoryFormDialog onSubmit={async (v) => {
+      const madeId = await createStoryFrom(teamId, { ...v, sprintId }, t)
+      return madeId
+    }} />`
+    const expr = propExpression(real, "onSubmit")
+    expect(expr, "the reader must return the WHOLE body, past every nested brace").toContain("return madeId")
+    expect(handsBackTheId(expr as string, "createStoryFrom")).toBe(true)
+    // …and the lazy regex it must not become, so the difference is a test and
+    // not a paragraph. It stops at the object literal and loses the return.
+    const lazy = /onSubmit=\{([\s\S]*?)\}/.exec(real)?.[1] ?? ""
+    expect(handsBackTheId(lazy, "createStoryFrom")).toBe(false)
   })
 
   // The two shapes, pinned. Both are invisible in a passing run once every call
