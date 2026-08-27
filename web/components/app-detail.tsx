@@ -731,8 +731,12 @@ export function AppDetailScreen({
         storyTypes={options.storyTypes}
         draftKey={`story:add:app:${appId}`}
         onSubmit={async (v) => {
-          await createStoryFrom(teamId, v, t)
+          // The id goes back so the dialog can hang the picked files on it —
+          // see the note at the sprint's copy of this call. Discarding it drops
+          // the file silently.
+          const madeId = await createStoryFrom(teamId, v, t)
           invalidate(sliceKey("stories-app", appId))
+          return madeId
         }}
       />
     <RecordFooter

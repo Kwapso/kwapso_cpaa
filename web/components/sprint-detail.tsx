@@ -350,8 +350,14 @@ export function SprintDetailScreen({
         storyTypes={options.storyTypes}
         draftKey={`story:add:sprint:${sprintId}`}
         onSubmit={async (v) => {
-          await createStoryFrom(teamId, { ...v, sprintId }, t)
+          // THE NEW STORY'S ID GOES BACK, and it is not bookkeeping: the dialog
+          // hangs whatever files somebody picked on whatever this returns. Three
+          // of the four create call sites awaited this and threw it away, so a
+          // screenshot chosen while writing the story was silently dropped —
+          // story created, no error, and nothing in R2 to recover from.
+          const madeId = await createStoryFrom(teamId, { ...v, sprintId }, t)
           invalidate(sliceKey("stories-sprint", sprintId))
+          return madeId
         }}
       />
 

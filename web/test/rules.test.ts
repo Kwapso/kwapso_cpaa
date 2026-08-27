@@ -2314,6 +2314,7 @@ describe("RULES — the laws of the base", () => {
       "details-ask-the-door", // R38: the paged-detail census above — a find over a PAGE is not a lookup
       "kit-supplies-the-ui", // R39: the UI-package census below, derived from what the kit itself imports
       "reachable-bytes", // R40: web/test/reachable-bytes.test.ts — the write census (off the wrangler bucket bindings) walked to the render
+      "picked-files-are-sent", // R41: web/test/picked-files-are-sent.test.ts — R40's sibling, where nothing is stored at all
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
