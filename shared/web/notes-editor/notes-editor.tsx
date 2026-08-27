@@ -18,7 +18,7 @@
 
 import * as React from "react"
 import { ListOrdered } from "@shared/ui/icons"
-import { Bold, Highlighter, Italic, List as ListIcon, Minus } from "lucide-react"
+import { Bold, FillColor, Italic, List as ListIcon, Minus } from "@shared/ui/icons"
 
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
@@ -84,7 +84,7 @@ function Notes({
           <Italic />
         </Toggle>
         <Toggle size="sm" aria-label={t("Highlight")} onPressedChange={highlight}>
-          <Highlighter />
+          <FillColor />
         </Toggle>
         <Toggle
           size="sm"

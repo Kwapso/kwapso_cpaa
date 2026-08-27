@@ -21,7 +21,7 @@
  *       (the OLD Notes is a rich-text editor; the kit's Notes is remark rows)
  *   TabsView / defaultTabsConfig / TabsConfig / TabItem  (from …/tabs/tabs)
  *                                        → @shared/web/screen-engine/tabs-view
- *   lucide-react names the kit ships     → @shared/ui/icons  (others stay on lucide, logged)
+ *   lucide-react names                   → @shared/ui/icons  (ALL of them — see below)
  *   @import "…shared/ui/styles.css"      → tokens.css + motion.css
  */
 
@@ -108,18 +108,17 @@ for (const file of targets) {
           const items = parseNamed(named[1])
           const inKit = items.filter((i) => iconNames.has(nameOf(i)))
           const notInKit = items.filter((i) => !iconNames.has(nameOf(i)))
-          if (!inKit.length) {
-            notInKit.forEach((i) => strayLucide.set(nameOf(i), (strayLucide.get(nameOf(i)) ?? 0) + 1))
-            return whole
-          }
+          /* NOTHING STAYS ON LUCIDE. This used to split the import and leave
+             the names the kit lacked pointing at lucide-react, logged for
+             Aurora — correct while the kit drew 96 glyphs. It draws 1,383 now
+             and lucide is not installed, so a name left behind is a build
+             error rather than a note. Record it and fail; the fix is a glyph
+             upstream or a different name, never a second icon package. */
+          notInKit.forEach((i) => strayLucide.set(nameOf(i), (strayLucide.get(nameOf(i)) ?? 0) + 1))
+          if (!inKit.length) return whole
           edits++
           const typePrefix = /^\s*import\s+type\s/.test(whole) ? "import type " : "import "
-          const lines = [`${typePrefix}{ ${inKit.join(", ")} } from "@shared/ui/icons"`]
-          if (notInKit.length) {
-            notInKit.forEach((i) => strayLucide.set(nameOf(i), (strayLucide.get(nameOf(i)) ?? 0) + 1))
-            lines.push(`${typePrefix}{ ${notInKit.join(", ")} } from "lucide-react"`)
-          }
-          return lines.join("\n")
+          return `${typePrefix}{ ${inKit.join(", ")} } from "@shared/ui/icons"`
         }
 
         if (!s.startsWith("@shared/ui/")) return whole
@@ -168,8 +167,11 @@ for (const file of targets) {
 }
 
 console.log(`\ndesign-imports: ${filesChanged} files changed, ${totalEdits} rewrites`)
-if (strayLucide.size)
-  console.log(`still on lucide-react (no kit icon of that name): ${[...strayLucide.keys()].join(", ")} — tell Aurora`)
+if (strayLucide.size) {
+  console.log(`NO KIT GLYPH for: ${[...strayLucide.keys()].join(", ")}`)
+  console.log("  lucide is not a dependency any more. Add the glyph upstream in Kwapso/kwapso-ui-ux, or use a name the kit draws.")
+  process.exitCode = 1
+}
 if (unresolved.size) {
   console.log("UNRESOLVED old-kit specifiers (no kit target found):")
   for (const [s, n] of unresolved) console.log(`  ${s} ×${n}`)

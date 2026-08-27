@@ -54,7 +54,7 @@ import { Spinner } from "@shared/ui/controls/spinner/spinner"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "@shared/ui/icons"
 
-import { DynamicIcon, type IconName } from "lucide-react/dynamic"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "./deep-link/shape"
 import { useT } from "@shared/web/language"
@@ -263,11 +263,10 @@ export function KnowledgeAsk({
                           Same glyph vocabulary as the knowledge base's own list,
                           so a source looks the same wherever it is shown. */}
                       <span className="bg-muted text-muted-foreground mt-0.5 grid size-5 shrink-0 place-items-center rounded-xl">
-                        <DynamicIcon
+                        <Icon
                           name={(KNOWLEDGE_KIND_ICON[c.kind] ?? "file") as IconName}
                           aria-hidden
                           className="size-3"
-                          fallback={() => null}
                         />
                       </span>
                       <span className="min-w-0">

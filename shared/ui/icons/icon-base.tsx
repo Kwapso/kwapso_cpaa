@@ -27,10 +27,12 @@ import { cn } from "../lib/utils";
        they do today.
      · `size` is accepted as a number, a string, or one of the six delivery
        sizes.
-     · `strokeWidth` / `absoluteStrokeWidth` are accepted and ignored — the
-       kwapso glyphs are filled silhouettes, not strokes, so there is no
-       stroke to weight. Accepting them means a call site does not have to be
-       edited to compile.
+     · `strokeWidth` / `absoluteStrokeWidth` DO SOMETHING NOW. They used to be
+       accepted and ignored, because the placeholder glyphs were filled
+       silhouettes with no stroke to weight. The art is the Iconoir pack, drawn
+       as strokes on a 24 grid at 1.5, so the props are honest: `strokeWidth`
+       sets the weight and `absoluteStrokeWidth` holds it constant in device
+       pixels as the icon scales, which is lucide's meaning for both.
    ========================================================================= */
 
 /**
@@ -105,13 +107,24 @@ export function createIcon({ displayName, viewBox, children }: CreateIconOptions
       size,
       title,
       className,
-      strokeWidth: _strokeWidth,
-      absoluteStrokeWidth: _absoluteStrokeWidth,
+      strokeWidth = 1.5,
+      absoluteStrokeWidth = false,
       ...props
     },
     ref
   ) {
     const dimension = resolveSize(size);
+
+    /* `absoluteStrokeWidth` means "hold the stroke at this many DEVICE pixels
+       as the icon scales", so it needs the size as a number. resolveSize hands
+       back a CSS length (a rem token), and a caller may pass "1.5em" or a
+       Tailwind class instead of a number at all — there is no px to divide by
+       in those cases, so the weight is left alone rather than guessed. */
+    const px = typeof size === "number" ? size : Number(size);
+    const weight =
+      absoluteStrokeWidth && Number.isFinite(px) && px > 0
+        ? (Number(strokeWidth) * 24) / px
+        : strokeWidth;
     const labelled = title !== undefined || props["aria-label"] !== undefined;
 
     return (
@@ -121,9 +134,21 @@ export function createIcon({ displayName, viewBox, children }: CreateIconOptions
         viewBox={viewBox}
         width={dimension}
         height={dimension}
-        fill="currentColor"
-        /* An icon takes the ink of whatever it sits in. It never names a
-           colour, which is how it works in both themes for free. */
+        /* THE WHOLE SET IS STROKED, so the root paints the stroke and the art
+           carries only geometry. The art still names no colour of its own,
+           which is how an icon works in both themes for free — it takes the
+           ink of whatever it sits in.
+
+           `fill` is none rather than currentColor, and that one word is what
+           makes stroked art possible: an outline path under a filled root is
+           a solid blob. The handful of glyphs with a genuinely filled part —
+           the dot of an eye, a pip — set `fill="currentColor"` on that element
+           themselves, and a child attribute beats this one. */
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={weight}
+        strokeLinecap="round"
+        strokeLinejoin="round"
         focusable="false"
         aria-hidden={labelled ? undefined : true}
         role={labelled ? "img" : undefined}

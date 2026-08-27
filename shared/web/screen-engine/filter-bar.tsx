@@ -13,7 +13,7 @@
 
 import * as React from "react"
 import { X } from "@shared/ui/icons"
-import { Filter } from "lucide-react"
+import { Filter } from "@shared/ui/icons"
 
 import { facetOptions } from "./collection"
 import { SEARCHABLE_THRESHOLD, type FilterFacet } from "./config"

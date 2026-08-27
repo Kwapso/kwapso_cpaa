@@ -4,7 +4,7 @@
 // WHAT THIS IS FOR
 //
 // UI-CONVENTIONS §5 (amended 17 Aug 2026) defines a TYPE MARK: one glyph, set as
-// DATA on the team's own dropdown value, sitting in the slot a lucide icon would
+// DATA on the team's own dropdown value, sitting in the slot a kit icon would
 // take and never inside a sentence. CHECKLIST 11.8 asks for one on every
 // collection and 21.6 asks for glyphs on the main screens. Both shipped PART
 // DONE, and both stop at the same wall in four places: the slot does not exist
@@ -122,7 +122,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // ── #18 · A TAB ──────────────────────────────────────────────────────────
   // The Tickets strip has a tab per TICKET TYPE, and a type is exactly the thing
   // §5 gives a mark to — the same glyph the ticket's own header band draws.
-  // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
+  // `TabsView` resolves `icon` as a kit glyph NAME, so a pictograph in that slot
   // renders nothing at all.
   it("#18 · SHIPPED — a tab takes a node, and the ticket kinds carry their marks", () => {
     const tabs = library("screen-engine", "tabs-view.tsx")
@@ -196,7 +196,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
 
     const panel = readFileSync(join(ROOT, "web", "components", "work-logs-panel.tsx"), "utf8")
     expect(
-      (panel.match(/icon:\s*<DynamicIcon name=\{CONCEPT_ICON\./g) ?? []).length,
+      (panel.match(/icon:\s*<Icon name=\{CONCEPT_ICON\./g) ?? []).length,
       "the numbers band's cards no longer carry their concept icons"
     ).toBeGreaterThanOrEqual(3)
   })

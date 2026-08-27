@@ -9,7 +9,7 @@ import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } fr
 import { personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
-import { DynamicIcon, type IconName } from "lucide-react/dynamic"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import type {
   Account,
   ActivityItem,
@@ -256,11 +256,10 @@ export function shapeKnowledgeList(
       id: s.id,
       mark: (
         <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl">
-          <DynamicIcon
+          <Icon
             name={(KNOWLEDGE_KIND_ICON[s.kind] ?? "file") as IconName}
             aria-hidden
             className="size-4"
-            fallback={() => null}
           />
         </span>
       ),

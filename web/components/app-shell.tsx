@@ -13,9 +13,9 @@ import { usePathname } from "next/navigation"
 import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/icons"
-// `Layers` is the audit module's mark and the kit's 96 have no glyph of that
-// name yet — it rides on lucide until Aurora ships one (logged for her).
-import { Layers } from "lucide-react"
+// `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
+// name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
+import { SeaWaves } from "@shared/ui/icons"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
@@ -67,7 +67,7 @@ const SECTION_ICONS: Record<string, typeof Home> = {
   stories: Hammer,
   sprints: CalendarRange,
   // The package a client bought — several sprints arriving together.
-  waves: Layers,
+  waves: SeaWaves,
   apps: AppWindow,
   tasks: ListTodo,
   time: Timer,

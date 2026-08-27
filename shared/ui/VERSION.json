@@ -1,12 +1,11 @@
 {
-  "repo": "Kwapso/design",
-  "tag": "v1.0.7",
-  "sha": "5e0968479c596501d0ba8c638827255205bee9f6",
-  "hash": "c3895ef1cb54309e48ac3615e33dfd04c4ebc0c9605dfac6fe7c4c54c930f244",
-  "syncedAt": "2026-08-25",
+  "repo": "Kwapso/kwapso-ui-ux",
+  "tag": "v1.0.8",
+  "sha": "5aeb0b41ab950f3a7853e4f9945dcf50a000f21e",
+  "hash": "7d199131dbb476016433c42bd74f244b3cb16c6ff4ce34c8051913da04115223",
+  "syncedAt": "2026-08-27",
   "iconArt": {
-    "stoodIn": 96,
-    "drawn": 0,
-    "source": "lucide-react"
+    "count": 1383,
+    "source": "kwapso-ui-ux"
   }
 }

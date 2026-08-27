@@ -1,8 +1,73 @@
 /* One named React export per icon, plus the shared types.
  *
- * 93 commission names + 3 additive (ChevronDown, ChevronUp, Star).
- * Artwork is placeholder; names, API and sizes are final.
+ * 1383 glyphs from the Iconoir pack (MIT), under Iconoir's own names.
+ * 60 of the 93 commission names + 3 additive names are spelled
+ * differently by Iconoir and are re-exported below as aliases, so a call site
+ * written against the commission spelling keeps working unchanged.
  */
 export { createIcon, ICON_SIZES } from "./icon-base";
 export type { IconProps, IconSize, IconComponent } from "./icon-base";
 export * from "./icons.generated";
+
+export {
+  Alarm as AlarmClock,
+  BellOff as AlarmClockOff,
+  UndoAction as ArchiveRestore,
+  ArrowSeparateVertical as ArrowUpDown,
+  Prohibition as Ban,
+  Cash as Banknote,
+  Building as Building2,
+  CalendarRotate as CalendarClock,
+  Calendar as CalendarDays,
+  CalendarArrowDown as CalendarRange,
+  CalendarRotate as CalendarSync,
+  StatsReport as ChartNoAxesColumn,
+  DoubleCheck as CheckCheck,
+  NavArrowDown as ChevronDown,
+  NavArrowLeft as ChevronLeft,
+  NavArrowRight as ChevronRight,
+  Sort as ChevronsUpDown,
+  NavArrowUp as ChevronUp,
+  Pause as CircleStop,
+  Copy as ClipboardCopy,
+  Reply as CornerDownRight,
+  OpenNewWindow as ExternalLink,
+  EyeClosed as EyeOff,
+  Page as FileSpreadsheet,
+  PageEdit as FileText,
+  ClockRotateRight as History,
+  Home as House,
+  MailIn as Inbox,
+  Key as KeyRound,
+  Translate as Languages,
+  BookStack as LibraryBig,
+  Lifebelt as LifeBuoy,
+  Link as Link2,
+  NumberedListLeft as ListOrdered,
+  TaskList as ListTodo,
+  Refresh as Loader2,
+  MoreHoriz as MoreHorizontal,
+  SidebarCollapse as PanelLeftClose,
+  SidebarExpand as PanelLeftOpen,
+  Attachment as Paperclip,
+  EditPencil as Pencil,
+  Edit as PenLine,
+  SwitchOff as Power,
+  RefreshDouble as RefreshCw,
+  Undo as RotateCcw,
+  PathArrow as Route,
+  SearchWindow as SearchX,
+  Settings as Settings2,
+  ShareAndroid as Share,
+  ShieldBroken as ShieldOff,
+  Sparks as Sparkles,
+  OpenInWindow as SquareArrowOutUpRight,
+  Trash as Trash2,
+  WarningTriangle as TriangleAlert,
+  Undo as Undo2,
+  UserBadgeCheck as UserCheck,
+  UserXmark as UserMinus,
+  User as UserRound,
+  Group as Users,
+  VideoCamera as Video,
+} from "./icons.generated";

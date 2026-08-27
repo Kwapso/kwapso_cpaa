@@ -515,7 +515,7 @@ to add a UI law is fixed: **RULES.md row ⇄ `registry.ts` entry ⇄ a real chec
 
 ## 4. The action-icon mapping
 
-Action buttons carry an icon (lucide), placed **before** the label, sized **`size-3.5`**
+Action buttons carry an icon (from `@shared/ui/icons`), placed **before** the label, sized **`size-3.5`**
 on inline action buttons. Keep the icon-for-action mapping identical across the app.
 Add a concept to the vocabulary, never a one-off icon at a call site.
 
@@ -609,7 +609,7 @@ plain, sentence case, no jargon, no emoji**, and it uses the **glossary terms**.
   in prose is what makes a business app read like a chat message.
 
   **A TYPE MARK is not copy, and it is allowed** (see §4). It is the small pictograph
-  that sits in the leading slot of a row where a lucide icon would otherwise sit, marking
+  that sits in the leading slot of a row where a kit icon would otherwise sit, marking
   what KIND of record this is: a bug on a fix, a question mark on a question, a gem on an
   implementation sprint. It qualifies only if all four are true, it occupies an icon
   slot rather than appearing inside a sentence, it is `aria-hidden` so a screen reader
@@ -890,7 +890,7 @@ It exists because a census on 19 Aug 2026 found **seventeen implementations** of
 "what to draw when there is no picture", collapsing to **thirteen visibly
 different answers** — one letter in a circle, two letters in a circle, an emoji on
 a muted square, a letter on a muted square, a big letter on a wide block, a bare
-emoji with no box, a lucide glyph in a filled square, the same glyph in an
+emoji with no box, a kit glyph in a filled square, the same glyph in an
 unfilled one, a coloured dot, and, on most rows in the app, nothing at all. None
 was wrong on its own screen. Drift like that is only ever visible in aggregate,
 and nobody sees the aggregate, which is why nobody had filed it.

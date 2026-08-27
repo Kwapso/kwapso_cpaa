@@ -8,7 +8,7 @@ import { cn } from "@shared/ui/lib/utils"
 import { Button, buttonVariants } from "@shared/ui/controls/button/button"
 import { Card, CardContent } from "@shared/ui/controls/card/card"
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/icons"
-import { DynamicIcon, type IconName } from "lucide-react/dynamic"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
@@ -74,7 +74,7 @@ export function EmptyLine({
   return (
     <p className="text-muted-foreground flex items-center gap-2 text-sm">
       <span aria-hidden className="shrink-0">
-        <DynamicIcon name={CONCEPT_ICON[concept] as IconName} className="size-4" fallback={() => null} />
+        <Icon name={CONCEPT_ICON[concept] as IconName} className="size-4" />
       </span>
       {children}
     </p>
