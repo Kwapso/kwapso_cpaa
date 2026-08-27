@@ -274,7 +274,30 @@ function firstSentence(answer) {
   return stop === -1 ? line : line.slice(0, stop + 1)
 }
 
-/** THE THREE THINGS HE NAMED, one function, all authored or measured off the
+/** THE PEOPLE WHOSE NAMES APPEAR IN THIS TEAM'S TRANSCRIPTS. Authored, because
+ * it is a fact about the agency and not about the pipeline — and short, because
+ * the check below only needs to recognise a name when it sees one. */
+const PEOPLE = ["Alexander", "Aurora", "Alaap", "Ãlaap", "Ishita", "Chilavert", "Marco", "Tobias"]
+
+/** DID THE ANSWER SAY WHO, and is that person actually in the material?
+ *
+ * The owner's comparison was NotebookLM: "able to pinpoint who said what, this is
+ * where their decision landed, this is what to do next" against our "the team
+ * discussed". The names are already in the passages — a transcript carries
+ * "Aurora observes…", a chat carries "Chilavert George:" — and the writer was
+ * flattening them into a committee.
+ *
+ * BOTH HALVES, AND THE SECOND IS THE ONE THAT MATTERS. Naming somebody is easy to
+ * fake, so this only counts a name the PASSAGES also contain. An answer that
+ * attributes a decision to a person who is not in the material scores zero here
+ * and should — an invented speaker is worse than none, for the same reason an
+ * invented date is: everything else this app shows a person is true. */
+function attributes(answer, written) {
+  const material = answer.passages.map((p) => p.text).join(" ")
+  return PEOPLE.some((who) => written.includes(who) && material.includes(who))
+}
+
+/** THE THINGS HE NAMED, one function, all authored or measured off the
  * material — never off the pipeline's own output. */
 function composeScore(q, answer, written) {
   const lead = firstSentence(written)
@@ -291,6 +314,9 @@ function composeScore(q, answer, written) {
     onTopic: offTopic.length === 0,
     // THE BIG JUICY FILE IT SHOULD HAVE TOUCHED — no slot spent on a placeholder.
     earned: empty.length === 0,
+    // WHO SAID IT — only asked of a question about a conversation, because a
+    // process map has no speakers and demanding one would be asking for fiction.
+    attributed: q.conversation ? attributes(answer, written) : null,
     lead,
     offTopic,
     empty: empty.length,
@@ -342,7 +368,8 @@ for (const [i, q] of QUESTIONS.entries()) {
     graded.push({ label, ...g })
     console.log(
       `     ANSWER  leads:${g.leads ? "yes" : "NO "}  on-topic:${g.onTopic ? "yes" : `NO (${g.offTopic.length}/${answer.citations.length})`}` +
-        `  earned:${g.earned ? "yes" : `NO (${g.empty}/${g.passages} say nothing)`}`
+        `  earned:${g.earned ? "yes" : `NO (${g.empty}/${g.passages} say nothing)`}` +
+        `${g.attributed === null ? "" : `  who-said-it:${g.attributed ? "yes" : "NO "}`}`
     )
     if (VERBOSE) {
       console.log(`       first sentence: ${g.lead.slice(0, 150)}`)
@@ -362,6 +389,18 @@ if (COMPOSE && graded.length) {
   console.log(`  leads with the answer      ${String(leads).padStart(2)}/${graded.length}  ${pct(leads)}   "beating around the bush"`)
   console.log(`  every citation on topic    ${String(onTopic).padStart(2)}/${graded.length}  ${pct(onTopic)}   "files that were not important"`)
   console.log(`  no slot spent on nothing   ${String(earned).padStart(2)}/${graded.length}  ${pct(earned)}   "the big juicy files it didn't touch"`)
+  // A FOURTH ROW, over a SMALLER set: only the questions about a conversation.
+  // Its denominator is different from the three above on purpose — a process map
+  // has nobody to quote, and folding it in would dilute the one thing this row is
+  // for.
+  const askedWho = graded.filter((g) => g.attributed !== null)
+  if (askedWho.length) {
+    const said = askedWho.filter((g) => g.attributed).length
+    console.log(
+      `  says who said it          ${String(said).padStart(2)}/${askedWho.length}  ` +
+        `${Math.round((100 * said) / askedWho.length)}%   "pinpoint who said what" (conversations only)`
+    )
+  }
   // ONE RUN IS NOT A SCORE, for the top line and the first row only. Measured over
   // three consecutive runs of the same code against the same material on 27 Aug
   // 2026: the two rows decided by RETRIEVAL — on topic, and no slot spent on

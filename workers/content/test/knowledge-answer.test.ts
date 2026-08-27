@@ -177,7 +177,7 @@ describe("writing it — one call, and a failure that costs nothing", () => {
   // its own censuses on 27 Aug: a predicate nobody calls is not a guard.
   it("takes the model's own source list off before anybody reads it", async () => {
     const { env } = fakeAi(
-      "The window is Tuesdays.\n\nSources:\n- Bergman rollout note\n- ⏮️ Week recap\n"
+      "The window is Tuesdays.\n\nSources:\n- Bergman rollout note\n"
     )
     expect(await writeAnswer(env, "what did we agree?", material, sources)).toBe("The window is Tuesdays.")
   })
@@ -303,7 +303,8 @@ describe("R23 — a written answer cannot outlive its sources", () => {
 describe("stripTrailingSourceList", () => {
   it("takes off a trailing Sources list, and leaves the answer whole", () => {
     const out = stripTrailingSourceList(
-      "The cutover moves to April.\n\nMarta will send the list.\n\nSources:\n- ⏮️ Week recap\n- Notes by Gemini\n"
+      "The cutover moves to April.\n\nMarta will send the list.\n\nSources:\n- ⏮️ Week recap\n- Bergman rollout note\n",
+      ["⏮️ Week recap", "Bergman rollout note"]
     )
     expect(out).toBe("The cutover moves to April.\n\nMarta will send the list.")
   })
@@ -311,7 +312,7 @@ describe("stripTrailingSourceList", () => {
   it("and the other ways it introduces one", () => {
     for (const heading of ["These points came from:", "This came from:", "**Sources**", "The sources:"])
       expect(
-        stripTrailingSourceList(`It moves to April.\n\n${heading}\n- ⏮️ Week recap\n`),
+        stripTrailingSourceList(`It moves to April.\n\n${heading}\n- ⏮️ Week recap\n`, ["⏮️ Week recap"]),
         heading
       ).toBe("It moves to April.")
   })
@@ -321,37 +322,39 @@ describe("stripTrailingSourceList", () => {
   // would delete the answer and leave the preamble.
   it("but never a list that is the answer", () => {
     const steps = "The steps are:\n- Collect the documents by email\n- Type the details into the system"
-    expect(stripTrailingSourceList(steps)).toBe(steps)
+    expect(stripTrailingSourceList(steps, ["Taking on a new insurance client"])).toBe(steps)
     const covered = "What was agreed:\n- the cutover moves\n- Ana sends the list"
-    expect(stripTrailingSourceList(covered)).toBe(covered)
+    expect(stripTrailingSourceList(covered, ["⏮️ Week recap"])).toBe(covered)
   })
 
   it("and never an answer that merely mentions where something came from", () => {
     const prose = "According to the Week recap notes, the cutover moves to April."
-    expect(stripTrailingSourceList(prose)).toBe(prose)
+    expect(stripTrailingSourceList(prose, ["⏮️ Week recap"])).toBe(prose)
   })
 
   it("and an answer with no list at all is returned untouched", () => {
     const plain = "The knowledge base has nothing on this."
-    expect(stripTrailingSourceList(plain)).toBe(plain)
+    expect(stripTrailingSourceList(plain, ["⏮️ Week recap"])).toBe(plain)
   })
 })
 
 describe("stripTrailingSourceList — the one-line form", () => {
   it("takes off a final `Source: A, B, C` line", () => {
     expect(
-      stripTrailingSourceList("Vouchers go out by email.\n\nSource: Issuing vouchers to a pharmacy, Pharmacy Vouchers")
+      stripTrailingSourceList("Vouchers go out by email.\n\nSource: Issuing vouchers to a pharmacy", [
+        "Issuing vouchers to a pharmacy",
+      ])
     ).toBe("Vouchers go out by email.")
   })
 
   // Mid-answer, that same shape is somebody making a point, not signing off.
   it("but not one in the middle of an answer", () => {
     const prose = "Source: the runbook.\n\nIt says to check the cookie before restarting."
-    expect(stripTrailingSourceList(prose)).toBe(prose)
+    expect(stripTrailingSourceList(prose, ["The dispatch runbook"])).toBe(prose)
   })
 
   it("and never the whole answer", () => {
-    expect(stripTrailingSourceList("Sources: the Week recap")).toBe("Sources: the Week recap")
+    expect(stripTrailingSourceList("Sources: the Week recap", ["⏮️ Week recap"])).toBe("Sources: the Week recap")
   })
 })
 
@@ -371,7 +374,10 @@ describe("stripTrailingSourceList — matched on how the heading ENDS", () => {
       "Sources:",
     ])
       expect(
-        stripTrailingSourceList(`The webhook was fixed on 27 August.\n\n${heading}\n- FluClinic: Stripe integration QC\n`),
+        stripTrailingSourceList(
+          `The webhook was fixed on 27 August.\n\n${heading}\n- FluClinic: Stripe integration QC\n`,
+          ["FluClinic: Stripe integration QC"]
+        ),
         heading
       ).toBe("The webhook was fixed on 27 August.")
   })
@@ -381,7 +387,7 @@ describe("stripTrailingSourceList — matched on how the heading ENDS", () => {
   it("and still refuses to eat a list that is the answer", () => {
     for (const heading of ["The steps are:", "What was agreed:", "Here is what happens next:", "The team agreed:"]) {
       const answer = `${heading}\n- Collect the documents by email\n- Type the details into the system`
-      expect(stripTrailingSourceList(answer), heading).toBe(answer)
+      expect(stripTrailingSourceList(answer, ["Taking on a new insurance client"]), heading).toBe(answer)
     }
   })
 })
@@ -418,5 +424,52 @@ describe("the writer is told when things happened", () => {
     const system = composeSystemPrompt()
     expect(system).toMatch(/never call something the latest/i)
     expect(system, "and it must say WHY, or it reads as a style rule").toMatch(/you cannot know/i)
+  })
+})
+
+// ── THE SHAPE IS NOT THE HEADING, IT IS THE CONTENTS ───────────────────────
+//
+// Two earlier versions matched the HEADING and both were outrun in the same
+// session by nothing more than a prompt edit: adding dates produced "This
+// information comes from the sources:", adding attribution produced "The sources
+// used to answer this question include:". A phrase list is a guess about wording,
+// and wording changes every time anybody touches the prompt.
+//
+// So the test is the thing that cannot be reworded: are the items OUR OWN source
+// titles? A model listing the titles it was given is signing off, whatever it
+// calls the heading — and a heading with anything else under it is prose.
+describe("stripTrailingSourceList — it is the items that decide", () => {
+  const titles = ["FluClinic: Stripe integration QC", "⏮️ Week recap"]
+
+  it("catches a sign-off nobody predicted the wording of", () => {
+    for (const heading of [
+      "The sources used to answer this question include:",
+      "This information comes from the sources:",
+      "**Sources**",
+      "Where this came from —",
+      "Referenced material:",
+    ])
+      expect(
+        stripTrailingSourceList(`The webhook was fixed.\n\n${heading}\n- FluClinic: Stripe integration QC\n`, titles),
+        heading
+      ).toBe("The webhook was fixed.")
+  })
+
+  // AND THE SAME LOOSE HEADING OVER REAL CONTENT IS UNTOUCHABLE, which is what
+  // the looseness is allowed to rest on.
+  it("but not a list of anything that is not a source we passed", () => {
+    const answer = "Sources:\n- Collect the documents by email\n- Type the details into the system"
+    expect(stripTrailingSourceList(answer, titles)).toBe(answer)
+  })
+
+  it("and not a block that mixes a source with a real point", () => {
+    const answer =
+      "It was fixed.\n\nWhat is left:\n- FluClinic: Stripe integration QC\n- Chilavert still owes the receipt copy"
+    expect(stripTrailingSourceList(answer, titles), "one real item makes it a paragraph").toBe(answer)
+  })
+
+  it("and nothing at all when we passed no titles to compare against", () => {
+    const answer = "It was fixed.\n\nSources:\n- FluClinic: Stripe integration QC"
+    expect(stripTrailingSourceList(answer, [])).toBe(answer)
   })
 })
