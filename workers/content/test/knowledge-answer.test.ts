@@ -26,7 +26,7 @@ import { TOOL_RESULT_TAG } from "@shared/workers/model-text"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 
 import type { Env } from "../src/env"
-import { composeSystemPrompt, composeUserPrompt, writeAnswer } from "../src/lib/knowledge-compose"
+import { composeSystemPrompt, composeUserPrompt, stripTrailingSourceList, writeAnswer } from "../src/lib/knowledge-compose"
 import { knowledgeAnswer } from "../src/lib/knowledge"
 
 const passage = (sourceId: string, title: string, text: string, seq = 0): KnowledgePassage => ({
@@ -157,13 +157,30 @@ describe("what the model is actually handed", () => {
       [passage("S1", "BERG-T0412", "The invoice run fails on the 1st.")],
       [cite("S1", "BERG-T0412", "resolved")]
     )
-    expect(prompt).toContain('says "resolved" right now')
+    // ON ITS OWN LINE, NOT WELDED TO THE TITLE. It used to read
+    // `Source: BERG-T0412 — that record says "resolved" right now`, which made
+    // the annotation part of the NAME as far as a model copying it was concerned:
+    // six of sixteen answers wrote a source list with our own scaffolding inside
+    // it, shown to the reader as the name of their record.
+    expect(prompt).toContain("Status of that record right now: resolved")
+    expect(prompt, "the title must be able to stand alone").toContain("Source: BERG-T0412\n")
   })
 })
 
 describe("writing it — one call, and a failure that costs nothing", () => {
   const material = [passage("S1", "Bergman rollout note", "We agreed the window is Tuesdays.")]
   const sources = [cite("S1", "Bergman rollout note")]
+
+  // AND THE CLEANING IS APPLIED, not merely available. The tests above prove
+  // `stripTrailingSourceList` works; this proves `writeAnswer` calls it — and
+  // without it they all still pass, which is the same hole this codebase found in
+  // its own censuses on 27 Aug: a predicate nobody calls is not a guard.
+  it("takes the model's own source list off before anybody reads it", async () => {
+    const { env } = fakeAi(
+      "The window is Tuesdays.\n\nSources:\n- Bergman rollout note\n- ⏮️ Week recap\n"
+    )
+    expect(await writeAnswer(env, "what did we agree?", material, sources)).toBe("The window is Tuesdays.")
+  })
 
   it("calls the model exactly ONCE and hands back what it wrote", async () => {
     const { env, calls } = fakeAi("The Bergman rollout note says the window is Tuesdays.")
@@ -267,5 +284,73 @@ describe("R23 — a written answer cannot outlive its sources", () => {
     })
     expect(answer.found).toBe(true)
     expect(answer.answer).toBeNull()
+  })
+})
+
+// ── THE SOURCE LIST THE MODEL WRITES ITSELF ────────────────────────────────
+//
+// The prompt tells it not to, in as many words, and it does it anyway: measured
+// over sixteen answers on 27 Aug 2026, TEN ended with a list of their own
+// sources. Everything the owner saw go wrong went wrong in that second list — an
+// internal fence name as `(tool_result from "NotesWeekrecapAug142026")`, a status
+// annotation copied in as if it were half a title, and a bullet opening with a
+// comma where a name should have been.
+//
+// The screen already lists every source from the SEAM, with a link on each and
+// the title exactly as the record holds it. So the model's version is the same
+// information with worse names, and it is cleaned at the boundary rather than
+// hoped about — the same argument `stripFenceEcho` makes beside it.
+describe("stripTrailingSourceList", () => {
+  it("takes off a trailing Sources list, and leaves the answer whole", () => {
+    const out = stripTrailingSourceList(
+      "The cutover moves to April.\n\nMarta will send the list.\n\nSources:\n- ⏮️ Week recap\n- Notes by Gemini\n"
+    )
+    expect(out).toBe("The cutover moves to April.\n\nMarta will send the list.")
+  })
+
+  it("and the other ways it introduces one", () => {
+    for (const heading of ["These points came from:", "This came from:", "**Sources**", "The sources:"])
+      expect(
+        stripTrailingSourceList(`It moves to April.\n\n${heading}\n- ⏮️ Week recap\n`),
+        heading
+      ).toBe("It moves to April.")
+  })
+
+  // THE HALF THAT MUST NOT BREAK, and the reason the heading list is narrow. A
+  // list is how a good answer to "what is the process?" is SHAPED — taking it off
+  // would delete the answer and leave the preamble.
+  it("but never a list that is the answer", () => {
+    const steps = "The steps are:\n- Collect the documents by email\n- Type the details into the system"
+    expect(stripTrailingSourceList(steps)).toBe(steps)
+    const covered = "What was agreed:\n- the cutover moves\n- Ana sends the list"
+    expect(stripTrailingSourceList(covered)).toBe(covered)
+  })
+
+  it("and never an answer that merely mentions where something came from", () => {
+    const prose = "According to the Week recap notes, the cutover moves to April."
+    expect(stripTrailingSourceList(prose)).toBe(prose)
+  })
+
+  it("and an answer with no list at all is returned untouched", () => {
+    const plain = "The knowledge base has nothing on this."
+    expect(stripTrailingSourceList(plain)).toBe(plain)
+  })
+})
+
+describe("stripTrailingSourceList — the one-line form", () => {
+  it("takes off a final `Source: A, B, C` line", () => {
+    expect(
+      stripTrailingSourceList("Vouchers go out by email.\n\nSource: Issuing vouchers to a pharmacy, Pharmacy Vouchers")
+    ).toBe("Vouchers go out by email.")
+  })
+
+  // Mid-answer, that same shape is somebody making a point, not signing off.
+  it("but not one in the middle of an answer", () => {
+    const prose = "Source: the runbook.\n\nIt says to check the cookie before restarting."
+    expect(stripTrailingSourceList(prose)).toBe(prose)
+  })
+
+  it("and never the whole answer", () => {
+    expect(stripTrailingSourceList("Sources: the Week recap")).toBe("Sources: the Week recap")
   })
 })
