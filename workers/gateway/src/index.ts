@@ -13,6 +13,7 @@ import {
   recordGatewayCrash,
   refuseForeignOrigin,
   serveMedia,
+  isRead,
 } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
 import { requestId, stampTrace } from "@shared/workers/trace"
@@ -133,8 +134,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // module — and this route stays so that what was written before it can still
     // be read. Same serving shape as /media/* below; just a different bucket,
     // matched first since it's a more specific prefix.
-    if (pathname.startsWith("/media/learning/") && request.method === "GET")
-      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range)
+    if (pathname.startsWith("/media/learning/") && isRead(request.method))
+      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range, request.method)
 
     // The agency's own files — brand assets, staff photos, certificate PDFs.
     // Its own bucket, matched before the generic prefix for the same reason the
@@ -145,13 +146,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // at all, so a capability URL that leaked into a client's hands would have
     // nowhere to be redeemed — which is the same shape as the API refusal one
     // layer up, said in routing instead of in a gate.
-    if (pathname.startsWith("/media/internal/") && request.method === "GET")
-      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/", range)
+    if (pathname.startsWith("/media/internal/") && isRead(request.method))
+      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/", range, request.method)
 
     // Uploaded files (profile photos, team logos). URLs carry ?v= for cache
     // busting, so the file itself can be cached hard.
-    if (pathname.startsWith("/media/") && request.method === "GET")
-      return serveMedia(env.MEDIA, pathname, "/media/", range)
+    if (pathname.startsWith("/media/") && isRead(request.method))
+      return serveMedia(env.MEDIA, pathname, "/media/", range, request.method)
 
     // Deep-link tree: /t/<teamId>/<module>/<id>/… is ONE client-resolved screen.
     // Static export emits a single shell (t.html), so serve it for ANY /t/* depth

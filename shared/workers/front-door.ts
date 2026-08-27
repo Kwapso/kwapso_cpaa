@@ -164,14 +164,108 @@ export function mediaHeaders(object: MediaObject): HeadersInit {
  * `prefix` is the URL segment already matched (e.g. "/media/"); everything after
  * it is the candidate key.
  */
+/** THE TWO METHODS THAT READ A FILE. A HEAD is a GET that stops before the
+ * body, and a media player sends one FIRST — to learn the size and the type
+ * before it decides how to fetch the bytes.
+ *
+ * IT USED TO BE `method === "GET"` at four route guards, so a HEAD fell past
+ * them into the SPA shell and came back 404 with `content-type: text/html`,
+ * while the GET beside it answered 206 with the file. A door that 404s to the
+ * question and answers the follow-up is worse than one that refuses both:
+ * everything looks fine until something asks in the ordinary order. */
+export function isRead(method: string): boolean {
+  return method === "GET" || method === "HEAD"
+}
+
+/** A FINITE NUMBER, OR NOTHING. The one question worth asking about a field on
+ * an object another runtime handed us. */
+function finite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
+}
+
+/** WHICH BYTES WE ARE ABOUT TO SEND — the numbers `Content-Range` is built from.
+ *
+ * THE BUG THIS EXISTS FOR (measured on staging 2026-08-27, every ranged read of
+ * every shape): `content-range: bytes NaN-NaN/2810365`. The status was right, the
+ * body was right, and the one header that says WHICH BYTES they are was
+ * arithmetic on `undefined`.
+ *
+ * WHAT WAS WRONG WAS THE QUESTION, not the arithmetic. The old code read R2's
+ * answer with `"suffix" in sent ? … : "offset" in sent ? …`, on a stated premise:
+ * "it is the shape the real binding hands BACK, so the response can describe what
+ * was actually sent." That premise is false. `in` tests whether a KEY EXISTS, not
+ * whether it holds anything, and the object R2 returns carries all three keys with
+ * `undefined` values — so the suffix branch was taken every single time, for every
+ * shape of request, and `size - undefined` is `NaN`. Reproduced exactly, all four
+ * request shapes, against a stub built to answer that way; the alternative
+ * hypothesis (accessors on a prototype, which `in` also finds) was ruled out
+ * because it leaves the suffix case correct and production had it broken too.
+ *
+ * WHY THE SUITE NEVER SAW IT, which is the part worth keeping. The existing test
+ * echoed back the very object `byteRange` had just built — a clean union with only
+ * the keys we set — so it measured our own parser round-tripping through a mirror.
+ * A stub written from OUR type instead of from the runtime's real answer can only
+ * ever confirm us. The tests below now answer the way R2 measurably does.
+ *
+ * SO WE DESCRIBE WHAT WE ASKED FOR, clamped to the object. R2's answer is used
+ * where it genuinely carries numbers — a runtime that DOES report a narrowed
+ * slice is still believed — and where it carries nothing, the ask is the honest
+ * description, because the body's own length shows R2 served exactly it. Every
+ * path returns finite numbers inside the object, or nothing at all. */
+function servedSlice(
+  asked: MediaRange,
+  reported: MediaRange | undefined,
+  size: number
+): { offset: number; length: number } | null {
+  const read = (r: MediaRange | undefined) => {
+    if (!r) return null
+    const suffix = finite((r as { suffix?: unknown }).suffix)
+    if (suffix !== undefined) {
+      const length = Math.min(suffix, size)
+      return { offset: Math.max(0, size - length), length }
+    }
+    const offset = finite((r as { offset?: unknown }).offset)
+    const length = finite((r as { length?: unknown }).length)
+    if (offset === undefined && length === undefined) return null
+    const start = offset ?? 0
+    return { offset: start, length: length ?? size - start }
+  }
+  const ask = read(asked)
+  if (!ask) return null // a range we could not read is not a range we may describe
+  const sent = read(reported)
+  // A REPORT MAY NARROW WHAT WE ASKED FOR. IT MAY NEVER WIDEN IT — found by a
+  // case in the suite below rather than by reasoning. A runtime that answers
+  // `{offset: 100}` with no length is, read literally, saying "from 100 to the
+  // end"; believed literally against an ask of 100 bytes it produced a header
+  // promising 900. Both directions of that mistake are bad — a player told there
+  // are more bytes than arrived stalls waiting for them, one told there are
+  // fewer throws away what it has — and only one of them is possible: R2 cannot
+  // send more than it was asked for. So the ask is the ceiling, always.
+  const slice = {
+    offset: sent?.offset ?? ask.offset,
+    length: Math.min(sent?.length ?? ask.length, ask.length),
+  }
+  // Inside the object, always — a header may not name a byte the file does not
+  // have, however the two numbers above were arrived at.
+  const offset = Math.min(Math.max(0, slice.offset), Math.max(0, size - 1))
+  const length = Math.min(slice.length, size - offset)
+  return length > 0 ? { offset, length } : null
+}
+
 export async function serveMedia(
   bucket: MediaBucket,
   pathname: string,
   prefix: string,
   /** The caller's `Range:` header, when there is one. Optional so the two
    * gateways' existing whole-object calls keep working unchanged. */
-  rangeHeader?: string | null
+  rangeHeader?: string | null,
+  /** The request's method. A HEAD must answer with the GET's headers and NO
+   * body — the point of a HEAD is to learn the size and the type without
+   * fetching the bytes, which is exactly what a media player asks first.
+   * Optional so the callers that only ever serve GETs keep working unchanged. */
+  method?: string
 ): Promise<Response> {
+  const head = method === "HEAD"
   const key = safeMediaKey(pathname.slice(prefix.length))
   if (!key) return new Response("Not found", { status: 404 })
   const range = byteRange(rangeHeader ?? null)
@@ -182,20 +276,18 @@ export async function serveMedia(
   // slice of the file in it is the worst possible reply: the player believes it
   // has the whole thing. R2 may also narrow what it returns, so the header
   // describes `object.range` — what was SENT — never what was asked for.
-  if (range && object.range && object.size !== undefined) {
-    // Read off the union R2 handed back, in the same three shapes it accepts. A
-    // suffix answer ("the last n bytes") has no offset of its own — it is the one
-    // whose start has to be computed from the total.
-    const sent = object.range
-    const offset =
-      "suffix" in sent ? Math.max(0, object.size - sent.suffix) : "offset" in sent ? sent.offset : 0
-    const length =
-      "suffix" in sent ? Math.min(sent.suffix, object.size) : (sent.length ?? object.size - offset)
-    headers.set("Content-Range", `bytes ${offset}-${offset + length - 1}/${object.size}`)
-    headers.set("Content-Length", String(length))
-    return new Response(object.body ?? null, { status: 206, headers })
+  if (range && object.size !== undefined) {
+    const slice = servedSlice(range, object.range, object.size)
+    // A slice we cannot describe truthfully is not served as a 206 at all. A
+    // `Content-Range` a client cannot parse is worse than no range: the player
+    // has a partial body and a header that does not say which part.
+    if (slice) {
+      headers.set("Content-Range", `bytes ${slice.offset}-${slice.offset + slice.length - 1}/${object.size}`)
+      headers.set("Content-Length", String(slice.length))
+      return new Response(head ? null : (object.body ?? null), { status: 206, headers })
+    }
   }
-  return new Response(object.body ?? null, { headers })
+  return new Response(head ? null : (object.body ?? null), { headers })
 }
 
 /**

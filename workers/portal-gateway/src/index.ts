@@ -37,6 +37,7 @@ import {
   recordGatewayCrash,
   refuseForeignOrigin,
   serveMedia,
+  isRead,
 } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
 import { requestId, stampTrace } from "@shared/workers/trace"
@@ -282,10 +283,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // cache busting, so the file itself can be cached hard. Same capability-URL
     // decision, same boundary validation, same headers as the agency door — one
     // function, so it cannot be otherwise.
-    if (pathname.startsWith("/media/") && request.method === "GET")
+    if (pathname.startsWith("/media/") && isRead(request.method))
       // A RANGE, IF THEY ASKED FOR ONE — the same seekable, resumable serving the
       // agency door gives, because it is the same function.
-      return serveMedia(env.MEDIA, pathname, "/media/", request.headers.get("Range"))
+      return serveMedia(env.MEDIA, pathname, "/media/", request.headers.get("Range"), request.method)
 
     // The tickets tree: /tickets/<ticketId> is ONE client-resolved screen. The
     // static export emits a single shell, so serve it for any /tickets/* depth
