@@ -1007,3 +1007,57 @@ describe("overruling a search that already answered takes the whole question", (
     expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
   })
 })
+
+// ── THE POOL IS A BUDGET FOR ATTRITION ──────────────────────────────────────
+//
+// Three things thin the candidate list between the index and the answer, and two
+// are permanent by design: the personal fence hides a colleague's own material,
+// an excluded source stays excluded, and a re-index leaves behind the ids it
+// replaced. R26 makes a stale id SAFE to meet — it reads back as no row, never as
+// somebody else's paragraph — but safe is not free: it is still a nearest
+// neighbour and still takes a slot.
+//
+// MEASURED on staging: "what did we agree in the week recap?" returns 100
+// neighbours over the floor and fifteen of them exist, the first at rank 17. A
+// pool of 24 spent sixteen slots on rows that cannot come back, and the base
+// answered "we have nothing on that" about a meeting it holds two 96-chunk
+// transcripts of.
+//
+// WHAT THIS TEST PROVES, AND WHAT IT DOES NOT. It locks the PROPERTY — a wall of
+// a colleague's private material must neither leak nor starve the answer — and it
+// passes with the pool at 24 as well as at 100, because a second mechanism also
+// covers this case: when nothing at all survives the read, the last-resort record
+// fallback opens the router's own best records by source id. That is defence in
+// depth and worth having. It also means this test is not the evidence for the
+// pool size; the evidence for that is the staging measurement in RANKING_POOL's
+// own comment, and the bench going 18/20 to 20/20 on the strength of it.
+describe("material a colleague cannot see must not starve the answer", () => {
+  const QUESTION = "is the dispatch rollout cutover paused?"
+
+  it("reaches the team's own material past a wall of somebody else's", async () => {
+    // MORE OF THEM THAN THE OLD POOL HELD, which is the whole point: with a pool
+    // of 24 these fill it entirely and the team's own note is cut before anyone
+    // finds out it was readable. Each one echoes the question word for word, so
+    // it outranks the team's note on both arms — and every one is invisible to
+    // the person asking.
+    for (let i = 0; i < 30; i++)
+      await addSource(OTHER_STAFF, {
+        title: `Aurora's private dispatch note ${i}`,
+        body: `dispatch rollout cutover paused. ${QUESTION} dispatch rollout cutover paused.`,
+        visibility: "private",
+      })
+    // The answer, in a colleague's words rather than the question's — which is
+    // what real material looks like, and why it ranks below the echoes.
+    await addSource(IDS.staffUser, {
+      title: "Bergman dispatch rollout",
+      body: "The dispatch rollout is on hold until March while Bergman finish their own migration.",
+    })
+    const answer = await ask(IDS.staffUser, QUESTION)
+    expect(answer.found, "the team's own note is right there").toBe(true)
+    expect(titles(answer)).toContain("Bergman dispatch rollout")
+    expect(
+      titles(answer).some((t) => t.includes("private")),
+      "and none of the colleague's private material leaked"
+    ).toBe(false)
+  })
+})

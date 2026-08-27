@@ -255,11 +255,37 @@ const LEXICAL_WEIGHT = 0.1
  * (EXACT_TERM_MAX_CHUNKS): "2026" never reaches this line. */
 const EXACT_WEIGHT = 2
 
-/** Chunks the fused list hands on to be READ out of the database. Bounded
- * because every one is a row; comfortably more than one answer carries, so the
+/** Chunks the fused list hands on to be READ out of the database.
+ *
+ * IT IS A BUDGET FOR ATTRITION, and 24 was not enough of one. The sentence above
+ * this line used to say "comfortably more than one answer carries, so the
  * personal fence and the excluded-source filter can drop rows without the answer
- * running short. */
-const RANKING_POOL = 24
+ * running short". The intent was right and the number was measured against
+ * nothing.
+ *
+ * MEASURED, 27 Aug 2026, on the question the owner's complaint is clearest on.
+ * "What did we agree in the week recap?" returns 100 neighbours over the
+ * relevance floor, and FIFTEEN of them exist: the other 85 are vectors whose
+ * source is no longer in the database at all, and the first surviving one is at
+ * rank 17. So a pool of 24 was spending 16 of its 24 slots on rows that cannot
+ * come back, and what little got through was another person's private calendar
+ * material, dropped again by the reader clause. The base answered "we have
+ * nothing on that" about a meeting it holds two 96-chunk transcripts of.
+ *
+ * ATTRITION IS NORMAL, NOT AN OUTAGE, and that is why this is a budget rather
+ * than a bug to fix elsewhere. Three separate things thin the pool between the
+ * index and the answer, and two of them are permanent by design: the personal
+ * fence hides a colleague's own material, an excluded source stays excluded, and
+ * a re-index leaves the ids it replaced behind (R26 makes those safe to meet —
+ * they read back as no row — but safe is not the same as free, because a ghost is
+ * still a nearest neighbour and still takes a slot).
+ *
+ * 100 is the whole candidate list, so the pool no longer throws away evidence
+ * before finding out whether it survives. The cost is ONE read of at most 100
+ * rows by primary key — the same single statement, a longer id list — against an
+ * answer that carries six. R14 is satisfied by the LIMIT at the statement, which
+ * says the number out loud. */
+const RANKING_POOL = 100
 
 /** Passages one answer carries. Enough for a real answer with more than one
  * source behind it; small enough that the assistant's context stays cheap. */
