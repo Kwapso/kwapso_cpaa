@@ -522,6 +522,20 @@ export function recordTimeSummaryKey(targetTable: string, targetId: string): str
 export function brandAssetsKey(teamId: string): string {
   return `brand_assets:${teamId}`
 }
+/** WHAT ONE STORY SHOWS FOR ITSELF — the files and links attached to it.
+ *
+ * WRITTEN HERE RATHER THAN IN THE PANEL, and that is the difference from the
+ * ticket's twin rather than a stylistic choice. `helpAttachmentsKey` lives in
+ * `web/components/help-attachments.tsx`, so `TEAM_RESOURCES.help` — which is
+ * `lib`, and must not import a component — cannot NAME it, and does not: a
+ * ticket's attachment list is dropped by nothing at all, so a screenshot a
+ * colleague adds appears on their screen and not on yours. Putting the story's
+ * key in lib is what lets `TEAM_RESOURCES.stories` below carry it, which is R15
+ * for this collection. (The ticket half is the same bug one record along; it is
+ * recorded in the upload scan rather than fixed in this commit.) */
+export function storyAttachmentsKey(storyId: string): string {
+  return `story-attachments:${storyId}`
+}
 /** WHAT WE HANDED OVER, ON ONE APP. Its rows live ONLY in a per-app slice,
  * because a deliverable is never read anywhere but the app it belongs to —
  * spelled the way `sliceKey` spells every nested collection (`<kind>-of:<id>`),
@@ -1002,6 +1016,12 @@ export const TEAM_RESOURCES: Record<
     deps: (t, id) => [
       `activity:record:stories:${id}`,
       `story:one:${id}`,
+      // …AND WHAT THE STORY SHOWS FOR ITSELF. Every attachment write publishes
+      // `stories` (the door has no resource of its own — an attachment is part
+      // of the story, not a thing beside it), so this is where the Files and
+      // links panel learns that somebody else added a screenshot. Its exact
+      // total rides `recordCountDeps` below, on the same ping.
+      storyAttachmentsKey(id),
       sprintsKey(t),
       insightsKey(t),
       ...recordCountDeps("stories"),

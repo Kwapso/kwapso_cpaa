@@ -373,6 +373,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "kit-supplies-the-ui",
     status: "enforced",
   },
+  {
+    id: "R40",
+    dimension: "arch",
+    law: "A STORED FILE MUST REACH A PERSON. Every call that puts BYTES in a bucket — an `env.<BUCKET>.put(` on a binding the wrangler configs declare as an `r2_bucket`, or the one shared seam that does it for you (`storeImageDataUrl`) — is claimed by an entry in `STORED_FILES` naming the FIELD a person reads the reference back through and the front-door FILE that renders it. Both halves are DERIVED: the write census is read off disk, so a new upload door cannot ship unclaimed; and the render is proved by finding that field reaching a fetched ATTRIBUTE — `href=`, `src=` or `picture=` — in that file, directly or through a `const` assigned from `safeHref`/`safeSrc`. A field that only ever reaches a form's values is NOT a read: that subtraction is the whole discriminator, because a filename written back into an edit dialog is not a file anybody can open. Rot-checked both ways, so an entry whose door no longer writes bytes turns the build red and the list can only shrink.",
+    why: "THREE INSTANCES OF ONE BUG, all green. R15 makes a published change reach a listener and R16 makes a count reach a screen; nothing made BYTES reach a person, so the app grew three doors that accepted a file, stored it perfectly and led nowhere. A story's attachments were written by one dialog and rendered by no screen at all. A client uploaded a document through the portal's \"Send a file\" and the agency was shown the FILENAME as plain text in a metadata line — the URL was on the row and read by nothing. A task's `file_url` was write-only from the day it shipped. In all three the door answered 200 and the bytes were in R2, which is exactly why no test and no reviewer caught it: everything worked except the last step, and the last step is the only one a person experiences. The check has to walk write-to-read, because that is the direction the failure runs, and it has to subtract form values, because a field round-tripped through an edit dialog looks like a read and is not one.",
+    checkId: "reachable-bytes",
+    status: "enforced",
+  },
 ]
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly
@@ -1654,3 +1662,112 @@ export const EMAIL_CENSUS: Record<string, EmailClassification> = {
     link: "ticket → the answered ticket, in the client's portal",
   },
 }
+
+/** R40 — EVERY DOOR THAT STORES BYTES, AND WHERE A PERSON MEETS THEM AGAIN.
+ *
+ * The DATA half of `reachable-bytes`, and deliberately the smaller half. What a
+ * machine cannot infer is the MAPPING — that the bytes `todos.ts` puts in the
+ * bucket are the thing a person opens off `Todo.fileUrl` in `work-panels.tsx`.
+ * Everything else is derived: the write census is read off disk against the
+ * bucket bindings the wrangler configs declare, and whether `shownIn` actually
+ * renders `field` is read off disk too. So an entry can lie about neither end.
+ *
+ * `writtenIn` is a repo-relative path that must still contain a byte-write.
+ * `field` is `Type.property` — the property is what the render scan looks for.
+ * `shownIn` is the front-door file that puts it in front of somebody.
+ *
+ * A DOOR MAY NEED TWO LINES. `staff.ts` is a generic upload endpoint: it stores
+ * bytes and hands the URL back in its response, and the CALLER decides which
+ * field it lands on. Two destinations, two lines, one write site — which is why
+ * the census asks that every write site be CLAIMED rather than matched one-to-one. */
+export const STORED_FILES: {
+  writtenIn: string
+  field: string
+  shownIn: string
+  why: string
+}[] = [
+  {
+    writtenIn: "workers/auth/src/lib/profile.ts",
+    field: "SessionUser.imageUrl",
+    shownIn: "web/components/profile-menu.tsx",
+    why: "a member's own photo, on the avatar in the rail they see on every screen",
+  },
+  {
+    writtenIn: "workers/tenancy/src/lib/teams.ts",
+    field: "TeamSummary.logoUrl",
+    shownIn: "web/components/team-switcher.tsx",
+    why: "the team's own logo, on the switcher at the top of the rail",
+  },
+  {
+    writtenIn: "workers/tenancy/src/routes/accounts.ts",
+    field: "Account.logoUrl",
+    shownIn: "web/components/account-detail.tsx",
+    why: "a client's mark, leading their record",
+  },
+  {
+    writtenIn: "workers/tenancy/src/routes/accounts.ts",
+    field: "Account.coverUrl",
+    shownIn: "web/components/account-detail.tsx",
+    why: "the wide image their record leads with — a second field on the same door",
+  },
+  {
+    writtenIn: "workers/tenancy/src/routes/processes.ts",
+    field: "AppRow.logoUrl",
+    shownIn: "web/components/app-tiles.tsx",
+    why: "a system's mark, on every tile and every row that names it. The door is called `processes` because that is the permission module; the record it writes is an APP",
+  },
+  {
+    writtenIn: "workers/content/src/routes/help.ts",
+    field: "HelpAttachment.url",
+    shownIn: "web/components/help-attachments.tsx",
+    why: "what somebody attached to a ticket, on the ticket's Files and links tab",
+  },
+  {
+    writtenIn: "workers/content/src/routes/stories.ts",
+    field: "StoryAttachment.url",
+    shownIn: "web/components/story-attachments.tsx",
+    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for",
+  },
+  {
+    writtenIn: "workers/content/src/routes/todos.ts",
+    field: "Todo.fileUrl",
+    shownIn: "web/components/work-panels.tsx",
+    why: "the document a client sent back through the portal. Shown as an unclickable filename until this law landed — the worst of the three, because a person outside the company was on one end of it",
+  },
+  {
+    writtenIn: "workers/content/src/routes/todos.ts",
+    field: "Task.fileUrl",
+    shownIn: "web/components/task-detail.tsx",
+    why: "the photo of the letter on a piece of our own admin. Write-only from the day the door shipped — the third breach. Same file as the to-do above because one route module owns both doors",
+  },
+  {
+    writtenIn: "workers/content/src/routes/knowledge.ts",
+    field: "KnowledgeItem.fileUrl",
+    shownIn: "web/components/knowledge-detail.tsx",
+    why: "the material behind a source, on the source's own screen",
+  },
+  {
+    writtenIn: "workers/content/src/routes/staff.ts",
+    field: "StaffProfile.photoUrl",
+    shownIn: "web/components/staff-panel.tsx",
+    why: "a colleague's face on their profile. The door is a generic upload endpoint and this is one of the two fields its answer lands on",
+  },
+  {
+    writtenIn: "workers/content/src/routes/staff.ts",
+    field: "StaffCertificate.fileUrl",
+    shownIn: "web/components/staff-panel.tsx",
+    why: "the certificate itself, behind its title. The second destination of the same upload endpoint",
+  },
+  {
+    writtenIn: "workers/content/src/routes/brand-assets.ts",
+    field: "BrandAsset.fileUrl",
+    shownIn: "web/components/deep-link/shape.tsx",
+    why: "a logo or a typeface on the agency's own brand shelf, drawn as the row's mark by the screen recipe",
+  },
+  {
+    writtenIn: "workers/content/src/routes/deliverables.ts",
+    field: "Deliverable.url",
+    shownIn: "web/components/deliverables-panel.tsx",
+    why: "what we handed over on an app, opened from the app's own shelf",
+  },
+]

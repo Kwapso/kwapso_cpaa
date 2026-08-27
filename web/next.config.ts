@@ -9,6 +9,27 @@ const staticExport = process.env.BUILD_STATIC
       // (`npm run dev:auth` → wrangler dev on :8787) so login works on
       // localhost exactly like it does behind the deployed gateway.
       async rewrites() {
+        // …OR AT A DEPLOYED ENVIRONMENT, when what you need is REAL ROWS.
+        //
+        // The local rewrites below need four wrangler processes and a seeded
+        // database, which is the right answer for working on a door. It is the
+        // wrong answer for the question "does this screen actually show the
+        // owner's two screenshots" — that one needs HIS data, and the only ways
+        // to see it were to deploy the branch or to take somebody's word for it.
+        // Both are how a screen ships looking finished. `DEV_API_ORIGIN=<origin>
+        // npm run dev` points every door and `/media/*` at a deployed
+        // environment instead, so a branch can be LOOKED at before it is merged.
+        //
+        // Dev only, by construction: this whole branch is the non-BUILD_STATIC
+        // one, so nothing here can reach the shipped build. Reads are ordinary
+        // GETs; a WRITE from here is refused by the CSRF check at the far door
+        // (shared/workers/front-door.ts — the Origin will be localhost), which
+        // is the correct answer and worth knowing before you try.
+        if (process.env.DEV_API_ORIGIN)
+          return [
+            { source: "/api/:path*", destination: `${process.env.DEV_API_ORIGIN}/api/:path*` },
+            { source: "/media/:path*", destination: `${process.env.DEV_API_ORIGIN}/media/:path*` },
+          ]
         return [
           { source: "/api/auth/:path*", destination: "http://127.0.0.1:8787/api/auth/:path*" },
           { source: "/api/tenancy/:path*", destination: "http://127.0.0.1:8788/api/tenancy/:path*" },

@@ -28,6 +28,7 @@ import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
+import { StoryAttachmentsPanel } from "@/components/story-attachments"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -43,7 +44,7 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { storiesKey } from "@/lib/live-resources"
+import { storiesKey, storyAttachmentsKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -79,6 +80,13 @@ export function StoryDetailScreen({
   // same string.
   useRecordCounts("stories", storyId)
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("stories", storyId))
+  // R16: the Files and links tab badges the door's exact COUNT(*), answered by
+  // the counts read above when the STORY opens rather than when the tab is
+  // clicked — a badge that is blank until you open the tab reads as an empty tab,
+  // which is exactly the complaint this screen is being fixed for. `null` is the
+  // third answer beside a number and an absence (the role may not read `work`),
+  // and it renders as nothing, exactly as a zero does.
+  const attachmentsTotal = useCachedValue<number | null>(`total:${storyAttachmentsKey(storyId)}`)
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
@@ -217,6 +225,16 @@ export function StoryDetailScreen({
         label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         badge: formatCount(activity.total),
+        badgeVariant: "" as const,
+      },
+      // WHAT THE STORY SHOWS FOR ITSELF. The same words the ticket's own tab
+      // uses, because it is the same collection one record along and a second
+      // name for it would be a second thing for a reader to learn (R6/R34).
+      {
+        value: "files",
+        label: t("Files and links"),
+        icon: "paperclip",
+        badge: formatCount(attachmentsTotal),
         badgeVariant: "" as const,
       },
     ],
@@ -360,6 +378,11 @@ export function StoryDetailScreen({
             )
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
+          // `work:edit`, which is what BOTH attachment doors gate on — not the
+          // read right the ticket's panel takes, and not `canLogTime`. A button
+          // drawn on a wider right is a button whose every press is a 403.
+          if (t.value === "files")
+            return <StoryAttachmentsPanel storyId={storyId} canEdit={canEdit} />
           return (
             <>
               {/* Above the fields it acts on, and out of the header's one-primary

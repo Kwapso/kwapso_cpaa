@@ -162,7 +162,15 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
   // story, a task and a meeting badge one collection each — their Time tab —
   // and their Activity total already rides the feed; a ticket's Time tab is the
   // fourth, listed above beside its stories and its files.
-  stories: [timeOn("stories")],
+  stories: [
+    timeOn("stories"),
+    // WHAT IT SHOWS FOR ITSELF — the files and links on the work. `work` because
+    // that is the right the attachment doors themselves ask for (`work:edit` to
+    // write, `work:read` to list), and `stories` because an attachment write
+    // publishes the STORY: the row is part of the story rather than a collection
+    // beside it, so there is no second resource for a ping to carry.
+    { key: "story-attachments", module: "work", resource: "stories", door: "content" },
+  ],
   tasks: [timeOn("tasks")],
   meetings: [timeOn("meetings")],
 }

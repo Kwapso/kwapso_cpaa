@@ -23,7 +23,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/controls/button/button"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Check, Pencil, Undo2 } from "@shared/ui/icons"
+import { Check, Paperclip, Pencil, Undo2 } from "@shared/ui/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
@@ -43,6 +43,7 @@ import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
+import { safeHref } from "@shared/web/rich-text"
 import { toast } from "@shared/ui/controls/sonner/sonner"
 import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -101,6 +102,42 @@ export function TaskDetailScreen({
     // A React node, not a string: a rich-text body renders as the formatting
     // somebody typed rather than as its own tags.
     { label: t("Detail"), value: task.detail ? <RichText html={task.detail} /> : "" },
+    // THE ONE THING ATTACHED TO IT — the photo of the letter, the form to file.
+    //
+    // `tasks.file_url` has been written since the day the door shipped: the
+    // create route caps the bytes, puts them in the AGENCY's own bucket and
+    // stores `/media/internal/<key>` on the row. Nothing in either front door
+    // ever read it back — a census of `.fileUrl` reads across web/ and
+    // web-portal/ returned zero hits for a task, and the only mention of
+    // `fileName` on this screen was the empty string the edit form opens with.
+    // So a colleague photographed the letter, attached it, and the record went
+    // on saying no file existed.
+    //
+    // NO NEW RIGHT IS ASKED FOR, and that is a decision rather than an omission.
+    // The file is set at CREATE (`work:create`) and no door removes or replaces
+    // it, so there is no button here to gate — and the row you are already
+    // reading arrived through `work:read`. Inventing a check would hide the file
+    // from somebody the door had already handed it to.
+    ...(task.fileUrl
+      ? [
+          {
+            label: t("File"),
+            value: (
+              <a
+                // Through the seam, like every other file on a screen — the same
+                // treatment knowledge-detail.tsx and staff-panel.tsx give theirs.
+                href={safeHref(task.fileUrl) ?? undefined}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-primary flex w-fit max-w-full flex-wrap items-center gap-2 underline-offset-2 hover:underline"
+              >
+                <Paperclip className="size-4 shrink-0" />
+                <span className="min-w-0 truncate">{task.fileName || t("Open the file")}</span>
+              </a>
+            ),
+          },
+        ]
+      : []),
   ]
 
   const tabsConfig = {
