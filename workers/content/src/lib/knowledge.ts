@@ -1707,29 +1707,92 @@ const MIN_TERM_SHARE = 0.5
  * requirement is all of them. */
 const SHORT_QUESTION_TERMS = 3
 
+/** WHY THE WORD MATCH IS RUNNING — three situations, and it may claim something
+ * different in each. It used to be a boolean, and the two cases it collapsed
+ * together are opposites. */
+type LexicalRole =
+  /** The vector arm has evidence. This is a tenth of a vote on a list somebody
+   * else decided the shape of, and cannot turn a refusal into an answer. */
+  | "beside"
+  /** NOBODY LOOKED. No vector store bound, the question could not be embedded,
+   * or the index came back with no neighbours at all — which is what a base
+   * whose material was indexed while the model was down looks like. The word
+   * match really is everything we have. */
+  | "blind"
+  /** THE VECTOR ARM LOOKED AND FOUND NOTHING. Not ignorance: an answer. To speak
+   * here is to overturn a semantic search that has already reported the base
+   * holds nothing on this. */
+  | "overruling"
+
 /** HOW MUCH OF THE QUESTION A CHUNK MUST HOLD — and it is not one number,
- * because the word arm has two jobs and only one of them can lie.
+ * because the word arm has three jobs and only one of them can lie.
  *
- * Running BESIDE the vector arm (`sole` false) it is a tenth of a vote on a list
- * the vector arm already decided the shape of. It cannot turn a refusal into an
- * answer, so a share is enough and the measured 0.5 stands.
+ * BESIDE the vector arm it is a tenth of a vote on a list the vector arm already
+ * decided the shape of. It cannot turn a refusal into an answer, so a share is
+ * enough and the measured 0.5 stands.
  *
- * Running as EVERYTHING WE HAVE (`sole` true — the vector arm found nothing over
- * its floor) it decides `found` on its own, which is the one decision R23 is
- * about. There a short question has to be present in FULL: "capital of France"
- * must mean a chunk that says both, or the base says it has nothing.
+ * BLIND, it decides `found` on its own — the one decision R23 is about — and a
+ * short question has to be present in FULL: "capital of France" must mean a
+ * chunk that says both, or the base says it has nothing. Beyond that a share,
+ * because this is the case where the word match is the only reader the material
+ * has and the material is really there (a note written while the model was down
+ * is findable by its words alone, deliberately, and there is a test that says
+ * so).
  *
- * WHAT THIS DOES NOT TOUCH, measured against the real model (bge-m3) on the
- * app's own 17 documents rather than assumed: a question the base can answer
- * clears the VECTOR floor and never reaches the sole branch at all — the German
- * access question tops out at 0.585 over 13 chunks, "who can see the margin?" at
- * 0.520, "what is an account in kwapso?" at 0.631 over 32. The France question
- * peaks at 0.321 and nothing is over the floor. So the only questions whose
- * behaviour changes here are the ones the vector arm had already refused. */
-function termFloor(terms: number, sole: boolean): number {
+ * OVERRULING, the WHOLE question, however long. Measured 27 Aug 2026 on the
+ * agency's own material: "what is our parental leave policy and how much notice
+ * does it need?" — a policy nobody has ever written down — put the vector arm's
+ * best neighbour at 0.451 against a floor of 0.5, so it correctly found nothing.
+ * The word match then cleared a proportional floor on "policy", "notice" and
+ * "leave" and answered out of a page of Gemini meeting notes. A proportion is
+ * the wrong instrument for overturning a search that has already answered: half
+ * a question is a coincidence three words wide. The exception is the one thing
+ * the word match is genuinely better at, and it is not here — a rare exact token
+ * bypasses this floor entirely (see the `rare` clause in `lexicalArm`), which is
+ * how "ticket 3144" still reaches its chunk under the strictest of the three.
+ *
+ * WHAT THIS DOES NOT TOUCH, measured against the real model (bge-m3): a question
+ * the base can answer clears the VECTOR floor and is `beside`, never either of
+ * the other two. Over the twenty questions in scripts/kb-bench.mjs, every one of
+ * the sixteen answerable ones tops 0.502 and every one of the four unanswerable
+ * ones tops 0.471 — so the only questions whose behaviour changes here are the
+ * ones the vector arm had already refused. */
+function termFloor(terms: number, role: LexicalRole): number {
   const share = Math.max(1, Math.ceil(terms * MIN_TERM_SHARE))
-  if (!sole) return share
+  if (role === "beside") return share
+  if (role === "overruling") return terms
   return terms <= SHORT_QUESTION_TERMS ? terms : share
+}
+
+/** HOW MANY CHUNKS A TOKEN MAY APPEAR IN AND STILL BE "EXACT".
+ *
+ * `termFloor` says a chunk sharing one word out of eight is a coincidence. The
+ * exact-term bypass below says THIS word is not a coincidence — and rarity is
+ * the only honest way to tell those two apart, because both arrive as a token
+ * with a digit in it. A ticket reference lives in a handful of places (the row
+ * itself, its conversation, the two emails that argued about it); a year lives
+ * in hundreds and would let every one of them through a floor built to stop
+ * exactly that.
+ *
+ * Counted INSIDE the reader's own fence and the chosen compartment, in the same
+ * statement, so "rare" means rare in the material this person can actually see
+ * and cannot be a second read of a different moment. */
+const EXACT_TERM_MAX_CHUNKS = 20
+
+/** THE TOKENS SOMEBODY TYPED EXACTLY — the digit-bearing subset of the question,
+ * which is the definition `questionTerms` itself already sorts by ("rarer-looking
+ * words, and anything with a digit in it — a reference, a date, an invoice
+ * number — first").
+ *
+ * NARROWER THAN `hasExactTerm` ON PURPOSE, and the two are answering different
+ * questions. That one decides whether the word match RUNS beside the vector arm,
+ * and a quoted phrase is good evidence that somebody wants a literal match. This
+ * decides which single token may carry a chunk over the proportional floor ALONE,
+ * and the words inside a quoted phrase are ordinary words: letting `forms` out of
+ * "gravity forms" waive the floor would reinstate the coincidence the floor
+ * exists to refuse. */
+export function exactTerms(question: string): string[] {
+  return questionTerms(question, MAX_QUESTION_TERMS).filter((t) => /\d/.test(t))
 }
 
 /** DID SOMEBODY TYPE SOMETHING EXACT? A token with a digit in it — a ticket
@@ -1758,10 +1821,14 @@ async function lexicalArm(
   cfg: D1Rest,
   guard: MemberGuard,
   terms: string[],
+  /** The digit-bearing subset of `terms` — see `exactTerms`. A chunk holding one
+   * of these, and rare enough for it to mean something, is evidence whatever the
+   * proportional floor says. */
+  exact: string[],
   compartments: string[],
-  /** true when the vector arm found nothing, so this list IS the answer — see
-   * `termFloor`, which is where the two jobs stop being the same job. */
-  sole: boolean
+  /** What this list is FOR — see `termFloor`, which is where the three jobs stop
+   * being the same job. */
+  role: LexicalRole
 ): Promise<CandidateRow[]> {
   if (!terms.length) return []
   const owner = ownerClause(guard)
@@ -1771,12 +1838,27 @@ async function lexicalArm(
     where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
     params.push(...compartments)
   }
+  // THE ONE CLAUSE THAT LETS AN EXACT TERM PAST THE PROPORTIONAL FLOOR, and it
+  // is absent — statement for statement, parameter for parameter — from a
+  // question that has no exact term in it. The floor's measured behaviour on
+  // every other question is therefore untouched by this, which is the whole of
+  // what the no-exact-term case is promised.
+  //
+  // The exact tokens are bound AFTER the WHERE's, because SQLite numbers `?` by
+  // where it appears in the text and `rare` is written after the scoped read.
+  const rare = exact.filter((t) => terms.includes(t))
+  const bypass = rare.length
+    ? `OR SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END) > 0`
+    : ""
+  if (rare.length) params.push(...rare)
   const rows = await d1Query<CandidateRow>(
     cfg,
     guard.databaseId,
     // R14 hard cap: the lexical arm returns at most LEXICAL_TOP_K rows, whatever
     // the compartment holds. The statement binds at most 24 terms + 1 owner + a
-    // handful of compartments — D1 refuses a statement past 100 parameters.
+    // handful of compartments + at most those same 24 terms again for the exact
+    // list — 53 or so against D1's ceiling of 100, and the term list is capped at
+    // MAX_QUESTION_TERMS precisely so this arithmetic stays true.
     //
     // `COUNT(*)` counts the DISTINCT terms of the question this chunk contains;
     // the primary key is (term, chunk_id), so a row per term is a term. That is
@@ -1792,9 +1874,18 @@ async function lexicalArm(
     // is derived from the question's own term count and is an integer, so it is
     // interpolated like every other server-owned value (CONVENTIONS); the ORDER
     // BY is left exactly as it was measured.
-    `SELECT chunk_id, SUM(weight) AS lex FROM knowledge_terms
-      WHERE ${where.join(" AND ")}
-      GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, sole)}
+    `WITH scoped AS (
+       SELECT chunk_id, term, weight FROM knowledge_terms WHERE ${where.join(" AND ")}
+     )${
+       rare.length
+         ? `, rare AS (
+       SELECT term FROM scoped WHERE term IN (${rare.map(() => "?").join(", ")})
+        GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
+     )`
+         : ""
+     }
+     SELECT chunk_id, SUM(weight) AS lex FROM scoped
+      GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, role)} ${bypass}
       ORDER BY lex DESC LIMIT ${LEXICAL_TOP_K}`,
     params
   )
@@ -1889,25 +1980,52 @@ export async function retrieve(
 
 
 
-  // WHEN THE WORD MATCH RUNS, in two cases and for two different reasons:
-  //   • the question contains something EXACT (a reference, an invoice number).
-  //     Then it runs BESIDE the vector arm, quietly, at a tenth of a vote,
-  //     because "exactly this string" is the one thing an embedding is
-  //     indifferent to;
-  //   • the vector arm found NO evidence — no store bound, the question could
-  //     not be embedded, this material was ingested while the model was down so
-  //     it has no vector, or nothing in the base is close enough. Then it is not
-  //     a peer, it is everything we have.
-  // The second case is only safe because the word arm has a floor of its own
-  // (`termFloor`), and it is a STRICTER floor in exactly that case — a short
-  // question must be present in full. Without that, letting it run whenever the
-  // vector arm drew a blank turns every honest "we have nothing on this" into a
-  // bag of vaguely related paragraphs, which is the failure R23 exists to
-  // prevent and which "half the question" was too weak to stop: half of a
-  // two-word question is one word.
-  const sole = !vector.length
+  // WHEN THE WORD MATCH RUNS — and the answer turns on a distinction the old
+  // version of this comment did not draw.
+  //
+  // BESIDE THE VECTOR ARM it is easy: the question contains something EXACT (a
+  // reference, an invoice number), so it runs quietly at a tenth of a vote,
+  // because "exactly this string" is the one thing an embedding is indifferent
+  // to. Nothing below changes that case.
+  //
+  // ── WHEN THE VECTOR ARM CAME BACK EMPTY, WHICH IS TWO SENTENCES ───────────
+  //
+  // This used to be one condition (`!vector.length`) covering four situations it
+  // called identical: no store bound, the question could not be embedded, the
+  // material has no vector because it was indexed while the model was down, or
+  // nothing in the base cleared the floor. The first three are IGNORANCE — we
+  // did not look, so the word match really is everything we have. The fourth is
+  // an ANSWER: a semantic search ran over the whole compartment and reported
+  // that nothing in it is about this. Treating an answer as ignorance let the
+  // word match overturn it, on shared common words, into a confident reply.
+  //
+  // MEASURED, 27 Aug 2026, over the agency's own material. Asked "what is our
+  // parental leave policy and how much notice does it need?" — a policy the base
+  // does not hold and nobody has ever written down — the vector arm topped out
+  // at 0.451 against a floor of 0.5 and correctly found nothing. The word arm
+  // then ran as sole evidence, cleared the proportional floor on "policy",
+  // "notice" and "leave", and answered out of a page of Gemini meeting notes.
+  // That is precisely the failure R23 exists to prevent, arriving through the
+  // one door that was left open for it.
+  //
+  // So a search that LOOKED and found nothing stands, with one exception, and it
+  // is the same exception the word match exists for: a rare exact token. An
+  // embedding is indifferent to "3144" and the inverted index is not, so that
+  // one case may still speak. Everything else — a question of ordinary words the
+  // semantic search has already answered — is a refusal.
+  //
+  // The strict floor (`termFloor`'s `sole` branch — a short question present in
+  // FULL) still applies whenever the word match stands alone, and is now the
+  // second line rather than the only one.
+  const role: LexicalRole = vector.length
+    ? "beside"
+    : !asked || !hasVectorStore(env) || !hits.length
+      ? "blind"
+      : "overruling"
   const lexical =
-    hasExactTerm(question) || sole ? await lexicalArm(cfg, guard, terms, route.compartments, sole) : []
+    role !== "beside" || hasExactTerm(question)
+      ? await lexicalArm(cfg, guard, terms, exactTerms(question), route.compartments, role)
+      : []
 
   const fused = fuse(vector, lexical)
 

@@ -295,25 +295,65 @@ export function googleIngestKinds(
       table: "google_calendar",
       label: "calendar entries",
       windowed: true,
-      textVersion: 1,
+      // 2 SINCE 27 AUG 2026 — an occurrence that has not happened is no longer
+      // filed (below). The rows already filed sit behind the cursor, so without
+      // the bump the 204 of them in staging would stay there for ever: the bump
+      // is what makes the sweep walk back and re-decide every entry.
+      textVersion: 2,
       // READING FROM THE CALENDAR IS WHAT TELLS THE KNOWLEDGE BASE WHAT WAS
       // AGREED WHEN. A meeting's title and the note somebody put in the
       // description are usually the only written record that a decision was
       // taken on a Tuesday in March — and "when did we agree that?" is a question
       // no other table in this app can answer.
+      //
+      // ── BUT AN EMPTY ONE THAT HAS NOT HAPPENED IS NOT A RECORD OF ANYTHING ──
+      //
+      // A recurring series is one calendar entry per occurrence, for ever
+      // forwards. With no description on it, every one of those says exactly
+      // this and nothing else: "Met on 2027-09-10." — about a day that has not
+      // arrived, which is not merely empty but untrue.
+      //
+      // MEASURED ON STAGING, 27 Aug 2026. 236 of the team's 237 calendar sources
+      // had no description at all, and 204 of those were dated in the future. Not
+      // 204 subjects: FOUR. "Week recap" ninety-two times, "Week planning"
+      // ninety-one, "Team Assembly" twenty, one other.
+      //
+      // WHAT IT COST, and it is not the disk. Asked "what did we agree in the
+      // week recap?", every one of the thirty nearest chunks in the index was one
+      // of these placeholders — the title matches what a person types, exactly,
+      // ninety-two times over — and the 96-chunk transcript of the meeting they
+      // meant never reached the ranking at all. The answer was "we have nothing
+      // on that", about a meeting the base holds a full transcript of. A ranking
+      // cannot recover from that and neither can the diversifier, which only ever
+      // sees what the search already chose.
+      //
+      // NARROW, AND IT UNDOES ITSELF. Only an entry with NO words of its own and
+      // a date still ahead: an agenda somebody typed is kept whatever its date,
+      // and a bare PAST entry is kept too — that one really is the record that a
+      // meeting happened, which is what the paragraph above defends. And because
+      // this retires rather than skips, the day the meeting finally happens the
+      // condition stops being true, the sweep meets a live row, and the engine
+      // revives it (see `sweepKind` — the app may undo its own retirement).
       read: (_cfg, _guard, cursor, limit) =>
-        slice("calendar", cursor, limit, (items) =>
-          items.map((item) => ({
-            originRowId: rowId(item),
-            sortAt: moment(item.updatedAt),
-            title: item.title,
-            body: [`Met on ${(moment(item.updatedAt) || "an unknown date").slice(0, 10)}.`, item.text]
-              .filter(Boolean)
-              .join("\n\n"),
-            sourceUrl: item.url,
-            ...fencing(item),
-          }))
-        ),
+        slice("calendar", cursor, limit, (items) => {
+          const now = new Date().toISOString()
+          return items.map((item) => {
+            const at = moment(item.updatedAt)
+            return {
+              originRowId: rowId(item),
+              sortAt: at,
+              title: item.title,
+              body: [`Met on ${(at || "an unknown date").slice(0, 10)}.`, item.text]
+                .filter(Boolean)
+                .join("\n\n"),
+              sourceUrl: item.url,
+              // An unparseable moment is empty, and "" is never after now — so a
+              // date we could not read keeps its entry rather than losing it.
+              retired: !item.text && at > now,
+              ...fencing(item),
+            }
+          })
+        }),
     },
     {
       kind: KIND_OF.chat,

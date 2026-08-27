@@ -31,6 +31,9 @@ const holder = vi.hoisted(() => ({
   /** Ids Google positively says have gone: in the bin, called off, or 404.
    * The only signal that may retire a source. */
   binned: new Set<string>(),
+  /** Extra calendar entries one test wants and the others must not see. Empty by
+   * default, so every count in this file stays what it was. */
+  events: [] as Record<string, unknown>[],
 }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
@@ -135,6 +138,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
               { email: "me@kwapso.app", name: "Me", response: "accepted", organizer: true, optional: false, resource: false },
             ],
           },
+          ...holder.events,
         ],
     }),
     chatMessages: async () => ({ learned: new Map<string, string>(), messages: [
@@ -271,6 +275,7 @@ beforeEach(() => {
   holder.db = buildSpineDb()
   holder.unlisted.clear()
   holder.binned.clear()
+  holder.events = []
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
      INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m5', '${IDS.team}', '${OTHER_STAFF}', '${IDS.adminRole}', '2026-01-01');
@@ -738,5 +743,139 @@ describe("Google material that has GONE stops being quoted", () => {
       )
       .get(FILE) as { n: number }
     expect(left.n, "a retired source must leave nothing quotable behind").toBe(0)
+  })
+})
+
+// ── AND WHEN THE REASON GOES AWAY ────────────────────────────────────────────
+//
+// Retiring was only ever half a rule. Every path above retires correctly and
+// none of them could be undone: `sweepKind` skipped any deactivated source, so
+// a source the APP retired stayed retired after the row came back — un-archive
+// a ticket and it never answered again.
+//
+// MEASURED ON STAGING, 26 Aug 2026. Switching off a Google connection switches
+// off its named spaces too (`disconnect`, deliberately). Every named Chat space
+// went off at 18:59; the replacements were written at 04:39:54 the next
+// morning. A pass ran at 04:38, in the gap, and retired all 67 conversations —
+// right, at that instant. Seventy-four seconds later the same eight spaces were
+// shared again and not one conversation could come back: 81% of the team's Chat
+// counted on screen, looked synced, and was unquotable for good.
+//
+// The seam is WHO retired it, read structurally rather than off a name:
+// `setSourceActive` stamps the actor's id, and both machine paths leave it null.
+describe("what the app retired comes back; what a person excluded does not", () => {
+  const SPACE_SOURCE = `S_SPACE_${IDS.staffUser}`
+  const THREAD = `${IDS.staffUser}:spaces/AAA/threads/T1`
+
+  /** Switch the named space off, sweep (which retires the conversation), then
+   * share it again — the staging incident, at fixture scale. */
+  const unshareThenReshare = async () => {
+    db().exec(`UPDATE google_sources SET deactivated_at = '2026-08-25' WHERE id = '${SPACE_SOURCE}';`)
+    await sweep()
+    expect(live(THREAD), "the gap really must retire it, or this proves nothing").toBe(false)
+    db().exec(`UPDATE google_sources SET deactivated_at = NULL WHERE id = '${SPACE_SOURCE}';`)
+  }
+
+  it("a conversation retired while nothing was shared answers again once it is", async () => {
+    await sweep()
+    await unshareThenReshare()
+    await sweep()
+    expect(live(THREAD), "the space is shared again — the conversation must come back").toBe(true)
+  })
+
+  it("and it comes back with its CHUNKS, not just its row", async () => {
+    await sweep()
+    await unshareThenReshare()
+    await sweep()
+    const back = db()
+      .prepare(
+        `SELECT count(*) AS n FROM knowledge_chunks
+          WHERE source_id = (SELECT id FROM knowledge_sources WHERE origin_row_id = ?)`
+      )
+      .get(THREAD) as { n: number }
+    // THE HALF A ROW-ONLY REVIVAL WOULD HAVE MISSED, and the reason the revival
+    // forces its re-index: retiring drops the chunks and leaves chunk_count and
+    // indexed_chunks both at zero, where the sweep's ordinary hash-skip reads
+    // `0 >= 0` as "already fully indexed". A source back on screen with nothing
+    // behind it is the exact state this whole block exists to end.
+    expect(back.n, "a revived source with no chunks is still unquotable").toBeGreaterThan(0)
+  })
+
+  it("but a source a PERSON took away stays away, however often the sweep runs", async () => {
+    await sweep()
+    const id = (db().prepare("SELECT id FROM knowledge_sources WHERE origin_row_id = ?").get(THREAD) as { id: string }).id
+    const off = await call(IDS.staffUser, "POST /api/content/knowledge/active", { id, active: false })
+    expect(off.status).toBe(200)
+    expect(live(THREAD)).toBe(false)
+    await sweep()
+    await sweep()
+    expect(live(THREAD), "taking the assistant's sight of something means taking it").toBe(false)
+  })
+})
+
+// ── A MEETING THAT HAS NOT HAPPENED YET ──────────────────────────────────────
+//
+// A recurring series is one calendar entry per occurrence, for ever forwards,
+// and with no description each of them says exactly this: "Met on 2027-09-10." —
+// about a day that has not arrived, which is not merely empty but untrue.
+//
+// MEASURED ON STAGING, 27 Aug 2026. 236 of the team's 237 calendar sources had
+// no description at all and 204 were dated in the future — and those 204 were
+// FOUR subjects: "Week recap" ninety-two times, "Week planning" ninety-one,
+// "Team Assembly" twenty, one other. Asked "what did we agree in the week
+// recap?", all thirty nearest chunks in the index were those placeholders, and
+// the 96-chunk transcript of the meeting never reached the ranking. The base
+// answered "we have nothing on that" about a meeting it holds in full.
+//
+// The rule is narrow in both directions, and both directions are tested: words
+// of its own keep an entry whatever its date, and a bare entry that has already
+// happened is kept too — that one IS the record that a meeting took place.
+describe("an empty calendar entry for a day that has not come is not material", () => {
+  const FUTURE = "2027-09-10T09:00:00.000Z"
+  const PAST = "2026-01-09T09:00:00.000Z"
+  const entry = (id: string, summary: string, start: string, description?: string) => ({
+    id,
+    summary,
+    description,
+    start,
+    end: start,
+    url: `https://calendar.example/${id}`,
+    attendees: [],
+  })
+
+  it("is not filed, however many occurrences the series has", async () => {
+    holder.events = [
+      entry("REC_1", "Week recap", FUTURE),
+      entry("REC_2", "Week recap", "2027-09-17T09:00:00.000Z"),
+      entry("REC_3", "Week recap", "2027-09-24T09:00:00.000Z"),
+    ]
+    await sweep()
+    for (const id of ["REC_1", "REC_2", "REC_3"])
+      expect(live(`${IDS.staffUser}:${id}`), `${id} has not happened and says nothing`).toBe(false)
+  })
+
+  it("but an entry somebody WROTE on is kept, whatever its date", async () => {
+    holder.events = [entry("AGENDA_1", "Week recap", FUTURE, "Bring the Bergman numbers.")]
+    await sweep()
+    expect(live(`${IDS.staffUser}:AGENDA_1`), "an agenda is words, and words are material").toBe(true)
+  })
+
+  it("and a bare entry that HAS happened is kept — that is the record that it did", async () => {
+    holder.events = [entry("PAST_1", "Week recap", PAST)]
+    await sweep()
+    expect(live(`${IDS.staffUser}:PAST_1`), "when did we agree that? is what the calendar is for").toBe(true)
+  })
+
+  // THE TWO FIXES MEET HERE. This retires rather than skips, so when the day
+  // finally arrives the condition stops being true — and because the app may now
+  // undo its OWN retirement, the sweep that meets the live row puts it back.
+  it("and the day it finally happens, it comes back on its own", async () => {
+    holder.events = [entry("SOON_1", "Week recap", FUTURE)]
+    await sweep()
+    expect(live(`${IDS.staffUser}:SOON_1`)).toBe(false)
+    // The day arrives: the same entry, now in the past. Nothing else changes.
+    holder.events = [entry("SOON_1", "Week recap", PAST)]
+    await sweep()
+    expect(live(`${IDS.staffUser}:SOON_1`), "it happened — it is a record now").toBe(true)
   })
 })
