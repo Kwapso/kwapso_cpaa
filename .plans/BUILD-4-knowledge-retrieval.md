@@ -197,3 +197,99 @@ reports, per question, how many hits over the floor read back as no row — abou
 fifteen lines. A lane whose job is moving this percentage should add that in its
 first commit rather than half way through, so the number is tracked from the
 start rather than measured once.
+
+---
+
+## READING A PDF PROPERLY — scoped 27 Aug 2026, NOT built
+
+Asked for as a scope, not an implementation. The short version: **we already read
+PDFs, and the missing piece is one specific thing.**
+
+### What exists
+
+`pdfText` in `workers/content/src/lib/file-text.ts` walks every
+`stream … endstream`, inflates it, skips any stream with no `Tj`/`TJ` operator,
+and scrapes the `( … )` literals out of the ones that draw text. That is the
+right shape and it is about 40 lines.
+
+### Why every PDF in this base still came out as mojibake
+
+A PDF literal is bytes **in the font's own encoding**. When a document embeds a
+SUBSET of a font — which is what InDesign, Word and every browser's "print to
+PDF" produce — those bytes are glyph INDICES, not characters, and `(\x03\x11\x2f)`
+is three glyphs of a font we do not have rather than three letters. Scraping the
+literal gives exactly the printable-ish rubbish these rows hold.
+
+The map back is the font's `/ToUnicode` CMap, an object inside the PDF that says
+"glyph 3 is V, glyph 17 is o". Nothing reads it today. That single absence
+explains why not one PDF in the agency's base extracts — 0.000 letter-shaped
+tokens on all of them, powers of attorney and vectorised logos alike.
+
+### What it would take
+
+- **Find each page's fonts** (`/Resources /Font`), then each font's `/ToUnicode`
+  stream. The stream is already inflatable by the code above.
+- **Parse the CMap**: `beginbfchar` / `endbfchar` pairs and `beginbfrange` /
+  `endbfrange` triples. It is a small, well-specified grammar — the whole of it is
+  perhaps 80 lines, and the existing `drawnStrings` becomes "decode with this
+  map" instead of "take the bytes".
+- **Track which font is current** in the content stream (`/F1 9 Tf` selects it),
+  because a page usually has several.
+
+Roughly 150–250 lines of parsing beside what is there, no dependency, no WASM,
+and it runs in a Worker exactly as the inflate already does. The alternative — a
+vendored PDF library — is megabytes of WASM for a job that is this specific.
+
+### What it costs and where it belongs
+
+At INGEST, where extraction already happens: once per file, inside the same
+bounded read (`DRIVE_BYTES_CAP`, 8 MB) and the same slice budget of 400 streams.
+Not a sweep — nothing about it changes after the file does, and a sweep would pay
+the cost again on every tick for no new answer.
+
+### What it does NOT solve
+
+A SCANNED page has no text layer at all, and no CMap work reaches it. That is
+OCR, it is a different order of expense, and `pdfText`'s own comment already says
+an empty result there is the true one.
+
+### How to know it worked
+
+The twelve PDFs of five chunks or more in `scripts/prune-unreadable-files.mjs`'s
+dry run are the test set, and two of them — `Confia-Vollmacht_Unternehmen.pdf`
+and `Confia-Vollmacht_privat.pdf` — are documents whose content is known to be
+real German prose. Today they score 0.000 on `readsLikeWords`. If they clear it
+after the change, the feature works; if they still fail, they are scans and
+belong to the OCR question instead.
+
+**This is why "retire the unreadable files" is not a substitute for extraction.**
+Retiring one loses nothing that was ever answerable — but it loses the ROW, and
+the row is what a re-extraction would re-fill.
+
+---
+
+## THE PATTERN THIS WHOLE ROUND KEPT FINDING
+
+An instrument that is right about what it checks and silent about what matters.
+It appeared at **three levels in one day**, each one measuring the level below and
+each one wrong in the same way:
+
+1. **The app.** Retrieval scored a placeholder and a transcript identically,
+   because it ranked on similarity and they are equally similar.
+2. **The bench measuring the app.** `kb-bench` scored those questions PASS,
+   because its key matched a cited TITLE — and an empty placeholder for a meeting
+   and the 92-chunk transcript of that meeting have the same title.
+3. **The answer key measuring the bench.** Two of six `every citation on topic`
+   failures were the key itself demanding the word in a TITLE, so the row
+   understates the base.
+
+And a fourth, in a test written to close the first three: a source census that
+looked for an identifier in a file **without stripping comments**, so the comment
+explaining why the call was there kept it green after the call was deleted. Seven
+checks in `web/test/rules.test.ts` had that shape, three of them standing on Laws
+of the Base.
+
+The lesson is not "check the code". It is: **when an instrument and a person
+disagree, measure the instrument.** Every one of these was found by asking what
+the check would say if the thing it guards were deleted — which is the only
+question that distinguishes a passing check from a blind one.
