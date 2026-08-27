@@ -20,6 +20,14 @@
       "runtimeArgs": ["run", "dev", "--workspace=web"],
       "port": 3000,
       "env": { "DEV_API_ORIGIN": "https://kwapso-staging.kwapso.workers.dev" }
+    },
+    {
+      "_": "The CLIENT PORTAL on :3001 with every door and /media/* pointed at deployed STAGING. Same flag, same reasoning as the entry above — see the DEV_API_ORIGIN note in web-portal/next.config.ts. Reads only.",
+      "name": "kwapso-portal-vs-staging",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:portal"],
+      "port": 3001,
+      "env": { "DEV_API_ORIGIN": "https://kwapso-portal-staging.kwapso.workers.dev" }
     }
   ]
 }

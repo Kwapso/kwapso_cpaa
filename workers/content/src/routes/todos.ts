@@ -11,17 +11,17 @@
 // which is the same statement made in a second place — see PORTAL_DOORS and the
 // PORTAL_VISIBLE_* tables in shared/rules/registry.ts.
 
-import { fail, json } from "@shared/workers/http"
+import { fail, json, pagedJson } from "@shared/workers/http"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
-import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos, todoOrThrow } from "../lib/todos"
+import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, getTodo, listTodos, todoOrThrow } from "../lib/todos"
 import { countTasks, createTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
-import { TASK_VIEWS, type TaskViewName } from "@shared/types"
+import { TASK_VIEWS, TODO_VIEWS, type TaskViewName, type TodoViewName } from "@shared/types"
 import type { Env } from "../env"
 
 /** WHOSE WORLD IS THIS CALLER STANDING IN? Resolved once per request, the same
@@ -42,23 +42,89 @@ async function callerScope(
  * PDF, small enough that one door cannot be used as free storage. */
 const MAX_TODO_FILE_BYTES = 10 * 1024 * 1024
 
-/** GET /api/content/todos — what we are waiting on. Fenced: a client login sees
- * their company's, staff see everyone's (?accountId narrows to one client). */
+/** The filters this door parses — ONE place, so the page and its counts can
+ * never be asked different questions (R16) and the machine surface has one thing
+ * to mirror (R19).
+ *
+ * `view` is matched against the two the app knows through the shared list, which
+ * is a positional allow-list check (R20) and not a cast: anything else — the
+ * retired `all` included — falls back to the open pile rather than reaching SQL.
+ */
+function todoFilterFrom(url: URL): { accountId?: string; view: TodoViewName } {
+  const asked = queryText(url.searchParams.get("view"), "View")
+  return {
+    accountId: queryText(url.searchParams.get("accountId"), "Client"),
+    view: (TODO_VIEWS as readonly string[]).includes(asked ?? "") ? (asked as TodoViewName) : "open",
+  }
+}
+
+/** ONE PAGE OF TO-DOS, plus every number a screen showing them badges (R14/R16).
+ *
+ * The three counts ride EVERY answer, whichever view was asked for, for the
+ * reason the task door gives: the badge on a pile you are not looking at cannot
+ * be counted from the rows you are. `total` is the count over what was LISTED,
+ * so a tab badge and the list under it are one answer.
+ *
+ * Used by all three to-do doors. A door that built this literal by hand would be
+ * a door that can ship half the contract — R14 says so, and the check reads this
+ * whole file for a hand-built `json(` carrying `todos`. */
+async function todoPage(
+  cfg: Parameters<typeof listTodos>[0],
+  guard: Parameters<typeof listTodos>[1],
+  scope: AccountScope,
+  filter: { accountId?: string; view: TodoViewName },
+  cursor: string | null
+): Promise<Response> {
+  // These are independent reads — one wait, not 2.
+  const [page, counts] = await Promise.all([
+    listTodos(cfg, guard, scope, filter, cursor),
+    countTodos(cfg, guard, scope, { accountId: filter.accountId }),
+  ])
+  return pagedJson(
+    "todos",
+    {
+      rows: page.rows,
+      total: filter.view === "done" ? counts.done : counts.open,
+      hasMore: page.hasMore,
+      nextCursor: page.nextCursor,
+    },
+    { openTotal: counts.open, doneTotal: counts.done, allTotal: counts.all }
+  )
+}
+
+/** GET /api/content/todos — what we are waiting on, and what has come back.
+ *
+ * Fenced: a client login sees their company's, staff see everyone's (?accountId
+ * narrows to one client). `?view=done` is the completed pile — which is the only
+ * pile that can be carrying a file, because completing one is what attaches it.
+ * `?id=` is one to-do by id. */
 export async function getTodos(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "todos", "read")
   const scope = await callerScope(cfg, guard)
   const url = new URL(request.url)
-  const filter = {
-    accountId: queryText(url.searchParams.get("accountId"), "Client"),
-    view: queryText(url.searchParams.get("view"), "View") === "all" ? ("all" as const) : ("open" as const),
+  const filter = todoFilterFrom(url)
+  const id = queryText(url.searchParams.get("id"), "Id")
+  // One to-do by id is a LOOKUP, not a page — answered directly rather than
+  // filtered out of a page that could legitimately not contain it (R38). It
+  // deliberately ignores the view: a to-do opened by id is open or done, and the
+  // caller asking for it by name already knows which one it is.
+  if (id) {
+    const [one, counts] = await Promise.all([
+      getTodo(cfg, guard, scope, id),
+      countTodos(cfg, guard, scope, { accountId: filter.accountId }),
+    ])
+    return pagedJson(
+      "todos",
+      {
+        rows: one ? [one] : [],
+        total: filter.view === "done" ? counts.done : counts.open,
+        hasMore: false,
+        nextCursor: null,
+      },
+      { openTotal: counts.open, doneTotal: counts.done, allTotal: counts.all }
+    )
   }
-  // These are independent reads — one wait, not 2.
-  const [todos, total] = await Promise.all([listTodos(cfg, guard, scope, filter), countTodos(cfg, guard, scope, filter)])
-  return json({
-    todos,
-    // R16: the exact server count, over the same question the list asked.
-    total,
-  })
+  return todoPage(cfg, guard, scope, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
 }
 
 /** POST /api/content/todos — ask a client for something (todos:create).
@@ -89,13 +155,7 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   // Best-effort, and after the write: a failed email must never fail the to-do
   // that triggered it. The row is already saved and already on their screen.
   await notifyTodoRaised(env, cfg, guard, created.id)
-  const filter = { view: "open" as const }
-  // These are independent reads — one wait, not 2.
-  const [todos, total] = await Promise.all([listTodos(cfg, guard, scope, filter), countTodos(cfg, guard, scope, filter)])
-  return json({
-    todos,
-    total,
-  })
+  return todoPage(cfg, guard, scope, { view: "open" }, null)
 }
 
 /** POST /api/content/todos/complete — the client's own act (todos:EDIT).
@@ -163,13 +223,7 @@ export async function postCancelTodo(request: Request, env: Env): Promise<Respon
   const id = requireText(body.id, "To-do", TEXT_LIMITS.short)
   const { moved, accountId } = await cancelTodo(cfg, guard, actor, id)
   if (moved) await publishChange(env, guard.teamId, "todos", id, "edit", accountId ?? undefined)
-  const filter = { view: "open" as const }
-  // These are independent reads — one wait, not 2.
-  const [todos, total] = await Promise.all([listTodos(cfg, guard, scope, filter), countTodos(cfg, guard, scope, filter)])
-  return json({
-    todos,
-    total,
-  })
+  return todoPage(cfg, guard, scope, { view: "open" }, null)
 }
 
 /** GET /api/content/portal/delivery — the client's own picture of the work they

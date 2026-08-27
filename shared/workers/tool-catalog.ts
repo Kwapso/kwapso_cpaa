@@ -1272,15 +1272,16 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_todos",
     summary:
-      "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks. Each carries the reference the client quotes, the due date, whether they have completed it and the file they sent if there is one. `view` is 'open' by default; pass 'all' to include the completed. `accountId` narrows to one client.",
+      "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks. Each carries the reference the client quotes, the `dueOn` date, `completedAt` and `completedByName` if it has come back, and `fileName` + `fileUrl` for the document they sent with it. `view` is 'open' by default — the ones still outstanding; pass 'done' for the ones that have come back, which are the only ones that can be carrying a file, because completing a to-do is what attaches it. `accountId` narrows to one client. Pass `id` to fetch just that one. Every answer carries `openTotal`, `doneTotal` and `allTotal` whichever view you asked for, so a count never has to be derived from the rows. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A cursor belongs to the view it was minted in: the two views are ordered by different columns, so one minted in 'open' is refused by 'done'.",
     binding: "CONTENT", method: "GET", path: "/api/content/todos",
-    schema: obj({ accountId: S, view: S }),
+    schema: obj({ accountId: S, view: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["accountId", "view"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      for (const k of ["accountId", "view", "id", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
-    agent: { write: false, summarize: () => "List what we're waiting on clients for" },
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one to-do" : "List what we're waiting on clients for") },
   },
   {
     name: "raise_todo",

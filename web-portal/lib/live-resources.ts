@@ -48,8 +48,16 @@ export const cacheKeys = {
   attachments: (ticketId: string) => `portal:attachments:${ticketId}`,
   attachmentsTotal: (ticketId: string) => `portal:attachments:${ticketId}:total`,
   impact: "portal:impact",
-  /** What we are waiting on them for, and what they bought. */
+  /** What we are waiting on them for, what they have already sent back, and
+   * what they bought. The first two are two PAGED views of one collection (R14),
+   * ordered by different columns, so each keeps its own rows, its own exact
+   * total and its own cursor — a cursor minted in one is refused by the other. */
   todos: "portal:todos",
+  todosTotal: "portal:todos:total",
+  todosCursor: "portal:todos:cursor",
+  todosDone: "portal:todos:done",
+  todosDoneTotal: "portal:todos:done:total",
+  todosDoneCursor: "portal:todos:done:cursor",
   delivery: "portal:delivery",
   processComments: (processId: string) => `portal:process-comments:${processId}`,
   /** What we handed over. ONE key for the whole screen — the door answers about
@@ -75,8 +83,16 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   accounts: (a) => (a ? [cacheKeys.company(a)] : []),
   account_links: (a) => (a ? [cacheKeys.company(a)] : []),
   portal_users: (a) => (a ? [cacheKeys.company(a), cacheKeys.context] : []),
-  // A to-do we raised, withdrew, or that a colleague of theirs just completed.
-  todos: () => [cacheKeys.todos],
+  // A to-do we raised, withdrew, or that a colleague of theirs just completed —
+  // and completing one moves it from the first list to the second, so BOTH go.
+  // Their totals go with them: a stale badge over a fresh list is R16's failure
+  // arriving by the back door.
+  todos: () => [
+    cacheKeys.todos,
+    cacheKeys.todosTotal,
+    cacheKeys.todosDone,
+    cacheKeys.todosDoneTotal,
+  ],
   // A story moving changes the two counts on their ticket rows AND the "3 of 8
   // done" on the sprint block they bought — neither of which they can see the
   // inside of, and both of which they watch.

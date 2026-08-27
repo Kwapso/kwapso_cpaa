@@ -25,6 +25,7 @@ import type {
   ProcessComment,
   SessionUser,
   Todo,
+  TodoViewName,
 } from "@shared/types"
 import type { Language } from "@shared/i18n"
 import type { SavingsView } from "@shared/workers/savings"
@@ -214,9 +215,23 @@ export const support = {
  * client's own picture of delivery — one is a list they act on, the other is a
  * block they read. */
 export const delivery = {
-  /** Their company's open to-dos. Bounded, not paged: a to-do is a thing we are
-   * waiting on, so there are a handful. */
-  todos: () => api<{ todos: Todo[]; total: number }>("/api/content/todos"),
+  /** Their company's to-dos, one page at a time (R14).
+   *
+   * TWO VIEWS, and the second is the one the owner ruled on ("yes they can see
+   * it ofc!"): `open` is what we are still waiting on them for, `done` is what
+   * they have already sent — including the DOCUMENT they attached, which is on
+   * `fileUrl` and which this gateway serves out of the same media bucket the
+   * completing door wrote it to. Until now completing a to-do was the last time
+   * a contact ever saw the file they had just uploaded.
+   *
+   * It PAGES because the done pile only grows: `completeTodo` never deletes, so
+   * a client three years in has every document they have ever sent us behind
+   * this door, and a ceiling would eventually be a refusal to show them their
+   * own. `total` counts the view asked for; both piles' counts ride along (R16). */
+  todos: (view: TodoViewName = "open", cursor?: string | null) =>
+    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
+      `/api/content/todos?view=${view}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+    ),
   /** Mark one done, and send the file with it if there is one. `fileDataUrl` is
    * a base64 data URL; the door caps it, parses it and stores it under a key
    * nobody can guess. */
