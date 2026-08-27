@@ -20,6 +20,7 @@ import { SeaWaves } from "@shared/ui/foundations/icons"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
 import { softNavigate } from "@/lib/nav"
+import { sectionClick } from "@/lib/nav-memory"
 import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // The row-level registry + coarse invalidations moved to lib (R15): they're DATA
 // the live-collections check imports, and the thread/help_threads + agent_usage
@@ -145,6 +146,14 @@ export function AppShell({
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
+  /** CLICKING A SECTION, WHICH IS NOT THE SAME AS FOLLOWING A LINK — it is the
+   * one control in the app that names a section rather than a destination, so
+   * it is the one that asks the nav memory where she was, and the one where a
+   * second click on the section you are already in resets it. The whole of that
+   * decision (and why the reset is a second click rather than a double-click)
+   * lives in `sectionClick`; the rail just draws the button. */
+  const goToSection = (path: string) => navigate(sectionClick(teamId, path, here))
+
   // THE RAIL, IN TWO GROUPS WITH A DIVIDER (the owner's ruling — see NavGroup in
   // pages.ts for why neither "keep it under nine" nor "show everything flat"
   // was accepted). Every destination declares which half it belongs to, so this
@@ -191,7 +200,7 @@ export function AppShell({
       <button
         key={item.slug}
         type="button"
-        onClick={() => navigate(item.path)}
+        onClick={() => goToSection(item.path)}
         aria-current={activeNav ? "page" : undefined}
         title={collapsed ? item.title : undefined}
         className={`motion-hover flex items-center rounded-[var(--radius)] text-sm font-medium ${
@@ -478,7 +487,7 @@ export function AppShell({
               <button
                 key={item.slug}
                 type="button"
-                onClick={() => navigate(item.path)}
+                onClick={() => goToSection(item.path)}
                 aria-current={activeNav ? "page" : undefined}
                 /* `min-w-0` + a box for the label: this bar is up to six
                    `flex-1` slots on 375px, so a label like "Knowledge base"
@@ -541,7 +550,7 @@ export function AppShell({
                         type="button"
                         onClick={() => {
                           setMoreOpen(false)
-                          navigate(item.path)
+                          goToSection(item.path)
                         }}
                         aria-current={activeNav ? "page" : undefined}
                         className={`motion-hover flex items-center gap-2 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium ${

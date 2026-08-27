@@ -7,6 +7,7 @@
 // selectable_data module; the server re-checks every write. Library primitives only.
 
 import * as React from "react"
+import { useRemembered } from "@shared/web/remembered"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { cn } from "@shared/ui/lib/utils"
@@ -68,7 +69,8 @@ export function SelectableScreen({
   // Collection filter chrome — the SAME shape the other collections (roles,
   // learning, help) use: a text search + a status filter defaulting to Active, so
   // deactivated values hide until you ask for them (then show greyed with Activate).
-  const [query, setQuery] = React.useState("")
+  // Remembered with the screen — see web/lib/nav-memory.ts.
+  const [query, setQuery] = useRemembered("search", "")
   const [status, setStatus] = React.useState<"active" | "inactive" | "all">("active")
 
   const values = valuesQ.data ?? []

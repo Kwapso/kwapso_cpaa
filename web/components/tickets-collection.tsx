@@ -35,6 +35,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
@@ -112,7 +113,9 @@ export function TicketsCollection({
   onIntent: (intent: ScreenIntent) => void
 }) {
   const t = useT()
-  const [facet, setFacet] = React.useState<HelpFacet>(ALL)
+  // Which type of ticket she was looking at, remembered with the rest of the
+  // screen — the sub-tab is as much "where she was" as the search box under it.
+  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", ALL)
 
   // THE TWO SCOPE CACHES: each is a server scope with its own page. There were
   // three until "My tickets" went (live-resources.ts says why).

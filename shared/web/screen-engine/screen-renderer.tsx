@@ -455,6 +455,10 @@ function renderBlock(
         <CollectionFrame
           config={block.collection ?? { ...defaultCollectionConfig }}
           data={rows}
+          /* WHICH collection this is, for the nav memory — a screen can carry
+             several, and the module it binds to is the name that tells them
+             apart. */
+          memoryKey={block.binding.source ?? block.binding.module}
           searchKeys={["title", "name", "label"]}
           renderItems={(page) => (
             <List
@@ -620,6 +624,7 @@ function renderList(
     <CollectionFrame
       config={recipe.collection ?? { ...defaultCollectionConfig }}
       data={rows}
+      memoryKey={recipe.binding.module}
       searchKeys={fields.map((f) => f.column)}
       renderItems={(page) =>
         display === "cards" ? (

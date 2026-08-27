@@ -14,6 +14,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
 
 // The old library's thread exported this; the kit's thread is messages-only,
@@ -164,7 +165,10 @@ export function HelpDetailScreen({
   // and read back here for the badge.
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("help", helpId))
 
-  const [tab, setTab] = React.useState("conversation")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "conversation".
+  const [tab, setTab] = useRemembered("tab", "conversation")
   const [editing, setEditing] = React.useState(false)
   // NEW WORK AGAINST THIS REQUEST — and this is NOT "make it a story".
   //

@@ -68,6 +68,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { Comments } from "@shared/ui/components/comments/comments"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
 
@@ -213,7 +214,10 @@ export function ProcessDetailScreen({
   const canCreate = can("processes", "create")
   const canArchive = can("processes", "delete")
 
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [stepOpen, setStepOpen] = React.useState(false)
   const [editingStep, setEditingStep] = React.useState<ProcessStep | null>(null)

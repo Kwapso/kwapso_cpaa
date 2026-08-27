@@ -20,6 +20,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 import { Check, ClipboardCheck, Pencil } from "@shared/ui/foundations/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
@@ -95,7 +96,10 @@ export function StoryDetailScreen({
   // rewrite the work was being offered neither.
   const canLogTime = can("work", "create")
 
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [reviewOpen, setReviewOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)

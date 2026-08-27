@@ -25,6 +25,7 @@ import * as React from "react"
 
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { OverviewList } from "@/components/overview-list"
@@ -48,7 +49,10 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
     tenancy.selectableOne(valueId)
   )
   const activity = useRecordActivity("selectable_data", valueId)
-  const [tab, setTab] = React.useState("overview")
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  const [tab, setTab] = useRemembered("tab", "overview")
 
   const value = valueQ.data ?? null
   // A FAILED READ SAYS SO. `data` stays undefined when the fetch REJECTS as well

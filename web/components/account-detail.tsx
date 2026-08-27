@@ -54,6 +54,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { useRemembered } from "@shared/web/remembered"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
@@ -239,11 +240,19 @@ export function AccountDetailScreen({
   // "add or edit their roles and tools" link carries — the management surface
   // is a tab on this record, and a link that lands one tab away is a link that
   // makes the reader hunt. Read once, on mount; the strip owns it after that.
-  const [tab, setTab] = React.useState(() => {
-    if (typeof window === "undefined") return "overview"
-    const asked = new URLSearchParams(window.location.search).get("tab")
-    return asked === "organisation" ? asked : "overview"
-  })
+  //
+  // AND A LINK BEATS THE MEMORY. The open tab is otherwise remembered per record
+  // (web/lib/nav-memory.ts), but an address that NAMES a tab is somebody telling
+  // us where to go — the memory does not get to argue with it. That is the same
+  // ruling as the one in the shell: nothing about this feature rewrites a
+  // destination a person asked for.
+  const askedTab = () =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab")
+  const [tab, setTab] = useRemembered(
+    "tab",
+    () => (askedTab() === "organisation" ? "organisation" : "overview"),
+    (found) => (askedTab() ? undefined : typeof found === "string" ? found : undefined)
+  )
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
   const [newContactOpen, setNewContactOpen] = React.useState(false)

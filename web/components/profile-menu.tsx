@@ -27,6 +27,7 @@ import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
+import { forgetEverything } from "@/lib/nav-memory"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
 
@@ -91,6 +92,11 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
           onSelect={() =>
             void auth.logout().then(() => {
               clearAllFormDrafts() // one user's unsaved drafts never leak to the next
+              // …and neither do their places. Signing out is a client-side route
+              // change, not a reload, so the nav memory would otherwise still be
+              // in this document when the next person signs in and would hand
+              // them somebody else's trail. Same sentence as the line above it.
+              forgetEverything()
               router.replace("/login")
             })
           }
