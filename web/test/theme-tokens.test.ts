@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
-const CSS = readFileSync(join(ROOT, "shared", "ui", "tokens", "tokens.css"), "utf8")
+const CSS = readFileSync(join(ROOT, "shared", "ui", "foundations", "tokens", "tokens.css"), "utf8")
 
 /** Every `--token: value` inside one brace-balanced block, as a sorted map. */
 function declarations(startAt: number): Map<string, string> {

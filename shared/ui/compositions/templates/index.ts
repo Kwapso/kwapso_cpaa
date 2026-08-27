@@ -27,7 +27,8 @@
                               is numbered 0 because it is under the others
                               rather than beside them.
      0a MainScreen          · main-screen.tsx   — "in the navbar"
-     0b DetailScreen        · detail-screen.tsx — "has breadcrumbs"
+     0b DetailScreen        · detail-screen.tsx — one record, read (no
+                              breadcrumb — override 73)
      0c Rail                · rail.tsx — THE NAVBAR ITSELF. The third region
                               of the shell, beside the two screens that fill
                               in the header band. It is here and not in
@@ -97,9 +98,10 @@ export type { ScreenShellProps, ScreenSpine } from "./screen-shell";
 export { MainScreen } from "./main-screen";
 export type { MainScreenProps } from "./main-screen";
 
-/* 0b · DetailScreen — a screen that has breadcrumbs. Parent-and-number
-   eyebrow, underline tabs, the identity chip row, the mango `Edit`, and the
-   charcoal footer. */
+/* 0b · DetailScreen — one record, read. No breadcrumb and no eyebrow band
+   (override 73): the title leads the body pane, the identity chips sit
+   directly under it — black ID chip first, then the collection chip — the
+   mango `Edit` rides the title's row, underline tabs, the charcoal footer. */
 export { DetailScreen } from "./detail-screen";
 export type { DetailScreenProps } from "./detail-screen";
 

@@ -24,15 +24,15 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { MoreHorizontal } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { MoreHorizontal } from "@shared/ui/foundations/icons"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { formatRelative } from "@shared/web/format"
@@ -176,7 +176,7 @@ export function RecordFooter({ audit }: { audit: RecordAudit }) {
   else if (edited) lines.push(t("Last edited {when}", { when: edited }))
   if (lines.length === 0) return null
   return (
-    <footer className="bg-muted text-muted-foreground mt-8 flex flex-wrap gap-x-6 gap-y-1 rounded-xl px-4 py-3 text-xs">
+    <footer className="bg-muted text-muted-foreground mt-8 flex flex-wrap gap-x-6 gap-y-1 rounded-[var(--radius)] px-4 py-3 text-xs">
       {lines.map((line) => (
         <span key={line}>{line}</span>
       ))}

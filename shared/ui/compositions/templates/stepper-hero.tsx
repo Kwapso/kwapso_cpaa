@@ -55,8 +55,8 @@ import * as React from "react";
 import {
   StatusStepper,
   type StatusStage,
-} from "../../controls/status-stepper/status-stepper";
-import { Text } from "../../controls/typography/typography";
+} from "../../components/status-stepper/status-stepper";
+import { Text } from "../../components/typography/typography";
 import { cn } from "../../lib/utils";
 import { useHasRoom } from "../../lib/use-has-room";
 import {

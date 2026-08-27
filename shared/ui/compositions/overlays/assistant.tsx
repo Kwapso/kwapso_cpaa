@@ -60,35 +60,35 @@
 
 import * as React from "react";
 
-import { ActionRow } from "../../controls/action-row/action-row";
-import { Button } from "../../controls/button/button";
-import { Text } from "../../controls/typography/typography";
+import { ActionRow } from "../../components/action-row/action-row";
+import { Button } from "../../components/button/button";
+import { Text } from "../../components/typography/typography";
 import {
   AgentChat,
   type AgentChatMessage,
   type AgentChatProps,
-} from "../../structures/agent-chat/agent-chat";
+} from "../../components/agent-chat/agent-chat";
 import {
   CopilotOverlay,
   type CopilotMessage,
   type CopilotProposal,
-} from "../../structures/copilot-overlay/copilot-overlay";
+} from "../../components/copilot-overlay/copilot-overlay";
 import {
   DataTable,
   type DataTableColumn,
-} from "../../structures/data-table/data-table";
+} from "../../components/data-table/data-table";
 import {
   ProgressDashboard,
   type ProgressRow,
-} from "../../structures/progress-dashboard/progress-dashboard";
+} from "../../components/progress-dashboard/progress-dashboard";
 import {
   RunSteps,
   type RunStep,
-} from "../../structures/run-steps/run-steps";
+} from "../../components/run-steps/run-steps";
 import {
   StatGrid,
   type StatItem,
-} from "../../structures/stat-grid/stat-grid";
+} from "../../components/stat-grid/stat-grid";
 import { cn } from "../../lib/utils";
 import { shapeCopy, type ShapeStateCopy } from "../states/states";
 

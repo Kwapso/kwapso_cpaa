@@ -96,16 +96,16 @@
 
 import * as React from "react";
 
-import { AmbientBackground } from "../../controls/ambient-background/ambient-background";
-import { Logotype } from "../../controls/brand/brand";
-import { Button } from "../../controls/button/button";
-import { Field } from "../../controls/field/field";
-import { Image } from "../../controls/image/image";
-import { Input } from "../../controls/input/input";
+import { AmbientBackground } from "../../components/ambient-background/ambient-background";
+import { Logotype } from "../../components/brand/brand";
+import { Button } from "../../components/button/button";
+import { Field } from "../../components/field/field";
+import { Image } from "../../components/image/image";
+import { Input } from "../../components/input/input";
 import {
   Headline,
   Text,
-} from "../../controls/typography/typography";
+} from "../../components/typography/typography";
 import { cn } from "../../lib/utils";
 import {
   ShapeStateBody,
@@ -163,9 +163,20 @@ import {
    reader announcing a stock photograph on a sign-in page is noise.
    ------------------------------------------------------------------------- */
 
-import photo960 from "../../assets/photography/exterior-mockup-960.jpg";
-import photo1440 from "../../assets/photography/exterior-mockup-1440.jpg";
-import photo1920 from "../../assets/photography/exterior-mockup-1920.jpg";
+import photo960src from "../../assets/photography/exterior-mockup-960.jpg";
+import photo1440src from "../../assets/photography/exterior-mockup-1440.jpg";
+import photo1920src from "../../assets/photography/exterior-mockup-1920.jpg";
+
+import { assetUrl } from "../../lib/asset-url";
+
+/* A bundler decides what an asset import evaluates to and they disagree — Vite
+   a URL string, Next a `StaticImageData` object. `assetUrl` settles it. Without
+   it this file does not COMPILE under Next, and because AuthShell imports
+   AuthPhotograph at module scope the error lands on every importer whether the
+   photograph is rendered or not. See lib/asset-url.ts. */
+const photo960 = assetUrl(photo960src);
+const photo1440 = assetUrl(photo1440src);
+const photo1920 = assetUrl(photo1920src);
 
 /**
  * The outside screens' photograph, filling whatever box it is given.

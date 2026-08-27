@@ -17,12 +17,12 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Card, CardContent } from "@shared/ui/controls/card/card"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { RecordActionsMenu } from "@/components/record-chrome"
@@ -219,7 +219,7 @@ export function StaffPanel({
               per-person figure would need its own COUNT(*) and this panel is not
               where somebody comes to ask it. */}
           {formatCount(teamCertTotal) ? (
-            <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+            <span className="bg-muted text-muted-foreground rounded-pill px-2 py-0.5 text-xs font-medium">
               {formatCount(teamCertTotal)}
             </span>
           ) : null}

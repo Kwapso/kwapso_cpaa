@@ -39,10 +39,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,8 +52,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Link2, Paperclip, Trash2 } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Link2, Paperclip, Trash2 } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpAttachment } from "@shared/types"
@@ -174,14 +174,14 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
       <CollectionHeading label={t("Files and links")} total={total} />
 
       {listQ.loading && !listQ.data ? (
-        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
       ) : attachments.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {t("Nothing attached yet. A screenshot often explains it faster than a paragraph.")}
         </p>
       ) : (
         // K5: one container, rows separated by a hairline — never a box each.
-        <ul className="divide-y rounded-xl border">
+        <ul className="divide-y rounded-[var(--radius)] border">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? Paperclip : Link2

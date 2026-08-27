@@ -15,8 +15,8 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   ScreenRenderer,
   type ScreenActionContext,

@@ -5,9 +5,9 @@
 import * as React from "react"
 
 import { cn } from "@shared/ui/lib/utils"
-import { Button, buttonVariants } from "@shared/ui/controls/button/button"
-import { Card, CardContent } from "@shared/ui/controls/card/card"
-import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/icons"
+import { Button, buttonVariants } from "@shared/ui/components/button/button"
+import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 
 import { CONCEPT_ICON } from "@/lib/pages"

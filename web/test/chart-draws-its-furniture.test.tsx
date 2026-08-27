@@ -29,7 +29,7 @@
 import { render } from "@testing-library/react"
 import { beforeAll, describe, expect, it } from "vitest"
 
-import { Chart } from "@shared/ui/structures/chart/chart"
+import { Chart } from "@shared/ui/components/chart/chart"
 
 // recharts measures its container, and jsdom reports every box as 0×0 — so a
 // chart would render nothing at all and the test would pass for the wrong

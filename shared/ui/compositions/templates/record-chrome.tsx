@@ -17,6 +17,64 @@
         describe it afterwards. Facts strip, the record's own text,
         attachments, then the ink footer. That order never changes."
 
+     THE IDENTITY ROW MOVES BELOW THE TITLE, AND THE BREADCRUMB ABOVE A RECORD
+     IS GONE — OVERRIDE 73 (2026-08-26), REVERSING THE QUOTE JUST ABOVE.
+     The client, comparing the live "Tickets · Padelbase · 4182" record page
+     against a reference mockup, verbatim: "notice how the chips are directly
+     underneath the title. in the example that I put, there is no edit button
+     like yours, but the edit button should be aligned with the title and the
+     chips underneath it. also, detail pages do not need this bar that you
+     have on top where we have Padelbase and the number. these are chips, so
+     the black chip is always the ID. we always use black chips for IDs, and
+     next to it, add a chip for Padelbase like in the example. of course,
+     translate this to universal rules."
+     This reverses the ch27.8 sentence quoted above on two points at once:
+     (1) "Breadcrumb, then the identity row" — there is no breadcrumb on a
+     record screen any more, in any spelling; (2) "the identity row … then
+     the title … then tags beneath it" and its own stated reason, "Keys sit
+     above because they tell you which record this is before you read what
+     it's called" — the client's ruling puts the identity row BELOW the
+     title instead, so this file no longer agrees with either the order or
+     the reasoning. WHAT CHANGED, CONCRETELY: `breadcrumb`/`breadcrumbLabel`
+     are removed from this component's API rather than kept unused — a grep
+     of every real caller (`DetailScreen`, the sole production consumer of
+     this shape) showed it never forwards a breadcrumb into `RecordChrome`
+     at all, so the prop was already dead outside one demo catalogue
+     specimen (`demo/shapes/screens-1-4.tsx`), which is not a caller this
+     ruling needs to keep serving. The identity row — the black ID badge,
+     ch27.8's own pill, now leading a NEW `collectionLabel` chip ("Padelbase
+     like in the example") and then the pre-existing `chips` — moves from
+     `eyebrow` (above the title) to the line directly under it. `actions`
+     moves into the title's own row: `RecordDetail` already threads `title`
+     and `actions` into the same `Title` row (baseline-aligned, actions
+     pushed `ms-auto`), so handing this file's `title` and `actions` straight
+     to it, with no `eyebrow` content above them any more, is what puts Edit
+     "aligned with the title" with no extra markup here — this file still
+     draws nothing of its own. `tags` is UNCHANGED and keeps its own line
+     below the new chip row: the client ruled on the chip row and the
+     breadcrumb, not on tags, and a tag ("Mail", "Retainer") is a topic label
+     while a chip here is identity/status — different meanings, so they stay
+     two rows rather than merging into one.
+     A DEEPER FINDING THIS RULING SURFACED, NOT FIXED IN THIS FILE: the live
+     Tickets/Padelbase page does not reach this component's identity row and
+     title in the same place at all. It renders through `RecordRoute` →
+     `DetailScreen` → `RecordChrome`, and `DetailScreen` draws its OWN
+     breadcrumb + eyebrow + title in `ScreenShell`'s header band, entirely
+     apart from this file's identity row in the body pane below — that split
+     is what actually produced the client's screenshot, not this file's own
+     internal ordering, which was already breadcrumb-then-identity-then-
+     title-then-tags, adjacent, before this override. `RecordRoute` is fixed
+     by composing `ScreenShell` and this shape directly instead of
+     `DetailScreen`, so the live specimen now gets this ruling. `DetailScreen`
+     itself — and its other callers, `mini-app/record.tsx`,
+     `compositions/states/new-empty-record.tsx`,
+     `compositions/screens/company-hub.tsx` and the `demo/shapes/
+     templates-0.tsx` catalogue — still draw the pre-ruling split and are
+     OUT OF SCOPE here: `detail-screen.tsx` was not one of the two files this
+     pass owned, and one of its four callers was under concurrent edit.
+     Logged in KWAPSO-SPEC.md's override register (row 73) rather than
+     guessed at.
+
      THERE IS NO FACTS STRIP — 26.04 BEATS 27.8, OVERRIDE 49 (2026-08-23).
      26.04, verbatim: "There is no facts strip — a record's values belong in
      its body, not stacked above the tabs." 27.8 says the opposite twice: the
@@ -85,24 +143,20 @@
    · Focus is one global rule. No radius, no colour, no size decided here.
 
    RENDERING CONTEXT
-   `"use client"`. This module builds the breadcrumb and identity nodes during
-   its own render and forwards a tab-change handler into Radix Tabs.
+   `"use client"`. This module builds the identity-row node during its own
+   render and forwards a tab-change handler into Radix Tabs.
    ========================================================================= */
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import {
-  Breadcrumbs,
-  type BreadcrumbsItem,
-} from "../../controls/breadcrumbs/breadcrumbs";
-import type { StatusStage } from "../../controls/status-stepper/status-stepper";
-import type { ActivityFeedItem } from "../../structures/activity-feed/activity-feed";
+import { Badge } from "../../components/badge/badge";
+import type { StatusStage } from "../../components/status-stepper/status-stepper";
+import type { ActivityFeedItem } from "../../components/activity-feed/activity-feed";
 import {
   RecordDetail,
   type RecordDetailAuditEntry,
   type RecordDetailTab,
-} from "../../structures/record-detail/record-detail";
+} from "../../components/record-detail/record-detail";
 import { cn } from "../../lib/utils";
 import {
   SHAPE_HEADING_SIZE,
@@ -143,17 +197,40 @@ export interface RecordChromeProps
    */
   banner?: React.ReactNode;
 
-  /** The trail above the identity row. ch27.8 puts it first. */
-  breadcrumb?: BreadcrumbsItem[];
-  /** Accessible name for the trail. */
-  breadcrumbLabel?: string;
-  /** The record number. Drawn as the charcoal pill ch27.8 names. */
+  /**
+   * The record number. Drawn as the charcoal pill ch27.8 names — always
+   * `Badge variant="inverse"`, always the FIRST chip. Override 73: this and
+   * everything below it now sit directly UNDER `title`, never above it, and
+   * there is no breadcrumb above them any more (see the header comment).
+   */
   recordNumber?: React.ReactNode;
-  /** Status, relation — the rest of the identity row, after the number. */
+  /**
+   * The chip naming the record's collection or context — the kit's own
+   * example is "Padelbase" beside a ticket's number. Override 73: it sits
+   * immediately after `recordNumber`, before `chips`, in the row directly
+   * under the title. Matches this file's naming for a single labelled node
+   * (`auditLabel`, `activityLabel`) rather than inventing a new shape.
+   */
+  collectionLabel?: React.ReactNode;
+  /** Status, relation, since — the rest of the identity row, after the collection chip. */
   chips?: React.ReactNode;
-  /** The record's name, on its own line. */
+  /** The record's name, on its own line. Carries `actions` in its own row (override 73). */
   title?: React.ReactNode;
-  /** Tags. ch27.8 puts them beneath the title, so they lead the meta line. */
+  /**
+   * The identity mark before the title — `RecordDetail`'s own slot, forwarded.
+   * 27.15 is why it exists at this level: a member profile is "the 27.8
+   * detail composition with a person in it", and its avatar sits before the
+   * name so "the identity block reads as one object" — sized to the name
+   * plus its chips (76 desktop / 64 narrow, the kit's ONE avatar-size
+   * exception), which is the caller's `Avatar` to size.
+   */
+  mark?: React.ReactNode;
+  /**
+   * Tags. Still ch27.8's own line beneath the title — override 73 does not
+   * touch this row, only the identity row above it in this file's own order.
+   * A tag is a topic label ("Mail", "Retainer"); a chip is identity/status —
+   * different meanings, so they stay two rows.
+   */
   tags?: React.ReactNode;
   /** "In build since 21 Mar · Aurora owns it" — the line under the title. */
   meta?: React.ReactNode;
@@ -279,11 +356,11 @@ function RecordChrome({
   door = "system",
   density,
   banner,
-  breadcrumb,
-  breadcrumbLabel = "Breadcrumb",
   recordNumber,
+  collectionLabel,
   chips,
   title,
+  mark,
   tags,
   meta,
   actions,
@@ -347,40 +424,50 @@ function RecordChrome({
     );
   }
 
-  /* Region 1's first line: the trail, then the identity row. Both live in
-     `RecordDetail`'s eyebrow slot because ch27.8 puts both above the title. */
-  const hasIdentity = recordNumber !== undefined || chips !== undefined;
-  const eyebrow =
-    breadcrumb === undefined && !hasIdentity ? undefined : (
-      <span className="flex min-w-0 flex-col gap-2">
-        {breadcrumb !== undefined ? (
-          <Breadcrumbs items={breadcrumb} label={breadcrumbLabel} />
-        ) : null}
-        {hasIdentity ? (
-          <span className="flex flex-wrap items-center gap-2">
-            {recordNumber !== undefined ? (
-              /* "the record number in the charcoal pill" — ch27.8. `inverse`
-                 is Badge's own charcoal; no fill is written here. */
-              <Badge variant="inverse">{recordNumber}</Badge>
-            ) : null}
-            {chips}
-          </span>
-        ) : null}
-      </span>
-    );
+  /* OVERRIDE 73 (2026-08-26) — THE IDENTITY ROW IS NOW UNDER THE TITLE, NOT
+     ABOVE IT, AND THERE IS NO BREADCRUMB. See the header comment for the
+     client's verbatim ruling and exactly what it reverses in ch27.8.
+     `RecordDetail`'s `eyebrow` slot — the one region above the title — is
+     never fed by this file any more; nothing here draws above `title`. */
+  const hasIdentity =
+    recordNumber !== undefined || collectionLabel !== undefined || chips !== undefined;
+  const identityRow = !hasIdentity
+    ? undefined
+    : (
+        <span className="flex flex-wrap items-center gap-2">
+          {recordNumber !== undefined ? (
+            /* "the record number in the charcoal pill" — ch27.8, unchanged.
+               `inverse` is Badge's own charcoal; no fill is written here.
+               THE CLIENT'S OWN RULE: "the black chip is always the ID". */
+            <Badge variant="inverse">{recordNumber}</Badge>
+          ) : null}
+          {collectionLabel !== undefined ? (
+            /* "next to it, add a chip for Padelbase like in the example" —
+               the client's own example, generalised to any collection. */
+            <Badge>{collectionLabel}</Badge>
+          ) : null}
+          {chips}
+        </span>
+      );
 
-  /* ch27.8 puts tags directly beneath the title and the since-line beneath
-     them. `RecordDetail`'s meta slot is the one region under the title, so
-     both sit there, tags first. SHP-4 in GAPS-SHAPES.md. */
+  /* `RecordDetail`'s `meta` slot is the one region under the title, so the
+     identity row, then tags, then the since-line all sit there in that
+     order. Tags are UNCHANGED by override 73 — the client ruled on the chip
+     row and the breadcrumb, not on tags, and a tag ("Mail", "Retainer") is a
+     topic label while a chip here is identity/status, so the two stay
+     separate rows rather than merging. SHP-4 in GAPS-SHAPES.md. */
   const metaLine =
-    tags === undefined && meta === undefined ? undefined : (
-      <span className="flex min-w-0 flex-col gap-2">
-        {tags !== undefined ? (
-          <span className="flex flex-wrap items-center gap-2">{tags}</span>
-        ) : null}
-        {meta}
-      </span>
-    );
+    identityRow === undefined && tags === undefined && meta === undefined
+      ? undefined
+      : (
+          <span className="flex min-w-0 flex-col gap-2">
+            {identityRow}
+            {tags !== undefined ? (
+              <span className="flex flex-wrap items-center gap-2">{tags}</span>
+            ) : null}
+            {meta}
+          </span>
+        );
 
   return (
     <div
@@ -393,8 +480,12 @@ function RecordChrome({
       {banner}
 
       <RecordDetail
-        eyebrow={eyebrow}
+        /* No `eyebrow` — override 73 leaves nothing above the title. `title`
+           and `actions` land in `Title`'s own row together, which is what
+           puts Edit "aligned with the title" (the client's own words) with
+           no extra markup written here. */
         title={title}
+        mark={mark}
         titleSize={SHAPE_HEADING_SIZE[measure]}
         meta={metaLine}
         actions={actions}

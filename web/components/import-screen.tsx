@@ -13,12 +13,12 @@
 // recipe. Gated by the caller holding create on at least one import target.
 
 import * as React from "react"
-import { Download, FileSpreadsheet, Sparkles, Upload } from "@shared/ui/icons"
+import { Download, FileSpreadsheet, Sparkles, Upload } from "@shared/ui/foundations/icons"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { ImportableTarget, ImportBatchReport, ImportBatchSummary, ImportBatchView } from "@shared/types"
 import { ApiFailure, dataOps } from "@/lib/api"
@@ -148,7 +148,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   return (
     <div className="flex flex-col gap-6">
       {busyNote && (
-        <div className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-xl border p-3 text-sm">
+        <div className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-[var(--radius)] border p-3 text-sm">
           <Sparkles className="size-4 animate-pulse" aria-hidden /> {busyNote}
         </div>
       )}
@@ -157,7 +157,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       {phase === "upload" && (
         <div className="flex flex-col gap-4">
           <label
-            className="border-muted-foreground/25 hover:bg-muted/40 flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-center motion-hover"
+            className="border-muted-foreground/25 hover:bg-muted/40 flex cursor-pointer flex-col items-center gap-2 rounded-[var(--radius)] border-2 border-dashed p-8 text-center motion-hover"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
@@ -198,7 +198,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
 
           {files.length > 0 && (
             <div className="flex flex-col gap-4">
-              <div className="divide-border divide-y rounded-xl border">
+              <div className="divide-border divide-y rounded-[var(--radius)] border">
               {files.map((f) => (
                 <div key={f.fileId} className="flex items-center gap-2 p-3 text-sm">
                   <FileSpreadsheet className="text-muted-foreground size-4 shrink-0" aria-hidden />
@@ -239,7 +239,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           </div>
 
           {batch.plan.warnings.map((w, i) => (
-            <p key={i} className="text-destructive bg-destructive/10 rounded-xl p-2.5 text-xs">
+            <p key={i} className="text-destructive bg-destructive/10 rounded-[var(--radius)] p-2.5 text-xs">
               {w}
             </p>
           ))}
@@ -259,7 +259,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               three boundaries between a reader and one fact and the single
               heaviest use of the border class in either front door — the
               "twisted" feeling arriving as geometry. */}
-          <div className="divide-border divide-y rounded-xl border">
+          <div className="divide-border divide-y rounded-[var(--radius)] border">
           {batch.plan.steps.map((step, i) => (
             <div key={step.fileId} className="flex flex-col gap-4 p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -324,7 +324,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               })()}
 
               {step.predictedRejects > 0 && (
-                <div className="bg-warning/10 flex flex-col gap-1 rounded-xl p-2.5">
+                <div className="bg-warning/10 flex flex-col gap-1 rounded-[var(--radius)] p-2.5">
                   <p className="text-xs font-medium text-warning">
                     {step.predictedRejects} of {step.rowCount} {t("row(s) will be skipped")}
                     {step.notes ? `, ${step.notes}` : ""}
@@ -369,7 +369,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             // ONE container round the collection, `divide-y` inside it (N6). It
             // was a bordered box per row, which draws a boundary AND leaves a
             // gap at every one of them — two cues where the rule allows one.
-            <div className="divide-border divide-y rounded-xl border">
+            <div className="divide-border divide-y rounded-[var(--radius)] border">
               {report.perTarget.map((row) => (
                 <div key={row.target} className="flex items-center gap-2 p-3 text-sm">
                   <span className="flex-1 font-medium">{row.targetName}</span>
@@ -403,7 +403,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                   <Download className="size-3.5" aria-hidden /> {t("Download to fix")}
                 </Button>
               </div>
-              <div className="max-h-48 overflow-auto rounded-xl border">
+              <div className="max-h-48 overflow-auto rounded-[var(--radius)] border">
                 {report.rejections.slice(0, 50).map((r, i) => (
                   <div key={i} className="flex gap-2 border-b p-2 text-xs last:border-0">
                     <span className="text-muted-foreground w-24 shrink-0 truncate">
@@ -441,7 +441,7 @@ function PastImports({ teamId }: { teamId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium">{t("Past imports")}</p>
-      <div className="divide-border divide-y rounded-xl border">
+      <div className="divide-border divide-y rounded-[var(--radius)] border">
         {batches.map((b) => (
           <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-xs">
             <span className="font-medium">{b.by}</span>

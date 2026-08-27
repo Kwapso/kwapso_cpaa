@@ -16,9 +16,9 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Check, Paperclip } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Check, Paperclip } from "@shared/ui/foundations/icons"
 
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatDate } from "@shared/web/format"
@@ -77,7 +77,7 @@ export function WaitingOnYou() {
        * short meta, no wrap needed. */}
       <ul className="flex flex-col gap-2">
         {open.map((todo) => (
-          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
+          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border p-4">
             <div className="min-w-0">
               <p className="font-medium">{todo.title}</p>
               {todo.detail && <RichText html={todo.detail} className="text-muted-foreground" />}

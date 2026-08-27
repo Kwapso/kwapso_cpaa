@@ -21,7 +21,7 @@
 
 import * as React from "react"
 
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
+import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 
 import { useLanguage } from "./language"
 

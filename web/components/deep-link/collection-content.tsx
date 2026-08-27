@@ -15,7 +15,7 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import {
   ScreenRenderer,

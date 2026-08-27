@@ -4,8 +4,8 @@
 /* THE theme — imported exactly as the agency app imports it. ONE master copy,
  * now IN this repo at shared/ui/styles.css; neither front door carries its own. The portal's difference from the agency app is SCALE, not a
  * second design language: same tokens, same components, more air. */
-@import "../../shared/ui/tokens/tokens.css";
-@import "../../shared/ui/motion/motion.css";
+@import "../../shared/ui/foundations/tokens/tokens.css";
+@import "../../shared/ui/foundations/motion/motion.css";
 
 /* THE KIT'S CLASSES EXIST ONLY IF TAILWIND READS THE KIT'S SOURCE. The old
  * stylesheet carried `@source "./registry"` inside itself; the kit's
@@ -15,10 +15,6 @@
  * (a tab's folder shape, a table's sticky header) is emitted because of
  * these three lines and for no other reason. (compositions/ joins the list
  * the day a door renders one.) */
-@source "../../shared/ui/controls";
-@source "../../shared/ui/structures";
-@source "../../shared/ui/icons";
-
 /* The library overrides BOTH front doors carry, in one file. */
 @import "../../shared/web/library-overrides.css";
 

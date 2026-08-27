@@ -38,7 +38,7 @@
 
 import * as React from "react"
 
-import { Flowchart, type FlowStep as KitFlowStep } from "@shared/ui/structures/flowchart/flowchart"
+import { Flowchart, type FlowStep as KitFlowStep } from "@shared/ui/components/flowchart/flowchart"
 import type { ProcessStep } from "@shared/types"
 import { hoursText, minutesText } from "@shared/workers/savings"
 import { frequencyText } from "@shared/web/frequency"

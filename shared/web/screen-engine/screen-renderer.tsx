@@ -9,7 +9,7 @@
 
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "@shared/ui/icons"
+import { X } from "@shared/ui/foundations/icons"
 
 import {
   gateState,
@@ -35,40 +35,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Button, buttonVariants } from "@shared/ui/controls/button/button"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@shared/ui/controls/select/select"
-import { DatePicker } from "@shared/ui/controls/date-picker/date-picker"
+} from "@shared/ui/components/select/select"
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 // The FIELD comes through the app's seam, not the kit directly — the seam
 // translates a config's words on the way to the screen (R33), and its import
 // ban is what keeps every renderer honest, this one included.
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/controls/file-upload/file-upload"
-import { Input } from "@shared/ui/controls/input/input"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { Switch } from "@shared/ui/controls/switch/switch"
-import { ActivityFeed } from "@shared/ui/structures/activity-feed/activity-feed"
-import { CardGrid } from "@shared/ui/structures/card-grid/card-grid"
-import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/controls/card/card"
-import { MoreHorizontal } from "@shared/ui/icons"
+import { Switch } from "@shared/ui/components/switch/switch"
+import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
+import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/components/card/card"
+import { MoreHorizontal } from "@shared/ui/foundations/icons"
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
-import { DataTable, type DataTableColumn } from "@shared/ui/structures/data-table/data-table"
+import { DataTable, type DataTableColumn } from "@shared/ui/components/data-table/data-table"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 import { List } from "@shared/web/list-compat"
-import { RecordDetail } from "@shared/ui/structures/record-detail/record-detail"
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/controls/avatar/avatar"
+import { RecordDetail } from "@shared/ui/components/record-detail/record-detail"
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 
 /* ------------------------- host-injected contracts ------------------------- */
 
@@ -206,10 +206,10 @@ function ActionButton({
 // force one. Built on the same Radix dialog the library's Dialog/Sheet use.
 const layerContent: Record<ScreenPresentation, string> = {
   responsive:
-    "inset-x-0 bottom-0 max-h-[90svh] rounded-t-xl sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl",
+    "inset-x-0 bottom-0 max-h-[90svh] rounded-t-[var(--radius)] sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[var(--radius)]",
   overlay:
-    "top-1/2 left-1/2 w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-xl",
-  sheet: "inset-x-0 bottom-0 max-h-[90svh] rounded-t-xl",
+    "top-1/2 left-1/2 w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius)]",
+  sheet: "inset-x-0 bottom-0 max-h-[90svh] rounded-t-[var(--radius)]",
   fullscreen: "inset-0 rounded-none",
 }
 
@@ -251,7 +251,7 @@ function ScreenLayer({
                  else. Not an opacity" — an alpha of a token is a colour the
                  palette does not contain. This faded the whole glyph from 70%
                  to 100%; it moves the INK now, between two named tones. */
-              className="text-ink-secondary motion-hover hover:text-foreground rounded-full"
+              className="text-ink-secondary motion-hover hover:text-foreground rounded-pill"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>
@@ -549,24 +549,21 @@ function renderList(
     // never appears empty when every action is gated away.
     const rowActions = recipe.actions.filter((a) => gateState(rights, a.gate) !== "hidden")
     // The kit's rule (ch26 §3): "a row's name is always the first, widest
-    // column and always clickable" — so the OPEN affordance is the first
-    // cell, not the <tr>, and the engine draws it that way.
-    const columns: Array<DataTableColumn<Row>> = fields.map((f, colIndex) => ({
+    // column and always clickable". THE KIT'S OWN DataTable DRAWS THAT BUTTON
+    // — `onRowSelect` + `recordColumnKey` turn the record cell into the press
+    // target, filling the cell so the whole name is the hit area. The engine
+    // used to hand-roll one inside `cell`, and its hover was an underline on
+    // the name; the kit's is the whole row washing (`TableRow`'s
+    // `hover:bg-accent`), which is the client's own ruling of 2026-08-26 read
+    // off two live screenshots and written into data-table.tsx. So the row
+    // display had a hover the client ruled against, on every recipe-driven
+    // table in both front doors, while the `list` and `cards` displays below
+    // already let the kit own it (`List onItemClick`, `Card interactive`).
+    const columns: Array<DataTableColumn<Row>> = fields.map((f) => ({
       key: f.column,
       header: f.field.label,
       sortable: true,
-      cell: (row) =>
-        colIndex === 0 ? (
-          <button
-            type="button"
-            className="text-start underline-offset-2 hover:underline"
-            onClick={() => open(row)}
-          >
-            {asNode(row[f.column]) ?? String(row[f.column] ?? "")}
-          </button>
-        ) : (
-          (asNode(row[f.column]) ?? String(row[f.column] ?? ""))
-        ),
+      cell: (row) => asNode(row[f.column]) ?? String(row[f.column] ?? ""),
     }))
     if (rowActions.length > 0)
       // The old table had a row-actions config; the kit rules an actions
@@ -601,6 +598,13 @@ function renderList(
         columns={columns}
         rows={rows}
         getRowId={(row, i) => String(row.id ?? i)}
+        /* Omitted, not passed as a no-op, when there is nothing to open —
+           the kit draws a dead focusable control otherwise, and its own prop
+           note asks for exactly this. A recipe with no visible fields has no
+           record cell either, and `recordColumnKey` would then fall through
+           to the ⋯ actions column: a button inside a button. */
+        onRowSelect={fields.length > 0 && onIntent ? (row) => open(row) : undefined}
+        recordColumnKey={fields[0]?.column}
         className="w-full"
       />
     )
@@ -736,7 +740,7 @@ function renderDetail(
   // title in a circle.
   const mark =
     avatarSrc || header?.avatar ? (
-      <Avatar className={header?.avatarShape === "square" ? "rounded-xl" : undefined}>
+      <Avatar className={header?.avatarShape === "square" ? "rounded-[var(--radius)]" : undefined}>
         {avatarSrc ? <AvatarImage src={safeSrc(avatarSrc)} alt="" /> : null}
         {header?.avatar ? <AvatarFallback>{initials(title)}</AvatarFallback> : null}
       </Avatar>

@@ -15,21 +15,21 @@
 // agent:create; the server re-gates every action AS the signed-in user.
 
 import * as React from "react"
-import { Check, History, Paperclip, Plus, X } from "@shared/ui/icons"
+import { Check, History, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
+import { Button } from "@shared/ui/components/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@shared/ui/controls/sheet/sheet"
-import { AgentChat } from "@shared/ui/structures/agent-chat/agent-chat"
-import { CollectionRegister } from "@shared/ui/structures/collection-frame/collection-frame"
-import { RunSteps } from "@shared/ui/structures/run-steps/run-steps"
+} from "@shared/ui/components/sheet/sheet"
+import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
+import { CollectionRegister } from "@shared/ui/components/collection-frame/collection-frame"
+import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 
 import { AgentHistoryDialog } from "@/components/agent-history-dialog"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
@@ -86,7 +86,7 @@ export function AgentPanel({
                   <button
                     type="button"
                     onClick={() => setUsageOpen(true)}
-                    className="rounded-full"
+                    className="rounded-pill"
                     title={t("See where your assistant credits went")}
                   >
                     <Badge

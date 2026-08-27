@@ -21,8 +21,8 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"

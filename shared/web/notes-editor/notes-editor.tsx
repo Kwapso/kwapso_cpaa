@@ -17,12 +17,12 @@
 // can never smuggle in executable HTML — see ./logic.
 
 import * as React from "react"
-import { ListOrdered } from "@shared/ui/icons"
-import { Bold, FillColor, Italic, List as ListIcon, Minus } from "@shared/ui/icons"
+import { ListOrdered } from "@shared/ui/foundations/icons"
+import { Bold, FillColor, Italic, List as ListIcon, Minus } from "@shared/ui/foundations/icons"
 
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Toggle } from "@shared/ui/controls/toggle/toggle"
+import { Toggle } from "@shared/ui/components/toggle/toggle"
 import { sanitizeNotesHtml } from "./logic"
 
 function Notes({
@@ -114,7 +114,7 @@ function Notes({
         suppressContentEditableWarning
         data-placeholder={placeholder}
         onInput={emit}
-        className="min-h-24 rounded-xl border bg-transparent px-3 py-2 text-sm empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] [&_hr]:my-2 [&_hr]:border-border [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+        className="min-h-24 rounded-[var(--radius)] border bg-transparent px-3 py-2 text-sm empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] [&_hr]:my-2 [&_hr]:border-border [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
       />
     </div>
   )

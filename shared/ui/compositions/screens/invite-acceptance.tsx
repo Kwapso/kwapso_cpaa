@@ -64,12 +64,12 @@
 
 import * as React from "react";
 
-import { ActionRow } from "../../controls/action-row/action-row";
-import { Avatar, AvatarFallback } from "../../controls/avatar/avatar";
-import { Button } from "../../controls/button/button";
-import { Card } from "../../controls/card/card";
-import { Separator } from "../../controls/separator/separator";
-import { Text } from "../../controls/typography/typography";
+import { ActionRow } from "../../components/action-row/action-row";
+import { Avatar, AvatarFallback } from "../../components/avatar/avatar";
+import { Button } from "../../components/button/button";
+import { Card } from "../../components/card/card";
+import { Separator } from "../../components/separator/separator";
+import { Text } from "../../components/typography/typography";
 import { AuthShell } from "./sign-in";
 
 export interface InviteAcceptanceScreenProps

@@ -67,7 +67,7 @@ import {
   type ScreenDensity,
   type ScreenRegisterTone,
   type ScreenState,
-} from "../../structures/screen-renderer/screen-renderer";
+} from "../../components/screen-renderer/screen-renderer";
 
 /**
  * The four states a shape can be in. Deliberately the SAME type

@@ -26,9 +26,9 @@
 import * as React from "react"
 import Link from "next/link"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { ArrowRight, Plus } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { ArrowRight, Plus } from "@shared/ui/foundations/icons"
 
 import { SAVINGS_CAPTION, hoursText } from "@shared/workers/savings"
 import { invalidate, useCached } from "@shared/web/store"
@@ -66,7 +66,7 @@ function TimeGivenBack() {
   // A card that is a link — one of the three things motion.css §13 allows to
   // gain elevation on hover, and `motion-hover-lift` is how it is spelt.
   return (
-    <Link href="/impact" className="hover:bg-muted/40 motion-hover-lift rounded-xl border p-6">
+    <Link href="/impact" className="hover:bg-muted/40 motion-hover-lift rounded-[var(--radius)] border p-6">
       <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
       <p className="text-3xl font-medium tracking-tight">{hoursText(data.savedSecondsPerMonth)}</p>
       <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
@@ -133,11 +133,11 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
 
         {loading && !tickets ? (
           <div className="flex flex-col gap-4">
-            <Skeleton className="h-20 w-full rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+            <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
           </div>
         ) : newest.length === 0 ? (
-          <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
+          <div className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
             <p>{t("You haven't asked us for anything yet.")}</p>
             <p className="mt-1 text-sm">{t("When you do, it'll live here, and so will our reply.")}</p>
           </div>

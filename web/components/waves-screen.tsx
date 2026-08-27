@@ -33,12 +33,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Pencil, Power, RotateCcw } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Pencil, Power, RotateCcw } from "@shared/ui/foundations/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import {
@@ -185,7 +185,7 @@ export function WaveCollection({
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((w) => (
-              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
+              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
                 {/* R35 — a record never appears without its face. A wave has no
                     picture of its own, so this is its initial. */}
                 <RecordMark name={w.name} />

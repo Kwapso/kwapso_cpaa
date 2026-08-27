@@ -54,8 +54,15 @@
        four, so the shape warns in development. The drawing was kept and the
        warning logged, because `door="portal"` would draw stage pills and put
        the client vocabulary on a system screen, which ruling 04 forbids.
-     · The appearance step's "visual option cards" have no primitive. `Choice`
-       rows carry the same choice in words. Logged rather than invented.
+     · The appearance step's "visual option cards" ARE a primitive now —
+       `AppearanceOptionGroup`, built in `settings.tsx` to 26.05's "How an
+       option panel is built" and imported here, because 27.14 says this step
+       "uses the same visual option cards as Settings · Appearance". The
+       badge reads "Picked" (27.14's word) where Settings reads "In use".
+       This step also offers the SIDEBAR group — ink / paper / mango — which
+       p27 draws between Theme and Text size and this file previously
+       omitted; client ruling D3 offers all three and override 56 defaults
+       mango.
 
 
    IT IS ON NEITHER OF THE TWO SCREEN MODELS, AND THAT IS THE CHAPTER'S CALL
@@ -88,20 +95,26 @@
 
 import * as React from "react";
 
-import { Checkbox } from "../../controls/checkbox/checkbox";
-import { Choice } from "../../controls/choice/choice";
-import { Field } from "../../controls/field/field";
-import { Input } from "../../controls/input/input";
-import { RadioGroup, RadioGroupItem } from "../../controls/radio-group/radio-group";
+import { Checkbox } from "../../components/checkbox/checkbox";
+import { Choice } from "../../components/choice/choice";
+import { Field } from "../../components/field/field";
+import {
+  AppearanceOptionGroup,
+  ScalePicture,
+  SpinePicture,
+  ThemePicture,
+  type AppearanceOption,
+} from "./settings";
+import { Input } from "../../components/input/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
-import { Text } from "../../controls/typography/typography";
-import type { StatusStage } from "../../controls/status-stepper/status-stepper";
+} from "../../components/select/select";
+import { Text } from "../../components/typography/typography";
+import type { StatusStage } from "../../components/status-stepper/status-stepper";
 import { FormScreen, StepperHero, type FormScreenSection } from "../templates";
 import { type ShapeState, type ShapeStateCopy } from "../states";
 
@@ -161,6 +174,13 @@ export interface OnboardingRouteProps
   theme?: string;
   /** Theme changed. */
   onThemeChange?: (value: string) => void;
+  /**
+   * Which spine is picked — ink, paper or mango. p27 draws the Sidebar group
+   * between Theme and Text size; override 56 makes mango the default.
+   */
+  spine?: string;
+  /** Spine changed. */
+  onSpineChange?: (value: string) => void;
   /** Which root scale is picked. */
   scale?: string;
   /** Scale changed. */
@@ -194,21 +214,27 @@ export interface OnboardingRouteProps
 
 const STEP_ORDER: readonly OnboardingStepId[] = ["identity", "appearance", "work"];
 
+/* The kit's own step rail, verbatim — "Who you are · How it should look ·
+   What you work on" (27.14 draws the three from the start, "so nobody is
+   walked blind"). Only step 2's title and description are drawn in the
+   chapter; steps 1 and 3 carry this file's own words, flagged as such. */
 const STEP_LABELS: Record<OnboardingStepId, string> = {
   identity: "Who you are",
-  appearance: "How it looks",
+  appearance: "How it should look",
   work: "What you work on",
 };
 
 const TITLES: Record<OnboardingStepId, string> = {
   identity: "Tell us who you are",
-  appearance: "Set it up the way you read",
+  appearance: "How should it look?",
   work: "Pick up your accounts",
 };
 
 const DESCRIPTIONS: Partial<Record<OnboardingStepId, string>> = {
   identity: "Only what the app cannot work out on its own.",
-  appearance: "Every one of these has a default and can be changed later in Settings.",
+  appearance:
+    "Pick a theme, a spine and a text size — shown, not described. This is " +
+    "yours alone: it changes nothing for anyone else on the account.",
   work: "Claim the accounts you own. Anything you miss can be handed to you later.",
 };
 
@@ -227,16 +253,75 @@ const ACCOUNTS: readonly OnboardingAccount[] = [
   { id: "havenlark", label: "Havenlark", description: "Invoicing and client portal" },
 ];
 
-const THEMES: readonly { value: string; label: string; description: string }[] = [
-  { value: "light", label: "Light", description: "Paper ground, charcoal ink." },
-  { value: "dark", label: "Dark", description: "The same tokens, unlit." },
-  { value: "system", label: "Match my system", description: "Follows the device setting." },
+/* 27.14's own captions, read off the kit's WIDE onboarding render — Light
+   and Dark share 26.05's words, System takes the step's own "Follows your
+   machine." (Settings says "Follow the machine, switch at dusk."). The
+   narrow render abbreviates further ("Off-beige paper.") and that is its
+   truncation, not a second vocabulary. The previous strings here ("Paper
+   ground, charcoal ink.", "Everything a step smaller.") appeared in no
+   chapter. */
+const THEMES: readonly AppearanceOption[] = [
+  {
+    value: "light",
+    label: "Light",
+    description: "Off-beige paper, charcoal ink.",
+    picture: <ThemePicture tone="light" />,
+  },
+  {
+    value: "dark",
+    label: "Dark",
+    description: "Unlit paper, off-beige type.",
+    picture: <ThemePicture tone="dark" />,
+  },
+  {
+    value: "system",
+    label: "System",
+    description: "Follows your machine.",
+    picture: <ThemePicture tone="system" />,
+  },
 ];
 
-const SCALES: readonly { value: string; label: string; description: string }[] = [
-  { value: "compact", label: "Compact", description: "Everything a step smaller." },
-  { value: "default", label: "Default", description: "What most people read at." },
-  { value: "large", label: "Large", description: "Everything a step bigger." },
+/* p27's Sidebar group — previously missing from this step entirely. */
+const SPINES: readonly AppearanceOption[] = [
+  {
+    value: "ink",
+    label: "Ink",
+    description: "Charcoal spine, mango row.",
+    picture: <SpinePicture spine="ink" />,
+  },
+  {
+    value: "paper",
+    label: "Paper",
+    description: "Soft-paper spine, quiet.",
+    picture: <SpinePicture spine="paper" />,
+  },
+  {
+    value: "mango",
+    label: "Mango",
+    description: "Full brand spine.",
+    picture: <SpinePicture spine="mango" />,
+  },
+];
+
+const SCALES: readonly AppearanceOption[] = [
+  {
+    value: "compact",
+    label: "13px",
+    description: "Tight rows.",
+    picture: <ScalePicture step="compact" />,
+  },
+  {
+    value: "default",
+    label: "15px",
+    description: "The default.",
+    picture: <ScalePicture step="default" />,
+  },
+  {
+    value: "large",
+    label: "17px",
+    description: "Roomy rows.",
+    picture: <ScalePicture step="large" />,
+  },
 ];
 
 function defaultFormatSignedInAs(email: string): React.ReactNode {
@@ -257,8 +342,8 @@ function defaultFormatSignedInAs(email: string): React.ReactNode {
  *  7. empty          — does not apply. Every step has fields, and a step with
  *                      nothing to answer would not be one of the three.
  *  8. error          — `state="error"`: the block failure inside the form.
- *  9. selected       — the current step in the rail, and the picked option in
- *                      each radio group.
+ *  9. selected       — the current step in the rail, and the ringed card in
+ *                      each option group.
  * 10. read-only      — does not apply to onboarding.
  *
  * THREE BREAKPOINTS
@@ -285,6 +370,8 @@ function OnboardingRoute({
   timezones = TIMEZONES,
   theme,
   onThemeChange,
+  spine,
+  onSpineChange,
   scale,
   onScaleChange,
   accounts = ACCOUNTS,
@@ -348,36 +435,43 @@ function OnboardingRoute({
     </React.Fragment>
   );
 
+  /* 27.14: "The appearance step uses the same visual option cards as
+     Settings · Appearance … never a list of words." Three groups in p27's
+     own order — Theme, Sidebar, Text size — each a row of picture cards with
+     the mango "Picked" badge on the one that is set. */
   const appearanceFields = (
     <React.Fragment>
       <Field label="Theme">
-        {() => (
-          <RadioGroup
+        {(control) => (
+          <AppearanceOptionGroup
+            {...control}
+            options={THEMES}
             value={theme}
             onValueChange={onThemeChange}
-            className="flex flex-col gap-2"
-          >
-            {THEMES.map((option) => (
-              <Choice key={option.value} label={option.label} description={option.description}>
-                <RadioGroupItem value={option.value} />
-              </Choice>
-            ))}
-          </RadioGroup>
+            badgeLabel="Picked"
+          />
+        )}
+      </Field>
+      <Field label="Sidebar">
+        {(control) => (
+          <AppearanceOptionGroup
+            {...control}
+            options={SPINES}
+            value={spine}
+            onValueChange={onSpineChange}
+            badgeLabel="Picked"
+          />
         )}
       </Field>
       <Field label="Text size">
-        {() => (
-          <RadioGroup
+        {(control) => (
+          <AppearanceOptionGroup
+            {...control}
+            options={SCALES}
             value={scale}
             onValueChange={onScaleChange}
-            className="flex flex-col gap-2"
-          >
-            {SCALES.map((option) => (
-              <Choice key={option.value} label={option.label} description={option.description}>
-                <RadioGroupItem value={option.value} />
-              </Choice>
-            ))}
-          </RadioGroup>
+            badgeLabel="Picked"
+          />
         )}
       </Field>
     </React.Fragment>

@@ -91,6 +91,20 @@ export type {
   BulkRecord,
 } from "./bulk-edit";
 
+/* delete-confirmation — the one composition that is a modal (27.4), and the
+   softer archive dialog it points at (27.5). Built 2026-08-26: the client's
+   fidelity re-audit found neither dialog existed anywhere in the build. */
+export {
+  ArchiveConfirmationDialog,
+  DeleteConfirmationDialog,
+} from "./delete-confirmation";
+export type {
+  ArchiveConfirmationDialogProps,
+  ArchiveConfirmationLabels,
+  DeleteConfirmationDialogProps,
+  DeleteConfirmationLabels,
+} from "./delete-confirmation";
+
 /* export — what leaves, and in what shape. */
 export { ExportScreen, defaultColumnIds } from "./export";
 export type {

@@ -10,8 +10,8 @@
 
 import Link from "next/link"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { ChevronRight } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import type { HelpTicket } from "@shared/types"
 import { formatRelative } from "@shared/web/format"
@@ -63,7 +63,7 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-xl border p-4"
+      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] border p-4"
     >
       <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-2">
         <p className="line-clamp-2">{richTextPlain(ticket.description)}</p>

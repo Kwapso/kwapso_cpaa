@@ -9,7 +9,7 @@
 
 import * as React from "react"
 
-import { List as KitList, type ListProps as KitListProps } from "@shared/ui/structures/list/list"
+import { List as KitList, type ListProps as KitListProps } from "@shared/ui/components/list/list"
 
 export interface ListItem {
   id: string

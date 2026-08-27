@@ -20,9 +20,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { AccountRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
@@ -112,7 +112,7 @@ export function AccountRateCard({
           {t("No rates set for")} {accountName} {t("yet, nothing is being charged by the hour.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {rates.map((r) => (
             <li
               key={r.id}

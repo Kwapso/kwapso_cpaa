@@ -46,7 +46,7 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   Command,
   CommandEmpty,
@@ -54,16 +54,16 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@shared/ui/controls/command/command"
+} from "@shared/ui/components/command/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@shared/ui/controls/popover/popover"
-import { Sheet, SheetContent, SheetTitle } from "@shared/ui/controls/sheet/sheet"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
-import { Check, ChevronsUpDown, X } from "@shared/ui/icons"
+} from "@shared/ui/components/popover/popover"
+import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/sheet"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
+import { Check, ChevronsUpDown, X } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached } from "@shared/web/store"
@@ -324,7 +324,7 @@ export function RecordPicker({
       disabled={disabled}
       // Square, not pill: this is a form control sitting in a column of inputs,
       // and the library's own Select trigger is the shape a person reads as one.
-      className="min-h-9 min-w-0 flex-1 justify-between rounded-xl px-3 font-normal"
+      className="min-h-9 min-w-0 flex-1 justify-between rounded-[var(--radius)] px-3 font-normal"
     >
       <span className={chosen ? "truncate" : "text-muted-foreground truncate"} title={label}>
         {label}
@@ -352,7 +352,7 @@ export function RecordPicker({
                  where a page-layer sheet paints BEHIND the form asking for it.
                  `overDialog` is the kit's word for exactly this (v1.0.5). */
               overDialog
-              className="flex h-[85dvh] flex-col gap-0 rounded-t-xl p-0"
+              className="flex h-[85dvh] flex-col gap-0 rounded-t-[var(--radius)] p-0"
             >
               <SheetTitle className="sr-only">{searchPlaceholder}</SheetTitle>
               {list}
@@ -386,14 +386,16 @@ export function RecordPicker({
         // A SIBLING of the trigger, never nested inside it: Button's base class
         // carries `[&_svg]:pointer-events-none`, so an X drawn inside the trigger
         // is invisible to hit-testing and the click just opens the list.
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           aria-label={t("Clear")}
           onClick={clear}
-          className="text-muted-foreground hover:text-foreground size-9 shrink-0 rounded-full"
+          className="text-muted-foreground hover:text-foreground size-9 shrink-0"
         >
-          <X className="mx-auto size-4" aria-hidden />
-        </button>
+          <X aria-hidden />
+        </Button>
       )}
     </div>
   )

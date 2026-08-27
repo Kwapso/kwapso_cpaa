@@ -16,11 +16,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Check, ClipboardCheck, Pencil } from "@shared/ui/icons"
+import { Check, ClipboardCheck, Pencil } from "@shared/ui/foundations/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
@@ -328,31 +328,34 @@ export function StoryDetailScreen({
           <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {story.ref && <span>{story.ref}</span>}
             {story.appId && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/apps/${story.appId}`)}
-                className="hover:text-foreground underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {options.appNames.get(story.appId) ?? t("Its app")}
-              </button>
+              </Button>
             )}
             {story.sprintId && story.sprintName && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/sprints/${story.sprintId}`)}
-                className="hover:text-foreground underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {t("In")} {story.sprintName}
-              </button>
+              </Button>
             )}
             {story.ticketId && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/tickets/${story.ticketId}`)}
-                className="hover:text-foreground underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {t("Answers")} {story.ticketRef ?? t("a ticket")}
-              </button>
+              </Button>
             )}
           </p>
         </>

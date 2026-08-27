@@ -16,7 +16,7 @@
 // it at all — one app is the headline figure drawn twice — is decided before
 // this file is ever asked for.
 
-import { Chart } from "@shared/ui/structures/chart/chart"
+import { Chart } from "@shared/ui/components/chart/chart"
 
 /** Hours a month, per app.
  *

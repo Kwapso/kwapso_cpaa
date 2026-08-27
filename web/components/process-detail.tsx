@@ -1,5 +1,5 @@
 "use client"
-import { Ban, GitBranch, ListOrdered, Plus } from "@shared/ui/icons"
+import { Ban, GitBranch, ListOrdered, Plus } from "@shared/ui/foundations/icons"
 import { ApiFailure } from "@/lib/api"
 
 // Process detail — one map at /processes/<id>, as a tabbed record (Law R2):
@@ -49,14 +49,14 @@ import { ApiFailure } from "@/lib/api"
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { InAppLink } from "@/components/in-app-link"
 import { AuditDateDialog, ConnectProcessDialog } from "@/components/process/process-dialogs"
 import { StepsPanel, stepSecondsPerMonth, versionLabel } from "@/components/process/steps-panel"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,10 +66,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Comments } from "@shared/ui/structures/comments/comments"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Comments } from "@shared/ui/components/comments/comments"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type {
   ClientRole,
@@ -522,7 +522,7 @@ export function ProcessDetailScreen({
                     it qualifies. `whitespace-pre-line` keeps the blank line the
                     caveat is written after. */}
                 {process.description && (
-                  <div className="bg-muted/40 rounded-xl border p-4">
+                  <div className="bg-muted/40 rounded-[var(--radius)] border p-4">
                     <RichText html={process.description} />
                   </div>
                 )}
@@ -536,7 +536,7 @@ export function ProcessDetailScreen({
                     Moving it WARNS first (Aurora's ruling): it changes every
                     figure on every screen at once, including the one on the
                     client's own portal. */}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border p-4">
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Measured from")}</p>
                     <p className="text-sm font-medium">{auditDate}</p>
@@ -561,7 +561,7 @@ export function ProcessDetailScreen({
                     side. It is a signpost, and a signpost that altered the road
                     would be worse than none — so this panel shows and removes,
                     and never computes. */}
-                <div className="flex flex-col gap-3 rounded-xl border p-4">
+                <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium">{t("Connected processes")}</p>
                     {canEdit && (
@@ -651,7 +651,7 @@ export function ProcessDetailScreen({
                     app does and what removes the last unit from the band. It is
                     a real <button>, so it is reachable by keyboard and announced
                     as a control, and the two states stay badges. H 7 → 4. */}
-                <div className="rounded-xl border">
+                <div className="rounded-[var(--radius)] border">
                   {versions.map((v) => (
                     <button
                       key={v.id}

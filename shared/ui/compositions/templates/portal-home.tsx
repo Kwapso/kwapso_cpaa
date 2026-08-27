@@ -179,22 +179,22 @@
 
 import * as React from "react";
 
-import { AmbientBackground } from "../../controls/ambient-background/ambient-background";
-import { Title } from "../../controls/title/title";
-import { List, type ListRow } from "../../structures/list/list";
+import { AmbientBackground } from "../../components/ambient-background/ambient-background";
+import { Title } from "../../components/title/title";
+import { List, type ListRow } from "../../components/list/list";
 import {
   DescriptionList,
   type DescriptionListItem,
-} from "../../structures/description-list/description-list";
+} from "../../components/description-list/description-list";
 import {
   ProgressDashboard,
   type ProgressRow,
-} from "../../structures/progress-dashboard/progress-dashboard";
+} from "../../components/progress-dashboard/progress-dashboard";
 import {
   StatGrid,
   type StatDeltaDirection,
   type StatItem,
-} from "../../structures/stat-grid/stat-grid";
+} from "../../components/stat-grid/stat-grid";
 import { cn } from "../../lib/utils";
 import { MainScreen } from "./main-screen";
 import {

@@ -12,10 +12,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,13 +25,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import {
   PermissionMatrix,
   type PermissionRight,
-} from "@shared/ui/structures/permission-matrix/permission-matrix"
+} from "@shared/ui/components/permission-matrix/permission-matrix"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { PermissionValue, RightSet, RolePermissions, TeamRole } from "@shared/types"
 import { RoleFormDialog } from "@/components/role-form-dialog"
@@ -231,7 +231,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           // Permissions — the main tab.
           return !role.active ? (
             // Deactivated: permissions frozen (holders keep access); offer reactivate.
-            <div className="border-border/60 flex flex-col gap-4 rounded-xl border p-6">
+            <div className="border-border/60 flex flex-col gap-4 rounded-[var(--radius)] border p-6">
               <p className="text-muted-foreground text-sm">
                 {t("This role is deactivated. Members who have it keep their access, but you can't give it to anyone new until you activate it again.")}
               </p>
@@ -247,7 +247,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
               )}
             </div>
           ) : permsQ.loading || !matrixModules || !draft ? (
-            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

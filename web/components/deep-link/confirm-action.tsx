@@ -13,8 +13,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { personName } from "@/lib/identity"

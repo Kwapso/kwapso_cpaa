@@ -184,7 +184,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
 
   // ── #20 · A BIG NUMBER ───────────────────────────────────────────────────
   it("#20 · SHIPPED — a stat card takes a glyph, and the numbers band carries one", () => {
-    const grid = readFileSync(join(ROOT, "shared", "ui", "structures", "stat-grid", "stat-grid.tsx"), "utf8")
+    const grid = readFileSync(join(ROOT, "shared", "ui", "components", "stat-grid", "stat-grid.tsx"), "utf8")
     expect(grid, "StatItem must still be the shape this check reads").toContain(
       "export interface StatItem"
     )

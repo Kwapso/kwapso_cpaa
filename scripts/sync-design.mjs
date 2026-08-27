@@ -37,8 +37,22 @@ const REPO = "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git"
 /** The kit's deliverable surface. demo/, verify/, mini-app/ and the GAPS
  * paper trail stay upstream — they are the workshop, not the product. */
 const DELIVERED = [
-  "tokens", "icons", "motion", "controls", "structures", "compositions",
-  "lib", "assets", "manifest.json", "README.md", "CHANGELOG.md",
+  /* THE LAYOUT CHANGED AT v1.1.0 and this list is the record of it. The kit
+     restructured to the four words the client uses: `controls/` and
+     `structures/` became one `components/`, and `tokens/`, `icons/` and
+     `motion/` moved under `foundations/`. Nothing was renamed inside those
+     folders — 1,431 of 1,507 moved paths are byte-identical and not one
+     basename changed — so this is a pure folder move and the app's imports
+     follow it mechanically.
+
+     `lib/` stayed at top level and is byte-identical between versions, which
+     is why the app's `@shared/ui/lib/*` imports need no change at all.
+
+     `docs/` arrives too, since 2026-08-27: five rulebooks, about 156 KB, that
+     had never once reached this repository because they were not on this list.
+     See the git history of this line. */
+  "components", "compositions", "foundations",
+  "lib", "assets", "manifest.json", "README.md", "CHANGELOG.md", "docs",
 ]
 
 /** One hash over every delivered file's path + bytes, path-sorted, so the
@@ -105,7 +119,7 @@ const main = async () => {
           sha,
           hash,
           syncedAt: new Date().toISOString().slice(0, 10),
-          iconArt: { count: readdirSync(join(TARGET, "icons")).filter((f) => f.endsWith(".svg")).length, source: "kwapso-ui-ux" },
+          iconArt: { count: readdirSync(join(TARGET, "foundations", "icons")).filter((f) => f.endsWith(".svg")).length, source: "kwapso-ui-ux" },
         },
         null,
         2

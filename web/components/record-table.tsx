@@ -62,19 +62,19 @@
 
 import * as React from "react"
 
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from "@shared/ui/icons"
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from "@shared/ui/foundations/icons"
 
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
 import type { ScreenActionContext } from "@shared/web/screen-engine/screen-renderer"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 import { gateState, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -82,7 +82,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@shared/ui/controls/table/table"
+} from "@shared/ui/components/table/table"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 
@@ -214,7 +214,7 @@ export function RecordTable<T extends TableRowData>({
       searchKeys={columns.map((c) => c.key) as (keyof T)[]}
       className={className}
       renderItems={(page) => (
-        <div className="overflow-hidden rounded-xl border">
+        <div className="overflow-hidden rounded-[var(--radius)] border">
           <Table>
             <TableHeader>
               <TableRow>

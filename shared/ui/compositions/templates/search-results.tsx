@@ -79,7 +79,7 @@ import * as React from "react";
 import {
   FilterBar,
   type FilterChip,
-} from "../../controls/filter-bar/filter-bar";
+} from "../../components/filter-bar/filter-bar";
 import {
   Pagination,
   PaginationContent,
@@ -88,16 +88,16 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "../../controls/pagination/pagination";
-import { SearchInput } from "../../controls/search-input/search-input";
+} from "../../components/pagination/pagination";
+import { SearchInput } from "../../components/search-input/search-input";
 import {
   SortControl,
   type SortDirection,
   type SortOption,
-} from "../../controls/sort-control/sort-control";
-import { Title } from "../../controls/title/title";
-import { Text } from "../../controls/typography/typography";
-import { List, type ListRow } from "../../structures/list/list";
+} from "../../components/sort-control/sort-control";
+import { Title } from "../../components/title/title";
+import { Text } from "../../components/typography/typography";
+import { List, type ListRow } from "../../components/list/list";
 import { cn } from "../../lib/utils";
 import {
   SHAPE_SHELL,

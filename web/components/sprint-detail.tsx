@@ -14,12 +14,12 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { CheckCheck, Pencil, RotateCcw } from "@shared/ui/icons"
+import { CheckCheck, Pencil, RotateCcw } from "@shared/ui/foundations/icons"
 
 import {
   SprintFormDialog,
@@ -170,13 +170,14 @@ export function SprintDetailScreen({
       label: t("Wave"),
       value:
         sprint.waveId && sprint.waveName ? (
-          <button
+          <Button
+            variant="link"
             type="button"
             onClick={() => softNavigate(`${host.base}/waves/${sprint.waveId}`)}
-            className="hover:text-foreground text-left underline-offset-2 hover:underline"
+            className="hover:text-foreground"
           >
             {sprint.waveName}
-          </button>
+          </Button>
         ) : (
           "—"
         ),
@@ -268,22 +269,24 @@ export function SprintDetailScreen({
               bought it, both one tap away. */}
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {sprint.appId && sprint.appName && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {t("On")} {sprint.appName}
-              </button>
+              </Button>
             )}
             {sprint.accountId && sprint.accountName && (
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                className="hover:text-foreground"
               >
                 {t("For")} {sprint.accountName}
-              </button>
+              </Button>
             )}
           </p>
         </>
@@ -296,7 +299,7 @@ export function SprintDetailScreen({
           two questions on one band is N4's fault. The cross-links stay in the
           header, because they ARE who and what. */}
       {canEdit && !sprint.completedAt && (
-        <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-sm">
+        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] border p-3 text-sm">
           {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
         </p>
       )}

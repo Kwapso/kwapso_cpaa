@@ -31,7 +31,7 @@ import { iconComponent } from "@shared/web/screen-engine/icon"
 import { ICON_ALIASES, kitExportName } from "@shared/web/screen-engine/icon-names"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
-const KIT_ICONS = join(ROOT, "shared", "ui", "icons")
+const KIT_ICONS = join(ROOT, "shared", "ui", "foundations", "icons")
 
 const read = (p: string) => readFileSync(p, "utf8")
 
@@ -189,7 +189,7 @@ describe("the icon vocabulary", () => {
     expect(
       offenders,
       `an icon pack other than the kit is imported:\n${offenders.join("\n")}\n\n` +
-        `The kit draws ${drawn.size} glyphs. Import from @shared/ui/icons, or add the glyph upstream.`
+        `The kit draws ${drawn.size} glyphs. Import from @shared/ui/foundations/icons, or add the glyph upstream.`
     ).toEqual([])
   })
 })

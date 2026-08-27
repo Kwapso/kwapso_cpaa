@@ -7,10 +7,10 @@
 
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/controls/avatar/avatar"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { UserPlus } from "@shared/ui/icons"
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { UserPlus } from "@shared/ui/foundations/icons"
 
 import type { HelpStakeholder } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"
@@ -67,7 +67,7 @@ export function HelpStakeholders({
       {stakeholders.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {stakeholders.map((s) => (
             <li
               key={s.userId}

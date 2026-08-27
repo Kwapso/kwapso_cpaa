@@ -30,6 +30,7 @@ import {
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
+  VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
   BASE_LAW_CEILING,
@@ -320,11 +321,11 @@ describe("RULES — the laws of the base", () => {
     const picker = stripComments(read(join(WEB, "components", "record-picker.tsx")))
     // A blind check reports "all clear" exactly like a passing one.
     expect(picker, "the record picker must be the library Command + Popover").toContain(
-      "controls/command/command"
+      "components/command/command"
     )
     const offenders = componentFiles()
       .filter((f) => !f.endsWith("record-picker.tsx"))
-      .filter((f) => stripComments(read(f)).includes("controls/command/command"))
+      .filter((f) => stripComments(read(f)).includes("components/command/command"))
     expect(
       offenders,
       `use <RecordPicker> instead of composing a second searchable picker: ${offenders.join(", ")}`
@@ -2189,16 +2190,24 @@ describe("RULES — the laws of the base", () => {
   // thumbnail it is a genuinely different value doing a genuinely different job.
   // Folding it into the vocabulary would put a lozenge round every highlighted
   // word, which is a redesign wearing a sweep's clothes.
-  it("two-radii: only rounded-xl, rounded-t-xl and rounded-full ship (R31)", () => {
+  it("two-radii: only rounded-[var(--radius)] and rounded-pill ship (R31)", () => {
     // `shared/rules/` is the LAW BOOK — prose ABOUT the code, not code that
     // renders. R31's own sentence names the steps it forbids, so a scan that
     // read it would go red on the rule's own text.
     const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
+    // The vendored kit is a DEPENDENCY with the same law in its own book and its
+    // own gate to run it — see VENDORED_UI_SCOPE. A hit here is unactionable:
+    // the hand-edit guard forbids fixing it, so the only response is a message
+    // upstream, which is a review comment wearing a build failure's clothes.
+    const ours = (f: { rel: string }) => !f.rel.startsWith(VENDORED_UI)
     const lawBook = join(ROOT, "shared", "rules")
-    // shared/ui/ IS IN SCOPE. It was excused for one day while the reskin's shape
-    // stage was pending; that stage collapsed 45 off-vocabulary radii in there
-    // into rounded-xl, the exemption's own rot check went red, and the exemption
-    // was deleted. The library is held to the same vocabulary as the app.
+    // shared/ui/ IS NOT IN SCOPE, and that reversed on 2026-08-27 when the kit
+    // became canon. It WAS in scope, deliberately, and the note that used to sit
+    // here recorded the reskin collapsing 45 off-vocabulary radii inside it. What
+    // changed is that the kit now carries this law in its OWN book — docs/RULES.md
+    // §4.2, stricter than R31 was — and has its own gate to run it under. A hit
+    // in a vendored dependency we may not edit is unactionable red: the only
+    // honest response is a message upstream. See VENDORED_UI_SCOPE.
     const offenders: string[] = []
     // An admitted exception has to be USED, or it is vocabulary nobody asked
     // for. Counted across the whole scan, vendored directory included, because
@@ -2207,7 +2216,23 @@ describe("RULES — the laws of the base", () => {
     for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
       if (f.path.startsWith(lawBook)) continue
       for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)*(?:\[[^\]]+\]|[a-z0-9]+)/g) ?? []) {
-        if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
+        // THE TAILWIND STEP NAMES ARE FORBIDDEN NOW, not merely tolerated —
+        // kit RULES.md §4.2, adopted 2026-08-27 when the kit became canon.
+        // `rounded-xl` and `rounded-lg` DO render at 24, but only because
+        // tokens.css happens to load after Tailwind's theme: Tailwind emits
+        // `--radius-lg: 0.5rem`, tokens.css emits `1.5rem`, and the kit wins by
+        // cascade order alone. 184 corners across both front doors were correct
+        // by IMPORT ORDER rather than by declaration, and nothing here stood
+        // under that — reorder globals.css and every card silently becomes 12px
+        // with the suite still green. `rounded-pill` and
+        // `rounded-[var(--radius)]` say the value instead of inheriting it.
+        if (/^rounded-(?:[tbse]-)?(?:xl|lg|2xl|3xl|md|sm|full)$/.test(hit) && ours(f))
+          offenders.push(
+            `${f.rel}: ${hit} — kit §4.2 forbids the Tailwind step names. ` +
+              `Write rounded-[var(--radius)] for a box, rounded-pill for a pill.`
+          )
+        if (/^rounded-(?:[tbse]-)?(?:xl|lg|2xl|3xl|md|sm|full)$/.test(hit) || hit === "rounded-none") continue
+        if (hit === "rounded-pill") continue // the kit's pill word, now the primary spelling
         // The kit's one-edge spellings of the SAME two radii, through its
         // tokens: the `rounded-t-xl` move in token clothing (R31's law text).
         // …and any bracket spelling that RESOLVES THROUGH A RADIUS TOKEN
@@ -2218,6 +2243,14 @@ describe("RULES — the laws of the base", () => {
           exceptionUsed.set(hit, exceptionUsed.get(hit)! + 1)
           continue
         }
+        /* THE FILTER SITS HERE AND NOT AT THE TOP OF THE LOOP, and the
+           difference is the exception ratchet. `rounded-select` is USED only
+           inside the vendored kit — it is the kit's own checkbox mark — so a
+           scan that skipped the whole directory would count zero uses and fail
+           the "an exception nothing uses must be deleted" half. The kit's
+           radius vocabulary is still READ, so the exception stays honest; only
+           its offences are somebody else's to fix. */
+        if (!ours(f)) continue
         offenders.push(`${f.rel}: ${hit}`)
       }
     }
@@ -2257,6 +2290,11 @@ describe("RULES — the laws of the base", () => {
   // lose its entry and the list can only shrink.
   it("closed-palette: no Tailwind ramp and no hex outside PALETTE_LITERAL_OK (R32)", () => {
     const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
+    // The vendored kit is a DEPENDENCY with the same law in its own book and its
+    // own gate to run it — see VENDORED_UI_SCOPE. A hit here is unactionable:
+    // the hand-edit guard forbids fixing it, so the only response is a message
+    // upstream, which is a review comment wearing a build failure's clothes.
+    const ours = (f: { rel: string }) => !f.rel.startsWith(VENDORED_UI)
     const RAMP =
       /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g
     const HEX = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g
@@ -2265,6 +2303,7 @@ describe("RULES — the laws of the base", () => {
     const hexed = new Set<string>()
     for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
       if (f.path.startsWith(lawBook)) continue
+      if (!ours(f)) continue
       const src = stripComments(f.source)
       for (const hit of src.match(RAMP) ?? []) ramps.push(`${f.rel}: ${hit}`)
       if ((src.match(HEX) ?? []).length > 0) hexed.add(f.rel)

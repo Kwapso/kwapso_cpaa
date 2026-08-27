@@ -17,13 +17,13 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Paperclip, Pencil, Power } from "@shared/ui/icons"
+import { Paperclip, Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"

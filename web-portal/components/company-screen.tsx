@@ -15,10 +15,10 @@
 // one it wasn't given — the fence would refuse it anyway, with the same 404 a
 // made-up id gets, but not asking is the cheaper guarantee.
 
-import { DescriptionList } from "@shared/ui/structures/description-list/description-list"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { List } from "@shared/ui/structures/list/list"
+import { DescriptionList } from "@shared/ui/components/description-list/description-list"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { List } from "@shared/ui/components/list/list"
 
 import type { AccountDetail } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
@@ -41,7 +41,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
     return (
       <div className="flex flex-col gap-4">
         <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-[var(--radius)]" />
       </div>
     )
   if (!data) return null

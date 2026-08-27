@@ -44,11 +44,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Checkbox } from "@shared/ui/controls/checkbox/checkbox"
-import { Label } from "@shared/ui/controls/label/label"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { Label } from "@shared/ui/components/label/label"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,9 +58,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { KeyRound, Pencil, Power } from "@shared/ui/icons"
+import { KeyRound, Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
@@ -452,14 +452,15 @@ export function ContactDetailScreen({
             {companies
               .filter((c) => c.active)
               .map((c) => (
-                <button
+                <Button
                   key={c.id}
+                  variant="link"
                   type="button"
                   onClick={() => softNavigate(`${basePath}/${c.accountId}`)}
-                  className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                  className="hover:text-foreground"
                 >
                   {c.relationship ? `${c.relationship} at ${c.personName}` : c.personName}
-                </button>
+                </Button>
               ))}
           </p>
         ) : undefined
@@ -492,7 +493,7 @@ export function ContactDetailScreen({
                     it. The remaining refusals belong to the door: a ring, and an
                     account outside the caller's fence. */}
                 {canEdit && (
-                  <div className="flex flex-col gap-3 rounded-xl border p-4">
+                  <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       {t("Parent account")}
                     </p>
@@ -529,7 +530,7 @@ export function ContactDetailScreen({
                   </div>
                 )}
                 {account.about && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
                       {t("About")}
                     </p>

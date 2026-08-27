@@ -27,12 +27,13 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Label } from "@shared/ui/components/label/label"
+import { Input } from "@shared/ui/components/input/input"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,8 +43,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Pencil, Plus, Power } from "@shared/ui/icons"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Pencil, Plus, Power } from "@shared/ui/foundations/icons"
 
 import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
@@ -158,7 +159,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -377,7 +378,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
           {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -433,7 +434,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
 
       {canEdit && (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex min-w-40 flex-1 flex-col gap-1 text-sm">
+          <Label className="flex min-w-40 flex-1 flex-col items-stretch gap-1">
             {t("Role")}
             <Input
               value={role}
@@ -441,8 +442,8 @@ function RoleRateCard({ teamId }: { teamId: string }) {
               placeholder={t("e.g. Bookkeeper")}
               disabled={busy}
             />
-          </label>
-          <label className="flex w-32 flex-col gap-1 text-sm">
+          </Label>
+          <Label className="flex w-32 flex-col items-stretch gap-1">
             {t("An hour")}
             <Input
               value={amount}
@@ -451,7 +452,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
               placeholder="45"
               disabled={busy}
             />
-          </label>
+          </Label>
           <Button
             size="sm"
             disabled={busy || !ready}

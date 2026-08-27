@@ -6,11 +6,12 @@
 
 import { useRouter } from "next/navigation"
 
+import { Button } from "@shared/ui/components/button/button"
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@shared/ui/controls/avatar/avatar"
+} from "@shared/ui/components/avatar/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +19,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@shared/ui/controls/dropdown-menu/dropdown-menu"
-import { ModeToggle } from "@shared/ui/controls/mode-toggle/mode-toggle"
-import { LogOut, Palette, Settings, UserRound } from "@shared/ui/icons"
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
+import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
+import { LogOut, Palette, Settings, UserRound } from "@shared/ui/foundations/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
@@ -36,14 +37,14 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="rounded-full ring-offset-2">
+        <Button variant="ghost" size="icon" className="size-8 rounded-pill p-0">
           <Avatar className="size-8">
             {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={t("You")} />}
             <AvatarFallback className="text-xs">
               {personInitials(user?.firstName, user?.lastName)}
             </AvatarFallback>
           </Avatar>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">

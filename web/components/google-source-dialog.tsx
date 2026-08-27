@@ -44,13 +44,13 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { Button } from "@shared/ui/components/button/button"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Input } from "@shared/ui/controls/input/input"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Check, Plus, Search } from "@shared/ui/icons"
+import { Input } from "@shared/ui/components/input/input"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Check, Plus, Search } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
@@ -268,7 +268,7 @@ export function GoogleSourceDialog({
                   setOptions(null)
                 }}
                 disabled={busy}
-                className={`flex flex-1 flex-col gap-1 rounded-xl border p-3 text-left ${
+                className={`flex flex-1 flex-col gap-1 rounded-[var(--radius)] border p-3 text-left ${
                   kind === k.value ? "border-primary bg-muted" : ""
                 }`}
               >
@@ -302,7 +302,7 @@ export function GoogleSourceDialog({
       </Field>
 
       {options !== null && (
-        <div className="flex max-h-56 flex-col overflow-y-auto rounded-xl border">
+        <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] border">
           {options.length === 0 ? (
             <p className="text-muted-foreground p-3 text-sm">{t("Nothing found in your Google account.")}</p>
           ) : (
@@ -397,7 +397,7 @@ export function GoogleSourceDialog({
                   })
                 }
                 disabled={busy}
-                className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-xl px-2 py-1 text-xs"
+                className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-[var(--radius)] px-2 py-1 text-xs"
                 title={t("Take it off the list")}
               >
                 <span className="max-w-[16rem] truncate">{i.name}</span>
@@ -419,7 +419,7 @@ export function GoogleSourceDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, shelf: s.value }))}
               disabled={busy}
-              className={`flex flex-col gap-1 rounded-xl border p-3 text-left ${
+              className={`flex flex-col gap-1 rounded-[var(--radius)] border p-3 text-left ${
                 values.shelf === s.value ? "border-primary bg-muted" : ""
               }`}
             >

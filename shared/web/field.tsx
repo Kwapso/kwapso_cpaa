@@ -47,7 +47,7 @@
 
 import * as React from "react"
 
-import { Field as KitField } from "@shared/ui/controls/field/field"
+import { Field as KitField } from "@shared/ui/components/field/field"
 import { type FieldConfig } from "@shared/web/screen-engine/config"
 import { useIsVisible } from "@shared/web/screen-engine/visibility"
 

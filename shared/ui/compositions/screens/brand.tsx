@@ -114,15 +114,15 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Card } from "../../controls/card/card";
-import { Text } from "../../controls/typography/typography";
-import { Title } from "../../controls/title/title";
+import { Button } from "../../components/button/button";
+import { Card } from "../../components/card/card";
+import { Text } from "../../components/typography/typography";
+import { Title } from "../../components/title/title";
 import {
   DescriptionList,
   type DescriptionListItem,
-} from "../../structures/description-list/description-list";
-import { ScreenRegister } from "../../structures/screen-renderer/screen-renderer";
+} from "../../components/description-list/description-list";
+import { ScreenRegister } from "../../components/screen-renderer/screen-renderer";
 import { cn } from "../../lib/utils";
 import { MainScreen } from "../templates";
 import type { ShapeState } from "../states";

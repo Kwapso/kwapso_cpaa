@@ -18,12 +18,12 @@
 
 import * as React from "react"
 
-import { DialogDescription, DialogTitle } from "@shared/ui/controls/dialog/dialog"
+import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { Input } from "@shared/ui/controls/input/input"
-import { Textarea } from "@shared/ui/controls/textarea/textarea"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Input } from "@shared/ui/components/input/input"
+import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content } from "@/lib/api"

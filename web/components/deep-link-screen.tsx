@@ -48,7 +48,7 @@ import { ProfileScreen } from "@/components/screens/profile-screen"
 import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
 import type { HelpScope, TaskView } from "@/lib/live-resources"
@@ -398,12 +398,12 @@ export function DeepLinkScreen() {
        * own `px-4 sm:px-6 lg:px-8` gutters (S2, and exactly the brand site's own
        * 40px `--margin--m`) do the work at every width below it.
        *
-       * `rounded-xl transition-shadow` went with it: it rounded and animated a
+       * `rounded-[var(--radius)] transition-shadow` went with it: it rounded and animated a
        * container that has no surface of its own. */}
       <div
         data-trace={traceHighlight ?? undefined}
         className={`mx-auto flex w-full max-w-[1600px] flex-col gap-6 ${
-          traceHighlight ? "ring-primary/60 rounded-xl ring-2 ring-offset-2 ring-offset-background" : ""
+          traceHighlight ? "ring-primary/60 rounded-[var(--radius)] ring-2 ring-offset-2 ring-offset-background" : ""
         }`}
       >
         {showTabs && (

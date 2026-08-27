@@ -8,7 +8,7 @@
 
 import * as React from "react"
 
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { AccountFormDialog } from "@/components/account-form-dialog"
@@ -34,8 +34,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
 import type { InternalKind } from "@/lib/use-screen-actions"
 import { ApiFailure } from "@/lib/api"
 import { personName } from "@/lib/identity"

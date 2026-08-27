@@ -25,11 +25,11 @@
 
 import * as React from "react"
 
-import { Input } from "@shared/ui/controls/input/input"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Input } from "@shared/ui/components/input/input"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Search } from "@shared/ui/icons"
+import { Search } from "@shared/ui/foundations/icons"
 import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 

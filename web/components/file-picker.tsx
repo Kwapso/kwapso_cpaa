@@ -23,10 +23,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Paperclip } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { Paperclip } from "@shared/ui/foundations/icons"
 
 import { ApiFailure } from "@/lib/api"
 // No canvas re-encode: a certificate is a document, and a PDF put through an
@@ -84,7 +84,7 @@ export function FilePicker({
 
   if (value)
     return (
-      <div className="bg-card flex items-center gap-2 rounded-xl border p-2 text-sm">
+      <div className="bg-card flex items-center gap-2 rounded-[var(--radius)] border p-2 text-sm">
         <Paperclip className="text-muted-foreground size-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{fileName || t("Uploaded file")}</span>
         <Button

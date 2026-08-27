@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@shared/ui/controls/dialog/dialog"
-import { ScrollArea } from "@shared/ui/controls/scroll-area/scroll-area"
+} from "@shared/ui/components/dialog/dialog"
+import { ScrollArea } from "@shared/ui/components/scroll-area/scroll-area"
 
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"
@@ -79,7 +79,7 @@ export function AgentHistoryDialog({
                       onPick(thread.id)
                     }}
                     disabled={busy}
-                    className="hover:bg-muted flex w-full flex-col items-start gap-1 rounded-xl p-2 text-left disabled:text-ink-disabled"
+                    className="hover:bg-muted flex w-full flex-col items-start gap-1 rounded-[var(--radius)] p-2 text-left disabled:text-ink-disabled"
                   >
                     <span className="line-clamp-1 text-sm font-medium">
                       {thread.id === currentThreadId

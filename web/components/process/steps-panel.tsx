@@ -1,5 +1,5 @@
 "use client"
-import { Trash2 } from "@shared/ui/icons"
+import { Trash2 } from "@shared/ui/foundations/icons"
 import { SAVINGS_CAPTION, hoursText, minutesText } from "@shared/workers/savings"
 import { frequencyText } from "@shared/web/frequency"
 import { moneyText } from "@shared/web/money"
@@ -32,11 +32,11 @@ import { RecordActionsMenu } from "@/components/record-chrome"
 // what proves it: every one of those twenty-four had to arrive from somewhere.
 
 import * as React from "react"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 import type { ProcessSaving } from "@shared/workers/savings"
 import { tenancy } from "@/lib/api"
 import { useT } from "@shared/web/language"
@@ -228,7 +228,7 @@ export function StepsPanel({
           server refuses the write regardless — this is the sentence,
           not the lock. */}
       {!isCurrent && (
-        <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-xs">
+        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] border p-3 text-xs">
           {t("This is how the work was described when")}{" "}
           {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
           {t("was cut")}
@@ -313,7 +313,7 @@ export function StepsPanel({
             : t("This version has no steps recorded.")}
         </p>
       ) : (
-        <div className="rounded-xl border">
+        <div className="rounded-[var(--radius)] border">
           {/* ONE STEP, AS A TITLE AND A META LINE (K1), and it used to
               be eight things on one sweep: number, name, "no longer
               done", minutes each time, runs a month, hours a month,
@@ -489,7 +489,7 @@ export function StepsPanel({
           there is, and a comparison that showed only surviving steps
           would leave it out. */}
       {saving && saving.steps.length > 0 && (
-        <div className="rounded-xl border p-4">
+        <div className="rounded-[var(--radius)] border p-4">
           <p className="text-muted-foreground text-sm">
             {t("Time given back, measured from")} {auditDate}
           </p>

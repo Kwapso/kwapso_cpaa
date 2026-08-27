@@ -121,15 +121,15 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Headline, Text } from "../../controls/typography/typography";
-import { SearchInput } from "../../controls/search-input/search-input";
+import { Button } from "../../components/button/button";
+import { Headline, Text } from "../../components/typography/typography";
+import { SearchInput } from "../../components/search-input/search-input";
 import {
   FilterBar,
   type FilterChip,
-} from "../../controls/filter-bar/filter-bar";
-import type { CollectionFrameTab } from "../../structures/collection-frame/collection-frame";
-import { Plus } from "../../icons";
+} from "../../components/filter-bar/filter-bar";
+import type { CollectionFrameTab } from "../../components/collection-frame/collection-frame";
+import { Plus, X } from "../../foundations/icons";
 import { MainScreen } from "../templates";
 
 /** One tab over the collection. Counts are real: the collection is full. */
@@ -411,25 +411,42 @@ function NoResultsScreen({
           <Headline as="h3" size="h3">
             {words.title}
           </Headline>
+          {/* THE THREE FACTS CARRY THE WEIGHT — p31 draws the total, the
+              narrowest facet's name and its would-show figure at 500 inside
+              the secondary sentence, so the numbers a reader acts on stand
+              out of the prose that frames them. They were set plain. */}
           <Text as="p" size="sm" tone="secondary" measure>
             {words.countLead}{" "}
-            <Text as="span" size="sm" numeric>
+            <Text
+              as="span"
+              size="sm"
+              numeric
+              className="font-[var(--font-weight-medium)]"
+            >
               {total}
             </Text>{" "}
             <span className="hidden sm:inline">{words.countNoun} </span>
             {words.countTail} {words.dropLead}{" "}
-            <Text as="span" size="sm">
+            <Text as="span" size="sm" className="font-[var(--font-weight-medium)]">
               {narrowestFacet}
             </Text>{" "}
             {words.dropTail}{" "}
-            <Text as="span" size="sm" numeric>
+            <Text
+              as="span"
+              size="sm"
+              numeric
+              className="font-[var(--font-weight-medium)]"
+            >
               {narrowestWouldShow}
             </Text>
             .
           </Text>
           <div className="mt-2 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
-            {/* PAPER. 27.22: "Clear is paper, never mango." */}
+            {/* PAPER. 27.22: "Clear is paper, never mango." The pill leads
+                with the × glyph p31 draws — the same mark every facet chip
+                carries, saying in one shape what the button undoes. */}
             <Button variant="secondary" onClick={onClear}>
+              <X aria-hidden="true" />
               {words.clear}
             </Button>
             {/* Offered, not searched silently. */}

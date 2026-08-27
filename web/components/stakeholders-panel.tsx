@@ -26,8 +26,9 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { ChevronRight } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
@@ -47,13 +48,20 @@ function PersonRow({ p, mainLabel }: { p: Side; mainLabel: string }) {
   return (
     <li className="flex flex-wrap items-center gap-2 px-3 py-2">
       <RecordMark picture={p.photo} name={p.name} shape="round" fit="cover" />
-      <button
+      {/* The kit's `link` variant: no box, inherited ink, underline on hover.
+          The overrides are layout only — the name flexes and truncates inside
+          the row, against a base skin that is `shrink-0 justify-center`. */}
+      <Button
         type="button"
+        variant="link"
         onClick={() => softNavigate(p.href)}
-        className="hover:text-primary min-w-0 flex-1 truncate text-left text-sm underline-offset-2 hover:underline"
+        className="hover:text-primary min-w-0 flex-1 shrink justify-start text-left underline-offset-2"
       >
-        {p.name}
-      </button>
+        {/* Truncation on the SPAN, not the control: the kit's skin is
+            `inline-flex`, and `text-overflow: ellipsis` does not apply to a
+            flex container — the name would clip at the same width with no "…". */}
+        <span className="min-w-0 truncate">{p.name}</span>
+      </Button>
       {p.main && (
         <Badge variant="secondary" className="shrink-0">
           {mainLabel}
@@ -71,7 +79,7 @@ function Group({ title, people, empty, mainLabel }: { title: string; people: Sid
       {people.length === 0 ? (
         <p className="text-muted-foreground text-sm">{empty}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-xl border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {people.map((p) => (
             <PersonRow key={p.id} p={p} mainLabel={mainLabel} />
           ))}

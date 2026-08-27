@@ -42,9 +42,9 @@ import * as React from "react"
 
 import dynamic from "next/dynamic"
 
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { StatGrid } from "@shared/ui/structures/stat-grid/stat-grid"
-import { ChartNoAxesColumn } from "@shared/ui/icons"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
+import { ChartNoAxesColumn } from "@shared/ui/foundations/icons"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"
@@ -79,7 +79,7 @@ const BAND_HEIGHT = 170
  * own height, so nothing on the page moves when the chunk lands. */
 const chartModule = () => import("@/components/pulse-charts")
 const chartLoading = () => (
-  <Skeleton className="w-full rounded-xl" style={{ height: BAND_HEIGHT }} />
+  <Skeleton className="w-full rounded-[var(--radius)]" style={{ height: BAND_HEIGHT }} />
 )
 
 const StageChart = dynamic(() => chartModule().then((m) => m.StageChart), {
@@ -125,7 +125,7 @@ export function hoursSpoken(seconds: number): string {
  * that says what would make a picture appear. */
 export function BandCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border p-4">
+    <section className="min-w-0 rounded-[var(--radius)] border p-4">
       <h3 className="text-muted-foreground mb-2 text-sm font-medium">{title}</h3>
       {children}
     </section>
@@ -141,7 +141,7 @@ export function BandCard({ title, children }: { title: string; children: React.R
 export function NothingYet({ what, how }: { what: string; how: string }) {
   return (
     <div
-      className="text-muted-foreground flex flex-col items-start justify-center gap-1 rounded-xl border border-dashed p-4 text-sm"
+      className="text-muted-foreground flex flex-col items-start justify-center gap-1 rounded-[var(--radius)] border border-dashed p-4 text-sm"
       style={{ minHeight: BAND_HEIGHT }}
     >
       <ChartNoAxesColumn aria-hidden className="mb-1 size-5 opacity-60" />
@@ -230,7 +230,7 @@ export function PulseBand({ teamId }: { teamId: string }) {
   // First load on a cold cache: one short skeleton so the page below does not
   // jump when the numbers land. After that the cache paints instantly and this is
   // never seen again (CACHING.md — cache-first, revalidate behind).
-  if (loading && !data) return <Skeleton className="h-24 w-full rounded-xl" />
+  if (loading && !data) return <Skeleton className="h-24 w-full rounded-[var(--radius)]" />
   if (!data) return null
 
   const { tickets, work, meetings } = data

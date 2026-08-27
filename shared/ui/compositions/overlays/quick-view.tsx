@@ -87,33 +87,33 @@
 
 import * as React from "react";
 
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../controls/dialog/dialog";
+} from "../../components/dialog/dialog";
 import {
   Sheet,
   SheetContent,
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "../../controls/sheet/sheet";
-import { Hint, Text } from "../../controls/typography/typography";
-import { Title } from "../../controls/title/title";
+} from "../../components/sheet/sheet";
+import { Hint, Text } from "../../components/typography/typography";
+import { Title } from "../../components/title/title";
 import {
   ActivityFeed,
   type ActivityFeedItem,
-} from "../../structures/activity-feed/activity-feed";
+} from "../../components/activity-feed/activity-feed";
 import {
   DescriptionList,
   type DescriptionListItem,
-} from "../../structures/description-list/description-list";
-import { ChevronLeft, ChevronRight } from "../../icons";
+} from "../../components/description-list/description-list";
+import { ChevronLeft, ChevronRight } from "../../foundations/icons";
 
 /**
  * CH27.37: "the ask cut at 200 characters". The chapter's own figure, kept as

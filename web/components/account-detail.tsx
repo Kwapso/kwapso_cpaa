@@ -39,10 +39,10 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,11 +52,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@shared/ui/controls/alert-dialog/alert-dialog"
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
-import { Pencil, Power } from "@shared/ui/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
@@ -657,13 +657,14 @@ export function AccountDetailScreen({
       headerExtra={
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {parent ? (
-            <button
+            <Button
+              variant="link"
               type="button"
               onClick={() => openAccount(parent.id)}
-              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              className="hover:text-foreground"
             >
               {t("Part of")} {parent.name}
-            </button>
+            </Button>
           ) : (
             <span>{t("Sits on its own")}</span>
           )}
@@ -689,10 +690,10 @@ export function AccountDetailScreen({
                     pasted URL, and the pictures in it came from an account
                     being cancelled. `RecordCover` renders exactly what having
                     no cover renders when the picture will not load: nothing. */}
-                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-xl object-cover sm:h-40" />
+                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-[var(--radius)] object-cover sm:h-40" />
                 <OverviewList items={overviewItems} />
                 {account.about && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
                       {t("About")}
                     </p>
@@ -725,7 +726,7 @@ export function AccountDetailScreen({
                     a figure a client cannot account for is worse than no figure
                     at all. */}
                 {moneyBack && (
-                  <div className="rounded-xl border p-4">
+                  <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
                     <p className="text-2xl font-medium tracking-tight tabular-nums">{moneyBack}</p>
                     <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>

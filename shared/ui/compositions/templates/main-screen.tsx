@@ -131,14 +131,14 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Title } from "../../controls/title/title";
-import { Text } from "../../controls/typography/typography";
+import { Button } from "../../components/button/button";
+import { Title } from "../../components/title/title";
+import { Text } from "../../components/typography/typography";
 import {
   CollectionFrame,
   type CollectionFrameTab,
-} from "../../structures/collection-frame/collection-frame";
-import { Plus } from "../../icons";
+} from "../../components/collection-frame/collection-frame";
+import { Plus } from "../../foundations/icons";
 import { ScreenShell, type ScreenSpine } from "./screen-shell";
 import { StatStrip, type StatStripFigure } from "./stat-strip";
 import { SHAPE_HEADING_SIZE, type ScreenDensity, type ShapeState } from "../states/states";

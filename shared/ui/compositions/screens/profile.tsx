@@ -60,17 +60,17 @@
 
 import * as React from "react";
 
-import { Button } from "../../controls/button/button";
-import { Field } from "../../controls/field/field";
-import { Input } from "../../controls/input/input";
+import { Button } from "../../components/button/button";
+import { Field } from "../../components/field/field";
+import { Input } from "../../components/input/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../controls/select/select";
-import { Textarea } from "../../controls/textarea/textarea";
+} from "../../components/select/select";
+import { Textarea } from "../../components/textarea/textarea";
 import { FormScreen, MainScreen, type FormScreenSection } from "../templates";
 import { type ShapeState, type ShapeStateCopy } from "../states";
 

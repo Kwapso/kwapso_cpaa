@@ -6,7 +6,9 @@
 //   • title           — an optional header
 //   • filter / sort    — EXECUTED here (via selectRows) from the config's rules
 //   • searchable       — a debounced SearchInput that filters the named columns
-//   • userFilter       — a FilterBar of `filterFacets` (dropdowns / chips)
+//   • userFilter       — a FilterBar of `filterFacets` (the design kit's own
+//                        filter row: a chip per facet that is on, and the facet
+//                        controls behind its "+ filter" slot)
 //   • showCount        — a LIVE "Showing X of Y" that reacts to search + facets
 //   • limit            — caps the TOTAL rows (e.g. "only ever show 50")
 //   • itemsPerPage     — paginates the (filtered) rows, with a Prev/Next pager
@@ -18,24 +20,23 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/icons"
-import { Filter } from "@shared/ui/icons"
+import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/foundations/icons"
 import { kitIcon } from "./tabs-view"
 
 import { selectRows } from "./collection"
 import { type CollectionConfig } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
-import { Button } from "@shared/ui/controls/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import { FilterBar } from "./filter-bar"
-import { SortControl } from "@shared/ui/controls/sort-control/sort-control"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@shared/ui/controls/popover/popover"
-import { SearchInput } from "@shared/ui/controls/search-input/search-input"
-import { useDebouncedCallback } from "@shared/ui/controls/use-debounce/use-debounce"
+} from "@shared/ui/components/popover/popover"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 
 function CollectionFrame<T>({
@@ -133,9 +134,6 @@ function CollectionFrame<T>({
     config.searchable ||
     showFilterBar ||
     showSort
-  const canClear =
-    query !== "" || Object.values(facetValues).some((v) => v !== "")
-
   const setFacet = (field: string, value: string) =>
     setFacetValues((s) => {
       const next = { ...s }
@@ -143,11 +141,6 @@ function CollectionFrame<T>({
       else next[field] = value
       return next
     })
-
-  const clearAll = () => {
-    setQuery("")
-    setFacetValues({})
-  }
 
   // Page change: optionally scroll the collection's top back into view.
   const goTo = (p: number) => {
@@ -176,6 +169,13 @@ function CollectionFrame<T>({
             <SearchInput
               defaultValue={query}
               onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+              // THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be
+              // cleared by the filter row's "Clear all", which was one control
+              // quietly owning two questions; the kit's bar says "Clear
+              // filters" and now means only that. Cleared THROUGH the debounce
+              // rather than around it, so a keystroke still in flight cannot
+              // land after the ✕ and put the text back.
+              onClear={() => debouncedSetQuery("")}
               placeholder={config.searchPlaceholder}
               className="w-44"
             />
@@ -186,8 +186,7 @@ function CollectionFrame<T>({
               values={facetValues}
               data={data}
               onChange={setFacet}
-              onClearAll={clearAll}
-              canClear={canClear}
+              onClearFacets={() => setFacetValues({})}
               resultCount={filtered.length}
               modal={modal}
             />
@@ -212,74 +211,69 @@ function CollectionFrame<T>({
               )
             : config.searchPlaceholder
 
+          // THE FILTER ROW LEFT THE FUNNEL, AND THAT IS THE POINT OF THE SWAP.
+          // The phone header used to hide the filters behind a funnel because
+          // the old row was a strip of dropdown triggers that could not fit
+          // beside a search box. The kit's bar answers the same question itself
+          // and answers it the other way round — below `sm` its chips become a
+          // one-line horizontal SCROLLER, and its own file says why in as many
+          // words: "the moment they are hidden, people forget they are on and
+          // read a filtered list as an empty one". So the funnel now holds the
+          // SORT and nothing else, and what is narrowing the list is on screen
+          // at every width. It cost the dot the funnel used to wear, which was
+          // the app telling somebody a filter was on without telling them which.
           return (
             <>
               {/* Mobile (< sm): ONE compact row — a stretching search field + a
-                  funnel that opens the same FilterBar in a popover. Left-to-right,
-                  never wrapping into 2–3 stacked rows. */}
+                  sort funnel. Left-to-right, never wrapping into stacked rows.
+                  The filter bar is its own row below, at every width. */}
               <div className="flex items-center gap-2 sm:hidden">
                 {config.searchable ? (
                   <SearchInput
                     defaultValue={query}
                     onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+                    onClear={() => debouncedSetQuery("")}
                     placeholder={mobilePlaceholder}
                     className="min-w-0 flex-1"
                   />
                 ) : (
                   <div className="min-w-0 flex-1">{titleBlock}</div>
                 )}
-                {(showFilterBar || showSort) && (
+                {showSort && (
                   <Popover modal={modal}>
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
                         variant="secondary"
                         size="icon"
-                        aria-label={
-                          showFilterBar && showSort
-                            ? t("Filters and sort")
-                            : showSort
-                              ? t("Sort")
-                              : t("Filters")
-                        }
-                        className="relative size-8 shrink-0"
+                        aria-label={t("Sort")}
+                        className="size-8 shrink-0"
                       >
-                        {showFilterBar ? <Filter /> : <ArrowUpDown />}
-                        {canClear && (
-                          <span
-                            aria-hidden
-                            className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
-                          />
-                        )}
+                        <ArrowUpDown />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
                       align="end"
                       className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3"
                     >
-                      {/* The same controls the desktop layout renders (built
-                          once above) — just stacked into a popover, since the
+                      {/* The same control the desktop layout renders (built
+                          once above) — just moved into a popover, since the
                           phone header is ONE row: search + this trigger. */}
                       {sortControl}
-                      {filterBar}
                     </PopoverContent>
                   </Popover>
                 )}
               </div>
 
-              {/* ≥ sm: the desktop/tablet layout — UNCHANGED. "inline" = title +
-                  search + filters on one wrapping row; "stacked" (default) =
-                  title+search row with the filter bar on its own line below. */}
-              {/* ≥ sm: "inline" = title + search + filters + sort on one
-                  wrapping row; "stacked" (default) = title+search row with the
-                  filters and sort together on the row below — sort is IN the
-                  header, aligned with the filters, never a bolted-on strip. */}
+              {/* ≥ sm: "inline" = title + search + sort on one wrapping row;
+                  "stacked" (default) = a title+search row with the sort on the
+                  row below. Sort is IN the header either way, never a bolted-on
+                  strip. */}
               <div className="hidden sm:block">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {titleBlock}
                     {searchBox}
-                    {filterBar}
                     {sortControl}
                   </div>
                 ) : (
@@ -288,21 +282,23 @@ function CollectionFrame<T>({
                       {titleBlock}
                       {searchBox}
                     </div>
-                    {(filterBar || sortControl) && (
+                    {sortControl && (
                       <div className="flex flex-wrap items-center gap-2">
-                        {filterBar}
                         {sortControl}
                       </div>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* THE FILTERS, AT EVERY WIDTH, on their own full-width row. */}
+              {filterBar}
             </>
           )
         })()}
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[var(--radius)] border border-dashed p-8 text-center text-sm text-muted-foreground">
           {/* aria-hidden by construction: the sentence under it already says
               what this is. The icon comes from the kit's set by name; a name
               the kit lacks renders nothing, same contract as the old

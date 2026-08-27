@@ -51,15 +51,16 @@
      · It never states a record number as its subject and never says what
        happened to anything. 27.23 says what happened; this says who to ask.
 
-   THE ONE AUTHORISED BLUR
+   THE ONE AUTHORISED BLUR — AND THE FIGURES ARE THE ARTIFACT'S OWN.
    Nothing else in the kit blurs. The `behind` node is blurred, desaturated
    and made inert (`aria-hidden`, `pointer-events-none`); the scrim is
    `Dialog`'s own, so it is "exactly as under a form panel or a delete
-   dialog". The artifact states that it IS blurred and desaturated but gives
-   no radius and no saturation figure, so both are logged as T3B-1 in
-   GAPS-TRACK3B.md rather than presented as kwapso values: the blur is one
-   step off the spacing ladder (`--space-1`, 4) so it cannot become a stray
-   px, and the desaturation is the single Tailwind step nearest "half".
+   dialog". T3B-1 logged the radius and the saturation as unstated and this
+   file derived both; the 2026-08-22 extract STATES them — 27.7 and 27.2 draw
+   the page behind with `filter: blur(2.5px) saturate(.82); opacity: .5`, and
+   27.2's prose spells it out: "blurred 2.5px, desaturated and dropped to
+   half opacity". The derivations (`--space-1`, `saturate-50`, full opacity)
+   are gone; the drawn values ship. T3B-1 is closed by the artifact itself.
 
    WHAT THE ARTIFACT ACTUALLY DRAWS, TRANSCRIBED OFF p22
    The card opens on a **poppy-dot chip reading `No access`** in the quiet
@@ -95,19 +96,19 @@
 
 import * as React from "react";
 
-import { ActionRow } from "../../controls/action-row/action-row";
-import { Avatar, AvatarFallback } from "../../controls/avatar/avatar";
-import { Badge } from "../../controls/badge/badge";
-import { Button } from "../../controls/button/button";
-import { Card } from "../../controls/card/card";
+import { ActionRow } from "../../components/action-row/action-row";
+import { Avatar, AvatarFallback } from "../../components/avatar/avatar";
+import { Badge } from "../../components/badge/badge";
+import { Button } from "../../components/button/button";
+import { Card } from "../../components/card/card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "../../controls/dialog/dialog";
-import { Hint, Text } from "../../controls/typography/typography";
+} from "../../components/dialog/dialog";
+import { Hint, Text } from "../../components/typography/typography";
 
 /** Which door. The portal never names another client. */
 export type AccessDeniedDoor = "system" | "portal";
@@ -283,7 +284,9 @@ function AccessDeniedScreen({
         <div
           data-slot="access-denied-behind"
           aria-hidden="true"
-          className="pointer-events-none select-none blur-[var(--space-1)] saturate-50"
+          /* The artifact's drawn treatment, figure for figure — 27.7/27.2:
+             `filter: blur(2.5px) saturate(.82); opacity: .5`. */
+          className="pointer-events-none select-none opacity-50 blur-[2.5px] saturate-[.82]"
         >
           {behind}
         </div>

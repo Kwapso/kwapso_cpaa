@@ -35,14 +35,14 @@
 import * as React from "react"
 
 import { cn } from "@shared/ui/lib/utils"
-import { Button, buttonVariants } from "@shared/ui/controls/button/button"
-import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
+import { Button, buttonVariants } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
-import { Badge } from "@shared/ui/controls/badge/badge"
-import { ExternalLink, FileText, Pencil, Power, Video } from "@shared/ui/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { ExternalLink, FileText, Pencil, Power, Video } from "@shared/ui/foundations/icons"
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
@@ -533,7 +533,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                     <Skeleton variant="list" lines={3} />
                   ) : transcriptQ.data.text ? (
                     <>
-                      <div className="max-h-96 overflow-y-auto rounded-xl border p-3">
+                      <div className="max-h-96 overflow-y-auto rounded-[var(--radius)] border p-3">
                         <p className="text-sm whitespace-pre-wrap">{transcriptQ.data.text}</p>
                       </div>
                       {/* NEVER SILENTLY TRIMMED. A transcript longer than one
@@ -680,7 +680,7 @@ function CalendarPanel({
         {people.length === 0 ? (
           <EmptyLine concept="members">{t("Nobody else is on the invitation.")}</EmptyLine>
         ) : (
-          <div className="flex flex-col rounded-xl border">
+          <div className="flex flex-col rounded-[var(--radius)] border">
             {people.map((g) => {
               const known = linkFor.get(g.email)
               return (
@@ -734,7 +734,7 @@ function CalendarPanel({
       {meeting.googleAttachments.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-muted-foreground text-sm font-medium">{t("Attached to the entry")}</h2>
-          <div className="flex flex-col rounded-xl border">
+          <div className="flex flex-col rounded-[var(--radius)] border">
             {meeting.googleAttachments.map((a) => (
               <a
                 key={a.fileId || a.url || a.title}

@@ -400,14 +400,14 @@ import { cn } from "../../lib/utils";
 import {
   Avatar,
   AvatarFallback,
-} from "../../controls/avatar/avatar";
-import { Isotype, Logotype } from "../../controls/brand/brand";
+} from "../../components/avatar/avatar";
+import { Isotype, Logotype } from "../../components/brand/brand";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "../../controls/tooltip/tooltip";
-import { Hint, Text } from "../../controls/typography/typography";
+} from "../../components/tooltip/tooltip";
+import { Hint, Text } from "../../components/typography/typography";
 import {
   ChartNoAxesColumn,
   ChevronDown,
@@ -416,7 +416,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-} from "../../icons";
+} from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
    THE ACTIVE ROW — mango, ruled, and now spine-aware.

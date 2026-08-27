@@ -48,11 +48,11 @@
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/controls/button/button"
-import { Input } from "@shared/ui/controls/input/input"
-import { Spinner } from "@shared/ui/controls/spinner/spinner"
-import { toast } from "@shared/ui/controls/sonner/sonner"
-import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "@shared/ui/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "@shared/ui/foundations/icons"
 
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"
@@ -122,7 +122,7 @@ export function KnowledgeAsk({
   }
 
   return (
-    <div className="bg-card flex flex-col gap-4 rounded-xl border p-4">
+    <div className="bg-card flex flex-col gap-4 rounded-[var(--radius)] border p-4">
       <form onSubmit={(e) => void ask(e)} className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={question}
@@ -262,7 +262,7 @@ export function KnowledgeAsk({
                           very good understanding of what is coming from where".
                           Same glyph vocabulary as the knowledge base's own list,
                           so a source looks the same wherever it is shown. */}
-                      <span className="bg-muted text-muted-foreground mt-0.5 grid size-5 shrink-0 place-items-center rounded-xl">
+                      <span className="bg-muted text-muted-foreground mt-0.5 grid size-5 shrink-0 place-items-center rounded-[var(--radius)]">
                         <Icon
                           name={(KNOWLEDGE_KIND_ICON[c.kind] ?? "file") as IconName}
                           aria-hidden
