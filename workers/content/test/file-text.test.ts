@@ -1,3 +1,6 @@
+import { stripComments } from "@shared/rules/source-scan"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 // READING THE WORDS OUT OF A FILE THAT IS NOT A TEXT FILE.
 //
 // Earned by a measurement, not a hunch. On 2026-08-20, of 410 Drive documents
@@ -13,13 +16,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import {
-  boundedBytes,
-  DRIVE_BYTES_CAP,
-  extractFileText,
-  fileShape,
-  looksLikeProse,
-} from "../src/lib/file-text"
+import { DRIVE_BYTES_CAP, boundedBytes, extractFileText, fileShape, looksLikeProse, readsLikeWords } from "../src/lib/file-text"
 
 /** A ZIP holding STORED (uncompressed) entries. Enough to exercise the directory
  * walk without depending on the runtime's deflate. */
@@ -184,5 +181,113 @@ describe("a file too big to read", () => {
 
   it("answers null for a response with no body at all", async () => {
     expect(await boundedBytes(new Response(null))).toBeNull()
+  })
+})
+
+// -- BINARY ARTWORK IN A RETRIEVAL INDEX ------------------------------------
+//
+// MEASURED ON STAGING, 27 Aug 2026. The largest "documents" the team held were
+// not documents: four Adobe Illustrator logos at 106, 106, 106 and 107 chunks,
+// two Outlook templates at 92 and 26, and seven PDFs of vectorised artwork
+// between 29 and 62. Roughly 580 chunks of PostScript, OLE headers and page
+// geometry - and because they were the BIGGEST sources, they carried weight in
+// every neighbourhood while saying nothing.
+//
+// TWO SEPARATE HOLES LET THEM IN, and the second is the interesting one.
+describe("a file whose bytes are not words is not material", () => {
+  // HOLE ONE: `.eps` and `.oft` were neither a known text extension nor a known
+  // opaque one, so `fileShape` called them "text" - the branch that skipped
+  // `extractFileText` entirely and decoded the bytes straight into a source.
+  it("artwork and mail templates are opaque, so nothing is even downloaded", () => {
+    for (const name of ["HOGO_LOGO_schwarz.eps", "HogoEinsatzliste.oft", "Brand.OTF"])
+      expect(fileShape(name, ""), name).toBe("opaque")
+  })
+
+  it("and if one is read anyway, its bytes do not read as prose", () => {
+    const eps =
+      "%!PS-Adobe-3.1 EPSF-3.0\n%%Title: Adobe Illustrator Artwork\n%%BoundingBox: 0 0 523 134\n" +
+      String.fromCharCode(0, 1, 2, 3, 4, 5, 6, 7).repeat(200)
+    expect(looksLikeProse(eps)).toBe(false)
+  })
+
+  // HOLE TWO, and this is why an extension list was never going to be enough.
+  // `looksLikeProse` counts READABLE characters, and a vectorised logo's page
+  // description is entirely readable - numbers and one-letter operators,
+  // printable to the last byte. Three real PDFs passed it on staging and went in
+  // as 52, 45 and 46 chunks of drawing instructions.
+  // SHAPED LIKE THE REAL THING RATHER THAN LIKE THE IDEA OF IT. A first draft of
+  // this fixture was a row of two-letter operators (rg, gs, cm, BT, Tf) and
+  // scored 0.4, because a two-letter operator is letter-shaped. Real page
+  // geometry measured 0.000 on staging: it is overwhelmingly COORDINATES, with
+  // the operators scattered between them, and that is what makes the test honest.
+  const geometry = Array.from(
+    { length: 60 },
+    (_, i) =>
+      `${72 + i}.${i}25 ${720 - i}.5 ${523 + i}.75 ${134 + i}.125 ${i}.5 ${i * 3}.0 ` +
+      `${i * 7}.25 ${i * 11}.125 m ${i * 13}.5 ${i * 17}.75 l`
+  ).join(" ")
+  const vollmacht =
+    "Vollmacht zur Auskunftserteilung. Hiermit bevollmaechtige ich die Confia Solutions " +
+    "saemtliche Auskuenfte bei meiner Versicherung einzuholen und Unterlagen entgegenzunehmen. " +
+    "Diese Vollmacht gilt bis auf Widerruf und kann jederzeit schriftlich zurueckgezogen werden."
+
+  it("page geometry is readable and is still not words", () => {
+    expect(looksLikeProse(geometry), "every character of it is printable").toBe(true)
+    expect(readsLikeWords(geometry), "and not one of them is a word").toBe(false)
+  })
+
+  // THE HALF THAT MUST NOT BREAK. A power of attorney and a customer sheet are
+  // exactly the material this base exists to answer from, and an extension test
+  // would have thrown them out with the logos.
+  it("but a power of attorney is words, and survives both tests", () => {
+    expect(looksLikeProse(vollmacht)).toBe(true)
+    expect(readsLikeWords(vollmacht)).toBe(true)
+  })
+
+  // AND THE STRICTER TEST IS NOT LET LOOSE ON EVERYTHING. A spreadsheet export
+  // and a data file are not prose either, and they are not this problem - they
+  // have their own shape and their own path.
+  it("and it is never asked about a CSV, which would fail it and should not", () => {
+    expect(fileShape("contacts.csv", "")).toBe("text")
+    expect(fileShape("export.json", "")).toBe("text")
+  })
+})
+
+// -- AND THE TWO PLACES THE GUARDS ARE ACTUALLY APPLIED ----------------------
+//
+// The tests above prove the two predicates. They do NOT prove that anything
+// calls them, and that distinction is the whole bug: `looksLikeProse` existed,
+// was correct, and rejected every one of the four Illustrator logos - it was
+// simply never asked, because a `.eps` resolved to shape "text" and that branch
+// returned its bytes without going near `extractFileText`. A predicate nobody
+// calls is not a guard.
+//
+// So the wiring is censused off the source, the way this codebase censuses every
+// other seam it cannot exercise directly (R19/R22 read handler source for the
+// same reason). Blunt on purpose: it catches the regression that actually
+// happened, which is somebody deleting a call.
+describe("the guards are applied, not merely defined", () => {
+  // COMMENTS STRIPPED FIRST, and the first version of this census did not do it
+  // and was worthless because of it: the comment INSIDE the pdf branch names
+  // `readsLikeWords` while explaining why it is there, so the assertion passed
+  // happily with the call itself deleted. The repo's other source censuses use
+  // this same helper for this same reason.
+  const LIB = stripComments(readFileSync(join(__dirname, "..", "src", "lib", "file-text.ts"), "utf8"))
+  const API = stripComments(readFileSync(join(__dirname, "..", "src", "lib", "google-api.ts"), "utf8"))
+
+  it("a PDF must pass BOTH tests before its text is kept", () => {
+    const branch = /if \(shape === "pdf"\) \{[\s\S]*?\n  \}/.exec(LIB)?.[0] ?? ""
+    expect(branch, "the pdf branch has moved - this census has gone blind").toContain("pdfText")
+    expect(branch).toContain("looksLikeProse")
+    expect(branch, "page geometry is readable; only the word test refuses it").toContain("readsLikeWords")
+  })
+
+  it("and the streamed read does not hand back bytes nobody checked", () => {
+    const fn = /export async function driveFileText[\s\S]*?\n\}/.exec(API)?.[0] ?? ""
+    expect(fn, "driveFileText has moved - this census has gone blind").toContain("DRIVE_TEXT_CAP")
+    expect(
+      fn,
+      "the shape-is-text path returned raw bytes for six of this team's largest sources"
+    ).toContain("looksLikeProse")
   })
 })

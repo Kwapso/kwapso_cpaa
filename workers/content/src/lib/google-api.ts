@@ -39,7 +39,7 @@ import {
   DRIVE_WALK_MAX_DEPTH,
   DRIVE_WALK_MAX_FILES,
 } from "@shared/workers/limits"
-import { DRIVE_BYTES_CAP, boundedBytes, extractFileText, fileShape } from "./file-text"
+import { DRIVE_BYTES_CAP, boundedBytes, extractFileText, fileShape, looksLikeProse } from "./file-text"
 import { GuardError } from "@shared/workers/gating"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
@@ -729,7 +729,22 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
     // crosses the wire while nothing reads it.
     await reader.cancel().catch(() => undefined)
   }
-  return text.slice(0, DRIVE_TEXT_CAP)
+  // AND THE GUARD THIS PATH NEVER APPLIED. `fileShape` says of an unknown mime
+  // with an unknown extension that it "is READ, not refused: the old behaviour
+  // for plain files, and `looksLikeProse` below is what stops the result being
+  // garbage". That was true of `extractFileText` and false here: a file whose
+  // shape came back "text" skipped that function entirely and its bytes were
+  // decoded straight into a knowledge source, with nothing checking them.
+  //
+  // MEASURED ON STAGING, 27 Aug 2026. `.eps` and `.oft` are neither a known text
+  // extension nor a known opaque one, so they took this path — and four Adobe
+  // Illustrator logos and two Outlook templates went into the index as 106, 106,
+  // 106, 107, 92 and 26 chunks of PostScript and OLE headers. They were the
+  // LARGEST documents the team had, so they carried weight in every neighbourhood
+  // while saying nothing. `looksLikeProse` rejects every one of them; it was
+  // simply never asked.
+  const read = text.slice(0, DRIVE_TEXT_CAP)
+  return looksLikeProse(read) ? read : ""
 }
 
 /** Google's own mime type for a POINTER to a file. Named beside the folder one

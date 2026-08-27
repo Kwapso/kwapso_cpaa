@@ -64,7 +64,7 @@ const OFFICE_EXTS = [".docx", ".xlsx", ".pptx"]
 const TEXT_EXTS = [".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".html", ".htm", ".yml", ".yaml", ".log", ".sql", ".ts", ".js", ".py", ".css", ".rtf"]
 /** Files with no words in them at all — asked about so the caller can skip the
  * download entirely rather than spend a request proving it. */
-const OPAQUE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico", ".mp4", ".mov", ".avi", ".mkv", ".webm", ".mp3", ".wav", ".m4a", ".aac", ".zip", ".gz", ".tar", ".rar", ".7z", ".dmg", ".exe", ".ttf", ".otf", ".woff", ".woff2", ".psd", ".ai", ".sketch", ".fig"]
+const OPAQUE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico", ".mp4", ".mov", ".avi", ".mkv", ".webm", ".mp3", ".wav", ".m4a", ".aac", ".zip", ".gz", ".tar", ".rar", ".7z", ".dmg", ".exe", ".ttf", ".otf", ".woff", ".woff2", ".psd", ".ai", ".sketch", ".fig", ".eps", ".oft", ".otf"]
 
 export function fileShape(name: string, mime: string): FileShape {
   const lower = (name || "").toLowerCase()
@@ -263,6 +263,36 @@ export function looksLikeProse(text: string): boolean {
   return readable / sample.length > 0.85
 }
 
+/** ARE THESE TOKENS WORDS, OR ARE THEY GEOMETRY?
+ *
+ * The question `looksLikeProse` cannot answer. That one counts READABLE
+ * characters, and a vectorised logo's page description is entirely readable — it
+ * is numbers and one-letter operators, printable to the last byte. So a PDF that
+ * holds no sentences at all sails through it.
+ *
+ * MEASURED over the 225 documents this team holds (27 Aug 2026), scoring the
+ * fraction of whitespace-separated tokens that are letter-shaped: 84 sit above
+ * 0.50 and 134 below 0.05, with almost nothing in between. The population is
+ * bimodal because the two things really are different in kind, and 0.20 sits in
+ * the empty middle rather than on a slope.
+ *
+ * THE ONE THING IT CANNOT DO, and why its caller applies it to PDFs alone: a CSV
+ * of addresses, a JSON export and a SQL dump are all legitimate material and all
+ * score low, because they are not prose either. They are not this problem.
+ *
+ * Below ten tokens it declines to judge and says yes — a short answer is not a
+ * binary one, and the emptiness test upstream already covers a file with nothing
+ * in it. */
+export function readsLikeWords(text: string): boolean {
+  const tokens = text.slice(0, 4000).split(/\s+/).filter(Boolean)
+  if (tokens.length < 10) return true
+  const wordish = tokens.filter((t) => /^[\p{L}][\p{L}'’-]{1,23}[.,;:!?)"'’]?$/u.test(t)).length
+  return wordish / tokens.length >= WORDISH_SHARE
+}
+
+/** Where the two populations separate — see `readsLikeWords`. */
+const WORDISH_SHARE = 0.2
+
 /** ONE FILE'S WORDS, whatever kind of file it is. Empty means "there are no
  * words in this", which is a true and useful answer. */
 export async function extractFileText(
@@ -275,7 +305,19 @@ export async function extractFileText(
   if (shape === "office") return officeText(bytes)
   if (shape === "pdf") {
     const text = await pdfText(bytes)
-    return looksLikeProse(text) ? text : ""
+    // TWO TESTS, AND THE SECOND ONLY HERE. `looksLikeProse` asks whether the
+    // characters are readable, and a vectorised logo's path data IS readable —
+    // "0.5 0.5 0.5 rg /GS0 gs q 1 0 0 1 72 720 cm" is all printable. Measured on
+    // staging, 27 Aug 2026: CS_Logo55x85_90grey.pdf, Confia_Logo-Optimierung.pdf
+    // and V2_Versicherungsvergleich_Confia.pdf all PASSED the readable test and
+    // went into the index as 52, 45 and 46 chunks of drawing instructions.
+    //
+    // `readsLikeWords` asks the other question — are these tokens words? — and it
+    // is applied ONLY to a PDF on purpose. A .csv of addresses, a .json, a .sql
+    // file are legitimate material and would fail it, and they have their own
+    // shape. A PDF is the one format here whose extractor either yields sentences
+    // or yields geometry, so it is the one place the stricter question is safe.
+    return looksLikeProse(text) && readsLikeWords(text) ? text : ""
   }
   const text = new TextDecoder().decode(bytes).slice(0, FILE_TEXT_CAP)
   return looksLikeProse(text) ? text : ""
