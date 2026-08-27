@@ -119,13 +119,22 @@ export function ContactsPanel({
         <ul className="divide-border divide-y rounded-[var(--radius)] border">
           {links.map((l) => (
             <Row key={l.id} active={l.active}>
-              <button
+              {/* The kit's `link` variant: no box, inherited ink, underline on
+                  hover. The overrides are layout only — the name flexes and
+                  truncates in the row, against a `shrink-0 justify-center`
+                  base skin. */}
+              <Button
                 type="button"
+                variant="link"
                 onClick={() => onOpen(l.personAccountId)}
-                className="hover:text-primary min-w-0 flex-1 truncate text-left text-sm underline-offset-2 hover:underline"
+                className="hover:text-primary min-w-0 flex-1 shrink justify-start text-left underline-offset-2"
               >
-                {l.personName}
-              </button>
+                {/* Truncation on the SPAN, not the control: the kit's skin is
+                    `inline-flex`, and `text-overflow: ellipsis` does not apply
+                    to a flex container — the name would clip at the same width
+                    with no "…" to say it had. */}
+                <span className="min-w-0 truncate">{l.personName}</span>
+              </Button>
               {l.relationship && (
                 <span className="text-muted-foreground text-xs">{l.relationship}</span>
               )}
