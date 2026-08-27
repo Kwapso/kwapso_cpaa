@@ -34,10 +34,12 @@
 // three the door does is decided by what the body carries, so this panel sends
 // one call for all three (`updateStoryAttachment`).
 //
-// THE ROW LEADS WITH THE THING ITSELF where the thing is a picture
-// (`AttachmentMark`) — the same square every other record in the app is known
-// by, shared with both ticket panels so a screenshot looks the same wherever it
-// is attached.
+// AND IT SHOWS WHAT IT HOLDS. A row whose file is a picture draws that picture
+// under its name (`AttachmentPreview`, the kit's own media well), shared with
+// both ticket panels so a screenshot looks the same wherever it is attached.
+// The owner's words: "we do our best to preview them rather than me clicking on
+// everything." Four screenshots on one story were four lines of text differing
+// only in a timestamp.
 //
 // UI-RULEBOOK K5: one card around the whole collection, hairline between rows,
 // never a box per row.
@@ -48,12 +50,12 @@ import { Button } from "@shared/ui/controls/button/button"
 import { Input } from "@shared/ui/controls/input/input"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Check, Link2, Pencil, Plus, Trash2, Upload, Xmark } from "@shared/ui/icons"
+import { Check, Link2, Paperclip, Pencil, Plus, Trash2, Upload, Xmark } from "@shared/ui/icons"
 
 import type { StoryAttachment } from "@shared/types"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { storyAttachmentsKey } from "@/lib/live-resources"
-import { AttachmentMark } from "@shared/web/attachment-mark"
+import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { safeHref } from "@shared/web/rich-text"
 import { formatRelative } from "@shared/web/format"
@@ -236,10 +238,11 @@ export function StoryAttachmentsPanel({
         <ul className="divide-border divide-y">
           {listQ.data.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center gap-2 py-3">
-              {/* The thing itself where the thing is a picture, its type's glyph
-                * where it is not — one square either way, so the column does not
-                * go ragged down a list that mixes screenshots and documents. */}
-              <AttachmentMark kind={a.kind} url={a.url} contentType={a.contentType} />
+              {a.kind === "file" ? (
+                <Paperclip className="text-muted-foreground size-4 shrink-0" />
+              ) : (
+                <Link2 className="text-muted-foreground size-4 shrink-0" />
+              )}
               {editing?.id === a.id ? (
                 <>
                   <Input
@@ -316,11 +319,11 @@ export function StoryAttachmentsPanel({
                   {/* THE METADATA WRAPS, NOT THE NAME. On a phone this span
                     * would not shrink and the name column has `min-w-0`, so the
                     * filename was squeezed down to its first letter — the row
-                    * read "S · 2.7 MB · Alaap K · 3h ago". The mark this commit
-                    * put in front of it (36px where a glyph was 16px) took
-                    * twenty more pixels off the same column. Below `sm` the
-                    * size, the person and the date take a line of their own and
-                    * the name gets the width it needs. */}
+                    * read "S · 2.7 MB · Alaap K · 3h ago", which is the same
+                    * class of bug as the one this panel is about: the file was
+                    * on the screen and the person could not tell which it was.
+                    * Below `sm` the size, the person and the date take a line of
+                    * their own and the name gets the width it needs. */}
                   <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
                     {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t)]
                       .filter(Boolean)
@@ -349,6 +352,20 @@ export function StoryAttachmentsPanel({
                         <Trash2 className="size-3.5" />
                       </Button>
                     </>
+                  )}
+                  {hasPreview(a.kind, a.contentType) && (
+                    // A FULL-WIDTH ITEM AT THE END OF A WRAPPING ROW, which is
+                    // how it takes its own line under the name without the row
+                    // becoming a second layout. A row with no picture renders
+                    // nothing at all here — not an empty well, which is what the
+                    // kit's media box would hold if it were always drawn.
+                    <div className="w-full pl-6">
+                      <AttachmentPreview
+                        kind={a.kind}
+                        url={a.url}
+                        contentType={a.contentType}
+                      />
+                    </div>
                   )}
                 </>
               )}

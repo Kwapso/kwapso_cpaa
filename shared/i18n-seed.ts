@@ -1383,6 +1383,7 @@ export const SEED: Catalogue = {
   "Auto-matched": { de: "Automatisch zugeordnet", es: "Emparejado automáticamente", ca: "Emparellat automàticament"},
   "Back in Meetings.": { de: "Wieder in den Terminen.", es: "De vuelta en Reuniones.", ca: "Un altre cop a Reunions."},
   "Binned, nothing was counted.": { de: "Verworfen, es wurde nichts gezählt.", es: "Descartado, no se contó nada.", ca: "Descartat, no s'ha comptat res."},
+  "Can't show this one": { de: "Kann das hier nicht anzeigen", es: "No se puede mostrar este", ca: "No es pot mostrar aquest"},
   "Cancelled, the record and its notes are kept.": { de: "Abgesagt, der Datensatz und seine Notizen bleiben erhalten.", es: "Cancelado, se conservan el registro y sus notas.", ca: "Cancel·lat, es conserven el registre i les seves notes."},
   "Certificate recorded.": { de: "Zertifikat erfasst.", es: "Certificado registrado.", ca: "Certificat registrat."},
   "Certificate saved.": { de: "Zertifikat gespeichert.", es: "Certificado guardado.", ca: "Certificat desat."},

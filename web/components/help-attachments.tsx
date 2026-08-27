@@ -21,11 +21,11 @@ import { Button } from "@shared/ui/controls/button/button"
 import { Input } from "@shared/ui/controls/input/input"
 import { Skeleton } from "@shared/ui/controls/skeleton/skeleton"
 import { toast } from "@shared/ui/controls/sonner/sonner"
-import { Link2, Plus, Trash2, Upload } from "@shared/ui/icons"
+import { Link2, Paperclip, Plus, Trash2, Upload } from "@shared/ui/icons"
 
 import type { HelpAttachment } from "@shared/types"
 import { ApiFailure, content as contentApi } from "@/lib/api"
-import { AttachmentMark } from "@shared/web/attachment-mark"
+import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { safeHref } from "@shared/web/rich-text"
 import { formatRelative } from "@shared/web/format"
@@ -165,13 +165,11 @@ export function HelpAttachmentsPanel({
         <ul className="divide-border divide-y">
           {listQ.data.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center gap-2 py-3">
-              {/* A SCREENSHOT LOOKS LIKE A SCREENSHOT. Half of what lands on a
-                * ticket is a picture of the thing somebody is describing, and a
-                * paperclip beside `Screenshot 2026-08-27 at 14.02.11.png` is the
-                * one shape a person cannot scan. The same square the story panel
-                * draws, from the same component, so an image attached to a
-                * ticket and an image attached to a story look alike. */}
-              <AttachmentMark kind={a.kind} url={a.url} contentType={a.contentType} />
+              {a.kind === "file" ? (
+                <Paperclip className="text-muted-foreground size-4 shrink-0" />
+              ) : (
+                <Link2 className="text-muted-foreground size-4 shrink-0" />
+              )}
               {isFollowable(a.url) ? (
                 <a
                   href={safeHref(a.url)}
@@ -204,6 +202,21 @@ export function HelpAttachmentsPanel({
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
+              )}
+              {/* A SCREENSHOT LOOKS LIKE A SCREENSHOT. Half of what lands on a
+                * ticket is a picture of the thing somebody is describing, and a
+                * paperclip beside `Screenshot 2026-08-27 at 14.02.11.png` is the
+                * one shape a person cannot scan. The same well the story panel
+                * draws, from the same component, so a picture attached to a
+                * ticket and a picture attached to a story look alike. */}
+              {hasPreview(a.kind, a.contentType) && (
+                <div className="w-full pl-6">
+                  <AttachmentPreview
+                    kind={a.kind}
+                    url={a.url}
+                    contentType={a.contentType}
+                  />
+                </div>
               )}
             </li>
           ))}
