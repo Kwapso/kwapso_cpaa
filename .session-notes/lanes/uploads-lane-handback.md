@@ -110,6 +110,83 @@ permits it: `postCompleteTodo` writes `env.MEDIA` → `/media/<key>`
 (`routes/todos.ts:145`), the client-visible bucket the portal gateway serves, not
 `/media/internal/`.
 
+## The completed-to-do view — designed, costed, NOT built
+
+I was assigned this and I am handing it back unbuilt, deliberately and with the
+design done, because it is a lane and not a tail. Three things I worked out that
+the next session should not have to:
+
+### 1 · It must be ONE paged list, not a second view — and the reason is a clash
+
+The obvious shape is a separate `Done` list beside the open one. It does not
+work. R14's check reads the routes file of every `GROWING_COLLECTIONS` entry and
+asserts that **nothing** hands that collection's `rowsKey` back through a
+hand-built `json(`:
+
+```
+`${c.routes} hands \`${c.rowsKey}\` back through a hand-built json()`
+```
+
+`getTodos` today answers `json({ todos, total })`. So the moment `todos` becomes
+a growing collection, the OPEN door in the same file trips the check. Either both
+views go through `pagedJson`, or the done rows need a different `rowsKey`
+(`completed`) — which is a second count and a second cache key, exactly the drift
+the planner warned about. **One door, both views paged, `rowsKey: "todos"`.**
+
+### 2 · The ordering is the thing that looks impossible and isn't
+
+`listTodos` orders by four terms:
+
+```sql
+ORDER BY (t.completed_at IS NOT NULL), t.due_on IS NULL, t.due_on, t.id DESC
+```
+
+`keysetAfter(pos, sortExpr, dir)` takes ONE expression, so this looks
+un-pageable. It collapses, because the view fixes the first term and the middle
+two are one expression:
+
+- **open** (`completed_at IS NULL` for every row, so term 1 is constant):
+  sort on `COALESCE(t.due_on, '9999-12-31')` ASC, id ASC. That single expression
+  IS "no date last, then soonest first" — the nulls-last flag and the date are
+  one key.
+- **done**: sort on `t.completed_at` DESC, id DESC. Naturally single.
+
+Give each ordering its own `sig` so `decodeCursor` refuses a cursor minted under
+the other one — the seam already does this, and it is what stops a cursor from
+the open list silently skipping rows in the done list.
+
+### 3 · Paging `todos` makes `todoOne` a live bug — fix it in the same commit
+
+`contentApi.todoOne` (`web/lib/api/content.ts:443`) fetches
+`/api/content/todos?view=all` and `.find()`s by id. Today that is harmless
+because it is wired only as the live layer's `fetchOne` and no screen draws one
+to-do. **The moment the list pages, it silently resolves only rows on page one** —
+R38's exact subject, and EDGE-CASES.md's list-cache-as-detail-source warning. It
+needs `?id=` on the door (the shape `helpOne` uses) before or with the paging,
+not after.
+
+### The rest of the shape
+
+- `countTodos` moves onto the bounded count seam (`shared/workers/count.ts`),
+  which R16-amended requires of every `GROWING_COLLECTIONS` total.
+- The `todos-account` counter in `workers/content/src/routes/record-counts.ts`
+  must ask the SAME question the panel now asks, or the tab badge counts open
+  while the list shows both.
+- `GROWING_COLLECTIONS.todos` needs `pagerFile` + `pagerKey` naming the
+  `<LoadMore>` and `todosKey(` inside its own props — the check requires the key
+  to appear INSIDE the control, not merely in the same file.
+- `live-resources.ts` primes the cursor sidecar (`cursorKey(todosKey(t))`).
+- The empty-state sentence stops being "Nothing outstanding with a client."
+- Then the portal half, which is the same door, the same counter, the same seam —
+  and which the owner has ruled must exist ("yes they can see it ofc!"). The
+  bucket permits it: `postCompleteTodo` writes `env.MEDIA` → `/media/<key>`
+  (`routes/todos.ts:145`), the client-visible bucket the portal gateway serves.
+
+Estimated blast radius: 2 worker files, the rules registry, 4 web files, the
+portal's list and screen. Two front doors, three laws (R14/R15/R16) and a
+pre-existing R38 hazard that activates on contact. That is why it is written down
+rather than half-done at the end of another lane.
+
 ## For whoever takes the eleven-door sweep
 
 Start from `STORED_FILES` in `shared/rules/registry.ts` rather than a grep. R40
