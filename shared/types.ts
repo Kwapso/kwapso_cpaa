@@ -665,6 +665,18 @@ export type StreamEvent =
   /** that tool finished — ok true, or false on failure (`error` = the door's short,
    * human reason, e.g. which permission was missing — shown on the failed step row). */
   | { t: "step_end"; tool: string; ok: boolean; summary: string; error?: string }
+  /** WHAT THE ASSISTANT JUST READ OUT OF THE KNOWLEDGE BASE — Law R23 on the wire.
+   *
+   * Until this existed, a retrieval's citations reached the MODEL and stopped
+   * there: the client is sent `step_start`/`step_end` and never a tool's result,
+   * so the panel could not have drawn a source under an answer if it had wanted
+   * to. This carries the answer seam's own two lists, unchanged and unassembled,
+   * so the turn's citation marks and the sources under it come from the same
+   * retrieval the answer was written from.
+   *
+   * It belongs to the turn that is streaming when it arrives, and it repeats: a
+   * turn that asks two questions retrieves twice. */
+  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
   /** TERMINAL: needs confirmation; the client shows the yes/no panel. Carries the
    * `threadId` so a FIRST-turn confirm (a brand-new conversation whose opening
    * message proposes a dangerous action) can be resolved — the thread is already

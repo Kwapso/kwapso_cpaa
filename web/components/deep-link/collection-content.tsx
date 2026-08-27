@@ -37,7 +37,7 @@ import {
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
 import { ContactsByCompany } from "@/components/contacts-by-company"
-import { KnowledgeAsk } from "@/components/knowledge-ask"
+import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
@@ -557,12 +557,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         {/* ASK IT, HERE. The list answers "what does it know?"; this answers
             "what does it know about X?", which is the question somebody actually
             came with. It sits ABOVE the list because a page whose first control
-            is a question box is a page people ask questions on. It spends no
-            assistant allowance and says so — see knowledge-ask.tsx. */}
-        <KnowledgeAsk
-          onOpenSource={(id) => go(`${sectionPath}/${id}`)}
-          onOpenRecord={(path) => go(`/t/${teamId}/${path}`)}
-        />
+            is a question box is a page people ask questions on. The answer
+            arrives in the assistant, with its sources marked at the claims and
+            room to ask the follow-up — see ask-the-assistant.tsx. */}
+        <AskTheAssistant />
         {/* R14's other half: the sweep only ever adds, so the search box is
             answered by the door — over every source, not the newest fifty. */}
         <PagedFind<KnowledgeSource>

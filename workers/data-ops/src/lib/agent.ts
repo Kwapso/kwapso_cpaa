@@ -12,6 +12,7 @@ import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "@shared/
 import { pendingCall } from "@shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
 import { blockBrief } from "@shared/agent-blocks"
+import { CITE_RULE, evidenceFrom, KNOWLEDGE_ASK_TOOL, SAVED_RESULT_PREFIX } from "@shared/agent-cites"
 import { GLOSSARY } from "@shared/glossary"
 import { DEFAULT_LANGUAGE, LANGUAGES, toLanguage, type Language } from "@shared/i18n"
 import { addTokens, consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, NO_TOKENS, refundAiUnits, type ConsumeResult, type TokenUsage, type UsageSource } from "@shared/workers/credits"
@@ -51,8 +52,38 @@ export const DROPDOWN_ORDER_RULE =
  * Named rather than inlined, for the same reason DROPDOWN_ORDER_RULE is: the
  * model obeys what both surfaces agree on, so this exact sentence is asserted
  * against the ask tool's own description by agent-parity.test.ts. */
-export const KNOWLEDGE_CITATION_RULE =
-  "When a question is about what the team KNOWS — a client's history, how we do something, what was agreed — call ask_knowledge first. Then answer ONLY from the passages it returns, and NAME the sources you used (their titles) in your reply. If it comes back with found:false, say so in its own words and stop: never fill the gap from memory. You can also add, correct and remove sources when asked (add_knowledge_source, update_knowledge_source, set_knowledge_source_active) — the same rights the person has, no more."
+export const KNOWLEDGE_CITATION_RULE = [
+  "When a question is about what the team KNOWS — a client's history, how we do something, what was agreed — call ask_knowledge first. Then answer ONLY from the passages it returns. If it comes back with found:false, say so in its own words and stop: never fill the gap from memory.",
+  // THE MARK, not a list of titles. This sentence replaced "NAME the sources you
+  // used (their titles) in your reply", which was the only instruction the model
+  // had and which it obeyed by writing its own list — measured on the composing
+  // path on 26 Aug 2026 at 10 answers in 16, against a prompt that told it not
+  // to. The app now DRAWS the sources under every answer, so a list in prose is
+  // the same list twice, and the model finally has somewhere better to put the
+  // attribution: on the claim itself.
+  CITE_RULE,
+  "You can also add, correct and remove sources when asked (add_knowledge_source, update_knowledge_source, set_knowledge_source_active) — the same rights the person has, no more.",
+].join(" ")
+
+/**
+ * WHAT THE PANEL IS TOLD ABOUT A RETRIEVAL — R23's answer, put on the wire.
+ *
+ * The client is sent step rows and never a tool's result, so before this the
+ * citations reached the model and nothing else: the assistant could name its
+ * sources only in prose, which is exactly the habit the mark replaces. This
+ * forwards the answer seam's own `citations` and `passages`, unchanged, so the
+ * panel assembles nothing — the same sentence R23 says about doors.
+ *
+ * WHETHER there is anything to draw is not decided here. `evidenceFrom`
+ * (shared/agent-cites.ts) decides it, and the panel calls the SAME function when
+ * it recovers a reopened turn's evidence out of the saved thread. All this adds
+ * is which door the result came through.
+ */
+export function knowledgeEvidence(tool: string, data: unknown): StreamEvent | null {
+  if (tool !== KNOWLEDGE_ASK_TOOL) return null
+  const evidence = evidenceFrom(data)
+  return evidence ? { t: "sources", ...evidence } : null
+}
 // Only the last MAX_HISTORY messages are REPLAYED to the model (full history stays in
 // the DB — audit + the panel rehydrates from all of it). Bounds long-thread context/cost.
 const MAX_HISTORY = 24
@@ -239,7 +270,7 @@ function rowList(data: object): [string, unknown[]] | null {
 /** Tool result → the fenced DATA string the model sees. */
 function fence(result: ToolResult): string {
   return result.ok
-    ? `OK. Result data: ${trimResult(result.data)}`
+    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data)}`
     : `FAILED: ${result.error ?? "unknown error"}`
 }
 
@@ -523,6 +554,16 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   // shown on the red step row, live AND when the chat is reopened.
   const failMsg = result.ok ? undefined : (result.error ?? "It failed.").slice(0, 140)
   emit?.({ t: "step_end", tool: tc.name, ok: result.ok, summary, ...(failMsg ? { error: failMsg } : {}) })
+  // R23 ON THE WIRE. A retrieval's own citations and passages, forwarded to the
+  // panel the moment they land, so the marks the model is about to write have
+  // something under them to point at. Nothing else on this stream carries a tool
+  // result, and this one does not carry the WHOLE result either — only what the
+  // answer seam already decided is the evidence. Not on the repeat branch above:
+  // the same question, twice in one turn, has already sent its sources.
+  if (emit && result.ok) {
+    const evidence = knowledgeEvidence(tc.name, result.data)
+    if (evidence) emit(evidence)
+  }
   // Title the usage-log row by the WRITES the turn ran (a failed write is still an action
   // attempted, kept with "(failed)"). A READ never titles the row — a read-only turn falls
   // back to the user's prompt.
