@@ -71,3 +71,29 @@ export {
   Group as Users,
   VideoCamera as Video,
 } from "./icons.generated";
+
+/* THE KIT'S OWN CONTRACT, as data. The pack above is Iconoir's concern and its
+ * size moves when the pack is re-vendored; these 96 spellings (93 commission
+ * + 3 additive) are the kit's promise — the names the system and portal
+ * call sites are written against. The generator refuses to emit if any of them
+ * stops resolving; consumers (the demo's icon sheet) can re-verify at runtime
+ * that every one is still an export of this module.
+ */
+export const KIT_ICON_NAMES = [
+  "Pencil", "Power", "UserMinus", "Ban", "Plus", "Upload",
+  "AlarmClock", "AlarmClockOff", "AppWindow", "ArchiveRestore", "Archive", "ArrowDown",
+  "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowUpDown", "ArrowUpRight", "BadgeCheck",
+  "Banknote", "Building2", "CalendarClock", "CalendarDays", "CalendarRange", "CalendarSync",
+  "ChartNoAxesColumn", "Check", "CheckCheck", "ChevronLeft", "ChevronRight", "ChevronsUpDown",
+  "CircleStop", "ClipboardCheck", "ClipboardCopy", "Clock", "Copy", "CornerDownRight",
+  "Download", "ExternalLink", "Eye", "EyeOff", "FileSpreadsheet", "FileText",
+  "GitBranch", "Hammer", "History", "Home", "House", "Inbox",
+  "KeyRound", "Languages", "LibraryBig", "LifeBuoy", "Link", "Link2",
+  "ListOrdered", "ListTodo", "Loader2", "Lock", "LogOut", "Mail",
+  "MailOpen", "MoreHorizontal", "Package", "Palette", "PanelLeftClose", "PanelLeftOpen",
+  "Paperclip", "PenLine", "PiggyBank", "Play", "RefreshCw", "RotateCcw",
+  "Route", "Search", "SearchX", "Send", "Settings", "Settings2",
+  "Share", "Shield", "ShieldOff", "Sparkles", "SquareArrowOutUpRight", "Timer",
+  "Trash2", "TriangleAlert", "Undo2", "UserCheck", "UserPlus", "UserRound",
+  "Users", "Video", "X", "ChevronDown", "ChevronUp", "Star",
+] as const;

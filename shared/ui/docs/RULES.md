@@ -123,6 +123,29 @@ ever moves the standing control height. `h-[var(--control-height-button)]` is
 one edit away from being right everywhere. This is also why a button reads
 `h-[var(--control-height-button)] px-5` rather than `h-10 px-5`.
 
+### 1.4 Half-steps snap by role. 12.5 is not a tie to break — the role breaks it.
+
+**The rule.** The artifact draws 10.5, 11.5, 12.5, 13.5 and 14.5; CH03's
+ladder has none of them. Snap to the nearest ladder step **whose role fits**
+(kit ruling 02: 11 is uppercase eyebrows only, 12 is badges / counts / status,
+14 is button and control labels). Where a half-step is equidistant — 12.5 is
+the only one — the role decides: **status text takes 12, caption and meta take
+13, a control label takes 14.** Never introduce a fourteenth step.
+
+**The reason.** 12.5 is the artifact's general small-UI size, not one role: its
+own 12.5px sites are field labels, row values, status pills, buttons and tab
+names — 364 of them. One number for all of them would make one of ruling 02's
+roles wear another's size, and the role test is already how the build snaps
+every other half-step without complaint: 13.5 goes *down* to 13 because 14 is
+reserved for control labels, and 11.5 goes *up* to 12 because 11 is reserved
+for uppercase eyebrows. So the split the repo ships is principled, not drift:
+`tooltip` and `status-stepper`'s stage pills sit at 12 because they *are*
+status text; the chart legend, `record-detail`'s meta line, `agent-chat`'s
+ghost text, `stat-grid`'s quiet line and `progress-dashboard`'s label sit at
+13 because they are caption and meta. Ratified as standing law by register
+row 76 (`D16-SNAP`, 2026-08-27, `verify/decide-3.html` §D16) — nothing in
+`tokens/` moved, and nothing on screen did either.
+
 ---
 
 ## 2 · Colour

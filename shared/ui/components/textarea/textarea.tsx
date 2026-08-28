@@ -179,6 +179,18 @@ export interface TextareaProps extends React.ComponentPropsWithoutRef<"textarea"
    * and this is only the mechanism.
    */
   autoGrow?: boolean;
+  /**
+   * Told when the field crosses from one line to more, and back. Only fires
+   * with `autoGrow`, and only on a CHANGE.
+   *
+   * It exists so a call site can honour the rule `chat.tsx` states for its own
+   * composer — "a pill that has grown three lines tall is a stadium" — without
+   * measuring the textarea a second time from outside. `Chat` knows it is
+   * multiline because it was TOLD; `AgentChat` grows on its own, so the same
+   * fact has to be measured, and it is measured here where the height is
+   * already being set.
+   */
+  onGrownChange?: (grown: boolean) => void;
 }
 
 /**
@@ -236,6 +248,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       disabled = false,
       readOnly = false,
       autoGrow = false,
+      onGrownChange,
       "aria-invalid": ariaInvalid,
       ...props
     },
@@ -271,13 +284,29 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
      * `props.value` is in the dependency list because a controlled field is
      * the shape both composers use; an uncontrolled one still re-measures on
      * every input through the handler below. */
+    const wasGrown = React.useRef(false);
     useIsomorphicLayoutEffect(() => {
       const el = own.current;
       if (!autoGrow || !el) return;
       el.style.height = "auto";
       el.style.height = `${el.scrollHeight}px`;
       el.style.overflowY = el.scrollHeight > el.clientHeight ? "auto" : "hidden";
-    }, [autoGrow, props.value]);
+
+      /* ONE LINE, computed rather than assumed: the line box plus the block
+         padding. Not `min-height` — a call site is free to hold the field open
+         taller than its text, and then "as tall as the minimum" would report a
+         single line as grown. */
+      const cs = getComputedStyle(el);
+      const line =
+        parseFloat(cs.lineHeight || "0") +
+        parseFloat(cs.paddingTop || "0") +
+        parseFloat(cs.paddingBottom || "0");
+      const grown = el.scrollHeight > Math.ceil(line) + 1;
+      if (grown !== wasGrown.current) {
+        wasGrown.current = grown;
+        onGrownChange?.(grown);
+      }
+    }, [autoGrow, onGrownChange, props.value]);
     // A call site may say it either way: the `error` prop, or `aria-invalid`
     // straight from a form library. Both reach the same skin.
     const invalid = error ?? (ariaInvalid === true || ariaInvalid === "true");

@@ -1,7 +1,7 @@
 {
   "name": "kwapso-design",
   "version": "1.0.8",
-  "status": "IN PROGRESS. Restructured 2026-08-24 to the four names the client uses: foundations/ (tokens/ icons/ motion/, moved in under D10-B on 2026-08-24) · controls/ (67) · structures/ (42) · compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states). Then restructured again 2026-08-26 — client ruling, verbatim: \"i still don't understand the difference between controls / structures. please merge them, and rename to components.\" controls/ and structures/ are now one flat components/ (108, after portal-conversation was also deleted this pass — client ruling: \"delete portal conversation\"). compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states) is unchanged by either 2026-08-26 ruling. Twenty-four files and 11,731 lines of example collection and detail routes were deleted on 2026-08-24 — the kit ships the TEMPLATE and the application builds the page. docs/ is complete (all five). Icons are the Iconoir pack (MIT, 1,383 glyphs), vendored 2026-08-27 over the placeholder set that was never drawn.",
+  "status": "IN PROGRESS. Restructured 2026-08-24 to the four names the client uses: foundations/ (tokens/ icons/ motion/, moved in under D10-B on 2026-08-24) · controls/ (67) · structures/ (42) · compositions/ (45 in four folders: 15 templates, 17 screens, 8 overlays, 5 states). Then restructured again 2026-08-26 — client ruling, verbatim: \"i still don't understand the difference between controls / structures. please merge them, and rename to components.\" controls/ and structures/ are now one flat components/ — 108 after that pass, which also deleted portal-conversation (client ruling: \"delete portal conversation\"), and 115 today: portal-conversation was restored 2026-08-27 (dc9d671 — the kwapso client portal imports it at ticket-screen.tsx, so the \"no functional consumer\" count behind the deletion was wrong), and donut, rings, kpi-progress, radar, tree and spreadsheet have since shipped. compositions/ was unchanged by either 2026-08-26 ruling and is 47 in four folders today: 15 templates, 18 screens (page-failure joined), 9 overlays (delete-confirmation joined), 5 states. Twenty-four files and 11,731 lines of example collection and detail routes were deleted on 2026-08-24 — the kit ships the TEMPLATE and the application builds the page. docs/ is complete (all five). Icons are the Iconoir pack (MIT, 1,383 glyphs), vendored 2026-08-27 over the placeholder set that was never drawn.",
   "tokens": {
     "declared": [
       "--accent",
@@ -88,6 +88,7 @@
       "--grid-columns",
       "--hair",
       "--hair-faint",
+      "--hair-grid",
       "--hair-strong",
       "--icon-16",
       "--icon-20",
@@ -880,6 +881,12 @@
         "read-only"
       ]
     },
+    "donut": {
+      "file": "components/donut/donut.tsx",
+      "exports": [
+        "Donut"
+      ]
+    },
     "dropdown-menu": {
       "file": "components/dropdown-menu/dropdown-menu.tsx",
       "exports": [
@@ -1113,6 +1120,12 @@
         "Kanban"
       ]
     },
+    "kpi-progress": {
+      "file": "components/kpi-progress/kpi-progress.tsx",
+      "exports": [
+        "KpiProgress"
+      ]
+    },
     "label": {
       "file": "components/label/label.tsx",
       "exports": [
@@ -1254,6 +1267,13 @@
         "read-only"
       ]
     },
+    "portal-conversation": {
+      "file": "components/portal-conversation/portal-conversation.tsx",
+      "exports": [
+        "PortalApprovalBand",
+        "PortalConversation"
+      ]
+    },
     "progress": {
       "file": "components/progress/progress.tsx",
       "exports": [
@@ -1309,6 +1329,12 @@
         "Queue"
       ]
     },
+    "radar": {
+      "file": "components/radar/radar.tsx",
+      "exports": [
+        "Radar"
+      ]
+    },
     "radio-group": {
       "file": "components/radio-group/radio-group.tsx",
       "exports": [
@@ -1350,6 +1376,12 @@
       "file": "components/record-detail/record-detail.tsx",
       "exports": [
         "RecordDetail"
+      ]
+    },
+    "rings": {
+      "file": "components/rings/rings.tsx",
+      "exports": [
+        "Rings"
       ]
     },
     "run-steps": {
@@ -1686,6 +1718,13 @@
         "Split"
       ]
     },
+    "spreadsheet": {
+      "file": "components/spreadsheet/spreadsheet.tsx",
+      "exports": [
+        "Spreadsheet",
+        "spreadsheetCellVariants"
+      ]
+    },
     "stat-grid": {
       "file": "components/stat-grid/stat-grid.tsx",
       "exports": [
@@ -1928,6 +1967,13 @@
         "error",
         "selected",
         "read-only"
+      ]
+    },
+    "tree": {
+      "file": "components/tree/tree.tsx",
+      "exports": [
+        "Tree",
+        "treeRowVariants"
       ]
     },
     "typography": {
@@ -3593,6 +3639,12 @@
           "OnboardingRoute"
         ]
       },
+      "page-failure": {
+        "file": "compositions/screens/page-failure.tsx",
+        "exports": [
+          "PageFailureScreen"
+        ]
+      },
       "portal-boot": {
         "file": "compositions/screens/portal-boot.tsx",
         "exports": [
@@ -3675,6 +3727,13 @@
         "file": "compositions/overlays/bulk-edit.tsx",
         "exports": [
           "BulkEditScreen"
+        ]
+      },
+      "delete-confirmation": {
+        "file": "compositions/overlays/delete-confirmation.tsx",
+        "exports": [
+          "ArchiveConfirmationDialog",
+          "DeleteConfirmationDialog"
         ]
       },
       "export": {
@@ -3787,9 +3846,10 @@
     },
     {
       "item": "Icon artwork — all 93, plus the 3 added",
-      "reason": "Placeholder art by instruction: a rounded frame with a per-name dot pattern, deliberately not final and visibly not final. The client is supplying the real icons. The NAMES, the React API, the five sizes and the currentColor wiring are FINAL.",
+      "reason": "WAS: placeholder art by instruction — a rounded frame with a per-name dot pattern, deliberately not final and visibly not final, with the client supplying the real icons. The NAMES, the React API, the six sizes and the currentColor wiring were final throughout, and none of them moved when the art landed.",
+      "resolution": "DELIVERED 2026-08-27: the Iconoir pack (MIT, 1,383 glyphs) was vendored over the placeholders — see iconArt. The swap procedure below is the one that was executed, and it remains the procedure for any future re-vendor or bespoke replacement.",
       "swapProcedure": "Drop the real <Name>.svg over the placeholder in foundations/icons/, run `node foundations/icons/generate-icons.mjs`. No component and no call site changes. The generator reads each file's own viewBox, so incoming art may be drawn on any grid.",
-      "severity": "expected",
+      "severity": "resolved",
       "owner": "client"
     },
     {

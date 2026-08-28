@@ -129,6 +129,14 @@ const ROW_DEFAULT_INTERACTIVE = "motion-row-hover cursor-pointer hover:bg-accent
    page than the panel -- #EFE6DD in light, --kw-unlit-quiet in dark. Still
    ONE answer for a chosen record: `TableRow`, `List`, `map`'s list row and
    `Card` all take this exact string. */
+/* OVERRIDE 77 (2026-08-27, the client's D15-B) — override 44 is OVERTURNED:
+   the selected paper is the lift the artifact drew. The string below is
+   unchanged on purpose (one answer for a chosen record survives), but
+   `--surface-selected` now points at `--surface-raised`, so the values in
+   the note above are history. A selected row still separates inside the
+   soft-paper panel (1.103 light / 1.111 dark against its unselected
+   neighbour) and now reads 1.000 against the off-beige body pane in light
+   — chosen from the drawing, which printed that figure. Register row 77. */
 const ROW_SELECTED = "bg-surface-selected";
 const ROW_DISABLED =
   "cursor-not-allowed bg-[var(--btn-disabled-fill)] text-[var(--btn-disabled-label)]";
