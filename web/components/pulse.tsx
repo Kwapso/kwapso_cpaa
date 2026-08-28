@@ -110,6 +110,13 @@ export const RecordWeeksChart = dynamic(() => chartModule().then((m) => m.WeeksC
   ssr: false,
   loading: chartLoading,
 })
+/** The margin panel's own picture — sold, our time by role, tools, margin.
+ * Same lazy boundary as the four above, so the Rates tab only pays for
+ * Recharts on the account that opens it. */
+export const MarginChart = dynamic(() => chartModule().then((m) => m.MarginChart), {
+  ssr: false,
+  loading: chartLoading,
+})
 
 /** Whole seconds → the hours a person says out loud. One decimal below ten
  * ("6.5"), none above it ("41") — the same shape the count ladder uses and for

@@ -41,10 +41,21 @@ import {
   SAVINGS_CAPTION,
   hoursText,
   minutesText,
+  savedHours,
   type SavingsView,
   type StepSaving,
 } from "@shared/workers/savings"
 import { useT } from "@shared/web/language"
+
+// THE PICTURE, beside the drill-down it used to be text-only above. `apps` comes
+// back from the one savings seam sorted biggest saving first (savingsView, the
+// order a client asks about first), so the chart and the accordion below it agree
+// without either one sorting again. Reused from the agency's own chart split
+// (pulse.tsx) rather than a new one — R39 and the "reuse, don't rebuild" seam —
+// and guarded the same way the Work logs page guards its own: a bar chart of one
+// bar is a sentence with a frame around it, so one app renders the sentence
+// instead (BandCard/HoursByChart/NothingYet, pulse.tsx).
+import { BandCard, HoursByChart, NothingYet } from "@/components/pulse"
 
 /** ONE step's arithmetic, said out loud. This line is the answer to the third
  * click, and it is deliberately the whole sum rather than its result.
@@ -126,6 +137,20 @@ export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
           </p>
         )}
       </div>
+
+      <BandCard title={t("Hours a month, by app")}>
+        {view.apps.length < 2 ? (
+          <NothingYet
+            what={t("One app is behind this figure.")}
+            how={t("This picture appears once a second app is giving time back.")}
+          />
+        ) : (
+          <HoursByChart
+            rows={view.apps.map((app) => ({ label: app.name, hours: savedHours(app.savedSecondsPerMonth) }))}
+            label={t("Hours a month")}
+          />
+        )}
+      </BandCard>
 
       <Accordion type="multiple" className="rounded-[var(--radius)] border px-4">
         {view.apps.map((app) => (

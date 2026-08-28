@@ -40,6 +40,14 @@ import { moneyText } from "@shared/web/money"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
+// THE PICTURE beside the column of `<Line>` rows below — sold, our time by
+// role, tools, and the margin itself, negative bars and all. Reused from the
+// agency's own chart split (pulse.tsx, R39) rather than a new file; this panel
+// never imports Recharts or `Chart` directly, matching the rule stated in
+// pulse-charts.tsx's own header ("the only file in the agency app that touches
+// the library's Chart").
+import { BandCard, MarginChart, NothingYet } from "@/components/pulse"
+
 /** Logged seconds as a person says them. One decimal place: a line reading
  * "0 hours" beside a cost of 45.00 is the kind of row that makes somebody
  * distrust the column. */
@@ -114,6 +122,17 @@ export function MarginPanel({
 
   const down = m.marginCents < 0
 
+  // The same rows the column below reads, just shaped for the axis: a positive
+  // bar for what we sold, a negative bar per role's time and for tools, and the
+  // margin itself last — so a reader sees the subtraction rather than doing it.
+  const chartRows = [
+    { label: t("Sold"), cents: m.revenueCents },
+    ...m.lines.map((l) => ({ label: `${t("Our time")}, ${l.label}`, cents: -l.costCents })),
+    { label: t("Tools"), cents: -m.toolCostCents },
+    { label: t("Margin"), cents: m.marginCents },
+  ]
+  const chartable = chartRows.filter((r) => r.cents !== 0).length >= 2
+
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-[var(--radius)] border p-4">
@@ -154,6 +173,17 @@ export function MarginPanel({
           </p>
         )}
       </div>
+
+      <BandCard title={t("Sold, our time and tools, side by side")}>
+        {chartable ? (
+          <MarginChart rows={chartRows} label={t("Amount")} />
+        ) : (
+          <NothingYet
+            what={t("There is only one figure to compare so far.")}
+            how={t("This picture appears once there is our time or a tool cost to set against what was sold.")}
+          />
+        )}
+      </BandCard>
 
       <div className="rounded-[var(--radius)] border px-4 py-1">
         <Line label={t("Sold")} detail="Everything priced on this account's sprints" cents={m.revenueCents} />
