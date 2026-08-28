@@ -1819,7 +1819,18 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
 
     // ── 2. the portal's own surface ──────────────────────────────────────────
-    const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    // COMMENTS OFF. `portalDoors` is an ALLOW-LIST — a door in it is SKIPPED by
+    // the walk below ("the portal opens it ON PURPOSE") — and this read was raw,
+    // so a comment in the portal gateway shaped like a PORTAL_DOORS entry
+    // silenced R21 for whatever door it named. Proved 27 Aug 2026: removing
+    // `refusePortalCaller` from getBrandAssets is caught and names the door, and
+    // stops being caught once portal-gateway/src/index.ts carries the line
+    // `// Not forwarded yet: "GET /api/content/brand-assets": "read" …`.
+    // R21 is the law written because a client login reached the agency's own
+    // doors twice; an allow-list it shares with prose is not a law.
+    const portalSrc = stripComments(
+      read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    )
     const portalDoors = new Set([...portalSrc.matchAll(/"([A-Z]+ \/[^"]+)":\s*"\w+"/g)].map((m) => m[1]))
     expect(portalDoors.size, "PORTAL_DOORS did not parse").toBeGreaterThan(5)
 
@@ -1965,7 +1976,18 @@ describe("RULES — the laws of the base", () => {
     ).toBeGreaterThan(3)
 
     // ── 1. none of them is on the portal's surface ────────────────────────────
-    const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    // COMMENTS OFF. `portalDoors` is an ALLOW-LIST — a door in it is SKIPPED by
+    // the walk below ("the portal opens it ON PURPOSE") — and this read was raw,
+    // so a comment in the portal gateway shaped like a PORTAL_DOORS entry
+    // silenced R21 for whatever door it named. Proved 27 Aug 2026: removing
+    // `refusePortalCaller` from getBrandAssets is caught and names the door, and
+    // stops being caught once portal-gateway/src/index.ts carries the line
+    // `// Not forwarded yet: "GET /api/content/brand-assets": "read" …`.
+    // R21 is the law written because a client login reached the agency's own
+    // doors twice; an allow-list it shares with prose is not a law.
+    const portalSrc = stripComments(
+      read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    )
     const portalDoors = new Set([...portalSrc.matchAll(/"([A-Z]+ \/[^"]+)":\s*"\w+"/g)].map((m) => m[1]))
     expect(portalDoors.size, "PORTAL_DOORS did not parse").toBeGreaterThan(5)
     const published = internalDoors.filter((d) => portalDoors.has(d.door))

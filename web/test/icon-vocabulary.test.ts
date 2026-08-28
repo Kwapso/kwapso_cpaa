@@ -26,14 +26,34 @@ import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
-import { sourceFiles } from "@shared/rules/source-scan"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { iconComponent } from "@shared/web/screen-engine/icon"
 import { ICON_ALIASES, kitExportName } from "@shared/web/screen-engine/icon-names"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 const KIT_ICONS = join(ROOT, "shared", "ui", "foundations", "icons")
 
-const read = (p: string) => readFileSync(p, "utf8")
+/** COMMENTS OFF, at the one seam every scan in this file reads through.
+ *
+ * `indirections()` builds an ALLOW-LIST — a name that is a CONCEPT_ICON key is
+ * SKIPPED by the vocabulary check, because it resolves through the table rather
+ * than naming a glyph directly — and it was reading pages.ts raw. So a block
+ * comment inside CONCEPT_ICON granted any name it listed. Proved 27 Aug 2026:
+ * an `icon: "zzznotaglyph"` in a component is caught ("the kit draws no such
+ * glyph"), and stops being caught once pages.ts carries
+ *   \/*
+ *   zzznotaglyph: "home",
+ *   *\/
+ * inside that table. What it buys is a HOLE where a glyph should be, on screen.
+ *
+ * The other direction is fixed here too, for free: `vocabulary()` collects
+ * `icon: "…"` off every component, so a commented-out icon name used to enter
+ * the census and demand a glyph nothing draws — a false failure rather than a
+ * silent pass, but noise in a law is how a law gets ignored.
+ *
+ * Every read in this file feeds a census or a table. None asserts absence, so
+ * none of them wants the raw bytes. */
+const read = (p: string) => stripComments(readFileSync(p, "utf8"))
 
 /** Every glyph the kit actually draws, by its PascalCase export name. The one
  * walker reads the folder — the art is flat, so `recursive: false`. */
