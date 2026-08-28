@@ -28,7 +28,7 @@ import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { stripJsoncComments } from "@shared/rules/source-scan"
+import { stripComments, stripJsoncComments } from "@shared/rules/source-scan"
 
 import { SHELL_MODULES } from "../src/index"
 
@@ -97,9 +97,14 @@ describe("every path the portal handler owns is also worker-first", () => {
 
 describe("every portal link an email can carry lands on a served path", () => {
   it("the ticket deep link sits under a shell prefix", () => {
-    const source = readFileSync(
-      join(HERE, "..", "..", "shared", "workers", "record-link.ts"),
-      "utf8"
+    // COMMENTS OFF BEFORE THE SCAN, because the tripwire below is the whole
+    // point of this test and prose can hold it up. Proved 27 Aug 2026: rename
+    // every real deep link in record-link.ts and leave ONE comment showing the
+    // shape — "a portal deep link looks like `/tickets/${ticketId}`" — and the
+    // scan reports itself alive while matching nothing that ships. That is worse
+    // than a check that simply passes: it launders an absence into a pass.
+    const source = stripComments(
+      readFileSync(join(HERE, "..", "..", "shared", "workers", "record-link.ts"), "utf8")
     )
     // The portal paths this file builds, read off its own source rather than
     // retyped: a template literal beginning `/…/${` is a deep link with an id in
