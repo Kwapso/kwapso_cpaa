@@ -16,7 +16,8 @@
 
 import { GuardError } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
-import { checkArgTypes, N, obj, S } from "@shared/workers/tool-args"
+import { B, checkArgTypes, N, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
 import type { Env } from "../env"
@@ -289,7 +290,61 @@ const MCP_ONLY: McpTool[] = [
 ]
 
 /** The MCP's full catalog: every shared endpoint (projected) + the MCP-only tools. */
-export const MCP_TOOLS: McpTool[] = [...SHARED_TOOLS.map(toMcpTool), ...MCP_ONLY]
+/** SWITCHING A RECORD OFF, OR BACK ON — twenty-one tools, generated from the
+ * ONE map (`RECORD_TOGGLES`) that also feeds the agent's single
+ * `set_record_active`.
+ *
+ * WHY THE TWO SURFACES DIFFER HERE, deliberately and for the first time. The
+ * agent re-sends its whole catalogue on every model step, so twenty-one names
+ * for one operation was about 2,500 tokens per step of pure repetition. An MCP
+ * client fetches `tools/list` ONCE and then calls by name — it pays nothing per
+ * step, and a tool name on that surface is an external contract somebody has
+ * scripts against (`set_dropdown_value_active` is pinned by catalog.test.ts for
+ * exactly that reason). So the collapse happens where it saves money and does
+ * not happen where it would only break things.
+ *
+ * The names are `set_<record>_active`, which reproduces every historical name on
+ * this surface EXACTLY — the dropdown one included, because the record is
+ * `dropdown_value` and the published name was always
+ * `set_dropdown_value_active`. Nothing was renamed to make this fit.
+ *
+ * One declaration, two projections: the same relationship the shared catalogue
+ * already has with its two surfaces, one level of shape further apart. */
+const RECORD_TOGGLE_TOOLS: McpTool[] = Object.entries(RECORD_TOGGLES).map(([record, e]) => {
+  const name = `set_${record}_active`
+  const gate = TOOL_GATES[name]
+  return {
+    name,
+    // The same two additions `toMcpTool` makes to a shared tool: the developer
+    // permission hint, and the sentence that stands in for the panel this
+    // surface has no way to show.
+    description:
+      (gate ? `${e.summary} Needs ${gate}.` : e.summary) +
+      (e.confirm === "never"
+        ? ""
+        : " Destructive or access-widening: confirm with a person before calling this."),
+    inputSchema: obj(
+      e.needsAppId
+        ? { [e.idField]: S, appId: S, active: B }
+        : { [e.idField]: S, active: B },
+      e.needsAppId ? [e.idField, "appId", "active"] : [e.idField, "active"]
+    ),
+    binding: e.binding,
+    method: "POST",
+    path: e.path,
+    buildBody: (i: Record<string, unknown>) => ({
+      [e.idField]: str(i, e.idField),
+      active: i.active === true,
+      ...(e.needsAppId ? { appId: str(i, "appId") } : {}),
+    }),
+  }
+})
+
+export const MCP_TOOLS: McpTool[] = [
+  ...SHARED_TOOLS.map(toMcpTool),
+  ...RECORD_TOGGLE_TOOLS,
+  ...MCP_ONLY,
+]
 
 export function getMcpTool(name: string): McpTool | undefined {
   return MCP_TOOLS.find((t) => t.name === name)

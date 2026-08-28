@@ -28,8 +28,9 @@ import { requestId } from "@shared/workers/trace"
 import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
 import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
-import { isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
+import { alwaysConfirms, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
 import type { Env } from "../env"
 import type { ToolSpec } from "./model"
@@ -49,6 +50,12 @@ export type AgentTool = {
   identityBlocked?: boolean
   buildQuery?: (input: Record<string, unknown>) => string
   buildBody?: (input: Record<string, unknown>) => Record<string, unknown>
+  /** The other doors this ONE tool forwards to (`set_record_active`, over the
+   * twenty-one record toggles). `path` stays the canonical one, and R19's
+   * coverage census credits these to this tool. */
+  routes?: string[]
+  /** Which of them THIS call goes to. A tool without one goes to `path`. */
+  route?: (input: Record<string, unknown>) => { binding: "TENANCY" | "CONTENT"; path: string }
   /** One-line human label for the step row / confirm panel. `names` maps an id → a
    * friendly name so a summary reads "Remove Jane Doe" not a ULID. */
   summarize: (input: Record<string, unknown>, names?: Record<string, string>) => string
@@ -78,6 +85,69 @@ function toAgentTool(s: SharedTool): AgentTool {
 /** Tools the AGENT exposes but the MCP does not: a read the MCP serves via export, the
  * two bulk writes, the set-shaped bulk, and the SELF import runner. */
 const AGENT_ONLY: AgentTool[] = [
+  /* ------------------------ SWITCHING A RECORD OFF, OR BACK ON ----------------
+   *
+   * ONE TOOL OVER TWENTY-ONE DOORS, and the agent's catalogue is where it
+   * belongs: this surface re-sends every tool definition on every model step, so
+   * twenty-one names for one operation was about 2,500 tokens per step of pure
+   * repetition. `shared/workers/record-toggles.ts` is the map and carries the
+   * reasoning — including why `set_deliverable_visibility` is NOT in it, why the
+   * MCP surface still publishes the twenty-one one at a time, and how each
+   * door's own confirm rule survived the collapse.
+   */
+  {
+    name: "set_record_active",
+    description:
+      "Switch a record off, or back on. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, app, app_module, process, wave, client_department, client_role, client_tool, account_rate, internal_rate, meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile or staff_certificate. `id` is that record's id — except a role, which takes `roleId` — and a deliverable also needs `appId`, the app whose shelf it sits on. `active` false switches it off (archive, deactivate, revoke, cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED: the row and everything hanging off it survive, so last year's figures stay true, and calling it twice changes nothing the second time. Each kind needs its own module's right, and switching one off asks the person first.",
+    binding: "TENANCY",
+    path: "/api/tenancy/accounts/active",
+    method: "POST",
+    // The rest of the family. `path` above is the canonical one; `route` picks
+    // the real door per call, and record-toggles.test.ts PROVES every entry is
+    // reachable by running it rather than trusting this list.
+    routes: Object.values(RECORD_TOGGLES).map((e) => e.path),
+    route: (i) => {
+      const entry = recordToggle(str(i, "record"))
+      // An unknown kind falls back to the canonical door, which then refuses the
+      // call on its own terms — the executor's arg check has already rejected a
+      // non-string, and the door is still the authority.
+      return entry
+        ? { binding: entry.binding, path: entry.path }
+        : { binding: "TENANCY" as const, path: "/api/tenancy/accounts/active" }
+    },
+    schema: obj({ record: S, id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
+    buildBody: (i) => {
+      const entry = recordToggle(str(i, "record"))
+      // The door reads ONE id field and this sends that one. `roleId` is exposed
+      // beside `id` because the roles door reads it by that name (R22), and a
+      // caller who sent the id under the other spelling is not punished for it.
+      const id = str(i, entry?.idField ?? "id") || str(i, "id") || str(i, "roleId")
+      return {
+        [entry?.idField ?? "id"]: id,
+        active: i.active === true,
+        ...(entry?.needsAppId ? { appId: str(i, "appId") } : {}),
+      }
+    },
+    write: true,
+    confirm: (i) => {
+      const entry = recordToggle(str(i, "record"))
+      // An unrecognised kind confirms: the safe direction for a question nobody
+      // has an answer to.
+      if (!entry) return true
+      if (alwaysConfirms(entry)) return true
+      return entry.confirm === "off" && i.active !== true
+    },
+    summarize: (i, names) => {
+      const entry = recordToggle(str(i, "record"))
+      if (!entry) return `Switch a record ${i.active === true ? "on" : "off"}`
+      const id = str(i, entry.idField) || str(i, "id") || str(i, "roleId")
+      const verb = i.active === true ? entry.on : entry.off
+      // A role reads better by its title than by a ULID, and `names` is where
+      // the resolved titles arrive.
+      const what = entry.idField === "roleId" ? roleLabel(i, names) : `${entry.noun} ${id}`
+      return `${verb} ${what}`
+    },
+  },
   {
     name: "get_role_permissions",
     description:
@@ -608,8 +678,48 @@ const AGENT_ONLY: AgentTool[] = [
   },
 ]
 
-/** The agent's full catalog: every shared endpoint (projected) + the agent-only tools. */
-export const TOOL_CATALOG: AgentTool[] = [...SHARED_TOOLS.map(toAgentTool), ...AGENT_ONLY]
+/** LIST TOOLS THE GRAMMAR REPLACED — dropped from THIS surface only.
+ *
+ * `query_records` asks any module a question, so a tool whose whole job was
+ * "give me this collection, narrowed by these three words" is now a second way
+ * to say something the grammar says better — and on this surface a second way
+ * is not free: every definition is re-sent on every model step of every turn.
+ * The MCP surface keeps all of them, unchanged, for the reason it kept the
+ * twenty-one toggles: it fetches its catalogue once, and a tool name there is an
+ * external contract.
+ *
+ * THE BAR FOR A LINE HERE is that the grammar is a STRICT SUPERSET of the door's
+ * own narrowing — every parameter it parses maps to a declared field, and it
+ * offers no derived view (`scope=mine`, `view=overdue`, `when=current`) that a
+ * filter cannot express. Seven list tools deliberately stay: `list_help_tickets`
+ * (`scope=mine` is a join through who is staffed to an app), `list_work_logs`
+ * (the same, and the model has no way to name "me"), `list_stories`,
+ * `list_todos`, `list_tasks`, `list_sprints` and `list_meetings` (each carries a
+ * derived view or a month), and `list_knowledge_sources`, which returns a
+ * SOURCE'S OWN WORDS when given an id and is the one read the prompt sends the
+ * model to for reading a document whole.
+ *
+ * Rot-checked by `workers/data-ops/test/tool-diet.test.ts`: every name here must
+ * still be a shared GET tool, and its module must still be one the grammar can
+ * be asked about — so a line cannot outlive the capability that replaced it. */
+export const REPLACED_BY_QUERY: Record<string, string> = {
+  list_accounts: "query_records on `accounts` — its q/type/parentId narrowing is name+code+email (a multi-field filter), accountType and parentAccountId",
+  list_apps: "query_records on `apps` — accountId, and q is a filter on the name",
+  list_app_modules: "query_records on `app_modules` — id, appId and deactivatedAt",
+  list_processes: "query_records on `processes` — appId, deactivatedAt, and q is name+description",
+  list_waves: "query_records on `waves` — accountId, and the ordering is the door's",
+  list_deliverables: "query_records on `deliverables` — appId and id, plus visibleToClientAt, which this tool never exposed",
+  list_dropdown_values: "query_records on `dropdown_values` — by id, by type, or the whole vocabulary",
+  list_account_rates: "query_records on `account_rates` — accountId, and it can now answer across clients rather than one at a time",
+  list_roles: "query_records on `roles` — by id or the whole list, with the deactivated ones filterable rather than merely present",
+}
+
+/** The agent's full catalog: every shared endpoint (projected, less the list
+ * tools the grammar replaced) + the agent-only tools. */
+export const TOOL_CATALOG: AgentTool[] = [
+  ...SHARED_TOOLS.filter((s) => !(s.name in REPLACED_BY_QUERY)).map(toAgentTool),
+  ...AGENT_ONLY,
+]
 
 /** binding:"SELF" — run the attached-in-chat import batch through the SAME engine the
  * Import screen uses: re-open teamContext from the request (act-as-user), gate `create`
@@ -723,9 +833,13 @@ export async function executeTool(
   }
   if (tool.run) return tool.run(env, request, input)
 
-  const fetcher = tool.binding === "CONTENT" ? env.CONTENT : env.TENANCY
+  // WHICH DOOR — asked of the tool, because one tool may cover a family of them
+  // (`set_record_active` stands on twenty-one). `checkArgTypes` has already run,
+  // so a `route` reading a record name off the input is reading a string.
+  const dest = tool.route ? tool.route(input) : { binding: tool.binding, path: tool.path }
+  const fetcher = dest.binding === "CONTENT" ? env.CONTENT : env.TENANCY
   const res = await forwardToDoor(fetcher, {
-    path: tool.path,
+    path: dest.path,
     method: tool.method,
     cookie: request.headers.get("Cookie") ?? "",
     traceId: requestId(request),
