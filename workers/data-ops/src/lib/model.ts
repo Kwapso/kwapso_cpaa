@@ -219,8 +219,33 @@ export function anthropicBody(opts: {
     // Effort controls reasoning depth + overall token spend (GA on the Sonnet-5 /
     // Opus-4.7+ family, no beta header). "low" = terse, consolidated tool calls —
     // the cheap setting. We leave `thinking` unset on purpose: those models run
-    // adaptive thinking by default and keep it minimal at low effort, which also
-    // keeps them willing to reach for tools. `effort` is sent ONLY to models that
+    // adaptive thinking by default and keep it minimal at low effort.
+    //
+    // WHAT LOW COSTS US IN TOOL CHOICE: NOTHING WE COULD MEASURE (27 Aug 2026).
+    // This comment used to end "…which also keeps them willing to reach for
+    // tools", which contradicted Anthropic's own docs (lower effort → FEWER,
+    // more consolidated tool calls) and had never been tested. So it was: ten
+    // real questions, the shipped prompt and the whole catalogue, low against
+    // HIGH — the ENDS, because a low-to-medium gap would sit inside the noise of
+    // a system we already know answers the same question two ways minutes apart.
+    //
+    //   tool calls per question   0.90 low   0.90 high
+    //   reached ask_knowledge     4/10 low   3/10 high
+    //   identical tool path       9 of 10 questions
+    //   output tokens            1,710 low  2,067 high (+21%)
+    //
+    // The single difference went AGAINST high, and neither theory survives: low
+    // is not more willing and high is not better. So `low` stays, and it stays
+    // for a measured reason rather than a plausible sentence. If the question
+    // comes back, medium is the untested middle — but only after something
+    // shows high is worth asking about.
+    //
+    // ONE OPERATIONAL FACT FOUND ON THE WAY: switching effort mid-run wrote the
+    // prompt cache again (one 50K write, about 20¢), so `effort` appears to
+    // participate in the cached prefix. Not proven — a cold node would look the
+    // same — but worth knowing before anybody A/Bs this in production.
+    //
+    // `effort` is sent ONLY to models that
     // support it — older tiers (e.g. Haiku 4.5) reject `output_config.effort` with
     // a 400, so swapping AGENT_MODEL to one of those must not carry it. (Never send
     // temperature/top_p or budget_tokens on the 4.7+ family — each is a 400.)
