@@ -66,6 +66,8 @@ import {
  * a schema argument, a door read, a response field, a tool name — because an
  * entry for a derivable word is a bypass with better manners. */
 const DESCRIPTION_VOCABULARY: Record<string, string> = {
+  open:
+    "the count of tickets NOT resolved, on each entry of `list_help_tickets`' `byAccount` tally — computed in the GROUP BY itself (`SUM(CASE WHEN h.status = 'resolved' THEN 0 ELSE 1 END)`) in workers/content/src/lib/help.ts and mapped as `open:`. Underivable for the same reason `runaway` is, plus one: it is NESTED a level inside a response field, and the response-key derivation reads the keys a door hands over rather than the shape of the objects inside them. Delete this line when that census learns to walk one level down, or when `byAccount` goes.",
   runaway:
     "the flag on a running timer that has been going longer than RUNAWAY_HOURS — computed at read time in workers/content/src/lib/work-logs.ts (`runaway: elapsed > …`), so it is a real row field the row-mapper derivation cannot see: no column is copied, the value is arithmetic over one.",
   awaiting_validation:

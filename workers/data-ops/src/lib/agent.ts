@@ -32,6 +32,21 @@ import { brand } from "@shared/brand"
 
 const MAX_STEPS = 12
 
+/** HOW LONG ONE TURN MAY RUN before it stops of its own accord.
+ *
+ * MAX_STEPS bounds how many times the model may act; nothing bounded how LONG.
+ * Measured on 2026-08-28 across eight multi-step questions on the Cloudflare
+ * engine: a median turn took 21 seconds, and two took 144 and 273. The 144-second
+ * one was killed by the platform mid-request and the person received an EMPTY
+ * BUBBLE — no answer, no error, no sign anything had happened. That is the worst
+ * outcome available: a failure that looks like the assistant ignoring you.
+ *
+ * A ceiling the app owns turns that into a sentence. It is generous on purpose —
+ * a genuine four-step job with a document read in it is allowed to take a minute
+ * and a half — and it is checked BETWEEN steps rather than interrupting one, so
+ * the turn always ends on a whole tool call with its result recorded. */
+const TURN_DEADLINE_MS = 150_000
+
 /** THE VOCABULARY CONTRACT (R9). A dropdown write is gated on the option already
  * existing, so "create X and move everything onto it" is two calls whose ORDER is
  * not optional. Named, not inlined, because the model only obeys what BOTH surfaces
@@ -1025,7 +1040,19 @@ async function runPlanLoop(
     quota = await getQuota(env, guard.teamId)
   }
 
+  const startedAt = Date.now()
   for (let step = 0; step < MAX_STEPS; step++) {
+    // BETWEEN steps, never inside one: a turn stopped here has a whole tool call
+    // behind it whose result is already saved, so what it says is true.
+    if (step > 0 && Date.now() - startedAt > TURN_DEADLINE_MS) {
+      const note =
+        "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
+        "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
+      say(note)
+      await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
+      await log()
+      return { done: true, threadId, reply: note, quota }
+    }
     stepUnit = null
     if (!(loopOpts.prepaid && step === 0)) {
       const c = await consumeAiUnit(env, guard.teamId)
