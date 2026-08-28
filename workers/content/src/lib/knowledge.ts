@@ -1813,6 +1813,42 @@ const MIN_TERM_SHARE = 0.5
  * requirement is all of them. */
 const SHORT_QUESTION_TERMS = 3
 
+/** WHAT THE WORD ARM MUST SHOW TO OVERRULE A SEMANTIC SEARCH THAT FOUND NOTHING.
+ *
+ * `overruling` used to demand ALL of a question's terms, which is the strictest
+ * thing available and was chosen because the alternative had just answered a
+ * parental-leave question out of unrelated meeting notes. It holds that door
+ * shut. It also shuts a door that should be open, and the case is on record:
+ *
+ *   "What is replacing the cartesian distance measurement for HOGO?" — REFUSED,
+ *   citing nothing. The answer is in the base, in one sentence of the HOGO
+ *   September sprint transcript: "integrate the Google Maps API for driving
+ *   distance calculations, replacing the current cartesian measurement method".
+ *   Re-ask it as "what did we decide about driving distance in the HOGO
+ *   September sprint meeting?" and it answers correctly. Same fact, same
+ *   source, one phrasing finds it and the other does not — which is exactly
+ *   what the owner had been reporting and nobody could reproduce.
+ *
+ * ALL-OR-NOTHING FAILS ON ONE ABSENT WORD. "HOGO" is in that source's TITLE and
+ * not in the sentence, so the chunk holding the answer carried four of five
+ * terms and was thrown away.
+ *
+ * WHY A SHARE AND NOT A RARITY CAP, since rarity was the obvious idea and was
+ * measured first: "cartesian" appears in 12 chunks of this base — but "notice"
+ * is in 27 and "policy" in 75, so any cap loose enough to admit the first
+ * admits the two that caused the parental-leave answer. The word-frequency
+ * distribution is a Zipf tail with no break in it (65% of the vocabulary is in
+ * three chunks or fewer), so every threshold is fitted to its examples.
+ *
+ * CO-OCCURRENCE IS THE HONEST DISCRIMINATOR. The parental-leave failure was
+ * many chunks each sharing ONE common word. The cartesian case is one chunk
+ * holding MOST of the question at once. That is a difference in kind, and it is
+ * what this measures.
+ *
+ * Short questions are unchanged: below SHORT_QUESTION_TERMS the only honest
+ * requirement is still all of them, for the reason above this line. */
+const OVERRULE_TERM_SHARE = 0.75
+
 /** WHY THE WORD MATCH IS RUNNING — three situations, and it may claim something
  * different in each. It used to be a boolean, and the two cases it collapsed
  * together are opposites. */
@@ -1866,7 +1902,8 @@ type LexicalRole =
 function termFloor(terms: number, role: LexicalRole): number {
   const share = Math.max(1, Math.ceil(terms * MIN_TERM_SHARE))
   if (role === "beside") return share
-  if (role === "overruling") return terms
+  if (role === "overruling")
+    return terms <= SHORT_QUESTION_TERMS ? terms : Math.max(1, Math.ceil(terms * OVERRULE_TERM_SHARE))
   return terms <= SHORT_QUESTION_TERMS ? terms : share
 }
 

@@ -327,11 +327,34 @@ function attributes(answer, written) {
  * material — never off the pipeline's own output. */
 function composeScore(q, answer, written) {
   const lead = firstSentence(written)
-  const titles = answer.citations.map((c) => c.title ?? "")
   const wanted = q.topic ?? q.cites ?? []
-  const offTopic = titles.filter(
-    (t) => !wanted.some((w) => t.toLowerCase().includes(String(w).toLowerCase()))
-  )
+  // OFF TOPIC IS ABOUT WHAT A CITATION SAYS, NOT WHOSE NAME IS ON IT.
+  //
+  // This used to be `titles.filter(t => no expected name is in t)` — it asked
+  // whether the base cited the source the KEY had named, and printed the answer
+  // under "files that were not important", which is a claim about relevance.
+  // Those are different questions and the difference is not academic: asked how
+  // FluClinic detects a duplicate company, the base cited a ticket titled
+  // "Match on Registration Number + Postcode" — verbatim the correct answer —
+  // and this scored it off-topic for being a ticket rather than the meeting.
+  // The row read 0/6, 0%, and 0% of nothing was wrong with those citations.
+  //
+  // So a citation is on topic when the expected source is named OR when the
+  // material it actually contributed carries one of the answer tokens the key
+  // author wrote down by hand off the source text (`lead`). Both halves are
+  // authored off the material; neither is taken from the pipeline's output.
+  const answerTokens = (q.lead ?? []).map((w) => String(w).toLowerCase())
+  const bySource = new Map()
+  for (const p of answer.passages)
+    bySource.set(p.sourceId, `${bySource.get(p.sourceId) ?? ""} ${p.text ?? ""}`.toLowerCase())
+  const offTopic = answer.citations
+    .filter((c) => {
+      const title = (c.title ?? "").toLowerCase()
+      if (wanted.some((w) => title.includes(String(w).toLowerCase()))) return false
+      const said = bySource.get(c.sourceId) ?? ""
+      return !answerTokens.some((tok) => said.includes(tok))
+    })
+    .map((c) => c.title ?? "")
   const empty = answer.passages.filter(hollow)
   return {
     // BEATING AROUND THE BUSH — the first sentence answers, or it preambles.
