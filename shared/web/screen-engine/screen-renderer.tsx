@@ -643,10 +643,26 @@ function renderList(
             {page.map((row) => {
               const id = String(row.id ?? "")
               return (
+                // RAISED, BECAUSE THE CARD BEHIND THIS ONE IS A PANEL.
+                // A grid card is drawn inside `CollectionCard`, which is a
+                // `<Card>` at the default variant — `bg-surface-panel`. This one
+                // was too, so it was `var(--surface-panel)` against
+                // `var(--surface-panel)`: contrast 1.000, and not a coincidence
+                // of two tokens that happen to share a value but the SAME token
+                // on both sides, so 1.000 in every palette present and future.
+                // Measured on /knowledge on 2026-08-28: 51 cards, 50 of them
+                // nested, 50 of 50 rgb(247,242,235) on rgb(247,242,235) — the
+                // one collection in the app given cards deliberately (R35, so
+                // the source's own glyph has room to be seen) drawing no cards
+                // at all. `raised` is the kit's answer by name: `bg-card` plus
+                // `--shadow-rest`, and its own header says it "only reads as
+                // raised when it sits inside a --surface-panel band", which is
+                // exactly where this sits.
                 <Card
                   key={id}
                   role="button"
                   tabIndex={0}
+                  variant="raised"
                   interactive
                   onClick={() =>
                     onIntent?.({ kind: "open", module: recipe.binding.module, id })

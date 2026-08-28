@@ -11,6 +11,12 @@ import * as React from "react"
 import { usePathname } from "next/navigation"
 
 import { Breadcrumbs } from "@shared/ui/components/breadcrumbs/breadcrumbs"
+// The rule between the two nav groups, here and in the phone's sheet. It was
+// a hand-rolled `<div className="bg-border h-px w-full" role="separator" />`
+// twice, which is the kit's own default weight spelled out by hand and its
+// role written by hand beside it. The kit part draws the same hairline
+// through Radix and gets the role from the primitive.
+import { Separator } from "@shared/ui/components/separator/separator"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/foundations/icons"
 // `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
@@ -203,12 +209,21 @@ export function AppShell({
         onClick={() => goToSection(item.path)}
         aria-current={activeNav ? "page" : undefined}
         title={collapsed ? item.title : undefined}
+        // The lit row and the quiet one, in the kit's spine vocabulary rather
+        // than in the page's `muted` — see the note on the rail column itself,
+        // further down this file. (Deliberately not naming that element's tag
+        // here: shell-nav.test.ts finds the rail by the first occurrence of it
+        // in this source, so the word in a comment would be what it reads.)
+        // `--spine-active-fill` is mango with `--spine-active-ink` on it (the
+        // kit's caption law: "the active row is mango on the ink and paper
+        // spines"), and a quiet row is `--spine-ink-quiet` darkening to full
+        // `--spine-ink` on hover, which is the kit's own ROW_IDLE.
         className={`motion-hover flex items-center rounded-[var(--radius)] text-sm font-medium ${
           collapsed ? "justify-center p-2" : "gap-2 px-3 py-2"
         } ${
           activeNav
-            ? "bg-muted text-foreground"
-            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            ? "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)] hover:bg-[var(--spine-active-hover)]"
+            : "text-[var(--spine-ink-quiet)] hover:bg-[var(--spine-chip-fill)] hover:text-[var(--spine-ink)]"
         }`}
       >
         <Icon className="size-4" />
@@ -354,8 +369,29 @@ export function AppShell({
        * w-60 — which the kit's three-way mode toggle made the bottom row. Clip
        * removes the scrollbar; the wrap on that row removes the overflow that
        * caused it. */}
+      {/* THE RAIL IS A SURFACE, AND IT READS THE KIT'S SPINE TOKENS.
+       *
+       * It used to paint nothing at all — `border-r` and a hairline were the
+       * whole of it — so the app's spine stood on whatever the page ground
+       * happened to be, and its active row was `bg-muted`, a colour that means
+       * "quiet" everywhere else in the app. The kit's own screen-shell names
+       * this exact defect as a client complaint: "THE RAIL IS A CONTAINER AND
+       * IT IS SOFT PAPER … the build painted nothing here and got away with it
+       * only because the card behind it happened to be soft paper."
+       *
+       * The kit answers it with eight `--spine-*` names (tokens.css §7b, the
+       * three spines) that this app referenced ZERO times. They are read here
+       * exactly as the kit's own `screen-shell.tsx` reads them, and no
+       * `data-spine` is written: `paper` is the value on bare `:root`, which is
+       * the kit's own arrangement so a rail rendered outside a shell still
+       * paints. Both palettes follow, because both are defined on those names.
+       *
+       * The finished `Rail` composition is the destination — it is blocked
+       * today by the kit's brand-artwork bug (see the swap map §3), so what is
+       * adopted now is the SURFACE and the vocabulary. When the composition
+       * lands it inherits the same tokens and nothing here has to be repainted. */}
       <aside
-        className={`hidden shrink-0 flex-col border-r md:sticky md:top-0 md:flex md:h-[100svh] md:overflow-y-auto md:overflow-x-clip ${collapsed ? "w-16 items-center" : "w-60"}`}
+        className={`hidden shrink-0 flex-col border-r bg-[var(--spine-fill)] text-[var(--spine-ink)] md:sticky md:top-0 md:flex md:h-[100svh] md:overflow-y-auto md:overflow-x-clip ${collapsed ? "w-16 items-center" : "w-60"}`}
       >
         <div className={collapsed ? "py-3" : "p-3"}>
           <TeamSwitcher
@@ -369,7 +405,7 @@ export function AppShell({
             <React.Fragment key={group[0].slug}>
               {/* The divider between the daily half and the occasional one. It
                   sits BETWEEN groups, never above the first or below the last. */}
-              {i > 0 && <div className="bg-border my-2 h-px w-full" role="separator" />}
+              {i > 0 && <Separator className="my-2" />}
               {group.map(navButton)}
             </React.Fragment>
           ))}
@@ -386,7 +422,7 @@ export function AppShell({
             onClick={toggleCollapsed}
             aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
             title={collapsed ? t("Expand") : t("Collapse")}
-            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground motion-hover rounded-[var(--radius)] p-2"
+            className="motion-hover rounded-[var(--radius)] p-2 text-[var(--spine-ink-quiet)] hover:bg-[var(--spine-chip-fill)] hover:text-[var(--spine-ink)]"
           >
             {collapsed ? (
               <PanelLeftOpen className="size-4" />
@@ -540,7 +576,7 @@ export function AppShell({
             <nav className="mt-4 flex flex-col gap-1 pb-2">
               {navGroups.map((group, i) => (
                 <React.Fragment key={group[0].slug}>
-                  {i > 0 && <div className="bg-border my-2 h-px w-full" role="separator" />}
+                  {i > 0 && <Separator className="my-2" />}
                   {group.map((item) => {
                     const Icon = item.Icon
                     const activeNav = isNavActive(item.path, here)

@@ -1647,6 +1647,7 @@ export const SEED: Catalogue = {
   "Ticked off. It's under All tasks.": { de: "Abgehakt. Es steht unter Alle Aufgaben.", es: "Marcado. Está en Todas las tareas.", ca: "Marcat. És a Totes les tasques."},
   "Today": { de: "Heute", es: "Hoy", ca: "Avui"},
   "Transcript read.": { de: "Mitschrift gelesen.", es: "Transcripción leída.", ca: "Transcripció llegida."},
+  "Try fewer words, or clear the filters.": { de: "Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Prueba con menos palabras o borra los filtros.", ca: "Prova amb menys paraules o esborra els filtres."},
   "Try “invite a member as a Viewer”": { de: "Versuchen Sie „ein Mitglied als Betrachter einladen“", es: "Prueba «invita a un miembro como Lector»", ca: "Prova «convida un membre com a Lector»"},
   "Update the details you hold for them.": { de: "Aktualisieren Sie die Angaben, die Sie zu dieser Person haben.", es: "Actualiza los datos que tienes de esta persona.", ca: "Actualitza les dades que en tens."},
   "Update what you're asking for. Everyone on the ticket will see the change.": { de: "Aktualisieren Sie, worum Sie bitten. Alle beim Ticket sehen die Änderung.", es: "Actualiza lo que estás pidiendo. Todos los que están en el ticket verán el cambio.", ca: "Actualitza el que demanes. Tothom qui és al ticket veurà el canvi."},

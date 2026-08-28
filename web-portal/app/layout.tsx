@@ -1,5 +1,3 @@
-import { Inter } from "next/font/google"
-
 import { Toaster } from "@shared/ui/components/sonner/sonner"
 import { ThemeProvider } from "@shared/web/theme-provider"
 
@@ -9,8 +7,6 @@ import { appMetadata, appViewport } from "@shared/web/pwa"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ErrorReporter } from "@/components/error-reporter"
 import "./globals.css"
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
 // The portal's identity is the AGENCY's brand — a client is visiting kwapso, not
 // a product called "portal". Name, description, icons and the viewport lock come
@@ -24,7 +20,9 @@ export const viewport = appViewport
 // thing to notice, and the portal's whole job is to have nothing to notice.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    // No font variable here — the same deletion as the agency door's layout,
+    // and for the same reason: --font-inter was published and never read.
+    <html lang="en" suppressHydrationWarning>
       <body className="bg-background min-h-[100svh] antialiased">
         {/* The client's front door opens on the same frame the agency's does —
          * one product, one ident, one animation. FIRST in the body so the

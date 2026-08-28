@@ -38,7 +38,6 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Dialog, DialogContent } from "@shared/ui/components/dialog/dialog"
-import { Spinner } from "@shared/ui/components/spinner/spinner"
 
 import { useT } from "./language"
 
@@ -67,13 +66,41 @@ export type SubmitConfig = {
  * collection already defaults `submitLabel: "Submit"`.
  *
  * `footer` survives for the handful of forms whose action bar is genuinely not
- * one button (a second, differently-typed action beside it). */
+ * one button (a second, differently-typed action beside it).
+ *
+ * ── BUSY IS NOT DISABLED, AND THE KIT HAS A WORD FOR EACH ─────────────────
+ *
+ * This button used to fold `busy` into `disabled`, and the kit's Button reads
+ * `disabled` as an instruction to draw the disabled SKIN — one flat grey fill
+ * and grey label, identical on all eight variants. So the instant you pressed
+ * Submit on any of the thirty-eight forms R4 routes through this shell, the
+ * one mango control on the screen went grey. It reads as "switched off", which
+ * is the opposite of what is happening: the save is in flight and the press
+ * WORKED.
+ *
+ * The kit already draws the distinction and states it as a rule (button.tsx,
+ * state 6): "loading — variant fill kept, spinner, aria-busy", implemented as
+ * `showDisabledSkin = disabled && !loading`. So `busy` goes to `loading` and
+ * only a genuinely unanswerable form goes to `disabled`. Both still refuse the
+ * press — the kit disables the element for either — and `loading` adds the
+ * `aria-busy` a screen reader needs, which the old spelling never said.
+ *
+ * The spinner and the busy word come from the kit too: it draws its own ring
+ * and swaps in `loadingLabel`, so the hand-held `<Spinner>` and the ternary
+ * that chose between two labels are both gone. The two sentences are still
+ * asked for at this position (R33) and are unchanged. */
 function SubmitButton({ submit }: { submit: SubmitConfig }) {
   const t = useT()
   return (
-    <Button type="submit" disabled={submit.busy || submit.disabled} className="gap-1">
-      {submit.busy ? <Spinner /> : submit.icon}
-      {submit.busy ? t("Submitting…") : t("Submit")}
+    <Button
+      type="submit"
+      loading={submit.busy}
+      loadingLabel={t("Submitting…")}
+      disabled={submit.disabled}
+      className="gap-1"
+    >
+      {submit.icon}
+      {t("Submit")}
     </Button>
   )
 }

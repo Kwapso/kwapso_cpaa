@@ -40,6 +40,43 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 
+/** THE SECTION'S OWN CREATE ACTION, published to the collection inside it.
+ *
+ * An empty collection is the FIRST thing a new team meets on every screen, and
+ * it was a dashed box, an optional glyph and one grey sentence with no way out
+ * of it — sixteen times over. The one thing a zero state has to do is name the
+ * next act, and the frame could not: the create button lives in the host ABOVE
+ * the collection (`SectionWithCreate`), and the frame is handed only rows and a
+ * config.
+ *
+ * So the host publishes what it already has — the label it puts on that button,
+ * its glyph, and its handler — and the frame reads it where it needs it. A
+ * context rather than a prop because the frame is reached through the screen
+ * engine, several layers below the host, and threading one optional action
+ * through every recipe path would be the same decision written eleven times.
+ * It is the arrangement R16's count arbitration already uses for the same
+ * reason. A collection with no host above it (the client portal draws its own)
+ * simply gets `null` and renders the sentence alone, exactly as before. */
+export type CollectionCreateAction = {
+  /** The host's own word for the act — already translated where it is set. */
+  label: string
+  /** The host's glyph, so the two buttons for one act cannot disagree. */
+  icon?: React.ReactNode
+  onCreate: () => void
+}
+
+const CreateActionContext = React.createContext<CollectionCreateAction | null>(null)
+
+export function CollectionCreateActionProvider({
+  action,
+  children,
+}: {
+  action: CollectionCreateAction | null
+  children: React.ReactNode
+}) {
+  return <CreateActionContext.Provider value={action}>{children}</CreateActionContext.Provider>
+}
+
 function CollectionFrame<T>({
   config,
   data,
@@ -83,6 +120,7 @@ function CollectionFrame<T>({
   className?: string
 }) {
   const t = useT()
+  const createAction = React.useContext(CreateActionContext)
   // ── WHAT THIS COLLECTION WAS BEING ASKED, WHEN SHE LEFT IT ─────────────────
   //
   // The four controls in this header are the "what she had typed" and "which
@@ -196,6 +234,13 @@ function CollectionFrame<T>({
         { query, searchKeys, page, facetValues }
       )
   const { visible, filtered, pageCount, page: current } = slice
+
+  // IS ANYTHING NARROWING THIS LIST RIGHT NOW? The zero state below turns on
+  // this and nothing else: a search with text in it, or one facet set. It is
+  // read after `selectRows` so it describes the same pass that produced
+  // `filtered`. (`asked` is taken in this file — it is the remembered question
+  // itself, which is the thing this is a predicate about.)
+  const narrowed = query.trim() !== "" || Object.keys(facetValues).length > 0
 
   const showFilterBar = config.userFilter && config.filterFacets.length > 0
   const showSort = config.sortable && config.sortOptions.length > 0
@@ -369,17 +414,48 @@ function CollectionFrame<T>({
         })()}
 
       {filtered.length === 0 ? (
-        <div className="rounded-[var(--radius)] border border-dashed p-8 text-center text-sm text-muted-foreground">
+        // ── THE ZERO STATE, AND IT IS TWO STATES ──────────────────────────
+        //
+        // It used to be one: a dashed box saying "No tickets yet." whether the
+        // collection was genuinely empty or a search had simply matched
+        // nothing. That sentence is a claim about the COLLECTION and it is
+        // plainly untrue mid-search — the same fault `paged-find` names on the
+        // server-side path and answers there. So what is said follows what was
+        // asked, and only the genuinely-empty half offers the create action:
+        // pointing at "New ticket" when a filter is hiding twelve of them would
+        // be worse than the grey line it replaces.
+        //
+        // The action is the section's own button, published by the host above
+        // (see `CollectionCreateActionProvider`) — the same word and the same
+        // glyph, so the zero state cannot invent a second name for one act.
+        // Where no host published one, this is the sentence alone, as before.
+        <div className="flex flex-col items-center gap-3 rounded-[var(--radius)] border border-dashed px-6 py-12 text-center">
           {/* aria-hidden by construction: the sentence under it already says
               what this is. The icon comes from the kit's set by name; a name
               the kit lacks renders nothing, same contract as the old
               DynamicIcon fallback. */}
           {config.emptyIcon ? (
-            <span aria-hidden className="mx-auto mb-3 block w-fit [&_svg]:size-8">
+            <span aria-hidden className="block w-fit text-muted-foreground [&_svg]:size-8">
               {kitIcon(config.emptyIcon)}
             </span>
           ) : null}
-          {t(config.emptyText)}
+          {/* THE HEADING. It was 14px grey body copy, which is the register the
+              app uses for a footnote — on a screen whose only content it is. */}
+          <p className="text-base font-medium text-foreground">
+            {narrowed ? t("Nothing matched.") : t(config.emptyText)}
+          </p>
+          {narrowed ? (
+            <p className="text-sm text-muted-foreground">
+              {t("Try fewer words, or clear the filters.")}
+            </p>
+          ) : (
+            createAction && (
+              <Button onClick={createAction.onCreate} className="mt-1 gap-1">
+                {createAction.icon}
+                {createAction.label}
+              </Button>
+            )
+          )}
         </div>
       ) : (
         renderItems(visible)
