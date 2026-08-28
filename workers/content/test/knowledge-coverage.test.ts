@@ -706,7 +706,7 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // came out of the Team Assembly?" while the 92-chunk transcript was not. The
   // bump is not cosmetic: those rows sit behind this lane's cursor and only a
   // rewind re-decides them.
-  meeting: { version: 3, digest: "b8ef95c2a14fb5f8" },
+  meeting: { version: 4, digest: "2429e9f9e1353766" },
   todo: { version: 1, digest: "e00d2b0c6bb86edb" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
@@ -785,10 +785,44 @@ describe("a meeting nobody has held and nobody has written on is not material", 
     expect(live("MTG_AGENDA"), "an agenda is words, and words are material").toBe(true)
   })
 
-  it("and a bare meeting that HAS happened is kept — that is the record that it did", async () => {
+  /* THE OWNER OVERRULED THIS ON 28 AUG 2026, and the sentence it used to assert
+     is preserved above the new one because the argument was not wrong, it lost.
+     It read: "a bare meeting that HAS happened is kept — that is the record that
+     it did", on the ground that "when did we meet?" is a question only this can
+     answer.
+
+     IT IS NOT. The meeting is a row in `meetings`, on the Meetings screen, and
+     the assistant reaches it through `list_meetings`. The knowledge base answers
+     from WORDS, and a bare meeting has none — so what the old rule bought was a
+     second, wordless copy of a fact the app already held, competing for citation
+     slots against material that has something to say.
+
+     The count is what settled it: 369 of 461 meetings in the agency's own base
+     held no words. */
+  it("and a bare meeting that HAS happened is not filed either — the meetings list knows", async () => {
     meeting("MTG_PAST", BEHIND)
     await sweepUntilCaughtUp()
-    expect(live("MTG_PAST"), "when did we meet? is a question only this can answer").toBe(true)
+    expect(
+      live("MTG_PAST"),
+      "a meeting with no agenda, no notes and no transcript is not material, whatever its date"
+    ).toBe(false)
+  })
+
+  it("and it comes back the moment somebody writes on it", async () => {
+    meeting("MTG_REVIVE", BEHIND)
+    await sweepUntilCaughtUp()
+    expect(live("MTG_REVIVE"), "bare, so not filed").toBe(false)
+    // `updated_at` MOVES, because the sweep walks a keyset over it and a real
+    // edit through the app stamps it (the audit block every write here carries).
+    // Setting the notes without it would leave the row behind the cursor — which
+    // is a fact about how the sweep finds work, not a way to hide a revival.
+    db().exec(
+      `UPDATE meetings SET notes = 'We agreed the cutover date.', updated_at = '2099-01-01' WHERE id = 'MTG_REVIVE';`
+    )
+    await sweepUntilCaughtUp()
+    // RETIRED, NOT SKIPPED — the distinction the reader's own comment draws, and
+    // the reason this is safe to apply to rows already filed under the old rule.
+    expect(live("MTG_REVIVE"), "words arrived, so the sweep revives it").toBe(true)
   })
 
   // AND THE TRANSCRIPT WINS THE SLOT IT WAS LOSING. The whole point, asserted on
