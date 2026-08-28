@@ -75,7 +75,30 @@ export function AgentPanel({
        * pressing Enter/arrows draws the browser's focus ring around the WHOLE
        * slide-in (the owner's "weird outline"). Harmless but ugly; the effect
        * above moves focus into the composer instead. */}
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+      {/* `bg-surface-panel`, and it is the kit's own composition law rather
+        * than a preference — PATTERN.md §11, "a card's ground is the panel
+        * tone, not the page tone": ANY REGION THAT CONTAINS CARDS uses
+        * `bg-surface-panel`.
+        *
+        * This region is nothing but cards. Every assistant turn is a `bg-card`
+        * bubble (agent-chat's `turnVariants`, ruling 36 — "a machine never
+        * wears the fill a person wears"), every step row is one, and so is the
+        * composer pill. The drawer itself was `bg-popover`, and `--popover`
+        * and `--card` are the SAME value in both palettes: #FFFEF9 in light,
+        * #26241F in dark. Contrast 1.000. So the kit drew the assistant its
+        * card, faithfully, in exactly the colour of the paper behind it — and
+        * the owner reported it on 28 Aug 2026 as "when the assistant says
+        * something, there is no background or card or pill", which is what a
+        * card at contrast 1.000 looks like to the only instrument that
+        * matters.
+        *
+        * §11 was written about light mode, where the same four tokens collide.
+        * On a drawer it bites in BOTH, because `--popover` tracks `--card`
+        * either way. Composed here rather than fixed in the kit's Sheet: §11
+        * closes with "no token changed and no component changed. This is a
+        * composition law", and the drawer's `--popover` surface is a recorded
+        * decision of its own (GAPS-A.md OVL-1). */}
+      <SheetContent side="right" className="flex w-full flex-col gap-0 bg-surface-panel p-0 sm:max-w-lg">
         {/* NO className. The kit's own SheetHeader already reserves the room:
          * `pe-[var(--space-9)]` for the drawer's absolute close ✕, and
          * `shadow-[var(--hairline-under)]` for the rule under it.

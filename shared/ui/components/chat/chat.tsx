@@ -547,7 +547,11 @@ const Chat = React.forwardRef<HTMLDivElement, ChatProps>(
               }}
               autoGrow
               className={cn(
-                "min-h-[var(--control-height-dense)] flex-1 resize-none border-0 bg-transparent",
+                /* `shadow-none` for `agent-chat.tsx`'s reason, said once
+                   there and true here: `border-0` does not reach the
+                   Textarea's resting hairline, which is a box-shadow. Two
+                   composers in one kit do not get two answers. */
+                "min-h-[var(--control-height-dense)] flex-1 resize-none border-0 bg-transparent shadow-none",
                 /* SYMMETRIC BLOCK PADDING, not `p-0`. A textarea sets its first
                    line at the TOP of its box, so a field held open by
                    `min-h` parks one line high with all the slack underneath —
