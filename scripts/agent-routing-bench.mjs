@@ -126,16 +126,71 @@ if (DRY) {
   process.exit(0)
 }
 
-const key =
-  process.env.ANTHROPIC_API_KEY ||
-  execSync("security find-generic-password -s anthropic-api-key -w").toString().trim()
+const key = process.env.BENCH_CF_MODEL
+  ? "" // a Cloudflare-hosted run needs no Anthropic key at all
+  : process.env.ANTHROPIC_API_KEY ||
+    execSync("security find-generic-password -s anthropic-api-key -w").toString().trim()
 
-const model = selectModel({
+/* WORKERS AI, for comparing a Cloudflare-hosted model against Claude on the SAME
+ * questions, the SAME prompt and the SAME 192-tool catalogue. The newer models
+ * (glm, gpt-oss, qwen) answer in the OpenAI chat-completions shape — a `choices`
+ * array with `message.tool_calls` — which is NOT the `response`/`tool_calls`
+ * shape @cf/meta/llama-* uses, and reading the wrong field makes a working model
+ * look like one that never calls a tool. Checked against both before trusting it. */
+function workersAiModel(name) {
+  const account = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
+  const token =
+    process.env.CLOUDFLARE_API_TOKEN ||
+    execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+  return {
+    name,
+    async complete(messages, tools) {
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${name}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          tools: tools.map((t) => ({
+            type: "function",
+            function: { name: t.name, description: t.description, parameters: t.schema },
+          })),
+        }),
+        signal: AbortSignal.timeout(180_000),
+      })
+      const json = await res.json()
+      // Workers AI answers 8005 "Internal server error" intermittently on a large
+      // request — seen once in a bisect that then passed at every size. A transient
+      // 500 is not a routing result, so it is retried rather than scored.
+      if (!json.success && JSON.stringify(json.errors).includes("8005")) {
+        await new Promise((r) => setTimeout(r, 2000))
+        return this.complete(messages, tools)
+      }
+      if (!json.success) throw new Error(`workers-ai: ${JSON.stringify(json.errors).slice(0, 300)}`)
+      const msg = json.result.choices?.[0]?.message ?? {}
+      const usage = json.result.usage ?? {}
+      return {
+        text: msg.content ?? "",
+        toolCalls: (msg.tool_calls ?? []).map((c, i) => ({
+          id: String(i),
+          name: c.function?.name ?? c.name,
+          input: {},
+        })),
+        // Priced per token, no prompt cache on this path — mapped onto the same
+        // shape so the spend line below needs no special case.
+        usage: { input: usage.prompt_tokens ?? 0, output: usage.completion_tokens ?? 0, cacheWrite: 0, cacheRead: 0 },
+        neurons: usage.neurons ?? 0,
+      }
+    },
+  }
+}
+
+const CF_MODEL = process.env.BENCH_CF_MODEL || ""
+const model = CF_MODEL ? workersAiModel(CF_MODEL) : selectModel({
   ANTHROPIC_API_KEY: key,
   AGENT_MODEL: process.env.AGENT_MODEL || "claude-sonnet-5",
   AGENT_EFFORT: process.env.AGENT_EFFORT || "low",
   AGENT_PROMPT_CACHE: process.env.AGENT_PROMPT_CACHE || "1h",
-})
+    })
 
 const spend = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }
 const rows = []
@@ -176,9 +231,25 @@ console.log(`tool calls per question                      ${(rows.reduce((n, r) 
 // THE SPEND LINE SITS HERE, ABOVE ANY EXIT. It was written below one once and
 // two paid runs reported no cost at all — a cost print that never runs is the
 // same class of fault this whole bench exists to catch.
+// The rate depends on WHICH model ran. Printing Claude's rates for a Cloudflare
+// run overstated a 12-cent bench as $2.40 — a cost line that is wrong is worse
+// than none, because it is quoted.
 // claude-sonnet-5: $3/M in, $15/M out, cache write 1.25x, cache read 0.1x.
-const usd =
-  (spend.input * 3 + spend.cacheWrite * 3.75 + spend.cacheRead * 0.3 + spend.output * 15) / 1_000_000
+// Cloudflare rates below are the account's own published per-million prices.
+const CF_RATES = {
+  "@cf/zai-org/glm-5.3-flash": [0.15, 0.5],
+  "@cf/zai-org/glm-4.7-flash": [0.0605, 0.4],
+  "@cf/openai/gpt-oss-120b": [0.35, 0.75],
+  "@cf/openai/gpt-oss-20b": [0.2, 0.3],
+  "@cf/qwen/qwen3-30b-a3b-fp8": [0.0509, 0.335],
+  "@cf/ibm-granite/granite-4.0-h-micro": [0.017, 0.112],
+  "@cf/meta/llama-4-scout-17b-16e-instruct": [0.27, 0.85],
+}
+const rate = CF_MODEL ? CF_RATES[CF_MODEL] : null
+if (CF_MODEL && !rate) console.log(`(no published rate on file for ${CF_MODEL} — cost not computed)`)
+const usd = rate
+  ? (spend.input * rate[0] + spend.output * rate[1]) / 1_000_000
+  : (spend.input * 3 + spend.cacheWrite * 3.75 + spend.cacheRead * 0.3 + spend.output * 15) / 1_000_000
 console.log()
 console.log(
   `spent  $${usd.toFixed(3)}   in ${spend.input.toLocaleString()}  cache w ${spend.cacheWrite.toLocaleString()} r ${spend.cacheRead.toLocaleString()}  out ${spend.output.toLocaleString()}`

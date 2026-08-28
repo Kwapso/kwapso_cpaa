@@ -69,7 +69,7 @@ describe("the reason reaches the screen", () => {
     // A worker with no key: `selectModel` throws before the loop's own catch
     // exists, so it arrives as the terminal error event instead.
     const { useAgentChat } = await import("@/lib/use-agent-chat")
-    stream = [{ t: "error", message: "model_error: no ANTHROPIC_API_KEY", reason: "unconfigured" }]
+    stream = [{ t: "error", message: "model_error: the assistant is not configured on this worker", reason: "unconfigured" }]
     const { result } = renderHook(() => useAgentChat("team1", true, true))
     await act(async () => {
       await result.current.send("hello")

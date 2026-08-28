@@ -1,63 +1,77 @@
 // AN HONEST FAILURE BEATS A QUIET DEMOTION.
 //
-// `selectModel` used to end `return new WorkersAiModel(…)` whenever
+// The original sin: `selectModel` ended `return new WorkersAiModel(…)` whenever
 // ANTHROPIC_API_KEY was unset. A secret that never got set on a new environment,
 // or a rotation that half happened, therefore produced an assistant that kept
-// answering — from a much weaker engine, with nobody told. No banner, no log
-// line, nothing a person could see except that the answers got worse. Somebody
-// judging the assistant in that state is judging a product they were never
-// shown, and the most likely somebody is the owner.
+// answering — from a much weaker engine, with nobody told. Somebody judging the
+// assistant in that state is judging a product they were never shown.
 //
 // The owner's ruling on 2026-08-27 was two words: "kill the escape hatch."
 //
-// THIS SUITE IS THE LOCK, and it is written so that putting the hatch back is a
-// red build rather than a code review nobody schedules. It asserts the throw,
-// and it asserts the ABSENCE — because a fallback is added by writing one line
-// at the end of a function, which is the easiest thing in the world to do while
-// meaning well ("just so a fresh environment still works").
+// THE WORLD INVERTED ON 2026-08-28 AND THE PRINCIPLE DID NOT. The owner moved the
+// assistant onto Cloudflare (@cf/zai-org/glm-5.3-flash) and disabled the
+// Anthropic key, so Workers AI is no longer the weak fallback — it is the engine.
+// There is nothing left to fall back TO, which is a stronger position than the
+// one this file used to defend, and exactly the reason the lock has to be
+// rewritten rather than deleted: a suite that still asserted a throw on a missing
+// ANTHROPIC_API_KEY would be green, meaningless, and read as coverage.
+//
+// So the property is now the one that survives the swap: ONE engine, chosen in
+// ONE place, with no second branch that could quietly substitute another — and a
+// door failure that still classifies into a sentence a person can act on.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { classifyModelHttp, ModelError, retryAfterSeconds } from "@shared/workers/model-failure"
-import { selectModel } from "../src/lib/model"
+import { DEFAULT_AGENT_MODEL, selectModel } from "../src/lib/model"
 import { stripComments } from "@shared/rules/source-scan"
 
 const SRC = readFileSync(join(__dirname, "..", "src", "lib", "model.ts"), "utf8")
 
-describe("a worker with no key has no assistant, and says so", () => {
-  it("selectModel THROWS rather than handing back a weaker engine", () => {
-    let thrown: unknown
-    try {
-      selectModel({} as never)
-    } catch (e) {
-      thrown = e
-    }
-    expect(thrown, "no key must be a refusal, not a substitution").toBeInstanceOf(ModelError)
-    expect((thrown as ModelError).reason).toBe("unconfigured")
+/** The AI binding a worker really has. Nothing here is called — `selectModel`
+ * only chooses. */
+const env = { AI: { run: async () => new Response("{}") } } as never
+
+describe("one engine, chosen in one place, with no hatch beside it", () => {
+  it("a worker with no model var still gets a working assistant, not a silent nothing", () => {
+    // The FAILURE THIS REPLACES: the old seam threw when a secret was missing, so
+    // a fresh environment had no assistant at all. The binding needs no secret,
+    // so the honest answer to "nothing configured" is now the default model
+    // rather than an error — and the default is named in code, not only in
+    // wrangler, so a worker deployed without vars is not a broken one.
+    const model = selectModel(env)
+    expect(model.name).toBe(DEFAULT_AGENT_MODEL)
+    expect(model.canActWithTools, "an assistant that cannot call tools is a demotion").toBe(true)
   })
 
-  it("…and the message an owner reads names the missing secret", () => {
-    // The person on the screen gets a translated sentence from the reason; this
-    // string is for the error store, where the only useful thing is WHICH knob.
-    try {
-      selectModel({} as never)
-    } catch (e) {
-      expect((e as Error).message).toContain("ANTHROPIC_API_KEY")
-    }
+  it("AGENT_MODEL swaps the engine, and nothing else can", () => {
+    expect(selectModel({ ...(env as object), AGENT_MODEL: "@cf/openai/gpt-oss-120b" } as never).name).toBe(
+      "@cf/openai/gpt-oss-120b"
+    )
   })
 
   it("no second engine is left in the agentic seam to be wired back in", () => {
-    // Off the DISK and comment-stripped: the file's own note about what was
-    // deleted names `WorkersAiModel` several times, and a check that read the
+    // Off the DISK and comment-stripped: this file's own note about what was
+    // deleted names ClaudeModel and ANTHROPIC_API_KEY, and a check that read the
     // comments would pass for the wrong reason — or fail for the wrong one.
     const code = stripComments(SRC)
-    expect(code, "the deleted adapter must not have come back").not.toContain("class WorkersAiModel")
-    expect(code, "and nothing in the agentic seam may call the AI binding").not.toContain("env.AI")
-    // The cheap INLINE path is a different question and still runs on Workers AI
-    // (shared/workers/model-text.ts). This is about the seam that calls TOOLS.
-    expect(code).toContain("new ClaudeModel(")
+    expect(code, "the Anthropic adapter must not come back").not.toContain("class ClaudeModel")
+    expect(code, "and nothing here may reach for that key again").not.toContain("ANTHROPIC_API_KEY")
+    expect(code, "nor call the provider directly").not.toContain("api.anthropic.com")
+    expect(code).toContain("class WorkersAiModel")
+  })
+
+  it("a refused door is an ERROR the loop can classify, never a quiet answer", () => {
+    // The other half of "no quiet demotion": when the engine says no, that has to
+    // arrive as a typed failure with a reason, so the screen can say WHY. A caught
+    // exception that becomes a cheerful empty reply is the same bug in a different
+    // coat — and it is what the owner actually saw today, when the disabled key
+    // turned every turn into "I couldn't answer that one."
+    const err = new ModelError(classifyModelHttp(401, ""), "model_error: refused")
+    expect(err).toBeInstanceOf(ModelError)
+    expect(err.reason).toBe("refused")
   })
 
   it("selectModel returns exactly one kind of model", () => {
