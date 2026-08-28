@@ -263,6 +263,20 @@ export type MeetingFilter = {
    * Validated at the door (`^\d{4}-\d{2}$`), so what reaches the SQL is two
    * numbers and a hyphen. */
   month?: string
+  /** HAS IT GOT WORDS ON FILE — 'yes' or 'no', and left off means "either".
+   *
+   * A FILTER BECAUSE OF THE ARITHMETIC. 36 of this base's 461 meetings carry a
+   * transcript, so "which call was that" is a question the meetings list answers
+   * 8% of the time by luck. A person scrolling can see at a glance which rows
+   * have the mark; a caller reading one page at a time cannot, and the assistant
+   * spent twelve list_meetings calls in one turn never landing on the meeting it
+   * was asked about — which was there the whole time, with 38,077 characters on
+   * it.
+   *
+   * The STAMP is the fact, not the file id: they move together on capture, and
+   * the stamp is the one that says a capture happened rather than that a
+   * document was noticed. */
+  transcript?: string
   q?: string
 }
 
@@ -333,12 +347,31 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     where.push("m.purpose_id = ?")
     params.push(filter.purposeId)
   }
+  // WHETHER ANYBODY EVER WROTE DOWN WHAT WAS SAID. The captured stamp, not the
+  // file id — see the field's own note. Anything that is not exactly 'yes' or
+  // 'no' narrows nothing, which is the same rule `month` follows: a filter
+  // nobody can spell is a list that looks empty for a reason nobody can see.
+  if (filter.transcript === "yes") where.push("m.transcript_captured_at IS NOT NULL")
+  if (filter.transcript === "no") where.push("m.transcript_captured_at IS NULL")
   if (filter.q) {
     // The needle is a LIKE PATTERN, not just a bound value — likeLiteral is what
     // stops `%` meaning "everything" (shared/workers/d1-rest.ts).
-    where.push("(LOWER(m.title) LIKE ? ESCAPE '\\' OR LOWER(m.agenda) LIKE ? ESCAPE '\\' OR LOWER(m.notes) LIKE ? ESCAPE '\\')")
+    //
+    // IT SEARCHES THE GUEST LIST TOO, and that is not a nicety. Of the 458 live
+    // meetings in this base, 4 have an agenda and 75 have notes — but 251 carry
+    // a guest list, because almost every meeting here arrives from Google with
+    // a title and the people who were asked. So a search over title, agenda and
+    // notes was a search over two columns that are nearly always empty, missing
+    // the one column that holds how a person actually names a call: "the one
+    // with Aparna". The mirror column is JSON and is matched as TEXT — an
+    // address or a display name inside it is a substring like any other, and a
+    // needle is never a pattern (likeLiteral, above). It is the same material
+    // the row already hands back in `googleGuests`, so nothing new is exposed.
+    where.push(
+      "(LOWER(m.title) LIKE ? ESCAPE '\\' OR LOWER(m.agenda) LIKE ? ESCAPE '\\' OR LOWER(m.notes) LIKE ? ESCAPE '\\' OR LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')"
+    )
     const needle = `%${likeLiteral(filter.q.toLowerCase())}%`
-    params.push(needle, needle, needle)
+    params.push(needle, needle, needle, needle)
   }
   return { sql: where.length ? where.join(" AND ") : "1 = 1", params }
 }
@@ -1395,15 +1428,42 @@ async function advanceBackfill(
 
 /* --------------- the two reads the meeting DETAIL screen makes ------------- */
 
-/** The transcript's own words, off the row. Null when there is no such meeting;
- * a meeting with nothing captured yet answers with empty text and a null stamp,
- * which is a different sentence from "that meeting doesn't exist" and the screen
- * says a different thing for each. */
+/** WHAT WAS SAID, AND — WHEN NOTHING WAS — A SENTENCE SAYING SO.
+ *
+ * Null when there is no such meeting. A meeting with nothing captured answers
+ * `found: false` and a message in words, and that is the whole point of this
+ * function existing rather than the door reading four columns itself.
+ *
+ * THE SHAPE IS R23's, DELIBERATELY. A knowledge answer decides `found`, its
+ * passages and its `message` in ONE expression, because "we have nothing" and "I
+ * could not tell" are different answers and a caller that has to infer one from
+ * an empty string will infer wrong. This door had exactly that bug, and the
+ * caller that inferred wrong was the assistant:
+ *
+ *   200 {"text":"","note":null,"url":null,"foundBy":null,"capturedAt":null}
+ *
+ * is indistinguishable, to a model, from having guessed the wrong meeting id. So
+ * it guessed again. MEASURED on staging, 28 Aug 2026, on the owner's own
+ * question: 23 tool calls in one turn, TWELVE of them list_meetings, two of them
+ * this door answering with that object, and the turn ended at "I took several
+ * steps and paused here" without reading anything. 36 of 461 meetings have words
+ * on file, so a blind retry is right 8% of the time.
+ *
+ * `found` and `message` are decided in ONE expression below for the same reason
+ * knowledgeAnswer decides its three together: a door that assembles half a
+ * contract ships half a contract. The screen is untouched by this — it reads
+ * `text` and `note` and asks only when the row already says a transcript
+ * exists. */
 export async function readTranscript(
   cfg: D1Rest,
   guard: MemberGuard,
   id: string
 ): Promise<{
+  /** Are there words on file? The one field a caller should branch on. */
+  found: boolean
+  /** Said in the assistant's own voice, because this is the sentence it must
+   * repeat rather than retrying a read that will answer the same way for ever. */
+  message: string
   text: string
   note: string | null
   url: string | null
@@ -1427,8 +1487,27 @@ export async function readTranscript(
   )
   const row = rows[0]
   if (!row) return null
+  const text = row.transcript_text ?? ""
+  // ONE DECISION, AND IT IS ABOUT WORDS. Not about whether a capture happened:
+  // a capture that came back with nothing leaves a stamp and an empty column,
+  // and to a caller asking "what was said" that is the same answer as never
+  // having looked — there is nothing to read either way. The screen already
+  // draws it that way (it asks only when the row says a transcript exists, then
+  // branches on the text), so this is the same discriminator in both places.
+  //
+  // The stamp still earns its keep: it is what tells the two EMPTY cases apart
+  // in the message below, which is the difference between "go and look" and
+  // "we looked, there was nothing".
+  const found = text !== ""
+  const looked = row.transcript_captured_at !== null
   return {
-    text: row.transcript_text ?? "",
+    found,
+    message: found
+      ? "These are the words that were said. Read them; do not ask for them again."
+      : looked
+        ? "We went and found a transcript for this meeting and it had no words in it. There is nothing to read here and there will not be — do not ask again, and do not try another meeting on the assumption you had the wrong one."
+        : "No transcript has been captured for this meeting. The meeting is real and this is its final answer — asking again, or asking about another meeting, will not produce words. To go and look for one, use read_meeting_transcript. To find the meetings that DO have words, ask list_meetings for the ones with a transcript.",
+    text,
     note: row.transcript_note,
     url: row.transcript_url,
     foundBy: row.transcript_found_by,
