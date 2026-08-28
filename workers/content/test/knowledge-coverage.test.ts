@@ -444,7 +444,14 @@ describe("a passage links to the record it came out of", () => {
     const segments = [...(map as RegExpExecArray)[1].matchAll(/:\s*"([^"]+)"/g)].map((m) => m[1])
     expect(segments.length).toBeGreaterThan(5)
 
-    const pages = readFileSync(join(ROOT, "web", "lib", "pages.ts"), "utf8")
+    // COMMENTS OFF, and this side is the one that matters: `known` is an
+    // ALLOW-LIST. `lib` above was already stripped and this read was not, so a
+    // single comment line in pages.ts carrying `segment: "…"` authorised a
+    // RECORD_PATH pointing anywhere. Proved 27 Aug 2026: pointing tasks at
+    // "fakepage" is caught, and is NOT caught once pages.ts says
+    // `// A page we plan to add: segment: "fakepage" — not built yet.`
+    // The failure that buys is a knowledge-base answer whose citation 404s.
+    const pages = stripComments(readFileSync(join(ROOT, "web", "lib", "pages.ts"), "utf8"))
     const known = new Set([...pages.matchAll(/segment:\s*"([^"]*)"/g)].map((m) => m[1]))
     expect(known.size, "web/lib/pages.ts did not parse").toBeGreaterThan(5)
     for (const segment of segments)
