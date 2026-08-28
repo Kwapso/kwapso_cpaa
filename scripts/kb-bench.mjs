@@ -139,8 +139,59 @@ function vectorizeStandIn() {
 
 /** The embedding model, over REST rather than over a binding. Same model id the
  * worker defaults to, so the numbers are on the same scale as production's. */
+/** WHICH WRITER COMPOSES THE ANSWER, so the choice can be MEASURED rather than
+ * argued. Unset, this is the model the worker itself defaults to and the numbers
+ * describe production. Set to a `claude-*` id and the same passages, the same
+ * prompt and the same seam go to Anthropic instead — one call, same place, so
+ * the only variable is the writer.
+ *
+ * It exists because the composer had never been compared to anything. Every
+ * knowledge answer this app has ever written came out of Workers AI, that was a
+ * cost decision nobody had revisited, and "is it good enough" had no number
+ * beside it. */
+const COMPOSE_MODEL = process.env.KB_COMPOSE_MODEL || ""
+
+async function claudeCompose(model, body) {
+  const key = process.env.ANTHROPIC_API_KEY
+  if (!key) throw new Error("KB_COMPOSE_MODEL names a Claude model but ANTHROPIC_API_KEY is not set")
+  const system = body.messages.find((m) => m.role === "system")?.content ?? ""
+  const rest = body.messages.filter((m) => m.role !== "system")
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model,
+      max_tokens: body.max_tokens ?? 1024,
+      system,
+      messages: rest.map((m) => ({ role: m.role, content: m.content })),
+      // Cheap on purpose: composing from passages already in front of it is not
+      // the reasoning-heavy half of this system, and a fair comparison against a
+      // 17B model should not be bought with thinking tokens the app would not
+      // spend either. Sent only to models that accept it.
+      ...(model.startsWith("claude-sonnet-5") || model.startsWith("claude-opus")
+        ? { output_config: { effort: "low" } }
+        : {}),
+    }),
+    signal: AbortSignal.timeout(120_000),
+  })
+  const json = await res.json()
+  if (json.error) throw new Error(`anthropic: ${JSON.stringify(json.error).slice(0, 300)}`)
+  const text = (json.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("")
+  COST.input += json.usage?.input_tokens ?? 0
+  COST.output += json.usage?.output_tokens ?? 0
+  return { choices: [{ message: { content: text }, finish_reason: json.stop_reason }] }
+}
+
+/** What this run actually spent, printed at the end. A budget nobody states is a
+ * budget nobody keeps. */
+const COST = { input: 0, output: 0 }
+
 const AI = {
   async run(model, input) {
+    // The EMBEDDING model always goes to Workers AI — swapping the writer must
+    // not silently swap the retriever, or the two arms of the comparison would
+    // differ in more than one thing.
+    if (COMPOSE_MODEL.startsWith("claude") && input?.messages) return claudeCompose(COMPOSE_MODEL, input)
     const res = await fetch(`${CF}/accounts/${ACCOUNT}/ai/run/${model}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
@@ -465,4 +516,15 @@ if (COMPOSE && graded.length) {
 }
 if (!VERBOSE) console.log("\nre-run with --verbose to see every citation, and every first sentence")
 if (!COMPOSE) console.log("re-run with --compose to grade the answer a person actually reads")
+// WHAT THIS RUN COST, when the writer was Claude. ABOVE `process.exit(0)`, which
+// is where the first version of it was not — it sat below and could never run,
+// so two paid runs reported no cost at all. A spend line that cannot print is
+// worse than none: it reads like a run that cost nothing.
+if (COMPOSE_MODEL.startsWith("claude")) {
+  const rate = COMPOSE_MODEL.includes("haiku") ? { in: 1, out: 5 } : { in: 2, out: 10 }
+  const usd = (COST.input / 1e6) * rate.in + (COST.output / 1e6) * rate.out
+  console.log(
+    `\nWRITER ${COMPOSE_MODEL} — ${COST.input.toLocaleString()} in / ${COST.output.toLocaleString()} out = $${usd.toFixed(3)}`
+  )
+}
 process.exit(0)
