@@ -595,7 +595,11 @@ export async function countTicketFacets(
   guard: MemberGuard,
   scope: AccountScope,
   filter: TicketFilter
-): Promise<{ byType: Record<string, number>; byStatus: Record<string, number> }> {
+): Promise<{
+  byType: Record<string, number>
+  byStatus: Record<string, number>
+  byAccount: { accountId: string; accountName: string | null; open: number; total: number }[]
+}> {
   const where = ticketWhere(guard, scope, {
     ...filter,
     tab: "all",
@@ -617,7 +621,47 @@ export async function countTicketFacets(
     if (r.help_type) byType[r.help_type] = (byType[r.help_type] ?? 0) + r.n
     byStatus[r.status] = (byStatus[r.status] ?? 0) + r.n
   }
-  return { byType, byStatus }
+
+  /* WHICH CLIENT HAS THE MOST, COUNTED BY THE DATABASE.
+   *
+   * Measured on 2026-08-28: asked "which account has the most open tickets?" the
+   * assistant spent six steps and four and a half minutes pulling ticket rows and
+   * trying to tally them in its head, then gave up and said the tool only returns
+   * overall totals. It was right — it did. A model counting hundreds of rows by
+   * reading them is slow, expensive and wrong, and no model is good at it.
+   *
+   * So the database counts. It is the same argument `byType` and `byStatus` were
+   * already making, applied to the third question people actually ask, and it is
+   * bounded the same way: GROUPED, so at most one row per account, ORDERED by
+   * open count so the answer to "the most" is the first row, and capped. */
+  const perAccount = await d1Query<{
+    account_id: string
+    account_name: string | null
+    open_n: number
+    total_n: number
+  }>(
+    cfg,
+    guard.databaseId,
+    `SELECT h.account_id AS account_id, a.name AS account_name,
+            SUM(CASE WHEN h.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
+            COUNT(*) AS total_n
+       FROM help h LEFT JOIN accounts a ON a.id = h.account_id
+      WHERE ${where.sql.join(" AND ")} AND h.account_id IS NOT NULL
+      GROUP BY h.account_id, a.name
+      ORDER BY open_n DESC, total_n DESC
+      LIMIT ${TICKET_FACET_CAP}`,
+    where.params
+  )
+  return {
+    byType,
+    byStatus,
+    byAccount: perAccount.map((r) => ({
+      accountId: r.account_id,
+      accountName: r.account_name,
+      open: Number(r.open_n) || 0,
+      total: Number(r.total_n) || 0,
+    })),
+  }
 }
 
 /** The rank a new ticket takes: above every one the caller can already see.

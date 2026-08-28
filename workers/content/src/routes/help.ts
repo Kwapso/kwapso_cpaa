@@ -123,6 +123,7 @@ async function ticketPage(
       mineTotal: counts.mineTotal,
       byType: facets.byType,
       byStatus: facets.byStatus,
+      byAccount: facets.byAccount,
       // Only on the door that made one, so no read carries a field that means
       // nothing on it.
       ...(createdId ? { id: createdId } : {}),
