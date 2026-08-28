@@ -477,13 +477,15 @@ the token budget trying to feed it everything.
   many of how many are shown. Behind it, `repeatGuard` makes an identical **read**
   (same tool, same arguments) within one turn answer from the first call, reads
   only, because a read is idempotent and a write's second run is the door's and the
-  confirm panel's decision, not the transport's. **The fence is provider-shaped, and the
-  weaker one had to be built by hand:** Claude's `tool_result` block is structural,
-  but Workers AI (selected whenever `ANTHROPIC_API_KEY` is unset) flattens tool
-  history into plain turns, where an attacker's ticket description read exactly
-  like the user's own words. Flattened results now carry an explicit
-  `<tool_result from="…">` marker that the system prompt names, and a closing
-  marker inside the payload is escaped so the fence can't be closed from within.
+  confirm panel's decision, not the transport's. **The fence outlived the provider it was built for:**
+  Claude's `tool_result` block is structural, but the Workers AI adapter (deleted
+  2026-08-27 with the escape hatch) flattened tool history into plain turns, where
+  an attacker's ticket description read exactly like the user's own words. The
+  explicit `<tool_result from="…">` marker it needed is still fitted where the
+  same shape occurs — tenancy's meeting-transcript extraction and content's
+  composed knowledge answer both hand untrusted prose to a model as ordinary
+  text — the system prompt still names it, and a closing marker inside the
+  payload is escaped so the fence can't be closed from within.
 
 **Resume is per-device and best-effort.** The panel remembers the last thread
 per team in **`localStorage`** (`agent-panel.tsx`) so reopening

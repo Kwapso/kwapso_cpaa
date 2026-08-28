@@ -20,6 +20,7 @@ import type { Actor, MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { Env } from "../env"
 import { selectModel, type ChatMessage, type Model, type ModelReply, type ToolCall, type ToolSpec } from "./model"
+import { ModelError } from "@shared/workers/model-failure"
 import { TOOL_RESULT_TAG } from "@shared/workers/model-text"
 import { executeTool, getTool, requiresConfirm, toolSpecs, type ToolResult } from "./tools"
 import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages, requireOwnThread } from "./threads"
@@ -882,15 +883,29 @@ async function runPlanLoop(
       opts.tally.tokens = addTokens(opts.tally.tokens, reply.usage)
     } catch (e) {
       // A model/runtime hiccup becomes a friendly, saved turn — never an uncaught 500.
-      // But the USER only sees "try again"; the OWNER must be able to see WHY, so record
-      // the swallowed error to the store (best-effort; never blocks the friendly reply).
+      // The OWNER must be able to see WHY, so the real error still goes to the store
+      // (best-effort; never blocks the reply).
       await recordWorkerError(env.DB, "data-ops", "agent/model-call", e)
-      const msg = "The assistant had trouble just now and couldn't reply. Please try again in a moment."
+      // …AND SO MUST THE PERSON, which is what changed on 2026-08-27. Every way a
+      // turn can die used to arrive as one sentence — "had trouble just now, try
+      // again in a moment" — which is true of a refused key, a spent rate limit, a
+      // provider outage and a worker with no key at all. Three of those a person can
+      // act on and one of them will never fix itself however many times they retry,
+      // so telling all four to try again is the app guessing out loud. The REASON
+      // rides the outcome and the SCREEN says the words, in the reader's own
+      // language (R28/R33 — a worker cannot call `t`).
+      const failure = e instanceof ModelError ? e.reason : "unavailable"
+      // The turn's own line stays short and reason-free ON PURPOSE. It is English
+      // written by a worker, so it is English a German reader gets; keeping it to
+      // the bare fact leaves the explaining to the screen, which can translate. It
+      // is saved because a reopened thread with a question and no answer at all
+      // reads as the app having forgotten.
+      const msg = "I couldn't answer that one."
       say(msg)
       await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: msg, source: opts.source })
       await refundUnspentUnit() // this step's unit bought no completion — hand it back
       await log()
-      return { done: true, threadId, reply: msg, quota }
+      return { done: true, threadId, reply: msg, quota, failure }
     }
 
     if (!reply.toolCalls.length) {

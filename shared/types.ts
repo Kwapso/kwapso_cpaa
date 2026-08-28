@@ -641,7 +641,19 @@ export type PendingCall = {
 
 /** The result of one agent chat turn: a finished reply, or a pause for confirmation. */
 export type ChatOutcome =
-  | { done: true; threadId: string; reply: string; quota: AgentQuota; overQuota?: boolean }
+  | {
+      done: true
+      threadId: string
+      reply: string
+      quota: AgentQuota
+      overQuota?: boolean
+      /** THE TURN FAILED AT THE MODEL DOOR and the loop turned it into a saved,
+       * friendly turn rather than a 500 — so the stream ends `done`, and this is
+       * the only thing that says the answer never happened. The screen draws its
+       * gentle notice from this; without it a failure is indistinguishable from
+       * a short reply. */
+      failure?: ModelFailure
+    }
   | {
       done: false
       threadId: string
@@ -657,6 +669,26 @@ export type ChatOutcome =
  * a server note) — `final` only settles the turn (thread/quota/reply fallback), so the
  * client renders the accumulated text and never loses an earlier explanation. The
  * `summary` on step_* uses the same name-resolved logic as the confirm-panel summaries. */
+/** WHY a model turn failed, as a closed set — one reason per SENTENCE a person
+ * needs, never one per status code (shared/workers/model-failure.ts classifies).
+ *
+ *   unconfigured           this environment has no assistant key at all
+ *   refused                the key was rejected (401/403) — an account decision
+ *   rate_limited           too many requests, for now (429)
+ *   provider_out_of_credit the account behind the key has run dry
+ *   overloaded             the provider is busy; it clears on its own
+ *   unavailable            anything else, including a network that never answered
+ *
+ * The WORDS live in the front doors, wrapped in `t(...)` (R28/R33). A worker
+ * cannot translate, so it sends the reason and the screen says the sentence. */
+export type ModelFailure =
+  | "unconfigured"
+  | "refused"
+  | "rate_limited"
+  | "provider_out_of_credit"
+  | "overloaded"
+  | "unavailable"
+
 export type StreamEvent =
   /** append this delta to the current assistant reply bubble (word-by-word). */
   | { t: "text"; d: string }
@@ -685,8 +717,11 @@ export type StreamEvent =
   | { t: "confirm"; threadId: string; calls: PendingCall[]; text?: string }
   /** TERMINAL: run complete; carries the full ChatOutcome (reply/quota/threadId). */
   | { t: "final"; outcome: ChatOutcome }
-  /** TERMINAL: something went wrong; a safe message to show. */
-  | { t: "error"; message: string }
+  /** TERMINAL: something went wrong; a safe message to show. `reason` is set
+   * when the failure was the MODEL door and could be classified — the screen
+   * says its own sentence for that reason and falls back to `message` when it
+   * is absent (an older worker, or a fault that was never a model call). */
+  | { t: "error"; message: string; reason?: ModelFailure }
 
 // ── The customer spine (SCOPE ch.03) ─────────────────────────────────────────
 // One table for every company and every person. What the workers hand the client

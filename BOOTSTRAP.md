@@ -62,8 +62,10 @@ who issues each credential; these are the ones that block this runbook:
   `*.workers.dev` subdomains are fine (that's what the defaults use). Where the
   domain is *registered* is not something this repo can tell you. INVENTORY.md
   § 2.
-- *(Optional)* an **Anthropic API key** if you want the AI agent's brain to be
-  Claude rather than the keyless Cloudflare Workers AI fallback.
+- An **Anthropic API key**. REQUIRED for the AI agent: since 2026-08-27 there is
+  no keyless fallback, because a silent downgrade to a weaker engine is worse
+  than an assistant that says it is not set up (see `selectModel`). Everything
+  else in the base stands up without it; the assistant refuses, in words.
 
 ```bash
 git clone <this-repo> brimba && cd brimba
@@ -338,7 +340,7 @@ you discover months later.
 | `TEST_LOGIN_KEY` | auth (**NON-PRODUCTION ONLY**) | the test-login door's own secret, its holder can sign in as ANY account on that environment. Deliberately a different name from `ADMIN_KEY` so the maintenance-key rollout can never arm it, and the door refuses outright when the worker's `ENVIRONMENT` var is `production`. |
 | `INTERNAL_KEY` | auth, tenancy, content, gateway, mcp | shared secret gating auth's `/internal/*` doors. tenancy + content call `/internal/send-email`; the **gateway** forwards client error beacons to `/internal/log-error` (a DIFFERENT reason, the gateway sends no email but still needs the key, or web errors never reach `error_logs`). The **mcp** worker uses it to mint team-pinned sessions (`/internal/mcp-session`). MUST match across all five. |
 | `GOOGLE_CONNECT_CLIENT_ID` + `GOOGLE_CONNECT_CLIENT_SECRET` + `GOOGLE_TOKEN_KEY` | content | *optional, but all-or-nothing*, the per-person Google **connections** (Drive / Gmail / Calendar / Chat). A DIFFERENT OAuth client from the sign-in one above (`kwapso sync`, the one carrying the sensitive scopes); `GOOGLE_TOKEN_KEY` is 32 random bytes base64 (`openssl rand -base64 32`) and is what the stored refresh tokens are encrypted under, so a dump of the table without it is a list of email addresses. With any one of the three missing, the Connect button is not offered and the rest of the product is untouched, deliberate, so a half-configured environment never walks somebody through a consent screen and then fails to keep what they granted. Redirect URIs, scopes and the rotation consequence: OPERATIONS.md § *Google connections*. |
-| `ANTHROPIC_API_KEY` | data-ops | *optional*, when set, the agent's brain is Claude; unset falls back to Workers AI. Both do full tool use. |
+| `ANTHROPIC_API_KEY` | data-ops | **required for the assistant.** The agent's brain is Claude. Unset, `selectModel` throws `unconfigured` and every screen says the assistant is not set up here — there is no fallback engine, on purpose: the old one answered from a much weaker model with nobody told. |
 
 **Vars** (plain config in `wrangler.jsonc`, not secret):
 
