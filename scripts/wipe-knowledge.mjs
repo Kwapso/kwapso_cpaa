@@ -112,8 +112,34 @@ if (!GO) {
 }
 
 for (const { team, db } of plan) {
-  /* The vector ids, READ BEFORE THE ROWS GO. A chunk's id is its vector's id. */
-  const ids = (await d1(db, "SELECT id FROM knowledge_chunks")).map((r) => r.id)
+  /* THE VECTOR IDS, DERIVED FROM THE SOURCES — not read off the chunk rows.
+   *
+   * THIS LINE USED TO BE `SELECT id FROM knowledge_chunks`, and it leaked in two
+   * ways at once. A source carries a `<sourceId>:summary` vector as well as its
+   * `<sourceId>:<seq>` chunk vectors (knowledge-vectors.ts, chunkVectorId /
+   * recordVectorId), and no chunk row names the summary — so every summary vector
+   * was left behind PERMANENTLY, because the only row that could ever name it
+   * again is a source this script deletes three lines later. Measured on staging
+   * on 28 Aug 2026: a Vectorize query at level="record" returned 300 hits of
+   * which 196 were dead, every one summary-shaped, every one with no source row.
+   *
+   * The second leak is the same shape from the other end: a chunk row already
+   * removed by something else — the team-schema migration that discards the old
+   * index does exactly this — names a vector this list can never reach, and the
+   * wipe then reports success.
+   *
+   * So the ids are DERIVED the way clearIndex derives them (knowledge.ts), from
+   * the SOURCE row and its own count, which is correct even when the chunk rows
+   * are already gone. */
+  const sources = await d1(
+    db,
+    "SELECT id, MAX(COALESCE(chunk_count,0), COALESCE(indexed_chunks,0)) AS written FROM knowledge_sources"
+  )
+  const pad = (n) => String(n).padStart(5, "0")  // knowledge-vectors.ts chunkVectorId — FIVE, checked
+  const ids = sources.flatMap((s) => [
+    `${s.id}:summary`,
+    ...Array.from({ length: Number(s.written) || 0 }, (_, i) => `${s.id}:${pad(i)}`),
+  ])
   if (ids.length) {
     /* Vectorize refuses more than 100 ids per call — measured, not assumed:
        it answered 40007 "max id count is 100" to a batch of a thousand. */
