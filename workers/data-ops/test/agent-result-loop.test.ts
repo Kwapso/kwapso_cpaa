@@ -22,7 +22,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { repeatGuard, trimResult } from "../src/lib/agent"
+import { readBudget, repeatGuard, trimResult } from "../src/lib/agent"
 import type { ToolCall } from "../src/lib/model"
 
 /** A ticket shaped like the door's own row (help.ts TICKET_COLS) — thirty-odd
@@ -107,15 +107,104 @@ describe("trimResult: the summary survives, the rows are what go", () => {
     expect(trimResult("a short answer")).toBe("a short answer")
   })
 
-  it("a long plain string is cut, and admits it", () => {
-    const trimmed = trimResult("x".repeat(5000))
-    expect(trimmed.length).toBeLessThan(5000)
+  it("a plain string longer than the allowance is cut, and admits it", () => {
+    // 50,000 rather than the 5,000 this used to use: the promise is unchanged —
+    // a string too big to hand over is cut and says so — but what "too big"
+    // means moved when a read of ONE THING stopped being held to the summary
+    // budget. Five thousand characters of a document now arrive whole, which is
+    // the entire point of RECORD_CHARS.
+    const trimmed = trimResult("x".repeat(50_000))
+    expect(trimmed.length).toBeLessThan(50_000)
     expect(trimmed).toMatch(/Trimmed here/)
   })
 
   it("never returns more than the ceiling plus its own note", () => {
     const [body] = trimResult(page(50)).split("\n")
     expect(body.length).toBeLessThanOrEqual(2000)
+  })
+})
+
+/* ------------------------- THE ZERO-ROWS BUG ------------------------------ */
+//
+// The other end of the same fault. Dropping rows "from the END in whole rows" is
+// right for fifty tickets and catastrophic for one document: a single 8,680-char
+// source does not fit a 2,000-char budget, so NO row fits, so the model was handed
+// `{"sources":[]}` and the sentence "0 of 1 sources are shown". An empty list is
+// not a trimmed answer — it is the answer "there is nothing", to a question that
+// had something.
+//
+// Measured against the live staging door on 28 Aug 2026: a source read by id gave
+// the model 220 of 8,680 characters (2.5%); one matching meeting gave it 233 of
+// 2,531 (9.2%). The owner had asked whether a scope document covered what a call
+// discussed, and the assistant answered — correctly — that it could not read
+// either one in full.
+describe("a read of ONE THING reaches the model", () => {
+  /** A source row the way the knowledge door really answers one: the material IS
+   * the row, and it is far past the summary budget on its own. */
+  const source = (chars: number) => ({
+    sources: [{ id: "01J", title: "Great wave venture scope", kind: "file", body: "s".repeat(chars) }],
+    total: 1,
+    hasMore: false,
+    nextCursor: null,
+  })
+
+  it("does not come back empty — the bug, in one line", () => {
+    const parsed = JSON.parse(trimResult(source(8_000)).split("\n")[0]) as { sources: unknown[] }
+    expect(parsed.sources, "one source asked for, one source returned").toHaveLength(1)
+  })
+
+  it("hands the whole document over when it fits the allowance", () => {
+    const whole = source(8_000)
+    expect(trimResult(whole)).toBe(JSON.stringify(whole))
+  })
+
+  it("keeps the row and cuts its longest field when it does NOT fit", () => {
+    const trimmed = trimResult(source(80_000))
+    const parsed = JSON.parse(trimmed.split("\n")[0]) as { sources: { body: string }[]; total: number }
+    expect(parsed.sources, "the row survives being too big").toHaveLength(1)
+    expect(parsed.total, "the summary fields survive, as they always did").toBe(1)
+    expect(parsed.sources[0].body, "and the reader is told the body was cut").toMatch(/cut here: body is 80000 characters in full/)
+    expect(trimmed).toMatch(/characters are missing in total/)
+  })
+
+  it("a PAGE is still summarised — the many-rows path is untouched", () => {
+    const trimmed = trimResult(page(50))
+    expect(trimmed).toMatch(/of 50 tickets are shown/)
+    expect(trimmed.split("\n")[0].length).toBeLessThanOrEqual(2000)
+  })
+
+  it("says what it did as a fact, never as an instruction", () => {
+    const trimmed = trimResult(source(80_000))
+    expect(trimmed).not.toMatch(/\byou (must|should)\b|\bdo not\b|\bcall\b/i)
+  })
+})
+
+/* ------------------------ THE TURN'S READING BUDGET ----------------------- */
+//
+// The record budget is thirty times the summary budget and a turn may take twelve
+// steps, so the ceiling that used to be per-result has to exist per-TURN or a
+// single turn could hand the model half a million characters — and because every
+// step re-sends the whole conversation, the last step pays for all of it.
+describe("readBudget: a turn may read a lot, but not without end", () => {
+  it("gives a full record allowance while there is room", () => {
+    const b = readBudget()
+    expect(b.allowance()).toBe(40_000)
+  })
+
+  it("falls back to the summary budget once the turn has read its fill", () => {
+    const b = readBudget()
+    b.spend(119_000)
+    expect(b.allowance(), "what is left, never less than a usable summary").toBe(2000)
+    b.spend(50_000)
+    expect(b.allowance(), "and it never goes negative on the next read").toBe(2000)
+  })
+
+  it("a spent budget still lets a document arrive shortened rather than empty", () => {
+    const b = readBudget()
+    b.spend(200_000)
+    const doc = { sources: [{ id: "01J", body: "s".repeat(9000) }], total: 1 }
+    const parsed = JSON.parse(trimResult(doc, b.allowance()).split("\n")[0]) as { sources: unknown[] }
+    expect(parsed.sources).toHaveLength(1)
   })
 })
 
