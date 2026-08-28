@@ -10,6 +10,7 @@ import { sectionFor } from "@/components/deep-link/route"
 import { BOTTOM_NAV_SLOTS, NAV, TEAM_SECTIONS, bottomNavItems, overflowNavItems } from "@/lib/pages"
 import { MODULE_PERMISSION } from "@/lib/screens"
 import { TEAM_MODULES } from "@shared/team-modules"
+import { stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(__dirname, "..", "..")
 
@@ -181,7 +182,12 @@ describe("the sidebar sequence the owner fixed", () => {
 // icon with it, and the values must all be different, so the next one cannot
 // quietly land on somebody else's.
 describe("the rail's icons", () => {
-  const src = readFileSync(join(ROOT, "web/components/app-shell.tsx"), "utf8")
+  // COMMENTS OFF BEFORE THE TABLE IS READ. `SECTION_ICONS` is written with
+  // explanatory lines between its entries, and the pair regex below matches any
+  // indented `key: Value,` — so an entry commented OUT with a block comment is
+  // still counted as an entry. Proved 27 Aug 2026: wrapping `waves: SeaWaves,`
+  // in a /* */ left this suite green while the rail had no icon for waves.
+  const src = stripComments(readFileSync(join(ROOT, "web/components/app-shell.tsx"), "utf8"))
   const block = src.match(/const SECTION_ICONS[^{]*\{([^}]*)\}/)?.[1] ?? ""
   const pairs = [...block.matchAll(/^\s*"?([\w-]+)"?:\s*(\w+),/gm)].map(([, key, icon]) => ({ key, icon }))
 
@@ -268,7 +274,15 @@ describe("every navigable section is reachable from its own URL", () => {
   // two-part contract reads as coverage of the whole. The other half is now held
   // by workers/gateway/test/shell-routing.test.ts.
   it("the gateway serves a shell for every sidebar section's sub-paths", () => {
-    const src = readFileSync(join(ROOT, "workers", "gateway", "src", "index.ts"), "utf8")
+    // COMMENTS OFF, same reason and a sharper edge: the entries are bare quoted
+    // strings, so ANY double-quoted word in a comment inside the array reads as a
+    // served module. Proved 27 Aug 2026 — deleting `"meetings",` and leaving a
+    // comment that says `the "meetings" page` left this green, i.e. a reload at
+    // /meetings/<id> would have 404'd with this test still reporting cover.
+    // (The gateway's own suite does catch that deletion; this one had stopped.)
+    const src = stripComments(
+      readFileSync(join(ROOT, "workers", "gateway", "src", "index.ts"), "utf8")
+    )
     const list = src.match(/export const SHELL_MODULES = \[([\s\S]*?)\]/)?.[1] ?? ""
     const served = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1])
     expect(
