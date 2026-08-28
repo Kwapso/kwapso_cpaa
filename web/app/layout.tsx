@@ -31,7 +31,26 @@ export default function RootLayout({
     // variable no stylesheet in either front door ever read, so the browser
     // was fetching and holding a whole second typeface that nothing drew.
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-[100svh] antialiased">
+      {/* THE PAGE HAS A GROUND. It did not — this element was
+       * `min-h-[100svh] antialiased` and nothing else, and I walked the whole
+       * chain in the running app on 2026-08-28: <section> → four <div>s →
+       * <main> → two <div>s → <body>, every one `rgba(0,0,0,0)`, with <html>
+       * transparent too and no rule in the 209KB compiled stylesheet painting
+       * either. So the agency app's page ground was the BROWSER CANVAS: pure
+       * white under `color-scheme: light` rather than `--background` #FFFEF9,
+       * and whatever the host paints in any embedded view.
+       *
+       * That is not only a wrong tone, it is what hid a second fault. The kit's
+       * surface model is two papers on an off-beige ground, and `--surface-panel`
+       * is the tone that is VISIBLE on that ground. On white it is visible too —
+       * by accident — which is why a `--surface-panel` card standing on a
+       * `--surface-panel` card (screen-renderer's CardGrid, 50 of the knowledge
+       * base's 51 cards) looked survivable here and would not have on the ground
+       * the kit assumes. The two are one change and land together.
+       *
+       * The client portal has always done this (web-portal/app/layout.tsx). This
+       * is the agency door catching up, one class, same token. */}
+      <body className="bg-background min-h-[100svh] antialiased">
         {/* The mark's stylesheet and its animator, FIRST in the body: the
          * animator has to be published before the parser reaches the loader
          * further down, so the mark is already turning when the bundle is still
@@ -43,7 +62,16 @@ export default function RootLayout({
          * (app bar + auth screens) owns it, localStorage remembers it, and
          * the provider's only job is the pre-paint boot script. */}
         <ThemeProvider>
-          <AmbientBackground />
+          {/* THE MANGO FIELD, FROM THE KIT. `variant="brand"` is mango
+           * softened to a wash with `color-mix` — ruling 26's one permitted use
+           * of mango as a fill — and `anchor="fixed"` pins it to the viewport
+           * for a whole-page wash rather than to the nearest positioned
+           * ancestor. Both are the kit's own names; neither was passed before,
+           * so this component has been drawing `variant="default"`, the
+           * near-invisible neutral tint, while 115 lines of app CSS tried to
+           * draw the real field through a class that is not on this element.
+           * globals.css says the rest. */}
+          <AmbientBackground variant="brand" anchor="fixed" />
           <ErrorReporter />
           <VersionWatch />
           {/* CONTAINMENT (ERROR-HANDLING.md C1). A thrown RENDER error is not caught
