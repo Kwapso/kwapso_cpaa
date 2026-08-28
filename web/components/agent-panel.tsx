@@ -76,71 +76,55 @@ export function AgentPanel({
        * slide-in (the owner's "weird outline"). Harmless but ugly; the effect
        * above moves focus into the composer instead. */}
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
-        {/* pe-12 reserves room on the right for the Sheet's own absolute close ✕
-         * (top-4 right-4) — without it the ✕ sits on top of the New chat button and
-         * swallows its taps (the bug the owner hit). */}
-        <SheetHeader className="border-b p-4 pe-12">
-          <div className="flex items-center justify-between gap-2">
-            <SheetTitle>{t("Assistant")}</SheetTitle>
-            {canUse && (
-              <div className="flex items-center gap-1">
-                {chat.quotaLabel && (
-                  <button
-                    type="button"
-                    onClick={() => setUsageOpen(true)}
-                    className="rounded-pill"
-                    title={t("See where your assistant credits went")}
-                  >
-                    <Badge
-                      variant={
-                        chat.quota?.blocked
-                          ? "destructive"
-                          : // NEARLY OUT wears the warning colour — a colour, not a
-                            // sentence, so R28 owes nothing. The threshold is the
-                            // last handful, not a fraction: 3 is "you will feel this
-                            // today", whatever the team's allowance is.
-                            chat.quota && !chat.quota.unlimited && chat.quota.remaining <= 3
-                            ? "warning"
-                            : "secondary"
-                      }
-                      className="cursor-pointer text-badge"
-                    >
-                      {chat.quotaLabel}
-                    </Badge>
-                  </button>
-                )}
-                {/* History: past conversations (resume any, incl. one started on
-                 * another device). size-10 ≈ a real thumb target (the size-8 pair
-                 * was too small to hit on a phone); bordered so they read as
-                 * buttons, not decorations. */}
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="size-10"
-                  onClick={() => setHistoryOpen(true)}
-                  disabled={chat.busy}
-                  title={t("Past conversations")}
-                  aria-label={t("Past conversations")}
-                >
-                  <History className="size-5" aria-hidden />
-                </Button>
-                {chat.items.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="size-10"
-                    onClick={chat.newChat}
-                    disabled={chat.busy}
-                    title={t("New chat")}
-                    aria-label={t("New chat")}
-                  >
-                    <Plus className="size-5" aria-hidden />
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
+        {/* NO className. The kit's own SheetHeader already reserves the room:
+         * `pe-[var(--space-9)]` for the drawer's absolute close ✕, and
+         * `shadow-[var(--hairline-under)]` for the rule under it.
+         *
+         * WHAT WAS HERE, AND WHY IT WAS THE BUG. `className="border-b p-4 pe-12"`
+         * OVERRODE all three: `p-4` replaced the kit's inset, `border-b` drew a
+         * second rule as a CSS border (BUILD-A-SCREEN §6.1 — separation is a fill
+         * or an inset shadow, never a stroke), and `pe-12` replaced a 4rem reserve
+         * with a 3rem one. The ✕ sits at `--space-6` and is `--control-height-dense`
+         * wide, so it occupies 3.5rem from the end — more than the 3rem reserved,
+         * which is the overlap the owner tapped. The old comment here also cited
+         * `top-4 right-4`, which is the OLD library's position, not this kit's.
+         *
+         * A hand-computed reservation against another component's absolute
+         * position is the defect. The number was never the fix. */}
+        <SheetHeader>
+          <SheetTitle>{t("Assistant")}</SheetTitle>
           <SheetDescription>{t("Ask me anything, or tell me what to change. I'll only do what you can do.")}</SheetDescription>
+          {/* The allowance reads as its own line rather than as a chip squeezed
+           * beside the title: SheetHeader is a COLUMN, so a child gets a row of
+           * its own. At 375 the sentence is 213px wide and there is no width in
+           * which it, the title and two controls share one line. */}
+          {canUse && chat.quotaLabel && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setUsageOpen(true)}
+                className="rounded-pill"
+                title={t("See where your assistant credits went")}
+              >
+                <Badge
+                  variant={
+                    chat.quota?.blocked
+                      ? "destructive"
+                      : // NEARLY OUT wears the warning colour — a colour, not a
+                        // sentence, so R28 owes nothing. The threshold is the
+                        // last handful, not a fraction: 3 is "you will feel this
+                        // today", whatever the team's allowance is.
+                        chat.quota && !chat.quota.unlimited && chat.quota.remaining <= 3
+                        ? "warning"
+                        : "secondary"
+                  }
+                  className="cursor-pointer text-badge"
+                >
+                  {chat.quotaLabel}
+                </Badge>
+              </button>
+            </div>
+          )}
         </SheetHeader>
 
         {!canUse ? (
@@ -178,6 +162,43 @@ export function AgentPanel({
                * in the gap before the first streamed event. */}
               <AgentChat
                 className="h-full rounded-none border-0 bg-transparent"
+                /* THE CHAT'S OWN HEAD CARRIES THE CHAT'S OWN CONTROLS. The kit
+                   names this slot for exactly these — "Controls at the inline
+                   end of the head — a collapse, a menu, a new-thread". They used
+                   to sit in the drawer's header, pushed to the same corner the
+                   Sheet's absolute ✕ occupies, and at 375 that put New chat at
+                   x=386 on a 375-wide screen: entirely off the phone. In here
+                   they are laid out IN FLOW by `ms-auto`, so they cannot collide
+                   with an absolutely-positioned sibling at any width.
+                   No `heading` — the drawer's SheetTitle already says Assistant,
+                   and the kit's mark is not a second name. */
+                header
+                headerActions={
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => setHistoryOpen(true)}
+                      disabled={chat.busy}
+                      title={t("Past conversations")}
+                      aria-label={t("Past conversations")}
+                    >
+                      <History className="size-5" aria-hidden />
+                    </Button>
+                    {chat.items.length > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={chat.newChat}
+                        disabled={chat.busy}
+                        title={t("New chat")}
+                        aria-label={t("New chat")}
+                      >
+                        <Plus className="size-5" aria-hidden />
+                      </Button>
+                    )}
+                  </>
+                }
                 // The kit's chat knows user and assistant; a TOOL STEP renders
                 // as a quiet assistant-side chip carrying the step's outcome.
                 messages={chat.items.map((it) => {
