@@ -485,7 +485,7 @@ export function ProcessDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={process.name} size="band" />}
-      eyebrow={t("Process")}
+      collectionLabel={t("Process")}
       title={process.name}
       status={[
         process.appName,

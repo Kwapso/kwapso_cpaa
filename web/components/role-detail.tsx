@@ -33,6 +33,7 @@ import {
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { PermissionValue, RightSet, RolePermissions, TeamRole } from "@shared/types"
 import { RoleFormDialog } from "@/components/role-form-dialog"
@@ -206,9 +207,10 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       // states are mutually exclusive in practice (a locked role is a seeded
       // one and a seeded one is never switched off), so the eyebrow carries
       // whichever applies and never both.
-      eyebrow={[t("Role"), role.active ? (role.isDefault ? t("Locked") : null) : t("Inactive")]
-        .filter(Boolean)
-        .join(" · ")}
+      collectionLabel={t("Role")}
+      chips={
+        role.active ? (role.isDefault ? <Badge>{t("Locked")}</Badge> : null) : <Badge>{t("Inactive")}</Badge>
+      }
       title={role.title}
       status={
         role.description || `${role.memberCount} member${role.memberCount === 1 ? "" : "s"}`

@@ -263,7 +263,8 @@ export function StoryDetailScreen({
     <RecordScreen
       mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
       // D4: the type word and the reference, above the title.
-      eyebrow={[story.storyType || t("Story"), story.ref].filter(Boolean).join(" · ")}
+      recordNumber={story.ref || undefined}
+      collectionLabel={story.storyType || t("Story")}
       title={translation.of(story.title)}
       // D5: where it is, who has it, when it is due. Three facts, no more.
       status={[

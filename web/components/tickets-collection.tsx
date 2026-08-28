@@ -160,7 +160,13 @@ export function TicketsCollection({
 
   const outerTabs = {
     ...defaultTabsConfig,
-    variant: "line" as const,
+    // THE FOLDER, by saying nothing. Client ruling E: "folder tabs are for main
+    // screens, line tabs for detail screens", and ch27.13: "folder tabs belong to
+    // collections and main screens only". Tickets is a collection on a main
+    // screen, and this strip cuts it into subsets — All and Archived — which is
+    // the folder's own job. It said `line` here and was the reason the owner saw
+    // folders on every section except this one. `defaultTabsConfig` is already
+    // the folder, so the fix is to stop overriding it rather than to flip it.
     tabs: [
       { value: "all", label: t("All tickets"), icon: "inbox", badge: formatCount(totals.help), badgeVariant: "" as const },
       // THE PUT-AWAY PILE. Archive shipped as a door with no button; giving it a

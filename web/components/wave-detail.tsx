@@ -228,7 +228,7 @@ export function WaveDetailScreen({
   return (
     <RecordScreen
       leading={<RecordMark name={wave.name} />}
-      eyebrow={t("Wave")}
+      collectionLabel={t("Wave")}
       title={wave.name}
       status={[wave.accountName ?? undefined, waveDates(wave, t), wave.active ? undefined : t("Switched off")]
         .filter(Boolean)

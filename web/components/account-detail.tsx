@@ -58,6 +58,7 @@ import { useRemembered } from "@shared/web/remembered"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
@@ -648,9 +649,9 @@ export function AccountDetailScreen({
       // clicks away led with a glyph. No logo falls back to the company's
       // initial, never to an empty square (shared/web/record-mark.tsx).
       leading={<RecordMark picture={account.logoUrl} name={account.name} size="band" />}
-      eyebrow={[t("Company"), account.code, account.active ? null : t("Archived")]
-        .filter(Boolean)
-        .join(" · ")}
+      recordNumber={account.code || undefined}
+      collectionLabel={t("Company")}
+      chips={account.active ? null : <Badge>{t("Archived")}</Badge>}
       title={account.name}
       actions={
         <>

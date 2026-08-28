@@ -62,6 +62,7 @@ import {
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { KeyRound, Pencil, Power } from "@shared/ui/foundations/icons"
+import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
@@ -430,13 +431,13 @@ export function ContactDetailScreen({
       // and a square in the list that links to it. `fit` keeps the face cropped.
       // No photo falls back to the initial.
       leading={<RecordMark picture={account.logoUrl} name={account.name} fit="cover" size="band" />}
-      eyebrow={[
-        t("Contact"),
-        account.active ? null : t("Archived"),
-        liveLogin ? t("Can sign in") : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      collectionLabel={t("Contact")}
+      chips={
+        <>
+          {account.active ? null : <Badge>{t("Archived")}</Badge>}
+          {liveLogin ? <Badge>{t("Can sign in")}</Badge> : null}
+        </>
+      }
       title={account.name}
       status={account.email ?? ""}
       actions={

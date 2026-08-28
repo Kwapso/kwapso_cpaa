@@ -625,9 +625,11 @@ export function HelpDetailScreen({
       // reference had existed on this record since the work engine landed and
       // appeared on no screen — the one thing a person needs when a client rings
       // up saying "about BERG-T0412".
-      eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
-        .filter(Boolean)
-        .join(" · ")}
+      // OVERRIDE 73: the ID in the black chip, the collection beside it, both
+      // BELOW the title. This is the record the client was looking at.
+      recordNumber={ticket.ref || undefined}
+      collectionLabel={ticket.helpType || t("Ticket")}
+      chips={ticket.archivedAt ? <Badge>{t("Archived")}</Badge> : null}
       // The description is rich text now, and a TITLE is one line: the words,
       // without the markup they were typed with. The body renders formatted in
       // the conversation below, which is where a person reads it. Translated

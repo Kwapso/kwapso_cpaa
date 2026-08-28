@@ -455,8 +455,20 @@ export function DeepLinkScreen() {
     resolved: resolvedNames,
   })
 
+  // OVERRIDE 73 (2026-08-26). The client, on the live `Tickets · Padelbase · 4182`
+  // page, verbatim: "detail pages do not need this bar that you have on top where
+  // we have Padelbase and the number. these are chips, so the black chip is always
+  // the ID … of course, translate this to universal rules." The universal rule is
+  // this line: a RECORD screen carries no crumb trail, because the identity that
+  // trail was spelling now sits in the chips under the title (see RecordScreen).
+  // A collection keeps its crumbs — he ruled on detail pages and nothing else.
+  //
+  // The row itself stays: it also carries the running timer on desktop, and a
+  // timer is not a breadcrumb.
+  const showCrumbs = recordId === null
+
   return (
-    <AppShell active={active} breadcrumbs={crumbs} onNavigate={go} activePath={currentPath}>
+    <AppShell active={active} breadcrumbs={showCrumbs ? crumbs : undefined} onNavigate={go} activePath={currentPath}>
       {/* data-trace marks the screen the agent just drove; the ring is a short-lived
        * glance cue (auto-cleared) so the user sees WHERE a traced change landed. It
        * rings the content region — a just-opened dialog draws the eye on its own. */}

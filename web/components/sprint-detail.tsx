@@ -241,7 +241,8 @@ export function SprintDetailScreen({
   return (
     <RecordScreen
       mark={kindMark}
-      eyebrow={[kindWord, sprint.ref].filter(Boolean).join(" · ")}
+      recordNumber={sprint.ref || undefined}
+      collectionLabel={kindWord}
       title={sprint.name}
       status={[
         sprint.completedAt ? t("Complete") : sprint.active ? t("Running") : t("Cancelled"),

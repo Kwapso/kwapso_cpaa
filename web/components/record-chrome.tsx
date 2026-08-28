@@ -34,6 +34,8 @@ import {
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { MoreHorizontal } from "@shared/ui/foundations/icons"
 
+import { RecordChrome } from "@shared/ui/compositions/templates/record-chrome"
+
 import { RecordMark } from "@shared/web/record-mark"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
@@ -209,202 +211,94 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
  * one primary and one secondary button belong in `actions`; everything else is
  * a RecordActionsMenu at the end of it (B1).
  */
-export function RecordHeader({
-  mark,
-  leading,
-  eyebrow,
-  title,
-  status,
-  actions,
-  children,
-  onCollapsedChange,
-}: {
-  /** The record type's glyph, when the type has one. */
-  mark?: string | null
-  /** A logo or avatar, when the record has a real image — it replaces the mark
-   * in the same square (G3). */
-  leading?: React.ReactNode
-  /** The type word, in caps, and the reference number with it (D4). */
-  eyebrow?: React.ReactNode
-  title: React.ReactNode
-  /** One dot-separated line, three facts maximum (D5). */
-  status?: React.ReactNode
-  /** One primary, one secondary, then the three-dot menu (B1). */
-  actions?: React.ReactNode
-  /** Anything the module wants inside the band, under the status line. */
-  children?: React.ReactNode
-  /** Told when the band leaves the screen, so RecordBody can pin a reduced
-   * title in its place. Wired by RecordScreen; not needed by hand. */
-  onCollapsedChange?: (collapsed: boolean) => void
-}) {
-  const sentinel = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => {
-    const el = sentinel.current
-    if (!el || !onCollapsedChange) return
-    // The sentinel sits at the BOTTOM of the band, and the margin is exactly how
-    // far down the screen the pinned chrome reaches: the shell's own bar (zero on
-    // desktop, the app bar's height on a phone) plus the collapsed line that
-    // replaces this band. So the swap happens at the moment the tab strip arrives
-    // where it will be pinned, and nothing jumps.
-    //
-    // The offset is MEASURED rather than written down, because `--shell-top` is
-    // in `rem` and the display-scale setting (S4) moves it. Falls back to "never
-    // collapsed" where the observer is missing (jsdom), which is the honest
-    // degradation: a plain, unpinned screen.
-    if (typeof IntersectionObserver === "undefined") return
-    const style = getComputedStyle(el)
-    const root = parseFloat(style.fontSize) || 16
-    // A custom property comes back as it was WRITTEN, not resolved — "3.75rem",
-    // not "60px" — so it is converted here rather than trusted as a number.
-    const declared = style.getPropertyValue("--shell-top").trim()
-    const shellTop = (parseFloat(declared) || 0) * (declared.endsWith("rem") ? root : 1)
-    const collapsedLine = root * 3.25
-    const io = new IntersectionObserver(
-      ([entry]) => onCollapsedChange(!entry.isIntersecting),
-      { rootMargin: `-${Math.round(shellTop + collapsedLine)}px 0px 0px 0px`, threshold: 0 }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [onCollapsedChange])
-
-  return (
-    <header className="flex flex-col gap-4 pb-6">
-      <div className="flex flex-wrap items-start gap-4">
-        {leading ?? (mark ? <TypeMark mark={mark} size="band" /> : null)}
-        <div className="min-w-0 flex-1">
-          {eyebrow && (
-            <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
-              {eyebrow}
-            </p>
-          )}
-          {/* T5: a long title wraps to two lines and clamps. It never truncates
-              on one, which hid the end of every real ticket title. */}
-          <h1 className="line-clamp-2 text-2xl font-medium tracking-tight">{title}</h1>
-          {status && <p className="text-muted-foreground mt-1 text-sm">{status}</p>}
-        </div>
-        {actions && (
-          // ml-auto on the GROUP so a narrow phone reflows instead of clipping
-          // (UI-CONVENTIONS "Action-button rows never clip").
-          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
-            {actions}
-          </div>
-        )}
-      </div>
-      {children}
-      <div ref={sentinel} aria-hidden className="h-px w-full" />
-    </header>
-  )
-}
-
-/** EVERYTHING FROM THE TAB STRIP DOWN (D3, C4).
+/** THE RECORD DETAIL SCREEN — the kit's shape, adapted to this app's call sites.
  *
- * Two jobs. It paints opaque paper full-bleed, so the ambient field stops at the
- * header band and the rest of the screen is calm — the "clean below the tabs"
- * half of CHECKLIST 11.5. And it pins a reduced title line to the top once the
- * band has scrolled away, with the tab strip directly under it, so a long ticket
- * never loses which record and which tab you are in.
+ * KIT-DRAWN, APP-FED. This file used to draw the four regions itself; the kit's
+ * `RecordChrome` draws them now and everything below is the mapping onto it. The
+ * house pattern is `screen-engine/tabs-view.tsx`'s: keep the CONTRACT twelve call
+ * sites already write, render every pixel through the kit.
  *
- * The strip is pinned with a class ON the library TabsView (which takes a
- * `className`), not by wrapping it — wrapping would pin the PANELS too, because
- * TabsView renders the bar and its content as one tree. No library change.
+ * OVERRIDE 73 (2026-08-26) IS WHY THE PROPS CHANGED. The client, looking at the
+ * live `Tickets · Padelbase · 4182` page, verbatim: "notice how the chips are
+ * directly underneath the title … the edit button should be aligned with the
+ * title and the chips underneath it. also, detail pages do not need this bar that
+ * you have on top where we have Padelbase and the number. these are chips, so the
+ * black chip is always the ID. we always use black chips for IDs, and next to it,
+ * add a chip for Padelbase like in the example. of course, translate this to
+ * universal rules."
+ *
+ * So `eyebrow` IS GONE — it was the dot-joined "Ticket · BERG-T0412 · Archived"
+ * line above the title, and the ruling puts that material below it as chips. In
+ * its place: `recordNumber` (the black `Badge variant="inverse"` — "the black chip
+ * is always the ID"), `collectionLabel` (the chip beside it), and `chips` for
+ * anything a screen adds. `actions` now shares the title's own row, which is what
+ * puts Edit "aligned with the title" without a line of markup here.
+ *
+ * WHAT WENT WITH THE OLD HEADER. `RecordHeader`'s IntersectionObserver collapse
+ * and `RecordBody`'s opaque-paper band are deleted rather than ported. The band
+ * existed to stop the ambient field at the tab strip (UI-RULEBOOK C4) — and the
+ * kit ships `AmbientBackground` with no translucency to stop, so the rule it
+ * served no longer describes anything. The kit has final authority; C4 is one of
+ * the rules that loses.
+ *
+ * THE TABS GO IN `panel`, NOT `tabs`. `RecordDetail` carries a tab strip of its
+ * own and draws it only when `tabs` is non-empty (record-detail.tsx:681, :761), so
+ * handing it our `children` as the panel gives exactly ONE strip — the app's
+ * `TabsView`, which is already kit-drawn and already knows folder from line. Two
+ * strips on one screen is the defect this lane exists to remove, not to move.
  */
-export function RecordBody({
-  collapsed,
-  mark,
-  eyebrow,
-  title,
-  children,
-}: {
-  collapsed: boolean
-  mark?: string | null
-  eyebrow?: React.ReactNode
-  title: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      // Full-bleed: the negative margins cancel the shell's own gutters so the
-      // paper runs edge to edge, and the padding puts the content back where it
-      // was. The min-height keeps the field from reappearing under a short
-      // record — a strip of drifting orange below the last row is exactly the
-      // thing 11.5 is about.
-      className="bg-background relative z-0 -mx-4 min-h-[calc(100svh-9rem)] px-4 pb-16 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
-      style={
-        {
-          // Where the tab strip pins: under the app bar, and under the collapsed
-          // line as well once there is one.
-          "--record-tabs-top": collapsed
-            ? "calc(var(--shell-top, 0px) + 3.25rem)"
-            : "var(--shell-top, 0px)",
-        } as React.CSSProperties
-      }
-    >
-      <div
-        className={`bg-background sticky top-[var(--shell-top,0px)] z-10 flex items-center gap-2 overflow-hidden transition-[height] duration-200 ${
-          collapsed ? "h-13" : "h-0"
-        }`}
-      >
-        {mark && (
-          <span aria-hidden className="text-lg leading-none">
-            {mark}
-          </span>
-        )}
-        <p className="truncate text-sm font-medium">
-          {eyebrow && <span className="text-muted-foreground mr-2 font-normal">{eyebrow}</span>}
-          {title}
-        </p>
-      </div>
-      {children}
-    </div>
-  )
-}
-
-/** The whole record: band, body, and the collapse wiring between them.
- *
- * `header` and `body` are given as elements so a module can put whatever it
- * likes in each — a status stepper, a warning band, a two-column split — while
- * the four regions and their order stay the same on every screen (D1). */
 export function RecordScreen({
   mark,
   leading,
-  eyebrow,
+  recordNumber,
+  collectionLabel,
+  chips,
   title,
   status,
   actions,
   headerExtra,
   children,
 }: {
+  /** The record type's glyph, when the type has one. */
   mark?: string | null
+  /** A logo or avatar, when the record has a real image — it replaces the mark
+   * in the same square (G3). */
   leading?: React.ReactNode
-  eyebrow?: React.ReactNode
+  /** The reference a person quotes on the phone. Drawn as the charcoal chip,
+   * below the title: "the black chip is always the ID". */
+  recordNumber?: React.ReactNode
+  /** What kind of record this is, or which collection it belongs to — the chip
+   * beside the ID. "add a chip for Padelbase like in the example". */
+  collectionLabel?: React.ReactNode
+  /** Anything else that belongs on the identity row — a status word, "Archived". */
+  chips?: React.ReactNode
   title: React.ReactNode
+  /** One dot-separated line, three facts maximum (D5). Below the chips. */
   status?: React.ReactNode
+  /** One primary, one secondary, then the three-dot menu (B1). Shares the
+   * title's row, per the ruling. */
   actions?: React.ReactNode
-  /** Rendered inside the band, under the status line (a status stepper). */
+  /** Anything the module wants under the identity row — a status stepper. */
   headerExtra?: React.ReactNode
   /** The TabsView and its panels. */
   children: React.ReactNode
 }) {
-  const [collapsed, setCollapsed] = React.useState(false)
-  const onCollapsedChange = React.useCallback((next: boolean) => setCollapsed(next), [])
   return (
-    <>
-      <RecordHeader
-        mark={mark}
-        leading={leading}
-        eyebrow={eyebrow}
-        title={title}
-        status={status}
-        actions={actions}
-        onCollapsedChange={onCollapsedChange}
-      >
-        {headerExtra}
-      </RecordHeader>
-      <RecordBody collapsed={collapsed} mark={mark} eyebrow={eyebrow} title={title}>
-        {children}
-      </RecordBody>
-    </>
+    <RecordChrome
+      mark={leading ?? (mark ? <TypeMark mark={mark} size="band" /> : null)}
+      recordNumber={recordNumber}
+      collectionLabel={collectionLabel}
+      chips={chips}
+      title={title}
+      meta={status}
+      actions={actions}
+      hero={headerExtra}
+      panel={children}
+      /* The audit strip and the activity column are this app's own — `RecordFooter`
+         and the Activity tab feed them from our own doors — so the kit's footer
+         stays off rather than drawing an empty second one. */
+      footerVisible={false}
+    />
   )
 }
 

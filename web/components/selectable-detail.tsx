@@ -24,6 +24,7 @@
 import * as React from "react"
 
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 
@@ -112,7 +113,8 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
       // one (it is the glyph this very screen sets), and the initial stands in
       // where it has none, which is the same square in the same slot either way.
       leading={<RecordMark name={value.value} mark={value.mark} size="band" />}
-      eyebrow={[t("Dropdown value"), value.type].filter(Boolean).join(" · ")}
+      collectionLabel={t("Dropdown value")}
+      chips={value.type ? <Badge>{value.type}</Badge> : null}
       title={value.value}
       status={[
         value.active ? t("Active") : t("Inactive"),
