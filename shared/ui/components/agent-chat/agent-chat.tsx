@@ -901,9 +901,23 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                   send();
                 }
               }}
+              autoGrow
               className={cn(
-                "min-h-[var(--control-height-dense)] flex-1 resize-none overflow-hidden",
-                "border-0 bg-transparent p-0",
+                "min-h-[var(--control-height-dense)] flex-1 resize-none",
+                /* THE CAP, and it is `chat.tsx`'s — nine rem is where that
+                   composer stops growing and starts scrolling, and two
+                   composers in one kit do not get two answers. `autoGrow`
+                   carries it out; the number stays here, in CSS, where a
+                   design decision belongs. */
+                "max-h-[9rem]",
+                /* `overflow-hidden` USED TO BE WRITTEN HERE, with no growth
+                   and no cap beside it. Measured at 375 with 150 characters
+                   typed: the box stayed 36, the content was 106, and the
+                   overflow was hidden — so seventy pixels of somebody's own
+                   sentence was invisible AND unscrollable before they sent
+                   it. `autoGrow` decides the overflow from whether the box
+                   still fits its text. */
+                "border-0 bg-transparent px-0 py-[var(--space-1h)]",
                 "text-caption leading-[var(--leading-normal)]",
               )}
             />

@@ -545,10 +545,23 @@ const Chat = React.forwardRef<HTMLDivElement, ChatProps>(
                   send();
                 }
               }}
+              autoGrow
               className={cn(
-                "min-h-[var(--control-height-dense)] flex-1 resize-none border-0 bg-transparent p-0",
+                "min-h-[var(--control-height-dense)] flex-1 resize-none border-0 bg-transparent",
+                /* SYMMETRIC BLOCK PADDING, not `p-0`. A textarea sets its first
+                   line at the TOP of its box, so a field held open by
+                   `min-h` parks one line high with all the slack underneath —
+                   which is what put this placeholder off its centre. Padding
+                   centres it by construction at one line and travels with the
+                   text as it grows; `items-end` on the pill was always right
+                   FOR A COMPOSER THAT GROWS and only looked wrong because this
+                   one did not. */
+                "px-0 py-[var(--space-1h)]",
                 "text-caption leading-[var(--leading-normal)]",
-                multiline ? "max-h-[9rem]" : "overflow-hidden",
+                /* The cap belongs to the multiline shape; a single-line
+                   composer stops at one line because that is all its content
+                   is. `autoGrow` reads this back and scrolls at the clamp. */
+                multiline ? "max-h-[9rem]" : "max-h-[var(--control-height-input)]",
               )}
             />
 
