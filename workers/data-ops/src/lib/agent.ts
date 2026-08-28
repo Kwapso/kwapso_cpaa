@@ -40,6 +40,67 @@ const MAX_STEPS = 12
  * perfectly-planned turn dies at the vocabulary gate having changed nothing. */
 export const DROPDOWN_ORDER_RULE =
   "A dropdown write NEVER invents the option. When a job says 'create X and move everything onto it', that is TWO calls in ONE turn and the order is not optional: create the dropdown value first (create_dropdown_value), then write the rows that use it second."
+/** WHICH DOOR A QUESTION OPENS — the routing rule, and why it points where it does.
+ *
+ * The prompt used to answer this question twice, differently. One sentence said
+ * "to answer ANY question about THIS team's real data — its members, roles,
+ * accounts, or support tickets — you MUST first call the matching tool (for
+ * example list_roles, list_members, list_accounts, list_help_tickets)"; another,
+ * further down, said a question about what the team KNOWS goes to ask_knowledge.
+ * Both are reasonable sentences. They collide on the most ordinary question
+ * anybody asks here — "what's going on with the HOGO account?" — and the first
+ * one wins, because it is marked IMPORTANT and it names the very word the
+ * question used.
+ *
+ * MEASURED, before and after, by scripts/agent-routing-bench.mjs: 18 real
+ * questions, the shipped prompt, the shipped catalogue, claude-sonnet-5 at low
+ * effort, one turn each, reading which door the model opens FIRST.
+ *
+ *                                          before   after
+ *   a knowledge question → ask_knowledge     6/12    12/12
+ *   a counting question → a live read         6/6     6/6
+ *
+ * Every one of the six misses was the same shape: a question ABOUT a record went
+ * to the list that names it — "tell me about FluClinic" to list_accounts, "where
+ * do things stand with task 3144" to list_help_tickets — which answers with a row
+ * of metadata and not one word of what the record has been through.
+ *
+ * Four CONTROL questions were added AFTER that pair, and they exist to catch the
+ * opposite failure — a rule that sends everything to the base would score full
+ * marks above by over-steering. Three writes and "is the knowledge base up to
+ * date?"; all four route live. 22/22 on the run that includes them.
+ *
+ * Read the number for what it is: 18 questions, authored here, graded against
+ * expectations authored here. It is evidence the rule steers, not proof the
+ * model is right about every question anybody will ask. The half worth trusting
+ * most is the live one, because that is the direction where a mis-steer invents
+ * a number, and it did not move.
+ *
+ * WHY THE KNOWLEDGE BASE IS THE DEFAULT. This is a fact about this app, not a
+ * preference: the base MIRRORS the team's own rows — ten kinds of them, tickets
+ * through tasks (workers/content/src/lib/knowledge-ingest.ts) — it is swept every
+ * fifteen minutes, and every citation it hands back carries `liveStatus`, that
+ * record read out of the database at the moment of asking. So one call returns
+ * the material AND what is true right now, where a list read returns a row and no
+ * material at all.
+ *
+ * WHY HALF THE QUESTIONS STILL GO LIVE, and this half is not a preference either:
+ * retrieval reads a SAMPLE. It cannot count, enumerate, sort or filter. "How many
+ * open tickets" answered out of passages is a confident wrong number, and a
+ * confident wrong number is worse than a slow right one — so those questions get
+ * a real read every time, and the rule says which is which in the model's own
+ * vocabulary rather than leaving it to be inferred.
+ *
+ * Named rather than inlined for the reason DROPDOWN_ORDER_RULE is: it is the
+ * sentence a test can hold, and agent-parity.test.ts checks both that it rides
+ * the wall and that every tool it names is a tool that exists. */
+export const KNOWLEDGE_FIRST_RULE = [
+  "Never answer a question about THIS team out of your own memory — look it up. There are two ways to look something up and choosing well is most of doing this job properly.",
+  "ask_knowledge is your DEFAULT, and you should reach for it first. It searches everything the team knows at once: its documents, notes and meeting transcripts, AND a mirror of the app's own records — tickets, accounts, contacts, systems, process maps, sprints, stories, meetings, to-dos and tasks — kept in step every fifteen minutes. Each source it cites also carries `liveStatus`, that record read from the database as you ask. So for any question ABOUT something — what it says, what was agreed on it, what has happened to it, where it stands, \"tell me about X\", \"catch me up on Y\", \"what's the latest on Z\" — one ask_knowledge call gives you both the story and what is true today, and it is far quicker than hunting through lists.",
+  "Go to a live list instead — list_help_tickets, list_members, list_roles, list_accounts, list_meetings and the rest — when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
+  "Never guess, never invent data, and never tell the user you can't check — pick the door, call the tool, then answer plainly from what comes back.",
+].join(" ")
+
 /** LAW R23, said on the surface the model actually reads.
  *
  * The door already makes a sourceless answer impossible to RECEIVE: `found`,
@@ -54,7 +115,7 @@ export const DROPDOWN_ORDER_RULE =
  * model obeys what both surfaces agree on, so this exact sentence is asserted
  * against the ask tool's own description by agent-parity.test.ts. */
 export const KNOWLEDGE_CITATION_RULE = [
-  "When a question is about what the team KNOWS — a client's history, how we do something, what was agreed — call ask_knowledge first. Then answer ONLY from the passages it returns. If it comes back with found:false, say so in its own words and stop: never fill the gap from memory.",
+  "When a question is about what the team KNOWS — a client's history, how we do something, what was agreed — call ask_knowledge first. Then answer ONLY from the passages it returns. If it comes back with found:false, never fill the gap from memory — say so in its own words. Where the question was about a RECORD rather than about something written down, looking that record up live is the one thing you may do instead: a lookup is not a guess.",
   // THE MARK, not a list of titles. This sentence replaced "NAME the sources you
   // used (their titles) in your reply", which was the only instruction the model
   // had and which it obeyed by writing its own list — measured on the composing
@@ -124,7 +185,7 @@ export function systemFor(language?: string | null): string {
 export const SYSTEM = [
   `You are ${brand.name}'s assistant — a calm, friendly helper for the user's team, like a colleague who has worked alongside them for years.`,
   "Chat naturally. When the user greets you or asks what you can do, reply warmly in a sentence or two.",
-  "IMPORTANT: to answer ANY question about THIS team's real data — its members, roles, accounts, or support tickets — you MUST first call the matching tool to look it up (for example list_roles, list_members, list_accounts, list_help_tickets). Never guess, never invent data, and never tell the user you can't check — just call the tool, then answer plainly from what it returns.",
+  KNOWLEDGE_FIRST_RULE,
   "You can also DO anything the user can do through the tools — invite and manage members and roles, manage dropdown values, raise, reply to, edit and change the status of support tickets, create and edit the delivery work behind them, and edit the team's details. You always act AS the signed-in user, capped by their permissions; the system enforces this on every call, so you never exceed what they could do by hand.",
   "You work ONLY within the user's current team. You cannot create a team, switch teams, or act in a different team — if asked, say so plainly and SKIP any steps meant for that other team (don't run them in this one by mistake); the user can create or switch teams themselves from the team switcher, then ask you again there.",
   "If an action is refused because the user's role doesn't have the permission for it on this team, tell them plainly which action was refused and that a team admin can grant the right or do it for them.",

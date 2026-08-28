@@ -11,7 +11,8 @@ import { describe, expect, it } from "vitest"
 
 import { GLOSSARY } from "@shared/glossary"
 import { capabilityBrief } from "../src/lib/app-brief"
-import { DROPDOWN_ORDER_RULE, KNOWLEDGE_CITATION_RULE, SYSTEM } from "../src/lib/agent"
+import { DROPDOWN_ORDER_RULE, KNOWLEDGE_CITATION_RULE, KNOWLEDGE_FIRST_RULE, SYSTEM } from "../src/lib/agent"
+import { TOOL_CATALOG } from "../src/lib/tools"
 import { TARGETS } from "../src/lib/targets"
 import { sharedByName } from "@shared/workers/tool-catalog"
 import {
@@ -198,5 +199,52 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
     expect(new Set(drawn), "the prompt offers a block the renderer cannot draw, or hides one it can").toEqual(
       new Set(BLOCK_KINDS)
     )
+  })
+})
+
+/* ----------------- WHICH DOOR A QUESTION OPENS (the routing rule) ---------- */
+//
+// The prompt has to say which lookup a question gets, because it offers the model
+// ~190 of them and the model picks one. Two things are worth holding still here,
+// and neither of them is the wording:
+//
+//   · the rule is ON the wall. A routing rule sitting in a constant that nothing
+//     joins into SYSTEM routes nothing at all, and looks completely fine.
+//   · every tool it NAMES exists. The rule steers by naming doors, so a renamed
+//     or retired tool turns a steer into a dead end that the model would loyally
+//     obey. Derived from the catalogue, because the catalogue is the only thing
+//     that knows — the same shape R27 holds tool descriptions to.
+//
+// What it deliberately does NOT check is the behaviour: how often the model
+// really opens the right door needs a paid model turn per question, which no
+// suite can afford. scripts/agent-routing-bench.mjs is that instrument, and the
+// numbers it produced sit above KNOWLEDGE_FIRST_RULE with the date they were taken.
+describe("routing: the prompt says which lookup a question gets", () => {
+  it("the rule rides the system wall", () => {
+    expect(SYSTEM, "the system rule wall must carry the routing rule").toContain(KNOWLEDGE_FIRST_RULE)
+  })
+
+  it("names the knowledge door as the default AND the reads that must stay live", () => {
+    expect(KNOWLEDGE_FIRST_RULE).toContain("ask_knowledge")
+    // Both halves, or it is a rule about one door and silence about the other —
+    // which is the shape the prompt was already in, and it routed by whichever
+    // of its two disagreeing sentences happened to be louder.
+    expect(KNOWLEDGE_FIRST_RULE, "must say what only a live read can do").toMatch(/COUNT/)
+    expect(KNOWLEDGE_FIRST_RULE, "must name at least one live list door").toMatch(/list_/)
+  })
+
+  it("every tool the prompt names is a tool that exists", () => {
+    const real = new Set(TOOL_CATALOG.map((t) => t.name))
+    // Anything in the prompt SHAPED like a tool name and opening with one of the
+    // catalogue's own verbs. The candidate list is nominated by shape and judged
+    // by the catalogue, so a tool renamed tomorrow fails here rather than in
+    // front of a user.
+    const verbs = new Set(TOOL_CATALOG.map((t) => t.name.split("_")[0]))
+    const claimed = (SYSTEM.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) ?? []).filter((n) =>
+      verbs.has(n.split("_")[0])
+    )
+    expect(new Set(claimed).size, "the prompt should steer by naming doors").toBeGreaterThan(3)
+    for (const n of new Set(claimed))
+      expect(real.has(n), `the prompt names "${n}", which is not in the tool catalogue`).toBe(true)
   })
 })
