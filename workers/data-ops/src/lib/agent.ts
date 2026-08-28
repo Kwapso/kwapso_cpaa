@@ -98,6 +98,7 @@ export const KNOWLEDGE_FIRST_RULE = [
   "Never answer a question about THIS team out of your own memory — look it up. There are two ways to look something up and choosing well is most of doing this job properly.",
   "ask_knowledge is your DEFAULT, and you should reach for it first. It searches everything the team knows at once: its documents, notes and meeting transcripts, AND a mirror of the app's own records — tickets, accounts, contacts, systems, process maps, sprints, stories, meetings, to-dos and tasks — kept in step every fifteen minutes. Each source it cites also carries `liveStatus`, that record read from the database as you ask. So for any question ABOUT something — what it says, what was agreed on it, what has happened to it, where it stands, \"tell me about X\", \"catch me up on Y\", \"what's the latest on Z\" — one ask_knowledge call gives you both the story and what is true today, and it is far quicker than hunting through lists.",
   "Go to a live list instead — list_help_tickets, list_members, list_roles, list_accounts, list_meetings and the rest — when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
+  "When the question is about what ONE THING SAYS — this document, that call, whether one covers the other — do not survey, READ. Find it once, then read it WHOLE by id: `list_knowledge_sources` with `id` returns that source's own words, and `get_meeting_transcript` returns everything said in a meeting. Two reads give you both sides of a comparison, in full, and a whole transcript is a normal thing to be handed. Listing the same collection again with different wording returns material you have already seen, and you have a limited number of steps to spend — so spend them on reading the thing, not on finding it twice.",
   "Never guess, never invent data, and never tell the user you can't check — pick the door, call the tool, then answer plainly from what comes back.",
 ].join(" ")
 
@@ -267,10 +268,73 @@ function usageTitle(tally: UsageTally, prompt: string): string {
   return tally.actions.join(" · ").slice(0, 200)
 }
 
-/** How much of one tool result the model is handed. Bounded so a page of fifty
- * records cannot blow the context — or the bill — on a turn that only needed a
- * number out of it. */
+/** THE SUMMARY BUDGET — what a long LIST is cut back to. A page of fifty tickets
+ * is a summary plus a sample; the model needs the count and the cursor far more
+ * than it needs row forty. */
 const RESULT_CHARS = 2000
+
+/** THE RECORD BUDGET — what a read of ONE THING may hand over whole.
+ *
+ * THIS IS THE ZERO-ROWS BUG, and it is the same fault as the one below it, found
+ * from the other end. `trimResult` drops rows "from the END in whole rows", which
+ * is exactly right for fifty tickets and catastrophic for one document: a single
+ * 8,680-character source does not fit a 2,000-character budget, so NO rows fit,
+ * so the model was handed `{"sources":[]}` and the sentence "0 of 1 sources are
+ * shown". An empty list is not a trimmed answer. It is the answer "there is
+ * nothing", to a question that had something.
+ *
+ * MEASURED against the live staging door on 28 Aug 2026:
+ *
+ *   read one source by id     8,680 chars out   ->    220 reached the model   2.5%
+ *   list meetings, one match  2,531 chars out   ->    233 reached the model   9.2%
+ *
+ * The owner had asked whether a scope document covered what a call discussed. The
+ * assistant asked for the document, received an empty list, fell back on search
+ * passages, and told him honestly that it could not read either one in full. The
+ * transcript behind that question is 38,171 characters and the document 7,199.
+ *
+ * WHY THE DISCRIMINATOR IS SHAPE AND NOT SIZE. The obvious fix — "raise the
+ * ceiling" — breaks the thing it is trying to help. A knowledge answer carries
+ * six passages and about 8,800 characters, and it survives today only by
+ * accident: `rowList` takes the FIRST array, which happens to be `compartments`,
+ * so the passages ride through untouched. Raise the ceiling for everything and a
+ * fifty-ticket page costs 7,500 tokens a step; fix `rowList` without this and the
+ * knowledge answers lose two thirds of their material. So: MANY rows is a list
+ * and keeps the summary budget; FEW rows is a record read and gets the room its
+ * text needs. */
+const RECORD_CHARS = 40_000
+
+/** More rows than this and the result is a LIST — a page to be summarised, not a
+ * record to be read. Eight because the paged doors deal in pages of fifty and
+ * every by-id read in the catalogue answers with one row; nothing real sits near
+ * the line, which is what a threshold wants. */
+const LIST_ROWS = 8
+
+/** WHAT ONE TURN MAY READ, in total characters of tool result.
+ *
+ * The record budget is thirty times the summary budget, and a turn may take
+ * twelve steps, so without this a turn could hand the model 480,000 characters —
+ * and because every step re-sends the whole conversation, the last step would pay
+ * for all of it. Three full documents is the shape of the job that needed this
+ * (compare a document against a transcript); the fourth falls back to the summary
+ * budget with a sentence saying why. */
+const TURN_READ_CHARS = 120_000
+
+/** One turn's reading budget. A small mutable object rather than a return value
+ * threaded through four signatures, for the same reason `repeatGuard` is one: it
+ * is per-TURN state and the step context is rebuilt every step. */
+export function readBudget(total = TURN_READ_CHARS) {
+  let left = total
+  return {
+    /** What a single result may spend right now. Never below the summary budget:
+     * a turn that has read a lot still gets a usable answer, just a shorter one. */
+    allowance: () => (left > RECORD_CHARS ? RECORD_CHARS : Math.max(RESULT_CHARS, left)),
+    spend: (n: number) => {
+      left -= n
+    },
+    left: () => left,
+  }
+}
 
 /** WHAT A TOOL RETURNED, TRIMMED TO FIT — by dropping ROWS, never by cutting the
  * string, and never silently.
@@ -294,17 +358,27 @@ const RESULT_CHARS = 2000
  * many of how many are here. It stays valid JSON, so the model can still parse
  * it. Anything already under the ceiling is handed over untouched.
  *
+ * AND A READ OF ONE THING IS NOT A PAGE OF FIFTY. See RECORD_CHARS: a result
+ * carrying few rows is a record being read, its text is the whole point of the
+ * call, and it gets the room to arrive. A row that is too big even for that keeps
+ * its place and loses the tail of its longest field, because one document with a
+ * cut in it is worth more than no document and a sentence about paging.
+ *
  * The note is stated as a FACT, not as an instruction: everything inside a tool
  * result is data the model must never take orders from (TOOL_RESULT_TAG, and the
  * system prompt that names it), and that has to hold for the sentences we write
  * ourselves too. */
-export function trimResult(data: unknown): string {
+export function trimResult(data: unknown, allowance: number = RECORD_CHARS): string {
   const whole = typeof data === "string" ? data : JSON.stringify(data)
   if (whole === undefined) return "" // a door that answered with nothing at all
   if (whole.length <= RESULT_CHARS) return whole
   const rows = data && typeof data === "object" && !Array.isArray(data) ? rowList(data) : null
+  // A RECORD READ: few rows, and the text in them is what was asked for.
+  if (rows && rows[1].length <= LIST_ROWS) return record(data as Record<string, unknown>, rows, allowance)
   if (!rows)
-    return `${whole.slice(0, RESULT_CHARS)}\n[Trimmed here: the result was longer than ${RESULT_CHARS} characters, so what is above is incomplete.]`
+    return whole.length <= allowance
+      ? whole
+      : `${whole.slice(0, allowance)}\n[Trimmed here: the result was longer than ${allowance} characters, so what is above is incomplete.]`
   const [key, list] = rows
   const rest = { ...(data as Record<string, unknown>), [key]: [] as unknown[] }
   let budget = RESULT_CHARS - JSON.stringify(rest).length
@@ -321,6 +395,45 @@ export function trimResult(data: unknown): string {
   )
 }
 
+/** A read of a HANDFUL of records: hand it over whole if it fits the turn's
+ * allowance, and otherwise keep every row and shorten the longest text in each,
+ * so the caller still learns what it asked about. Never returns an empty list. */
+function record(data: Record<string, unknown>, rows: [string, unknown[]], allowance: number): string {
+  const [key, list] = rows
+  const whole = JSON.stringify(data)
+  if (whole.length <= allowance) return whole
+  const overhead = JSON.stringify({ ...data, [key]: [] }).length
+  const each = Math.max(200, Math.floor((allowance - overhead) / Math.max(1, list.length)))
+  let cut = 0
+  const kept = list.map((row) => {
+    const [shrunk, lost] = shrinkRow(row, each)
+    cut += lost
+    return shrunk
+  })
+  return (
+    JSON.stringify({ ...data, [key]: kept }) +
+    `\n[All ${list.length} ${key} are here, but the longest text in each was shortened to fit: ${cut} characters are missing in total. Where a cut matters, reading the record itself gives the whole of it.]`
+  )
+}
+
+/** Shorten one row to `budget` characters by cutting its LONGEST string field,
+ * which on every record in this catalogue is the body, the transcript or the
+ * description — the field a shorter row is still useful without all of. Returns
+ * the row and how many characters went. */
+function shrinkRow(row: unknown, budget: number): [unknown, number] {
+  if (!row || typeof row !== "object" || JSON.stringify(row).length <= budget) return [row, 0]
+  const obj = row as Record<string, unknown>
+  const longest = Object.entries(obj)
+    .filter((e): e is [string, string] => typeof e[1] === "string")
+    .sort((a, b) => b[1].length - a[1].length)[0]
+  if (!longest) return [row, 0]
+  const [field, text] = longest
+  const room = budget - JSON.stringify({ ...obj, [field]: "" }).length - 60
+  if (room >= text.length) return [row, 0]
+  const keep = Math.max(0, room)
+  return [{ ...obj, [field]: `${text.slice(0, keep)}… [cut here: ${field} is ${text.length} characters in full]` }, text.length - keep]
+}
+
 /** The one array on a paged result — `sources`, `tickets`, `members`, whatever the
  * door named its rows. The first array wins: `pagedJson` puts the rows first and
  * every other field it adds is a scalar. */
@@ -330,9 +443,9 @@ function rowList(data: object): [string, unknown[]] | null {
 }
 
 /** Tool result → the fenced DATA string the model sees. */
-function fence(result: ToolResult): string {
+function fence(result: ToolResult, allowance?: number): string {
   return result.ok
-    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data)}`
+    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data, allowance)}`
     : `FAILED: ${result.error ?? "unknown error"}`
 }
 
@@ -564,6 +677,9 @@ type StepCtx = {
   names: Record<string, string>
   /** this turn's already-run READS, so an identical one answers from the first. */
   repeats: ReturnType<typeof repeatGuard>
+  /** what this turn may still hand the model in tool-result text. Per-TURN, like
+   * `repeats`, so it is made outside the loop and the step context carries it. */
+  budget: ReturnType<typeof readBudget>
   emit?: Emit
 }
 
@@ -632,7 +748,8 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   if (t?.write) {
     tally.actions.push(result.ok ? summary : `${summary} (failed)`)
   }
-  const content = fence(result)
+  const content = fence(result, ctx.budget.allowance())
+  ctx.budget.spend(content.length)
   // Only a result worth replaying is remembered: a failure is not the answer to
   // the question, and a retry after a bad minute is a reasonable thing to do.
   if (t && result.ok) ctx.repeats.remember(!!t.write, tc, content)
@@ -832,6 +949,7 @@ async function runPlanLoop(
   // happens ACROSS steps — call a tool, get a model turn back, call the identical
   // tool again — so a guard rebuilt each iteration would never see the repeat.
   const repeats = repeatGuard()
+  const budget = readBudget()
 
   // ONE narration seam: everything the assistant says flows out as a `text` event —
   // streamed deltas from the model, or one say() chunk for a non-streaming model and
@@ -1036,7 +1154,7 @@ async function runPlanLoop(
       emit && reply.toolCalls.some((tc) => hasNameableId(tc.input))
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
-    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, emit }
+    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, budget, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
       const { message, ok } = await runToolCall(stepCtx, tc)
@@ -1145,7 +1263,7 @@ export async function confirmAndRun(
   // loop ran the call (see runToolCall: writes title the row, reads ride along quietly).
   // A fresh guard: these are the CONFIRMED calls, which are writes — the guard
   // never touches a write — and the plan this turn resumes into gets its own.
-  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), emit }
+  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), budget: readBudget(), emit }
   const toolMsgs: ChatMessage[] = []
   let failed = false
   for (const tc of calls) {
