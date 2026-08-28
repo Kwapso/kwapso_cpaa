@@ -146,6 +146,10 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // its own quiet notice. Cleared the moment the next question is asked — a
   // warning about a limit that has since cleared is its own small lie.
   const [failure, setFailure] = React.useState<ModelFailure | null>(null)
+  /** A TURN HAS BEGUN IN THIS PANEL. A ref, not state, because the thing that
+   * has to read it is an async continuation that started before the turn did —
+   * see the resume effect below. */
+  const started = React.useRef(false)
 
   // A QUESTION HANDED IN FROM A SCREEN (web/lib/agent-open.ts): the knowledge
   // base's ask box, and the same box on an account's or an app's knowledge tab.
@@ -196,7 +200,26 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
         dataOps
           .agentThread(id)
           .then((r) => {
-            if (!alive) return
+            // THE PRECONDITION IS RE-READ HERE, not only where this started.
+            //
+            // THE BUG, reported live on 2026-08-28: the owner asked a question
+            // from the knowledge base's ask box, watched the tool row tick
+            // green, and then got NOTHING — no answer, no error, two credits
+            // spent, and the answer sitting in the database all along.
+            //
+            // Opening the panel and sending are one action on that path, so
+            // this resume and the turn start together. The resume began when
+            // `items` really was empty, its fetch took a few hundred
+            // milliseconds, and `setItems(toChatItems(...))` then REPLACED the
+            // whole array — including the empty assistant bubble the stream was
+            // writing into. Every later delta mapped over an id that was no
+            // longer there and went nowhere. The step rows survived because
+            // `step_start` appends when it cannot find the bubble; the answer
+            // had no such fallback (it does now, below).
+            //
+            // A stale async write has to re-ask its own question at the moment
+            // it lands. `alive` covered unmounting and nothing else.
+            if (!alive || started.current) return
             setItems(toChatItems(r.messages))
             setThreadId(id)
             // Remember it on THIS device so the next open resumes instantly.
@@ -229,12 +252,32 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     let replyText = ""
     const stepIdByTool = new Map<string, string>()
 
+    /** WRITE THE ASSISTANT'S WORDS, wherever its bubble has got to.
+     *
+     * The turn's bubble is created optimistically at send time and everything
+     * the model says is addressed to that id — so anything that removes it
+     * mid-stream silently swallows the answer. That is not hypothetical: it
+     * happened, in front of the owner, and cost him two credits and an answer
+     * he never saw (the resume race above).
+     *
+     * The race is fixed at its cause. This is the SECOND lock, and it is the one
+     * that holds for a cause nobody has thought of yet: if the bubble is gone,
+     * the words are APPENDED rather than dropped. A reply in a slightly odd
+     * place is recoverable; a reply that was never shown is not. `step_start`
+     * has always done exactly this, which is precisely why the tool rows
+     * survived the bug and the answer did not. */
+    const writeAssistant = (content: React.ReactNode) =>
+      setItems((prev) =>
+        prev.some((it) => it.id === assistantId)
+          ? prev.map((it) => (it.id === assistantId ? { ...it, content } : it))
+          : [...prev, { id: assistantId, role: "assistant" as const, content }]
+      )
+
     await run((ev) => {
       switch (ev.t) {
         case "text": {
           replyText += ev.d
-          const html = <AgentMarkdown text={replyText} />
-          setItems((prev) => prev.map((it) => (it.id === assistantId ? { ...it, content: html } : it)))
+          writeAssistant(<AgentMarkdown text={replyText} />)
           break
         }
         case "step_start": {
@@ -322,11 +365,8 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           // overwritten by a later wrap-up note. `final`'s reply is the fallback for
           // a turn that streamed nothing; drop a bubble that stayed empty.
           const text = replyText || finalText
-          setItems((prev) =>
-            text
-              ? prev.map((it) => (it.id === assistantId ? { ...it, content: <AgentMarkdown text={text} /> } : it))
-              : prev.filter((it) => it.id !== assistantId)
-          )
+          if (text) writeAssistant(<AgentMarkdown text={text} />)
+          else setItems((prev) => prev.filter((it) => it.id !== assistantId))
           break
         }
         case "error": {
@@ -344,10 +384,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           // beside the composer does the explaining. An UNclassified one keeps
           // the server's message, because then it really is all we know.
           if (ev.reason) setFailure(ev.reason)
-          const shown = ev.reason ? t("I couldn't answer that one.") : ev.message
-          setItems((prev) =>
-            prev.map((it) => (it.id === assistantId ? { ...it, content: shown } : it))
-          )
+          writeAssistant(ev.reason ? t("I couldn't answer that one.") : ev.message)
           break
         }
       }
@@ -413,6 +450,9 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
 
   async function send(text: string) {
     if (busy) return
+    // Before anything is appended: from here on, a resume that was already in
+    // flight must leave this panel alone.
+    started.current = true
     const assistantId = newId()
     const files = attached.length ? attached : undefined
     // Same attachment note the server saves, so the optimistic bubble matches history.
@@ -486,6 +526,9 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // later reopen doesn't resume this one.
   function newChat() {
     if (busy) return
+    // A deliberate reset is allowed to clear the flag — the person asked for an
+    // empty panel, so a resume landing afterwards has nothing to trample.
+    started.current = false
     setItems([])
     setThreadId(undefined)
     setPending(null)
