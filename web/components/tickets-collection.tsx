@@ -241,7 +241,28 @@ export function TicketsCollection({
             worse than the line tab it replaced. Tasks, Sprints, Apps and
             Accounts introduce their card directly and take the shape; this one
             takes it the day its search moves above the strips. */}
-        <div className="flex flex-col gap-2">
+        {/* THE GAP CANCELS THE KIT'S OWN OVERLAP, and that is why it is a calc
+            and not a number somebody liked the look of.
+ 
+            A folder tab is drawn PULLED DOWN by `--folder-tab-overlap` (1.06375rem
+            ≈ 17px) so the active one looks physically attached to the panel under
+            it — tabs.tsx says so, and collection-frame rides its panel up by
+            exactly that much to meet it. With two strips stacked there is no panel
+            between them, so the outer strip's feet reach 17px into a `gap-2` of
+            8px and stand on the inner strip's tabs. The owner reported it as "the
+            tabs cut into each other", which is precisely what it is.
+ 
+            So the gap is the overlap plus the ordinary spacing: the first part
+            gets the feet back to the line, the second is the space a reader sees.
+            Written against the token, so a kit that redraws the silhouette moves
+            this with it rather than leaving a number here that used to be right.
+ 
+            This exists because two folder strips are stacked at all, which the
+            kit does not do and our own law forbade until the owner ruled for it
+            on 2026-08-28 (see TWO_FOLDERS_OK in web/test/rules.test.ts). The
+            spacing is therefore ours to decide: there is no kit rule for a shape
+            the kit declines to draw. */}
+        <div className="flex flex-col gap-[calc(var(--folder-tab-overlap)+0.5rem)]">
           <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
           <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
         </div>
