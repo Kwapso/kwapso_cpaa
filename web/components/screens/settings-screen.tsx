@@ -93,7 +93,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           disappears when there is none, which is nearly always. */}
       {pendingInvites.length > 0 && (
         <section className="motion-panel-in flex flex-col gap-4">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invites waiting for you")}</h2>
+          <h2 className="text-muted-foreground text-micro uppercase">{t("Invites waiting for you")}</h2>
           <InvitationsPanel refresh={active.refresh} />
         </section>
       )}
@@ -116,7 +116,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
       {/* THE TEAM'S OWN ADMIN — see the header for why these rows are here. */}
       {teamId && adminSections.length > 0 && (
         <section className="motion-panel-in flex flex-col gap-4">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <h2 className="text-muted-foreground text-micro uppercase">
             {t("This team")}
           </h2>
           <List
@@ -144,7 +144,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           web/test/one-team.test.ts holds both halves of that decision. */}
       {!TEAM_SCREENS_HIDDEN && (
         <section className="motion-panel-in flex flex-col gap-4">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Teams")}</h2>
+          <h2 className="text-muted-foreground text-micro uppercase">{t("Teams")}</h2>
           <List
             surface="none"
             className="rounded-[var(--radius)] border"

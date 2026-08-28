@@ -98,7 +98,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
         <LanguageSection save={(lang) => auth.setLanguage(lang)} />
 
         <section className="motion-panel-in flex flex-col gap-4">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <h2 className="text-muted-foreground text-micro uppercase">
             {t("Account activity")}
           </h2>
           {accountActivityQ.error ? (

@@ -193,7 +193,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                 />
                 <div className="flex min-w-0 flex-col gap-1 p-3">
                   {d.kind && (
-                    <span className="text-muted-foreground truncate text-badge font-medium tracking-wide uppercase">
+                    <span className="text-muted-foreground truncate text-micro uppercase">
                       {d.kind}
                     </span>
                   )}

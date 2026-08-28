@@ -198,7 +198,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
 
   return (
     <section className="motion-panel-in flex flex-col gap-4">
-      <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Google")}</h2>
+      <h2 className="text-muted-foreground text-micro uppercase">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
         {t("Connect your own Google account. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
       </p>

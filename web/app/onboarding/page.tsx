@@ -178,7 +178,7 @@ export default function OnboardingPage() {
         </div>
         <div className="motion-panel-in w-full max-w-sm text-center">
           <BrandMark className="mb-1" />
-          <h1 className="mt-2 text-2xl font-medium tracking-tight">{t("You're in the right place")}</h1>
+          <h1 className="mt-2 text-2xl font-medium">{t("You're in the right place")}</h1>
           {/* The worker's own sentence, not a second copy written here. */}
           <p className="text-muted-foreground mt-2 text-sm">{wrongDoor}</p>
           <p className="text-muted-foreground mt-4 text-sm">
@@ -199,7 +199,7 @@ export default function OnboardingPage() {
       <div className="motion-panel-in w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           <BrandMark className="mb-1" />
-          <h1 className="text-2xl font-medium tracking-tight">
+          <h1 className="text-2xl font-medium">
             {teamless ? t("You're not in a team") : t("Set up your profile")}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">

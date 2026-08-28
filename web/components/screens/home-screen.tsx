@@ -72,7 +72,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
           <AvatarFallback className="text-xl">{letterMark(ctx.team?.name)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-medium tracking-tight">{ctx.team?.name}</h1>
+          <h1 className="truncate text-2xl font-medium">{ctx.team?.name}</h1>
           <div className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
             {ctx.role && <Badge variant="secondary">{ctx.role.title}</Badge>}
             <span>

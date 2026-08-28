@@ -72,7 +72,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
             back to the company's initial rather than an empty square. */}
         <RecordMark picture={account.logoUrl} name={account.name} size="band" />
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="text-3xl font-medium tracking-tight">{account.name}</h1>
+          <h1 className="text-3xl font-medium">{account.name}</h1>
           <p className="text-muted-foreground">
             {t("What we hold for you. If any of it is wrong, tell us and we'll fix it.")}
           </p>

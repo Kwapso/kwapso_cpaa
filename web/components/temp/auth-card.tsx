@@ -54,7 +54,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
     <div className="motion-panel-in w-full max-w-sm">
       <div className="flex flex-col items-center text-center">
         <BrandMark className="mb-1" />
-        <h1 className="text-2xl font-medium tracking-tight">
+        <h1 className="text-2xl font-medium">
           {t("Welcome to")} {brand.name}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">

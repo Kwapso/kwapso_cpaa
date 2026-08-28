@@ -251,7 +251,7 @@ export function AppDetailScreen({
   if (!app.canOpen)
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-2xl font-medium tracking-tight">{app.name}</h1>
+        <h1 className="text-2xl font-medium">{app.name}</h1>
         <p className="text-muted-foreground text-sm">
           {t(
             "You're not on this app, so its page is closed. Ask an admin to add you to the team on it."

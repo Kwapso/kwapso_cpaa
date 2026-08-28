@@ -703,7 +703,7 @@ export function AccountDetailScreen({
                 <OverviewList items={overviewItems} />
                 {account.about && (
                   <div className="rounded-[var(--radius)] border p-4">
-                    <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+                    <p className="text-muted-foreground mb-2 text-micro uppercase">
                       {t("About")}
                     </p>
                     <RichText html={account.about} />
@@ -737,7 +737,7 @@ export function AccountDetailScreen({
                 {moneyBack && (
                   <div className="rounded-[var(--radius)] border p-4">
                     <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
-                    <p className="text-2xl font-medium tracking-tight tabular-nums">{moneyBack}</p>
+                    <p className="text-2xl font-medium tabular-nums">{moneyBack}</p>
                     <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
                   </div>
                 )}

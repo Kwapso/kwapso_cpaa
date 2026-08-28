@@ -413,7 +413,7 @@ export function RecordCalendar({
             agendaDays.map((day) => (
               <section key={day} className="flex flex-col gap-2">
                 <h3
-                  className={`text-xs font-medium tracking-[0.5px] uppercase ${
+                  className={`text-micro uppercase ${
                     day === today ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >

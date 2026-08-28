@@ -504,7 +504,7 @@ export function StepsPanel({
               how the two figures stop matching in a meeting. */}
           <div className="mt-1 flex flex-wrap items-baseline gap-x-8 gap-y-2">
             <div>
-              <p className="text-2xl font-semibold tracking-tight">
+              <p className="text-2xl font-semibold">
                 {hoursText(saving.savedSecondsPerMonth)}
               </p>
               <p className="text-muted-foreground text-xs">
@@ -518,7 +518,7 @@ export function StepsPanel({
                 null rather than zero for exactly this reason. */}
             {saving.pricedSteps > 0 && (
               <div>
-                <p className="text-2xl font-semibold tracking-tight">
+                <p className="text-2xl font-semibold">
                   {moneyText(saving.savedCentsPerMonth)}
                 </p>
                 <p className="text-muted-foreground text-xs">

@@ -89,7 +89,7 @@ export function LanguageSection({
 
   return (
     <section className={className ?? "motion-panel-in flex flex-col gap-4"}>
-      <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+      <h2 className="text-muted-foreground text-micro uppercase">
         {t("Language")}
       </h2>
       <div className="flex flex-col gap-4 rounded-[var(--radius)] border p-4">

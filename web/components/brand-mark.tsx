@@ -25,7 +25,7 @@ export function BrandMark({
         )}
       </span>
       {showName && (
-        <span className="text-lg font-medium tracking-tight">{brand.name}</span>
+        <span className="text-lg font-medium">{brand.name}</span>
       )}
     </div>
   )

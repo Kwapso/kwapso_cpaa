@@ -68,7 +68,7 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
     <div className="flex w-full flex-col gap-6">
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-medium tracking-tight">{team.name}</h1>
+          <h1 className="text-2xl font-medium">{team.name}</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {t("Who we are: our material, our team, and the details that go on a contract.")}
           </p>

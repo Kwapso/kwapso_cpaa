@@ -380,7 +380,7 @@ export function SprintsScreen({
                 </h2>
             {groupByKind(inState, byKind, lang, t("No type said")).map((group) => (
               <div key={group.key} className="flex flex-col gap-2">
-                <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
+                <p className="text-muted-foreground text-micro uppercase">
                   {group.word}
                 </p>
                 <List

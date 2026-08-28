@@ -111,7 +111,7 @@ export function ImpactPanel({ view }: { view: SavingsView | undefined }) {
     <div className="flex flex-col gap-4">
       <div className="rounded-[var(--radius)] border p-4">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
-        <p className="text-2xl font-medium tracking-tight">
+        <p className="text-2xl font-medium">
           {hoursText(view.savedSecondsPerMonth)}
         </p>
         {/* R25 — the sentence that makes the number honest, from the one place it
