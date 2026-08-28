@@ -32,6 +32,7 @@ import { CollectionRegister } from "@shared/ui/components/collection-frame/colle
 import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 
 import { AgentHistoryDialog } from "@/components/agent-history-dialog"
+import { AssistantLimitNotice } from "@/components/assistant-limit-notice"
 import { citationPills, TurnSources } from "@/components/agent-sources"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
 import { useAgentChat } from "@/lib/use-agent-chat"
@@ -158,6 +159,18 @@ export function AgentPanel({
               void chat.addAttachments(e.dataTransfer.files)
             }}
           >
+            {/* WHY IT COULDN'T ANSWER, when the model door was the reason.
+                PINNED UNDER THE HEADER, above the conversation — the first
+                placement put it under the composer, which on screen reads as a
+                note stranded below the input rather than as a status the panel
+                is reporting (seen in the browser, 27 Aug 2026; the composer
+                belongs to AgentChat, so "above the composer" and "at the bottom
+                of the panel" are the same place). It is a fact about the APP,
+                not something the assistant said, so it stays outside the
+                conversation entirely. Clears the moment the next question is
+                asked. */}
+            {chat.failure && <AssistantLimitNotice failure={chat.failure} />}
+
             <div className="min-h-0 flex-1">
               {/* Fill the sheet and shed the component's own card chrome (it ships
                * as a standalone fixed-height card) so it reads as one panel, not a
