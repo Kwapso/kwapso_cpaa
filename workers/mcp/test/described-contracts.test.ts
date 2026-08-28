@@ -201,6 +201,25 @@ function responseFields(door: Door): Set<string> {
   }
   for (const call of callTexts(handler, "json")) for (const k of literalKeys(call)) out.add(k)
   const libs = moduleLibSources(door)
+  // A DOOR THAT HANDS ITS ANSWER OVER WHOLE. `json(answer)` carries no literal at
+  // all, so every class above is blind to it — and that shape is not an oversight,
+  // it is R23's rule written on another door: when `found` and the sentence that
+  // hangs off it are ONE decision, the seam that made them is the contract and the
+  // handler must not pick fields out again. The knowledgeAnswer clause below says
+  // exactly this for exactly one seam, by name. This says it for any of them: find
+  // what identifier reached `json`, find the lib function the handler awaited into
+  // it, and read THAT function's keys. Earned by getMeetingTranscript, whose empty
+  // answer became `found: false` plus a sentence — two real fields the check could
+  // not see, and the tempting repair was a vocabulary line apologising for the
+  // blind spot instead of removing it. (The same repair the shorthand-property bug
+  // got wrong once already — see literalKeys.)
+  for (const call of callTexts(handler, "json")) {
+    const held = call.match(/^json\(\s*(\w+)\s*\)$/)?.[1]
+    if (!held) continue
+    const maker = handler.match(new RegExp(`const ${held}\\s*=\\s*await\\s+(\\w+)\\(`))?.[1]
+    if (!maker) continue
+    for (const lib of libs) for (const k of literalKeys(fnBody(lib, maker))) out.add(k)
+  }
   for (const lib of libs)
     for (const m of lib.matchAll(/(\w+):\s*(?:r|row)\??\.\w+/g)) out.add(m[1])
   for (const lib of libs)

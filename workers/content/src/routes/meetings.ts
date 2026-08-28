@@ -53,8 +53,20 @@ function filterFrom(url: URL): MeetingFilter {
     // narrowing to nothing would be a calendar that looks empty for a reason
     // nobody can see.
     month: monthOrNone(queryText(url.searchParams.get("month"), "Month") ?? null),
+    // R20 on the query half, and the same two-step `month` takes: through the
+    // seam FIRST, then held to an allow-list. 'yes' and 'no' are the whole
+    // vocabulary; anything else narrows nothing rather than narrowing to nothing.
+    transcript: yesNoOrNone(queryText(url.searchParams.get("transcript"), "Transcript") ?? null),
     q: queryText(url.searchParams.get("q"), "Search") ?? undefined,
   }
+}
+
+/** 'yes', 'no', or nothing at all. An allow-list rather than a truthiness test,
+ * because `transcript=maybe` must mean "I did not narrow" and not "narrow to the
+ * ones with none" — a filter that quietly picks a side is worse than one that
+ * refuses. */
+function yesNoOrNone(raw: string | null): string | undefined {
+  return raw === "yes" || raw === "no" ? raw : undefined
 }
 
 /** `YYYY-MM` or nothing. The month number is checked as well as the shape:
@@ -285,15 +297,13 @@ export async function getMeetingTranscript(request: Request, env: Env): Promise<
   await refusePortalCaller(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Meeting", TEXT_LIMITS.short)
   if (!id) return fail(400, "invalid_input", "Say which meeting.")
-  const found = await readTranscript(cfg, guard, id)
-  if (!found) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
-  return json({
-    text: found.text,
-    note: found.note,
-    url: found.url,
-    foundBy: found.foundBy,
-    capturedAt: found.capturedAt,
-  })
+  const answer = await readTranscript(cfg, guard, id)
+  if (!answer) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
+  // HANDED OVER WHOLE, never reassembled. `found` and `message` are one decision
+  // made in readTranscript (R23's shape), and a door that picked four of the six
+  // fields out again would be free to ship the half that says nothing — which is
+  // the half this door used to ship.
+  return json(answer)
 }
 
 /**

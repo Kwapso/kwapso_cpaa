@@ -315,6 +315,129 @@ describe("the meetings list itself", () => {
 // switchboard — NOT a 403, which would mean the door still exists and is merely
 // refusing this caller. The distinction is the whole test: a permission can be
 // granted back, a missing route cannot.
+describe("a meeting that has no words SAYS so, and the list can find the ones that do", () => {
+  // THE FAULT, MEASURED ON STAGING 28 Aug 2026. `get_meeting_transcript` answered
+  // 200 with {"text":"","note":null,"url":null,"foundBy":null,"capturedAt":null}
+  // for a meeting with nothing on file. To a model that is indistinguishable from
+  // having guessed the wrong id, so it guessed again: 23 tool calls in one turn,
+  // TWELVE of them list_meetings, and the turn ended without reading anything.
+  // 36 of that base's 461 meetings have words, so a blind retry is right 8% of
+  // the time — and the meeting it had been asked about, with 38,077 characters on
+  // it, was never among the ones it saw.
+
+  it("the empty answer says it is empty, in words, and says it is final", async () => {
+    const m = await arrange({ title: "A call nobody recorded" })
+    const res = await call(IDS.staffUser, "GET /api/content/meetings/transcript", undefined, `?id=${m.id}`)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { found: boolean; message: string; text: string; capturedAt: string | null }
+    // R23's shape: the boolean and the sentence are one decision, so a caller can
+    // branch on `found` and repeat `message` rather than inferring from "".
+    expect(body.found).toBe(false)
+    expect(body.text).toBe("")
+    expect(body.capturedAt).toBeNull()
+    // NOT AN EMPTY STRING, and not a shrug. It has to be actionable prose or the
+    // model does what it did: try again.
+    expect(body.message.length).toBeGreaterThan(40)
+    expect(body.message).toMatch(/read_meeting_transcript/)
+    expect(body.message).toMatch(/list_meetings/)
+  })
+
+  it("a captured transcript answers found: true, with the words", async () => {
+    const m = await arrange({ title: "A call somebody recorded" })
+    db()
+      .prepare("UPDATE meetings SET transcript_text = ?, transcript_captured_at = ? WHERE id = ?")
+      .run("Aparna: so how do we scope this", "2026-08-25T14:30:00.000Z", m.id)
+    const res = await call(IDS.staffUser, "GET /api/content/meetings/transcript", undefined, `?id=${m.id}`)
+    const body = (await res.json()) as { found: boolean; message: string; text: string }
+    expect(body.found).toBe(true)
+    expect(body.text).toContain("how do we scope this")
+    expect(body.message).not.toMatch(/No transcript/)
+  })
+
+  it("a capture that came back EMPTY is still found: false — the case the stamp and the words disagree about", async () => {
+    // THE ONLY CASE WHERE `found` HAS TWO PLAUSIBLE DEFINITIONS, so it is the
+    // only case that proves which one shipped. A stamp with no text means we
+    // went and looked and there was nothing; to a caller asking what was said
+    // that is the same answer as never having looked, and `found: true` with an
+    // empty string would put it straight back in the bind this whole change
+    // exists to end. The stamp is not thrown away — it is what makes the two
+    // empty messages different sentences.
+    const m = await arrange({ title: "A silent call" })
+    db()
+      .prepare("UPDATE meetings SET transcript_text = '', transcript_captured_at = ? WHERE id = ?")
+      .run("2026-08-25T14:30:00.000Z", m.id)
+    const res = await call(IDS.staffUser, "GET /api/content/meetings/transcript", undefined, `?id=${m.id}`)
+    const body = (await res.json()) as { found: boolean; message: string; capturedAt: string | null }
+    expect(body.found).toBe(false)
+    expect(body.capturedAt, "the stamp still rides the answer — it is history").not.toBeNull()
+    expect(body.message).toMatch(/no words in it/)
+    expect(body.message, "we already looked, so it must NOT send the caller looking").not.toMatch(/read_meeting_transcript/)
+  })
+
+  it("a meeting that does not exist is still a 404, not a 'found: false'", async () => {
+    // The distinction the old shape could not draw, drawn from the other side:
+    // "there is no such meeting" and "there are no words" are different answers
+    // and a caller must be able to tell them apart.
+    const res = await call(IDS.staffUser, "GET /api/content/meetings/transcript", undefined, "?id=01NOSUCHMEETING000000000000")
+    expect(res.status).toBe(404)
+  })
+
+  it("transcript=yes keeps only the meetings that have words; 'no' keeps only the rest", async () => {
+    const withWords = await arrange({ title: "Recorded", startsAt: "2026-09-01T10:00:00.000Z" })
+    await arrange({ title: "Not recorded", startsAt: "2026-09-02T10:00:00.000Z" })
+    db()
+      .prepare("UPDATE meetings SET transcript_captured_at = ? WHERE id = ?")
+      .run("2026-09-01T11:00:00.000Z", withWords.id)
+
+    const yes = await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=all&transcript=yes")
+    const yesBody = (await yes.json()) as { meetings: Meeting[]; total: number }
+    expect(yesBody.meetings.map((m) => m.title)).toEqual(["Recorded"])
+    // R16: the badge counts the SAME question the rows answered. A filter that
+    // narrowed the rows and not the count would read as "1 of 2 shown".
+    expect(yesBody.total).toBe(1)
+
+    const no = await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=all&transcript=no")
+    const noBody = (await no.json()) as { meetings: Meeting[]; total: number }
+    expect(noBody.meetings.map((m) => m.title)).toEqual(["Not recorded"])
+    expect(noBody.total).toBe(1)
+  })
+
+  it("a transcript filter nobody can spell narrows NOTHING — it never picks a side", async () => {
+    const withWords = await arrange({ title: "Recorded", startsAt: "2026-09-01T10:00:00.000Z" })
+    await arrange({ title: "Not recorded", startsAt: "2026-09-02T10:00:00.000Z" })
+    db()
+      .prepare("UPDATE meetings SET transcript_captured_at = ? WHERE id = ?")
+      .run("2026-09-01T11:00:00.000Z", withWords.id)
+    const res = await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=all&transcript=maybe")
+    const body = (await res.json()) as { total: number }
+    expect(body.total, "a word outside the allow-list must mean 'I did not narrow'").toBe(2)
+  })
+
+  it("q finds a meeting by WHO WAS ON IT, which is how a person names a call", async () => {
+    // Of the 458 live meetings on staging, 4 have an agenda and 75 have notes —
+    // but 251 carry a guest list, because they arrive from Google with a title
+    // and the people who were asked. Searching two nearly-always-empty columns
+    // and skipping the populated one made `q` a filter that mostly found nothing.
+    const m = await arrange({ title: "Strategy session", startsAt: "2026-09-03T10:00:00.000Z" })
+    await arrange({ title: "Something else", startsAt: "2026-09-04T10:00:00.000Z" })
+    db()
+      .prepare("UPDATE meetings SET google_attendees_json = ? WHERE id = ?")
+      .run(JSON.stringify([{ email: "aparna@gwventures.pro", name: "datla aparna" }]), m.id)
+    const res = await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=all&q=aparna")
+    const body = (await res.json()) as { meetings: Meeting[]; total: number }
+    expect(body.meetings.map((x) => x.title)).toEqual(["Strategy session"])
+    expect(body.total).toBe(1)
+  })
+
+  it("the needle is never a pattern — a guest-list search cannot mean 'everything'", async () => {
+    await arrange({ title: "Recorded", startsAt: "2026-09-01T10:00:00.000Z" })
+    await arrange({ title: "Not recorded", startsAt: "2026-09-02T10:00:00.000Z" })
+    const res = await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=all&q=%25")
+    const body = (await res.json()) as { total: number }
+    expect(body.total, "a bare % must match nothing, not every meeting the agency ever held").toBe(0)
+  })
+})
+
 describe("nothing in this app writes to a calendar", () => {
   const GONE: [string, unknown][] = [
     ["POST /api/content/google/calendar/events", { summary: "New", start: "x", end: "y" }],
