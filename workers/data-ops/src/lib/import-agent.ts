@@ -109,11 +109,18 @@ function adaptPlan(files: AnalyzeFile[], raw: RawStep[]): ImportPlan {
   return { order, steps: sortStepsByOrder(steps, order), warnings, bySource: "agent" }
 }
 
-/** Build the plan. Uses Claude when a key is set (one call), else the deterministic
- * fallback. The caller has already metered a credit for this. */
+/** Build the plan: one model call, with the deterministic fallback behind it for
+ * when that call FAILS. The caller has already metered a credit for this.
+ *
+ * IT USED TO CHECK FOR A KEY FIRST — `if (!env.ANTHROPIC_API_KEY) return
+ * buildFallbackPlan(files)` — which was right while the model needed a secret and
+ * became a silent demotion the moment it stopped. The engine is now the AI
+ * BINDING (2026-08-28), which every deployment of this worker has, so there is no
+ * configuration in which a person should be handed the dumb plan without the
+ * clever one having been tried and failed. The fallback stays; only its trigger
+ * moved from "unconfigured" to "it did not work". */
 export async function analyzeBatch(env: Env, files: AnalyzeFile[]): Promise<ImportPlan> {
   if (!files.length) return { order: [], steps: [], warnings: ["No files to plan."], bySource: "fallback" }
-  if (!env.ANTHROPIC_API_KEY) return buildFallbackPlan(files)
   try {
     const messages: ChatMessage[] = [
       { role: "system", content: `${SYSTEM}\n\nTarget tables:\n${catalogPrompt()}` },

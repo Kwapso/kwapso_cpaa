@@ -9,65 +9,10 @@
 import { describe, expect, it } from "vitest"
 
 import { sseFrame, terminalEvent } from "../src/routes/agent"
-import { parseAnthropicStream, supportsEffort, toAnthropicMessages } from "../src/lib/model"
+import { parseOpenAiStream, toOpenAiMessages } from "../src/lib/model"
 import type { ChatMessage } from "../src/lib/model"
 import type { ChatOutcome, StreamEvent } from "@shared/types"
 import type { AgentQuota } from "@shared/types"
-
-describe("toAnthropicMessages: canonical wire shape (coalescing is API-safe)", () => {
-  it("collapses a multi-tool turn's results into ONE user message, wrap-up ask riding it", () => {
-    // The exact shape the failure path builds: an assistant turn with 3 tool calls,
-    // then 3 tool results, then a trailing user text (the wrap-up ask). The API rejects
-    // two user messages in a row, so the 3 results + the ask must be ONE user message.
-    const convo: ChatMessage[] = [
-      { role: "system", content: "SYS" },
-      { role: "user", content: "do three things" },
-      {
-        role: "assistant",
-        content: "on it",
-        toolCalls: [
-          { id: "t1", name: "create_role", input: {} },
-          { id: "t2", name: "create_brand_asset", input: {} },
-          { id: "t3", name: "raise_help_ticket", input: {} },
-        ],
-      },
-      { role: "tool", content: "FAILED: no permission", toolCallId: "t1", toolName: "create_role" },
-      { role: "tool", content: "FAILED: no permission", toolCallId: "t2", toolName: "create_brand_asset" },
-      { role: "tool", content: "OK", toolCallId: "t3", toolName: "raise_help_ticket" },
-      { role: "user", content: "explain what failed" },
-    ]
-    const msgs = toAnthropicMessages(convo)
-
-    // system dropped; then user / assistant / user — no same-role run.
-    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant", "user"])
-
-    // The assistant turn carries its text + one tool_use per call.
-    expect(msgs[1].content).toEqual([
-      { type: "text", text: "on it" },
-      { type: "tool_use", id: "t1", name: "create_role", input: {} },
-      { type: "tool_use", id: "t2", name: "create_brand_asset", input: {} },
-      { type: "tool_use", id: "t3", name: "raise_help_ticket", input: {} },
-    ])
-
-    // The 3 tool_results AND the wrap-up ask are ONE coalesced user message.
-    expect(msgs[2].content).toEqual([
-      { type: "tool_result", tool_use_id: "t1", content: "FAILED: no permission" },
-      { type: "tool_result", tool_use_id: "t2", content: "FAILED: no permission" },
-      { type: "tool_result", tool_use_id: "t3", content: "OK" },
-      { type: "text", text: "explain what failed" },
-    ])
-  })
-
-  it("skips empty-text turns (the API rejects an empty text block)", () => {
-    const msgs = toAnthropicMessages([
-      { role: "user", content: "hi" },
-      { role: "assistant", content: "" }, // empty — must be dropped
-      { role: "user", content: "still there?" },
-    ])
-    // The two user messages coalesce (the empty assistant between them is gone).
-    expect(msgs).toEqual([{ role: "user", content: [{ type: "text", text: "hi" }, { type: "text", text: "still there?" }] }])
-  })
-})
 
 const QUOTA: AgentQuota = {
   freeDaily: 25,
@@ -79,9 +24,7 @@ const QUOTA: AgentQuota = {
   unlimited: false,
 }
 
-/** A ReadableStream of one or more UTF-8 chunks — mimics the fetch Response body the
- * parser reads, and (by splitting a frame across chunks) proves the buffer stitches
- * partial frames back together. */
+/** A response body as a stream of chunks, so a frame can be cut in half on purpose. */
 function bodyOf(...chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder()
   return new ReadableStream<Uint8Array>({
@@ -92,17 +35,68 @@ function bodyOf(...chunks: string[]): ReadableStream<Uint8Array> {
   })
 }
 
-describe("supportsEffort: only send output_config.effort where the model accepts it", () => {
-  it("true for the Sonnet-5 / Opus-4.7+ / Fable family (incl. dated ids)", () => {
-    for (const m of ["claude-sonnet-5", "claude-sonnet-5-20260930", "claude-opus-4-8", "claude-opus-4-7", "claude-fable-5"])
-      expect(supportsEffort(m), m).toBe(true)
+describe("toOpenAiMessages: the wire shape, and the round-trip the old one could not do", () => {
+  it("a multi-tool turn replays as one assistant turn and one tool message per result", () => {
+    // The exact shape the failure path builds: an assistant turn with 3 tool calls,
+    // then 3 results, then a trailing user text (the wrap-up ask).
+    //
+    // THIS IS THE CHANGE OF 2026-08-28, and it is why an agent loop is possible on
+    // this transport at all. The Anthropic shape needed the three results and the
+    // ask COALESCED into one user message, because two user messages in a row were
+    // rejected. The chat-completions shape carries a result as its own
+    // `role:"tool"` message keyed by `tool_call_id`, so nothing is merged and the
+    // model sees which answer belongs to which call.
+    const convo: ChatMessage[] = [
+      { role: "system", content: "SYS" },
+      { role: "user", content: "do three things" },
+      {
+        role: "assistant",
+        content: "on it",
+        toolCalls: [
+          { id: "t1", name: "create_role", input: {} },
+          { id: "t2", name: "create_brand_asset", input: { label: "x" } },
+          { id: "t3", name: "raise_help_ticket", input: {} },
+        ],
+      },
+      { role: "tool", content: "FAILED: no permission", toolCallId: "t1", toolName: "create_role" },
+      { role: "tool", content: "FAILED: no permission", toolCallId: "t2", toolName: "create_brand_asset" },
+      { role: "tool", content: "OK", toolCallId: "t3", toolName: "raise_help_ticket" },
+      { role: "user", content: "explain what failed" },
+    ]
+    const msgs = toOpenAiMessages(convo)
+
+    // The system prompt STAYS — it is a message on this transport, not a top-level field.
+    expect(msgs.map((m) => m.role)).toEqual([
+      "system", "user", "assistant", "tool", "tool", "tool", "user",
+    ])
+
+    // The assistant turn carries its text and one tool_call per call, arguments as a STRING.
+    expect(msgs[2]).toEqual({
+      role: "assistant",
+      content: "on it",
+      tool_calls: [
+        { id: "t1", type: "function", function: { name: "create_role", arguments: "{}" } },
+        { id: "t2", type: "function", function: { name: "create_brand_asset", arguments: '{"label":"x"}' } },
+        { id: "t3", type: "function", function: { name: "raise_help_ticket", arguments: "{}" } },
+      ],
+    })
+
+    // Each result is its own message, keyed back to the call it answers.
+    expect(msgs[3]).toEqual({ role: "tool", tool_call_id: "t1", content: "FAILED: no permission" })
+    expect(msgs[5]).toEqual({ role: "tool", tool_call_id: "t3", content: "OK" })
   })
-  it("false for older tiers that 400 on effort (so AGENT_MODEL can swap to them)", () => {
-    for (const m of ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6", "claude-3-5-haiku"])
-      expect(supportsEffort(m), m).toBe(false)
+
+  it("an assistant turn with no tool calls stays a plain message", () => {
+    const msgs = toOpenAiMessages([
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi there" },
+    ])
+    expect(msgs).toEqual([
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi there" },
+    ])
   })
 })
-
 describe("sseFrame: each event serializes to one data: frame", () => {
   it("wraps every event shape as `data: <json>\\n\\n`", () => {
     const cases: StreamEvent[] = [
@@ -194,47 +188,44 @@ describe("terminalEvent: a ChatOutcome becomes the single terminal event", () =>
   })
 })
 
-describe("parseAnthropicStream: parses the Messages SSE into text + tool calls", () => {
-  // A realistic (trimmed) Anthropic Messages stream: two text deltas, then a tool_use
-  // block whose JSON input arrives across two input_json_delta chunks, then message_stop.
+describe("parseOpenAiStream: parses the chat-completions SSE into text + tool calls", () => {
+  // A realistic (trimmed) chat-completions stream: two text deltas, then a tool call
+  // whose argument JSON arrives across two chunks. The id and name appear only on the
+  // FIRST chunk of a call, which is why the parser keys by `index`.
   const frames = [
-    'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1"}}\n\n',
-    'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
-    'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Invit"}}\n\n',
-    'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ing them now."}}\n\n',
-    'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n',
-    'event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_9","name":"invite_member","input":{}}}\n\n',
-    'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"email\\":\\"a@b.com\\","}}\n\n',
-    'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\\"roleId\\":\\"r1\\"}"}}\n\n',
-    'event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n',
-    'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}\n\n',
-    'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+    'data: {"choices":[{"delta":{"content":"Invit"}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"ing them now."}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_9","type":"function","function":{"name":"invite_member","arguments":"{\\"email\\":\\"a@b.com\\","}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"roleId\\":\\"r1\\"}"}}]}}]}\n\n',
+    'data: {"usage":{"prompt_tokens":1200,"completion_tokens":40},"choices":[{"delta":{}}]}\n\n',
+    "data: [DONE]\n\n",
   ]
 
   it("fires onText for each text delta and returns the joined text + parsed tool call", async () => {
     const deltas: string[] = []
-    const reply = await parseAnthropicStream(bodyOf(frames.join("")), (d) => deltas.push(d))
+    const reply = await parseOpenAiStream(bodyOf(frames.join("")), (d) => deltas.push(d))
 
-    // Text deltas arrived in order, and only the text (not the JSON) was streamed.
+    // Text deltas arrived in order, and only the text (not the argument JSON) streamed.
     expect(deltas).toEqual(["Invit", "ing them now."])
     expect(reply.text).toBe("Inviting them now.")
 
-    // The tool_use block's input JSON — split across two input_json_delta chunks — was
-    // stitched back together and parsed into the real object.
+    // The argument JSON — split across two chunks — was stitched and parsed.
     expect(reply.toolCalls).toHaveLength(1)
     expect(reply.toolCalls[0]).toEqual({
-      id: "toolu_9",
+      id: "call_9",
       name: "invite_member",
       input: { email: "a@b.com", roleId: "r1" },
     })
+    // And the turn's cost came back with it.
+    expect(reply.usage?.input).toBe(1200)
+    expect(reply.usage?.output).toBe(40)
   })
 
   it("stitches a frame split across two body chunks (partial-frame buffering)", async () => {
-    // Break the stream mid-frame to prove the decoder buffers until the `\n\n` boundary.
     const whole = frames.join("")
     const cut = Math.floor(whole.length / 2)
     const deltas: string[] = []
-    const reply = await parseAnthropicStream(bodyOf(whole.slice(0, cut), whole.slice(cut)), (d) =>
+    const reply = await parseOpenAiStream(bodyOf(whole.slice(0, cut), whole.slice(cut)), (d) =>
       deltas.push(d)
     )
     expect(reply.text).toBe("Inviting them now.")
@@ -243,14 +234,23 @@ describe("parseAnthropicStream: parses the Messages SSE into text + tool calls",
 
   it("a text-only turn yields no tool calls", async () => {
     const textOnly = [
-      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
-      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello there."}}\n\n',
-      'data: {"type":"message_stop"}\n\n',
+      'data: {"choices":[{"delta":{"content":"Hello there."}}]}\n\n',
+      "data: [DONE]\n\n",
     ].join("")
     const deltas: string[] = []
-    const reply = await parseAnthropicStream(bodyOf(textOnly), (d) => deltas.push(d))
+    const reply = await parseOpenAiStream(bodyOf(textOnly), (d) => deltas.push(d))
     expect(deltas).toEqual(["Hello there."])
     expect(reply.text).toBe("Hello there.")
     expect(reply.toolCalls).toEqual([])
+  })
+
+  it("a model that writes malformed arguments still yields a call, not a dead turn", async () => {
+    // A door can refuse an argument-less call cleanly; a turn that dies parsing cannot
+    // be recovered at all. So bad JSON degrades to {} rather than throwing.
+    const bad =
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"list_roles","arguments":"{not json"}}]}}]}\n\n' +
+      "data: [DONE]\n\n"
+    const reply = await parseOpenAiStream(bodyOf(bad), () => {})
+    expect(reply.toolCalls).toEqual([{ id: "c1", name: "list_roles", input: {} }])
   })
 })

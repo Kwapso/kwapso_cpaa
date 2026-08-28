@@ -52,5 +52,4 @@ export type Env = {
   WORKERS_AI_MODEL?: string
   // Secret (wrangler secret put): when set, the agentic path upgrades to Claude;
   // when absent, the agent answers via Workers AI (acting is limited).
-  ANTHROPIC_API_KEY?: string
 }

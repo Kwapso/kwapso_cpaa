@@ -54,7 +54,7 @@
   ],
   "vars": {
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
-    "AGENT_MODEL": "claude-sonnet-5",
+    "AGENT_MODEL": "@cf/zai-org/glm-5.3-flash",
     "AGENT_EFFORT": "low",
     // THE PROMPT CACHE. "off" | "5m" | "1h" (unset = "5m"). Marks the assistant's
     // stable prefix — the tool catalogue + the system prompt, about nine tenths of
@@ -124,7 +124,7 @@
       "vars": {
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
-        "AGENT_MODEL": "claude-sonnet-5",
+        "AGENT_MODEL": "@cf/zai-org/glm-5.3-flash",
         "AGENT_EFFORT": "low",
         // Staging shares the production knob so a cost measurement here means
         // something there (test/prompt-cache.test.ts).

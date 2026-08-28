@@ -7,4 +7,3 @@ ADMIN_KEY=
 # OPTIONAL. Set it and the assistant's brain is Claude; leave it blank and it
 # falls back to Cloudflare Workers AI. BOTH do full tool use — the key changes
 # which model thinks, never whether the assistant can act.
-ANTHROPIC_API_KEY=

@@ -120,7 +120,6 @@ function env(): never {
     // model door answers 503, the loop's own catch turns it into a settled
     // turn, and what is under test (the proposal is spent exactly once, the
     // approved call reaches its door) is unchanged.
-    ANTHROPIC_API_KEY: "test-key-never-sent-anywhere",
     TENANCY: {
       fetch: async (url: string) => {
         doorCalls.push(new URL(url).pathname)
