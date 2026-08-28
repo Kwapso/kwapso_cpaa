@@ -935,7 +935,23 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                    sentence was invisible AND unscrollable before they sent
                    it. `autoGrow` decides the overflow from whether the box
                    still fits its text. */
-                "border-0 bg-transparent px-0 py-[var(--space-1h)]",
+                /* AND `shadow-none`, because `border-0` never reached the
+                   hairline. The Textarea's resting edge is
+                   `shadow-[var(--hairline-strong)]` — a box-shadow, not a
+                   border — so shedding the border left the field drawing a
+                   SECOND box one pixel inside the pill, and `px-0` (which is
+                   right: the pill already insets by 16) put the placeholder
+                   hard against that inner edge. Measured at 390 in the
+                   drawer: the placeholder began 0px from a visible line, and
+                   the pill's own 16 counted for nothing because the pill was
+                   not the box a reader could see.
+
+                   `shadow-none` drops only the RESTING edge — `textarea.tsx`
+                   says it in its own words, "Focus adds nothing: the global
+                   ring IS the focus treatment" — so the field is still
+                   plainly focused and the composer is one box again, which
+                   is what "a paper pill" meant. */
+                "border-0 bg-transparent shadow-none px-0 py-[var(--space-1h)]",
                 "text-caption leading-[var(--leading-normal)]",
               )}
             />
