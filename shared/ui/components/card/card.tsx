@@ -100,6 +100,16 @@ const INTERACTIVE_COLOURED = "cursor-pointer motion-hover-lift";
    page than the panel -- #EFE6DD in light, --kw-unlit-quiet in dark. Still
    ONE answer for a chosen record: `TableRow`, `List`, `map`'s list row and
    `Card` all take this exact string. */
+/* OVERRIDE 77 (2026-08-27, the client's D15-B) — override 44 is OVERTURNED:
+   the selected paper is the lift the artifact drew. The string below is
+   unchanged on purpose (one answer for a chosen record survives), but
+   `--surface-selected` now points at `--surface-raised` — which is `--card`,
+   the `raised` variant's OWN fill. So row 40's limit returns inverted:
+   a selection is visible on a `default` card (1.103 light / 1.111 dark)
+   and PAINTS NOTHING on a `raised` one — 1.000 in BOTH palettes. A pickable
+   grid must be `default` now, the exact opposite of what override 44's
+   note below concluded. Chosen from the drawing; register row 77 carries
+   the full per-context table. */
 const CARD_SELECTED = "bg-surface-selected";
 
 /** Variants whose fill is an accent, so the neutral hover wash must not land. */

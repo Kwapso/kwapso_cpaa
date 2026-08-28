@@ -197,6 +197,12 @@ const aliasLines = Object.entries(ALIASES)
   .map(([name, target]) => `  ${target} as ${name},`)
   .join("\n");
 
+/* The kit's contract as data, for anything that wants to verify it at runtime
+   (the demo's icon sheet does). Wrapped to readable lines. */
+const kitNameLines = [];
+for (let i = 0; i < NAMED.length; i += 6)
+  kitNameLines.push("  " + NAMED.slice(i, i + 6).map((n) => `"${n}",`).join(" "));
+
 const index = `/* One named React export per icon, plus the shared types.
  *
  * ${icons.length} glyphs from the Iconoir pack (MIT), under Iconoir's own names.
@@ -211,6 +217,17 @@ export * from "./icons.generated";
 export {
 ${aliasLines}
 } from "./icons.generated";
+
+/* THE KIT'S OWN CONTRACT, as data. The pack above is Iconoir's concern and its
+ * size moves when the pack is re-vendored; these ${NAMED.length} spellings (${COMMISSION_93.length} commission
+ * + ${Object.keys(ADDED).length} additive) are the kit's promise — the names the system and portal
+ * call sites are written against. The generator refuses to emit if any of them
+ * stops resolving; consumers (the demo's icon sheet) can re-verify at runtime
+ * that every one is still an export of this module.
+ */
+export const KIT_ICON_NAMES = [
+${kitNameLines.join("\n")}
+] as const;
 `;
 
 if (!CHECK_ONLY) {

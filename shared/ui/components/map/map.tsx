@@ -530,7 +530,16 @@ const Map = React.forwardRef<HTMLDivElement, MapProps>(
                              the K1 reversal moved that paper under the rows,
                              so it is `--surface-selected` now: one rung
                              further from the page than the panel. No hover on
-                             top of it: it is already the marked row. */
+                             top of it: it is already the marked row.
+                             OVERRIDE 77 (2026-08-27, D15-B) — 44 overturned:
+                             `--surface-selected` now points at
+                             `--surface-raised`, i.e. `--card` — WHICH IS THIS
+                             LIST'S OWN UNSELECTED ROW FILL. The marked row
+                             measures 1.000 against its neighbours in BOTH
+                             palettes; only the missing hover wash and
+                             `aria-current` distinguish it. Recorded loudly
+                             in register row 77 — the client chose the lift
+                             from a drawing that printed the 1.000. */
                           "bg-surface-selected text-foreground"
                         : "bg-card text-foreground hover:bg-accent",
                     )}

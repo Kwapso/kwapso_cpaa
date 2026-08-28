@@ -26,7 +26,11 @@
      heights as "32 dense · 38 field inside a row · 40 control · 44 touch row"
      and then keeps 56 for this one thing. It does not shrink at mobile, it
      does not grow at desktop, and a dense table is not a variant this file
-     offers, because the ruling names one number.
+     offers, because the ruling names one number. Register row 75 (`D14-KEEP`,
+     2026-08-27) ratified all of this against CH17's own drawn density
+     (header 13/18, rows 14/18, body 12.5) and CH19's 13.5 and 13: the
+     client kept the primitive's figures and declined a `density` prop, so
+     one table density exists and this file draws it.
    · A table's rules are the legitimate hairline, drawn as INSET SHADOWS and
      never as `border` properties (review 1A · fix 2). `--hair` between rows,
      `--hair-strong` under the header and above the footer. Never a hairline
@@ -336,6 +340,14 @@ const ROW_DEFAULT = "motion-row-hover hover:bg-accent";
    page than the panel -- #EFE6DD in light, --kw-unlit-quiet in dark. Still
    ONE answer for a chosen record: `TableRow`, `List`, `map`'s list row and
    `Card` all take this exact string. */
+/* OVERRIDE 77 (2026-08-27, the client's D15-B) — override 44 is OVERTURNED:
+   the selected paper is the lift the artifact drew. The string below is
+   unchanged on purpose (one answer for a chosen record survives), but
+   `--surface-selected` now points at `--surface-raised`, so the values in
+   the note above are history. A selected row still separates inside the
+   soft-paper panel (1.103 light / 1.111 dark against its unselected
+   neighbour) and now reads 1.000 against the off-beige body pane in light
+   — chosen from the drawing, which printed that figure. Register row 77. */
 const ROW_SELECTED = "bg-surface-selected";
 
 /* A fill and an ink. Never an opacity, and no hover, so a dead row cannot

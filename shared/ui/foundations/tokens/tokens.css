@@ -496,7 +496,23 @@
      the band, 1.221 vs a raised card, 1.107 vs a default card -- which also
      closes row 40's "selected paints nothing on a default card" limit.
      Dark: 1.252 vs the neighbour, 1.351 vs the band, 1.127 vs a raised card. */
-  --surface-selected: #EFE6DD;             /* a chosen row, item or card     */
+  /* OVERTURNED 2026-08-27 -- RULED D15-B, REGISTER ROW 77. The client took
+     the artifact's lift after seeing it drawn and measured live on
+     verify/decide-3.html §D15: the selected paper IS the raised paper now,
+     in both palettes, so this token points at --surface-raised and override
+     44's #EFE6DD leaves the file (dark's --kw-unlit-quiet predates 44 and
+     stays; selection just no longer reads it). SAID PLAINLY, BECAUSE THE
+     DRAWING PRINTED IT IN RED AND THE CLIENT CHOSE IT ANYWAY: a selected
+     thing now measures 1.000 against the off-beige body pane in light,
+     1.000 against an unselected `raised` card in BOTH palettes, and 1.000
+     against `map`'s unselected bg-card list rows in BOTH palettes -- in
+     those contexts the selection is genuinely indistinguishable by fill.
+     Inside the soft-paper panel (table rows, list rows, a `default` card)
+     it separates 1.103 light / 1.111 dark. Full per-context table in
+     register row 77. The NAME survives on purpose: overrides 40/44's one
+     standing achievement -- ONE answer for a chosen record, four call sites
+     reading one string -- was not what was overturned; only the paper was. */
+  --surface-selected: var(--surface-raised); /* a chosen row, item or card   */
 
   /* ---- THE THREE SPINES · only the four values that FLIP with the palette.
      The spine MAPPING is palette-free and lives in section 7b; these are the
@@ -523,6 +539,21 @@
   --ink-on-accent:   var(--kw-charcoal);   /* the accent law, as a token     */
   --hair:            var(--border);
   --hair-strong:     rgba(26, 25, 24, .20);/* section rules                  */
+  /* ---- THE GRIDLINE GROUND — a fourth tier, minted 2026-08-27 ------------
+     CH19 view 06 (the dense spreadsheet, `tableCells`) draws its 1px grid as
+     a `gap: 1px` filled with `background: rgba(26,25,24,.10)` — charcoal at
+     10%, WRITTEN OUT IN THE KIT'S OWN HTML, not derived. 10% is not one of
+     the standing hairline tiers (6 faint / 8 hair / 20 strong), and
+     `verify/decide-3.html` §D13 drew the specimen at --hair (8%) only
+     because no name existed, saying so in its own foot. D13 was ruled
+     "ships" on 2026-08-27, which brings the drawn value into the build: the
+     kit states an exact rgba, so the exact rgba is the token rather than the
+     nearest neighbour. A GRIDLINE, not a hairline: it is a gap ground
+     behind opaque cells (a filled 1px lattice), never an inset box-shadow
+     edge — no --hairline-* shape points at it. Dark is derived by the
+     kit's own hairline method: carry the alpha, flip the ink.
+     KWAPSO-SPEC.md register row 78.                                        */
+  --hair-grid:       rgba(26, 25, 24, .10);
   /* THE HAIRLINE ON AN INVERSE GROUND. The artifact states both values in its
      own :root — `--invhair: rgba(255,254,249,.12)` and
      `--invhair2: rgba(255,254,249,.24)`, flipping to `rgba(26,25,24,.12)` and
@@ -1089,7 +1120,13 @@
        what a `raised` card is already painted and a selected card there would
        measure 1.000. --kw-unlit-quiet is the next rung and was already in the
        file, so dark invents no hex. */
-    --surface-selected:     var(--kw-unlit-quiet);
+    /* OVERTURNED 2026-08-27, D15-B (register row 77): the lift is taken
+       exactly as drawn after all -- the selected paper is the raised paper,
+       one rung CLOSER than 44's #2F2D28, and the 1.000 against a raised
+       card that 44's rung existed to avoid is accepted, chosen from the
+       drawing. See the light block's overturn note for every measured
+       context. */
+    --surface-selected:     var(--surface-raised);
 
     /* THE THREE SPINES, dark. 26.02 states the two fills outright: "In dark
        mode ink becomes #1C1B18 and paper becomes #26241F; mango is unchanged
@@ -1102,6 +1139,8 @@
     --spine-paper-fill:      var(--kw-unlit-raised);
     --spine-paper-chip:      var(--kw-unlit-quiet);
     --hair-strong:          rgba(255, 254, 249, .24);
+    /* The gridline ground (CH19 view 06): carry the alpha, flip the ink. */
+    --hair-grid:            rgba(255, 254, 249, .10);
     /* The inverse ground flips to off-beige in dark, so its hairline flips
        with it — the artifact's own dark --invhair / --invhair2. */
     --hair-inverse:         rgba(26, 25, 24, .12);
@@ -1198,7 +1237,13 @@
      what a `raised` card is already painted and a selected card there would
      measure 1.000. --kw-unlit-quiet is the next rung and was already in the
      file, so dark invents no hex. */
-  --surface-selected:     var(--kw-unlit-quiet);
+  /* OVERTURNED 2026-08-27, D15-B (register row 77): the lift is taken
+     exactly as drawn after all -- the selected paper is the raised paper,
+     one rung CLOSER than 44's #2F2D28, and the 1.000 against a raised
+     card that 44's rung existed to avoid is accepted, chosen from the
+     drawing. See the light block's overturn note for every measured
+     context. */
+  --surface-selected:     var(--surface-raised);
 
   /* THE THREE SPINES, dark. 26.02 states the two fills outright: "In dark
      mode ink becomes #1C1B18 and paper becomes #26241F; mango is unchanged
@@ -1211,6 +1256,8 @@
   --spine-paper-fill:      var(--kw-unlit-raised);
   --spine-paper-chip:      var(--kw-unlit-quiet);
   --hair-strong:          rgba(255, 254, 249, .24);
+  /* The gridline ground (CH19 view 06): carry the alpha, flip the ink. */
+  --hair-grid:            rgba(255, 254, 249, .10);
   /* The inverse ground flips to off-beige in dark, so its hairline flips
      with it — the artifact's own dark --invhair / --invhair2. */
   --hair-inverse:         rgba(26, 25, 24, .12);

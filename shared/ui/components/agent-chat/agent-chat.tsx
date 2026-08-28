@@ -599,6 +599,11 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
   ) => {
     const list = messages ?? [];
 
+    /* Whether the composer holds more than one line. Measured by the textarea,
+       which is already setting its own height, and used for one thing only:
+       the stadium rule on the pill below. */
+    const [grown, setGrown] = React.useState(false);
+
     /* Exclusive states resolved in JS (PATTERN §4): loading beats error beats
        empty. `thinking` is NOT one of these — it is a turn that is added to a
        conversation that already exists, so it lives alongside `default`. */
@@ -885,8 +890,20 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
           <div
             data-slot="agent-chat-composer"
             /* The kit's composer: a paper pill, 8 of inset with 16 at the
-               inline start. */
-            className="flex min-w-0 items-end gap-2 rounded-pill bg-card ps-4 pe-2 py-2"
+               inline start — until it has grown.
+
+               THE STADIUM RULE, and it is `chat.tsx`'s own: "a multiline
+               composer steps to the box radius, because a pill that has grown
+               three lines tall is a stadium." That composer knows it is
+               multiline because the call site TOLD it. This one grows on its
+               own, so the same fact is measured instead — `autoGrow` reports
+               the crossing and the radius follows it. One rule, two ways of
+               learning the same thing, and neither component invents a second
+               shape. */
+            className={cn(
+              "flex min-w-0 items-end gap-2 bg-card ps-4 pe-2 py-2",
+              grown ? "rounded-[var(--radius)]" : "rounded-pill",
+            )}
           >
             <Textarea
               aria-label={composerLabel}
@@ -902,6 +919,7 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                 }
               }}
               autoGrow
+              onGrownChange={setGrown}
               className={cn(
                 "min-h-[var(--control-height-dense)] flex-1 resize-none",
                 /* THE CAP, and it is `chat.tsx`'s — nine rem is where that
