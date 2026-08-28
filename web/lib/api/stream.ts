@@ -8,6 +8,7 @@ import { ApiFailure } from "@shared/web/api"
 import type {
   ApiError,
   ChatOutcome,
+  ModelFailure,
   KnowledgeCitation,
   KnowledgePassage,
   PendingCall,
@@ -28,7 +29,10 @@ export type AgentStreamEvent =
   | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
   | { t: "confirm"; threadId: string; calls: PendingCall[]; text?: string }
   | { t: "final"; outcome: ChatOutcome }
-  | { t: "error"; message: string }
+  /** `reason` is set when the failure was the MODEL door and could be
+   * classified — the screen says its own sentence for that reason (R28/R33: a
+   * worker cannot translate) and falls back to `message` when it is absent. */
+  | { t: "error"; message: string; reason?: ModelFailure }
 
 /** Read a POST's `text/event-stream` body, splitting on the blank-line record
  * separator and calling `onEvent` for each `data:` line's JSON. Shared by the two

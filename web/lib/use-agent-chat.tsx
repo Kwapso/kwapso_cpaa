@@ -30,7 +30,7 @@ export type AgentChatItem =
 import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
-import type { AgentMessage, AgentQuota, PendingCall } from "@shared/types"
+import type { AgentMessage, AgentQuota, ModelFailure, PendingCall } from "@shared/types"
 import { evidenceFromSaved, mergeEvidence, type TurnEvidence } from "@shared/agent-cites"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
 import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
@@ -140,6 +140,12 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   const [quota, setQuota] = React.useState<AgentQuota | null>(null)
   // A paused turn awaiting the user's go-ahead — the proposed actions + the text.
   const [pending, setPending] = React.useState<{ calls: PendingCall[]; text: string } | null>(null)
+  // WHY THE LAST TURN COULDN'T ANSWER, when the model door was the reason. Held
+  // beside the transcript rather than inside it: the bubble is what the assistant
+  // SAID, and this is a fact about the app, which is a different thing and gets
+  // its own quiet notice. Cleared the moment the next question is asked — a
+  // warning about a limit that has since cleared is its own small lie.
+  const [failure, setFailure] = React.useState<ModelFailure | null>(null)
 
   // A QUESTION HANDED IN FROM A SCREEN (web/lib/agent-open.ts): the knowledge
   // base's ask box, and the same box on an account's or an app's knowledge tab.
@@ -302,6 +308,10 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
         }
         case "final": {
           const out = ev.outcome
+          // The loop turns a model failure into a settled turn rather than a
+          // 500, so `done` is true and this is the ONLY thing that says the
+          // answer never happened.
+          if (out.done && out.failure) setFailure(out.failure)
           setThreadId(out.threadId)
           // Remember this thread so reopening the panel resumes it (best-effort).
           if (teamId && out.threadId) writeLastThread(teamId, out.threadId)
@@ -320,8 +330,23 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "error": {
+          // A model failure that never reached the loop's own catch — a worker
+          // with no key is the ordinary one, because `selectModel` throws before
+          // the loop exists to catch it.
+          //
+          // AND ITS MESSAGE NEVER REACHES THE BUBBLE. `ev.message` on this path
+          // is written for the error store — "model_error: Claude returned 403.
+          // {…}" — and putting it in the conversation is the same fault this
+          // whole change is about, one layer down: a person is handed a status
+          // code instead of a sentence. Seen on screen before it was fixed. So a
+          // CLASSIFIED failure gets the same short line the server saves for its
+          // own settled turns, translated here where `t` exists, and the notice
+          // beside the composer does the explaining. An UNclassified one keeps
+          // the server's message, because then it really is all we know.
+          if (ev.reason) setFailure(ev.reason)
+          const shown = ev.reason ? t("I couldn't answer that one.") : ev.message
           setItems((prev) =>
-            prev.map((it) => (it.id === assistantId ? { ...it, content: ev.message } : it))
+            prev.map((it) => (it.id === assistantId ? { ...it, content: shown } : it))
           )
           break
         }
@@ -401,6 +426,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     ])
     setBusy(true)
     setPending(null)
+    setFailure(null)
     setAttached([])
     try {
       await consume((onEvent) => dataOps.agentChatStream({ message: text, threadId, files }, onEvent), assistantId)
@@ -463,6 +489,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     setItems([])
     setThreadId(undefined)
     setPending(null)
+    setFailure(null)
     if (teamId) clearLastThread(teamId)
   }
 
@@ -526,6 +553,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     busy,
     quota,
     pending,
+    failure,
     showTyping,
     confirmSteps,
     quotaLabel,

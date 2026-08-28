@@ -112,6 +112,15 @@ let doorCalls: string[] = []
 function env(): never {
   return {
     ...(makeEnv(db, IDS.staffUser) as unknown as object),
+    // A KEY, AND A MODEL DOOR THAT REFUSES. Until 2026-08-27 this env had no
+    // key at all and `selectModel` quietly handed back the Workers AI adapter
+    // with no `AI` binding, so the model call threw and the loop settled the
+    // turn — which is the path this suite actually exercises. The escape hatch
+    // is gone, so the same shape is now stated out loud: a key is present, the
+    // model door answers 503, the loop's own catch turns it into a settled
+    // turn, and what is under test (the proposal is spent exactly once, the
+    // approved call reaches its door) is unchanged.
+    ANTHROPIC_API_KEY: "test-key-never-sent-anywhere",
     TENANCY: {
       fetch: async (url: string) => {
         doorCalls.push(new URL(url).pathname)
@@ -120,6 +129,18 @@ function env(): never {
     },
   } as never
 }
+
+/** The model door, refusing, with no network involved. Every test in this file
+ * settles its turn through the loop's own catch; leaving this to a real `fetch`
+ * would mean a unit test reaching the internet to find that out. */
+beforeEach(() => {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = String(input instanceof Request ? input.url : input)
+    if (url.includes("api.anthropic.com"))
+      return new Response('{"error":{"type":"overloaded_error"}}', { status: 529 })
+    throw new Error(`unexpected fetch in a unit test: ${url}`)
+  })
+})
 
 const request = () => new Request("https://data-ops/api/agent/confirm", { headers: { Cookie: "session=x" } })
 

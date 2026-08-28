@@ -22,6 +22,7 @@
 
 import { isLanguage, LANGUAGES } from "@shared/i18n"
 import { refusePortalCaller } from "@shared/workers/account-scope"
+import { ModelError } from "@shared/workers/model-failure"
 import { fail, json } from "@shared/workers/http"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
@@ -111,7 +112,16 @@ function streamRun(env: Env, run: (emit: Emit) => Promise<ChatOutcome>): Respons
       } else {
         console.error("agent stream error:", e)
         await recordWorkerError(env.DB, "data-ops", "POST /api/data-ops/agent (stream)", e)
-        await write({ t: "error", message: "The assistant had trouble just now. Please try again in a moment." })
+        // A MODEL failure that escaped the loop — a worker with no key is the
+        // ordinary one, because `selectModel` throws before the loop's own catch
+        // exists. It carries its reason so the screen can say the true thing;
+        // anything else keeps the generic sentence, which is honest about the one
+        // case where we genuinely do not know.
+        await write(
+          e instanceof ModelError
+            ? { t: "error", message: e.message, reason: e.reason }
+            : { t: "error", message: "The assistant had trouble just now. Please try again in a moment." }
+        )
       }
     } finally {
       await writer.close().catch(() => {})

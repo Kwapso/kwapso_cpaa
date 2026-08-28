@@ -17,8 +17,8 @@ under **two front doors**: `gateway` (the agency app, `web/`) and `portal-gatewa
 surface: personal access tokens (hashed, shown-once, team-pinned, revocable;
 managed under Settings → Access tokens) bridged to short-lived team-pinned
 sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's model is
-swappable: Claude when `ANTHROPIC_API_KEY` is set, else Cloudflare Workers AI
-(both do full tool use); it confirms on destructive + bulk actions and is metered
+swappable but no longer silent: Claude when `ANTHROPIC_API_KEY` is set, and with
+no key there is no assistant at all rather than a quietly weaker one; it confirms on destructive + bulk actions and is metered
 by a credit quota, **the app's own daily allowance** (the `AGENT_FREE_DAILY` var:
 code default 25, both environments ship **50**, and staging's
 `AGENT_NO_DAILY_CAP` props the refusal door open so the 50 is enforced on

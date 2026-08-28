@@ -1,8 +1,9 @@
 // The swappable MODEL seam. The agent loop talks to this interface only — switching
-// providers is a one-line change in selectModel(), never a rewrite. Default: Claude
-// (Anthropic Messages API, full tool use) WHEN an ANTHROPIC_API_KEY is set; otherwise
-// Cloudflare Workers AI (which now ALSO does full tool use — the agent can answer AND
-// act on Workers AI, no key needed). Workers AI is also the cheap inline path.
+// providers is a one-line change in selectModel(), never a rewrite. It is Claude
+// (Anthropic Messages API, full tool use), and a worker with no ANTHROPIC_API_KEY
+// has no assistant rather than a quietly weaker one — see selectModel for the
+// ruling and what that costs. The cheap INLINE path is a different question and
+// still runs on Workers AI: shared/workers/model-text.ts.
 
 import type { Env } from "../env"
 import { NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
@@ -46,7 +47,7 @@ export type ModelReply = { text: string; toolCalls: ToolCall[]; usage?: TokenUsa
 // transport that writes it, and the test that proves the Workers AI path is fenced
 // reads it beside the flattening it guards.
 export { TOOL_RESULT_TAG, fenceToolResult } from "@shared/workers/model-text"
-import { fenceToolResult } from "@shared/workers/model-text"
+import { ModelError, classifyModelHttp } from "@shared/workers/model-failure"
 
 export interface Model {
   readonly name: string
@@ -177,6 +178,17 @@ export function readUsage(raw: AnthropicUsage | undefined): TokenUsage {
   }
 }
 
+/** A provider HTTP failure → the typed error the loop can explain. The status
+ * and the body BOTH ride the message, because the message is what lands in the
+ * error store for an owner to read; the `reason` is what the person on the
+ * screen is told. Two audiences, one throw. */
+function modelHttpError(status: number, detail: string): ModelError {
+  return new ModelError(
+    classifyModelHttp(status, detail),
+    `model_error: Claude returned ${status}. ${detail.slice(0, 200)}`
+  )
+}
+
 /** THE ONE REQUEST BODY both complete() and stream() send — same messages, tools,
  *  effort and cache rules; only the `stream` flag differs. Exported pure so the
  *  byte-identical proof can build it twice (cache on, cache off) with no network.
@@ -207,8 +219,33 @@ export function anthropicBody(opts: {
     // Effort controls reasoning depth + overall token spend (GA on the Sonnet-5 /
     // Opus-4.7+ family, no beta header). "low" = terse, consolidated tool calls —
     // the cheap setting. We leave `thinking` unset on purpose: those models run
-    // adaptive thinking by default and keep it minimal at low effort, which also
-    // keeps them willing to reach for tools. `effort` is sent ONLY to models that
+    // adaptive thinking by default and keep it minimal at low effort.
+    //
+    // WHAT LOW COSTS US IN TOOL CHOICE: NOTHING WE COULD MEASURE (27 Aug 2026).
+    // This comment used to end "…which also keeps them willing to reach for
+    // tools", which contradicted Anthropic's own docs (lower effort → FEWER,
+    // more consolidated tool calls) and had never been tested. So it was: ten
+    // real questions, the shipped prompt and the whole catalogue, low against
+    // HIGH — the ENDS, because a low-to-medium gap would sit inside the noise of
+    // a system we already know answers the same question two ways minutes apart.
+    //
+    //   tool calls per question   0.90 low   0.90 high
+    //   reached ask_knowledge     4/10 low   3/10 high
+    //   identical tool path       9 of 10 questions
+    //   output tokens            1,710 low  2,067 high (+21%)
+    //
+    // The single difference went AGAINST high, and neither theory survives: low
+    // is not more willing and high is not better. So `low` stays, and it stays
+    // for a measured reason rather than a plausible sentence. If the question
+    // comes back, medium is the untested middle — but only after something
+    // shows high is worth asking about.
+    //
+    // ONE OPERATIONAL FACT FOUND ON THE WAY: switching effort mid-run wrote the
+    // prompt cache again (one 50K write, about 20¢), so `effort` appears to
+    // participate in the cached prefix. Not proven — a cold node would look the
+    // same — but worth knowing before anybody A/Bs this in production.
+    //
+    // `effort` is sent ONLY to models that
     // support it — older tiers (e.g. Haiku 4.5) reject `output_config.effort` with
     // a 400, so swapping AGENT_MODEL to one of those must not carry it. (Never send
     // temperature/top_p or budget_tokens on the 4.7+ family — each is a 400.)
@@ -277,7 +314,7 @@ class ClaudeModel implements Model {
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => "")
-      throw new Error(`model_error: Claude returned ${res.status}. ${detail.slice(0, 200)}`)
+      throw modelHttpError(res.status, detail)
     }
     const data = (await res.json()) as { content?: AnthropicBlock[]; usage?: AnthropicUsage }
     const blocks = data.content ?? []
@@ -310,7 +347,7 @@ class ClaudeModel implements Model {
     })
     if (!res.ok || !res.body) {
       const detail = res.body ? await res.text().catch(() => "") : ""
-      throw new Error(`model_error: Claude returned ${res.status}. ${detail.slice(0, 200)}`)
+      throw modelHttpError(res.status, detail)
     }
     return parseAnthropicStream(res.body, onText)
   }
@@ -415,122 +452,60 @@ export async function parseAnthropicStream(
   return { text, toolCalls, usage }
 }
 
-/* ------------------------------- Workers AI ------------------------------- */
-// Tool-calling on Workers AI (env.AI.run). LEARNED LIVE (2026-06-28): models split
-// into tool-format camps — llama-3.3 took a flat tools shape, but the strong models
-// (llama-4-scout, mistral, gemma, kimi, gpt-oss) require the OpenAI-WRAPPED shape
-// `{type:"function", function:{name,description,parameters}}` (a flat shape 400s with
-// "tools[0].function required"). So we send WRAPPED (widest support) and parse BOTH
-// response shapes: native `tool_calls:[{name,arguments(object)}]` OR wrapped
-// `[{id,type,function:{name,arguments(JSON string)}}]` (also under `choices[].message`).
-// The chat template also REJECTS a replayed assistant-tool-call + role:"tool" round-
-// trip, so we FLATTEN tool history into plain messages (a result → a user message).
-// Default: @cf/meta/llama-4-scout-17b-16e-instruct (fast; chats AND calls tools well).
-// Docs: https://developers.cloudflare.com/workers-ai/function-calling/
-type WorkersAiFn = { name?: string; arguments?: unknown }
-type WorkersAiToolCall = { id?: string; name?: string; arguments?: unknown; function?: WorkersAiFn }
-type WorkersAiReply = {
-  response?: string
-  tool_calls?: WorkersAiToolCall[]
-  choices?: { message?: { content?: string; tool_calls?: WorkersAiToolCall[] } }[]
-}
-
-class WorkersAiModel implements Model {
-  readonly canActWithTools = true
-  // No stream() — callers fall back to complete(), so token deltas are absent but the
-  // step_start/step_end events still flow around each tool the model runs.
-  readonly canStream = false
-  constructor(
-    private ai: Ai,
-    readonly name: string
-  ) {}
-
-  async complete(messages: ChatMessage[], tools: ToolSpec[]): Promise<ModelReply> {
-    // Workers AI reliably ACCEPTS a tool call on a turn (we pass `tools` + parse
-    // `tool_calls` out of the reply), but its chat template REJECTS a replayed
-    // assistant-tool-call + role:"tool" round-trip (verified live — the follow-up
-    // turn threw). So we FLATTEN prior tool activity into plain messages: a tool
-    // RESULT becomes a user message the model reads to answer; an empty tool-call
-    // assistant turn is dropped. The model can still call a (further) tool on this
-    // turn — only the HISTORY is flattened.
-    //
-    // FLATTENING LOSES THE ONE THING THAT SAID "THIS IS DATA". Claude keeps a
-    // result in its own tool_result block, so the structure carries the fence; a
-    // flattened result is a plain user turn, and every ticket description and
-    // account name in it then reads exactly like something the user typed. So the
-    // marker is written back in explicitly — see fenceToolResult, and the system
-    // prompt that names the same tag.
-    const msgs = messages
-      .map((m): { role: "system" | "user" | "assistant"; content: string } | null => {
-        if (m.role === "tool")
-          return { role: "user", content: fenceToolResult(m.toolName ?? "tool", m.content ?? "") }
-        if (m.role === "assistant" && m.toolCalls && m.toolCalls.length)
-          return m.content ? { role: "assistant", content: m.content } : null
-        return { role: m.role as "system" | "user" | "assistant", content: m.content ?? "" }
-      })
-      .filter((m): m is { role: "system" | "user" | "assistant"; content: string } => m !== null)
-
-    const body: Record<string, unknown> = { messages: msgs, max_tokens: AGENT_MAX_TOKENS, temperature: 0.3 }
-    if (tools.length)
-      body.tools = tools.map((t) => ({
-        type: "function",
-        function: { name: t.name, description: t.description, parameters: t.schema },
-      }))
-
-    let out: WorkersAiReply
-    try {
-      out = (await this.ai.run(this.name as keyof AiModels, body as never)) as WorkersAiReply
-    } catch (e) {
-      // Surface model/runtime errors as a typed error the loop turns into a clean
-      // message, instead of an uncaught 500. Most common cause historically: a
-      // deprecated/removed model id (this is what crashed the agent before).
-      const detail = e instanceof Error ? e.message : String(e)
-      throw new Error(`model_error: Workers AI (${this.name}) failed. ${detail.slice(0, 200)}`)
-    }
-
-    const choice = out.choices?.[0]?.message
-    const text = out.response ?? choice?.content ?? ""
-    const rawCalls = (Array.isArray(out.tool_calls) ? out.tool_calls : choice?.tool_calls) ?? []
-    const toolCalls: ToolCall[] = rawCalls
-      .map((c, i): ToolCall | null => {
-        const fn = c.function ?? c // OpenAI-wrapped vs native/flat
-        if (typeof fn.name !== "string") return null
-        let args: unknown = fn.arguments
-        if (typeof args === "string") {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            args = {}
-          }
-        }
-        return {
-          id: c.id ?? `call_${i}`,
-          name: fn.name,
-          input: args && typeof args === "object" ? (args as Record<string, unknown>) : {},
-        }
-      })
-      .filter((c): c is ToolCall => c !== null)
-    return { text, toolCalls }
-  }
-}
-
 /* -------------------------------- selection -------------------------------- */
 
-/** The agentic model: Claude when a key is set, else Workers AI — which now ALSO
- *  does full tool use (llama-3.3-70b-instruct-fp8-fast supports function calling).
- *  Swapping the brain is one edit here (or the WORKERS_AI_MODEL var). */
+/**
+ * THE AGENTIC MODEL. Claude, and only Claude.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * THE ESCAPE HATCH IS GONE (2026-08-27, the owner's ruling, in his own words:
+ * "kill the escape hatch"). This function used to end `return new
+ * WorkersAiModel(…)` whenever `ANTHROPIC_API_KEY` was unset, and the whole
+ * `WorkersAiModel` adapter went with it.
+ *
+ * WHY, and it is not tidiness. A missing key is nearly always an accident — a
+ * secret that never got set on a new environment, a rotation that half
+ * happened — and the fallback made that accident INVISIBLE. The assistant kept
+ * answering, from a much weaker engine, with nobody told: no banner, no log
+ * line, no difference a person could see except that the answers got worse.
+ * Somebody judging the assistant in that state is judging a product they were
+ * never shown, and the most likely somebody is the owner. AN HONEST FAILURE
+ * BEATS A QUIET DEMOTION, and the quieter the demotion the truer that is.
+ *
+ * WHAT A MISSING KEY DOES NOW: it throws `unconfigured`, which the loop turns
+ * into a saved turn and the screen turns into a plain sentence saying the
+ * assistant is not set up here and who can fix it. Loud, honest and actionable
+ * — the three things the fallback was not.
+ *
+ * WHAT WAS DELETED WITH IT. `WorkersAiModel` was ~100 lines of adapter only this
+ * branch could reach, so leaving it would have left a dead engine beside a live
+ * one, one edit from being wired back in by somebody reading this comment as a
+ * suggestion. The tool-result FENCE it needed (`fenceToolResult`, and the
+ * flattening it defends) is NOT gone and was never only its: tenancy's process
+ * extraction and content's composed knowledge answer both fence untrusted text
+ * through the same seam, and its own suite still proves a fence cannot be closed
+ * from the inside.
+ *
+ * WHAT THIS COSTS, said here rather than discovered later: a fork of this base
+ * with no Anthropic key now has no assistant at all, where before it had a weak
+ * one. That is the trade the ruling makes and it is the right way round — "there
+ * is no assistant here" is a sentence somebody can act on; "the assistant is
+ * quietly worse than the one you were shown" is not.
+ *
+ * Swapping the brain is still one edit here (or the AGENT_MODEL var).
+ */
 export function selectModel(env: Env): Model {
-  if (env.ANTHROPIC_API_KEY)
-    return new ClaudeModel(
-      env.ANTHROPIC_API_KEY,
-      env.AGENT_MODEL || "claude-sonnet-5",
-      env.AGENT_EFFORT || "low",
-      // The prompt cache is a CLAUDE feature and rides only this branch. Workers
-      // AI below takes the same messages and tools with no marker anywhere near
-      // it — there is nothing to break on the no-key path.
-      cacheMode(env.AGENT_PROMPT_CACHE)
+  if (!env.ANTHROPIC_API_KEY)
+    throw new ModelError(
+      "unconfigured",
+      "model_error: no ANTHROPIC_API_KEY is set on this worker, so there is no assistant to call."
     )
-  return new WorkersAiModel(env.AI, env.WORKERS_AI_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct")
+  return new ClaudeModel(
+    env.ANTHROPIC_API_KEY,
+    env.AGENT_MODEL || "claude-sonnet-5",
+    env.AGENT_EFFORT || "low",
+    cacheMode(env.AGENT_PROMPT_CACHE)
+  )
 }
 
 // The ONE-SHOT CHEAP CALL (the help-reply draft, the conversation title) used to

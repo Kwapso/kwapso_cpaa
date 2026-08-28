@@ -402,26 +402,16 @@ describe("the counts reach the usage log rather than a second telemetry channel"
   })
 })
 
-/* ══════════════════ 6. the fallback path, and the switch ══════════════════ */
+/* ═════════════ 6. the marker is built once, and only for Claude ═════════════ */
 
-describe("Workers AI is not touched by any of this", () => {
-  it("the no-key path selects Workers AI and sends no marker anywhere", async () => {
-    const bodies: Record<string, unknown>[] = []
-    const env = {
-      AI: {
-        run: async (_m: string, body: Record<string, unknown>) => {
-          bodies.push(body)
-          return { response: "ok" }
-        },
-      },
-      AGENT_PROMPT_CACHE: "1h", // set, and deliberately irrelevant here
-    } as never
-    const model = selectModel(env)
-    expect(model.name).toContain("@cf/")
-    await model.complete(convo(null, "hi"), TOOLS)
-    expect(JSON.stringify(bodies[0])).not.toContain("cache_control")
-  })
+// This block used to open with "the no-key path selects Workers AI and sends no
+// marker anywhere". That path is gone (the escape hatch was killed on
+// 2026-08-27 — selectModel's own note says why), so the test that proved the
+// OTHER provider never saw a `cache_control` has no other provider to prove it
+// about. What survives is the reason it was written: the marker must be built in
+// exactly one place, so it cannot leak into whatever is wired in next.
 
+describe("the cache marker is built in one place", () => {
   it("the marker is built in exactly one place, so it cannot leak into another provider", () => {
     const model = SRC("src/lib/model.ts")
     expect(
