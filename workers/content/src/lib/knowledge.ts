@@ -2311,7 +2311,7 @@ export async function retrieve(
   // is nothing to reorder. And if the covers found no record over the floor —
   // which is what a question the base has nothing on produces — it does not run,
   // and the refusal stands exactly as it always did.
-  let ranked = diversify(rankPassages(fused, rows), want)
+  let ranked = diversify(rankPassages(fused, rows))
   if (!ranked.length && route.records.length) {
     const named = route.records.slice(0, ROUTER_FALLBACK_RECORDS).map((r) => r.sourceId)
     const revived = await d1Query<ScoredRow>(
@@ -2330,11 +2330,9 @@ export async function retrieve(
     // Scored on the scale `fuse` uses, in the order the router put the records
     // and the author put the paragraphs, so everything downstream is handed the
     // shape it already understands.
-    ranked = diversify(
-      revived.map((row, i) => ({ row, score: 1 / (RRF_K + i) })),
-      want
-    )
+    ranked = diversify(revived.map((row, i) => ({ row, score: 1 / (RRF_K + i) })))
   }
+  ranked = await widenNeighbours(cfg, guard, reader, ranked, want)
   const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => ({
     sourceId: row.source_id,
     title: row.title,
@@ -2485,30 +2483,228 @@ function saysSomething(row: ScoredRow): boolean {
   return words(plainText(row.text ?? "")).filter((w) => !named.has(w)).length >= SUBSTANTIVE_WORDS
 }
 
-function diversify(
-  ranked: { row: ScoredRow; score: number }[],
-  want: number
+/** THE SAME PARAGRAPH, UNDER ANOTHER NAME — the share of one passage's own words
+ * that another passage must also carry before the two are the same material.
+ *
+ * ── WHAT THIS FIXES, MEASURED ───────────────────────────────────────────────
+ *
+ * On the agency's own base, 28 Aug 2026, over the twenty bench questions: 17 of
+ * the 84 passages the knowledge base handed back — ONE SLOT IN FIVE — were a
+ * paragraph the same answer had already shown the reader, and ten of the sixteen
+ * answered questions carried at least one such pair. Two questions about ticket
+ * 3144 spent THREE of their six slots on one identical paragraph.
+ *
+ * It is not a scoring bug and it is not the failure `PASSAGES_PER_TITLE` catches.
+ * A meeting reaches this base by several roads: the meeting record's own mirror
+ * embeds the Gemini notes, the notes document is indexed again from Drive, and
+ * the notes email carries them a third time. Three different TITLES, one set of
+ * words — so the title cap, which exists to stop one SUBJECT filling an answer,
+ * looks straight past the case where the answer is one PARAGRAPH three times. The
+ * ranking is right that all three match; a reader who has read the first has read
+ * all of them.
+ *
+ * ── WHY 0.9, AND WHY A FLOOR UNDER IT ───────────────────────────────────────
+ *
+ * The overlaps between passages in one answer are sharply bimodal: distinct
+ * material sits at 0.0–0.8 and every genuine re-arrival at 0.90–1.00. The band
+ * just below is where the pairs that must SURVIVE live — "Recording a damage
+ * case" against "Recording damage to a vehicle" at 0.78 are two different process
+ * maps and both belong in that answer. So the line goes above them.
+ *
+ * `ENOUGH_TO_COMPARE` is the other half, and it matters more than the ratio. A
+ * share computed over a handful of words is noise: a seven-word calendar envelope
+ * scored 0.71 against a sixty-word transcript chunk purely because a short set is
+ * easy to cover. Every genuine duplicate measured had at least 55 distinct words.
+ * Below twenty there is not enough text to tell "the same paragraph" from "two
+ * short notes about one thing", and a passage that thin is `saysSomething`'s
+ * business, not this rule's. One rule, one job. */
+const SAME_WORDS = 0.9
+const ENOUGH_TO_COMPARE = 20
+
+/** A passage's distinct informative words, for comparing it against another.
+ * Same shape as `saysSomething`'s counter and for the same reason — it is the
+ * words a reader would actually take from the passage, not its punctuation. */
+function distinctWords(row: ScoredRow): Set<string> {
+  return new Set(
+    plainText(row.text ?? "")
+      .replace(MIRROR_WRAPPER, " ")
+      .replace(/[^A-Za-z0-9À-ÿ]+/g, " ")
+      .toLowerCase()
+      .split(" ")
+      .filter((w) => w.length >= 4)
+  )
+}
+
+/** HAS THE ANSWER ALREADY SAID THIS? Measured over the SMALLER of the two word
+ * sets, because a chunk that is wholly contained in a longer one adds the reader
+ * nothing either — the question is what is NEW, not what is equal. */
+function alreadySaid(words: Set<string>, said: Set<string>[]): boolean {
+  if (words.size < ENOUGH_TO_COMPARE) return false
+  return said.some((earlier) => {
+    if (earlier.size < ENOUGH_TO_COMPARE) return false
+    const [small, large] = words.size <= earlier.size ? [words, earlier] : [earlier, words]
+    let shared = 0
+    for (const w of small) if (large.has(w)) shared++
+    return shared / small.size >= SAME_WORDS
+  })
+}
+
+/** EXPORTED FOR ONE TEST, and the reason is worth the export. The bargain below
+ * — nothing that adds nothing, unless it is all there is — cannot be reached
+ * through the door in the end-to-end harness: posting a source runs the sweep and
+ * so does asking a question, so the fixture's own mirrored rows are back in the
+ * base by the time any question is answered, and "all there is" is never true.
+ * The suite tried, and passed for a year without testing it. */
+export function diversify(
+  ranked: { row: ScoredRow; score: number }[]
 ): { row: ScoredRow; score: number }[] {
   const seen = new Map<string, number>()
+  const said: Set<string>[] = []
   const kept: { row: ScoredRow; score: number }[] = []
-  const skipped: { row: ScoredRow; score: number }[] = []
+  // TWO REASONS TO SET A PASSAGE ASIDE, AND THEY ARE NOT WORTH THE SAME, which
+  // is what the single `skipped` list here used to assume. A passage held back
+  // only by the title cap still carries words this answer does not have; one that
+  // says nothing of its own, or that repeats a passage already in the answer,
+  // carries none. Pooled into one list and re-sorted by score, an envelope
+  // scoring 0.014 walked in ahead of a real paragraph scoring 0.012 — so the
+  // backfill, which exists so an answer is never SHORT, was quietly undoing the
+  // rule beside it. Measured: on "What happened at the Team Assembly meeting in
+  // August?" the sixth slot went to "Updated invitation: 🧡 Team Assembly @ Wed
+  // Aug 19", whose entire body is its own title, while the transcript's other
+  // chunks sat below it unused.
+  const capped: { row: ScoredRow; score: number }[] = []
+  const spent: { row: ScoredRow; score: number }[] = []
   for (const item of ranked) {
     const key = (item.row.title ?? "").trim().toLowerCase()
     const used = seen.get(key) ?? 0
-    // TWO PREFERENCES, ONE PASS, AND THE SAME BARGAIN FOR BOTH: spread the answer
-    // across the things it is about, and spend slots on passages that say
-    // something — but neither is PAID for. Anything set aside here comes back
-    // below if the answer would otherwise be short, so an answer can still be six
-    // passages from one document, and still quote a bare diary entry when a bare
-    // diary entry is genuinely all there is.
-    if (used < PASSAGES_PER_TITLE && saysSomething(item.row)) {
+    const words = distinctWords(item.row)
+    // THREE PREFERENCES, ONE PASS, AND THE SAME BARGAIN FOR ALL THREE: spread the
+    // answer across the things it is about, spend slots on passages that say
+    // something, and never show the reader the same paragraph twice — but none of
+    // them is PAID for. Anything set aside here comes back below if the answer
+    // would otherwise be short, so an answer can still be six passages from one
+    // document, and still quote a bare diary entry when a bare diary entry is
+    // genuinely all there is.
+    if (!saysSomething(item.row) || alreadySaid(words, said)) {
+      spent.push(item)
+      continue
+    }
+    said.push(words)
+    if (used < PASSAGES_PER_TITLE) {
       seen.set(key, used + 1)
       kept.push(item)
-    } else skipped.push(item)
+    } else capped.push(item)
   }
-  // Never fewer than the caller asked for while candidates remain: the cap is a
-  // preference between equals, not a reason to answer with less.
-  return kept.length >= want ? kept : [...kept, ...skipped]
+  // ── AND WHAT THE BACKFILL IS ACTUALLY FOR ──────────────────────────────────
+  //
+  // It no longer asks how many passages the caller wanted, and that is a
+  // simplification rather than a change: `retrieve` slices this to `want`, so a
+  // capped passage still only ever surfaces when the answer would be short. One
+  // place decides the ceiling.
+  //
+  // The title cap is a preference between EQUALS, so a passage it held back comes
+  // back the moment the answer would otherwise be short: `capped` is real material
+  // this answer does not have, and there is no reason to leave it out.
+  //
+  // `spent` is not that, and it took a measurement to see it. A passage that says
+  // nothing beyond its own title, or that repeats a paragraph already in the
+  // answer, cannot make an answer better — the citation list already carries the
+  // title, and the reader has already read the words. Padding six slots with those
+  // is precisely the two complaints this module was reopened for: references to
+  // files that were not important, and the big file it should have touched left
+  // untouched underneath them. Five passages that each say something is a better
+  // answer than five and an envelope, and there is no length a reader is owed.
+  //
+  // So it comes back for one reason only: when it is ALL THERE IS. A bare meeting
+  // record — "X is a meeting of ours, on 2026-08-19." — is a thin answer and a
+  // true one, and the alternative to quoting it is refusing a question the base
+  // can genuinely speak to. That case is `kept` and `capped` both empty; it is not
+  // "the answer came to five".
+  const material = [...kept, ...capped]
+  if (material.length) return material
+  return spent
+}
+
+/** HOW FAR EITHER SIDE OF A MATCHED PASSAGE TO REACH. One paragraph before and
+ * one after: near enough that it is still about what matched, close enough that
+ * nothing has to decide whether it is relevant. Two would be a page. */
+const NEIGHBOUR_REACH = 1
+
+/**
+ * WHEN THE ANSWER IS SHORT, WIDEN WHAT IT ALREADY HAS — rather than leave the
+ * slots empty or fill them with something worse.
+ *
+ * ── WHY THERE IS A SHORTFALL TO FILL ────────────────────────────────────────
+ *
+ * Not because the base is thin. Measured on the agency's own staging base, 28 Aug
+ * 2026: asked to summarise the week recap, the vector arm returned its full
+ * hundred nearest neighbours and NINE of them still existed in the database — the
+ * other ninety-one are ids of chunks that re-indexing replaced, which R26 makes
+ * survivable (a ghost id reads back as no row, never as somebody else's
+ * paragraph) and which nothing makes VISIBLE. So the pool a six-passage answer is
+ * chosen from is routinely seven or eight rows, three of which are the same
+ * paragraph arriving by three roads. Take those away honestly and the answer is
+ * four passages — of a ninety-six-chunk transcript that is sitting right there.
+ *
+ * The index being stale is its own problem and a bigger one; this is what the
+ * retrieval can do about it without pretending the duplicates were material.
+ *
+ * ── WHY THE NEIGHBOURS, AND NOT MORE OF THE DOCUMENT ────────────────────────
+ *
+ * The chunk that matched is the evidence; the paragraph either side of it is the
+ * rest of the same thought, which is exactly what a reader who found the right
+ * sentence wants next. Starting from the top of the document instead would spend
+ * the freed slots on a transcript's opening — "Hello. I don't think I can hear
+ * you." — which is how a top-up makes an answer worse while making it longer.
+ *
+ * IT CANNOT REACH ANYTHING NEW. Same fence, same columns, and only sources this
+ * answer is already built on — so it can widen an answer and can never open one.
+ * A question the base refuses has no `ranked` to widen and this does not run.
+ */
+async function widenNeighbours(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  reader: { sql: string; params: string[] },
+  ranked: { row: ScoredRow; score: number }[],
+  want: number
+): Promise<{ row: ScoredRow; score: number }[]> {
+  if (!ranked.length || ranked.length >= want) return ranked
+  const have = new Set(ranked.map((r) => r.row.id))
+  const wanted: string[] = []
+  for (const { row } of ranked)
+    for (let d = -NEIGHBOUR_REACH; d <= NEIGHBOUR_REACH; d++)
+      if (d !== 0 && row.seq + d >= 0)
+        wanted.push(`(c.source_id = ${sqlString(row.source_id)} AND c.seq = ${row.seq + d})`)
+  if (!wanted.length) return ranked
+  const near = await d1Query<ScoredRow>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: at most the shortfall itself, and the WHERE names a bounded
+    // set of (source, seq) pairs built from the passages already chosen.
+    `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
+            s.origin_table, s.origin_row_id, s.record_date
+       FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
+      WHERE (${wanted.join(" OR ")})
+        AND s.deactivated_at IS NULL AND ${reader.sql}
+      ORDER BY c.seq LIMIT ${RANKING_POOL}`,
+    reader.params
+  )
+  // Held to the SAME two bars as everything else in the answer: it must say
+  // something of its own, and it must not repeat a passage already there. A
+  // neighbour is a candidate, not a free pass. Scored just under the passage it
+  // came from so the ranking the search decided is never re-ordered by this.
+  const said = ranked.map(({ row }) => distinctWords(row))
+  const out = [...ranked]
+  for (const row of near) {
+    if (out.length >= want) break
+    if (have.has(row.id)) continue
+    const words = distinctWords(row)
+    if (!saysSomething(row) || alreadySaid(words, said)) continue
+    said.push(words)
+    have.add(row.id)
+    out.push({ row, score: 0 })
+  }
+  return out
 }
 
 function rankPassages(
