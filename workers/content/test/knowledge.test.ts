@@ -37,6 +37,7 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
+import { diversify } from "../src/lib/knowledge"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
 
@@ -1106,17 +1107,14 @@ describe("an envelope does not take a slot from something that says more", () =>
   })
 
   // NEVER PAID FOR — the same bargain the title cap makes. When a bare diary entry
-  // is genuinely all there is, it is still the answer.
-  it("but an envelope is still quoted when an envelope is all there is", async () => {
-    db().exec("DELETE FROM knowledge_terms; DELETE FROM knowledge_chunks; DELETE FROM knowledge_sources;")
-    await addSource(IDS.staffUser, {
-      title: "Bergman dispatch review",
-      body: "Bergman dispatch review is a meeting of ours, on 2026-08-25.",
-    })
-    const answer = await ask(IDS.staffUser, "when was the Bergman dispatch review?")
-    expect(answer.found, "a diary entry is a poor answer and a better one than silence").toBe(true)
-    expect(titles(answer)).toContain("Bergman dispatch review")
-  })
+  // is genuinely all there is, it is still the answer. That half is proved at the
+  // seam rather than here, and the note on `diversify` says why: this harness
+  // cannot build a base in which an envelope IS all there is, because both the
+  // POST and the ask re-run the sweep. The test that used to sit here emptied the
+  // three tables, posted one bare record, and asked — and was answered out of
+  // thirteen sources with the envelope in the sixth slot, which the backfill would
+  // have handed it whether or not it was all there was. See "an answer is never
+  // padded" below.
 })
 
 // ── A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE ────────────────
@@ -1217,5 +1215,238 @@ describe("a video link is refused unless its transcript comes with it", () => {
       sourceUrl: "https://files.bergman.example/standup-2026-03-04.mp4",
     })
     expect(res.status).toBe(400)
+  })
+})
+
+// ── ONE PARAGRAPH IS ONE SLOT, HOWEVER MANY ROADS IT ARRIVED BY ─────────────
+//
+// The failure this locks, measured on the agency's own staging base 28 Aug 2026
+// over the twenty questions in scripts/kb-bench-questions.mjs: 17 of the 84
+// passages the knowledge base handed back — ONE SLOT IN FIVE — were a paragraph
+// the SAME answer had already shown the reader, and ten of the sixteen answered
+// questions carried at least one such pair. Two questions about ticket 3144 spent
+// three of their six slots on one identical paragraph.
+//
+// Nothing was mis-ranked. A meeting reaches this base by several roads — the
+// meeting record's own mirror embeds the Gemini notes, the notes document is
+// indexed again from Drive, the notes email carries them a third time — so three
+// different TITLES hold one set of words, and `PASSAGES_PER_TITLE`, which exists
+// to stop one SUBJECT filling an answer, looks straight past it.
+//
+// Both halves are proved here, because the fix has two and the second is the one
+// that can rot: suppressing the repeat frees a slot, and a slot freed is only
+// worth having if what fills it says something. The backfill used to pool "held
+// back by the title cap" with "says nothing at all" into one list re-sorted by
+// score, so freeing those slots handed them straight to the envelopes.
+describe("the same paragraph, arriving under three names, is worth one slot", () => {
+  // Long enough to be a real chunk and to clear ENOUGH_TO_COMPARE's twenty
+  // distinct words comfortably — below that the comparison is not made at all,
+  // deliberately, and a fixture that sat under it would be measuring nothing.
+  // LONG ENOUGH THAT THE TITLE IS NOT THE PASSAGE. The embedding in this suite is
+  // a deterministic bag of words (see the head of the file), so on a short body
+  // the extra words in a longer title — "2026/08/19 12:29 CEST — Notes by Gemini"
+  // — dilute the match enough to drop that copy under the relevance floor, and
+  // only one of the three ever reaches the ranking. The rule would then look
+  // enforced by a fixture in which there was nothing to enforce it against.
+  const NOTES =
+    "The assembly agreed to hold a monthly remote gathering, with the organising rotated between the team " +
+    "rather than owned by one person. Aurora raised that the previous cadence was too sparse for anybody to " +
+    "build on, Alexander offered to take the first month, and the group settled on culture and bonding as the " +
+    "standing purpose rather than project reporting, which stays in the weekly recap. The group agreed the " +
+    "gathering is remote by default so that nobody is left out of the monthly rhythm, and that whoever is " +
+    "organising picks the shape of it rather than working from a template agreed once and never revisited. " +
+    "Alexander asked that the agreed purpose be written down where the team can find it, and Aurora agreed to " +
+    "put the monthly rota beside it so the remote gathering does not quietly lapse the way the last one did."
+
+  beforeEach(async () => {
+    // THE SAME WORDS, THREE TIMES, UNDER THE THREE TITLES THE REAL BASE USES.
+    for (const title of [
+      "Team Assembly",
+      "Team Assembly - 2026/08/19 12:29 CEST - Notes by Gemini",
+      "Notes: “Team Assembly” Aug 19, 2026",
+    ])
+      await addSource(IDS.staffUser, { title, body: NOTES })
+  })
+
+  it("cites it once, and does not hand the reader the same words twice", async () => {
+    const answer = await ask(IDS.staffUser, "What was agreed at the monthly remote assembly?")
+    expect(answer.found, "the material is right there").toBe(true)
+    const saying = answer.passages.filter((p) => p.text.includes("rotated between the team"))
+    expect(
+      saying.length,
+      `the same paragraph came back ${saying.length} times, as ${titles(answer).join(" / ")}`
+    ).toBe(1)
+  })
+
+  it("spends the slot it saved on material the answer does not already have", async () => {
+    await addSource(IDS.staffUser, {
+      title: "Assembly follow-up",
+      // Sharing the question's own vocabulary on purpose: the embedding here is a
+      // deterministic bag of words (see the head of this file), so a second
+      // subject worded entirely differently would sit under the relevance floor
+      // and this test would pass or fail on the fixture rather than on the rule.
+      body:
+        "What was agreed after the monthly remote assembly: the rota for organising it was written up and the " +
+        "first three months were allocated, so nobody has to chase the monthly assembly each time. The remote " +
+        "calendar hold goes out a fortnight ahead of every gathering.",
+    })
+    const answer = await ask(IDS.staffUser, "What was agreed at the monthly remote assembly?")
+    expect(titles(answer)).toContain("Assembly follow-up")
+    // Two subjects, not one said twice — which is what the slot was FOR.
+    expect(answer.passages.length).toBe(2)
+  })
+
+  it("does not fill the slot with an envelope that says only its own title", async () => {
+    // An envelope: a calendar row whose whole body is the words already in its
+    // name. Perfectly RELEVANT — it is a near-perfect match for a question naming
+    // the thing it is about — which is exactly why it used to win the slot.
+    await addSource(IDS.staffUser, {
+      title: "Updated invitation: Team Assembly @ Wed Aug 19, 2026 4pm - 5pm",
+      body: "Updated invitation: Team Assembly @ Wed Aug 19, 2026 4pm - 5pm",
+    })
+    const answer = await ask(IDS.staffUser, "What was agreed at the monthly remote assembly?")
+    expect(titles(answer).join(" / ")).not.toMatch(/Updated invitation/)
+  })
+})
+
+// ── AN ANSWER IS NEVER PADDED WITH A PASSAGE THAT ADDS NOTHING ─────────────
+//
+// The other half of the bargain the two describes above make, tested at the seam
+// because the door cannot reach it (see the note on `diversify`, and the one
+// where this test used to live end-to-end).
+//
+// The rule has two sentences and they pull in opposite directions, which is why
+// both are pinned here. A passage that says nothing beyond its own title, or that
+// repeats one already in the answer, may not fill a slot while real material is
+// available — six is a ceiling, never a quota, and the citation list already
+// carries every title. But when such a passage is ALL there is, it is still the
+// answer: "we have nothing on that" about a meeting we hold the record of is the
+// worse sentence.
+//
+// It is a unit test on purpose. The backfill used to pool "held back by the title
+// cap" with "says nothing at all" into one list re-sorted by score, so an envelope
+// scoring 0.014 walked in ahead of a real paragraph scoring 0.012 — and that is
+// invisible from outside unless the fixture happens to run short, which is exactly
+// the condition the end-to-end harness cannot produce.
+describe("an answer is never padded, and never silent when it has something", () => {
+  const NOTES =
+    "Marta agreed the cutover moves to the first Monday of April, and Ana will send the supplier list " +
+    "before the invoice run so the desk can check it against the board before anybody signs it off."
+  const MORE =
+    "The supplier list itself is kept by the desk and reissued each quarter, so the April cutover needs " +
+    "the March issue rather than the one on the board today, which Ana confirmed before the meeting closed."
+  const row = (id: string, title: string, text: string) =>
+    ({ id, source_id: id, seq: 0, text, title, kind: "document" }) as never
+
+  const scored = (rows: unknown[]) => rows.map((r, i) => ({ row: r as never, score: 1 / (60 + i) }))
+
+  it("leaves the envelope out while there is material, however well it scored", () => {
+    // Best first, and the envelope is the BEST — which is the case a score cliff
+    // cannot reach and this rule exists for.
+    const out = diversify(
+      scored([
+        row("e", "Bergman dispatch review", "Bergman dispatch review is a meeting of ours, on 2026-08-25."),
+        row("a", "Bergman dispatch review notes", NOTES),
+        row("b", "Bergman dispatch follow-up", MORE),
+      ])
+    )
+    expect(out.map((o) => o.row.title)).toEqual([
+      "Bergman dispatch review notes",
+      "Bergman dispatch follow-up",
+    ])
+  })
+
+  it("and quotes it when it is the only thing there is", () => {
+    const out = diversify(
+      scored([row("e", "Bergman dispatch review", "Bergman dispatch review is a meeting of ours, on 2026-08-25.")])
+    )
+    expect(out.map((o) => o.row.title)).toEqual(["Bergman dispatch review"])
+  })
+
+  it("prefers a passage held back only by the title cap over one that says nothing", () => {
+    // Three chunks of one document: the cap keeps two and sets the third aside,
+    // and an envelope scoring better than it sits alongside. The third chunk is
+    // real material this answer does not have; the envelope is not.
+    const out = diversify(
+      scored([
+        row("a1", "Cutover plan", NOTES),
+        row("a2", "Cutover plan", MORE),
+        row("e", "Invitation: Cutover plan @ Tue Aug 25", "Invitation: Cutover plan @ Tue Aug 25"),
+        row("a3", "Cutover plan", "The board copy is replaced on the first working day of each quarter by the desk."),
+      ])
+    )
+    expect(out.map((o) => o.row.id)).toEqual(["a1", "a2", "a3"])
+  })
+})
+
+// ── A SHORT ANSWER IS WIDENED FROM WHAT IT ALREADY HAS ─────────────────────
+//
+// The other half of removing the repeats. Taking three copies of one paragraph
+// out of an answer honestly leaves four passages where there were six, and the
+// slots are worth filling — from the paragraph either side of the one that
+// matched, which is the rest of the same thought, and never from the top of the
+// document, which on a transcript is "Hello. I don't think I can hear you."
+//
+// Why there is a shortfall at all is measured in the note on `widenNeighbours`
+// and is not this rule's fault: on the agency's own staging base the vector arm
+// returns a hundred nearest neighbours and nine of them still exist in the
+// database, so a six-passage answer is routinely chosen from seven rows.
+//
+// Two things are pinned, and the second is the one that keeps it honest: it fills
+// the gap, and it can never open a door. A neighbour is held to the same two bars
+// as every other passage — it must say something of its own and must not repeat
+// what is already there — and it can only come from a source the answer is
+// already built on.
+describe("a short answer is widened from the passages it already has", () => {
+  // Six paragraphs of one document, worded so that each is distinctly about its
+  // own thing: a neighbour that merely restated its sibling would be refused by
+  // the same rule that refuses a repeat, and the test would prove nothing.
+  const PARA = [
+    "The cutover window opens on the first Monday of April and closes the following Friday evening.",
+    "Marta owns the supplier list during the window and reissues it each quarter from the desk copy.",
+    "Ana checks the invoice run against the board before anybody signs the cutover off as complete.",
+    "The board copy is replaced on the first working day of each quarter, which is why March matters.",
+    "Rollback is a single switch and the desk keeps the key, so nobody waits for an approval to use it.",
+    "Training for the desk staff runs the fortnight before, in two sessions, morning and afternoon.",
+  ]
+
+  it("fills the empty slots from the paragraphs beside the one that matched", async () => {
+    await addSource(IDS.staffUser, {
+      title: "Cutover plan",
+      // Chunked by the shipped chunker, so the neighbours are real rows with real
+      // seq numbers rather than a fixture's idea of them.
+      body: PARA.map((p) => p.repeat(9)).join("\n\n"),
+    })
+    const answer = await ask(IDS.staffUser, "Who owns the supplier list during the cutover window?")
+    expect(answer.found).toBe(true)
+    const fromPlan = answer.passages.filter((p) => p.title === "Cutover plan")
+    // More than the title cap would ever have allowed on its own — which is the
+    // whole point: the cap is about spreading an answer, and this is about not
+    // handing back a short one when the document has more to say.
+    expect(fromPlan.length, `only ${fromPlan.length} passages of a six-paragraph document`).toBeGreaterThan(
+      2
+    )
+    // And they are neighbours of a match, not the document from the top.
+    const seqs = fromPlan.map((p) => p.seq).sort((a, b) => a - b)
+    expect(Math.max(...seqs) - Math.min(...seqs), `seqs ${seqs.join(",")}`).toBeLessThanOrEqual(
+      fromPlan.length
+    )
+  })
+
+  it("never reaches a source the answer was not already built on", async () => {
+    await addSource(IDS.staffUser, {
+      title: "Cutover plan",
+      body: PARA.map((p) => p.repeat(9)).join("\n\n"),
+    })
+    // A source that the search did NOT reach. If widening could open a door, this
+    // is what would come through it — it is about the same subject in the same
+    // words, and it is fenced to somebody else.
+    await addSource(OTHER_STAFF, {
+      title: "Private cutover note",
+      body: PARA.join(" ").repeat(4),
+      visibility: "private",
+    })
+    const answer = await ask(IDS.staffUser, "Who owns the supplier list during the cutover window?")
+    expect(titles(answer)).not.toContain("Private cutover note")
   })
 })
