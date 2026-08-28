@@ -472,3 +472,87 @@ Ordered by ratio of screens fixed to work done, so notes can be answered in grou
    triage (→ `Queue`), tiles (→ `Tiles`).
 8. **Cross-cutting:** pass `minWidth` on every table; adopt `Headline`/`Text`/`Hint` for the 58
    raw headings (after Upstream Note 2 lands); delete the two dead `Inter` imports.
+
+---
+
+## 8 · Card-on-card census (requested by the planner, 2026-08-28)
+
+Requested after the assistant-drawer fix ([99d165e7](.)): find every region that contains cards
+and stands on `bg-popover`, `bg-background` or `bg-card`. **Census only — nothing fixed.**
+
+Kit re-read at **v1.2.3** (`3934658`). The bump changes only `components/agent-chat/agent-chat.tsx`
+and `components/chat/chat.tsx` — `diff -rq` against the v1.2.2 tree confirms no other file moved —
+so nothing in this report is affected by it.
+
+### 8.1 · Every `<Card>` render site in both doors, and its ground
+
+There are **six**, and **not one passes `variant`**. All are therefore `variant="default"` =
+`bg-surface-panel`, which PATTERN.md §11 reserves for a card sitting on the **page**.
+
+| Site | Ground it stands on | Verdict |
+|---|---|---|
+| [screen-bits.tsx:114](web/components/deep-link/screen-bits.tsx) `CollectionCard` — wraps **every** agency collection | `<main>` → `<body>` → **nothing** (§8.3) | panel on UA canvas — visible, but not the designed ground |
+| [screen-renderer.tsx:646](shared/web/screen-engine/screen-renderer.tsx) `Card` inside `CardGrid` | `CollectionCard`, i.e. `--surface-panel` | **FAULT — see §8.2** |
+| [staff-panel.tsx:194](web/components/staff-panel.tsx), [:237](web/components/staff-panel.tsx) | member record body → `<main>` → `<body>` → nothing | panel on UA canvas — visible |
+| [ticket-screen.tsx:257](web-portal/components/ticket-screen.tsx), [:319](web-portal/components/ticket-screen.tsx) | portal `<main>` inside `<body class="bg-background">` | **correct** — panel on page, exactly §11 |
+
+### 8.2 · One live fault: the knowledge base collection
+
+`display: "cards"` appears on exactly one recipe —
+[screens.ts:457](web/lib/screens.ts), the knowledge base, whose own comment says it is
+*"the one collection that earns them… a card gives the source's own glyph room to be seen
+before the title is read, which is the whole point of drawing it (R35)."*
+
+The render path is
+[collection-content.tsx:604](web/components/deep-link/collection-content.tsx) →
+`SectionWithCreate` → `CollectionCard` (`<Card>`, `--surface-panel`) →
+`ScreenRenderer` → `<CardGrid>` → `<Card>` (`--surface-panel`).
+
+**Panel on panel — the same token on both sides.** This is worse than the assistant instance
+the planner fixed: `--popover` and `--card` merely *share a value* (so it is a 1.000 that could
+in principle diverge), whereas these two are literally `var(--surface-panel)` against
+`var(--surface-panel)`, so the contrast is 1.000 in **every** palette, present and future. The
+one collection in the app that was given cards deliberately, for a stated reason, draws them
+invisibly. Per §11 the fix is `variant="raised"` on the grid's card, which no site currently passes.
+
+### 8.3 · The structural cause: the agency `<body>` paints no ground at all
+
+[web/app/layout.tsx:32](web/app/layout.tsx) is `<body className="min-h-[100svh] antialiased">`.
+[web-portal/app/layout.tsx:28](web-portal/app/layout.tsx) is
+`<body className="bg-background min-h-[100svh] antialiased">`.
+
+I compiled the agency stylesheet and read every `html`/`body` rule in the 209KB output: they are
+Tailwind's preflight (`line-height`, `font-family`, `tab-size`), `scrollbar-gutter: stable`,
+`overflow-x: clip` and `max-width: 100vw`. **Not one rule sets a background on `html` or `body`,
+and `tokens.css` paints neither.** So the agency app's page ground is the browser canvas — white
+under `color-scheme: light` (tokens.css:89) — and not `--background` `#FFFEF9`.
+
+That is why the agency door does *not* show the card-on-card fault where the portal would: white
+is not soft paper, so a `--surface-panel` card on it happens to be visible. The bug is masked by a
+second bug. It also means the kit's "two papers on off-beige ground" model
+(`compositions/templates/screen-shell.tsx`) is not what either the light or the dark agency screen
+is actually drawing.
+
+### 8.4 · Two things that look like the fault and are not — checked, cleared
+
+- **`<List>` — nine call sites, zero faults.** The kit's `List` fills `bg-card` at
+  `variant="panel"` and `variant="cards"`. All six `list-compat` sites pass `surface="none"`
+  ([record-calendar](web/components/record-calendar.tsx), [profile-screen](web/components/screens/profile-screen.tsx),
+  [settings-screen](web/components/screens/settings-screen.tsx) ×2, [invitations](web/components/invitations.tsx),
+  [home-screen](web/components/screens/home-screen.tsx), [sprints-screen](web/components/sprints-screen.tsx),
+  [screen-renderer](shared/web/screen-engine/screen-renderer.tsx) ×2) → `variant="rows"`, no fill.
+  Both portal sites ([delivery-block:50](web-portal/components/delivery-block.tsx),
+  [company-screen:98](web-portal/components/company-screen.tsx)) import the kit's `List` directly
+  and pass `variant="rows"`. The `<List>` at
+  [agent-markdown.tsx:78](web/components/agent-markdown.tsx) is `block.tag` — a markdown
+  `<ul>`/`<ol>`, not the kit component.
+- **`ScreenLayer` at `bg-card`** ([screen-renderer.tsx:240](shared/web/screen-engine/screen-renderer.tsx))
+  holds forms, not cards. A `variant="raised"` card would be invisible there; none exists.
+
+### 8.5 · Correction to §2.4 of this report
+
+§2.4 said `list-compat` omitting `state` means "no call site can put a list into the kit's own
+loading/empty/error body". That holds for the **six `list-compat` sites**, but the portal's two
+sites import the kit's `List` directly and
+[company-screen.tsx:100](web-portal/components/company-screen.tsx) does pass
+`state` and `emptyTitle`. The portal is ahead of the agency door here, not behind it.
