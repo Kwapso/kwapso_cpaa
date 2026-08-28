@@ -1033,7 +1033,10 @@ export const INGEST_KINDS: IngestKind[] = [
     // written on it is no longer filed (see `retired` below). The 348 rows
     // already filed sit behind this lane's cursor, and the bump is what makes the
     // sweep walk back and re-decide every one of them.
-    textVersion: 3,
+    // v4 SINCE 28 AUG 2026: the same for a meeting that HAS happened and still
+    // has nothing written on it. Bumped for the same reason — the bump is what
+    // sends the sweep back over rows already filed under the old rule.
+    textVersion: 4,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -1148,9 +1151,25 @@ export const INGEST_KINDS: IngestKind[] = [
         // that it took place, which is the only thing some meetings ever leave.
         // And because this retires rather than skips, the day it happens the
         // condition stops being true and the sweep revives it.
+        // v4 SINCE 28 AUG 2026 — A BARE MEETING IS NOT FILED AT ALL, past or
+        // future. The clause above kept a bare meeting that had ALREADY
+        // happened, on the argument that the record it took place is the only
+        // thing some meetings ever leave. The owner overruled it after seeing
+        // the count: 369 of 461 meetings in the agency's own base held no words,
+        // sitting in a knowledge base whose only job is to answer FROM words.
+        //
+        // WHAT MAKES THAT SAFE, and it is why the argument above loses rather
+        // than being wrong: the meeting itself is untouched. It is still a row
+        // in `meetings`, still on the Meetings screen, and the assistant still
+        // reaches it through `list_meetings`. "Did we meet HOGO in July?" is a
+        // question for the meetings LIST, which knows; the knowledge base's job
+        // is the words that were said, and a bare meeting has none.
+        //
+        // It RETIRES rather than skips, so the day somebody writes an agenda,
+        // pastes a transcript or Gemini files its notes, the condition stops
+        // being true and the next sweep revives it with its words.
         retired:
-          r.deactivated_at !== null ||
-          (!r.agenda && !r.notes && !r.transcript_text && Date.parse(r.starts_at) > Date.now()),
+          r.deactivated_at !== null || (!r.agenda && !r.notes && !r.transcript_text),
       }))
     },
   },
