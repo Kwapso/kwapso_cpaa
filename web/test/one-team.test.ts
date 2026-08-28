@@ -65,7 +65,7 @@ describe("one team: the UI offers no way to make another", () => {
     // BOTH HALVES INSIDE THE BRANCH, not merely somewhere in the file.
     // `tenancy.bootstrap()` is called twice in this component — the other is the
     // effect that works out whether you are teamless at all — so asking the whole
-    // file whether it mentions it proved nothing: emptying the panel\'s refresh
+    // file whether it mentions it proved nothing: emptying the panel's refresh
     // handler left this green while a person accepting an invite stayed stranded,
     // which is the bug the assertion is named after.
     const stripped = stripComments(src)
@@ -84,7 +84,7 @@ describe("one team: the UI offers no way to make another", () => {
     expect(
       teamlessBranch.includes("tenancy.bootstrap()"),
       "accepting must re-check bootstrap so a fresh team routes them home — the call has to be " +
-        "in the branch\'s own wiring, not merely somewhere else in the file"
+        "in the branch's own wiring, not merely somewhere else in the file"
     ).toBe(true)
   })
 
