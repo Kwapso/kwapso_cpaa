@@ -181,11 +181,21 @@ export function TicketsCollection({
   // different screen rather than a narrower list.
   const innerTabs = {
     ...defaultTabsConfig,
-    // A LINE, not the folder. This strip filters WITHIN the collection the outer
-    // folder already chose, and a folder tab is drawn to sit attached to a card —
-    // there is no second card under this one to attach to. (`pill` used to be
-    // spelled here; the kit has no pill tab and drew it as a line anyway.)
-    variant: "line" as const,
+    // THE FOLDER TOO, by the owner's ruling of 2026-08-28: "there's no way out ..
+    // lets' keep 2 tabs but both as the folder tabs." He was shown the alternative
+    // — ch27.13 puts a sub-picker in the toolbar — and chose two folder strips
+    // over moving the control, which is his screen to decide.
+    //
+    // What this overrides, written down because the reasoning was sound and lost
+    // anyway: a folder tab is drawn to sit attached to a card, and this strip has
+    // no second card beneath it. It reads as a folder resting on the one above.
+    // That is a cosmetic cost he has accepted; a control moving between regions
+    // was the one he would not. (`pill` used to be spelled here; the kit has no
+    // pill tab and drew it as a line anyway.)
+    //
+    // Inherited rather than spelled: `defaultTabsConfig` is already the folder,
+    // and saying `variant` here again is how sixteen screens once hard-coded
+    // `line` on top of a default that had moved.
     tabs: [
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
