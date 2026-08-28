@@ -30,16 +30,30 @@
     // which has no DOM.
     "../shared/**/*.tsx",
     ".next/types/**/*.ts"
+    // THE KIT'S COMPOSITIONS ARE IN THIS PROGRAM, and until 2026-08-28 they
+    // were excluded. The exclusion's reason — "a .png import is a string
+    // [under vite]; under Next it is a StaticImageData" — stopped being true
+    // at kit v1.2.3, which reads every asset import through
+    // shared/ui/lib/asset-url.ts. Both of its other clauses were already
+    // false: "neither door imports them" (web/components/record-chrome.tsx
+    // imports templates/record-chrome), and "the kit's own `npm run check`
+    // typechecks them upstream" — upstream checks them under VITE, which is
+    // the one toolchain that cannot see a Next-only fault.
+    //
+    // Measured before removing it: an exclusion does not un-check an IMPORTED
+    // file (tsc pulls it in through the import graph), so it only ever hid the
+    // 46 compositions nothing imports yet — exactly the ones the app is about
+    // to start using. A deliberate type error in templates/rail.tsx left
+    // `npm run check` green with the exclusion and turns it red without.
+    //
+    // THE COST, stated rather than discovered: a composition this app does not
+    // use can now turn the build red on a sync. That is the trade being made
+    // on purpose — a kit screen that does not compile under Next is something
+    // to learn at the sync, not on the day somebody first imports it.
   ],
   "exclude": [
     "node_modules",
     "e2e/**",
-    "playwright.config.ts",
-    // The kit's COMPOSITIONS are reference pages built under the kit's own
-    // vite tsconfig (a .png import is a string there; under Next it is a
-    // StaticImageData). Neither door imports them — screens are built from
-    // controls/structures — so they stay out of this program. The kit's own
-    // `npm run check` typechecks them upstream.
-    "../shared/ui/compositions/**"
+    "playwright.config.ts"
   ]
 }

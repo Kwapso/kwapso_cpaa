@@ -35,7 +35,7 @@
     "../shared/**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "out", ".next",
-    "../shared/ui/compositions/**"
-  ]
+  // The kit's compositions are in this program too — see the note in
+  // web/tsconfig.json for why the exclusion that used to sit here is gone.
+  "exclude": ["node_modules", "out", ".next"]
 }
