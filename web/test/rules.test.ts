@@ -2801,8 +2801,25 @@ describe("a tab strip's shape is decided in one place", () => {
 // a screen rendering more than one strip has an inner one, and an inner one is
 // a line.
 describe("a tab strip is not nested inside another one", () => {
+  /** SCREENS THE OWNER HAS RULED STACK TWO FOLDERS ANYWAY. Data, with the
+   * ruling that bought each one, rot-checked below so a pin whose screen no
+   * longer stacks two strips turns the build red and the list can only shrink.
+   *
+   * The rule above it stands and its reason is not stylistic: two folders
+   * stacked put one strip's feet through the other's toolbar, seen on a phone
+   * the moment the default flipped. An entry here is somebody accepting that
+   * cost with their eyes open, not a disagreement about whether it exists. */
+  const TWO_FOLDERS_OK: Record<string, string> = {
+    "web/components/tickets-collection.tsx":
+      "Owner's ruling, 2026-08-28: \"there's no way out .. lets' keep 2 tabs but " +
+      "both as the folder tabs.\" He was shown ch27.13's alternative — the inner " +
+      "picker moves into the toolbar — and chose two folder strips over moving a " +
+      "control between regions. His screen, his call.",
+  }
+
   it("tab-shape: any screen with two strips gives the inner one a line", () => {
     const offenders: string[] = []
+    const staleRulings = new Set(Object.keys(TWO_FOLDERS_OK))
     let scanned = 0
     for (const f of [
       ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
@@ -2811,8 +2828,15 @@ describe("a tab strip is not nested inside another one", () => {
       const src = read(f.path)
       if ((src.match(/<TabsView/g) ?? []).length < 2) continue
       scanned++
-      if (!/variant:\s*"line"/.test(src)) offenders.push(f.path.replace(ROOT + "/", ""))
+      const rel = f.path.replace(ROOT + "/", "")
+      staleRulings.delete(rel)
+      if (rel in TWO_FOLDERS_OK) continue
+      if (!/variant:\s*"line"/.test(src)) offenders.push(rel)
     }
+    expect(
+      [...staleRulings],
+      "TWO_FOLDERS_OK names screens that no longer stack two strips — delete these"
+    ).toEqual([])
     expect(scanned, "the nested-strip census found nothing — it has stopped matching").toBeGreaterThan(0)
     expect(
       offenders,
