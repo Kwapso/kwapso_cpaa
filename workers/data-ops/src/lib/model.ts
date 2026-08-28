@@ -211,11 +211,27 @@ export function selectModel(env: Env): Model {
   return new WorkersAiModel(env, env.AGENT_MODEL || DEFAULT_AGENT_MODEL)
 }
 
-/** The model the assistant runs on. glm-5.3-flash: tool calling, a 1.3M context
- * so the catalogue and a long document fit together, and its own prompt cache at
- * a fifth of the input price. Named here rather than only in wrangler so a worker
- * with no var still has a working assistant. */
-export const DEFAULT_AGENT_MODEL = "@cf/zai-org/glm-5.3-flash"
+/** The model the assistant runs on. Named here rather than only in wrangler so a
+ * worker deployed with no vars still has a working assistant.
+ *
+ * IT WAS glm-5.3-flash FOR ABOUT AN HOUR, and the swap back is worth recording
+ * because the reason was not quality. glm answered the routing bench 21/22 and
+ * cost a third of gpt-oss; then, with production already down, it began refusing
+ * every request carrying our catalogue. Measured immediately, five consecutive
+ * calls at three catalogue sizes each:
+ *
+ *     glm-5.3-flash    0/15   AiError 3048, "Unknown internal error", HTTP 503
+ *     gpt-oss-120b    15/15
+ *
+ * Same body, same minute, over both the binding and the REST door — so it is
+ * Cloudflare's side, not a shape we send. A model that is cheaper and slightly
+ * better at choosing a tool is worth nothing if it will not answer, and an
+ * assistant is not a place to find that out twice. gpt-oss-120b is still 2.6x
+ * cheaper than the Anthropic path it replaced, reasons, calls tools, and holds
+ * 128K — enough for the 46K preamble and a whole document beside it.
+ *
+ * glm is worth revisiting when it is stable; `AGENT_MODEL` is the one edit. */
+export const DEFAULT_AGENT_MODEL = "@cf/openai/gpt-oss-120b"
 
 class WorkersAiModel implements Model {
   readonly canActWithTools = true
@@ -225,26 +241,22 @@ class WorkersAiModel implements Model {
     readonly name: string
   ) {}
 
-  private async run(body: Record<string, unknown>, stream: boolean): Promise<Response> {
-    // The AI BINDING, not the REST door: a binding needs no account id and no
-    // token on the worker, and it is the surface Cloudflare meters against the
-    // team's own allowance.
-    const res = (await this.env.AI.run(this.name as never, body as never, {
-      returnRawResponse: true,
-    } as never)) as unknown as Response
-    if (!(res instanceof Response)) throw modelHttpError(502, "the AI binding returned no response")
-    if (!res.ok) throw modelHttpError(res.status, await res.text().catch(() => ""))
-    void stream
-    return res
-  }
-
+  /** THE BINDING RETURNS TWO DIFFERENT THINGS and getting that wrong is a silent
+   *  outage, which is exactly how this shipped the first time: `env.AI.run(model,
+   *  body)` resolves to the PARSED OBJECT, and only `{ returnRawResponse: true }`
+   *  hands back a `Response`. The non-streaming path wants the object; the
+   *  streaming path needs the raw body to read the SSE off. So the two call it
+   *  differently rather than sharing a wrapper that has to guess. */
   async complete(messages: ChatMessage[], tools: ToolSpec[]): Promise<ModelReply> {
-    const res = await this.run(workersAiBody({ messages, tools, stream: false }), false)
-    const data = (await res.json()) as {
+    const data = (await this.env.AI.run(
+      this.name as never,
+      workersAiBody({ messages, tools, stream: false }) as never
+    )) as {
       choices?: { message?: { content?: string; tool_calls?: OpenAiToolCall[] } }[]
       usage?: WorkersAiUsage
     }
-    const msg = data.choices?.[0]?.message ?? {}
+    const msg = data?.choices?.[0]?.message
+    if (!msg) throw modelHttpError(502, `the model returned no message: ${JSON.stringify(data).slice(0, 200)}`)
     return { text: msg.content ?? "", toolCalls: toCalls(msg.tool_calls), usage: readUsage(data.usage) }
   }
 
@@ -257,7 +269,13 @@ class WorkersAiModel implements Model {
     tools: ToolSpec[],
     onText: (delta: string) => void
   ): Promise<ModelReply> {
-    const res = await this.run(workersAiBody({ messages, tools, stream: true }), true)
+    const res = (await this.env.AI.run(
+      this.name as never,
+      workersAiBody({ messages, tools, stream: true }) as never,
+      { returnRawResponse: true } as never
+    )) as unknown as Response
+    if (!(res instanceof Response)) throw modelHttpError(502, "the AI binding streamed no response")
+    if (!res.ok) throw modelHttpError(res.status, await res.text().catch(() => ""))
     return parseOpenAiStream(res.body, onText)
   }
 }
