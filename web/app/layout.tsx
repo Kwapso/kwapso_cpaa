@@ -1,5 +1,3 @@
-import { Inter } from "next/font/google"
-
 import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
 import { Toaster } from "@shared/ui/components/sonner/sonner"
 import { ThemeProvider } from "@shared/web/theme-provider"
@@ -11,8 +9,6 @@ import { ErrorReporter } from "@/components/error-reporter"
 import { InstallPrompt } from "@/components/install-prompt"
 import { VersionWatch } from "@/components/version-watch"
 import "./globals.css"
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
 // Name, description, icons and the viewport lock come from the ONE place both
 // front doors read (shared/web/pwa.ts → shared/brand.ts). The PWA install icons
@@ -28,7 +24,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    // NO FONT VARIABLE HERE. The typeface is the kit's (Saans, declared as
+    // --font-sans by foundations/tokens/tokens.css and picked up by <html>
+    // through --default-font-family). This element used to carry a
+    // next/font/google Inter class as well, publishing --font-inter — a
+    // variable no stylesheet in either front door ever read, so the browser
+    // was fetching and holding a whole second typeface that nothing drew.
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-[100svh] antialiased">
         {/* The mark's stylesheet and its animator, FIRST in the body: the
          * animator has to be published before the parser reaches the loader

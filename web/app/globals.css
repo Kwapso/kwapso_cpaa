@@ -113,12 +113,59 @@ body {
 }
 
 /* Dark mode: the same field, dialled down so it reads as warmth on charcoal
- * rather than a light leak. */
-.dark .ambient::before {
+ * rather than a light leak.
+ *
+ * IT IS KEYED THE WAY THE THEME IS ACTUALLY SET. This block used to say
+ * `.dark`, which is how the OLD provider marked dark mode — it wrapped
+ * next-themes, and next-themes writes a CLASS on <html>. The kit's mechanism
+ * replaced it (shared/web/theme-provider.tsx: the ModeToggle writes
+ * `data-theme` and localStorage remembers it), and nothing has written a
+ * `.dark` class since. So for as long as the kit has been in, these two rules
+ * matched nothing and three blurred mango pools burned at full daylight
+ * intensity behind every dark screen in the agency app. Nothing catches this:
+ * a selector that matches nothing is not an error, it is just silence.
+ *
+ * So it is keyed EXACTLY as tokens.css keys the dark palette (§3 "dark is a
+ * mechanism, not a swatch") — twice, because dark is two states. Once under
+ * the system preference for a viewer who never chose, excluding an explicit
+ * light choice; once on the explicit `data-theme="dark"` so a choice wins in
+ * both directions. The two blocks must stay identical, for the same reason
+ * tokens.css says so: "system dark" and "I picked dark" are the same screen.
+ *
+ * AND A SECOND THING IS WRONG HERE, WHICH THIS DOES NOT FIX. On 28 Aug 2026
+ * the whole of this block was measured against the running agency app and
+ * `document.querySelectorAll(".ambient")` returned ZERO. The kit's
+ * <AmbientBackground /> draws `data-slot="ambient-background"` and its own two
+ * blobs; it carries no `ambient` CLASS, and no file in either front door adds
+ * one. It also states in its own header that it has "no pointer listener", so
+ * `--mx` / `--my` — which the first pool below reads — are never written
+ * either. Every rule in this block has therefore been matching nothing since
+ * the kit landed, and the mango field the owner asked for (planning round 3,
+ * h1) is not on screen in either palette.
+ *
+ * This block is left CORRECT rather than deleted, and the field is left OFF
+ * rather than switched on, because reconnecting it is a visible product
+ * decision and not a lane's to take. Verified by hand that day: with
+ * `className="ambient" anchor="fixed"` passed to the kit component, these two
+ * rules resolve to opacity .34 / .26 in dark and the field reads as warmth on
+ * charcoal exactly as the paragraph above intends. DELETE THIS BLOCK, or
+ * connect it, the day that decision is made — it cannot be right to leave
+ * fifty lines of stylesheet that nothing can reach. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ambient::before {
+    filter: blur(80px) saturate(105%);
+    opacity: 0.34;
+  }
+  :root:not([data-theme="light"]) .ambient::after {
+    opacity: 0.26;
+  }
+}
+
+:root[data-theme="dark"] .ambient::before {
   filter: blur(80px) saturate(105%);
   opacity: 0.34;
 }
-.dark .ambient::after {
+:root[data-theme="dark"] .ambient::after {
   opacity: 0.26;
 }
 

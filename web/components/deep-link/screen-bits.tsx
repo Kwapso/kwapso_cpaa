@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
+import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
@@ -228,7 +229,20 @@ export function SectionWithCreate({
       {/* No gap: the folder strip's own negative margin IS the join. */}
       <div className="flex flex-col">
         {folderTabs}
-        <CollectionCard>{children}</CollectionCard>
+        {/* THE SAME ACTION, PUBLISHED DOWNWARDS. An empty collection has to
+            name the next act, and until now it could not: this button is here,
+            in the host, and the collection that is empty is several layers
+            below inside the screen engine. So the act is published rather than
+            re-authored — the same word, the same glyph and the same handler —
+            and the frame draws it in its zero state. `null` while the caller
+            may not create, which is the same condition that hides the button
+            above; a person without the right is shown no way out because there
+            is not one for them. */}
+        <CollectionCreateActionProvider
+          action={show ? { label, icon: <Icon className="size-4" />, onCreate } : null}
+        >
+          <CollectionCard>{children}</CollectionCard>
+        </CollectionCreateActionProvider>
       </div>
     </div>
   )
