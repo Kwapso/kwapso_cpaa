@@ -76,7 +76,12 @@ function toAgentTool(s: SharedTool): AgentTool {
 }
 
 /** Tools the AGENT exposes but the MCP does not: a read the MCP serves via export, the
- * two bulk writes, the set-shaped bulk, and the SELF import runner. */
+ * two bulk writes, the set-shaped bulk, the SELF import runner, and — further down —
+ * the whole Google Drive/Gmail/Chat/Calendar block. Every name here, and the reason
+ * it stays agent-only, is DATA in workers/mcp/test/agent-mcp-tool-parity.test.ts
+ * (R43), checked against the live catalog rather than left for this comment to
+ * describe on its own: this sentence undercounted itself for six weeks after the
+ * Google block landed, four tools named here while twenty-five actually existed. */
 const AGENT_ONLY: AgentTool[] = [
   {
     name: "get_role_permissions",
