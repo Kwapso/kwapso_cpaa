@@ -50,6 +50,13 @@
    ========================================================================= */
 
 import * as React from "react";
+
+/** `useLayoutEffect` warns when React renders on the server; the measurement
+    must still run before paint in a browser, or a composer that has grown
+    arrives one frame late and the sentence jumps under the cursor. The choice
+    is made once, here — the same line `tabs.tsx` and `use-debounce.ts` make. */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
@@ -158,6 +165,20 @@ export interface TextareaProps extends React.ComponentPropsWithoutRef<"textarea"
    * `input.tsx` derives it: GAPS.md INP-3.
    */
   loading?: boolean;
+  /**
+   * The field takes the height of what is in it, between one line and
+   * whatever `max-height` the call site sets in CSS — and scrolls once it
+   * reaches that cap, so nothing a person typed is ever unreachable.
+   *
+   * OFF by default, because the standing textarea is 96 tall and draggable
+   * (`min-h-[6rem]` + `resize-y`) and that is chapter 9's field. This is for
+   * the composer shape: one line at rest, growing under the sentence.
+   *
+   * The CAP STAYS IN CSS. This sets `height` and reads back what the browser
+   * allowed, so `max-h-[9rem]` at the call site is still the design decision
+   * and this is only the mechanism.
+   */
+  autoGrow?: boolean;
 }
 
 /**
@@ -214,11 +235,49 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       loading = false,
       disabled = false,
       readOnly = false,
+      autoGrow = false,
       "aria-invalid": ariaInvalid,
       ...props
     },
     ref,
   ) => {
+    // The element is needed HERE to measure it, and the call site's ref must
+    // still be honoured — so one internal ref, handed to both.
+    const own = React.useRef<HTMLTextAreaElement | null>(null);
+    const attach = React.useCallback(
+      (node: HTMLTextAreaElement | null) => {
+        own.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = node;
+      },
+      [ref],
+    );
+
+    /* GROW TO THE SENTENCE, then scroll.
+     *
+     * `height: auto` first, because a textarea's `scrollHeight` never SHRINKS
+     * below the height it is currently given — measure without resetting and
+     * a field that grew to four lines stays four lines when the text is
+     * deleted. Then `height` is set to the measured content, and the CSS
+     * `max-height` clamps it: the cap is the call site's decision and this
+     * only carries it out.
+     *
+     * The overflow follows the clamp rather than being written down: hidden
+     * while the box still fits its text (so no scrollbar flickers over a
+     * one-line composer), `auto` the moment it does not. `overflow-hidden`
+     * as a fixed class is what made a long question INVISIBLE and
+     * unscrollable at the same time.
+     *
+     * `props.value` is in the dependency list because a controlled field is
+     * the shape both composers use; an uncontrolled one still re-measures on
+     * every input through the handler below. */
+    useIsomorphicLayoutEffect(() => {
+      const el = own.current;
+      if (!autoGrow || !el) return;
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+      el.style.overflowY = el.scrollHeight > el.clientHeight ? "auto" : "hidden";
+    }, [autoGrow, props.value]);
     // A call site may say it either way: the `error` prop, or `aria-invalid`
     // straight from a form library. Both reach the same skin.
     const invalid = error ?? (ariaInvalid === true || ariaInvalid === "true");
@@ -229,7 +288,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 
     return (
       <textarea
-        ref={ref}
         data-slot="textarea"
         data-state={state}
         /* Review 1A · fix 5 — a read-only component is not a focus target. */
@@ -241,6 +299,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         aria-busy={loading || undefined}
         className={cn(textareaVariants({ state }), className)}
         {...props}
+        ref={attach}
       />
     );
   },
