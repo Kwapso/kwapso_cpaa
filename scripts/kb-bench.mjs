@@ -48,7 +48,7 @@ import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
 import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -201,7 +201,7 @@ const env = {
 
 /* -------------------------------- the questions ---------------------------- */
 
-const { QUESTIONS } = await import(join(HERE, "kb-bench-questions.mjs"))
+const { QUESTIONS } = await import(process.env.KB_QUESTIONS ? resolve(process.env.KB_QUESTIONS) : join(HERE, "kb-bench-questions.mjs"))
 
 /* --------------------------------- scoring --------------------------------- */
 
