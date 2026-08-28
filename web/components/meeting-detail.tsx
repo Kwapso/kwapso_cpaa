@@ -372,7 +372,8 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={item.title} size="band" />}
-      eyebrow={[t("Meeting"), item.ref].filter(Boolean).join(" · ")}
+      recordNumber={item.ref || undefined}
+      collectionLabel={t("Meeting")}
       title={item.title}
       // The date leads, and it is also the answer to "has this happened?" — which
       // is why there is no third word here any more.

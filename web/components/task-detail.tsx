@@ -183,7 +183,8 @@ export function TaskDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={task.title} size="band" />}
-      eyebrow={[t("Task"), task.ref].filter(Boolean).join(" · ")}
+      recordNumber={task.ref || undefined}
+      collectionLabel={t("Task")}
       title={task.title}
       status={[done ? t("Done") : t("Open"), task.assigneeName || undefined]
         .filter(Boolean)

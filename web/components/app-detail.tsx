@@ -463,7 +463,7 @@ export function AppDetailScreen({
       // disagree about which picture an app has.
       mark={appStageMark(app.stage)}
       leading={<AppMark app={app} size="band" />}
-      eyebrow={t("App")}
+      collectionLabel={t("App")}
       title={app.name}
       status={[app.stage, accountName || t("Ours, no client"), app.active ? undefined : t("Archived")]
         .filter(Boolean)

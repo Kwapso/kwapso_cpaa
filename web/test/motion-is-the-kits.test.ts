@@ -43,14 +43,15 @@ const ROOT = join(HERE, "..", "..") // repo root
 const HAND_ROLLED =
   /\btransition-(colors|opacity|shadow|transform|all|\[[^\]]+\])/
 
-/** Pinned, with the reason each. Rot-checked below. */
-const HAND_ROLLED_OK: Record<string, string> = {
-  "web/components/record-chrome.tsx":
-    "transition-[height] on the collapsing sticky record header. motion.css has " +
-    "no class for a SIZE change on scroll — every §7 row class animates a row " +
-    "arriving or leaving, not a header shrinking — so there is nothing to reach " +
-    "for. Delete this pin the day the kit draws one.",
-}
+/** Pinned, with the reason each. Rot-checked below.
+ *
+ * EMPTY, and that is the point. The one pin here was `record-chrome.tsx`'s
+ * `transition-[height]` on the collapsing sticky record header, and its own
+ * reason ended "Delete this pin the day the kit draws one." That day is
+ * 2026-08-27: the header is the kit's `RecordChrome` now and the hand-rolled
+ * collapse went with it, so the pin described nothing and this check said so
+ * before anybody read the diff. The list can only shrink. */
+const HAND_ROLLED_OK: Record<string, string> = {}
 
 describe("motion is the kit's, everywhere", () => {
   /** Both front doors and the host seams they share. `shared/ui/` is NOT walked:
