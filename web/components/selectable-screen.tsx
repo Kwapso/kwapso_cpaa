@@ -32,6 +32,273 @@ import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
+
+/** Shared by every row, virtualized or not — one function so the two render
+ * paths cannot draw a value two different ways. */
+interface RowContext {
+  teamId: string
+  onOpen?: (id: string) => void
+  canEdit: boolean
+  canDelete: boolean
+  editingId: string | null
+  editValue: string
+  editMark: string
+  savingId: string | null
+  setEditingId: (id: string | null) => void
+  setEditValue: (v: string) => void
+  setEditMark: (v: string) => void
+  saveRename: (id: string) => void
+  setDefault: (v: SelectableValue, next: boolean) => void
+  setActive: (v: SelectableValue, next: boolean) => void
+  t: ReturnType<typeof useT>
+}
+
+function ValueRow({
+  v,
+  ctx,
+  rowRef,
+  posinset,
+  setsize,
+}: {
+  v: SelectableValue
+  ctx: RowContext
+  rowRef?: React.Ref<HTMLLIElement>
+  /** This row's 1-based position in the FULL (unwindowed) list, and the full
+   * count — the reason both exist at all: with only a handful of rows in the
+   * DOM, a screen reader has no other way to say "row 214 of 400". Both
+   * omitted on the unvirtualized path, where the DOM's own order and length
+   * already say the whole thing (ARIA's own guidance for `aria-posinset` /
+   * `aria-setsize`: only needed when not every item is present in the DOM). */
+  posinset?: number
+  setsize?: number
+}) {
+  const {
+    teamId, onOpen, canEdit, canDelete, editingId, editValue, editMark, savingId,
+    setEditingId, setEditValue, setEditMark, saveRename, setDefault, setActive, t,
+  } = ctx
+  return (
+    <li
+      ref={rowRef}
+      aria-posinset={posinset}
+      aria-setsize={setsize}
+      className={`flex items-center gap-2 px-3 py-2 ${v.active ? "" : "opacity-60"}`}
+    >
+      {editingId === v.id ? (
+        <>
+          <Input
+            value={editMark}
+            onChange={(e) => setEditMark(e.target.value)}
+            aria-label={t("Emoji")}
+            placeholder={t("Emoji")}
+            maxLength={4}
+            className="h-8 w-16 shrink-0 text-center"
+          />
+          <Input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            aria-label={t("Option")}
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus
+            className="h-8"
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void saveRename(v.id)}
+            disabled={savingId === v.id}
+            aria-label={t("Save")}
+          >
+            {savingId === v.id ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Check className="size-4" />
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setEditingId(null)}
+            aria-label={t("Cancel")}
+          >
+            <X className="size-4" />
+          </Button>
+        </>
+      ) : (
+        <>
+          {/* THE TYPE MARK, where it is SET (CHECKLIST 11.8). It
+              sits in the leading icon slot and is `aria-hidden`,
+              with the word right beside it, two of the four
+              conditions UI-CONVENTIONS §5 puts on a type mark, and
+              this screen is the third one (it is data, set here). */}
+          {v.mark && (
+            <span aria-hidden className="w-5 shrink-0 text-base leading-none">
+              {v.mark}
+            </span>
+          )}
+          {/* THE WORD OPENS ITS RECORD. A real href so the row can
+              be middle-clicked, copied and opened in a new tab,
+              with the plain left click intercepted into the
+              History-API move — the pattern app-tiles.tsx uses,
+              and the reason it is a pattern rather than a bare
+              anchor is that a bare anchor to an in-app path is a
+              full page reload of the whole shell. */}
+          {onOpen ? (
+            <a
+              href={`/t/${teamId}/dropdowns/${v.id}`}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+                  return
+                e.preventDefault()
+                onOpen(v.id)
+              }}
+              className="flex-1 text-sm underline-offset-2 hover:underline"
+            >
+              {v.value}
+            </a>
+          ) : (
+            <span className="flex-1 text-sm">{v.value}</span>
+          )}
+          {!v.active && (
+            <Badge variant="secondary" className="shrink-0">
+              {t("Inactive")}
+            </Badge>
+          )}
+          {/* ONE OF THE DEFAULTS — a word the app shipped with, and
+              the reason the Deactivate action is not on this row.
+              `is_default` has been on every seeded value since the
+              table was written and was read by nothing at all. */}
+          {v.isDefault && (
+            <Badge variant="secondary" className="shrink-0">
+              {t("Default")}
+            </Badge>
+          )}
+          {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2). The row
+              was `mark · value · "Inactive" · Edit · Power`:
+              two facts, a state and two actions in one sweep,
+              which is N4's other worked example. Facts on the
+              line, the state as a badge at the end of it, the
+              actions in the trailing slot — and never interleaved.
+              H 5 → 3. */}
+          <RecordActionsMenu
+            tone="row"
+            actions={[
+              ...(v.active && canEdit
+                ? [
+                    {
+                      key: "rename",
+                      label: t("Rename"),
+                      icon: <Pencil className="size-3.5" />,
+                      onSelect: () => {
+                        setEditingId(v.id)
+                        setEditValue(v.value)
+                        setEditMark(v.mark ?? "")
+                      },
+                    },
+                  ]
+                : []),
+              ...(canEdit
+                ? [
+                    v.isDefault
+                      ? {
+                          key: "undefault",
+                          label: t("Stop treating as a default"),
+                          icon: <ShieldOff className="size-3.5" />,
+                          onSelect: () => void setDefault(v, false),
+                        }
+                      : {
+                          key: "default",
+                          label: t("Make it a default"),
+                          icon: <Shield className="size-3.5" />,
+                          onSelect: () => void setDefault(v, true),
+                        },
+                  ]
+                : []),
+              // DEACTIVATE STANDS DOWN ON A DEFAULT rather than
+              // offering itself and failing at the door. The door
+              // refuses it either way (that is the real defence,
+              // and it holds for the agent and MCP too); this is
+              // so a person is never offered a button that cannot
+              // work. Take the default mark off and it comes back.
+              ...(canDelete && !v.isDefault
+                ? [
+                    v.active
+                      ? {
+                          key: "deactivate",
+                          label: t("Deactivate"),
+                          icon: <Power className="size-3.5" />,
+                          destructive: true,
+                          onSelect: () => void setActive(v, false),
+                        }
+                      : {
+                          key: "activate",
+                          label: t("Activate"),
+                          icon: <Power className="size-3.5" />,
+                          onSelect: () => void setActive(v, true),
+                        },
+                  ]
+                : []),
+            ]}
+          />
+        </>
+      )}
+    </li>
+  )
+}
+
+/** One type's own rows. VIRTUALIZED PER GROUP, not across the whole screen —
+ * `useVirtualRows` assumes one row height for the whole list it is given, and
+ * a flattened list would mix group-header rows (a different height) into
+ * that assumption. Each group's own items ARE uniform, so this is the grain
+ * that keeps the hook's guarantee true. A group under the threshold renders
+ * exactly as it always did — same markup, no scroll box, `virtualized: false`
+ * — so nothing about a short group's page position or print layout changes.
+ *
+ * THE SCROLL BOX ONLY APPEARS ONCE VIRTUALISED. Windowing only saves anything
+ * inside a HEIGHT-BOUNDED container: unbounded, the browser would still be
+ * asked to lay out (if not paint) every row as the page grows to fit them.
+ * `max-h-[28rem]` is roughly nine rows at the 56px fallback height — enough
+ * to browse a handful of screens' worth before scrolling, on any group large
+ * enough to need it at all. */
+function GroupValues({ items, ctx }: { items: SelectableValue[]; ctx: RowContext }) {
+  const v = useVirtualRows<HTMLUListElement>({ count: items.length })
+
+  if (!v.virtualized) {
+    return (
+      <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        {items.map((item) => (
+          <ValueRow key={item.id} v={item} ctx={ctx} />
+        ))}
+      </ul>
+    )
+  }
+
+  return (
+    <ul
+      ref={v.scrollRef}
+      className="divide-border divide-y rounded-[var(--radius)] border max-h-[28rem] overflow-y-auto"
+    >
+      {/* THE SPACERS ARE `<li>`s, not `<div>`s wrapping one — a `<ul>`'s only
+          valid direct children are `<li>`, and a reader's list-item count
+          depends on that structure staying true even for the two rows that
+          carry no content. Both are `aria-hidden`, from `use-virtual-rows`'s
+          own `SPACER_ATTR` contract, so neither is announced as an empty
+          list item. */}
+      <li {...v.startSpacerProps} />
+      {v.rows.map((index) => (
+        <ValueRow
+          key={items[index].id}
+          v={items[index]}
+          ctx={ctx}
+          posinset={index + 1}
+          setsize={items.length}
+          rowRef={index === v.startIndex ? (v.measureRef as unknown as React.Ref<HTMLLIElement>) : undefined}
+        />
+      ))}
+      <li {...v.endSpacerProps} />
+    </ul>
+  )
+}
 
 export function SelectableScreen({
   teamId,
@@ -146,6 +413,13 @@ export function SelectableScreen({
     return <p className="text-destructive text-sm">{t("Couldn't load dropdown values.")}</p>
   if (valuesQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
+  // Bundled once so `GroupValues`/`ValueRow` take one prop instead of
+  // fourteen — every group reads the SAME state and handlers, never its own.
+  const rowCtx: RowContext = {
+    teamId, onOpen, canEdit, canDelete, editingId, editValue, editMark, savingId,
+    setEditingId, setEditValue, setEditMark, saveRename, setDefault, setActive, t,
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -252,175 +526,7 @@ export function SelectableScreen({
           {grouped.map((g) => (
             <div key={g.type} className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">{g.type}</h2>
-              <ul className="divide-border divide-y rounded-[var(--radius)] border">
-                {g.items.map((v) => (
-                  <li
-                    key={v.id}
-                    className={`flex items-center gap-2 px-3 py-2 ${
-                      v.active ? "" : "opacity-60"
-                    }`}
-                  >
-                    {editingId === v.id ? (
-                      <>
-                        <Input
-                          value={editMark}
-                          onChange={(e) => setEditMark(e.target.value)}
-                          aria-label={t("Emoji")}
-                          placeholder={t("Emoji")}
-                          maxLength={4}
-                          className="h-8 w-16 shrink-0 text-center"
-                        />
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          aria-label={t("Option")}
-                          // eslint-disable-next-line jsx-a11y/no-autofocus
-                          autoFocus
-                          className="h-8"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void saveRename(v.id)}
-                          disabled={savingId === v.id}
-                          aria-label={t("Save")}
-                        >
-                          {savingId === v.id ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Check className="size-4" />
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setEditingId(null)}
-                          aria-label={t("Cancel")}
-                        >
-                          <X className="size-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        {/* THE TYPE MARK, where it is SET (CHECKLIST 11.8). It
-                            sits in the leading icon slot and is `aria-hidden`,
-                            with the word right beside it, two of the four
-                            conditions UI-CONVENTIONS §5 puts on a type mark, and
-                            this screen is the third one (it is data, set here). */}
-                        {v.mark && (
-                          <span aria-hidden className="w-5 shrink-0 text-base leading-none">
-                            {v.mark}
-                          </span>
-                        )}
-                        {/* THE WORD OPENS ITS RECORD. A real href so the row can
-                            be middle-clicked, copied and opened in a new tab,
-                            with the plain left click intercepted into the
-                            History-API move — the pattern app-tiles.tsx uses,
-                            and the reason it is a pattern rather than a bare
-                            anchor is that a bare anchor to an in-app path is a
-                            full page reload of the whole shell. */}
-                        {onOpen ? (
-                          <a
-                            href={`/t/${teamId}/dropdowns/${v.id}`}
-                            onClick={(e) => {
-                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
-                                return
-                              e.preventDefault()
-                              onOpen(v.id)
-                            }}
-                            className="flex-1 text-sm underline-offset-2 hover:underline"
-                          >
-                            {v.value}
-                          </a>
-                        ) : (
-                          <span className="flex-1 text-sm">{v.value}</span>
-                        )}
-                        {!v.active && (
-                          <Badge variant="secondary" className="shrink-0">
-                            {t("Inactive")}
-                          </Badge>
-                        )}
-                        {/* ONE OF THE DEFAULTS — a word the app shipped with, and
-                            the reason the Deactivate action is not on this row.
-                            `is_default` has been on every seeded value since the
-                            table was written and was read by nothing at all. */}
-                        {v.isDefault && (
-                          <Badge variant="secondary" className="shrink-0">
-                            {t("Default")}
-                          </Badge>
-                        )}
-                        {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2). The row
-                            was `mark · value · "Inactive" · Edit · Power`:
-                            two facts, a state and two actions in one sweep,
-                            which is N4's other worked example. Facts on the
-                            line, the state as a badge at the end of it, the
-                            actions in the trailing slot — and never interleaved.
-                            H 5 → 3. */}
-                        <RecordActionsMenu
-                          tone="row"
-                          actions={[
-                            ...(v.active && canEdit
-                              ? [
-                                  {
-                                    key: "rename",
-                                    label: t("Rename"),
-                                    icon: <Pencil className="size-3.5" />,
-                                    onSelect: () => {
-                                      setEditingId(v.id)
-                                      setEditValue(v.value)
-                                      setEditMark(v.mark ?? "")
-                                    },
-                                  },
-                                ]
-                              : []),
-                            ...(canEdit
-                              ? [
-                                  v.isDefault
-                                    ? {
-                                        key: "undefault",
-                                        label: t("Stop treating as a default"),
-                                        icon: <ShieldOff className="size-3.5" />,
-                                        onSelect: () => void setDefault(v, false),
-                                      }
-                                    : {
-                                        key: "default",
-                                        label: t("Make it a default"),
-                                        icon: <Shield className="size-3.5" />,
-                                        onSelect: () => void setDefault(v, true),
-                                      },
-                                ]
-                              : []),
-                            // DEACTIVATE STANDS DOWN ON A DEFAULT rather than
-                            // offering itself and failing at the door. The door
-                            // refuses it either way (that is the real defence,
-                            // and it holds for the agent and MCP too); this is
-                            // so a person is never offered a button that cannot
-                            // work. Take the default mark off and it comes back.
-                            ...(canDelete && !v.isDefault
-                              ? [
-                                  v.active
-                                    ? {
-                                        key: "deactivate",
-                                        label: t("Deactivate"),
-                                        icon: <Power className="size-3.5" />,
-                                        destructive: true,
-                                        onSelect: () => void setActive(v, false),
-                                      }
-                                    : {
-                                        key: "activate",
-                                        label: t("Activate"),
-                                        icon: <Power className="size-3.5" />,
-                                        onSelect: () => void setActive(v, true),
-                                      },
-                                ]
-                              : []),
-                          ]}
-                        />
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <GroupValues items={g.items} ctx={rowCtx} />
             </div>
           ))}
         </div>
