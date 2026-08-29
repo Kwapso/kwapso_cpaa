@@ -57,12 +57,14 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const googleError = useSignInError()
 
   return (
-    // NO WIDTH AND NO CENTRING. `AuthShell` owns both: it caps its content
-    // column at the kit's body measure and centres that column on the BLOCK
-    // axis only. ch27.16, verbatim: "Nothing on an auth screen is centred. The
-    // title, the field label, the helper line and the button label all range
-    // left … A centred auth card is the most common way this brand gets
-    // misdrawn." This used to be a centred card 24rem wide.
+    // NO WIDTH AND NO CENTRING HERE — `PortalDoor` (portal-shell.tsx) owns
+    // both: it caps its content column at the kit's body measure and, as of
+    // the owner's 2026-08-29 override, centres that column within its own
+    // half of the two-panel door whenever there's room to (`mx-auto`, see
+    // PortalDoor's own comment for the full ch27.16 quote and why the
+    // agency's sign-in went further and dropped its panel while this one kept
+    // its real photograph). This used to be a centred card 24rem wide, before
+    // ch27.16 first ruled that out.
     <div className="flex w-full min-w-0 flex-col">
       {/* THE MARK IS NOT DRAWN HERE. It is the shell's `mark` slot, one level
           up, which is the position the chapter puts it in. What stood here was
