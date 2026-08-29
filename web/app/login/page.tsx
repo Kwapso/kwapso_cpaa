@@ -1,22 +1,22 @@
 "use client"
 
-// The sign-in screen. All real logic lives in the temp AuthCard placeholder
-// (see UI-GAPS.md — the library will absorb it as `auth-card`).
+// The sign-in screen. Its chrome is the kit's own composition
+// (compositions/screens/sign-in-system.tsx); see AuthCard for the wiring.
 
 import { useRouter } from "next/navigation"
 
 import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 
-import { AuthCard } from "@/components/temp/auth-card"
+import { AuthCard } from "@/components/auth-card"
 
 export default function LoginPage() {
   const router = useRouter()
   return (
-    <main className="flex min-h-[100svh] items-center justify-center p-6">
+    <>
       <div className="fixed right-4 top-4 z-30">
         <ModeToggle />
       </div>
       <AuthCard onSignedIn={() => router.replace("/home")} />
-    </main>
+    </>
   )
 }
