@@ -84,6 +84,8 @@
 //   POST /api/tenancy/internal-rates/active-> retire / restore an internal rate
 //   GET  /api/tenancy/margin               -> revenue - our time - tool costs (internal)
 //   GET  /api/tenancy/activity             -> activity feed (?scope=team|user|role&id=)
+//   GET  /api/tenancy/query                -> ask a module a question (?module=&where=&groupBy=&countOnly=&cursor=)
+//   GET  /api/tenancy/query/describe       -> what a module has: its fields, types and allowed values
 //   GET  /api/tenancy/team-meta            -> the active team's Overview metadata
 //   GET  /api/tenancy/invites              -> the team's invites (all statuses)
 //   GET  /api/tenancy/invites/audit        -> one invite's invite_logs audit (?id)
@@ -140,6 +142,7 @@ import {
   postUpdateTeam,
   switchActiveTeam,
 } from "./routes/team"
+import { getQueryDescribe, getQueryRecords } from "./routes/query"
 import { getMembers, postMemberRemove, postMemberRole } from "./routes/members"
 import {
   getMyPerms,
@@ -301,6 +304,15 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
     kind: "housekeeping",
   },
   "GET /api/tenancy/activity": { handler: getActivityFeed, kind: "read" },
+  // THE TWO QUERY DOORS — the generic read that stands in for fifty list tools
+  // (shared/workers/query-grammar.ts says why). They sit HERE, beside the
+  // activity feed, because that is this worker's other module-spanning read: one
+  // team database, and the module named in the request resolves to a table AND
+  // to the permission its own list door already gates on. Neither grants a row
+  // that was not already readable one screen at a time, and both refuse a client
+  // login at the door (R21).
+  "GET /api/tenancy/query": { handler: getQueryRecords, kind: "read" },
+  "GET /api/tenancy/query/describe": { handler: getQueryDescribe, kind: "read" },
   "GET /api/tenancy/team-meta": { handler: getTeamMetaFeed, kind: "read" },
   "GET /api/tenancy/invites": { handler: getInvites, kind: "read" },
   "GET /api/tenancy/invites/audit": { handler: getInviteAudit, kind: "read" },

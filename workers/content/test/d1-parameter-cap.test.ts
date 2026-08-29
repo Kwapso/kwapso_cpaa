@@ -165,6 +165,11 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         `the databases that alarmed tonight, capped at CRON_ALERT_CAP (${CRON_ALERT_CAP})`,
       "tenancy/src/lib/accounts.ts: scope.roots":
         `the portal switcher's companies, capped at PORTAL_ROOTS_CAP (${PORTAL_ROOTS_CAP}) by ROOTS_SQL`,
+      // The vocabulary GROUPS one query module declares — derived from that
+      // module's own `vocabulary` markers in QUERY_MODULES, fixed at author time.
+      // The largest module declares two.
+      "tenancy/src/routes/query.ts: groups":
+        "the dropdown groups one query module names — one per `vocabulary` marker in its own field list, fixed at author time",
       "tenancy/src/lib/activity-read.ts: allowedTables":
         "the modules a caller may read — one per TEAM_MODULES entry, fixed at author time",
       "tenancy/src/lib/work-engine.ts: BORROWED":

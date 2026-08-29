@@ -112,7 +112,8 @@ export const DROPDOWN_ORDER_RULE =
 export const KNOWLEDGE_FIRST_RULE = [
   "Never answer a question about THIS team out of your own memory — look it up. There are two ways to look something up and choosing well is most of doing this job properly.",
   "ask_knowledge is your DEFAULT, and you should reach for it first. It searches everything the team knows at once: its documents, notes and meeting transcripts, AND a mirror of the app's own records — tickets, accounts, contacts, systems, process maps, sprints, stories, meetings, to-dos and tasks — kept in step every fifteen minutes. Each source it cites also carries `liveStatus`, that record read from the database as you ask. So for any question ABOUT something — what it says, what was agreed on it, what has happened to it, where it stands, \"tell me about X\", \"catch me up on Y\", \"what's the latest on Z\" — one ask_knowledge call gives you both the story and what is true today, and it is far quicker than hunting through lists.",
-  "Go to a live list instead — list_help_tickets, list_members, list_roles, list_accounts, list_meetings and the rest — when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
+  "Go to a live read instead when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\", \"in July\", \"per client\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
+  "query_records is the live read, and it is ONE tool for every module: tickets, stories, sprints, work_logs, tasks, todos, meetings, accounts, apps, app_modules, processes, deliverables, waves, knowledge_sources, roles, dropdown_values and account_rates. Call describe_module first on any module you have not queried in this conversation and use the field names it gives you — a guessed field name is refused, not ignored. Then say what you want in filters rather than reading rows and counting them yourself: a date range is one filter with the \"between\" operator, three clients named in one question is one filter with \"contains\" and a list of their names, and \"how many per client\" or \"per month\" is groupBy, which comes back as counts. Two calls should answer almost anything. Paging through hundreds of rows to count them by hand is the wrong answer to a question the door can answer in one.",
   "When the question is about what ONE THING SAYS — this document, that call, whether one covers the other — do not survey, READ. Find it once, then read it WHOLE by id: `list_knowledge_sources` with `id` returns that source's own words, and `get_meeting_transcript` returns everything said in a meeting. Two reads give you both sides of a comparison, in full, and a whole transcript is a normal thing to be handed. Listing the same collection again with different wording returns material you have already seen, and you have a limited number of steps to spend — so spend them on reading the thing, not on finding it twice.",
   "Never guess, never invent data, and never tell the user you can't check — pick the door, call the tool, then answer plainly from what comes back.",
 ].join(" ")
@@ -140,7 +141,7 @@ export const KNOWLEDGE_CITATION_RULE = [
   // the same list twice, and the model finally has somewhere better to put the
   // attribution: on the claim itself.
   CITE_RULE,
-  "You can also add, correct and remove sources when asked (add_knowledge_source, update_knowledge_source, set_knowledge_source_active) — the same rights the person has, no more.",
+  "You can also add, correct and remove sources when asked (add_knowledge_source, update_knowledge_source, and set_record_active with record \"knowledge_source\" to take one away or give it back) — the same rights the person has, no more.",
 ].join(" ")
 
 /**
@@ -943,7 +944,9 @@ async function runPlanLoop(
   loopOpts: { prepaid?: boolean; fold?: boolean } = {},
   emit?: Emit
 ): Promise<ChatOutcome> {
-  const model = selectModel(env)
+  // The thread id is the affinity key: every step of this turn re-sends the same
+  // 37.6K preamble, and only a shared key lands them on the GPU still holding it.
+  const model = selectModel(env, threadId)
   // WHAT THIS CALLER CAN ACTUALLY DO, in one read, so the preamble stops paying
   // to describe doors that are certain to refuse them (toolSpecs' own note has
   // the arithmetic). Fail OPEN: an unreadable sheet means the whole catalogue,
@@ -1322,7 +1325,7 @@ export async function confirmAndRun(
     // and reads the same tool list this caller was offered, so the explanation
     // cannot name a tool they were never shown. Fail open, as everywhere else.
     const held = await rightsSheet(cfg, guard).catch(() => undefined)
-    const note = await failureWrapUp(selectModel(env), convo, toolSpecs(held), tally)
+    const note = await failureWrapUp(selectModel(env, opts.threadId), convo, toolSpecs(held), tally)
     emit?.({ t: "text", d: note })
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: note, source: opts.source })
     // Fold into the propose row (not a separate row) — APPENDING the actions
