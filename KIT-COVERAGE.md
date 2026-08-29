@@ -121,7 +121,7 @@ Regenerate the ticks with:
 
 - [x] `sort-control`
 - [x] `table`
-- [ ] `use-virtual-rows`
+- [x] `use-virtual-rows`
 - [ ] `visibility`
 - [ ] `data-preview-table`
 - [x] `description-list`
@@ -132,7 +132,7 @@ Regenerate the ticks with:
 - [ ] `progress-dashboard`
 - [x] `stat-grid`
 - [ ] `tree`
-- [ ] `stopwatch`
+- [x] `stopwatch`
 
 ## Feedback and overlay
 
@@ -240,7 +240,7 @@ Regenerate the ticks with:
 - [ ] `templates/rail`
 - [x] `templates/record-chrome`
 - [ ] `templates/record-route`
-- [ ] `templates/screen-shell`
+- [x] `templates/screen-shell`
 - [ ] `templates/search-results`
 - [x] `templates/sign-in`
 - [ ] `templates/stat-strip`
@@ -254,4 +254,4 @@ Regenerate the ticks with:
 
 ---
 
-**Components 67/115 · Compositions 6/47**
+**Components 69/115 · Compositions 7/47**
