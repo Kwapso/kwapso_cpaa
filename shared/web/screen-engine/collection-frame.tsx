@@ -47,6 +47,7 @@ import { Text } from "@shared/ui/components/typography/typography"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 import { ShapeStateBody, type ShapeStateCopy } from "@shared/ui/compositions/states/states"
+import { CollectionFrame as KitCollectionFrame } from "@shared/ui/components/collection-frame/collection-frame"
 
 /** THE SECTION'S OWN CREATE ACTION, published to the collection inside it.
  *
@@ -98,6 +99,7 @@ function CollectionFrame<T>({
   state = "ready",
   copy,
   errorAction,
+  useKitPanel = false,
 }: {
   config: CollectionConfig
   data: T[]
@@ -144,6 +146,18 @@ function CollectionFrame<T>({
   copy?: Partial<ShapeStateCopy>
   /** The one next step offered on a failed read (a Retry button, typically). */
   errorAction?: React.ReactNode
+  /**
+   * PROTOTYPE, ONE CALLER AT A TIME (COMPOSITION-MISMATCHES.md, the
+   * CollectionFrame entry). Draws the header/toolbar/panel through the kit's
+   * own `components/collection-frame/collection-frame.tsx` instead of this
+   * file's hand-rolled header and the host's `CollectionCard` box — the
+   * owner's ruling on the double-box question ("make the kit override
+   * whatever we have"). The state-switch body (`ShapeStateBody`) is
+   * UNCHANGED either way; only the chrome around it moves. Defaults to
+   * `false` so every existing call site keeps its current, unreviewed-change
+   * markup until this is verified and rolled out on purpose.
+   */
+  useKitPanel?: boolean
 }) {
   const t = useT()
   const createAction = React.useContext(CreateActionContext)
@@ -289,6 +303,164 @@ function CollectionFrame<T>({
     setPage(p)
     if (config.scrollToTop)
       rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  const pager =
+    !serverSide && config.itemsPerPage != null && pageCount > 1 ? (
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <Text as="span" size="caption" tone="tertiary" numeric>
+          {t("Page {page} of {pages}", { page: current + 1, pages: pageCount })}
+        </Text>
+        <Pagination label={t("Pagination")} className="w-auto justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                label={t("Prev")}
+                srLabel={t("Prev")}
+                size="sm"
+                disabled={current === 0}
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  goTo(current - 1)
+                }}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                label={t("Next")}
+                srLabel={t("Next")}
+                size="sm"
+                disabled={current >= pageCount - 1}
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  goTo(current + 1)
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    ) : null
+
+  // THE PROTOTYPE BRANCH — see the `useKitPanel` doc above. Every hook and
+  // every computed value above this line (asked/remember, selectRows, the
+  // create-action context) is IDENTICAL on both paths; only the chrome
+  // differs. The state-switch body is the same `ShapeStateBody` calls the
+  // legacy branch below makes — copied rather than shared behind a helper,
+  // because the two branches are not going to coexist past the prototype
+  // (one will replace the other; see COMPOSITION-MISMATCHES.md).
+  if (useKitPanel) {
+    // THE COUNT FOLDS INTO THE SEARCH PLACEHOLDER ("Search 7 roles…") rather
+    // than drawing beside it. Two reasons. First, R16: this is a FILTERED-
+    // view hint, not the collection's count — a counted tab strip or
+    // `CollectionHeading` already carries the collection's own total exactly
+    // once elsewhere on this screen (Roles has no `config.title`; its tab
+    // already says "Member roles 7"), and a second, louder Badge in the
+    // kit's own `heading`+`count` slot would be the duplicate-count shape
+    // R16 exists to catch. Second, and the reason it is folded into the
+    // placeholder rather than drawn as a sibling caption: the kit's toolbar
+    // gives the WHOLE `search` node one flex slot (`basis-full` below `sm`),
+    // so a caption placed beside the input inside that one slot fights the
+    // input for width and clips it on a phone — proven live, not guessed
+    // (first pass genuinely did this; caught on the phone screenshot). The
+    // old code had exactly this fold already, but only below `sm`; it is
+    // simpler and safer to apply it at every width now that there is one
+    // search node instead of two responsive ones.
+    const searchPlaceholder = config.showCount
+      ? config.searchPlaceholder.replace(/^Search\b/i, (m) => `${m} ${filtered.length}`)
+      : config.searchPlaceholder
+    const searchBox = config.searchable ? (
+      <SearchInput
+        defaultValue={query}
+        onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+        onClear={() => debouncedSetQuery("")}
+        placeholder={searchPlaceholder}
+      />
+    ) : null
+    const filterBar = showFilterBar ? (
+      <FilterBar
+        facets={config.filterFacets}
+        values={facetValues}
+        data={data}
+        onChange={setFacet}
+        onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
+        resultCount={filtered.length}
+        modal={modal}
+      />
+    ) : null
+    // THE VIEW-SWITCH SLOT, BY THE KIT'S OWN PRECEDENT: CH27.13 shares it
+    // between the actual view switcher and "the sub-tab picker are controls"
+    // — this frame has no view switcher, so `SortControl` takes the slot
+    // rather than inventing a sixth one the component does not offer.
+    const sortControl = showSort ? (
+      <SortControl
+        options={config.sortOptions}
+        value={sortBy}
+        onValueChange={setSortBy}
+        direction={sortDir}
+        onDirectionChange={setSortDir}
+      />
+    ) : null
+    const createButton = createAction ? (
+      <Button onClick={createAction.onCreate} className="gap-1">
+        {createAction.icon}
+        {createAction.label}
+      </Button>
+    ) : null
+
+    return (
+      <KitCollectionFrame
+        className={className}
+        heading={config.title || undefined}
+        rule={Boolean(config.title)}
+        search={searchBox}
+        filters={filterBar}
+        viewSwitch={sortControl}
+        actions={createButton}
+      >
+        {state === "loading" ? (
+          <ShapeStateBody shape="collectionScreen" state="loading" copy={copy} />
+        ) : state === "error" ? (
+          <ShapeStateBody
+            shape="collectionScreen"
+            state="error"
+            copy={copy}
+            action={errorAction}
+          />
+        ) : filtered.length === 0 ? (
+          <ShapeStateBody
+            shape="collectionScreen"
+            state="empty"
+            filtered={narrowed}
+            copy={{ emptyTitle: t(config.emptyText), ...copy }}
+            action={
+              narrowed
+                ? Object.keys(facetValues).length > 0 && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
+                    >
+                      {t("Clear filters")}
+                    </Button>
+                  )
+                : createAction && (
+                    <Button onClick={createAction.onCreate} className="gap-1">
+                      {createAction.icon}
+                      {createAction.label}
+                    </Button>
+                  )
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {renderItems(visible)}
+            {pager}
+          </div>
+        )}
+      </KitCollectionFrame>
+    )
   }
 
   return (
@@ -519,43 +691,7 @@ function CollectionFrame<T>({
         renderItems(visible)
       )}
 
-      {!serverSide && config.itemsPerPage != null && pageCount > 1 && (
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <Text as="span" size="caption" tone="tertiary" numeric>
-            {t("Page {page} of {pages}", { page: current + 1, pages: pageCount })}
-          </Text>
-          <Pagination label={t("Pagination")} className="w-auto justify-end">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  label={t("Prev")}
-                  srLabel={t("Prev")}
-                  size="sm"
-                  disabled={current === 0}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    goTo(current - 1)
-                  }}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  label={t("Next")}
-                  srLabel={t("Next")}
-                  size="sm"
-                  disabled={current >= pageCount - 1}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    goTo(current + 1)
-                  }}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+      {pager}
     </div>
   )
 }
