@@ -185,8 +185,22 @@ function useTokenValues(names: readonly string[]): Record<string, string> {
       attributeFilter: ["data-theme", "data-scale", "dir", "class", "style"],
     });
 
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    media.addEventListener("change", read);
+    /* GUARDED, BECAUSE `window` EXISTING DOES NOT MEAN `matchMedia` DOES.
+       This read was `window.matchMedia(...)` bare, and it threw
+       "window.matchMedia is not a function" the moment anything rendered
+       `BrandRoute` under jsdom — which is every unit test an application
+       writes about its brand screen. `typeof window === "undefined"` does not
+       catch it: jsdom HAS a window and, by default, no `matchMedia`. Two other
+       files in this repository already guard the same call the same way
+       (`overlays/delete-confirmation`, `overlays/quick-view`); this one was
+       the odd one out. A missing `matchMedia` means no palette-change event,
+       which the MutationObserver and the sentinel poll above already cover —
+       so the screen loses nothing, where before it lost the whole render. */
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : undefined;
+    media?.addEventListener("change", read);
 
     let last = getComputedStyle(document.documentElement)
       .getPropertyValue(SENTINEL)
@@ -202,7 +216,7 @@ function useTokenValues(names: readonly string[]): Record<string, string> {
 
     return () => {
       observer.disconnect();
-      media.removeEventListener("change", read);
+      media?.removeEventListener("change", read);
       window.clearInterval(timer);
     };
   }, [read]);
