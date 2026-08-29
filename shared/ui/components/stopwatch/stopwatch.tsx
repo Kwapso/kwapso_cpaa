@@ -81,7 +81,31 @@ const discClasses = [
 ];
 
 export interface StopwatchProps
-  extends Omit<React.ComponentPropsWithoutRef<"div">, "onChange" | "defaultValue"> {
+  extends Omit<React.ComponentPropsWithoutRef<"div">, "onChange" | "defaultValue" | "children"> {
+  /**
+   * WHAT THIS PILL IS TIMING — between the clock glyph and the count.
+   *
+   * A placement, not a drawing: nothing here styles the node, exactly as
+   * `ScreenShell` places a rail and `CollectionFrame` places a toolbar. The
+   * pill's own shape — the fill, the radius, the glyph, the disc — is
+   * untouched, and `undefined` renders what this component has always
+   * rendered, byte for byte.
+   *
+   * IT EXISTS BECAUSE A SECOND CLOCK MAKES THE FIRST ONE AMBIGUOUS. One
+   * stopwatch needs no name; two running at once are two durations and
+   * nothing else, and a name in a `title` tooltip is invisible on a phone.
+   * The consuming app had already reached that conclusion and hand-drew a
+   * near-identical pill beside this one to get a name into it — which is a
+   * duplicated component, and the reason this is a gap rather than a
+   * preference.
+   *
+   * AND `children` IS OMITTED ABOVE, WHICH IS THE OTHER HALF. This interface
+   * extends the div props, so the TYPE said children were accepted while the
+   * render wrote its own JSX children — and explicit children beat a spread,
+   * so anything passed was discarded in silence. Omitting it makes the type
+   * tell the truth: a stopwatch takes named slots, not arbitrary content.
+   */
+  leading?: React.ReactNode;
   /** Whether the clock is counting, controlled. */
   running?: boolean;
   /** Whether the clock starts counting when it manages its own state. */
@@ -211,6 +235,7 @@ const Stopwatch = React.forwardRef<HTMLDivElement, StopwatchProps>(
       disabled = false,
       readOnly = false,
       label = "Stopwatch",
+      leading,
       startLabel = "Start",
       stopLabel = "Stop",
       formatDuration = defaultFormatDuration,
@@ -267,6 +292,11 @@ const Stopwatch = React.forwardRef<HTMLDivElement, StopwatchProps>(
         {...props}
       >
         <Clock size={16} aria-hidden="true" className="shrink-0" />
+
+        {/* The name of the thing being timed. Undefined renders nothing at
+            all — not an empty span — so the pill is unchanged for every
+            caller that does not need it. */}
+        {leading === undefined ? null : leading}
 
         {/* `aria-live` is off on purpose: a clock that announced every second
             would talk over everything else on the page. The value is read on
