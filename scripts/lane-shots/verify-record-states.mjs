@@ -12,16 +12,28 @@ import { chromium } from "playwright"
 import { mkdirSync } from "node:fs"
 
 const BASE = "http://localhost:3055"
+const TEAM = "01KZWXFD86N0K3RZRBHKMKRWYS"
 const FAKE_ID = "01AAAAAAAAAAAAAAAAAAAAAAAA" // valid ULID shape, no such row
 
-// One entry per screen this has been run against. `apiPattern` is what gets
-// delayed (loading) or aborted (error) — the door this screen's own query
-// reads. `hasError` is false for a screen with no error branch to shoot (its
-// data arrives as host-fed props, not its own query — task-detail today).
+// One entry per screen this has been run against. `path` is the URL segment
+// (clean top-level) or the full `t/<team>/<module>` deep-link prefix — either
+// works, this just appends `/<id>`. `apiPattern` is what gets delayed
+// (loading) or aborted (error) — the door this screen's own query reads.
+// `hasError` is false for a screen with no error branch to shoot (its data
+// arrives as host-fed props, not its own query — task-detail today).
 const RECORDS = {
   help: { path: "tickets", realId: "01M0DJKV43EKSZZDZB3SRWCNYX", apiPattern: "**/api/content/help*", hasError: true },
   story: { path: "stories", realId: "01M0YHZZ8BNADAHKVA25YA5ZAT", apiPattern: "**/api/content/stories?*", hasError: true },
   task: { path: "tasks", realId: "01M0CAGMC6AYY6PHJDV9PTPXM3", apiPattern: "**/api/content/tasks*", hasError: false },
+  account: { path: `t/${TEAM}/accounts`, realId: "01M0YCM30PRASKYJC7MER9C7AN", apiPattern: "**/api/tenancy/accounts/detail*", hasError: true },
+  app: { path: `t/${TEAM}/apps`, realId: "01KZXD6DQZSEYS5D39QHHDAM9T", apiPattern: "**/api/tenancy/apps*", hasError: true },
+  knowledge: { path: `t/${TEAM}/knowledge`, realId: "01M165ZD4MBEVT47HJEEQHJM7Y", apiPattern: "**/api/content/knowledge*", hasError: true },
+  meeting: { path: `t/${TEAM}/meetings`, realId: "01M0B1J2JC05M83YZRXEBF4DDJ", apiPattern: "**/api/content/meetings*", hasError: true },
+  process: { path: `t/${TEAM}/processes`, realId: "01M0Y5YG0F860X9EJXKKA178R7", apiPattern: "**/api/tenancy/processes*", hasError: true },
+  role: { path: `t/${TEAM}/roles`, realId: "01KZWXFHVTT7SZXCN3N2FDNY46", apiPattern: "**/api/tenancy/roles*", hasError: true },
+  selectable: { path: `t/${TEAM}/dropdowns`, realId: "5a52269589deb373b89be75443731610", apiPattern: "**/api/tenancy/selectable*", hasError: true },
+  sprint: { path: `t/${TEAM}/sprints`, realId: "01M0W6BVBBRJXXAP6TCV70Z9AD", apiPattern: "**/api/content/sprints*", hasError: true },
+  wave: { path: `t/${TEAM}/waves`, realId: "01M0W6BK1PTRDQK8H53KMMJ34P", apiPattern: "**/api/tenancy/waves*", hasError: true },
 }
 
 const kind = process.argv[2]

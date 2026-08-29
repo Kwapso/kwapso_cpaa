@@ -44,7 +44,7 @@ import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chr
 import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
-import { primeCache, useCached } from "@shared/web/store"
+import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
 
@@ -144,9 +144,31 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     }
   }
 
-  if (rolesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the role.")}</p>
-  if (rolesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!role) return <p className="text-muted-foreground text-sm">{t("That role doesn't exist.")}</p>
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (rolesQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the role.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(`member_roles:${teamId}`)}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (rolesQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  if (!role)
+    return (
+      <RecordScreen
+        title={t("Role")}
+        state="empty"
+        copy={{ emptyTitle: t("That role doesn't exist."), emptyDescription: "" }}
+      />
+    )
 
   // SERVER ⇄ KIT rights vocabulary. The app's sheet says read/create; the kit
   // ruled its four ids are the client's own words, see/add (the older

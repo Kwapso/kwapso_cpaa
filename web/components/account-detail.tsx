@@ -402,9 +402,25 @@ export function AccountDetailScreen({
     toast.success(t("Contact added."))
   }
 
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58). No empty branch: this door never
+  // returns a null record, only data or an error, so only those two states
+  // are migrated.
   if (detailQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load the account.")}</p>
-  if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the account.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(accountKey(accountId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (detailQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
 
   const { account, parent, links, linksTotal } = detailQ.data
 
