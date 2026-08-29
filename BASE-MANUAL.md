@@ -232,8 +232,8 @@ Four more structural guards layer on top (all in `agent.ts` / `tools.ts`):
 - **Fenced tool results**, a tool's output goes back to the model as DATA
   (`role:"tool"`), never as instructions. **On both providers, and they fence
   differently.** Claude carries it in a real `tool_result` block, so the transport
-  itself says what the text is. Workers AI (the model chosen whenever
-  `ANTHROPIC_API_KEY` is unset, a fresh environment's default) rejects a replayed
+  itself says what the text is. Workers AI (the only engine since 29 Aug 2026, when the
+  Anthropic transport was deleted) rejects a replayed
   tool round-trip, so results are flattened into ordinary turns, and a flattened
   result used to arrive as a bare user message, indistinguishable from something
   the signed-in person typed. It is now wrapped in `<tool_result from="…"> … </>`,

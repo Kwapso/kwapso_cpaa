@@ -20,7 +20,20 @@ const token = (verify.headers.get("set-cookie") ?? "").split(";")[0].split("=")[
 if (!token) { console.log("no session"); process.exit(1) }
 
 const WIDTHS = { phone: [390,844], tablet: [768,1024], laptop: [1280,800], wide: [1920,1080] }
-const SCREENS = [["home","/"],["tickets","/tickets"],["knowledge","/knowledge"],["accounts","/accounts"]]
+// A record screen and a deep-linked one are here on purpose: they took the
+// state-swap change today, and a detail page's chrome is drawn by a different
+// composition from a collection's.
+const TEAM = "01KZWXFD86N0K3RZRBHKMKRWYS"
+const SCREENS = [
+  ["home", "/"],
+  ["tickets", "/tickets"],
+  ["knowledge", "/knowledge"],
+  ["accounts", "/accounts"],
+  ["ticket-detail", "/tickets/01M0DJKV43EKSZZDZB3SRWCNYX"],
+  ["stories", `/t/${TEAM}/stories`],
+  ["work-logs", `/t/${TEAM}/work-logs`],
+  ["settings", `/t/${TEAM}/settings`],
+]
 const browser = await chromium.launch()
 const problems = []
 for (const [name, path] of SCREENS) {

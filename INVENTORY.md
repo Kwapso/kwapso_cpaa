@@ -95,7 +95,7 @@ set for local development.
 | `INTERNAL_KEY` | you, any long random string | auth, tenancy, content, mcp, **both gateways** |
 | `ADMIN_KEY` | you | tenancy, data-ops |
 | `TEST_LOGIN_KEY` | you | auth, **non-production only** |
-| `ANTHROPIC_API_KEY` | Anthropic console. Optional | data-ops |
+| ~~`ANTHROPIC_API_KEY`~~ | **Removed 29 Aug 2026** — the assistant runs on Workers AI over the `AI` binding; no key exists | — |
 | `GLIDE_API_KEY` | Glide, Business plan and above. Legacy only | nothing deployed, local scripts only |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare, same scope as `CF_D1_TOKEN` | nothing deployed, local scripts only |
 

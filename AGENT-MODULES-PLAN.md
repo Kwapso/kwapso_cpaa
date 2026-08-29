@@ -77,9 +77,10 @@ docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~
 ### Phase 3. Agent brain + MCP
 
 **3A/3B. Agent brain (`workers/data-ops`). DONE.** The swappable model interface
-(Claude when `ANTHROPIC_API_KEY` is set, full tool use, so it can ACT; else Workers
-AI, text-only answers; `cheapText` always Workers AI for cheap inline + the help-draft
-fallback) ; the act-as-user executor calling the gated endpoints (forwarding the
+(Workers AI, full tool use, so it can ACT; `cheapText` is a separate Workers AI seam
+for the cheap inline jobs + the help-draft fallback. This line described a
+Claude-or-Workers-AI fork until 29 Aug 2026, when the Anthropic transport was
+deleted and there stopped being a fork) ; the act-as-user executor calling the gated endpoints (forwarding the
 caller's session cookie, never exceeding their rights) ; the confirm rule (>1 row OR
 delete-type OR a dangerous table, roles/members/screens/import) ; the identity-act
 hard-blocks (blocked by omission from the tool catalog + a backstop guard) ;

@@ -276,8 +276,9 @@ tells the agent this capability exists).
 
 ## 8 · Degrade gracefully (no key = still works)
 
-When `ANTHROPIC_API_KEY` is unset, the analyze step falls back to the deterministic
-planner: fuzzy `autoMap` per file + target detection by matching a file's headers
+If the model call fails, the analyze step falls back to the deterministic planner
+(until 29 Aug 2026 the trigger was an unset `ANTHROPIC_API_KEY`; there is no key
+now, so the fallback is a failure path rather than a configuration one): fuzzy `autoMap` per file + target detection by matching a file's headers
 to each target's required columns + the declared `references`/order. Less clever at
 messy real-world headers, but the base still imports, the model makes it *better*,
 it isn't a hard dependency (mirrors the chat agent's Workers-AI fallback).
