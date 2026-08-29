@@ -43,7 +43,7 @@ import {
   PopoverTrigger,
 } from "@shared/ui/components/popover/popover"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
-import { Text } from "@shared/ui/components/typography/typography"
+import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 import { ShapeStateBody, type ShapeStateCopy } from "@shared/ui/compositions/states/states"
@@ -438,30 +438,58 @@ function CollectionFrame<T>({
             copy={copy}
             action={errorAction}
           />
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && narrowed ? (
+          // NO-RESULTS stays on the plain sentence + "Clear filters" — see
+          // COMPOSITION-MISMATCHES.md, the no-results half of this entry,
+          // for why the kit's own richer no-results body (naming the exact
+          // total, the narrowest excluding facet, and its would-show count)
+          // is deliberately not built here yet: it needs computations this
+          // engine doesn't have, not a copy swap.
           <ShapeStateBody
             shape="collectionScreen"
             state="empty"
-            filtered={narrowed}
+            filtered
             copy={{ emptyTitle: t(config.emptyText), ...copy }}
             action={
-              narrowed
-                ? Object.keys(facetValues).length > 0 && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
-                    >
-                      {t("Clear filters")}
-                    </Button>
-                  )
-                : createAction && (
-                    <Button onClick={createAction.onCreate} className="gap-1">
-                      {createAction.icon}
-                      {createAction.label}
-                    </Button>
-                  )
+              Object.keys(facetValues).length > 0 && (
+                <Button
+                  variant="secondary"
+                  onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
+                >
+                  {t("Clear filters")}
+                </Button>
+              )
             }
           />
+        ) : filtered.length === 0 ? (
+          // GENUINELY EMPTY — assembled from the kit's own primitives
+          // (Headline + Text + Button) to match `EmptyCollectionScreen`'s
+          // `emptyBody` register (states/empty-collection.tsx), the one
+          // piece of that composition this engine can adopt without also
+          // needing a figure strip or zero-badged tabs (concepts
+          // `CollectionConfig` doesn't have — see COMPOSITION-MISMATCHES.md).
+          // "Left-aligned, type only... no dashed placeholder rectangle" is
+          // the composition's own law, kept here rather than the dashed box
+          // this used to be.
+          <div
+            data-slot="collection-empty-body"
+            className="flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]"
+          >
+            <Headline as="h3" size="h3">
+              {copy?.emptyTitle ?? t(config.emptyText)}
+            </Headline>
+            {copy?.emptyDescription ? (
+              <Text as="p" size="sm" tone="secondary" measure>
+                {copy.emptyDescription}
+              </Text>
+            ) : null}
+            {createAction ? (
+              <Button onClick={createAction.onCreate} className="mt-2 gap-1">
+                {createAction.icon}
+                {createAction.label}
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             {renderItems(visible)}

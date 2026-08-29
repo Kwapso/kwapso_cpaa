@@ -28,6 +28,31 @@ reverse — a composition can share a NAME's job and still not share its
 CONTRACT (RecordChrome vs. DetailScreen is the example the app already lived
 through).
 
+## A note on the numbers: adoptions the census cannot see
+
+`KIT-COVERAGE.md`'s `[x]`/`[ ]` count is a census of DIRECT imports — it
+greps `@shared/ui/...` import strings in `web/`, `web-portal/` and
+`shared/web/`. That undercounts real adoption whenever this app reaches a
+kit part THROUGH another kit part it already imports, because the inner
+import never appears in the app's own source. Two confirmed so far:
+
+- **`notes`** shows unchecked, but `comments/comments.tsx` (already
+  adopted, `[x]`) imports it directly (`import { Notes } from
+  "../notes/notes"`) and is built on top of it. Every place `Comments`
+  renders in this app is already drawing `Notes`'s row.
+- **`folder`** shows unchecked, but `tabs/tabs.tsx` (already adopted,
+  `[x]`) imports it for the `variant="folder"` tab strip already in use
+  (`web/components/deep-link/screen-bits.tsx`'s `SectionWithCreate`,
+  `folderTabs` slot).
+
+Neither is a gap to close — both are already reaching this app, just
+invisible to a grep that only looks one import deep. The real number of
+kit parts genuinely serving this app is `[x]`'s count plus at least these
+two, and there is currently no automated way to find the rest of them (the
+check would need to walk each `[x]` component's own import graph, not
+just the app's). Worth a `kit-coverage.mjs` enhancement if the owner wants
+the number itself to be trustworthy rather than a floor.
+
 ## THE 2026-08-29 CORRECTION — READ THIS BEFORE TRUSTING AN OLDER VERDICT
 
 The first pass over these 23 checked whether a claim about a composition was
@@ -417,10 +442,7 @@ straight into the kit's `heading`+`count` Badge drew an ORPHANED count chip
 on a title-less collection — a second count for the one collection, which is
 what R16 exists to catch — and the fix's own first draft then clipped the
 search input on a phone by fighting it for space inside one flex slot; both
-are written up in the commit message rather than repeated here. `empty-
-collection` and `no-results` (the other lane's states work, hosted in this
-same engine file) are its next callers, per the planner's sequencing —
-not rolled out to the other five list-recipe call sites yet either.
+are written up in the commit message rather than repeated here.
 
 **A third bug, found only after the ScreenShell family landed** (commit
 `ca10f067`): the planner's own flagged risk — "a collection drawn through
@@ -432,6 +454,52 @@ pane — exactly the nesting the kit's own `tone` doc names by name. Fixed
 with `tone="bare"` `inset={false}`, unconditionally: this frame never
 renders anywhere else in this app. Re-verified at all four widths, both
 themes, after the fix.
+
+**`empty-collection`'s genuinely-empty half — ADOPTED** (commit `960ae29e`).
+`states/empty-collection.tsx`'s own `emptyBody` register (Headline + Text +
+Button, "left-aligned, type only… no dashed placeholder rectangle") is
+assembled directly in the `useKitPanel` branch for the not-narrowed empty
+case, reusing `config.emptyText` and `createAction` — nothing new needed,
+which is the test the planner set for "adoption" rather than "a feature":
+everything the body needs already exists. The rest of that composition
+(a figure strip of zero-reading stats above the tabs, tabs carrying
+zero-badges) is NOT adopted — `CollectionConfig` has no "figures" concept
+and no per-tab zero-badge concept, and inventing either is real, separate
+scope. Verified on `roles` with the list route-mocked to zero rows, all
+four widths, both themes
+(`scripts/lane-shots/verify-empty-body.mjs`). Two create buttons appear
+at once (toolbar + body) — matches the composition's own documented
+design ("this screen carries TWO mango actions… the header's +, which
+acts on the page, and the register's Add the first"), not a bug.
+
+**`no-results` — DELIBERATELY NOT ADOPTED this pass; here is what it would take.**
+`states/no-results.tsx`'s own `emptyBody` register says three things a
+plain sentence doesn't: the exact total row count, which facet is
+excluding the most rows ("the narrowest" one), and how many rows would
+show if just that one facet were cleared (a live "clear this one, not all
+of them" number, not just the “Clear filters” button this app already
+has). All three numbers are real UI value — genuinely more informative
+than the current no-results sentence — but the middle one requires the
+engine to answer a question it has never had to answer: for the CURRENT
+combination of query + facet values, if each active facet were cleared
+ONE AT A TIME, which single facet would let back in the most rows? That's
+a comparison across every active facet, re-running `selectRows` per
+candidate (or an equivalent shortcut), and it has real edge cases nobody
+has hit yet because nothing computes it today: two facets tied for
+"narrowest" (which one does the sentence name?), a facet that excludes
+every remaining row on its own (would-show-if-cleared = the full
+unfiltered count, which reads differently from "some but not all"), and a
+search term interacting with a facet (does the recomputation re-apply the
+search, or just the other facets — the sentence's grammar depends on the
+answer). None of this is visible until someone hits it on a real filtered
+list with more than one facet on at once. It is also not urgent:
+no-results already has a working "Clear filters" button (this session's
+first pass), so the current plain sentence is not a dead end, just plainer
+than the kit's — "plain and correct beats rich and speculative" is the
+planner's own call on the trade. Left on `ShapeStateBody` + the existing
+sentence + button, unchanged, pending a dedicated pass that builds and
+tests the narrowest-facet computation on its own, against real filtered
+data.
 
 ## The `screens/`+`states/` lane's pass, 2026-08-29 — the pattern behind every rejection below
 
