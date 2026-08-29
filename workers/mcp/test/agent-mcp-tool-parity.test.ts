@@ -9,8 +9,8 @@
 // MCP tool passes that census trivially, and the asymmetry between the two
 // machine surfaces — which is exactly the sentence the owner asked to be made
 // checkable ("same thing an agent can do, same thing from MCP") — is never
-// itself examined. Twenty-five tools live on the agent and nowhere on MCP;
-// twenty-three live on MCP and nowhere on the agent. Every one of them turned
+// itself examined. Twenty-five tools lived on the agent and nowhere on MCP;
+// twenty-three lived on MCP and nowhere on the agent. Every one of them turned
 // out to be a real, written decision (MCP.md §3's "intentionally NOT on the
 // machine surface" list, and the mirror sentence in
 // workers/mcp/src/lib/tools.ts's own MCP_ONLY comment) — but nothing before
@@ -19,14 +19,34 @@
 // itself today: it names four tools and was never updated when the 21 Google
 // tools joined it, which is the drift this test exists to catch happening again.
 //
+// EARNED A SECOND TIME, on this law's own first real merge (29 Aug 2026). Two
+// branches, each green alone, collapsed onto an integration branch and R43 was
+// the only thing that caught what neither could see by itself: the agent's 21
+// `set_*_active` toggles collapsed into one `set_record_active` (a genuine,
+// reasoned cost saving — the agent re-sends its whole catalogue every model
+// step), and 9 `list_*` tools stopped being sent to the agent in favour of the
+// new `query_records` grammar — but MCP, which pays nothing per step and treats
+// a tool name as an external contract, kept publishing all 30 by name. The
+// owner's ruling: correct and deliberate, wire the one piece that was a genuine
+// gap (`set_record_active` had NO form on MCP at all — not even the generic
+// shape), and reason the rest. **THE DIRECTION THAT MATTERS: MCP is a STRICT
+// SUPERSET of the agent's catalog, never a subset.** Every one of these 30
+// names is MCP holding something the agent no longer carries by that name —
+// nothing a person can do through the UI became unreachable from MCP, which is
+// the owner's actual sentence. An agent-only column reappearing here would be
+// the dangerous direction; an mcp-only one growing is the safe one, and this
+// file's own coverage test (below) still fails loudly the day that stops being
+// true for any UNDOCUMENTED name.
+//
 // Nothing here is hand-listed beyond the two reason tables: tool names come
 // from TOOL_CATALOG and MCP_TOOLS themselves, exactly as filter-parity.test.ts
 // reads doors off the route tables rather than prose.
 
 import { describe, expect, it } from "vitest"
 
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
-import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
+import { REPLACED_BY_QUERY, TOOL_CATALOG } from "../../data-ops/src/lib/tools"
 import { MCP_TOOLS } from "../src/lib/tools"
 
 const AGENT_TOOL_NAMES = new Set(TOOL_CATALOG.map((t) => t.name))
@@ -148,6 +168,37 @@ const MCP_ONLY_TOOLS: Record<string, string> = {
   agent_confirm: ASSISTANT_BRIDGE_REASON,
 }
 
+/** THE 29 AUG 2026 MERGE FINDING. Two shapes, both DERIVED from the same data
+ * their own lane declared rather than re-explained by hand here — a duplicate
+ * copy of a reason is exactly the drift this whole file exists to prevent.
+ *
+ * 1. Nine `list_*` reads: `query_records` replaced them on the agent (fewer
+ *    tokens re-sent every model step), MCP kept the named ones (a tool name
+ *    there is an external contract, and MCP pays nothing per step to keep
+ *    publishing it). `REPLACED_BY_QUERY` (workers/data-ops/src/lib/tools.ts) is
+ *    the agent's OWN reason for dropping each one — read here, not retyped, so
+ *    a table that goes stale on one side goes stale everywhere it is read. */
+const QUERY_DELETION_CONDITION =
+  " DELETE THIS LINE only when the query grammar has been the MCP read path for a full release and no external integration calls this name — until then MCP keeps the named tool as a compatibility promise nobody asked to have broken."
+for (const [name, agentReason] of Object.entries(REPLACED_BY_QUERY))
+  MCP_ONLY_TOOLS[name] = `on the agent, superseded by ${agentReason}. ${QUERY_DELETION_CONDITION}`
+
+/** 2. Twenty-one `set_<record>_active` toggles: collapsed into the agent's one
+ *    `set_record_active` for the same per-step-cost reason (workers/mcp/src/lib/
+ *    tools.ts's own RECORD_TOGGLE_TOOLS comment), kept individually on MCP as
+ *    the pinned external contract, and — since 29 Aug 2026 — MCP ALSO publishes
+ *    the generic `set_record_active` beside them (wired, not merely reasoned,
+ *    the fix this file's own coverage test demanded), so this asymmetry is now
+ *    MCP holding MORE names for the same capability, never fewer. `RECORD_TOGGLES`
+ *    (@shared/workers/record-toggles) is the one declaration behind both the
+ *    named tools and the generic one; its `.summary` is read here rather than
+ *    retyped. */
+const TOGGLE_DELETION_CONDITION =
+  " DELETE THIS LINE only if the named tool is ever formally retired in favour of the generic set_record_active alone — until then both stay published: the generic form is additive, not a replacement, and an external integration's existing call to this exact name must keep working."
+for (const [record, entry] of Object.entries(RECORD_TOGGLES))
+  MCP_ONLY_TOOLS[`set_${record}_active`] =
+    `the named form of set_record_active for "${record}" (${entry.summary}). Kept as its own MCP tool — a name here is an external contract, and collapsing the agent's catalogue must never silently break one.${TOGGLE_DELETION_CONDITION}`
+
 describe("R43 — agent/mcp tool-set parity: a name on one surface is on both, or is a written decision", () => {
   it("finds tools on both surfaces, and an asymmetry on both sides (the census must not go blind)", () => {
     expect(TOOL_CATALOG.length).toBeGreaterThanOrEqual(150)
@@ -193,10 +244,10 @@ describe("R43 — agent/mcp tool-set parity: a name on one surface is on both, o
   // never fewer (a stale exemption the ratchet test above would already catch,
   // named again here as a direct count so the two numbers this file's own
   // header prose states cannot go stale the way the AGENT_ONLY comment did).
-  it("the agent-only count matches the reasoned table exactly (25, 26 Aug 2026)", () => {
+  it("the agent-only count matches the reasoned table exactly (25, 29 Aug 2026 — set_record_active wired onto MCP, not reasoned away)", () => {
     expect(agentOnly.length).toBe(Object.keys(AGENT_ONLY_TOOLS).length)
   })
-  it("the mcp-only count matches the reasoned table exactly (23, 26 Aug 2026)", () => {
+  it("the mcp-only count matches the reasoned table exactly (53, 29 Aug 2026 — +30 from the record-toggle collapse and the query grammar)", () => {
     expect(mcpOnly.length).toBe(Object.keys(MCP_ONLY_TOOLS).length)
   })
 })

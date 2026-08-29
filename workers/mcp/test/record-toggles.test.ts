@@ -202,3 +202,63 @@ describe("the MCP surface kept its twenty-one names, and their gates", () => {
     }
   })
 })
+
+// R43'S FIX (29 Aug 2026): the agent's set_record_active had no MCP counterpart
+// at all — every one of the 21 named doors was individually reachable, but the
+// GENERIC shape was agent-only, an asymmetry R19/R22's door-level coverage
+// census could never see (every door already had a tool from SOMEWHERE). MCP
+// now publishes set_record_active TOO, beside the 21 named ones, so this
+// section holds it to the exact same standard as the agent's own copy above —
+// run the router, do not read the list.
+describe("the GENERIC form is on MCP too, beside the 21 named ones, and it is real", () => {
+  const generic = () => getMcpTool("set_record_active")!
+
+  it("set_record_active exists on MCP without displacing any of the 21 named tools", () => {
+    expect(generic()).toBeDefined()
+    for (const record of Object.keys(RECORD_TOGGLES))
+      expect(getMcpTool(`set_${record}_active`), `set_${record}_active must still exist beside the generic form`).toBeDefined()
+  })
+
+  it("declares every door in the family, same set as the agent's own", () => {
+    expect(new Set(generic().routes)).toEqual(new Set(Object.values(RECORD_TOGGLES).map((e) => e.path)))
+    expect(new Set(generic().routes)).toEqual(new Set(tool().routes))
+  })
+
+  for (const [record, entry] of Object.entries(RECORD_TOGGLES))
+    it(`"${record}" routes to ${entry.path}, identically to the agent's copy`, () => {
+      const input = { record, id: "01ROW", roleId: "01ROW", active: false }
+      const dest = generic().route!(input)
+      expect(dest).toEqual({ binding: entry.binding, path: entry.path })
+      expect(dest).toEqual(tool().route!(input))
+      const table = entry.binding === "TENANCY" ? TENANCY_ROUTES : CONTENT_ROUTES
+      expect(Object.keys(table), `${entry.binding} must serve POST ${entry.path}`).toContain(`POST ${entry.path}`)
+    })
+
+  it("an unrecognised record falls back to the canonical door, same as the agent's copy", () => {
+    for (const nonsense of ["", "__proto__", "constructor", "internal_rate_card"]) {
+      const dest = generic().route!({ record: nonsense, id: "x", active: true })
+      expect(dest.path).toBe("/api/tenancy/accounts/active")
+      expect(dest.binding).toBe("TENANCY")
+    }
+  })
+
+  for (const [record, entry] of Object.entries(RECORD_TOGGLES))
+    it(`"${record}" sends ${entry.idField}${entry.needsAppId ? " + appId" : ""}, identically to the agent's copy`, () => {
+      const input = { record, id: "01ROW", roleId: "01ROW", appId: "01APP", active: true }
+      const body = generic().buildBody!(input)
+      expect(body).toEqual(tool().buildBody!(input))
+      expect(body[entry.idField]).toBe("01ROW")
+      expect(body.active).toBe(true)
+      expect("appId" in body).toBe(Boolean(entry.needsAppId))
+    })
+
+  it("the drift guard's canonical path is a real door (catalog.test.ts checks path, not routes)", () => {
+    // catalog.test.ts's per-tool drift guard reads `t.path`, singular, for every
+    // MCP_TOOLS entry — it would happily pass a `route`d tool whose canonical
+    // `path` is real but whose OTHER twenty routes silently rotted, because it
+    // never iterates `routes`. That gap is exactly why this file exists for the
+    // agent's copy already; the two tests above close it for the MCP copy too.
+    expect(generic().path).toBe("/api/tenancy/accounts/active")
+    expect(Object.keys(TENANCY_ROUTES)).toContain("POST /api/tenancy/accounts/active")
+  })
+})

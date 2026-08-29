@@ -335,6 +335,16 @@ Today it covers:
   re-imported.
 - **Write, deterministic create / edit / deactivate** (free, no AI; each needs the
   matching role right, e.g. `member_roles:create`):
+  - **`set_record_active`, the generic form.** Every `set_<record>_active` tool below
+    (roles, accounts, dropdown values, process maps, and the rest — twenty-one in
+    all) is also reachable through this one tool: `record` names which kind
+    (`account`, `role`, `dropdown_value`, …), `id` is that record's id (a role takes
+    `roleId`, a deliverable also needs `appId`), `active` says which way. Both forms
+    stay published side by side — the named ones are the pinned external contract
+    (added first, and a script calling `set_account_active` keeps working forever),
+    the generic one is for an integration that would rather send one shape for
+    every record kind than remember twenty-one names. Same map, same doors, same
+    confirm rule, either way.
   - the team, `update_team` (rename the team this token is pinned to; needs `teams:edit`)
   - roles, `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
   - members, `set_member_role`, `remove_member` (people join via **invite**)
