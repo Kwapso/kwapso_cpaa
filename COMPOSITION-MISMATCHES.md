@@ -422,6 +422,17 @@ collection` and `no-results` (the other lane's states work, hosted in this
 same engine file) are its next callers, per the planner's sequencing —
 not rolled out to the other five list-recipe call sites yet either.
 
+**A third bug, found only after the ScreenShell family landed** (commit
+`ca10f067`): the planner's own flagged risk — "a collection drawn through
+the kit's panel INSIDE the kit's shell is a combination neither prototype
+tested" — was real. `KitCollectionFrame`'s default `tone="page"` plus its
+default inset drew a visible second box once `AppShell` started nesting
+this frame inside `ScreenShell`'s already off-beige, already-padded body
+pane — exactly the nesting the kit's own `tone` doc names by name. Fixed
+with `tone="bare"` `inset={false}`, unconditionally: this frame never
+renders anywhere else in this app. Re-verified at all four widths, both
+themes, after the fix.
+
 ## The `screens/`+`states/` lane's pass, 2026-08-29 — the pattern behind every rejection below
 
 One sentence answers "why does the number stop" for this whole section, and
