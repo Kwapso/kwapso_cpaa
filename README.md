@@ -221,6 +221,12 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     is work we owe the library; NEEDS-A-SPEC is work the kit owes the app, and
     everything on it is wearing the new tokens with its old shape untouched,
     because the kit's own rule is to log rather than improvise.
+    Beside both, **[KIT-COVERAGE.md](KIT-COVERAGE.md)** answers the third
+    question those two do not: of the parts the kit ALREADY ships and the app
+    already has, how many has it actually adopted. The owner narrated the whole
+    catalogue and it was reconciled against the parts on disk, so every item
+    maps in both directions. Regenerate its ticks with
+    `node scripts/kit-coverage.mjs`; never edit them by hand.
 11. The UI comes ONLY from the component library, which is vendored **in this
     repo** at `shared/ui/` and imported as `@shared/ui/…` — and it is a PINNED
     dependency: `github.com/Kwapso/design` at the tag in `shared/ui/VERSION.json`,

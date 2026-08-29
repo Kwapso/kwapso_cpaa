@@ -122,6 +122,7 @@ export type { ProfileRouteProps, ProfileValues } from "./profile";
 export { OnboardingRoute } from "./onboarding";
 export type {
   OnboardingAccount,
+  OnboardingFieldLabels,
   OnboardingRouteProps,
   OnboardingStepId,
 } from "./onboarding";

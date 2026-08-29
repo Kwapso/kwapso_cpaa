@@ -175,6 +175,25 @@ export interface HomeRouteProps
   onSearchClear?: () => void;
   /** The field's placeholder. */
   searchPlaceholder?: string;
+  /**
+   * THE THREE ACCESSIBLE NAMES THIS SCREEN USED TO OWN.
+   *
+   * `countLabel`, `searchLabel` and `bodyLabel` were written into the call
+   * below as the literals "tickets", "Search tickets" and "Open tickets",
+   * while every neighbour on the same call — `railLabel`, `figuresLabel`,
+   * `tabsLabel`, `searchPlaceholder`, `columnLabels` — was a prop. Nothing
+   * distinguished them; they were simply missed, and the cost falls on the
+   * one reader who cannot see the screen: a person using a screen reader in
+   * German heard three English words on the app's landing page and had no
+   * way to change them.
+   *
+   * Undefined keeps the words that shipped.
+   */
+  countLabel?: string;
+  /** What a screen reader calls the search field. */
+  searchLabel?: string;
+  /** What a screen reader calls the row region. */
+  bodyLabel?: string;
 
   /** Active facets, as removable chips. */
   filters?: FilterChip[];
@@ -445,6 +464,12 @@ function HomeRoute({
   onSearchChange,
   onSearchClear,
   searchPlaceholder = "Search tickets",
+  /* The three that were literals in the call below. Defaulted HERE so the
+     words are declared once, beside their neighbours, instead of buried
+     three hundred lines down in the render. */
+  countLabel = "tickets",
+  searchLabel = "Search tickets",
+  bodyLabel = "Open tickets",
   filters,
   onFilterRemove,
   onFiltersClear,
@@ -537,7 +562,8 @@ function HomeRoute({
       eyebrow={eyebrow}
       heading={heading}
       count={count}
-      countLabel="tickets"
+      /* FORWARDED, NOT WRITTEN — see the props. */
+      countLabel={countLabel}
       figures={
         <StatStrip
           figures={strip}
@@ -570,7 +596,7 @@ function HomeRoute({
       onSearchChange={onSearchChange}
       onSearchClear={onSearchClear}
       searchPlaceholder={searchPlaceholder}
-      searchLabel="Search tickets"
+      searchLabel={searchLabel}
       filters={filters}
       onFilterRemove={onFilterRemove}
       onFiltersClear={onFiltersClear}
@@ -591,7 +617,7 @@ function HomeRoute({
               onTicketSelect(row);
             }
       }
-      bodyLabel="Open tickets"
+      bodyLabel={bodyLabel}
       page={page}
       pageCount={pageCount}
       onPageChange={onPageChange}

@@ -455,6 +455,15 @@ function QuickView({
         data-slot="quick-view"
         data-width="wide"
         onKeyDown={handleKeyDown}
+        /* NO DESCRIPTION, SAID OUT LOUD. Radix wants either a
+           `DialogDescription` or an explicit `aria-describedby={undefined}`,
+           and with neither it logs a warning into every consumer's console —
+           this composition was the one of the five dialog overlays that had
+           neither. A peek has no summary line above its facts: the facts ARE
+           the body, and inventing a sentence to satisfy the check would be
+           putting words on the screen to quieten a log. So the honest half of
+           Radix's own contract is the one taken. */
+        aria-describedby={undefined}
         /* No `showClose={false}`: the chip is the drawn ×, and Close in the
            footer is the stated way out. Both close, neither edits. */
       >
