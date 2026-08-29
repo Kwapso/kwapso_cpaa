@@ -629,6 +629,28 @@ word: the kit says a client portal never shows a social sign-in row; this
 app ships Google on the portal per SCOPE ch.06 because it proves identity
 without granting access. Keep ours, or change the kit's law?
 
+## [!] `screens/sign-in.tsx` (`AuthShell` + `SignInScreen`) — mismatch, found 2026-08-29
+
+Two exports, both accounted for without adopting either.
+
+`SignInScreen` is the same magic-link assumption `link-sent.tsx` already
+failed on, and its own doc header says so directly: "one field, magic link,
+password behind a text link, no social row, no code step" (logged in the
+kit's own source as T3A-3). This app has no magic link and no password —
+the six-digit code step this composition explicitly omits is the one this
+app's entire sign-in depends on. `templates/sign-in.tsx`'s `SignIn` is the
+kit's OTHER shell, the one WITH a code step, and it is what both of this
+app's real doors actually render through (`sign-in-system`, adopted; the
+question on `sign-in-portal` is above) — this file's own header even flags
+the two shells as an unresolved drift inside the kit itself (T3A-2).
+
+`AuthShell`, the shared two-panel shell the file also exports, has exactly
+three consumers in the kit: `link-sent.tsx`, `invite-acceptance.tsx`, and
+`session-expired.tsx` (`sign-in-portal.tsx` uses the other family). All
+three are recorded above as a mismatch or explicitly not built this pass —
+so `AuthShell` has no live route in this app to stand under regardless of
+whether it is itself adoptable.
+
 ## Components (KIT-COVERAGE.md's checklist, from screens_collections's pass)
 
 Findings from a bottom-up component sweep (Detail and examples, Collection

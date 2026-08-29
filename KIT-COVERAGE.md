@@ -190,7 +190,7 @@ Regenerate the ticks with:
 
 - [ ] `detail-view`
 - [x] `record-detail`
-- [ ] `brand`
+- [x] `brand`
 - [x] `portal-conversation`
 
 ## Components the kit ships that the list did not name (0)
@@ -214,7 +214,7 @@ Regenerate the ticks with:
 - [ ] `screens/link-sent`
 - [ ] `screens/not-found`
 - [ ] `screens/onboarding`
-- [ ] `screens/page-failure`
+- [x] `screens/page-failure`
 - [ ] `screens/portal-boot`
 - [ ] `screens/portal-home`
 - [ ] `screens/portal-impact`
@@ -242,7 +242,7 @@ Regenerate the ticks with:
 - [ ] `templates/record-route`
 - [ ] `templates/screen-shell`
 - [ ] `templates/search-results`
-- [ ] `templates/sign-in`
+- [x] `templates/sign-in`
 - [ ] `templates/stat-strip`
 - [x] `templates/stepper-hero`
 
@@ -254,4 +254,4 @@ Regenerate the ticks with:
 
 ---
 
-**Components 66/115 · Compositions 4/47**
+**Components 67/115 · Compositions 6/47**
