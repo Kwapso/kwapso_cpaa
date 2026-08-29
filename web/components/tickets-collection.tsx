@@ -338,6 +338,7 @@ export function TicketsCollection({
                     label={t("Raise ticket")}
                     icon="plus"
                     onCreate={onCreate}
+                    useKitPanel
                   >
                     <ScreenRenderer
                       recipe={listRecipe}

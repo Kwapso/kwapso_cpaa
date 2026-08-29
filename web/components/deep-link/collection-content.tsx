@@ -157,6 +157,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           href: "/api/tenancy/roles/export",
         }}
         onCreate={() => go(sectionPath, { panel: "add", module: "roles" })}
+        useKitPanel
       >
         <ScreenRenderer
           recipe={rolesRecipe}

@@ -163,6 +163,7 @@ export function SectionWithCreate({
   download,
   aboveCard,
   folderTabs,
+  useKitPanel,
   children,
 }: {
   show: boolean
@@ -194,14 +195,39 @@ export function SectionWithCreate({
    * Only a `variant: "folder"` strip belongs here. A `line` strip has no feet
    * to hide and wants the gap. */
   folderTabs?: React.ReactNode
+  /**
+   * The collection below draws through the kit's own
+   * `components/collection-frame/collection-frame.tsx` (the engine's
+   * `useKitPanel`), which means it already draws its own soft-paper box AND
+   * its own create control in the toolbar's `actions` slot — the panel is
+   * the box now, and `CollectionCard` on top of it would be the double-box
+   * the kit's own `tone` doc calls "the broken combination" (measured
+   * invisible today only because both surfaces happen to share one token;
+   * COMPOSITION-MISMATCHES.md has the full account). Two things change:
+   * `CollectionCard` is skipped (`children` renders directly, straight onto
+   * `ScreenShell`'s own off-beige body pane), and the header's own AddButton
+   * is skipped too, because the panel's `actions` slot already carries a
+   * labelled create button — the ONE-mango law this app has followed all
+   * session, not two create controls for the same act.
+   */
+  useKitPanel?: boolean
   children: React.ReactNode
 }) {
   const Icon = icon === "plus" ? Plus : Mail
   const showSecondary = secondary?.show ?? false
   const showDownload = download?.show ?? false
+  // See `useKitPanel` above: the panel's own toolbar carries the create
+  // control, so the header row's copy of it would be a second mango for
+  // one act.
+  const showCreateInHeader = show && !useKitPanel
+  const collection = useKitPanel ? (
+    children
+  ) : (
+    <CollectionCard>{children}</CollectionCard>
+  )
   return (
     <div className="flex flex-col gap-4">
-      {(show || showSecondary || showDownload) && (
+      {(showCreateInHeader || showSecondary || showDownload) && (
         // flex-wrap: on a narrow phone a row of action buttons (Export/Import/New)
         // must REFLOW to a new line, never clip. `justify-end` alone pushes overflow
         // off the LEFT edge where the container hides it (the owner's cut-off button).
@@ -228,7 +254,7 @@ export function SectionWithCreate({
               <noun>", without anybody having to choose between them.
               Import and Export keep their words above (B4): they are rare,
               consequential and not guessable from a glyph. */}
-          {show && <AddButton label={label} onClick={onCreate} icon={<Icon className="size-4" />} />}
+          {showCreateInHeader && <AddButton label={label} onClick={onCreate} icon={<Icon className="size-4" />} />}
         </div>
       )}
       {aboveCard}
@@ -243,11 +269,13 @@ export function SectionWithCreate({
             and the frame draws it in its zero state. `null` while the caller
             may not create, which is the same condition that hides the button
             above; a person without the right is shown no way out because there
-            is not one for them. */}
+            is not one for them. Published regardless of `useKitPanel`: the
+            kit panel's own ready-state `actions` slot reads it too (the
+            engine's `createButton`), not only the empty register. */}
         <CollectionCreateActionProvider
           action={show ? { label, icon: <Icon className="size-4" />, onCreate } : null}
         >
-          <CollectionCard>{children}</CollectionCard>
+          {collection}
         </CollectionCreateActionProvider>
       </div>
     </div>
