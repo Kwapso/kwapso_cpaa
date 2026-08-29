@@ -580,6 +580,84 @@ describe("the projection leaves the long columns out until they are asked for", 
   })
 })
 
+describe("a filter value that names nothing comes back WITH the number", () => {
+  // THE SENTENCE THAT MADE THIS NECESSARY. Asked the owner's own question on
+  // staging on 29 Aug 2026, the assistant answered: "There are 97 open tickets
+  // for FluClinic, Confia and HORSt combined". Ninety-seven is right — it is 66
+  // + 31 across TWO clients. The prose lists three names and says "combined",
+  // which tells the reader a third client contributed to a total it is missing
+  // from. A correct number wrapped in a false statement, which is worse than a
+  // wrong number, because nothing about it looks wrong.
+  //
+  // The model had the information (describe_module lists the clients in use) and
+  // used the caller's words anyway. So the fact has to ride the ANSWER.
+  it("names the client that does not exist, beside the count", async () => {
+    // The fixture HAS a HORSt (staging does not), so the third needle here is
+    // one that names nobody in either — the shape is what is being tested.
+    const { status, body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "accountId", op: "contains", value: ["flu", "confia", "wanderlust"] }],
+        countOnly: true,
+      })
+    )
+    expect(status).toBe(200)
+    expect(body.total, "the count is over the clients that DO exist").toBe(8)
+    expect(body.unmatched).toEqual([{ field: "accountId", values: ["wanderlust"] }])
+  })
+
+  it("says nothing when everything the caller named exists", async () => {
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "accountId", op: "contains", value: ["flu", "confia"] }],
+        countOnly: true,
+      })
+    )
+    expect(body.unmatched, "silence is for when there is nothing to report").toBeUndefined()
+  })
+
+  it("an id that matches nothing is reported too, not just a name", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "accountId", op: "in", value: ["A_GHOST"] }], countOnly: true })
+    )
+    expect(body.total).toBe(0)
+    expect(body.unmatched).toEqual([{ field: "accountId", values: ["A_GHOST"] }])
+  })
+
+  it("a word the TEAM does not use is the same failure and is reported the same way", async () => {
+    // "how many Bug tickets" when this team calls them Defects returns 0, which
+    // reads as "none" rather than "not a word we use". The vocabulary is theirs
+    // and changes without a deploy, so it cannot be refused at the boundary the
+    // way a fixed status can — it has to be answered honestly instead.
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "helpType", op: "in", value: ["Bug", "Kerfuffle"] }], countOnly: true })
+    )
+    expect(body.unmatched).toEqual([{ field: "helpType", values: ["Kerfuffle"] }])
+  })
+
+  it("a fixed status is still refused outright, which is the same honesty earlier", async () => {
+    // Where the answer is knowable without asking the database, the door says so
+    // at the boundary instead of counting zero and reporting it afterwards.
+    const { status } = await ask(
+      q({ module: "tickets", where: [{ field: "status", op: "in", value: ["open"] }] })
+    )
+    expect(status).toBe(400)
+  })
+
+  it("a date range is never called unmatched (a range names no entity)", async () => {
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "resolvedAt", op: "between", value: ["2030-01-01", "2030-12-31"] }],
+        countOnly: true,
+      })
+    )
+    expect(body.total).toBe(0)
+    expect(body.unmatched, "an empty range is an answer, not a misspelling").toBeUndefined()
+  })
+})
+
 describe("THE QUESTION THIS LANE WAS OPENED BY, in two calls", () => {
   it("'how many open tickets from flu clinic, confia and HORSt combined, and how many resolved in July 2026 across all?'", async () => {
     // CALL ONE — the three clients, by name, in one filter, grouped so the

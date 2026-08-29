@@ -387,11 +387,29 @@ function sortMenu(mod: QueryModule): SortMenu<Row> {
 
 export type QueryGroup = { key: Record<string, unknown>; label?: string | null; count: number }
 
+/** A value the caller filtered by that names NOTHING here.
+ *
+ * WHY THIS RIDES THE ANSWER. Asked "how many open tickets from flu clinic,
+ * confia and HORSt combined", the door answered 97 — correctly, across the two
+ * clients that exist — and the assistant then wrote "97 open tickets for
+ * FluClinic, Confia and HORSt combined", because those were the words it had
+ * been given. The number was right and the sentence was a lie: it told the
+ * reader a third client contributed to a total it is missing from.
+ *
+ * A filter value that matched no entity is a FACT ABOUT THE ANSWER, not a
+ * detail of how it was computed, and dropping it silently is how a correct
+ * number becomes a wrong statement. So it travels WITH the total, in the same
+ * object, the way R23 makes `found`, `passages` and `citations` one decision —
+ * a caller cannot receive the count without also receiving what it excludes. */
+export type Unmatched = { field: string; values: string[] }
+
 export type QueryAnswer = {
   page: Page<Row>
   total: number
   groups: QueryGroup[] | null
   groupsTruncated: boolean
+  /** the filter values that named nothing — empty when everything resolved */
+  unmatched: Unmatched[]
   sort: string
   dir: "asc" | "desc"
 }
@@ -407,6 +425,9 @@ export async function runQuery(
   refs: Record<string, QueryModule>
 ): Promise<QueryAnswer> {
   const where = whereSql(q, refs)
+  // WHAT NAMED NOTHING — worked out alongside the count rather than after it, so
+  // no return path below can hand back a total without it.
+  const unmatchedPromise = findUnmatched(cfg, guard, q, refs)
   // R14/R16 — the exact total, bounded by the ONE counting ceiling, over exactly
   // the question the rows themselves answer.
   const totalPromise = countCollection(
@@ -441,6 +462,7 @@ export async function runQuery(
       total: await totalPromise,
       groups,
       groupsTruncated: truncated,
+      unmatched: await unmatchedPromise,
       sort: "",
       dir: "desc",
     }
@@ -455,6 +477,7 @@ export async function runQuery(
       total: await totalPromise,
       groups: null,
       groupsTruncated: false,
+      unmatched: await unmatchedPromise,
       sort: "",
       dir: "desc",
     }
@@ -480,9 +503,71 @@ export async function runQuery(
     total: await totalPromise,
     groups: null,
     groupsTruncated: false,
+    unmatched: await unmatchedPromise,
     sort: ordering.name,
     dir: ordering.dir,
   }
+}
+
+/** WHICH OF THE CALLER'S OWN WORDS NAMED NOTHING.
+ *
+ * Two kinds of filter value can silently match nothing, and both produce a
+ * confident wrong sentence rather than an error:
+ *   · a REFERENCE by name — "HORSt" when no client is called that;
+ *   · a TEAM-EDITED vocabulary value — "Bug" when this team calls them Defects.
+ * (A fixed enum cannot: `checkValue` refuses an unknown status outright and
+ * names the seven it could have been. That is the same honesty, one step
+ * earlier, where the answer is knowable without asking the database.)
+ *
+ * One small read per eligible filter, and only for the ops where a value is a
+ * NAME rather than a range: nothing here runs for a date or a number. */
+async function findUnmatched(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  q: ParsedQuery,
+  refs: Record<string, QueryModule>
+): Promise<Unmatched[]> {
+  const NAME_OPS: QueryOp[] = ["eq", "in", "contains"]
+  const out: Unmatched[] = []
+  for (const c of q.where) {
+    if (!NAME_OPS.includes(c.op) || !c.values.length) continue
+    const needles = c.values.map((v) => String(v))
+    for (const field of c.fields) {
+      const ref = field.ref ? refs[field.ref] : undefined
+      if (ref) {
+        // The SAME predicate the filter itself used, asked of the referenced
+        // table alone — so "matched nothing" here means exactly what it means
+        // there. Bounded: the caller's own value list is already capped.
+        const rows = await d1Query<{ label: string | null }>(
+          cfg,
+          guard.databaseId,
+          `SELECT DISTINCT ${ref.labelColumn} AS label FROM ${ref.table}
+            WHERE ${needles.map(() => `LOWER(${ref.labelColumn}) LIKE ? ESCAPE '\\'`).join(" OR ")}
+              OR id IN (${holes(needles.length)})
+            LIMIT ${VALUES_PER_CLAUSE * 4}`,
+          [...needles.map((n) => `%${likeLiteral(n).toLowerCase()}%`), ...needles]
+        )
+        const labels = rows.map((r) => (r.label ?? "").toLowerCase())
+        const missed = needles.filter((n) => !labels.some((l) => l.includes(n.toLowerCase())))
+        if (missed.length) out.push({ field: field.name, values: missed })
+        continue
+      }
+      // A word from the team's own vocabulary. Only the EXACT ops: `contains`
+      // on one of these is a substring question and a partial word is not a
+      // mistake.
+      if (!field.vocabulary || c.op === "contains") continue
+      const rows = await d1Query<{ value: string }>(
+        cfg,
+        guard.databaseId,
+        `SELECT value FROM selectable_data WHERE type = ? AND LOWER(value) IN (${holes(needles.length)})`,
+        [field.vocabulary, ...needles.map((n) => n.toLowerCase())]
+      )
+      const known = new Set(rows.map((r) => r.value.toLowerCase()))
+      const missed = needles.filter((n) => !known.has(n.toLowerCase()))
+      if (missed.length) out.push({ field: field.name, values: missed })
+    }
+  }
+  return out
 }
 
 /** A grouped answer over a REFERENCE field comes back labelled — "Bergman S.A.",

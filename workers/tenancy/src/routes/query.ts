@@ -225,8 +225,10 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
  *
  * The answer always goes through `pagedJson` (R14), so a caller reads one shape
  * whether they asked for rows or for a tally: `records` (empty when grouping),
- * the exact `total` over the SAME filters, `hasMore`, `nextCursor`, and `groups`
- * beside them.
+ * the exact `total` over the SAME filters, `hasMore`, `nextCursor`, `groups`,
+ * and `unmatched` — the filter values that named nothing here, which belong
+ * beside the total because a caller who does not receive them will state a
+ * correct number about a wider set than it covers.
  */
 export async function getQueryRecords(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
@@ -262,6 +264,10 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
     module: canonical,
     ...(canonical === name ? {} : { askedAs: name }),
     ...(answer.groups ? { groups: answer.groups, groupsTruncated: answer.groupsTruncated } : {}),
+    // WHAT THE NUMBER EXCLUDES, beside the number. A filter value that named
+    // nothing is a fact about the answer, not a detail of how it was computed —
+    // see `Unmatched` in the engine for the sentence that made it necessary.
+    ...(answer.unmatched.length ? { unmatched: answer.unmatched } : {}),
     ...(answer.sort ? { sort: answer.sort, dir: answer.dir } : {}),
   })
 }
