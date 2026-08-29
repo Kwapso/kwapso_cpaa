@@ -2,16 +2,35 @@
 
 // A small render-error catcher. When the wrapped UI throws, instead of Next.js
 // nuking the whole page with the generic "a client-side exception has occurred",
-// we show the ACTUAL error message inline (and log the stack) so a crash on
-// staging is diagnosable on the spot. React error boundaries must be classes.
+// this shows an honest, generic card (and logs the stack) so nobody sees a blank
+// tab. The raw error message is diagnostic value, not user copy — it renders
+// too, but only on a host where "diagnosable" means us: staging or a local dev
+// server. A client on production sees the same plain sentence a member of staff
+// sees; the owner's ruling, 2026-08-29, after the raw error.message shipped to
+// everyone regardless of environment. React error boundaries must be classes.
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { PageFailureScreen } from "@shared/ui/compositions/screens/page-failure"
 
 import { reportError } from "@shared/web/log"
 import { useT } from "@shared/web/language"
 import { healStaleShell, isStaleShellError } from "@/components/version-watch"
+
+// staging hosts are `agency-staging.kwapso.app` / `staging-client.kwapso.app`
+// (OPERATIONS.md's hostname table) — hyphenated, never a real client's own
+// domain. `href` rather than `hostname` alone because a test environment's
+// stand-in `window.location` carries only the former.
+function isDiagnosableHost(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    const hostname = window.location.hostname || new URL(window.location.href).hostname
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("staging")
+  } catch {
+    return false
+  }
+}
 
 type Props = { label?: string; children: React.ReactNode }
 type State = { error: Error | null }
@@ -77,6 +96,15 @@ function StaleShell() {
   )
 }
 
+// THE KIT'S OWN WHOLE-PAGE FAILURE CARD (chapter 21, PageFailureScreen), the
+// same one portal-shell.tsx already renders for its "unavailable" session
+// state — this boundary sits at the ROOT of the tree (web/app/layout.tsx),
+// so a throw it catches is exactly that case: the app itself could not draw a
+// frame, not one screen inside a frame that's still standing.
+//
+// The wrapper's `mx-auto … max-w-md … px-6` is portal-shell.tsx's own
+// unavailable-state wrapper, copied rather than re-invented — the same
+// whole-page-card layout, same reason.
 function Broken({
   label,
   detail,
@@ -88,19 +116,32 @@ function Broken({
 }) {
   const t = useT()
   return (
-    <div className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-[var(--radius)] border p-4 text-sm">
-      {/* ONE SENTENCE PER BRANCH, not "Something broke" plus a tail. The tail was
-          a template naming the panel, so the sentence a German reader got was
-          half-translated at best and could not be reordered at all. */}
-      <p className="text-destructive font-medium">
-        {label ? t("Something broke in {label}.", { label }) : t("Something broke.")}
-      </p>
-      <p className="text-muted-foreground break-words font-mono text-xs">{detail}</p>
-      <div>
-        <Button variant="secondary" size="sm" onClick={onRetry}>
-          {t("Try again")}
-        </Button>
-      </div>
-    </div>
+    <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center px-6">
+      <PageFailureScreen
+        variant="500"
+        labels={{
+          headline: t("Something on our side broke."),
+          body: t("We've been told about it. Try again in a moment."),
+          action: t("Try again"),
+          // The composition's own 500 defaults are a placeholder error code
+          // ("Error 8F31-A2") and a fabricated "your last save went through
+          // at 12:04" — this boundary has neither a real reference nor a
+          // save to point to, so both are suppressed rather than left to
+          // show invented text (the same rule portal-shell.tsx's own
+          // PageFailureScreen call already follows for "unavailable").
+          reference: undefined,
+        }}
+        onAction={onRetry}
+      />
+      {/* THE DIAGNOSTIC, NOT THE USER COPY. Everybody above sees the same
+          honest sentence; only a diagnosable host also gets the raw error —
+          which screen it was in, and what it actually said. */}
+      {isDiagnosableHost() ? (
+        <p className="text-muted-foreground border-destructive/30 bg-destructive/5 mt-4 w-full break-words rounded-[var(--radius)] border p-4 font-mono text-xs">
+          {label ? `${label}: ` : ""}
+          {detail}
+        </p>
+      ) : null}
+    </main>
   )
 }
