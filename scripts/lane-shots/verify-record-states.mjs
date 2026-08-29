@@ -1,20 +1,36 @@
-// One-off verification: help-detail.tsx's three new RecordScreen states
-// (loading / error / empty) — chrome-persists-while-panel-swaps, prototyped
-// on this one screen per the planner's scope-discipline instruction.
+// Verification for the RecordScreen state-swap rollout (help-detail prototype,
+// commit 73414c58): loading / error / empty, chrome-persists-while-panel-
+// swaps, on whichever record screen this is pointed at.
 //
 // Not part of the reusable shoot.mjs rig because it needs route interception
 // (delay/abort a specific request) that shoot.mjs's prep() doesn't do.
 //
-//   KW_SESSION=<cookie> node scripts/lane-shots/verify-help-states.mjs
+//   KW_SESSION=<cookie> node scripts/lane-shots/verify-record-states.mjs <kind> [only]
+//   <kind>: one of the keys in RECORDS below.
+//   [only]: "loading" | "error" | "empty" — omit to shoot all three.
 import { chromium } from "playwright"
 import { mkdirSync } from "node:fs"
 
 const BASE = "http://localhost:3055"
-const REAL_TICKET = "01M0DJKV43EKSZZDZB3SRWCNYX"
-const FAKE_TICKET = "01AAAAAAAAAAAAAAAAAAAAAAAA" // valid ULID shape, no such row
+const FAKE_ID = "01AAAAAAAAAAAAAAAAAAAAAAAA" // valid ULID shape, no such row
+
+// One entry per screen this has been run against. `apiPattern` is what gets
+// delayed (loading) or aborted (error) — the door this screen's own query
+// reads. `hasError` is false for a screen with no error branch to shoot (its
+// data arrives as host-fed props, not its own query — task-detail today).
+const RECORDS = {
+  help: { path: "tickets", realId: "01M0DJKV43EKSZZDZB3SRWCNYX", apiPattern: "**/api/content/help*", hasError: true },
+  story: { path: "stories", realId: "01M0YHZZ8BNADAHKVA25YA5ZAT", apiPattern: "**/api/content/stories?*", hasError: true },
+  task: { path: "tasks", realId: "01M0CAGMC6AYY6PHJDV9PTPXM3", apiPattern: "**/api/content/tasks*", hasError: false },
+}
+
+const kind = process.argv[2]
+const only = process.argv[3]
+const record = RECORDS[kind]
+if (!record) { console.error(`usage: verify-record-states.mjs <${Object.keys(RECORDS).join("|")}> [loading|error|empty]`); process.exit(1) }
 const TOKEN = process.env.KW_SESSION
 if (!TOKEN) { console.error("KW_SESSION not set"); process.exit(1) }
-const OUT = ".lane-shots/help-detail-states"
+const OUT = `.lane-shots/${kind}-detail-states`
 mkdirSync(OUT, { recursive: true })
 
 const WIDTHS = { phone: { width: 390, height: 844 }, laptop: { width: 1280, height: 900 } }
@@ -36,34 +52,27 @@ async function shot(name, width, theme, { url, routePrep }) {
   await ctx.close()
 }
 
-const only = process.argv[2] // "loading" | "error" | "empty" | undefined (all)
-
 for (const width of ["phone", "laptop"]) {
   for (const theme of ["light", "dark"]) {
-    if (!only || only === "loading")
-      // LOADING — delay the help list + by-id doors well past this script's
-      // own wait, so the screenshot lands mid-spin every time.
+    if ((!only || only === "loading"))
       await shot(`loading-${width}-${theme}`, width, theme, {
-        url: `/tickets/${REAL_TICKET}`,
+        url: `/${record.path}/${record.realId}`,
         routePrep: async (page) => {
-          await page.route("**/api/content/help*", async (route) => {
+          await page.route(record.apiPattern, async (route) => {
             await new Promise((r) => setTimeout(r, 30000))
             await route.continue()
           })
         },
       })
-    if (!only || only === "error")
-      // ERROR — the ticket list door itself fails.
+    if (record.hasError && (!only || only === "error"))
       await shot(`error-${width}-${theme}`, width, theme, {
-        url: `/tickets/${REAL_TICKET}`,
+        url: `/${record.path}/${record.realId}`,
         routePrep: async (page) => {
-          await page.route("**/api/content/help?*", (route) => route.abort("failed"))
-          await page.route("**/api/content/help", (route) => route.abort("failed"))
+          await page.route(record.apiPattern, (route) => route.abort("failed"))
         },
       })
     if (!only || only === "empty")
-      // EMPTY — a well-formed id nothing answers to.
-      await shot(`empty-${width}-${theme}`, width, theme, { url: `/tickets/${FAKE_TICKET}` })
+      await shot(`empty-${width}-${theme}`, width, theme, { url: `/${record.path}/${FAKE_ID}` })
   }
 }
 
