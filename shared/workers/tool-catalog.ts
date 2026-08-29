@@ -254,7 +254,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "describe_module",
     summary:
-      "What can I ask about this module? Give it `module` and it answers with every field you may filter, group or sort by — the field's name, its type (text, number, date, boolean, id or enum), the values an enum accepts, and what an id points at. Call it BEFORE query_records on a module you have not queried this conversation, and never guess a field name: a wrong one is refused, not ignored. With no `module` at all it lists the modules this caller may read, one line each. Enum values that the team edits themselves (ticket types, sprint types, industries) are read live from their own dropdown list, so they are the words actually in use rather than the words that shipped.",
+      "What can I ask about this module? Give it `module` and it answers with every field you may filter, group or sort by — the field's name, its type (text, number, date, boolean, id or enum), the values an enum accepts, and what an id points at. It also lists the client NAMES actually in use on that module, so you can see the company is spelled 'FluClinic' before searching for 'flu clinic' and finding nothing. Call it BEFORE query_records on a module you have not queried this conversation, and never guess a field name or a client's spelling: a wrong field is refused, and a wrong spelling quietly matches nothing. With no `module` at all it lists the modules this caller may read, one line each. Enum values that the team edits themselves (ticket types, sprint types, industries) are read live from their own dropdown list, so they are the words actually in use rather than the words that shipped.",
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/query/describe",

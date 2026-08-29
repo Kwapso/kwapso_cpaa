@@ -40,6 +40,12 @@ import type { Env } from "../env"
  * It NAMES the alternatives, because "unknown module" with no list is how a
  * model ends up guessing table names — and guessing is the behaviour the
  * allow-list exists to make pointless rather than merely refused. */
+/** HOW MANY NAMES `describe_module` LISTS for one reference field (R14: a hard
+ * cap, and a small one). It is a hint for composing a filter, not a collection
+ * read — a caller who wants the whole list asks `query_records` for it, and one
+ * that hits this ceiling is told so rather than handed a quietly short list. */
+const CHOICE_CAP = 60
+
 const unknownModule = (name: string | undefined) =>
   fail(
     400,
@@ -77,6 +83,9 @@ function jsonParam(text: string | undefined, field: string): unknown {
  * (left out of the default projection), what it points at, and — for an enum —
  * the values it accepts. A team-edited vocabulary is read LIVE off the team's own
  * dropdown list, because those words are theirs and change without a deploy.
+ * A reference field marked `choices` also carries the names IN USE on this
+ * module, so a caller composing a filter can see that the client is spelled
+ * "FluClinic" before searching for "flu clinic" and finding nothing.
  *
  * Without `module`: the modules this caller may read, and one line each. Gated
  * per module from the caller's own rights sheet, so the catalogue a person sees
@@ -101,6 +110,37 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
   const mod = queryModule(name)
   if (!mod) return unknownModule(name)
   await requireRight(cfg, guard, mod.module, "read")
+
+  // THE NAMES A CALLER CAN ACTUALLY FILTER ON. Only the ones IN USE on this
+  // module — the clients who have tickets, not every company in the book — so
+  // one small extra read answers the question a caller really has. See `choices`
+  // in the grammar for the confusion it exists to end: an empty result cannot
+  // tell you whether you spelled the client wrong or asked about one that isn't
+  // here, and both happen.
+  //
+  // GATED, and per referenced module: the names belong to that module, so they
+  // come out only if this caller may read it. A field whose target they cannot
+  // read comes back without them rather than being refused.
+  const held = await rightsSheet(cfg, guard)
+  const choices = new Map<string, { names: string[]; more: boolean }>()
+  for (const f of mod.fields) {
+    if (!f.choices || !f.ref) continue
+    const target = queryModule(f.ref)
+    if (!target || !held.has(`${target.module}:read`)) continue
+    // R14 — a hard cap, said at the query. Small on purpose: this is a hint for
+    // composing a filter, not a collection read, and a caller who needs the
+    // whole list asks query_records for it.
+    const rows = await d1Query<{ label: string | null }>(
+      cfg,
+      guard.databaseId,
+      `SELECT DISTINCT r.${target.labelColumn} AS label
+         FROM ${mod.table} t JOIN ${target.table} r ON r.id = t.${f.column}
+        WHERE t.${f.column} IS NOT NULL
+        ORDER BY label LIMIT ${CHOICE_CAP + 1}`
+    )
+    const names = rows.map((r) => r.label).filter((v): v is string => !!v)
+    choices.set(f.name, { names: names.slice(0, CHOICE_CAP), more: names.length > CHOICE_CAP })
+  }
 
   // The team's own words for the fields that have them. ONE bounded read for all
   // of them (R14: LIST_HARD_CAP), not one per field — a module declares at most a
@@ -131,6 +171,12 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
       ...(f.values ? { values: f.values } : {}),
       ...(f.vocabulary ? { values: vocab.get(f.vocabulary) ?? [], editable: true } : {}),
       ...(f.ref ? { references: f.ref } : {}),
+      ...(choices.has(f.name)
+        ? {
+            inUse: choices.get(f.name)!.names,
+            ...(choices.get(f.name)!.more ? { inUseCapped: true } : {}),
+          }
+        : {}),
       ...(f.bulky ? { bulky: true } : {}),
       ...(f.note ? { note: f.note } : {}),
     })),

@@ -175,3 +175,25 @@ console.log(
     `before the preamble each step re-sends\n` +
     `   (the assistant gave up at 369,193 input tokens in one turn on 27 Aug 2026)`
 )
+
+/* ── the names a caller can actually filter on, which is why "horst" misses ── */
+
+// The describe half, priced. Asked before CALL 1 it costs a few hundred
+// characters and turns "nothing matched" into "here is how the clients are
+// spelled" — the difference between an empty answer a person can act on and one
+// they cannot.
+const { QUERY_MODULES: MODS } = await import(join(REPO, "shared", "workers", "query-grammar.ts"))
+const tickets = MODS.tickets
+const inUse = await sql(
+  team.database_id,
+  `SELECT DISTINCT r.name AS label FROM ${tickets.table} t JOIN accounts r ON r.id = t.account_id
+    WHERE t.account_id IS NOT NULL ORDER BY label LIMIT 61`
+)
+const names = inUse.map((r) => r.label).filter(Boolean)
+console.log(
+  `\n══ WHAT describe_module WOULD HAVE SAID FIRST\n` +
+    `   clients with tickets (${names.length}): ${names.join(", ")}\n` +
+    `   ${JSON.stringify(names).length} chars (~${Math.round(JSON.stringify(names).length / CHARS_PER_TOKEN)} tokens)\n` +
+    `   — which is where "flu clinic" becomes "FluClinic", and where "horst" is ` +
+    `visibly not a client rather than an empty result that says nothing.`
+)
