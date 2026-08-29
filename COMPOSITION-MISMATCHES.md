@@ -548,33 +548,52 @@ renders anywhere else in this app. Re-verified at all four widths, both
 themes, after the fix.
 
 **A fourth bug — the double-box was still real, just invisible, and a
-peer's deeper detector is what caught it** (commit `230d1cfb`). The
-`tone="bare"` fix above stopped the FRAME's own redundant fill, but never
-removed the surrounding `CollectionCard` — the app's own `<Card>` box
-(`web/components/deep-link/screen-bits.tsx`'s `SectionWithCreate`) was
-still wrapping the kit panel, five DOM levels down. A peer's first probe
-walked only four ancestors and reported clean; re-run unbounded with a
-canary nested deep enough to prove it, it found the real nesting on both
-roles and tickets. It costs nothing visible TODAY only because
-`CollectionCard`'s fill and the kit panel's fill are the same token
-(`bg-surface-panel`) — measured, not assumed: card 974px/radius 27/no
-shadow, panel 902px/radius 27/no shadow, 36px of dead inset between them.
-The kit's own `tone` doc calls soft-paper-on-soft-paper "the broken
-combination... the active folder tab has nothing to be seen against" —
-today's invisibility is a coincidence of tokens, not a settled state, and
-the day either screen grows a folder tab it would surface as a tab bug
-with no visible cause. Not a kit bug (the kit never composes its frame
-inside a `Card`; it drops straight into `ScreenShell`'s own off-beige
-body, which is what makes the panel readable at all) — the in-rule fix was
-always app-side, per this entry's own first-pass reasoning
-("`CollectionCard` also stripped... "). Fixed for real this time:
+peer's deeper detector is what caught it** (commit `230d1cfb`, verified
+`230d1cfb`). The `tone="bare"` fix above stopped the FRAME's own redundant
+fill, but never removed the surrounding `CollectionCard` — the app's own
+`<Card>` box (`web/components/deep-link/screen-bits.tsx`'s
+`SectionWithCreate`) was still wrapping the kit panel, five DOM levels
+down. A peer's first probe walked only four ancestors and reported clean;
+re-run unbounded with a canary nested deep enough to prove it, it found
+the real nesting on both roles and tickets. It cost nothing visible
+because `CollectionCard`'s fill and the kit panel's fill were the same
+token (`bg-surface-panel`) — measured, not assumed: card 974px/radius
+27/no shadow, panel 902px/radius 27/no shadow, 36px of dead inset between
+them. Not a kit bug (the kit never composes its frame inside a `Card`; it
+drops straight into `ScreenShell`'s own off-beige body, which is what
+makes the panel readable at all) — the in-rule fix was always app-side,
+per this entry's own first-pass reasoning. Fixed for real this time:
 `SectionWithCreate` takes a `useKitPanel` prop that skips `CollectionCard`
 outright. Caught a second, related bug in the same pass — with the box
 gone, the header's own icon-only create button and the panel's own
 labelled one were both rendering for the READY state (not the deliberately
 doubled empty-state mangos) — fixed by skipping the header's button too
-when `useKitPanel` is on. Re-verified live, all four widths, both themes,
-both collections, both of Tickets' tabs.
+when `useKitPanel` is on.
+
+**A CLAIM MADE HERE AND THEN RETRACTED, on record because the retraction
+matters as much as the finding.** An earlier draft of this entry said the
+invisible double box deferred a real cost — that a folder tab, if either
+collection ever grew one, would lose its ground against a panel whose fill
+matched it exactly, quoting the kit's own "the active folder tab has
+nothing to be seen against." That was a plausible inference from the kit's
+documentation about a nesting nobody had actually measured, and it was
+wrong: the folder tab strip sits OUTSIDE `CollectionCard` entirely, direct
+on `ScreenShell`'s off-beige body (`screen-shell-body`), and always has.
+Measured on deployed staging, pre-fix, with the Card still present: active
+tab fill `rgb(247,242,235)` against a `rgb(255,254,249)` ground, contrast
+1.103 — the kit's own stated healthy figure — throughout. The double box
+was real and worth fixing (36px of dead inset drawing a surface nobody
+could see), but it was never sitting on a live contrast defect, and
+nothing was going to break when a collection grew a folder tab. Say what
+was wrong, not just what's fixed now.
+
+**Verified post-fix, on real staging data (the positive control that makes
+a zero mean something):** `appCardPresent=false` on both roles (974px
+panel, `nested=[]`, 7 real named rows — "Admin — Default role, full
+access," "Client — A client login" — one create control, "New role") and
+tickets (974px panel, `nested=[]`, 50 real tickets). The panel's own width
+grew from 902 to 974 — the space `CollectionCard` used to hold — confirming
+it is now THE box rather than a second one hiding inside the first.
 
 **`empty-collection`'s genuinely-empty half — ADOPTED** (commit `960ae29e`).
 `states/empty-collection.tsx`'s own `emptyBody` register (Headline + Text +
