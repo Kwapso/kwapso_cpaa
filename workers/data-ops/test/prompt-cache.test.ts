@@ -13,7 +13,21 @@
 // rate is $0.03/M against $0.15/M for uncached input — but it caches
 // AUTOMATICALLY on a repeated prefix rather than on a marker somebody places. So
 // there is no longer a marker to assert, and what is left is the property the
-// markers existed to serve, which was always the load-bearing half:
+// markers existed to serve, which was always the load-bearing half.
+//
+// CORRECTED 2026-08-29: "caches AUTOMATICALLY on a repeated prefix" was half the
+// sentence. Cloudflare caches a prefix on the GPU that computed it, and a
+// request only reuses it by LANDING ON THAT GPU — which is steered by an
+// `x-session-affinity` header and by nothing else. Measured against the live
+// account, four calls each behind one 6.6K prefix:
+//
+//     glm-5.3-flash  cached 0, 6592, 6592, 6592   (99.6% once warm)
+//     gpt-oss-120b   cached 0,    0,    0,    0   (no cached rate at all)
+//
+// We shipped 16 turns with no header and no cached token, at 4.2x the cold input
+// per turn, and nothing anywhere said so — a missing header is not an error, it
+// is a bill. Hence the last describe in this file, which asserts the header
+// leaves the building; the rest of the list is what makes the hit worth having:
 //
 //   · the prefix is the same bytes for every caller, so a cache CAN hit;
 //   · the stable part comes before the conversational part, so the hit is long;
@@ -24,7 +38,7 @@
 import { describe, expect, it } from "vitest"
 
 import { SYSTEM, systemFor } from "../src/lib/agent"
-import { readUsage, workersAiBody, type ChatMessage } from "../src/lib/model"
+import { DEFAULT_AGENT_MODEL, readUsage, selectModel, workersAiBody, type ChatMessage } from "../src/lib/model"
 import { toolSpecs } from "../src/lib/tools"
 
 const TOOLS = toolSpecs()
@@ -133,5 +147,69 @@ describe("what a turn cost comes back", () => {
       cacheWrite: 0,
       cacheRead: 99,
     })
+  })
+})
+
+
+// ── THE HEADER, which is the whole mechanism ────────────────────────────────
+//
+// The properties above make a prefix that CAN be cached. This makes it actually
+// happen. There is no observable difference between a working cache and a broken
+// one from inside the worker — same answer, same latency band, just five times
+// the bill — so the seam is asserted here rather than trusted.
+
+describe("the affinity header", () => {
+  /** Captures what the binding was handed. The third argument is the one under
+   *  test; the first two only have to be plausible. */
+  function spyEnv() {
+    const seen: { model: string; options: Record<string, unknown> | undefined }[] = []
+    return {
+      seen,
+      env: {
+        AI: {
+          run: async (model: string, _body: unknown, options?: Record<string, unknown>) => {
+            seen.push({ model, options })
+            return { choices: [{ message: { content: "ok" } }], usage: {} }
+          },
+        },
+      } as never,
+    }
+  }
+
+  it("sends the thread id as x-session-affinity, so every step of a turn lands on one GPU", async () => {
+    const { env, seen } = spyEnv()
+    await selectModel(env, "thread_01ABC").complete([{ role: "user", content: "hi" }], [])
+    const headers = seen[0]?.options?.extraHeaders as Record<string, string> | undefined
+    expect(headers?.["x-session-affinity"]).toBe("thread_01ABC")
+  })
+
+  it("sends the SAME key for every call in one conversation", async () => {
+    const { env, seen } = spyEnv()
+    const model = selectModel(env, "thread_01ABC")
+    await model.complete([{ role: "user", content: "one" }], [])
+    await model.complete([{ role: "user", content: "two" }], [])
+    const keys = seen.map((c) => (c.options?.extraHeaders as Record<string, string>)?.["x-session-affinity"])
+    expect(keys).toEqual(["thread_01ABC", "thread_01ABC"])
+  })
+
+  it("gives different conversations different keys, so one does not evict the other", async () => {
+    const { env, seen } = spyEnv()
+    await selectModel(env, "thread_A").complete([{ role: "user", content: "hi" }], [])
+    await selectModel(env, "thread_B").complete([{ role: "user", content: "hi" }], [])
+    const keys = seen.map((c) => (c.options?.extraHeaders as Record<string, string>)?.["x-session-affinity"])
+    expect(new Set(keys).size).toBe(2)
+  })
+
+  it("sends no header at all when there is no conversation to pin", async () => {
+    const { env, seen } = spyEnv()
+    await selectModel(env).complete([{ role: "user", content: "hi" }], [])
+    expect(seen[0]?.options?.extraHeaders).toBeUndefined()
+  })
+
+  it("runs on a model that HAS a cached rate — the header is worthless without one", () => {
+    // gpt-oss-120b answers perfectly and caches nothing, ever; measured 0 cached
+    // tokens across four calls behind an identical prefix. A model with no cached
+    // rate turns this whole file into decoration.
+    expect(DEFAULT_AGENT_MODEL).toBe("@cf/zai-org/glm-5.3-flash")
   })
 })

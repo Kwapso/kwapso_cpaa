@@ -943,7 +943,9 @@ async function runPlanLoop(
   loopOpts: { prepaid?: boolean; fold?: boolean } = {},
   emit?: Emit
 ): Promise<ChatOutcome> {
-  const model = selectModel(env)
+  // The thread id is the affinity key: every step of this turn re-sends the same
+  // 37.6K preamble, and only a shared key lands them on the GPU still holding it.
+  const model = selectModel(env, threadId)
   // WHAT THIS CALLER CAN ACTUALLY DO, in one read, so the preamble stops paying
   // to describe doors that are certain to refuse them (toolSpecs' own note has
   // the arithmetic). Fail OPEN: an unreadable sheet means the whole catalogue,
@@ -1322,7 +1324,7 @@ export async function confirmAndRun(
     // and reads the same tool list this caller was offered, so the explanation
     // cannot name a tool they were never shown. Fail open, as everywhere else.
     const held = await rightsSheet(cfg, guard).catch(() => undefined)
-    const note = await failureWrapUp(selectModel(env), convo, toolSpecs(held), tally)
+    const note = await failureWrapUp(selectModel(env, opts.threadId), convo, toolSpecs(held), tally)
     emit?.({ t: "text", d: note })
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: note, source: opts.source })
     // Fold into the propose row (not a separate row) — APPENDING the actions
