@@ -295,6 +295,40 @@ or header actions. Forcing the swap would mean inventing collection context
 that doesn't exist at these call sites. Left as-is; `screens/page-failure.tsx`
 (below) is the composition that actually matches a case in this app.
 
+## [!] `screens/splash.tsx` and `screens/portal-boot.tsx` — mismatch, found 2026-08-29
+
+Both compositions' "booting" register is `SignInSplash`
+(`compositions/templates/sign-in.tsx`) — confirmed by reading it: a static
+centred mark on a field, explicitly "NO ANIMATION. It hands over; it does
+not fade. Nothing here imports `motion/` and nothing sets a transition,"
+and "this screen IS the loading state... no spinner, no progress bar."
+
+This app's actual boot screen, `shared/web/mark-loader.tsx` (`MarkLoader`,
+used by both `web/` and `web-portal/`), is a deliberately more capable
+system the kit's static mark does not model at all: a continuously looping
+SVG animation published once as `window.__ksMark` and driven by an inline
+pre-hydration script so the mark is moving before the React bundle even
+arrives, plus `useMarkHold` — a fix, dated 26 Aug 2026, for an owner-reported
+bug ("the animation does not get a chance to complete") that holds the
+loader on screen until the animation reaches a real stopping point rather
+than being torn off mid-frame. The file's own history describes removing a
+*second*, competing splash overlay that used to run alongside this one for
+exactly the double-render/frame-rate cost swapping back in a second static
+splash would reintroduce. Adopting `SignInSplash` here would be a visible
+regression against two documented, deliberate fixes — not a lateral swap.
+
+`portal-boot.tsx`'s other half (`PortalIndexRoute`'s `boot="failed"` case,
+`ShapeStateBody` with `shape="portalHome"`) models the same real condition
+`web-portal/components/portal-shell.tsx`'s `session.state === "unavailable"`
+already covers — and that branch is now `screens/page-failure.tsx` (see
+above), adopted because chapter 21's own law names it as the one register
+built for "app could not draw a frame at all." Two kit chapters offer two
+different answers for the same failure; `page-failure` was already chosen
+on the more specific textual match ("only a whole-page failure... may
+replace the frame") and general-page-failure `PageFailureScreen`'s three-
+case coverage in this app. Not re-litigated here without a reason to prefer
+the other.
+
 ## Why this file exists
 
 A recorded mismatch is a result, not a stall. Without this list, the next
