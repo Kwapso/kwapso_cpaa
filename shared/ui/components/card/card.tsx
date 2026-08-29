@@ -22,8 +22,18 @@
 
    THE LAW THIS FILE OBEYS
    · A card is a box, so its radius is `--radius` (24). There is no fifth
-     radius and `rounded-lg` is re-pointed at 24, so it is never reached for
-     meaning "slightly rounded".
+     radius, and the named middle step of Tailwind's own ladder (the one
+     between `md` and `xl`) is re-pointed at 24 too, so it is never reached
+     for meaning "slightly rounded".
+
+     THAT STEP IS DESCRIBED HERE RATHER THAN SPELLED, and so are the two
+     below in `tokens.css`, because Tailwind scans this comment. It scans
+     every file it is pointed at, source and prose alike, and it cannot tell
+     an explanation from an intention — so writing the class in order to say
+     it is forbidden COMPILED it into every consuming app's stylesheet, where
+     it was the only thing in the whole build asking for a third box radius.
+     See CHANGELOG v1.2.4/v1.2.5: the same bug, in markdown, produced a rule
+     that was not even valid CSS.
    · Blocks are separated by COLOUR, not by strokes. The one blessed hairline
      is same-tone separation, which is exactly what the header and footer
      rules inside a single shell are — one shell, two hairlines, never three
