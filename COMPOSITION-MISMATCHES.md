@@ -629,6 +629,74 @@ word: the kit says a client portal never shows a social sign-in row; this
 app ships Google on the portal per SCOPE ch.06 because it proves identity
 without granting access. Keep ours, or change the kit's law?
 
+## Components (KIT-COVERAGE.md's checklist, from screens_collections's pass)
+
+Findings from a bottom-up component sweep (Detail and examples, Collection
+views, Forms and data, Notes and notifications, Feedback and overlay, Data
+display), reported by a peer for this file since it now covers the whole
+catalogue's "why not," not just the 23 compositions it started with.
+
+**Shipped, not a finding:** `brand` — `web-portal/components/portal-shell.tsx`
+now renders the kit's real `Logotype`/`AuthPhotograph` instead of the
+`auth-artwork.tsx` shim, verified by probe-compile after UI-GAPS row 23's
+asset-url fix landed. Committed `2eebb832`.
+
+**Confirmed mismatches:**
+- `form` — `FormShell` is already this app's own locked, machine-checked
+  law (R4, `forms-use-formshell`: "the one wrapper every form renders
+  through"), and the kit's `Form` states the identical job description for
+  itself. Adopting it would build a second seam for a role one already
+  fills.
+- `import-wizard` — the same "one file, one table, manual column mapping"
+  mismatch already on record for the import trio, one primitive layer
+  down (`ImportWizard` composes `Form`+`Field`+`Select` for the mapping
+  step this app's agentic import has no place for).
+- `progress`, `progress-dashboard` — `pulse.tsx`'s own locked law ("big
+  NUMBER or CHART, nothing else") already cited for `stat-strip`, ruling
+  out a third shape. No progress-bar/dashboard concept exists anywhere in
+  the app's savings/hours/margin screens.
+- `notifications` — no bell/inbox concept anywhere in either front door
+  (grepped both). This app's live-update model is realtime in-place sync,
+  not a notification log. A real gap, but a new FEATURE, not a swap.
+- `tree`, `stopwatch` — no current app equivalent (no hierarchical UI
+  outside the already-adopted flowchart/process-maps; work logs are
+  entered retrospectively, never clocked).
+- Most of Collection views (kanban, calendar-view, spreadsheet, matrix,
+  swimlane, timeline, agenda, gallery, split, queue, chat, tiles, map,
+  compare, flowdetail, copilot-overlay — ~16 types) — no current app
+  equivalent. The recipe engine's view-type union has a fixed set (list/
+  table, card-grid, activity-feed, etc.) and none of these has an obvious
+  existing collection to attach to. This was an architecture-level read
+  (the engine's own type union), not a per-composition render — flagged as
+  worth a second look if anyone disagrees with treating it as one category
+  rather than 16 individual verdicts, since only `brand` among this whole
+  batch was actually rendered before being decided.
+
+**Not a real gap:** `notes` reads `[ ]` in KIT-COVERAGE.md but is a census
+blind spot — `Comments` (already `[x]`) imports `Notes` internally
+(`shared/ui/components/comments/comments.tsx:87`) and is built directly on
+top of it. The coverage script only counts direct import strings, so it
+can't see a transitive one. Worth a rot-check-style note if the script ever
+grows a "transitively used" column.
+
+**Too big for a same-session swap, flagged for its own dedicated pass:**
+`detail-view` — a whole "record overview panel" primitive (header + avatar
++ kv + sections + aside + footer). Adopting it for real would mean
+restructuring the many hand-composed `*-detail.tsx` files, which might
+genuinely reduce real duplication but is scoped work, not a batch item. Not
+picked up this pass.
+
+**Unresolved, needs a render-based look:** `checklist` (ordered rows, a
+tick mark, an owner, a due date) reads as a plausible fit for
+`web/components/work-panels.tsx`'s `TodosPanel` (a simple open/done to-do
+list), but nobody has actually rendered the two side by side yet. Recorded
+as an open thread rather than a claimed verdict either way.
+
+`screen-renderer` and `collection-frame` are left alone here — the app's
+own files under those names do a different job from their kit namesakes
+(see the warning at the top of this file), and `collection-frame` is the
+subject of this file's own `useKitPanel` prototype above.
+
 ## Why this file exists
 
 A recorded mismatch is a result, not a stall. Without this list, the next
