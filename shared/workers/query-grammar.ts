@@ -689,6 +689,14 @@ export function suggestModule(name: string | undefined): string[] {
  * here, because that IS derivable. */
 export const FIELD_ALIASES: Record<string, string> = {
   reference: "ref",
+  // THE WORDS THE LIST DOORS SORT BY. `list_help_tickets` offers 'rank',
+  // 'created', 'updated', 'status', 'kind' and 'title', so a model that learned
+  // the vocabulary from the tool beside this one asks to sort by `updated` — and
+  // was refused. That refusal is how a "most recently updated" question falls
+  // back to a call with no ordering at all, whose first row is the newest by
+  // CREATION and reads exactly like an answer.
+  updated: "updatedAt",
+  created: "createdAt",
   // A ticket has a `title`, an account has a `name`, and which of the two a
   // person says depends on the record rather than on the app. Applied only
   // where the module has the target and not the alias, so neither ever shadows
