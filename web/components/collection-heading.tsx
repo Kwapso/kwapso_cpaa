@@ -21,6 +21,8 @@
 import * as React from "react"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { formatCount } from "@shared/web/format-count"
 import { CONCEPT_ICON, TEAM_SECTIONS } from "@/lib/pages"
 import { useCountStandsDown } from "@/components/counted-tabs"
@@ -48,7 +50,7 @@ export function CollectionHeading({
   // should lose its glyph, not its heading.
   const icon = (CONCEPT_ICON as Record<string, string>)[sectionKey]
   return (
-    <h1 className="flex items-center gap-2 text-2xl font-medium">
+    <Headline as="h1" size="h3" className="flex items-center gap-2">
       {icon ? (
         // aria-hidden: the WORD beside it is the name of the page, and a screen
         // reader announcing "route, Processes" is one label read twice.
@@ -57,11 +59,7 @@ export function CollectionHeading({
         </span>
       ) : null}
       {t(title)}
-      {badge ? (
-        <span className="bg-muted text-muted-foreground rounded-pill px-2 py-0.5 text-xs font-medium">
-          {badge}
-        </span>
-      ) : null}
-    </h1>
+      {badge ? <Badge variant="secondary">{badge}</Badge> : null}
+    </Headline>
   )
 }
