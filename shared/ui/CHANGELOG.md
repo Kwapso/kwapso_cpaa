@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.2.8 — 2026-08-29
+
+### Docs — PATTERN.md §10 records that the kit now ships its own exclusion
+
+§10 already described this exact bug and prescribed `source(none)`. It was
+right and it was not enough: it asked every CONSUMER to remember, and a
+consumer writing plain `@import "tailwindcss"` inherits Tailwind's automatic
+walk regardless. Since v1.2.5 `tokens.css` scans code rather than directories
+and carries `@source not` for markdown, so the exclusion travels with the thing
+it describes. §10 now says so, and records the half no exclusion can reach —
+three SOURCE COMMENTS that named a forbidden radius in order to forbid it, and
+emitted it, fixed in v1.2.6 by describing rather than spelling.
+
+### Docs — PATTERN.md §12, on checking the claims this document makes
+
+Nine wrong answers in one day from probes that all looked like they worked, two
+of which reached other people. Run the canary first; build it from the hardest
+instance rather than the simplest; distrust any bound the moment a probe reports
+nothing; plant a sentinel when a count cannot name its source. The worst failure
+is the confident all-clear, because a wrong finding argues with the code and
+dies, and a wrong all-clear agrees with everybody.
+
+No component, token or behaviour changed.
+
 ## v1.2.7 — 2026-08-29
 
 ### Fixed — `Stopwatch` advertised `children` and threw them away
