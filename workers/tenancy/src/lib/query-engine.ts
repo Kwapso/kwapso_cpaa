@@ -267,6 +267,22 @@ export function parseQuery(
 
 const holes = (n: number): string => Array.from({ length: n }, () => "?").join(", ")
 
+/** Which field types compare WITHOUT regard to case. Text and ids: a reference
+ * is the same reference in either case, and `contains` has always agreed. An
+ * `enum` is excluded because its values are checked against a declared list at
+ * the boundary, and a date or a number has no case to fold. */
+const foldsCase = (field: QueryField): boolean => field.type === "text" || field.type === "id"
+
+/** An exact comparison, folded where case should not decide it. `LOWER()` on the
+ * column costs the index on that column — accepted deliberately: every one of
+ * these reads is already bounded, and a lookup that silently misses is worse
+ * than one that scans. */
+const folded = (field: QueryField, col: string, op: string, rhs: string): string =>
+  foldsCase(field) ? `LOWER(${col}) ${op} ${rhs}` : `${col} ${op} ${rhs}`
+
+const foldValues = (field: QueryField, values: Param[]): Param[] =>
+  foldsCase(field) ? values.map((v) => (typeof v === "string" ? v.toLowerCase() : v)) : values
+
 /** One filter, as SQL plus its bound parameters.
  *
  * `field.column` is a literal from our own source (promise 2 in the header);
@@ -331,25 +347,32 @@ function oneFieldSql(
     case "in":
     case "notIn": {
       const not = c.op === "notIn"
-      const plain = `${col} ${not ? "NOT IN" : "IN"} (${holes(c.values.length)})`
-      if (!ref) return { sql: plain, params: c.values }
+      // CASE DOES NOT DECIDE WHETHER A RECORD EXISTS. `contains` has always
+      // compared without it; an exact match did not, so a model that lowercased
+      // a reference it had just been given got nothing back — measured on
+      // staging with BERG2-T0002 on 29 Aug 2026. One rule for all string
+      // comparison rather than two, and the fold is the same one either side.
+      const plain = folded(field, col, not ? "NOT IN" : "IN", `(${holes(c.values.length)})`)
+      const vals = foldValues(field, c.values)
+      if (!ref) return { sql: plain, params: vals }
       // An id OR the referenced record's exact name, so a caller holding the
       // name and not the id is not made to look it up first.
       const byName = `${col} ${not ? "NOT IN" : "IN"} (SELECT r.id FROM ${ref.table} r WHERE LOWER(r.${ref.labelColumn}) IN (${holes(c.values.length)}))`
       const lowered = c.values.map((v) => String(v).toLowerCase())
       return {
         sql: not ? `(${plain} AND ${byName})` : `(${plain} OR ${byName})`,
-        params: [...c.values, ...lowered],
+        params: [...vals, ...lowered],
       }
     }
     default: {
       const not = c.op === "ne"
-      const plain = `${col} ${not ? "<>" : "="} ?`
-      if (!ref) return { sql: plain, params: c.values }
+      const plain = folded(field, col, not ? "<>" : "=", "?")
+      const vals = foldValues(field, c.values)
+      if (!ref) return { sql: plain, params: vals }
       const byName = `${col} ${not ? "NOT IN" : "IN"} (SELECT r.id FROM ${ref.table} r WHERE LOWER(r.${ref.labelColumn}) = ?)`
       return {
         sql: not ? `(${plain} AND ${byName})` : `(${plain} OR ${byName})`,
-        params: [c.values[0], String(c.values[0]).toLowerCase()],
+        params: [vals[0], String(c.values[0]).toLowerCase()],
       }
     }
   }
@@ -427,7 +450,7 @@ export async function runQuery(
   const where = whereSql(q, refs)
   // WHAT NAMED NOTHING — worked out alongside the count rather than after it, so
   // no return path below can hand back a total without it.
-  const unmatchedPromise = findUnmatched(cfg, guard, q, refs)
+  const unmatchedPromise = findUnmatched(cfg, guard, mod, q, refs)
   // R14/R16 — the exact total, bounded by the ONE counting ceiling, over exactly
   // the question the rows themselves answer.
   const totalPromise = countCollection(
@@ -514,6 +537,7 @@ export async function runQuery(
  * Two kinds of filter value can silently match nothing, and both produce a
  * confident wrong sentence rather than an error:
  *   · a REFERENCE by name — "HORSt" when no client is called that;
+ *   · a HANDLE on one record — an id or a human reference that names none;
  *   · a TEAM-EDITED vocabulary value — "Bug" when this team calls them Defects.
  * (A fixed enum cannot: `checkValue` refuses an unknown status outright and
  * names the seven it could have been. That is the same honesty, one step
@@ -524,6 +548,7 @@ export async function runQuery(
 async function findUnmatched(
   cfg: D1Rest,
   guard: MemberGuard,
+  mod: QueryModule,
   q: ParsedQuery,
   refs: Record<string, QueryModule>
 ): Promise<Unmatched[]> {
@@ -549,6 +574,35 @@ async function findUnmatched(
         )
         const labels = rows.map((r) => (r.label ?? "").toLowerCase())
         const missed = needles.filter((n) => !labels.some((l) => l.includes(n.toLowerCase())))
+        if (missed.length) out.push({ field: field.name, values: missed })
+        continue
+      }
+      // A HANDLE ON ONE RECORD — its id, or its human reference. A zero here is
+      // "no such thing", not "no rows met your criteria", and the difference is
+      // the difference between a correction and an answer. This was the hole the
+      // client case did not cover: the assistant looked ticket BERG2-T0002 up by
+      // the wrong handle, got a bare zero, and said the ticket did not exist one
+      // turn after naming it.
+      if (field.identity) {
+        const exact = c.op !== "contains"
+        const rows = await d1Query<{ v: string | null }>(
+          cfg,
+          guard.databaseId,
+          `SELECT DISTINCT ${field.column} AS v FROM ${mod.table}
+            WHERE ${needles
+              .map(() =>
+                exact
+                  ? `LOWER(${field.column}) = ?`
+                  : `LOWER(${field.column}) LIKE ? ESCAPE '\\'`
+              )
+              .join(" OR ")}
+            LIMIT ${VALUES_PER_CLAUSE * 4}`,
+          needles.map((n) => (exact ? n.toLowerCase() : `%${likeLiteral(n).toLowerCase()}%`))
+        )
+        const found = rows.map((r) => (r.v ?? "").toLowerCase())
+        const missed = needles.filter((n) =>
+          exact ? !found.includes(n.toLowerCase()) : !found.some((f) => f.includes(n.toLowerCase()))
+        )
         if (missed.length) out.push({ field: field.name, values: missed })
         continue
       }

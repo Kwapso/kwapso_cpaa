@@ -39,8 +39,10 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import {
   canonicalModule,
+  FIELD_ALIASES,
   MODULE_ALIASES,
   QUERY_MODULES,
+  queryField,
   suggestModule,
 } from "@shared/workers/query-grammar"
 import { GROUP_CAP, MAX_CLAUSES, VALUES_PER_CLAUSE } from "../src/lib/query-engine"
@@ -580,6 +582,68 @@ describe("the projection leaves the long columns out until they are asked for", 
   })
 })
 
+describe("a field answers to the word the app uses for it, in any case", () => {
+  // MEASURED ON STAGING, 29 Aug 2026, as a two-turn failure the owner will
+  // repeat: the assistant found ticket BERG2-T0002, was asked to resolve it, and
+  // replied that no ticket with that reference existed — one turn after naming
+  // it. Probing the real book turned up three separate faults behind that, and
+  // each one silently returned zero rather than saying anything.
+  it("`reference` reaches `ref` — the word the app's own prose uses", async () => {
+    // list_help_tickets' description says "`q` searches the REFERENCE, the
+    // description and the title". The column is `ref`. Same class as help vs
+    // tickets: the word in front of a person is not the word the field answered
+    // to, and the refusal cost a whole turn.
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [{ field: "reference", op: "eq", value: "TIC-0000001" }], countOnly: true })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(1)
+  })
+
+  it("a field also answers to its own COLUMN, which needs no list", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "title_en", op: "eq", value: "Ticket 1" }], countOnly: true })
+    )
+    expect(body.total).toBe(1)
+  })
+
+  it("case does not decide whether a record exists", async () => {
+    // The trap that actually bit: a model that lowercases a reference it was
+    // just given gets nothing back from an exact match. `contains` has always
+    // compared without regard to case; now every string comparison does.
+    for (const spelling of ["TIC-0000001", "tic-0000001", "Tic-0000001"]) {
+      const { body } = await ask(
+        q({ module: "tickets", where: [{ field: "ref", op: "eq", value: spelling }], countOnly: true })
+      )
+      expect(body.total, spelling).toBe(1)
+    }
+  })
+
+  it("a number and a date are NOT folded (there is no case to fold)", async () => {
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "resolvedAt", op: "between", value: ["2026-07-01", "2026-07-31"] }],
+        countOnly: true,
+      })
+    )
+    expect(body.total).toBe(4)
+  })
+
+  it("every field alias resolves somewhere and shadows nothing", () => {
+    for (const [alias, target] of Object.entries(FIELD_ALIASES)) {
+      const modules = Object.values(QUERY_MODULES).filter((m) => m.fields.some((f) => f.name === target))
+      expect(modules.length, `"${alias}" points at "${target}", which is no module's field`).toBeGreaterThan(0)
+      // …and where a module really HAS a field by the alias's own name, the
+      // real one wins. Asserted rather than reasoned about.
+      for (const mod of Object.values(QUERY_MODULES)) {
+        const real = mod.fields.find((f) => f.name === alias)
+        if (real) expect(queryField(mod, alias)).toBe(real)
+      }
+    }
+  })
+})
+
 describe("a filter value that names nothing comes back WITH the number", () => {
   // THE SENTENCE THAT MADE THIS NECESSARY. Asked the owner's own question on
   // staging on 29 Aug 2026, the assistant answered: "There are 97 open tickets
@@ -623,6 +687,34 @@ describe("a filter value that names nothing comes back WITH the number", () => {
     )
     expect(body.total).toBe(0)
     expect(body.unmatched).toEqual([{ field: "accountId", values: ["A_GHOST"] }])
+  })
+
+  it("a HANDLE that names no record is reported — the hole the client case missed", async () => {
+    // The two-turn failure, reduced. Both of these used to return a bare zero,
+    // which reads as "there is no such ticket" and is how the assistant
+    // contradicted itself one turn after naming the record.
+    const absent = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: "TIC-9999999" }], countOnly: true })
+    )
+    expect(absent.body.total).toBe(0)
+    expect(absent.body.unmatched).toEqual([{ field: "ref", values: ["TIC-9999999"] }])
+
+    // …and the id/ref confusion itself: a REFERENCE handed to the `id` field.
+    // Saying so is what lets the model try the other handle instead of
+    // announcing that the record does not exist.
+    const wrongHandle = await ask(
+      q({ module: "tickets", where: [{ field: "id", op: "eq", value: "TIC-0000001" }], countOnly: true })
+    )
+    expect(wrongHandle.body.total).toBe(0)
+    expect(wrongHandle.body.unmatched).toEqual([{ field: "id", values: ["TIC-0000001"] }])
+  })
+
+  it("a handle that DOES name a record reports nothing", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: "TIC-0000001" }], countOnly: true })
+    )
+    expect(body.total).toBe(1)
+    expect(body.unmatched).toBeUndefined()
   })
 
   it("a word the TEAM does not use is the same failure and is reported the same way", async () => {

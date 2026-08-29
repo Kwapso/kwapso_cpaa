@@ -93,6 +93,17 @@ export type QueryField = {
    * `in` then match the referenced record's NAME as well as its id, and a
    * `groupBy` on it comes back labelled. */
   ref?: string
+  /** THIS FIELD'S JOB IS TO NAME A RECORD — its id, or its human reference.
+   *
+   * A filter on one of these that matches nothing is not "no rows met your
+   * criteria", it is "no such thing exists", and the two need different
+   * sentences: the first is an answer and the second is a correction. So a value
+   * that names nothing here comes back in `unmatched`, exactly as an unknown
+   * client does. Earned on 29 Aug 2026, when the assistant found ticket
+   * BERG2-T0002, was asked to resolve it one turn later, looked it up by the
+   * wrong handle, got a bare zero and said the ticket did not exist — one turn
+   * after naming it. */
+  identity?: boolean
   /** LIST THE NAMES A CALLER CAN ACTUALLY FILTER ON, in `describe_module`.
    *
    * Only the names IN USE on the module being described — the clients who have
@@ -137,7 +148,7 @@ export type QueryModule = {
 
 /* --------------------------- the shared field shapes ------------------------- */
 
-const ID: QueryField = { name: "id", column: "id", type: "id" }
+const ID: QueryField = { name: "id", column: "id", type: "id", identity: true }
 const CREATED: QueryField = { name: "createdAt", column: "created_at", type: "date" }
 const UPDATED: QueryField = { name: "updatedAt", column: "updated_at", type: "date" }
 /** Deactivate-never-delete: every archivable record carries the same field, so
@@ -185,7 +196,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "createdAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text", note: "the human reference, e.g. TIC-0000042" },
+      { name: "ref", column: "ref", type: "text", identity: true, note: "the human reference, e.g. TIC-0000042" },
       { name: "title", column: "title_en", type: "text" },
       { name: "description", column: "description", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: HELP_STATUSES },
@@ -216,7 +227,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "createdAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text" },
+      { name: "ref", column: "ref", type: "text", identity: true },
       { name: "title", column: "title", type: "text" },
       { name: "detail", column: "detail", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: STORY_STATUSES },
@@ -243,7 +254,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "startsOn",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text" },
+      { name: "ref", column: "ref", type: "text", identity: true },
       { name: "name", column: "name", type: "text" },
       { name: "sprintType", column: "sprint_type", type: "enum", vocabulary: "Sprint type" },
       { name: "goal", column: "goal", type: "text", bulky: true },
@@ -296,7 +307,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "createdAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text" },
+      { name: "ref", column: "ref", type: "text", identity: true },
       { name: "title", column: "title", type: "text" },
       { name: "detail", column: "detail", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: ["open", "done"] },
@@ -321,7 +332,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "createdAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text" },
+      { name: "ref", column: "ref", type: "text", identity: true },
       { name: "title", column: "title", type: "text" },
       { name: "detail", column: "detail", type: "text", bulky: true },
       { name: "dueOn", column: "due_on", type: "date" },
@@ -342,7 +353,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "startsAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text" },
+      { name: "ref", column: "ref", type: "text", identity: true },
       { name: "title", column: "title", type: "text" },
       { name: "agenda", column: "agenda", type: "text", bulky: true },
       { name: "notes", column: "notes", type: "text", bulky: true },
@@ -662,11 +673,50 @@ export function suggestModule(name: string | undefined): string[] {
   return canonical ? [canonical] : []
 }
 
-/** A module's field by the name the model uses. Same reasoning, one level down:
- * a field name arrives from a request too. */
+/** THE OTHER NAMES A FIELD ANSWERS TO — the same lesson as MODULE_ALIASES, one
+ * level down, and learned the same way.
+ *
+ * `list_help_tickets`' own description says "`q` searches the REFERENCE, the
+ * description and the title". The column is `ref`. So the word the app uses in
+ * front of a person is not the word the field answers to, and on 29 Aug 2026 a
+ * lookup by `reference` was refused for exactly that reason.
+ *
+ * Small and hand-written, because unlike a module there is no second source to
+ * derive a field's other name from — a table and a permission string exist
+ * anyway, a synonym does not. Each line is rot-checked: it must resolve to a
+ * real field on at least one module, and it must never shadow a field that
+ * already exists. A field's own COLUMN is handled separately and needs no line
+ * here, because that IS derivable. */
+export const FIELD_ALIASES: Record<string, string> = {
+  reference: "ref",
+  // A ticket has a `title`, an account has a `name`, and which of the two a
+  // person says depends on the record rather than on the app. Applied only
+  // where the module has the target and not the alias, so neither ever shadows
+  // a real field.
+  name: "title",
+  title: "name",
+}
+
+/** A module's field by the name the model uses — its own name, its COLUMN, a
+ * loose spelling of either, or one of the few synonyms above. Same reasoning as
+ * `queryModule`, one level down: a field name arrives from a request too, and a
+ * refusal it did not deserve costs the same turn. */
 export function queryField(mod: QueryModule, name: string | undefined): QueryField | undefined {
   if (!name) return undefined
-  return mod.fields.find((f) => f.name === name)
+  const exact = mod.fields.find((f) => f.name === name)
+  if (exact) return exact
+  // The COLUMN, which is derivable and therefore needs no list: a model that
+  // read `title_en` or `account_id` somewhere means the field that carries it.
+  const byColumn = mod.fields.find((f) => f.column === name)
+  if (byColumn) return byColumn
+  const loose = plain(name)
+  const bySpelling = mod.fields.find((f) => plain(f.name) === loose || plain(f.column) === loose)
+  if (bySpelling) return bySpelling
+  if (!Object.prototype.hasOwnProperty.call(FIELD_ALIASES, name)) return undefined
+  const target = FIELD_ALIASES[name]
+  // An alias never shadows a real field: if this module HAS one by the name the
+  // caller used, the branches above already returned it.
+  return mod.fields.find((f) => f.name === target)
 }
 
 /** The module names, for a tool description and for an error that has to say
