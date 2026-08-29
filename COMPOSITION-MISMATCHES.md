@@ -344,6 +344,23 @@ contract of every collection screen in both doors. Not prototyped this pass;
 recommending the same dedicated-branch treatment as the rail question, given
 the reach, rather than rolling it into this batch.
 
+## The `screens/`+`states/` lane's pass, 2026-08-29 — the pattern behind every rejection below
+
+One sentence answers "why does the number stop" for this whole section, and
+it is the same sentence four separate investigations landed on
+independently: **the kit ships the general case, and this app already made
+a more specific decision.** Not-found's collection stays fine while ours has
+no collection to reason about; the static splash is the generic loading
+answer while our animated one is a dated, owner-motivated fix; invite-
+acceptance assumes nobody has an account yet while ours deliberately lets
+any signed-in person see every invite waiting for them; sign-in-portal
+assumes a generic client portal never shows a social row while SCOPE ch.06
+is a specific, documented reason ours does. A more generic decision wearing
+the kit's clothes is a downgrade even when it compiles cleanly — the test
+each entry below applies is never "does the kit ship something with this
+name," it is "is the kit's version the same decision as ours, or a more
+generic one."
+
 ## [x] `screens/page-failure.tsx` — adopted, 2026-08-29
 
 The portal's `session.state === "unavailable"` branch
@@ -416,6 +433,131 @@ otherwise, so there is nothing to put in the composition's eyebrow, count,
 or header actions. Forcing the swap would mean inventing collection context
 that doesn't exist at these call sites. Left as-is; `screens/page-failure.tsx`
 (below) is the composition that actually matches a case in this app.
+
+## [!] `screens/splash.tsx` and `screens/portal-boot.tsx` — mismatch, found 2026-08-29
+
+Both compositions' "booting" register is `SignInSplash`
+(`compositions/templates/sign-in.tsx`) — confirmed by reading it: a static
+centred mark on a field, explicitly "NO ANIMATION. It hands over; it does
+not fade. Nothing here imports `motion/` and nothing sets a transition,"
+and "this screen IS the loading state... no spinner, no progress bar."
+
+This app's actual boot screen, `shared/web/mark-loader.tsx` (`MarkLoader`,
+used by both `web/` and `web-portal/`), is a deliberately more capable
+system the kit's static mark does not model at all: a continuously looping
+SVG animation published once as `window.__ksMark` and driven by an inline
+pre-hydration script so the mark is moving before the React bundle even
+arrives, plus `useMarkHold` — a fix, dated 26 Aug 2026, for an owner-reported
+bug ("the animation does not get a chance to complete") that holds the
+loader on screen until the animation reaches a real stopping point rather
+than being torn off mid-frame. The file's own history describes removing a
+*second*, competing splash overlay that used to run alongside this one for
+exactly the double-render/frame-rate cost swapping back in a second static
+splash would reintroduce. Adopting `SignInSplash` here would be a visible
+regression against two documented, deliberate fixes — not a lateral swap.
+
+`portal-boot.tsx`'s other half (`PortalIndexRoute`'s `boot="failed"` case,
+`ShapeStateBody` with `shape="portalHome"`) models the same real condition
+`web-portal/components/portal-shell.tsx`'s `session.state === "unavailable"`
+already covers — and that branch is now `screens/page-failure.tsx` (see
+above), adopted because chapter 21's own law names it as the one register
+built for "app could not draw a frame at all." Two kit chapters offer two
+different answers for the same failure; `page-failure` was already chosen
+on the more specific textual match ("only a whole-page failure... may
+replace the frame") and general-page-failure `PageFailureScreen`'s three-
+case coverage in this app. Not re-litigated here without a reason to prefer
+the other.
+
+## [!] `screens/invite-acceptance.tsx` — mismatch, found 2026-08-29
+
+The composition's own doc header states the model it assumes: an
+unauthenticated person clicks an emailed invite link, lands on ONE screen
+naming that single invite (who invited them, into which account, what
+role), and pressing Accept "goes straight into onboarding (27.14) with the
+name and email already filled from the invite" — no account exists yet at
+the point this screen is shown.
+
+This app's real invite flow is a deliberately different shape, stated in
+`web/components/invitations.tsx`'s own comment: "The fix for 'I was invited
+but have no way to see/accept it': this works for ANY signed-in user, not
+just a teamless one at onboarding." A person signs in first, however they
+like (Google or email+code, at whatever address), lands in the app, and
+`InvitationsScreen`/`InvitationsPanel` (`web/app/invitations/page.tsx`,
+"where the invite email's 'Join' button lands") shows an INBOX of every
+pending invite for that address — plural, post-authentication, no
+onboarding hand-off. The kit's single-invite pre-account screen and this
+app's authenticated multi-invite inbox are different products, not two
+renderings of the same one.
+
+## [!] `screens/link-sent.tsx` — mismatch, found 2026-08-29
+
+Built entirely around a magic link: "We sent you a link," opened on
+possibly a different device, "works once and expires in 15 minutes," with
+a live resend countdown and no code to type anywhere.
+
+This app's sign-in (`shared/web/use-email-sign-in.ts`, driving both
+`web/components/auth-card.tsx` and `web-portal/components/sign-in.tsx`)
+sends a 6-digit CODE, typed into a field on the same device, in the same
+form the email step was submitted from — there is no separate device, no
+link to click, and no "waiting room" screen at all: the UI swaps straight
+from the email field to a code field on the same screen. Every one of
+27.17's stated behaviors (open-elsewhere-and-land-where-you-left-off,
+one-time link, no code) describes a mechanism this app does not have.
+
+## [!] `screens/session-expired.tsx` — mismatch, found 2026-08-29, not built
+
+Unlike the rest of this section, this is not a "the app already made a more
+specific decision" case — there is no current app equivalent to compare
+against at all, and the reason is that giving it one is real, unstarted
+plumbing on the AUTH path, the one path where a half-built screen locks
+somebody out of their own account. Three blockers, in the order they were
+found:
+
+1. Nothing persists the signed-out user's email anywhere. The composition's
+   whole point is a pre-filled `email` field ("we know who it was"), but
+   `web/lib/use-active-team.ts`'s 401 branch clears the session cache and
+   redirects to `/login` — by the time a screen could read it, it is gone.
+2. No `returnTo`/`redirectTo` mechanism exists anywhere in the login flow —
+   checked `web/app/login/page.tsx`, `web/components/auth-card.tsx`, and
+   `shared/web/use-email-sign-in.ts`. The composition's destination chip and
+   "back to where you were" promise has nothing to restore TO.
+3. The destination chip wants a friendly record title
+   (`destinationTitle`), and `use-active-team.ts` runs generically on every
+   page — it has no per-page context to derive one from.
+
+The app's current behaviour (silent redirect on a genuine 401; the session
+cache is deliberately KEPT on a mere outage, since a 500 is not a sign-out —
+see that file's own comment) is correct and is not being touched. If this
+screen is wanted, it is a scoped brief of its own — storage for the last
+identity, a redirect-back contract the whole login flow has to honour, and a
+decision about the destination title — not an adoption to fold into a batch.
+
+## [!] `screens/sign-in-portal.tsx` — a decision for the owner, not a rejection, found 2026-08-29
+
+Everything except one line is a clean fit: two-step email→code flow, one
+mango Continue, resend with a live countdown, "Wrong address?" back — all of
+it maps directly onto what `shared/web/use-email-sign-in.ts` already
+provides, the same pattern `sign-in-system` already proved for the agency
+door.
+
+The one line is real and it is a law, not a missing prop: `PortalLoginRoute`
+states "there is never a social sign-in row: the account is the company's,
+not a Google profile's," and does not even expose a `providers` prop —
+only the lower-level `SignIn` template does. `web-portal/components/
+sign-in.tsx` offers Google today, on purpose, and says why in its own
+comment: "signing in with Google never creates access; the invite does"
+(SCOPE ch.06) — Google proves identity, the invite still gates access
+either way, so a provider row creates nothing a code doesn't already grant.
+
+Passing `providers` through the lower `SignIn` template to route around
+`PortalLoginRoute`'s law would work, and that is exactly why it was not
+done: it would leave the app quietly contradicting a rule the kit states out
+loud, with nothing anywhere recording that a decision had been made. A
+deviation nobody can find is worse than a mismatch everybody can read. Kept
+as-is, recorded as a question the owner may want to answer once, in one
+word: the kit says a client portal never shows a social sign-in row; this
+app ships Google on the portal per SCOPE ch.06 because it proves identity
+without granting access. Keep ours, or change the kit's law?
 
 ## Why this file exists
 
