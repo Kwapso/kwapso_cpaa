@@ -228,11 +228,19 @@ actions, via the kit's `Title` component) — this app's collection headings
 every screen, threaded in via one `breadcrumbs` prop from
 `deep-link-screen.tsx`) rather than carrying per-screen content. Making the
 header genuinely per-screen would mean widening that one prop channel from
-"a breadcrumb array" to "arbitrary per-screen header content" — plausible
-(the channel already exists and is already per-route), but real, scoped
-architecture work on the same file the rail question already touched, not
-folded into this pass. Recording it here as the one concrete next question
-for whoever picks this back up, rather than a vague "more to check."
+"a breadcrumb array" to "arbitrary per-screen header content."
+
+**DECIDED, not pursued: `CollectionHeading`-in-body stands.** Raised as an
+open question; the planner's answer is no, for the reason the finding
+itself already gave — none of the five templates moves the adoption count
+(recomposition is invisible to a direct-import census either way), so
+widening `AppShell`'s header channel would be a layout change reaching
+every collection screen in the app, for a gain nobody could point at,
+while the owner is testing live. `CollectionHeading`-in-body now stands on
+the exact same footing as the breadcrumb-header decision already made for
+records: the templates document a shape this app already built under
+different names, and this is the second piece of that shape, decided
+rather than left open.
 
 **`templates/portal-home.tsx` — no gain, verdict unchanged.** Reread in
 full: this composition isn't in the design artifact at all — the kit's own
