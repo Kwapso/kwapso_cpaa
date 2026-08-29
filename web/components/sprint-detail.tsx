@@ -138,10 +138,32 @@ export function SprintDetailScreen({
     }
   }
 
-  if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprint.")}</p>
-  if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (sprintsQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the sprint.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(sprintsKey(teamId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (sprintsQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   const sprint = sprintsQ.data.find((s) => s.id === sprintId) ?? null
-  if (!sprint) return <p className="text-muted-foreground text-sm">{t("That sprint no longer exists.")}</p>
+  if (!sprint)
+    return (
+      <RecordScreen
+        title={t("Sprint")}
+        state="empty"
+        copy={{ emptyTitle: t("That sprint no longer exists."), emptyDescription: "" }}
+      />
+    )
 
   const kindOption = sprintTypes.find((o) => o.value === sprint.sprintType)
   const kindLine = !sprint.sprintType

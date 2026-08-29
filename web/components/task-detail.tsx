@@ -92,8 +92,20 @@ export function TaskDetailScreen({
   const [editing, setEditing] = React.useState(false)
   const options = useTaskFormOptions(canEdit ? teamId : null)
 
-  if (loading) return <Skeleton variant="list" lines={4} />
-  if (!task) return <p className="text-muted-foreground text-sm">{t("That record no longer exists.")}</p>
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — rolled out
+  // from the help-detail prototype (73414c58). No error branch here: this
+  // component is host-fed (`task`/`loading` are props, not this file's own
+  // query), and the host exposes no failure state to forward — only loading
+  // and "the record does not exist", so only those two are migrated.
+  if (loading) return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  if (!task)
+    return (
+      <RecordScreen
+        title={t("Task")}
+        state="empty"
+        copy={{ emptyTitle: t("That record no longer exists."), emptyDescription: "" }}
+      />
+    )
 
   const done = task.status === "done"
   const overviewItems = [

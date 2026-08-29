@@ -144,10 +144,31 @@ export function KnowledgeDetailScreen({
     }
   }
 
-  if (sourcesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the source.")}</p>
-  if (sourcesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!item && oneQ.data === undefined && !inPage) return <Skeleton variant="list" lines={4} />
-  if (!item) return <p className="text-muted-foreground text-sm">{t("That source doesn't exist.")}</p>
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (sourcesQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the source.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(knowledgeKey(teamId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (sourcesQ.data === undefined || (!item && oneQ.data === undefined && !inPage))
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  if (!item)
+    return (
+      <RecordScreen
+        title={t("Source")}
+        state="empty"
+        copy={{ emptyTitle: t("That source doesn't exist."), emptyDescription: "" }}
+      />
+    )
 
   const mirrored = item.originRowId !== null
   // A FILE's words belong to the file, exactly as a mirrored source's belong to

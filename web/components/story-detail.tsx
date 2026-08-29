@@ -174,10 +174,33 @@ export function StoryDetailScreen({
     toast.success(t("Sent for review."))
   }
 
-  if (storyQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the story.")}</p>
-  if (storyQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — rolled out
+  // from the help-detail prototype (73414c58). Same shape: each branch below
+  // still returns before the "ready" body, so no hook order changed.
+  if (storyQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the story.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(`story:one:${storyId}`)}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (storyQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   const story = storyQ.data
-  if (!story) return <p className="text-muted-foreground text-sm">{t("That story no longer exists.")}</p>
+  if (!story)
+    return (
+      <RecordScreen
+        title={t("Story")}
+        state="empty"
+        copy={{ emptyTitle: t("That story no longer exists."), emptyDescription: "" }}
+      />
+    )
 
   const overviewItems = [
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },

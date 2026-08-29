@@ -235,10 +235,32 @@ export function AppDetailScreen({
     }
   }
 
-  if (appsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the app.")}</p>
-  if (appsQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (appsQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the app.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(appsKey(teamId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (appsQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   const app = appsQ.data.find((a) => a.id === appId) ?? null
-  if (!app) return <p className="text-muted-foreground text-sm">{t("That app no longer exists.")}</p>
+  if (!app)
+    return (
+      <RecordScreen
+        title={t("App")}
+        state="empty"
+        copy={{ emptyTitle: t("That app no longer exists."), emptyDescription: "" }}
+      />
+    )
 
   const account = app.accountId ? (accountsQ.data ?? []).find((a) => a.id === app.accountId) : null
   const accountName = account?.name ?? (app.accountId ? "A client" : null)

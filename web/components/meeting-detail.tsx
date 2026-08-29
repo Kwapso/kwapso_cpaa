@@ -256,10 +256,31 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     }
   }
 
-  if (meetingsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the meeting.")}</p>
-  if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!item && oneQ.data === undefined && !inPage) return <Skeleton variant="list" lines={4} />
-  if (!item) return <p className="text-muted-foreground text-sm">{t("That meeting doesn't exist.")}</p>
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (meetingsQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the meeting.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(meetingsKey(teamId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (meetingsQ.data === undefined || (!item && oneQ.data === undefined && !inPage))
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  if (!item)
+    return (
+      <RecordScreen
+        title={t("Meeting")}
+        state="empty"
+        copy={{ emptyTitle: t("That meeting doesn't exist."), emptyDescription: "" }}
+      />
+    )
 
   const overviewItems = [
     { label: t("Who it is with"), value: item.accountName ?? "Nobody, it is ours" },

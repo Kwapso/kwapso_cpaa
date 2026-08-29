@@ -25,6 +25,7 @@ import * as React from "react"
 
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 
@@ -38,7 +39,7 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import type { SelectableValue } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
-import { useCached } from "@shared/web/store"
+import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
 export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; valueId: string }) {
@@ -63,14 +64,39 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
   // screen that span quietly instead of reporting it. The error is checked
   // FIRST, because "we asked and it went wrong" is a different sentence from
   // "we are still asking".
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58). The error register also gets an
+  // actual retry now: this used to be the one screen that told a reader to
+  // refresh the page by hand rather than offering a button that does it.
   if (valueQ.error)
     return (
-      <p className="text-destructive text-sm">
-        {t("That didn't load. Refresh the page, and tell us if it keeps happening.")}
-      </p>
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{
+          errorTitle: t("That didn't load."),
+          errorDescription: t("Try again, and tell us if it keeps happening."),
+        }}
+        errorAction={
+          <Button
+            variant="secondary"
+            onClick={() => invalidate(selectableOneKey(teamId, valueId))}
+          >
+            {t("Try again")}
+          </Button>
+        }
+      />
     )
-  if (valueQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!value) return <p className="text-muted-foreground text-sm">{t("That record no longer exists.")}</p>
+  if (valueQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  if (!value)
+    return (
+      <RecordScreen
+        title={t("Dropdown value")}
+        state="empty"
+        copy={{ emptyTitle: t("That record no longer exists."), emptyDescription: "" }}
+      />
+    )
 
   // ALL FOUR ENRICHMENTS ARE OPTIONAL AND NULL ON MOST ROWS (shared/types.ts) —
   // a dropdown value is a label first. An empty string is what OverviewList
