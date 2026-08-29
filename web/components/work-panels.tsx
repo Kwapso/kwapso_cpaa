@@ -21,6 +21,7 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Ban, ChevronRight } from "@shared/ui/foundations/icons"
@@ -845,6 +846,64 @@ export function TodosPanel({
             ? t("Nothing has come back from a client yet.")
             : t("Nothing outstanding with a client.")}
         </EmptyLine>
+      ) : view === "done" ? (
+        // THE DONE PILE IS A RECORD, NOT A LIST OF ACTIONS — the open pile's
+        // row carries one (Withdraw), and Checklist's row has no slot for it
+        // (checked: mark/number/label/owner+when, nothing else). A finished
+        // to-do offers nothing to press, so the shape that had no action slot
+        // to miss fits it exactly, and its mark says "done" as a real
+        // checkmark where the open-pile row said nothing at all. `onToggle`
+        // omitted is the composition's own read-only register (its own doc
+        // header: "Absent, the whole list is read-only and no mark is
+        // interactive") — verified by rendering, not assumed: the checkbox
+        // comes back `disabled`, `aria-checked="true"`, `aria-readonly` on
+        // the list.
+        <Checklist
+          numbered={false}
+          showProgress={false}
+          label={t("Sent back by the client")}
+          items={q.data.map((todo) => {
+            const fileLink = safeHref(todo.fileUrl)
+            return {
+              id: todo.id,
+              done: true,
+              // Checklist's own label span has no truncation of its own —
+              // the kit draws a multi-line task description there, and a
+              // to-do's title mid-length is closer to a table row's single
+              // line. Truncated here rather than left to wrap: at 27 rows,
+              // five or six lines apiece (measured against real staging
+              // titles) turned the list into something nobody scans.
+              label: (
+                <span className="block truncate">
+                  {todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}
+                </span>
+              ),
+              owner: todo.accountName,
+              when: todo.completedAt ? t("done {date}", { date: formatDate(todo.completedAt) }) : null,
+              dateTime: todo.completedAt ?? undefined,
+              meta:
+                todo.completedByName || todo.fileName ? (
+                  <>
+                    {todo.completedByName}
+                    {todo.completedByName && todo.fileName ? " · " : null}
+                    {todo.fileName &&
+                      (fileLink ? (
+                        <a
+                          href={fileLink}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="text-primary underline-offset-2 hover:underline"
+                        >
+                          {todo.fileName}
+                        </a>
+                      ) : (
+                        todo.fileName
+                      ))}
+                  </>
+                ) : null,
+            }
+          })}
+        />
       ) : (
         <RowList>
           {q.data.map((todo) => {
@@ -866,28 +925,10 @@ export function TodosPanel({
             // text it always was — the same fallback `staff-panel.tsx` gives a
             // certificate, whose shape this copies rather than inventing a third.
             const fileLink = safeHref(todo.fileUrl)
-            // WHAT EACH PILE'S QUIET LINE SAYS. An open to-do is about a DATE we
-            // are waiting on; a done one is about who sent it back and when —
-            // the same row answering the two different questions each tab asks.
-            //
-            // WHOLE SENTENCES WITH A HOLE IN THEM, never a word joined to a
-            // date: `t("due")` declares a three-letter fragment to be copy, and
-            // `isUserVisible` refuses it — so it would be translated NOWHERE
-            // while looking translated (R28). A `{date}` hole is also the only
-            // shape a translator can reorder.
-            const meta =
-              view === "done"
-                ? [
-                    todo.accountName,
-                    todo.completedAt
-                      ? t("done {date}", { date: formatDate(todo.completedAt) })
-                      : null,
-                    todo.completedByName,
-                  ]
-                : [
-                    todo.accountName,
-                    todo.dueOn ? t("due {date}", { date: formatDate(todo.dueOn) }) : t("no date"),
-                  ]
+            const meta = [
+              todo.accountName,
+              todo.dueOn ? t("due {date}", { date: formatDate(todo.dueOn) }) : t("no date"),
+            ]
             return (
               <Row
                 key={todo.id}
@@ -917,11 +958,10 @@ export function TodosPanel({
                     )}
                   </p>
                 </div>
-                {/* Only where it SAYS something: in the done pile every row is
-                    done and the tab above already said so. On the open pile it
-                    is the row that has just been completed under the reader's
-                    eyes, patched in place by the live layer. */}
-                {todo.completedAt && view === "open" && (
+                {/* The row that has just been completed under the reader's
+                    eyes, patched in place by the live layer, before the tab
+                    it now belongs to has caught up. */}
+                {todo.completedAt && (
                   <Badge variant="secondary" className="text-badge">
                     {t("Done")}
                   </Badge>
