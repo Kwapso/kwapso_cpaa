@@ -5,8 +5,68 @@ import { readFileSync, writeFileSync } from "node:fs"
 const lines = (f) => readFileSync(f, "utf8").split("\n").map(s => s.trim()).filter(Boolean)
 const components = lines("/tmp/kit-components.txt")
 const compositions = lines("/tmp/kit-compositions.txt")
-const imported = new Set(lines("/tmp/app-imports.txt").map(s => s.replace(/^components\//, "").replace(/\/.*$/, "")))
-const importedFull = new Set(lines("/tmp/app-imports.txt"))
+const direct = lines("/tmp/app-imports.txt")
+
+// REACHED, NOT MERELY IMPORTED. Counting only the app's own import lines
+// understated adoption six times over in one day, always in the same
+// direction: `notes` reaches every screen through Comments, `folder` through
+// tabs, `title` through the kit's own record-detail, `progress` through
+// file-upload, `motion` through both doors' globals.css. Each was found by
+// hand, reported as a footnote, and the headline number stayed wrong.
+//
+// A part the app reaches THROUGH another part it has adopted is adopted. That
+// is what a person looking at the screen would say, and the number exists to
+// answer that question rather than a question about import syntax. So the
+// walk closes over the kit's own imports: start from what the app names, and
+// keep pulling in whatever those files name, until nothing new appears.
+//
+// It cannot over-count. Nothing enters the set without a path back to a file
+// the app itself imports, so an unreached part stays unreached no matter how
+// many other unreached parts import it — which is exactly the case that
+// caught `heatmap`, imported only by the unadopted `pulse-band`.
+import { readdirSync, statSync } from "node:fs"
+import { join } from "node:path"
+
+const KIT = "/Users/alaap_kanchwala_apple/Desktop/kwapso_cpaa/shared/ui"
+const sourceOf = (spec) => {
+  const base = join(KIT, spec)
+  for (const c of [base + ".tsx", base + ".ts", join(base, spec.split("/").pop() + ".tsx"), join(base, "index.ts")]) {
+    try { if (statSync(c).isFile()) return readFileSync(c, "utf8") } catch {}
+  }
+  try {
+    for (const f of readdirSync(base)) if (f.endsWith(".tsx") || f.endsWith(".ts"))
+      return readFileSync(join(base, f), "utf8")
+  } catch {}
+  return ""
+}
+
+const reached = new Set(direct)
+const queue = [...direct]
+while (queue.length) {
+  const spec = queue.pop()
+  const src = sourceOf(spec)
+  if (!src) continue
+  // A kit file names its siblings relatively ("../title/title") and its own
+  // foundations absolutely. Both resolve to a part; anything outside the kit
+  // is somebody else's problem.
+  const here = spec.split("/").slice(0, -1).join("/")
+  for (const m of src.matchAll(/from\s+"((?:\.\.?\/|@shared\/ui\/)[^"]+)"/g)) {
+    let r = m[1]
+    if (r.startsWith("@shared/ui/")) r = r.slice("@shared/ui/".length)
+    else {
+      const parts = (here + "/" + r).split("/")
+      const out = []
+      for (const seg of parts) { if (seg === "..") out.pop(); else if (seg !== "." && seg) out.push(seg) }
+      r = out.join("/")
+    }
+    if (!/^(components|compositions|foundations)\//.test(r)) continue
+    if (!reached.has(r)) { reached.add(r); queue.push(r) }
+  }
+}
+
+const imported = new Set([...reached].map(s => s.replace(/^components\//, "").replace(/\/.*$/, "")))
+const importedFull = new Set(reached)
+const transitive = [...reached].filter(r => !direct.includes(r)).sort()
 
 // The owner's own groupings, in his order, with his words kept as the heading.
 const GROUPS = [
@@ -78,4 +138,5 @@ out += `---\n\n**Components ${have}/${components.length} · Compositions ${cHave
 if (absent) out += ` · ${absent} named-but-absent`
 out += `\n`
 writeFileSync("KIT-COVERAGE.md", out)
+console.log(`  reached through another kit part (invisible to a direct-import count): ${transitive.length}`)
 console.log(`components ${have}/${components.length}   compositions ${cHave}/${compositions.length}   named-but-absent ${absent}   unlisted ${unlisted.length}`)
