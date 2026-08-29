@@ -221,6 +221,15 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     is work we owe the library; NEEDS-A-SPEC is work the kit owes the app, and
     everything on it is wearing the new tokens with its old shape untouched,
     because the kit's own rule is to log rather than improvise.
+    **[KIT-COVERAGE.md](KIT-COVERAGE.md)** is the owner's own checklist off the
+    kit's catalogue, reconciled against what `shared/ui/` actually ships and
+    regenerated from the app's real import specifiers
+    (`scripts/kit-coverage.mjs`) rather than hand-ticked. Its companion,
+    **[COMPOSITION-MISMATCHES.md](COMPOSITION-MISMATCHES.md)**, is the other
+    half of that number: every kit composition checked and found NOT to fit
+    this app's architecture, with the specific structural reason for each —
+    so a locked mismatch is a recorded result nobody re-discovers by trying it
+    again, not a silent gap that reads like nobody looked.
 11. The UI comes ONLY from the component library, which is vendored **in this
     repo** at `shared/ui/` and imported as `@shared/ui/…` — and it is a PINNED
     dependency: `github.com/Kwapso/design` at the tag in `shared/ui/VERSION.json`,
