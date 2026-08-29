@@ -107,10 +107,15 @@ app-wide sidebar (`web/components/app-shell.tsx`). That check stopped at
 "does ScreenShell draw a rail" and never read whether the rail's CONTENTS
 were forced. They are not: `screen-shell.tsx`'s own header states, verbatim,
 `rail={null}` is a real, documented opt-out ("nothing in the repo needs it
-today" — because every current call site has one to pass), and the shell
-"does not draw the rail's CONTENTS" in either case — it owns only the
-column's placement, width and full-height paper fill. Passing this app's own
-nav as the `rail` node, or `null`, produces no duplicate chrome.
+today" — because every current call site has one to pass). A peer
+independently confirmed this by RENDERING each of the six with `rail={null}`
+and diffing the DOM against the default, rather than reading the prop
+comment: zero `nav`/`aside` elements and no 13rem column in the markup at
+all on every one of them (the whole rail branch is `{railNode ? (…) : null}`
+in the shell's own source) — not an empty gutter, not a duplicated
+landmark, the column is gone outright. Passing this app's own nav as the
+`rail` node, or `null`, produces no duplicate chrome, confirmed both by
+reading and by rendering.
 
 What survives past that correction, and is the reason this is `[~]` and not
 `[x]`: **`ScreenShell` is a per-route composition, and `AppShell` is a
@@ -186,12 +191,19 @@ grant it" well AND the `Request` link are drawn from ONE conditional block
 gated on `grantor !== undefined` — there is no way to get the well without
 the button (`Request`'s `onClick` is unconditional inside that block, so
 `onRequest` alone does not neutralize it; only omitting `grantor` does).
-Omitting `grantor` entirely removes the self-service affordance cleanly,
-while keeping the denial sentence, the blurred page-behind layer and a
-`Back` button. This is a real fit for the client portal's `NoAccess` screen.
-If the portal still wants to name a contact, that has to be prose in the
-description text, not the interactive grantor row. Not prototyped this
-pass.
+Passing `grantor={null}` removes the self-service affordance cleanly, while
+keeping the denial sentence, the blurred page-behind layer and a `Back`
+button. **Update from a peer's render-probe sweep:** the composition's
+DEFAULT parameter (`grantor = DEFAULT_GRANTOR`) meant an app that merely
+*omitted* the prop, rather than passing `null` explicitly, would still have
+rendered a real name and a live `Request` link — a genuine kit bug (the
+prop's own doc said "undefined draws no grantor block at all," which was
+never true against the actual default), now fixed upstream (kit v1.2.4/
+v1.2.5) so `grantor={null}` is the clean, confirmed-by-rendering opt-out.
+Pass `null` explicitly, not nothing. This is a real fit for the client
+portal's `NoAccess` screen. If the portal still wants to name a contact,
+that has to be prose in the description text, not the interactive grantor
+row. Not prototyped this pass.
 
 ### `templates/stat-strip.tsx` — CORRECTED, partially adoptable
 
@@ -208,17 +220,29 @@ already carry a real chart, which stay exactly as `pulse.tsx`'s law says.
 Not prototyped this pass; needs a scan of which `pulse.tsx`/`impact-panel.tsx`
 tiles are number-only today before swapping any in.
 
-## [!] Confirmed mismatches, re-examined and unchanged (10)
+### `templates/form-screen.tsx` (+ `templates/multi-step-form.tsx`) — CORRECTED, per a peer's render probe
 
-### `templates/form-screen.tsx` (+ `templates/multi-step-form.tsx`)
+The first pass rejected this outright: the composition is a side-sheet, this
+app's `FormShell` (`shared/web/form-shell.tsx`, 32+ call sites) is a centred
+`Dialog`, and the kit's own doc header states the UX position in words ("a
+centred modal is for confirmations only"). A peer rendered `FormScreen` with
+`surface="page"` rather than reading the prop table, and found it draws a
+**plain div** — no dialog role, no sheet, no scrim. The side-sheet chrome
+lives entirely in `surface="panel"`; `surface="page"` is the form BODY
+alone. That is the same grain this app already found for records
+(`RecordChrome`, not `DetailScreen`'s `ScreenShell` wrapper) — the lower-
+level content composes into `FormShell`'s own centred `Dialog`, and the
+side-sheet-vs-centred-modal disagreement never has to be litigated because
+`FormScreen`'s outer sheet is simply never used. Not prototyped this pass;
+next step is reading what `surface="page"` actually expects as its steps/
+fields contract and whether it fits `FormShell`'s own field-rendering, before
+touching any of the 32+ call sites. `multi-step-form` still has nothing to
+attach to (no wizard exists in the app) and is unaffected by this correction.
 
-Re-checked for an opt-out: none exists. The side-sheet-vs-centred-dialog
-disagreement is drawn into the composition's own layout, not gated by a
-prop, and the kit's own doc header states the UX position in words ("a
-centred modal is for confirmations only") rather than as a configurable
-default. `FormShell` (`shared/web/form-shell.tsx`, 32+ call sites) is a
-centred `Dialog` on purpose. `multi-step-form` inherits this and also has no
-wizard anywhere in the app to hang it on regardless.
+## [!] Confirmed mismatches, re-examined and unchanged (6)
+
+Four groups below, plus `ArchiveConfirmationDialog` and `StepperHero` for
+stories, each recorded once under its sibling's entry rather than twice.
 
 ### `overlays/import.tsx`, `templates/import-flow.tsx`, `overlays/import-proposal.tsx`
 
@@ -264,13 +288,11 @@ vocabulary facet chips (`shared/web/screen-engine/filter-bar.tsx`). Omitting
 the operator list does not collapse the composition into a chip row; it just
 leaves the operator dropdown emptier. Confirmed unchanged.
 
-### `overlays/access-denied.tsx`'s cousin, `overlays/delete-confirmation.tsx`'s `ArchiveConfirmationDialog`
-
-See `[~]` above — the split verdict is recorded there, not duplicated here.
-
-### `templates/stepper-hero.tsx` for `story-status-stepper.tsx`
-
-See `[x]` above — recorded once, not duplicated here.
+`ArchiveConfirmationDialog` (the mandatory-reason sibling of
+`DeleteConfirmationDialog`) and `StepperHero` for `story-status-stepper.tsx`
+(the 4-stage door mismatch) are also still real, unresolved mismatches, but
+each is recorded once already — under the `[~]`/`[x]` entry for its sibling
+composition — rather than duplicated here.
 
 ## [ ] No current app equivalent (4)
 
@@ -339,9 +361,22 @@ names the precedent for `SortControl` sharing the `viewSwitch` slot) rather
 than the bespoke header markup it draws today. All of the DATA logic
 (`selectRows`, facets, the remembered-question state) is unaffected — this
 is a presentation-layer rewrite of one file, but that one file is the visual
-contract of every collection screen in both doors. Not prototyped this pass;
-recommending the same dedicated-branch treatment as the rail question, given
-the reach, rather than rolling it into this batch.
+contract of every collection screen in both doors.
+
+**Prototyped and verified, one caller, not yet rolled out further.** Commit
+`989dea7e`: a `useKitPanel` flag (default `false`) on the engine's
+`CollectionFrame`, wired temporarily to the roles collection only, verified
+at 390/768/1280/1920, both themes, plus a live search interaction, then
+reverted so every other call site is byte-identical. Two real bugs surfaced
+by the screenshots and fixed before commit: passing `config.showCount`
+straight into the kit's `heading`+`count` Badge drew an ORPHANED count chip
+on a title-less collection — a second count for the one collection, which is
+what R16 exists to catch — and the fix's own first draft then clipped the
+search input on a phone by fighting it for space inside one flex slot; both
+are written up in the commit message rather than repeated here. `empty-
+collection` and `no-results` (the other lane's states work, hosted in this
+same engine file) are its next callers, per the planner's sequencing —
+not rolled out to the other five list-recipe call sites yet either.
 
 ## Why this file exists
 
