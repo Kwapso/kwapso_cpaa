@@ -353,10 +353,26 @@ export function PortalDoor({ children }: { children: React.ReactNode }) {
         <AuthPhotograph />
       </div>
 
-      {/* THE OTHER HALF — one column of content, centred on the BLOCK axis and
-          on no other. Every line inside it ranges left. */}
+      {/* THE OTHER HALF — one column of content, centred on the BLOCK axis and,
+          since the owner's override below, on the inline axis too wherever
+          there is room to.
+
+          THE OWNER'S OVERRIDE, APP-SIDE ONLY. The kit's own file quotes
+          ch27.16 verbatim: "Nothing on an auth screen is centred… range left,
+          the same as every other kwapso surface." Seeing the AGENCY door
+          flush-left in an empty 840px column, he ruled the opposite — but the
+          agency has no photography and collapses to one full-width column
+          (`web/components/auth-card.tsx` has the same note). THIS door keeps
+          its two panels and its real, client-supplied photograph
+          (`AuthPhotograph`, see the header comment above) — there is nothing
+          empty here to react to. So only the half of the ruling that still
+          applies applies: `mx-auto` below centres the content WITHIN its own
+          half whenever the column is wider than `--measure-body` (a large
+          desktop), and is a no-op everywhere it already fills the column (a
+          phone, where the photo is hidden and this is the only column). The
+          picture stays exactly where it was. */}
       <div className="relative flex min-w-0 flex-col justify-center">
-        <div className="flex w-full min-w-0 max-w-[var(--measure-body)] flex-col gap-[var(--space-6)]">
+        <div className="mx-auto flex min-w-0 max-w-[var(--measure-body)] flex-col gap-[var(--space-6)]">
           <Logotype size="lg" on="paper" />
           {children}
           <p className="text-muted-foreground text-xs">{brand.motto}</p>
