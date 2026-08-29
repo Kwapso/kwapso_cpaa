@@ -435,9 +435,36 @@ list forbids. Exclude the docs:
 `source(none)` turns off automatic detection and the explicit `@source` scans
 only the component source. Verified with tailwindcss 4.3.3: the four primitives
 compile to kwapso values and the bundle contains **no** `opacity-*`,
-`outline-none`, `outline-hidden`, `ring-*`, `rounded-lg`, `rounded-md`,
-`rounded-xl` or `rounded-2xl` rule at all. Broad auto-detection puts every one
-of those back, from this file's rejection list.
+`outline-none`, `outline-hidden`, `ring-*` or off-vocabulary radius rule at
+all. Broad auto-detection puts every one of those back, from this file's
+rejection list.
+
+**SINCE v1.2.5 THE KIT SHIPS THE EXCLUSION ITSELF, so the advice above is now
+belt-and-braces rather than a requirement.** The paragraph above was right and
+it was not enough, because it asked every CONSUMER to remember it. They did
+not, and could not be expected to: `tokens.css` shipped bare-directory
+`@source` lines, and a consumer who writes plain `@import "tailwindcss"`
+inherits Tailwind's automatic walk regardless of anything written here. The
+kwapso app did exactly that and compiled this file into its stylesheet — a
+parse error on every build of both its front doors, from one line of prose in
+§9 quoting an arbitrary font-size utility with a wildcard in the token name,
+plus four named box radii this document exists to forbid.
+
+`tokens.css` now scans `**/*.{ts,tsx}` rather than directories, AND carries
+`@source not` for markdown, so the exclusion travels with the thing it
+describes and a consumer gets it without knowing it exists.
+
+**AND THE LESSON GENERALISES PAST MARKDOWN, WHICH IS THE PART THAT COST MOST.**
+Tailwind reads `.tsx` too, and it cannot tell an explanation from an
+intention. Three SOURCE COMMENTS — one in `card/card.tsx` and two in
+`tokens.css` — named a forbidden radius step in order to say it was forbidden,
+and emitted it. No `@source` exclusion can reach those: they live in the files
+where the real classes live, which must be scanned. Only the wording can fix
+it, and v1.2.6 rewrote all three to DESCRIBE the step instead of spelling it.
+
+So: in a comment, in any file this kit scans, describe the class you are
+forbidding — never write it. This section is the exception that proves it, and
+only because markdown is now excluded outright.
 
 ---
 
@@ -477,3 +504,63 @@ and per this section you usually are — you want `raised`.
 
 No token changed and no component changed. This is a composition law, and it
 belongs in `docs/RULES.md` when that gets written.
+
+---
+
+## 12 · A measurement proves nothing until the instrument has been shown it can fail
+
+Everything above is a claim somebody has to CHECK — a fill, a contrast, a
+compiled bundle, whether a prop reaches the DOM. This section is about the
+checking, because on 29 Aug 2026 one lane produced nine wrong answers in a day
+from probes that all looked like they worked, and two of those answers reached
+other people before being caught.
+
+**Run the canary first.** A case that must come back positive, and where it is
+cheap, one that must come back negative. If the canary is silent the
+measurement is not evidence, however confident the number is.
+
+The ways it went wrong, each named with what it looked like at the time:
+
+- **A stale cache.** A build reused a cached stylesheet, so a CSS fix read as
+  "no effect". Clear the build cache before believing a build.
+- **A tab that never paints.** An embedded browser pane ran at
+  `document.hidden === true`: `requestAnimationFrame` never fires and CSS
+  animations never tick, so an anchored surface never receives the
+  `animationend` it unmounts on. A supposed unmount bug "reproduced" perfectly
+  there and was pure artefact. Anything animation-driven must be measured
+  somewhere that paints.
+- **A truncated value.** A computed shadow sliced at 50 characters, where the
+  leading transparent placeholders filled all fifty — so a field carrying a
+  perfectly good hairline read as edgeless.
+- **The wrong algorithm.** Accessible names computed from `textContent`, which
+  is not the accessible-name algorithm: a button named by its image's `alt`
+  looked nameless. Ask the browser (`Accessibility.getFullAXTree`), never a
+  hand-rolled approximation of a spec.
+- **Asking for the wrong property.** A folder tab's fill lives on an SVG shape,
+  not a CSS background, so `backgroundColor`, then pseudo-elements, then child
+  backgrounds all came back empty and the tab looked unfilled. It was correct
+  the whole time.
+- **A polluted canary.** A probe injected an unnamed control as its negative
+  canary and then counted its own injection as the finding.
+
+**And the canary must be the SHAPE of the real case.** A probe hunting a
+same-tone box nested inside another walked four ancestors up; its canary was a
+two-level nesting, so it passed every run while the real pairing sat five
+levels apart and went straight through. That certified a clean bill of health
+for sixteen screens, all of it retracted. Build the canary from the hardest
+instance you can imagine, not the simplest one that demonstrates the idea — and
+when a probe carries a BOUND (a depth, a slice length, a result limit, a
+timeout), distrust the bound the moment it reports nothing.
+
+**A count cannot name its source.** Grepping a built artefact for a real symbol
+tells you it is present, never which of N files put it there — so it cannot
+distinguish "my fix did nothing" from "my fix worked and a second source is
+still feeding it". Plant a sentinel: a unique token that could only have come
+from the file under suspicion, rebuild, and grep for the sentinel. One build per
+candidate settles it.
+
+**The worst failure is the confident all-clear.** Every one above except two
+cost a wrong FINDING, and a finding argues with the code, so somebody checks it
+and it dies. The depth-bounded walk cost a wrong ALL-CLEAR and an inference
+drawn from this document — reasoning about a nesting that had not been measured
+— cost a wrong WARNING. Both agree with everybody and are never re-opened.
