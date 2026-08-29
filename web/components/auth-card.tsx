@@ -35,7 +35,24 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
   const googleError = useSignInError()
 
   return (
+    // THE OWNER'S OVERRIDE, APP-SIDE ONLY — do not "fix" this back by editing
+    // the kit. The kit's own file quotes ch27.16 verbatim: "Nothing on an
+    // auth screen is centred… range left, the same as every other kwapso
+    // surface." He looked at this screen live (1710px: the wordmark, field
+    // and buttons sitting at x=0 in an 840px column with 870px of empty
+    // screen beside them — `media={null}` starves the kit's own
+    // `md:grid-cols-2` of its second column, and the remaining one still
+    // ranges left with no cap) and ruled the opposite for both doors: centred,
+    // no panel. The kit's own `data-slot="sign-in-content"` is the stable
+    // hook this reaches from outside — targeted by a descendant selector
+    // rather than a class edited into the vendored file, so a design-sync
+    // re-pull never has to notice this exists. `md:grid-cols-1` on the root
+    // is this app's own override of a grid meant for two columns; the kit's
+    // own null-media single-column behaviour is a separate fix, upstream,
+    // not this one.
+    <div className="[&_[data-slot=sign-in-content]]:mx-auto [&_[data-slot=sign-in-content]]:max-w-md">
     <LoginRoute
+      className="md:grid-cols-1"
       // R33: LoginRoute's own defaults are English literals baked into the
       // (vendored, uneditable) composition — every one restated here through
       // t() so a reader who chose German gets German rather than the kit's
@@ -75,5 +92,6 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
         },
       ]}
     />
+    </div>
   )
 }
