@@ -686,11 +686,25 @@ restructuring the many hand-composed `*-detail.tsx` files, which might
 genuinely reduce real duplication but is scoped work, not a batch item. Not
 picked up this pass.
 
-**Unresolved, needs a render-based look:** `checklist` (ordered rows, a
-tick mark, an owner, a due date) reads as a plausible fit for
-`web/components/work-panels.tsx`'s `TodosPanel` (a simple open/done to-do
-list), but nobody has actually rendered the two side by side yet. Recorded
-as an open thread rather than a claimed verdict either way.
+**`checklist` — CLOSED, no current app equivalent.** Two candidates
+considered, both real mismatches rather than one render-check away from
+fitting:
+- `work-panels.tsx`'s `TodosPanel` (client to-dos) has no tick/checkbox at
+  all — completion is a "Done" badge only, and the sole staff action on an
+  open row is Withdraw. These are things staff is WAITING ON THE CLIENT
+  for; only the client's own action closes one. `checklist`'s whole
+  interaction model is a person ticking a mark to move a row open→done —
+  wiring that on here would offer a control that lies about who can press
+  it.
+- `tasks-screen.tsx`'s "Ours to do" list (real staff tasks, genuine
+  tick-to-complete via `task-detail.tsx`'s `onToggleDone`) is closer in
+  spirit but already deliberately richer than `checklist`'s fixed
+  5-column row (mark/number/title/owner/when): six server-driven view tabs
+  with exact R14/R16 counts, priority, assignee, department glyph, due
+  date. `checklist` has no slot for most of that — adopting it would be a
+  downgrade, not a fit.
+
+Filed in the same bucket as most of Collection views.
 
 `screen-renderer` and `collection-frame` are left alone here — the app's
 own files under those names do a different job from their kit namesakes
