@@ -31,7 +31,7 @@
 // read" on the triage screen, and the resolve panel — and they live beside the
 // record, not on this strip.
 
-import { StatusStepper } from "@shared/ui/components/status-stepper/status-stepper"
+import { StepperHero } from "@shared/ui/compositions/templates/stepper-hero"
 
 import { HELP_STATUSES, type HelpStatus } from "@shared/types"
 import { HELP_STATUS } from "@/components/deep-link/shape"
@@ -57,12 +57,16 @@ const STAGES = HELP_STATUSES.map((value) => ({ value, label: HELP_STATUS[value] 
 
 export function HelpStatusStepper({ status }: { status: HelpStatusValue }) {
   return (
-    <StatusStepper
+    <StepperHero
+      door="system"
       stages={STAGES.map((s) => ({ id: s.value, label: s.label }))}
       current={STAGES.findIndex((s) => s.value === status)}
-      // NOT PRESSABLE, and both halves are needed. No `onChange` means there is
-      // nothing to press; `disabled` is what stops it LOOKING pressable, which is
-      // the half the tester actually reported ("it should not look pressable").
+      // NOT PRESSABLE, and both halves are needed. No `onStageSelect` means
+      // there is nothing to press; `disabled` is what stops it LOOKING
+      // pressable, which is the half the tester actually reported ("it
+      // should not look pressable"). Same read-only contract StatusStepper
+      // gave us — StepperHero's own register 10 states it in words: "no
+      // onStageSelect: the strip states, and nothing moves."
       disabled
     />
   )
