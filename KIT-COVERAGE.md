@@ -11,12 +11,16 @@ Every item he named resolves to a real part once transcription is undone —
 is one part, and headline/text/hint are three exports of typography. Nothing he
 asked for is missing and nothing in the kit went unnamed.
 
-`[x]` = the app imports it today. `[ ]` = it does not. `(absent)` = the owner named
+`[x]` = the app REACHES it — directly, or through another part it already
+reaches. Counting only the app's own import lines understated this SIX times in
+one day, always the same way: `notes` arrives through Comments, `folder` through
+tabs, `title` through the kit's own record-detail, `progress` through file-upload,
+`motion` through both doors' stylesheets. Each was found by hand and filed as a
+footnote while the headline stayed wrong. 26 parts are reached that way today.
+The walk cannot over-count: nothing enters without a path back to a file the app
+itself names, which is why `heatmap` stays unadopted even though `pulse-band`
+imports it — pulse-band is not reached either. `[ ]` = not reached. `(absent)` = named
 it and the kit has no such part, which is worth knowing rather than silently dropping.
-
-Regenerate the ticks with:
-
-    grep -rhoE '@shared/ui/(components|compositions|foundations)/[A-Za-z0-9/_-]+' web/ web-portal/ shared/web/ | sed 's#@shared/ui/##' | sort -u
 
 ## Charts and graphs
 

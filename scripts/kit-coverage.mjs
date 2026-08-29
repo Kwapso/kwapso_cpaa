@@ -102,9 +102,16 @@ out += `Every item he named resolves to a real part once transcription is undone
       `"more toggle" is mode-toggle, "status/stepper" is one part, "portal/conversation"\n` +
       `is one part, and headline/text/hint are three exports of typography. Nothing he\n` +
       `asked for is missing and nothing in the kit went unnamed.\n\n` +
-      `\`[x]\` = the app imports it today. \`[ ]\` = it does not. \`(absent)\` = the owner named\n`
-out += `it and the kit has no such part, which is worth knowing rather than silently dropping.\n\n`
-out += `Regenerate the ticks with:\n\n    grep -rhoE '@shared/ui/(components|compositions|foundations)/[A-Za-z0-9/_-]+' web/ web-portal/ shared/web/ | sed 's#@shared/ui/##' | sort -u\n\n`
+      `\`[x]\` = the app REACHES it — directly, or through another part it already\n` +
+      `reaches. Counting only the app's own import lines understated this SIX times in\n` +
+      `one day, always the same way: \`notes\` arrives through Comments, \`folder\` through\n` +
+      `tabs, \`title\` through the kit's own record-detail, \`progress\` through file-upload,\n` +
+      `\`motion\` through both doors' stylesheets. Each was found by hand and filed as a\n` +
+      `footnote while the headline stayed wrong. ${transitive.length} parts are reached that way today.\n` +
+      `The walk cannot over-count: nothing enters without a path back to a file the app\n` +
+      `itself names, which is why \`heatmap\` stays unadopted even though \`pulse-band\`\n` +
+      `imports it — pulse-band is not reached either. \`[ ]\` = not reached. \`(absent)\` = named\n` +
+      `it and the kit has no such part, which is worth knowing rather than silently dropping.\n\n`
 
 const seen = new Set()
 let have = 0, need = 0, absent = 0
