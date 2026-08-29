@@ -457,6 +457,12 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
       detail: a.colorHex || a.category || a.description || "—",
       category: a.category || "—",
       state: a.active ? "Live" : "Archived",
+      // The gallery display's own slot (`recipe.image`) — a plain URL
+      // string, not the `mark` node above. A colour asset has no file (0043:
+      // the two are exclusive by construction), so it draws Gallery's own
+      // no-picture register — its name on soft paper — rather than a broken
+      // image or an invented swatch tile.
+      fileUrl: a.fileUrl || undefined,
     })),
   }
 }

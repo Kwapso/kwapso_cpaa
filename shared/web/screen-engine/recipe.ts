@@ -171,7 +171,7 @@ export interface ScreenRecipe {
   header?: ScreenHeader
   tabs?: RecipeTab[]
   /** list: how the rows render + the collection (search/filter/sort/pages). */
-  display?: "table" | "list" | "cards"
+  display?: "table" | "list" | "cards" | "gallery"
   collection?: CollectionConfig
   /** list (display: "list"): the List surface. Omit (or "card") for the default
    * bordered surface; "none" = flat, for when the host wraps the collection in
@@ -187,6 +187,15 @@ export interface ScreenRecipe {
    * A column holding a plain string renders as that string, so point this at
    * the shaped node, not at a raw `logoUrl`. */
   leading?: string
+  /** list (display: "gallery"): the column holding each row's picture, as a
+   * plain URL STRING — deliberately not `leading`, which the list/card
+   * displays read as an already-rendered node (a shaped `mark`). The kit's
+   * `Gallery` needs the raw `src` itself, not a picture already wrapped in a
+   * `RecordMark`, so this points at a second, plainer column. A row with
+   * nothing at this column draws Gallery's own no-image register (the title
+   * on soft paper) rather than an empty box — that is `Gallery`'s state, not
+   * a fallback this engine invents. */
+  image?: string
   /** custom: the composed tree. */
   layout?: RecipeNode
   /** confirm: the prompt. */

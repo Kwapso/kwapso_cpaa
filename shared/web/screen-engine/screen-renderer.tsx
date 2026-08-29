@@ -57,6 +57,7 @@ import { Switch } from "@shared/ui/components/switch/switch"
 import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/components/card/card"
+import { Gallery, type GalleryTile } from "@shared/ui/components/gallery/gallery"
 import { MoreHorizontal } from "@shared/ui/foundations/icons"
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
 import { DataTable, type DataTableColumn } from "@shared/ui/components/data-table/data-table"
@@ -655,7 +656,28 @@ function renderList(
       useKitPanel={useKitPanel}
       band={band}
       renderItems={(page) =>
-        display === "cards" ? (
+        display === "gallery" ? (
+          /* The one view where an image leads (Gallery, components/gallery).
+             A row with nothing at `recipe.image` draws the tile's own
+             no-picture register (its title on soft paper) rather than an
+             empty box — that is the composition's own state, read straight
+             off `GalleryTile.src` being undefined, not a fallback built
+             here. `onTileSelect` opens the record exactly as a list row or
+             a card does. */
+          <Gallery
+            label={recipe.collection?.title}
+            tiles={page.map(
+              (row): GalleryTile => ({
+                id: String(row.id ?? ""),
+                title: String(row[fields[0]?.column ?? "id"] ?? ""),
+                src: recipe.image ? (row[recipe.image] as string | undefined) : undefined,
+              })
+            )}
+            onTileSelect={(tile) =>
+              onIntent?.({ kind: "open", module: recipe.binding.module, id: tile.id })
+            }
+          />
+        ) : display === "cards" ? (
           /* The kit's CardGrid is the LAYOUT; the cards are children. A card
              still opens its record exactly as a list row does — the whole
              card is the press target, drawn from the kit's own Card.
