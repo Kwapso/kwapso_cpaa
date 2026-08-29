@@ -158,7 +158,14 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         }}
         onCreate={() => go(sectionPath, { panel: "add", module: "roles" })}
       >
-        <ScreenRenderer recipe={rolesRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+        <ScreenRenderer
+          recipe={rolesRecipe}
+          data={data}
+          rights={rights}
+          onAction={onAction}
+          onIntent={onIntent}
+          useKitPanel
+        />
       </SectionWithCreate>
     )
   }
