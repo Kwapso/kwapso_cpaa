@@ -37,9 +37,16 @@ import { appMoneyKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import type { AppMoneyBack } from "@shared/types"
 import { moneyText } from "@shared/web/money"
-import { SAVINGS_CAPTION, hoursText } from "@shared/workers/savings"
+import { SAVINGS_CAPTION, hoursText, savedHours } from "@shared/workers/savings"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+
+// `lines` reads exactly like the agency's own "hours by X" comparisons — reused
+// from pulse.tsx (R39, the kit's Chart underneath) rather than a new picture.
+// The door (appMoneyBack) rolls up `listSavings`, which sorts a process list
+// biggest-saving-first before this panel ever sees it, so the chart and the list
+// below it read in the same order without sorting twice.
+import { BandCard, HoursByChart, NothingYet } from "@/components/pulse"
 
 
 export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: string } }) {
@@ -114,6 +121,20 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
           </div>
         </div>
       )}
+
+      <BandCard title={t("Hours a month, by process")}>
+        {view.lines.length < 2 ? (
+          <NothingYet
+            what={t("One map is behind this figure.")}
+            how={t("This picture appears once a second map is giving time back.")}
+          />
+        ) : (
+          <HoursByChart
+            rows={view.lines.map((line) => ({ label: line.name, hours: savedHours(line.savedSecondsPerMonth) }))}
+            label={t("Hours a month")}
+          />
+        )}
+      </BandCard>
 
       {/* WHERE IT COMES FROM, process by process — the same drill-down every
           other savings screen offers, with the role and its price added. */}
