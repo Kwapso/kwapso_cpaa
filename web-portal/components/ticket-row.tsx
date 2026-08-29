@@ -11,6 +11,7 @@
 import Link from "next/link"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Clamp } from "@shared/ui/components/clamp/clamp"
 import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import type { HelpTicket } from "@shared/types"
@@ -66,7 +67,7 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
       className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] border p-4"
     >
       <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-2">
-        <p className="line-clamp-2">{richTextPlain(ticket.description)}</p>
+        <Clamp lines={2} collapsible={false}>{richTextPlain(ticket.description)}</Clamp>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
           <Badge variant={status.variant}>{t(status.label)}</Badge>
           {/* HOW MUCH WORK IS ON IT, and nothing else about that work

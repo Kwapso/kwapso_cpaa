@@ -24,7 +24,7 @@ import * as React from "react"
 
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Progress } from "@shared/ui/components/progress/progress"
+import { KpiProgress } from "@shared/ui/components/kpi-progress/kpi-progress"
 import type {
   ScreenActionContext,
   ScreenIntent,
@@ -247,15 +247,15 @@ export function TasksScreen({
   const doneToday = counts.dueTodayDone ?? 0
   const progressBar = (
     <section className="flex flex-col gap-2" aria-label={t("Today's tasks")}>
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-medium">{t("Today's tasks")}</h2>
-        <p className="text-muted-foreground text-xs tabular-nums">
-          {dueToday === 0
+      <KpiProgress
+        label={t("Today's tasks")}
+        value={
+          dueToday === 0
             ? t("Nothing due today or before.")
-            : t("{done} / {due} done", { done: doneToday, due: dueToday })}
-        </p>
-      </div>
-      <Progress value={dueToday === 0 ? 100 : Math.round((doneToday / dueToday) * 100)} />
+            : t("{done} / {due} done", { done: doneToday, due: dueToday })
+        }
+        percent={dueToday === 0 ? 100 : Math.round((doneToday / dueToday) * 100)}
+      />
       {!seesEveryones && (
         <p className="text-muted-foreground text-xs">
           {t("These are the tasks assigned to you. Seeing everyone's is a separate access right.")}
