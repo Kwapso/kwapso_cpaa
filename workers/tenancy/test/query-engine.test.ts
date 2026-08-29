@@ -37,6 +37,12 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
+import {
+  canonicalModule,
+  MODULE_ALIASES,
+  QUERY_MODULES,
+  suggestModule,
+} from "@shared/workers/query-grammar"
 import { GROUP_CAP, MAX_CLAUSES, VALUES_PER_CLAUSE } from "../src/lib/query-engine"
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "./spine-harness"
@@ -376,6 +382,93 @@ describe("R14: the read is bounded, and it pages by key", () => {
   it("the group ceiling is a real number, said at the query", () => {
     expect(GROUP_CAP).toBeGreaterThan(50)
     expect(VALUES_PER_CLAUSE).toBeLessThan(100)
+  })
+})
+
+describe("a module answers to the names it already has everywhere else", () => {
+  // THE BUG THIS CLOSES, measured on staging on 29 Aug 2026 against the owner's
+  // own question. The assistant opened with describe_module("help"), the grammar
+  // calls that module `tickets`, and the door refused — so the turn died on its
+  // first call. That was not the model guessing: `list_help_tickets`,
+  // `set_help_status`, the path /api/content/help, the permission string on every
+  // role's sheet and the MCP tool names ALL say help, deliberately (CLAUDE.md:
+  // the LABEL is Tickets, everything else stays `help`). The grammar introduced
+  // the one place where the label was the name.
+  async function describe(qs: string) {
+    const request = new Request(`https://tenancy/api/tenancy/query/describe${qs}`, {
+      headers: { Cookie: "session=x" },
+    })
+    const res = await worker.fetch(request, makeEnv(() => holder.db as DatabaseSync, IDS.staffUser))
+    return { status: res.status, body: JSON.parse(await res.text()) as Record<string, unknown> }
+  }
+
+  it("describe_module('help') answers about tickets, and says so", async () => {
+    const { status, body } = await describe("?module=help")
+    expect(status, "the name every other tool in the catalogue uses must work").toBe(200)
+    expect(body.module, "the answer echoes the CANONICAL name so the caller learns it").toBe("tickets")
+    expect(body.askedAs).toBe("help")
+  })
+
+  it("query_records('help') answers about tickets too", async () => {
+    const { status, body } = await ask(q({ module: "help", countOnly: true }))
+    expect(status).toBe(200)
+    expect(body.total).toBe(13)
+    expect(body.module).toBe("tickets")
+    expect(body.askedAs).toBe("help")
+  })
+
+  it("every alias is DERIVED and resolves to a real module", () => {
+    expect(Object.keys(MODULE_ALIASES).length, "the derivation went empty").toBeGreaterThan(3)
+    for (const [alias, key] of Object.entries(MODULE_ALIASES)) {
+      expect(QUERY_MODULES[key], `${alias} points at "${key}", which is not a module`).toBeDefined()
+      expect(
+        Object.keys(QUERY_MODULES),
+        `${alias} is itself a module name — a key must always win over an alias`
+      ).not.toContain(alias)
+    }
+  })
+
+  it("THE AUDIT: every module whose grammar name differs from its own table or right is aliased", () => {
+    // The planner's question, answered by derivation rather than by eye. A name
+    // that differs and is NOT reachable is the next `help`.
+    const unreachable: string[] = []
+    for (const [key, mod] of Object.entries(QUERY_MODULES))
+      for (const other of [mod.table, mod.module]) {
+        if (other === key) continue
+        // A name several modules claim is deliberately NOT an alias (`work` is
+        // five of them). It must still lead somewhere: the refusal names them.
+        const claimants = Object.entries(QUERY_MODULES).filter(
+          ([, m]) => m.table === other || m.module === other
+        )
+        if (claimants.length > 1) {
+          expect(suggestModule(other).sort(), `"${other}" covers several modules and must name them all`).toEqual(
+            claimants.map(([k]) => k).sort()
+          )
+          continue
+        }
+        if (canonicalModule(other) !== key) unreachable.push(`${other} -> ${key}`)
+      }
+    expect(
+      unreachable,
+      `these modules answer to a name elsewhere in the app that the grammar refuses — the same trap "help" was: ${unreachable.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("a name nobody recognises gets a suggestion, or honestly none", async () => {
+    const near = await ask(q({ module: "ticket" }))
+    expect(near.status).toBe(400)
+    expect(String(near.body.message)).toContain('Did you mean "tickets"')
+    const shared = await ask(q({ module: "work" }))
+    expect(String(shared.body.message), "a right covering five modules names the five").toContain("stories")
+    const nonsense = await ask(q({ module: "tikets" }))
+    expect(nonsense.status).toBe(400)
+    expect(String(nonsense.body.message), "no confident wrong guess").not.toContain("Did you mean")
+    expect(String(nonsense.body.message), "…but still the list").toContain("tickets")
+  })
+
+  it("case and separators do not decide whether a caller gets an answer", async () => {
+    for (const spelling of ["Tickets", "TICKETS", "Help"])
+      expect((await describe(`?module=${spelling}`)).body.module, spelling).toBe("tickets")
   })
 })
 

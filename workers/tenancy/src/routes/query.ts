@@ -28,30 +28,46 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { queryText, TEXT_LIMITS } from "@shared/workers/validate"
 import {
+  canonicalModule,
+  MODULE_ALIASES,
   QUERY_MODULES,
   QUERY_MODULE_NAMES,
   QUERY_OPS,
   queryModule,
+  suggestModule,
 } from "@shared/workers/query-grammar"
 import { parseQuery, runQuery } from "../lib/query-engine"
 import type { Env } from "../env"
 
-/** The one sentence a caller sees when they name something that is not a module.
- * It NAMES the alternatives, because "unknown module" with no list is how a
- * model ends up guessing table names — and guessing is the behaviour the
- * allow-list exists to make pointless rather than merely refused. */
 /** HOW MANY NAMES `describe_module` LISTS for one reference field (R14: a hard
  * cap, and a small one). It is a hint for composing a filter, not a collection
  * read — a caller who wants the whole list asks `query_records` for it, and one
  * that hits this ceiling is told so rather than handed a quietly short list. */
 const CHOICE_CAP = 60
 
-const unknownModule = (name: string | undefined) =>
-  fail(
+/** The one sentence a caller sees when they name something that is not a module.
+ *
+ * It names the alternatives, and it LEADS WITH THE NEAREST ONE. Listing them all
+ * was not enough on its own: asked the owner's own question on staging on 29 Aug
+ * 2026, the assistant asked for `help`, read a refusal that listed every module,
+ * correctly worked out from it that the module is called `tickets` — and then
+ * OFFERED to do the work rather than retrying. A refusal that has to be reasoned
+ * about costs a whole turn; one that says "did you mean" is a correction the
+ * model can act on in the same breath.
+ *
+ * (`help` itself now RESOLVES — see MODULE_ALIASES — so it never reaches here.
+ * This is for the next name nobody thought of.) */
+const unknownModule = (name: string | undefined) => {
+  const near = suggestModule(name)
+  return fail(
     400,
     "unknown_module",
-    `There is nothing here called "${name ?? ""}". You can query: ${QUERY_MODULE_NAMES.join(", ")}.`
+    `There is nothing here called "${name ?? ""}".` +
+      (near.length === 1 ? ` Did you mean "${near[0]}"?` : "") +
+      (near.length > 1 ? ` That covers ${near.join(", ")} — ask for one of those.` : "") +
+      ` You can query: ${QUERY_MODULE_NAMES.join(", ")}.`
   )
+}
 
 /** Parse a JSON-shaped query parameter that has ALREADY been through the
  * boundary seam.
@@ -101,7 +117,17 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
     const held = await rightsSheet(cfg, guard)
     return json({
       modules: QUERY_MODULE_NAMES.filter((n) => held.has(`${QUERY_MODULES[n].module}:read`)).map(
-        (n) => ({ name: n, summary: QUERY_MODULES[n].summary, permission: QUERY_MODULES[n].module })
+        (n) => ({
+          name: n,
+          summary: QUERY_MODULES[n].summary,
+          permission: QUERY_MODULES[n].module,
+          // THE OTHER NAMES IT ANSWERS TO, said up front rather than discovered
+          // by being refused. `tickets` also answers to `help`, which is what
+          // every other tool in the catalogue calls it.
+          ...(Object.entries(MODULE_ALIASES).some(([, key]) => key === n)
+            ? { alsoCalled: Object.entries(MODULE_ALIASES).filter(([, key]) => key === n).map(([a]) => a) }
+            : {}),
+        })
       ),
       ops: QUERY_OPS,
     })
@@ -159,8 +185,13 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
     for (const r of rows) vocab.set(r.type, [...(vocab.get(r.type) ?? []), r.value])
   }
 
+  const canonical = canonicalModule(name)!
   return json({
-    module: name,
+    module: canonical,
+    // The caller reached the right module by another of its names. Saying so is
+    // how they learn the right one instead of using the other for the rest of
+    // the conversation.
+    ...(canonical === name ? {} : { askedAs: name }),
     summary: mod.summary,
     permission: `${mod.module}:read`,
     defaultSort: mod.defaultSort,
@@ -226,8 +257,10 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
   // The reference tables a filter or a labelled group may reach — resolved from
   // the SAME allow-list, so a `ref` that names nothing declared simply is not one.
   const answer = await runQuery(cfg, guard, mod, parsed, QUERY_MODULES)
+  const canonical = canonicalModule(name)!
   return pagedJson("records", { ...answer.page, total: answer.total }, {
-    module: name,
+    module: canonical,
+    ...(canonical === name ? {} : { askedAs: name }),
     ...(answer.groups ? { groups: answer.groups, groupsTruncated: answer.groupsTruncated } : {}),
     ...(answer.sort ? { sort: answer.sort, dir: answer.dir } : {}),
   })
