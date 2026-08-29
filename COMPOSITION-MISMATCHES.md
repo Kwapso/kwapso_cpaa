@@ -34,7 +34,7 @@ through).
 greps `@shared/ui/...` import strings in `web/`, `web-portal/` and
 `shared/web/`. That undercounts real adoption whenever this app reaches a
 kit part THROUGH another kit part it already imports, because the inner
-import never appears in the app's own source. Two confirmed so far:
+import never appears in the app's own source. Four confirmed so far:
 
 - **`notes`** shows unchecked, but `comments/comments.tsx` (already
   adopted, `[x]`) imports it directly (`import { Notes } from
@@ -44,14 +44,26 @@ import never appears in the app's own source. Two confirmed so far:
   `[x]`) imports it for the `variant="folder"` tab strip already in use
   (`web/components/deep-link/screen-bits.tsx`'s `SectionWithCreate`,
   `folderTabs` slot).
+- **`title`** shows unchecked, but the kit's own `record-detail.tsx`
+  (already adopted, `[x]`) imports and renders it — every recipe-driven
+  detail screen has been drawing through `Title`'s composition all along,
+  reached from inside a kit part rather than from this app's own source.
+- **`motion`** (a foundation, not a component) shows unchecked, but both
+  front doors' own `globals.css` reach it: 30 keyframes load into both
+  stylesheets, 29 of them actually used at runtime. The census only scans
+  `web/`, `web-portal/` and `shared/web/` import STRINGS; a CSS `@import`
+  or a build-time asset pull into a stylesheet is invisible to that grep
+  the same way a nested component import is.
 
-Neither is a gap to close — both are already reaching this app, just
-invisible to a grep that only looks one import deep. The real number of
-kit parts genuinely serving this app is `[x]`'s count plus at least these
-two, and there is currently no automated way to find the rest of them (the
-check would need to walk each `[x]` component's own import graph, not
-just the app's). Worth a `kit-coverage.mjs` enhancement if the owner wants
-the number itself to be trustworthy rather than a floor.
+Neither is a gap to close — all four are already reaching this app, just
+invisible to a grep that only looks one import deep (three) or only looks
+at import strings at all (the fourth). The real number of kit parts
+genuinely serving this app is `[x]`'s count plus at least these four, and
+there is currently no automated way to find the rest of them (the check
+would need to walk each `[x]` component's own import graph AND its
+stylesheet's own pulls, not just the app's). Worth a `kit-coverage.mjs`
+enhancement if the owner wants the number itself to be trustworthy rather
+than a floor.
 
 ## THE 2026-08-29 CORRECTION — READ THIS BEFORE TRUSTING AN OLDER VERDICT
 
@@ -842,11 +854,15 @@ now renders the kit's real `Logotype`/`AuthPhotograph` instead of the
 asset-url fix landed. Committed `2eebb832`.
 
 **Confirmed mismatches:**
-- `form` — `FormShell` is already this app's own locked, machine-checked
-  law (R4, `forms-use-formshell`: "the one wrapper every form renders
-  through"), and the kit's `Form` states the identical job description for
-  itself. Adopting it would build a second seam for a role one already
-  fills.
+- `form` — CONFIRMED, on a sharper reason than the first pass gave. Not
+  just "a second seam for a role `FormShell` already fills" (a preference,
+  which a newer export could in principle change): `FormShell` renders its
+  own `<form onSubmit>`, and the kit's `Form` IS a `<form>` element too.
+  Nesting two `<form>` elements is invalid HTML regardless of any prop —
+  `hideActions` silences `Form`'s own save bar, not its root element, so
+  there is no configuration that avoids it. A parser fact, not a
+  preference, on record so a later reader doesn't wonder if a newer `Form`
+  changed the calculus.
 - `import-wizard` — the same "one file, one table, manual column mapping"
   mismatch already on record for the import trio, one primitive layer
   down (`ImportWizard` composes `Form`+`Field`+`Select` for the mapping
@@ -862,15 +878,30 @@ asset-url fix landed. Committed `2eebb832`.
   outside the already-adopted flowchart/process-maps; work logs are
   entered retrospectively, never clocked).
 - Most of Collection views (kanban, calendar-view, spreadsheet, matrix,
-  swimlane, timeline, agenda, gallery, split, queue, chat, tiles, map,
-  compare, flowdetail, copilot-overlay — ~16 types) — no current app
-  equivalent. The recipe engine's view-type union has a fixed set (list/
-  table, card-grid, activity-feed, etc.) and none of these has an obvious
+  swimlane, timeline, agenda, split, queue, chat, tiles, map, compare,
+  flowdetail, copilot-overlay — ~15 types) — no current app equivalent.
+  The recipe engine's view-type union has a fixed set (list/table,
+  card-grid, activity-feed, etc.) and none of these has an obvious
   existing collection to attach to. This was an architecture-level read
   (the engine's own type union), not a per-composition render — flagged as
   worth a second look if anyone disagrees with treating it as one category
-  rather than 16 individual verdicts, since only `brand` among this whole
-  batch was actually rendered before being decided.
+  rather than individual verdicts.
+
+**`gallery` — ADOPTED, and the exception the batch above already flagged.**
+This one WAS actually rendered before being decided, and it turned out to
+be the correct exception: `brandListRecipe` (`web/lib/screens.ts`) drew
+every image in the brand library — headshots, logos, colour swatches — as
+a text row, a genuine, visible defect rather than a missing view type.
+Added `display: "gallery"` to the recipe engine's display union
+(`shared/web/screen-engine/recipe.ts`), alongside a new `image` field
+(a plain URL column, deliberately distinct from `leading`'s already-
+rendered `mark` node — `Gallery` needs the raw `src` to draw its own
+no-picture register for a colour asset that has none). Verified live at
+all four widths, both themes — real photos render as real tiles,
+letterboxed per the composition's 16:9-contain law; colour swatches (no
+file, by construction) correctly fall through to the title-on-soft-paper
+register; narrow width drops to one column below 420, matching CH27.28's
+own figure. Commit `095484de`.
 
 **Not a real gap:** `notes` reads `[ ]` in KIT-COVERAGE.md but is a census
 blind spot — `Comments` (already `[x]`) imports `Notes` internally
@@ -886,25 +917,31 @@ restructuring the many hand-composed `*-detail.tsx` files, which might
 genuinely reduce real duplication but is scoped work, not a batch item. Not
 picked up this pass.
 
-**`checklist` — CLOSED, no current app equivalent.** Two candidates
-considered, both real mismatches rather than one render-check away from
-fitting:
-- `work-panels.tsx`'s `TodosPanel` (client to-dos) has no tick/checkbox at
-  all — completion is a "Done" badge only, and the sole staff action on an
-  open row is Withdraw. These are things staff is WAITING ON THE CLIENT
-  for; only the client's own action closes one. `checklist`'s whole
-  interaction model is a person ticking a mark to move a row open→done —
-  wiring that on here would offer a control that lies about who can press
-  it.
+**`checklist` — UPGRADED to `[~]` adoptable, partial, on a re-render.** Two
+candidates, and the first render (props-table only) missed a real opt-out:
 - `tasks-screen.tsx`'s "Ours to do" list (real staff tasks, genuine
   tick-to-complete via `task-detail.tsx`'s `onToggleDone`) is closer in
-  spirit but already deliberately richer than `checklist`'s fixed
-  5-column row (mark/number/title/owner/when): six server-driven view tabs
-  with exact R14/R16 counts, priority, assignee, department glyph, due
+  interaction spirit but already deliberately richer than `checklist`'s
+  fixed 5-column row (mark/number/title/owner/when): six server-driven view
+  tabs with exact R14/R16 counts, priority, assignee, department glyph, due
   date. `checklist` has no slot for most of that — adopting it would be a
-  downgrade, not a fit.
+  downgrade, not a fit. Still held.
+- `work-panels.tsx`'s `TodosPanel` (client to-dos): the first pass assumed
+  omitting `onToggle` still left an INTERACTIVE-looking control that would
+  lie about who can press it. Re-rendered rather than assumed: omitting
+  `onToggle` makes the whole row read-only — `checklist.tsx`'s own words,
+  "no mark is interactive" — and produces a real disabled, `aria-checked`,
+  `aria-readonly` mark, not a control in disguise. That fits `TodosPanel`'s
+  DONE pile exactly, which is already read-only and action-less today (a
+  "Done" badge, nothing to press). A real limit surfaced on the same render:
+  the row has no trailing-action slot at all, so it does NOT fit the OPEN
+  pile, which needs a Withdraw button per row. Not implemented — splitting
+  one panel's two tabs into two different row shapes (`checklist` for done,
+  something else for open) is a product call about consistency within one
+  screen, not a rendering question, and is flagged rather than decided here.
 
-Filed in the same bucket as most of Collection views.
+The rest of the batch is filed in the same bucket as most of Collection
+views.
 
 `screen-renderer` and `collection-frame` are left alone here — the app's
 own files under those names do a different job from their kit namesakes
