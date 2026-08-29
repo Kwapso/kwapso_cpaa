@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.2.9 — 2026-08-29
+
+### Fixed — `media={null}` never drew the single column its own doc promised
+
+`media`'s prop doc says, verbatim: *"Pass a node to override, or `null` to draw
+a single column."* Both auth frames wrote `md:grid-cols-2` unconditionally, so
+`null` removed the photograph and left a two-column grid with one empty column.
+Measured at 1710 on the consuming app's live sign-in: content 840 wide at x=0,
+870px of nothing beside it, every word pinned to the left half.
+
+`SignIn` (templates) and `AuthShell` (screens) both carried it; the second is
+shared by sign-in, invite-acceptance, link-sent and session-expired.
+
+### Fixed — `SignIn` had no page inset, so its content sat flush to the window
+
+`AuthShell` states the auth page inset in words — *"the page inset steps
+24 → 32"*, ch05's "24–32px card inset" range — and draws it.
+`SignIn` drew none. Measured: at 1710 WITH a photograph the title's right edge
+was 0px from the window, and on a 390 phone it touched both edges. Independent
+of the media bug, and true before it. `SignIn` now uses its sibling's tokens and
+breakpoint rather than a number invented for it.
+
+**This changes the with-photograph render**, which is stated rather than
+buried: the shell gains its inset, so at 1710 the columns go 840/840 → 810/810
+and the content's right margin 0 → 30. The column COUNT, the breakpoint and the
+content's start (x=870) are unchanged. No call site in either front door passes
+`media`, so nothing in the consuming app moves.
+
+### Note — the same shape, three times in one day
+
+The single column was DOCUMENTED and not enforced. So was PATTERN.md §10's
+`@source` advice, which asked every consumer to remember. So was
+`AccessDeniedScreen`'s empty register, which its own default made unreachable.
+A sentence in a doc is not a mechanism.
+
 ## v1.2.8 — 2026-08-29
 
 ### Docs — PATTERN.md §10 records that the kit now ships its own exclusion
