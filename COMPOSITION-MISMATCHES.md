@@ -329,6 +329,42 @@ replace the frame") and general-page-failure `PageFailureScreen`'s three-
 case coverage in this app. Not re-litigated here without a reason to prefer
 the other.
 
+## [!] `screens/invite-acceptance.tsx` — mismatch, found 2026-08-29
+
+The composition's own doc header states the model it assumes: an
+unauthenticated person clicks an emailed invite link, lands on ONE screen
+naming that single invite (who invited them, into which account, what
+role), and pressing Accept "goes straight into onboarding (27.14) with the
+name and email already filled from the invite" — no account exists yet at
+the point this screen is shown.
+
+This app's real invite flow is a deliberately different shape, stated in
+`web/components/invitations.tsx`'s own comment: "The fix for 'I was invited
+but have no way to see/accept it': this works for ANY signed-in user, not
+just a teamless one at onboarding." A person signs in first, however they
+like (Google or email+code, at whatever address), lands in the app, and
+`InvitationsScreen`/`InvitationsPanel` (`web/app/invitations/page.tsx`,
+"where the invite email's 'Join' button lands") shows an INBOX of every
+pending invite for that address — plural, post-authentication, no
+onboarding hand-off. The kit's single-invite pre-account screen and this
+app's authenticated multi-invite inbox are different products, not two
+renderings of the same one.
+
+## [!] `screens/link-sent.tsx` — mismatch, found 2026-08-29
+
+Built entirely around a magic link: "We sent you a link," opened on
+possibly a different device, "works once and expires in 15 minutes," with
+a live resend countdown and no code to type anywhere.
+
+This app's sign-in (`shared/web/use-email-sign-in.ts`, driving both
+`web/components/auth-card.tsx` and `web-portal/components/sign-in.tsx`)
+sends a 6-digit CODE, typed into a field on the same device, in the same
+form the email step was submitted from — there is no separate device, no
+link to click, and no "waiting room" screen at all: the UI swaps straight
+from the email field to a code field on the same screen. Every one of
+27.17's stated behaviors (open-elsewhere-and-land-where-you-left-off,
+one-time link, no code) describes a mechanism this app does not have.
+
 ## Why this file exists
 
 A recorded mismatch is a result, not a stall. Without this list, the next
