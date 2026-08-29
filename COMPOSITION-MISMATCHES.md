@@ -34,7 +34,7 @@ through).
 greps `@shared/ui/...` import strings in `web/`, `web-portal/` and
 `shared/web/`. That undercounts real adoption whenever this app reaches a
 kit part THROUGH another kit part it already imports, because the inner
-import never appears in the app's own source. Two confirmed so far:
+import never appears in the app's own source. Four confirmed so far:
 
 - **`notes`** shows unchecked, but `comments/comments.tsx` (already
   adopted, `[x]`) imports it directly (`import { Notes } from
@@ -44,14 +44,26 @@ import never appears in the app's own source. Two confirmed so far:
   `[x]`) imports it for the `variant="folder"` tab strip already in use
   (`web/components/deep-link/screen-bits.tsx`'s `SectionWithCreate`,
   `folderTabs` slot).
+- **`title`** shows unchecked, but the kit's own `record-detail.tsx`
+  (already adopted, `[x]`) imports and renders it — every recipe-driven
+  detail screen has been drawing through `Title`'s composition all along,
+  reached from inside a kit part rather than from this app's own source.
+- **`motion`** (a foundation, not a component) shows unchecked, but both
+  front doors' own `globals.css` reach it: 30 keyframes load into both
+  stylesheets, 29 of them actually used at runtime. The census only scans
+  `web/`, `web-portal/` and `shared/web/` import STRINGS; a CSS `@import`
+  or a build-time asset pull into a stylesheet is invisible to that grep
+  the same way a nested component import is.
 
-Neither is a gap to close — both are already reaching this app, just
-invisible to a grep that only looks one import deep. The real number of
-kit parts genuinely serving this app is `[x]`'s count plus at least these
-two, and there is currently no automated way to find the rest of them (the
-check would need to walk each `[x]` component's own import graph, not
-just the app's). Worth a `kit-coverage.mjs` enhancement if the owner wants
-the number itself to be trustworthy rather than a floor.
+Neither is a gap to close — all four are already reaching this app, just
+invisible to a grep that only looks one import deep (three) or only looks
+at import strings at all (the fourth). The real number of kit parts
+genuinely serving this app is `[x]`'s count plus at least these four, and
+there is currently no automated way to find the rest of them (the check
+would need to walk each `[x]` component's own import graph AND its
+stylesheet's own pulls, not just the app's). Worth a `kit-coverage.mjs`
+enhancement if the owner wants the number itself to be trustworthy rather
+than a floor.
 
 ## THE 2026-08-29 CORRECTION — READ THIS BEFORE TRUSTING AN OLDER VERDICT
 
@@ -228,11 +240,19 @@ actions, via the kit's `Title` component) — this app's collection headings
 every screen, threaded in via one `breadcrumbs` prop from
 `deep-link-screen.tsx`) rather than carrying per-screen content. Making the
 header genuinely per-screen would mean widening that one prop channel from
-"a breadcrumb array" to "arbitrary per-screen header content" — plausible
-(the channel already exists and is already per-route), but real, scoped
-architecture work on the same file the rail question already touched, not
-folded into this pass. Recording it here as the one concrete next question
-for whoever picks this back up, rather than a vague "more to check."
+"a breadcrumb array" to "arbitrary per-screen header content."
+
+**DECIDED, not pursued: `CollectionHeading`-in-body stands.** Raised as an
+open question; the planner's answer is no, for the reason the finding
+itself already gave — none of the five templates moves the adoption count
+(recomposition is invisible to a direct-import census either way), so
+widening `AppShell`'s header channel would be a layout change reaching
+every collection screen in the app, for a gain nobody could point at,
+while the owner is testing live. `CollectionHeading`-in-body now stands on
+the exact same footing as the breadcrumb-header decision already made for
+records: the templates document a shape this app already built under
+different names, and this is the second piece of that shape, decided
+rather than left open.
 
 **`templates/portal-home.tsx` — no gain, verdict unchanged.** Reread in
 full: this composition isn't in the design artifact at all — the kit's own
@@ -526,6 +546,54 @@ pane — exactly the nesting the kit's own `tone` doc names by name. Fixed
 with `tone="bare"` `inset={false}`, unconditionally: this frame never
 renders anywhere else in this app. Re-verified at all four widths, both
 themes, after the fix.
+
+**A fourth bug — the double-box was still real, just invisible, and a
+peer's deeper detector is what caught it** (commit `230d1cfb`, verified
+`230d1cfb`). The `tone="bare"` fix above stopped the FRAME's own redundant
+fill, but never removed the surrounding `CollectionCard` — the app's own
+`<Card>` box (`web/components/deep-link/screen-bits.tsx`'s
+`SectionWithCreate`) was still wrapping the kit panel, five DOM levels
+down. A peer's first probe walked only four ancestors and reported clean;
+re-run unbounded with a canary nested deep enough to prove it, it found
+the real nesting on both roles and tickets. It cost nothing visible
+because `CollectionCard`'s fill and the kit panel's fill were the same
+token (`bg-surface-panel`) — measured, not assumed: card 974px/radius
+27/no shadow, panel 902px/radius 27/no shadow, 36px of dead inset between
+them. Not a kit bug (the kit never composes its frame inside a `Card`; it
+drops straight into `ScreenShell`'s own off-beige body, which is what
+makes the panel readable at all) — the in-rule fix was always app-side,
+per this entry's own first-pass reasoning. Fixed for real this time:
+`SectionWithCreate` takes a `useKitPanel` prop that skips `CollectionCard`
+outright. Caught a second, related bug in the same pass — with the box
+gone, the header's own icon-only create button and the panel's own
+labelled one were both rendering for the READY state (not the deliberately
+doubled empty-state mangos) — fixed by skipping the header's button too
+when `useKitPanel` is on.
+
+**A CLAIM MADE HERE AND THEN RETRACTED, on record because the retraction
+matters as much as the finding.** An earlier draft of this entry said the
+invisible double box deferred a real cost — that a folder tab, if either
+collection ever grew one, would lose its ground against a panel whose fill
+matched it exactly, quoting the kit's own "the active folder tab has
+nothing to be seen against." That was a plausible inference from the kit's
+documentation about a nesting nobody had actually measured, and it was
+wrong: the folder tab strip sits OUTSIDE `CollectionCard` entirely, direct
+on `ScreenShell`'s off-beige body (`screen-shell-body`), and always has.
+Measured on deployed staging, pre-fix, with the Card still present: active
+tab fill `rgb(247,242,235)` against a `rgb(255,254,249)` ground, contrast
+1.103 — the kit's own stated healthy figure — throughout. The double box
+was real and worth fixing (36px of dead inset drawing a surface nobody
+could see), but it was never sitting on a live contrast defect, and
+nothing was going to break when a collection grew a folder tab. Say what
+was wrong, not just what's fixed now.
+
+**Verified post-fix, on real staging data (the positive control that makes
+a zero mean something):** `appCardPresent=false` on both roles (974px
+panel, `nested=[]`, 7 real named rows — "Admin — Default role, full
+access," "Client — A client login" — one create control, "New role") and
+tickets (974px panel, `nested=[]`, 50 real tickets). The panel's own width
+grew from 902 to 974 — the space `CollectionCard` used to hold — confirming
+it is now THE box rather than a second one hiding inside the first.
 
 **`empty-collection`'s genuinely-empty half — ADOPTED** (commit `960ae29e`).
 `states/empty-collection.tsx`'s own `emptyBody` register (Headline + Text +
@@ -856,11 +924,15 @@ now renders the kit's real `Logotype`/`AuthPhotograph` instead of the
 asset-url fix landed. Committed `2eebb832`.
 
 **Confirmed mismatches:**
-- `form` — `FormShell` is already this app's own locked, machine-checked
-  law (R4, `forms-use-formshell`: "the one wrapper every form renders
-  through"), and the kit's `Form` states the identical job description for
-  itself. Adopting it would build a second seam for a role one already
-  fills.
+- `form` — CONFIRMED, on a sharper reason than the first pass gave. Not
+  just "a second seam for a role `FormShell` already fills" (a preference,
+  which a newer export could in principle change): `FormShell` renders its
+  own `<form onSubmit>`, and the kit's `Form` IS a `<form>` element too.
+  Nesting two `<form>` elements is invalid HTML regardless of any prop —
+  `hideActions` silences `Form`'s own save bar, not its root element, so
+  there is no configuration that avoids it. A parser fact, not a
+  preference, on record so a later reader doesn't wonder if a newer `Form`
+  changed the calculus.
 - `import-wizard` — the same "one file, one table, manual column mapping"
   mismatch already on record for the import trio, one primitive layer
   down (`ImportWizard` composes `Form`+`Field`+`Select` for the mapping
@@ -876,15 +948,30 @@ asset-url fix landed. Committed `2eebb832`.
   outside the already-adopted flowchart/process-maps; work logs are
   entered retrospectively, never clocked).
 - Most of Collection views (kanban, calendar-view, spreadsheet, matrix,
-  swimlane, timeline, agenda, gallery, split, queue, chat, tiles, map,
-  compare, flowdetail, copilot-overlay — ~16 types) — no current app
-  equivalent. The recipe engine's view-type union has a fixed set (list/
-  table, card-grid, activity-feed, etc.) and none of these has an obvious
+  swimlane, timeline, agenda, split, queue, chat, tiles, map, compare,
+  flowdetail, copilot-overlay — ~15 types) — no current app equivalent.
+  The recipe engine's view-type union has a fixed set (list/table,
+  card-grid, activity-feed, etc.) and none of these has an obvious
   existing collection to attach to. This was an architecture-level read
   (the engine's own type union), not a per-composition render — flagged as
   worth a second look if anyone disagrees with treating it as one category
-  rather than 16 individual verdicts, since only `brand` among this whole
-  batch was actually rendered before being decided.
+  rather than individual verdicts.
+
+**`gallery` — ADOPTED, and the exception the batch above already flagged.**
+This one WAS actually rendered before being decided, and it turned out to
+be the correct exception: `brandListRecipe` (`web/lib/screens.ts`) drew
+every image in the brand library — headshots, logos, colour swatches — as
+a text row, a genuine, visible defect rather than a missing view type.
+Added `display: "gallery"` to the recipe engine's display union
+(`shared/web/screen-engine/recipe.ts`), alongside a new `image` field
+(a plain URL column, deliberately distinct from `leading`'s already-
+rendered `mark` node — `Gallery` needs the raw `src` to draw its own
+no-picture register for a colour asset that has none). Verified live at
+all four widths, both themes — real photos render as real tiles,
+letterboxed per the composition's 16:9-contain law; colour swatches (no
+file, by construction) correctly fall through to the title-on-soft-paper
+register; narrow width drops to one column below 420, matching CH27.28's
+own figure. Commit `095484de`.
 
 **Not a real gap:** `notes` reads `[ ]` in KIT-COVERAGE.md but is a census
 blind spot — `Comments` (already `[x]`) imports `Notes` internally
@@ -900,25 +987,31 @@ restructuring the many hand-composed `*-detail.tsx` files, which might
 genuinely reduce real duplication but is scoped work, not a batch item. Not
 picked up this pass.
 
-**`checklist` — CLOSED, no current app equivalent.** Two candidates
-considered, both real mismatches rather than one render-check away from
-fitting:
-- `work-panels.tsx`'s `TodosPanel` (client to-dos) has no tick/checkbox at
-  all — completion is a "Done" badge only, and the sole staff action on an
-  open row is Withdraw. These are things staff is WAITING ON THE CLIENT
-  for; only the client's own action closes one. `checklist`'s whole
-  interaction model is a person ticking a mark to move a row open→done —
-  wiring that on here would offer a control that lies about who can press
-  it.
+**`checklist` — UPGRADED to `[~]` adoptable, partial, on a re-render.** Two
+candidates, and the first render (props-table only) missed a real opt-out:
 - `tasks-screen.tsx`'s "Ours to do" list (real staff tasks, genuine
   tick-to-complete via `task-detail.tsx`'s `onToggleDone`) is closer in
-  spirit but already deliberately richer than `checklist`'s fixed
-  5-column row (mark/number/title/owner/when): six server-driven view tabs
-  with exact R14/R16 counts, priority, assignee, department glyph, due
+  interaction spirit but already deliberately richer than `checklist`'s
+  fixed 5-column row (mark/number/title/owner/when): six server-driven view
+  tabs with exact R14/R16 counts, priority, assignee, department glyph, due
   date. `checklist` has no slot for most of that — adopting it would be a
-  downgrade, not a fit.
+  downgrade, not a fit. Still held.
+- `work-panels.tsx`'s `TodosPanel` (client to-dos): the first pass assumed
+  omitting `onToggle` still left an INTERACTIVE-looking control that would
+  lie about who can press it. Re-rendered rather than assumed: omitting
+  `onToggle` makes the whole row read-only — `checklist.tsx`'s own words,
+  "no mark is interactive" — and produces a real disabled, `aria-checked`,
+  `aria-readonly` mark, not a control in disguise. That fits `TodosPanel`'s
+  DONE pile exactly, which is already read-only and action-less today (a
+  "Done" badge, nothing to press). A real limit surfaced on the same render:
+  the row has no trailing-action slot at all, so it does NOT fit the OPEN
+  pile, which needs a Withdraw button per row. Not implemented — splitting
+  one panel's two tabs into two different row shapes (`checklist` for done,
+  something else for open) is a product call about consistency within one
+  screen, not a rendering question, and is flagged rather than decided here.
 
-Filed in the same bucket as most of Collection views.
+The rest of the batch is filed in the same bucket as most of Collection
+views.
 
 `screen-renderer` and `collection-frame` are left alone here — the app's
 own files under those names do a different job from their kit namesakes
@@ -960,19 +1053,86 @@ use explicit `LoadMore` buttons, not scroll-triggered pagination (a
 deliberate UX choice, not a gap); no scroll-triggered animations exist to
 pause.
 
-**One real candidate, not implemented:** `use-virtual-rows` — a
-behaviour-only hook that windows a >100-row list to what's near the
-viewport. `web/components/selectable-screen.tsx` (the dropdown-values
-screen) is a concrete attachment point: it fetches via
-`tenancy.selectable()`, a single flat GET with no cursor, capped at
-`LIST_HARD_CAP` (1,000), and maps every row into the DOM with no windowing
-— a team with a lot of accumulated dropdown values could genuinely hit
-hundreds of rows in one render. Not wired in: it needs load-testing against
-a team that actually has that many values, and a wrong row-height
-measurement or a missed ARIA index would be a worse regression than the
-unbounded list it replaces. Flagged for a dedicated look with real data.
+**`use-virtual-rows` — SHIPPED** (commit `9ec3efcf`). The candidate above
+was verified against real data rather than wired in blind:
+`web/components/selectable-screen.tsx` now windows a dropdown-values group
+once it crosses 100 rows — per GROUP, not per screen, since the hook
+assumes one uniform row height across whatever list it's handed, and this
+screen's groups (one per vocabulary type) are the uniform grain, the whole
+screen is not. Load-tested against a team seeded with real volume before
+shipping, which is exactly the load-testing this entry originally asked
+for before wiring it in.
 
-## Why this file exists
+TOOLING NOTE, worth keeping for the next scroll/animation/rAF-dependent
+check: the Browser pane throttles a hidden/backgrounded tab hard enough
+that `requestAnimationFrame` never fires — silently, no error, the checked
+behaviour just never happens. Neither overriding `document.hidden`/
+`visibilityState` nor patching `window.requestAnimationFrame` gets past
+it; the throttle is enforced below what a page can see or override. A real
+Playwright browser (`scripts/verify-virtual-scroll.mjs`, kept in the repo)
+is what actually proved the scroll-triggered windowing works. A peer hit
+the same constraint the same day verifying a closed Popover that looked
+"stuck open" in the pane — really just a canary animation with no rAF
+ticking, not a real bug — so this is the second investigation it has
+silently cost, worth naming here rather than let a third rediscover it.
+
+## The remaining `screens/`+`states/` compositions — a kit-side sweep, 2026-08-29
+
+Only one `screens/` file (`not-found.tsx`, above) and the four `states/`
+files this lane's own `useKitPanel` entry already covers had been looked at
+before today, out of 18 `screens/` + 5 `states/` = 23 total — the rest sat
+uncovered, on neither side. A peer swept all 23 from the KIT side (rendered
+every one, not read the props table) and reports it here rather than commit
+it, since this file has one owner. The headline: **there is no kit-side
+blocker in any of the 23.**
+
+- **Required props:** of 23 files, exactly two exported components have
+  one — `settings.tsx`'s `AppearanceOptionGroup` (`options`, a
+  sub-primitive, not the route itself) and `states.tsx`'s `ShapeStateBody`
+  (`shape`, `state` — the shared register this file's own adoptions already
+  use internally). All 18 `screens/` compositions take ZERO required props.
+  None demands a data shape this app would have to invent — the exact
+  discriminator that killed the import trio and `bulk-edit`'s original
+  (wrong) reason elsewhere in this file.
+- **All 23 render** from `{}` alone, 3–57KB of markup each, and survive all
+  four state registers (loading/error/empty/ready) — a 188-render sweep,
+  not a spot check.
+- **No unreachable copy.** A hardcoded-string census across all 47
+  compositions found three offenders (`home`, `onboarding`,
+  `sign-in-system`) — all in this set, all fixed upstream in kit v1.2.4.
+  Nothing else here writes a sentence this app couldn't translate, so
+  R28/R33 blocks none of the 23.
+- **No doc-vs-implementation contradictions** — the same census found one
+  across all 47 (`access-denied`'s `grantor` default), already fixed and
+  already folded into this file above.
+- Eleven of the 23 accept `rail` (the `rail={null}` opt-out this file
+  already verified applies identically); seventeen have a `labels`/`copy`
+  seam.
+
+**One caveat left for a human, not fixed upstream:** `settings.tsx` renders
+"Record title" and "Status · 4 open" as literal English inside its
+text-size preview thumbnail. It's `aria-hidden="true"` (a screen reader
+never meets it — the kit is asserting "this is a picture of type, not
+words"), but a reader using any other language SEES it. Whether a type
+specimen is copy or decoration is a real design call, defensible either
+way — left for the owner, not fixed on one engineer's judgement. Worth a
+line here if `settings` is ever adopted.
+
+**What this is not:** not "adopt all 23." Several are product decisions
+(a brand reference page, a company hub, an archive band screen) for the
+owner, not a rendering question, and portal sign-in already has a named
+conflict elsewhere in this file. What the sweep settles is narrower: for
+these 23, there is nothing left to DISCOVER on the kit side, so nobody has
+to re-derive it, and any blocker that surfaces during actual adoption is
+kit-side to fix the same day rather than app-side to work around.
+
+**The two probes are available on request.** Nested-same-tone-surface
+detection (the double-box class of bug this file's own `useKitPanel` entry
+found and fixed by hand) and accessible-name-from-the-browser's-own-
+computation, both carrying an injected canary so a zero-result actually
+means something. `useKitPanel` is now live on one real collection (roles,
+`65728b64`) — worth pointing both probes at it rather than leaving that
+offer unused.
 
 A recorded mismatch is a result, not a stall. Without this list, the next
 lane (or the next session) re-reads all 23 signatures from zero and either

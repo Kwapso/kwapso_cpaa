@@ -671,10 +671,20 @@ function internalDetailActions(module: string, prefix: string, archiveLabel: str
   ]
 }
 
-/** Brand library list — the material everything else is made with. */
+/** Brand library list — the material everything else is made with.
+ *
+ * DISPLAY IS `gallery`, NOT `list` — a real, visible defect until now: this
+ * screen showed IMAGES as a text row (a tiny leading mark and two lines of
+ * copy), the one collection in the app where the kit's own "offered only
+ * where images exist" gallery view (components/gallery/gallery.tsx,
+ * CH27.28) applies literally — "deliverables, assets and screens" names the
+ * exact case. `recipe.image` points at the plain URL column `shapeBrandList`
+ * exposes (`fileUrl`) — separate from `leading`'s already-rendered `mark`
+ * node, because Gallery reads a raw `src` and draws its own no-picture
+ * register (the title on soft paper) when a colour asset has none. */
 const brandListRecipe: ScreenRecipe = {
   type: "list",
-  display: "list",
+  display: "gallery",
   surface: "none",
   binding: { module: "brand" },
   gate: { module: "brand_assets", right: "read" },
@@ -684,6 +694,7 @@ const brandListRecipe: ScreenRecipe = {
   // where the type has one, and its initial where it has neither, which
   // is what keeps every list in the app the same shape.
   leading: "mark",
+  image: "fileUrl",
   actions: [],
   collection: listCollection("Nothing in the brand library yet.", "Search the brand library…", [
     { field: "category", label: "Type", control: "select" },
