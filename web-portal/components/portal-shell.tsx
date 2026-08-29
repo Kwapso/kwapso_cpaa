@@ -21,10 +21,12 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
 import { Button } from "@shared/ui/components/button/button"
+import { PageFailureScreen } from "@shared/ui/compositions/screens/page-failure"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppearanceMenu } from "@shared/web/appearance-menu"
 import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spacer } from "@shared/ui/components/spacer/spacer"
 import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
@@ -116,14 +118,25 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
 
   // Ours, not theirs. Say so, and offer the only useful thing — try again —
   // rather than the sign-in screen, which would read as "you were logged out".
+  // The kit's PageFailureScreen (chapter 21) is the one whole-page failure
+  // register — law 4 names it (with the dead session) as the only state
+  // allowed to replace the frame, which this branch already does by hand.
   if (session.state === "unavailable")
     return (
-      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
-        <h1 className="text-2xl font-medium">{t("We can't reach your account")}</h1>
-        <p className="text-muted-foreground">
-          {t("Something on our side isn't responding. Nothing is lost. Try again in a moment.")}
-        </p>
-        <Button onClick={refresh}>{t("Try again")}</Button>
+      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center px-6">
+        <PageFailureScreen
+          variant="500"
+          labels={{
+            headline: t("We can't reach your account"),
+            body: t("Something on our side isn't responding. Nothing is lost. Try again in a moment."),
+            action: t("Try again"),
+            // The composition's own 500 default is a placeholder error code
+            // ("Error 8F31-A2") — this app has no real reference to show, so
+            // it is explicitly suppressed rather than left to show fake text.
+            reference: undefined,
+          }}
+          onAction={refresh}
+        />
       </main>
     )
 
@@ -166,7 +179,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
             onSwitched={refresh}
             onSwitching={setSwitching}
           />
-          <div className="flex-1" />
+          <Spacer axis="inline" grow />
           {/* Beside the light/dark toggle, not behind a fourth nav entry: the
            * three destinations below are fixed by design, and a language is the
            * same class of thing as a theme — a personal display preference,

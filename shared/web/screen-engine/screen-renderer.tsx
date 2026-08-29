@@ -37,6 +37,7 @@ import {
   AlertDialogTrigger,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
+import { ActionRow } from "@shared/ui/components/action-row/action-row"
 import {
   Select,
   SelectContent,
@@ -389,7 +390,7 @@ function ScreenForm({
           </Field>
         ))}
       </div>
-      <div className="flex flex-wrap justify-end gap-2">
+      <ActionRow align="end" className="gap-2">
         {recipe.actions
           .filter((a) => gateState(rights, a.gate) !== "hidden")
           .map((a) => (
@@ -402,7 +403,7 @@ function ScreenForm({
               {a.label}
             </Button>
           ))}
-      </div>
+      </ActionRow>
     </div>
   )
 }

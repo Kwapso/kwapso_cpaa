@@ -7,6 +7,7 @@ import * as React from "react"
 import { cn } from "@shared/ui/lib/utils"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
@@ -139,9 +140,14 @@ export function AddButton({
   icon?: React.ReactNode
 }) {
   return (
-    <Button size="icon" onClick={onClick} aria-label={label} title={label}>
-      {icon ?? <Plus className="size-4" />}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="icon" onClick={onClick} aria-label={label}>
+          {icon ?? <Plus className="size-4" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }
 

@@ -26,7 +26,7 @@ Regenerate the ticks with:
 - [ ] `pulse-band`
 - [ ] `donut`
 - [ ] `rings`
-- [ ] `kpi-progress`
+- [x] `kpi-progress`
 - [ ] `radar`
 
 ## Colour and surface
@@ -37,7 +37,7 @@ Regenerate the ticks with:
 
 ## Typography
 
-- [ ] `clamp`
+- [x] `clamp`
 - [x] `typography`
 - [ ] `title`
 - [ ] `article-body`
@@ -45,7 +45,7 @@ Regenerate the ticks with:
 ## Space and motion
 
 - [ ] `container`
-- [ ] `spacer`
+- [x] `spacer`
 
 ## Buttons
 
@@ -64,7 +64,7 @@ Regenerate the ticks with:
 ## Selection controls
 
 - [x] `checkbox`
-- [ ] `choice`
+- [x] `choice`
 - [x] `radio-group`
 - [ ] `rating`
 - [x] `slider`
@@ -84,12 +84,12 @@ Regenerate the ticks with:
 - [x] `dropdown-menu`
 - [ ] `hover-card`
 - [x] `popover`
-- [ ] `tooltip`
+- [x] `tooltip`
 
 ## Cards
 
 - [x] `accordion`
-- [ ] `action-row`
+- [x] `action-row`
 - [ ] `aspect-ratio`
 - [x] `card`
 - [x] `collapsible`
@@ -128,7 +128,7 @@ Regenerate the ticks with:
 
 ## Data display
 
-- [x] `progress`
+- [ ] `progress`
 - [ ] `progress-dashboard`
 - [x] `stat-grid`
 - [ ] `tree`
@@ -244,7 +244,7 @@ Regenerate the ticks with:
 - [ ] `templates/search-results`
 - [ ] `templates/sign-in`
 - [ ] `templates/stat-strip`
-- [ ] `templates/stepper-hero`
+- [x] `templates/stepper-hero`
 
 ## Foundations
 
@@ -254,4 +254,4 @@ Regenerate the ticks with:
 
 ---
 
-**Components 61/115 · Compositions 3/47**
+**Components 66/115 · Compositions 4/47**

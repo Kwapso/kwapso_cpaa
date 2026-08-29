@@ -1,12 +1,13 @@
 # Composition mismatches — why the number stops where it stops
 
 The owner's target is 47 of 47 kit compositions (`shared/ui/compositions/`)
-imported into the app. This file is the record of a full pass over the 23
-`templates/` and `overlays/` compositions assigned to one lane on 2026-08-29
-(the other 24 — 18 whole `screens/` and 4 `states/` — belong to a different
-lane's territory and are not covered here), **re-examined on 2026-08-29
-after a peer's correction** (below) turned two of the seventeen rejections
-into doors.
+imported into the app. It began as the record of a full pass over the 23
+`templates/` and `overlays/` compositions assigned to one lane on 2026-08-29,
+**re-examined the same day** after a peer's correction (below) turned two of
+the seventeen rejections into doors — and it now also carries the `screens/`
+and `states/` findings from the second lane's pass, so one file answers "why
+did this one stop" for the whole catalogue rather than two files each
+answering half.
 
 **Reading this file:** `[x]` means the composition fits and was adopted. `[~]`
 means it is now judged ADOPTABLE — a real opt-out or override was found on
@@ -382,6 +383,221 @@ are written up in the commit message rather than repeated here. `empty-
 collection` and `no-results` (the other lane's states work, hosted in this
 same engine file) are its next callers, per the planner's sequencing —
 not rolled out to the other five list-recipe call sites yet either.
+
+## The `screens/`+`states/` lane's pass, 2026-08-29 — the pattern behind every rejection below
+
+One sentence answers "why does the number stop" for this whole section, and
+it is the same sentence four separate investigations landed on
+independently: **the kit ships the general case, and this app already made
+a more specific decision.** Not-found's collection stays fine while ours has
+no collection to reason about; the static splash is the generic loading
+answer while our animated one is a dated, owner-motivated fix; invite-
+acceptance assumes nobody has an account yet while ours deliberately lets
+any signed-in person see every invite waiting for them; sign-in-portal
+assumes a generic client portal never shows a social row while SCOPE ch.06
+is a specific, documented reason ours does. A more generic decision wearing
+the kit's clothes is a downgrade even when it compiles cleanly — the test
+each entry below applies is never "does the kit ship something with this
+name," it is "is the kit's version the same decision as ours, or a more
+generic one."
+
+## [x] `screens/page-failure.tsx` — adopted, 2026-08-29
+
+The portal's `session.state === "unavailable"` branch
+(`web-portal/components/portal-shell.tsx`) was a hand-rolled whole-page
+takeover — "We can't reach your account" + a Retry button, replacing the
+entire shell. This is exactly the register `PageFailureScreen`'s doc header
+names as the one case (alongside a dead session) that law 4 allows to
+replace the frame at all, and its `500` variant's shape (headline, body,
+one paper "Reload" action) matched the hand-built version's intent line for
+line. Swapped in `variant="500"` with the existing copy passed through as
+`labels`, `onAction={refresh}`; kept the outer centring wrapper as-is since
+the composition itself is only the card, not a page layout.
+
+## States (4) — routed to `screens_detail_charts`, findings recorded 2026-08-29
+
+The screens/states brief described the four `states/` compositions as
+"nearly done — empty-collection and no-results already draw through
+ShapeStateBody and simply are not imported by name." Reading the actual call
+sites shows that undersells what's really there and oversells what a fix
+would cost:
+
+**`states/empty-collection.tsx` (`EmptyCollectionScreen`) and
+`states/no-results.tsx` (`NoResultsScreen`)** — `ShapeStateBody`
+(`shared/ui/compositions/states/states.tsx`) genuinely IS wired into
+`shared/web/screen-engine/collection-frame.tsx` today, for loading, error,
+and the empty/no-results split (`filtered` is exactly that switch) — this
+part is real, working, and not aspirational. But `EmptyCollectionScreen` and
+`NoResultsScreen` themselves — the standalone whole-screen compositions with
+their own figures, tabs, rail and `onExport` prop — are unimported anywhere
+in `web/` or `web-portal/` (confirmed by grep: both symbols appear only
+inside their own files and the `states/index.ts` barrel). Reaching them
+would mean editing `collection-frame.tsx` itself, which is the shared engine
+seam `screens_detail_charts` owns — not an import to add from outside it.
+
+**`states/archive.tsx` (`ArchiveScreen`)** is not a screen this app can swap
+in in place of one file: "archive" here is a *tab* embedded separately
+inside 20+ collection screens (`tickets-collection.tsx`, `work-panels.tsx`,
+`account-detail-panels.tsx`, `contact-detail.tsx`, and others), each
+swapping its own columns/rows in place. `ArchiveScreen` itself has zero call
+sites outside its own module. Adopting it is a per-collection rollout, not a
+state swap.
+
+**`states/new-empty-record.tsx` (`NewEmptyRecordScreen`)** has no standalone
+screen to replace at all — every record-detail file
+(`role-detail.tsx`, `sprint-detail.tsx`, `story-detail.tsx`,
+`app-detail.tsx`, `meeting-detail.tsx`, `task-detail.tsx`,
+`selectable-detail.tsx`, `knowledge-detail.tsx`, and others) hand-rolls its
+own `copy={{ emptyTitle: … }}` into its own `CollectionFrame`/
+`ShapeStateBody` call. The register it would replace is scattered across as
+many files as there are record types, all inside `screens_detail_charts`'s
+territory.
+
+## Screens (1) — `screens/not-found.tsx` mismatch, found 2026-08-29
+
+`NotFoundScreen` is built for one specific register: a URL for **one record**
+that was deleted, moved, or never existed **inside an otherwise-fine
+collection** — its own doc header states this three times ("the collection
+is fine — one record inside it is not," "the frame stays drawn... because
+the collection is fine," law 4's "only a whole-page failure... may replace
+the frame"). Every prop follows from that: a `record` number said twice (a
+chip and a sentence), a real collection eyebrow/count, the collection's own
+Export and create actions staying drawn in the header.
+
+The app's actual `<NotFound />` (`web/components/deep-link/screen-bits.tsx`)
+is called from a different failure entirely: `module-content.tsx` and
+`collection-content.tsx` reach it when a URL segment names no module at all,
+or when `resolveRecipe()` returns nothing for a module that has no detail
+recipe configured — i.e. there is no collection to speak of, fine or
+otherwise, so there is nothing to put in the composition's eyebrow, count,
+or header actions. Forcing the swap would mean inventing collection context
+that doesn't exist at these call sites. Left as-is; `screens/page-failure.tsx`
+(below) is the composition that actually matches a case in this app.
+
+## [!] `screens/splash.tsx` and `screens/portal-boot.tsx` — mismatch, found 2026-08-29
+
+Both compositions' "booting" register is `SignInSplash`
+(`compositions/templates/sign-in.tsx`) — confirmed by reading it: a static
+centred mark on a field, explicitly "NO ANIMATION. It hands over; it does
+not fade. Nothing here imports `motion/` and nothing sets a transition,"
+and "this screen IS the loading state... no spinner, no progress bar."
+
+This app's actual boot screen, `shared/web/mark-loader.tsx` (`MarkLoader`,
+used by both `web/` and `web-portal/`), is a deliberately more capable
+system the kit's static mark does not model at all: a continuously looping
+SVG animation published once as `window.__ksMark` and driven by an inline
+pre-hydration script so the mark is moving before the React bundle even
+arrives, plus `useMarkHold` — a fix, dated 26 Aug 2026, for an owner-reported
+bug ("the animation does not get a chance to complete") that holds the
+loader on screen until the animation reaches a real stopping point rather
+than being torn off mid-frame. The file's own history describes removing a
+*second*, competing splash overlay that used to run alongside this one for
+exactly the double-render/frame-rate cost swapping back in a second static
+splash would reintroduce. Adopting `SignInSplash` here would be a visible
+regression against two documented, deliberate fixes — not a lateral swap.
+
+`portal-boot.tsx`'s other half (`PortalIndexRoute`'s `boot="failed"` case,
+`ShapeStateBody` with `shape="portalHome"`) models the same real condition
+`web-portal/components/portal-shell.tsx`'s `session.state === "unavailable"`
+already covers — and that branch is now `screens/page-failure.tsx` (see
+above), adopted because chapter 21's own law names it as the one register
+built for "app could not draw a frame at all." Two kit chapters offer two
+different answers for the same failure; `page-failure` was already chosen
+on the more specific textual match ("only a whole-page failure... may
+replace the frame") and general-page-failure `PageFailureScreen`'s three-
+case coverage in this app. Not re-litigated here without a reason to prefer
+the other.
+
+## [!] `screens/invite-acceptance.tsx` — mismatch, found 2026-08-29
+
+The composition's own doc header states the model it assumes: an
+unauthenticated person clicks an emailed invite link, lands on ONE screen
+naming that single invite (who invited them, into which account, what
+role), and pressing Accept "goes straight into onboarding (27.14) with the
+name and email already filled from the invite" — no account exists yet at
+the point this screen is shown.
+
+This app's real invite flow is a deliberately different shape, stated in
+`web/components/invitations.tsx`'s own comment: "The fix for 'I was invited
+but have no way to see/accept it': this works for ANY signed-in user, not
+just a teamless one at onboarding." A person signs in first, however they
+like (Google or email+code, at whatever address), lands in the app, and
+`InvitationsScreen`/`InvitationsPanel` (`web/app/invitations/page.tsx`,
+"where the invite email's 'Join' button lands") shows an INBOX of every
+pending invite for that address — plural, post-authentication, no
+onboarding hand-off. The kit's single-invite pre-account screen and this
+app's authenticated multi-invite inbox are different products, not two
+renderings of the same one.
+
+## [!] `screens/link-sent.tsx` — mismatch, found 2026-08-29
+
+Built entirely around a magic link: "We sent you a link," opened on
+possibly a different device, "works once and expires in 15 minutes," with
+a live resend countdown and no code to type anywhere.
+
+This app's sign-in (`shared/web/use-email-sign-in.ts`, driving both
+`web/components/auth-card.tsx` and `web-portal/components/sign-in.tsx`)
+sends a 6-digit CODE, typed into a field on the same device, in the same
+form the email step was submitted from — there is no separate device, no
+link to click, and no "waiting room" screen at all: the UI swaps straight
+from the email field to a code field on the same screen. Every one of
+27.17's stated behaviors (open-elsewhere-and-land-where-you-left-off,
+one-time link, no code) describes a mechanism this app does not have.
+
+## [!] `screens/session-expired.tsx` — mismatch, found 2026-08-29, not built
+
+Unlike the rest of this section, this is not a "the app already made a more
+specific decision" case — there is no current app equivalent to compare
+against at all, and the reason is that giving it one is real, unstarted
+plumbing on the AUTH path, the one path where a half-built screen locks
+somebody out of their own account. Three blockers, in the order they were
+found:
+
+1. Nothing persists the signed-out user's email anywhere. The composition's
+   whole point is a pre-filled `email` field ("we know who it was"), but
+   `web/lib/use-active-team.ts`'s 401 branch clears the session cache and
+   redirects to `/login` — by the time a screen could read it, it is gone.
+2. No `returnTo`/`redirectTo` mechanism exists anywhere in the login flow —
+   checked `web/app/login/page.tsx`, `web/components/auth-card.tsx`, and
+   `shared/web/use-email-sign-in.ts`. The composition's destination chip and
+   "back to where you were" promise has nothing to restore TO.
+3. The destination chip wants a friendly record title
+   (`destinationTitle`), and `use-active-team.ts` runs generically on every
+   page — it has no per-page context to derive one from.
+
+The app's current behaviour (silent redirect on a genuine 401; the session
+cache is deliberately KEPT on a mere outage, since a 500 is not a sign-out —
+see that file's own comment) is correct and is not being touched. If this
+screen is wanted, it is a scoped brief of its own — storage for the last
+identity, a redirect-back contract the whole login flow has to honour, and a
+decision about the destination title — not an adoption to fold into a batch.
+
+## [!] `screens/sign-in-portal.tsx` — a decision for the owner, not a rejection, found 2026-08-29
+
+Everything except one line is a clean fit: two-step email→code flow, one
+mango Continue, resend with a live countdown, "Wrong address?" back — all of
+it maps directly onto what `shared/web/use-email-sign-in.ts` already
+provides, the same pattern `sign-in-system` already proved for the agency
+door.
+
+The one line is real and it is a law, not a missing prop: `PortalLoginRoute`
+states "there is never a social sign-in row: the account is the company's,
+not a Google profile's," and does not even expose a `providers` prop —
+only the lower-level `SignIn` template does. `web-portal/components/
+sign-in.tsx` offers Google today, on purpose, and says why in its own
+comment: "signing in with Google never creates access; the invite does"
+(SCOPE ch.06) — Google proves identity, the invite still gates access
+either way, so a provider row creates nothing a code doesn't already grant.
+
+Passing `providers` through the lower `SignIn` template to route around
+`PortalLoginRoute`'s law would work, and that is exactly why it was not
+done: it would leave the app quietly contradicting a rule the kit states out
+loud, with nothing anywhere recording that a decision had been made. A
+deviation nobody can find is worse than a mismatch everybody can read. Kept
+as-is, recorded as a question the owner may want to answer once, in one
+word: the kit says a client portal never shows a social sign-in row; this
+app ships Google on the portal per SCOPE ch.06 because it proves identity
+without granting access. Keep ours, or change the kit's law?
 
 ## Why this file exists
 
