@@ -1010,6 +1010,23 @@ defect first.
   The habit costs a minute per measurement. On the day above it caught five
   wrong answers, two of which had already been sent to other lanes.
 
+  **AND THE CANARY HAS TO BE THE SHAPE OF THE REAL CASE, WHICH IS THE HALF
+  THIS PARAGRAPH LEARNED AN HOUR AFTER IT WAS WRITTEN.** A canary proves the
+  instrument sees the case the CANARY is, and nothing more. A probe hunting a
+  same-tone box nested inside another walked four ancestors up, and its canary
+  was a two-level nesting — so the canary passed, every run, while the real
+  pairing sat FIVE levels apart and went straight through. That produced a
+  clean bill of health for six screens, six portal routes and four
+  compositions, all of it retracted.
+
+  It is the more expensive direction. Every other failure listed above cost a
+  wrong FINDING, which argues with the code and gets caught; this one cost a
+  wrong ALL-CLEAR, which agrees with everybody and is never revisited. So
+  build the canary out of the hardest instance you can imagine rather than the
+  simplest one that demonstrates the idea, and when a probe carries a bound —
+  a depth, a slice length, a result limit, a timeout — treat the bound as the
+  first thing to distrust when it reports nothing.
+
 ## Scale + idempotency + filter patterns (R14 · R17 · R19)
 These three are machine-checked; write them the house way so the build stays green.
 
