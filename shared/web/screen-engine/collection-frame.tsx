@@ -413,6 +413,15 @@ function CollectionFrame<T>({
     return (
       <KitCollectionFrame
         className={className}
+        // `tone="bare"`/`inset={false}`: this frame always renders inside
+        // `AppShell`'s `ScreenShell` body pane now (COMPOSITION-MISMATCHES.md,
+        // the ScreenShell-family entry) — an off-beige ground that already
+        // paid for its own inset. The kit's own doc for `tone` names this
+        // exact nesting: "MainScreen drops this frame straight into
+        // ScreenShell's off-beige body pane, and a second off-beige fill on
+        // top of it would be a level of the nesting that is not there."
+        tone="bare"
+        inset={false}
         heading={config.title || undefined}
         rule={Boolean(config.title)}
         search={searchBox}
