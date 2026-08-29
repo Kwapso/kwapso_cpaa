@@ -1,10 +1,10 @@
 # Composition mismatches — why the number stops where it stops
 
 The owner's target is 47 of 47 kit compositions (`shared/ui/compositions/`)
-imported into the app. This file is the record of a full pass over the 23
-`templates/` and `overlays/` compositions assigned to one lane on 2026-08-29
-(the other 24 — 18 whole `screens/` and 4 `states/` — belong to a different
-lane's territory and are not covered here).
+imported into the app. This file started as the record of a full pass over
+the 23 `templates/` and `overlays/` compositions assigned to one lane on
+2026-08-29, and now also carries the `states/` findings from the
+`screens/`+`states/` lane's first pass the same day.
 
 **Reading this file:** `[x]` means the composition fits and was adopted or
 extended. `[!]` means a genuine, structural mismatch — forcing it would break
@@ -221,6 +221,79 @@ present) and rewiring the app's real flow logic
 `SignIn`'s prop shape. Real, scoped work on the single most safety-
 sensitive screen in the app — a candidate for a deliberate pass, not a
 same-session swap.
+
+## [x] `screens/page-failure.tsx` — adopted, 2026-08-29
+
+The portal's `session.state === "unavailable"` branch
+(`web-portal/components/portal-shell.tsx`) was a hand-rolled whole-page
+takeover — "We can't reach your account" + a Retry button, replacing the
+entire shell. This is exactly the register `PageFailureScreen`'s doc header
+names as the one case (alongside a dead session) that law 4 allows to
+replace the frame at all, and its `500` variant's shape (headline, body,
+one paper "Reload" action) matched the hand-built version's intent line for
+line. Swapped in `variant="500"` with the existing copy passed through as
+`labels`, `onAction={refresh}`; kept the outer centring wrapper as-is since
+the composition itself is only the card, not a page layout.
+
+## States (4) — routed to `screens_detail_charts`, findings recorded 2026-08-29
+
+The screens/states brief described the four `states/` compositions as
+"nearly done — empty-collection and no-results already draw through
+ShapeStateBody and simply are not imported by name." Reading the actual call
+sites shows that undersells what's really there and oversells what a fix
+would cost:
+
+**`states/empty-collection.tsx` (`EmptyCollectionScreen`) and
+`states/no-results.tsx` (`NoResultsScreen`)** — `ShapeStateBody`
+(`shared/ui/compositions/states/states.tsx`) genuinely IS wired into
+`shared/web/screen-engine/collection-frame.tsx` today, for loading, error,
+and the empty/no-results split (`filtered` is exactly that switch) — this
+part is real, working, and not aspirational. But `EmptyCollectionScreen` and
+`NoResultsScreen` themselves — the standalone whole-screen compositions with
+their own figures, tabs, rail and `onExport` prop — are unimported anywhere
+in `web/` or `web-portal/` (confirmed by grep: both symbols appear only
+inside their own files and the `states/index.ts` barrel). Reaching them
+would mean editing `collection-frame.tsx` itself, which is the shared engine
+seam `screens_detail_charts` owns — not an import to add from outside it.
+
+**`states/archive.tsx` (`ArchiveScreen`)** is not a screen this app can swap
+in in place of one file: "archive" here is a *tab* embedded separately
+inside 20+ collection screens (`tickets-collection.tsx`, `work-panels.tsx`,
+`account-detail-panels.tsx`, `contact-detail.tsx`, and others), each
+swapping its own columns/rows in place. `ArchiveScreen` itself has zero call
+sites outside its own module. Adopting it is a per-collection rollout, not a
+state swap.
+
+**`states/new-empty-record.tsx` (`NewEmptyRecordScreen`)** has no standalone
+screen to replace at all — every record-detail file
+(`role-detail.tsx`, `sprint-detail.tsx`, `story-detail.tsx`,
+`app-detail.tsx`, `meeting-detail.tsx`, `task-detail.tsx`,
+`selectable-detail.tsx`, `knowledge-detail.tsx`, and others) hand-rolls its
+own `copy={{ emptyTitle: … }}` into its own `CollectionFrame`/
+`ShapeStateBody` call. The register it would replace is scattered across as
+many files as there are record types, all inside `screens_detail_charts`'s
+territory.
+
+## Screens (1) — `screens/not-found.tsx` mismatch, found 2026-08-29
+
+`NotFoundScreen` is built for one specific register: a URL for **one record**
+that was deleted, moved, or never existed **inside an otherwise-fine
+collection** — its own doc header states this three times ("the collection
+is fine — one record inside it is not," "the frame stays drawn... because
+the collection is fine," law 4's "only a whole-page failure... may replace
+the frame"). Every prop follows from that: a `record` number said twice (a
+chip and a sentence), a real collection eyebrow/count, the collection's own
+Export and create actions staying drawn in the header.
+
+The app's actual `<NotFound />` (`web/components/deep-link/screen-bits.tsx`)
+is called from a different failure entirely: `module-content.tsx` and
+`collection-content.tsx` reach it when a URL segment names no module at all,
+or when `resolveRecipe()` returns nothing for a module that has no detail
+recipe configured — i.e. there is no collection to speak of, fine or
+otherwise, so there is nothing to put in the composition's eyebrow, count,
+or header actions. Forcing the swap would mean inventing collection context
+that doesn't exist at these call sites. Left as-is; `screens/page-failure.tsx`
+(below) is the composition that actually matches a case in this app.
 
 ## Why this file exists
 
