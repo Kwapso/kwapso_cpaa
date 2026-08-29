@@ -52,6 +52,7 @@ import {
 } from "@shared/ui/components/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
+import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 
 const NAV_ICONS = { home: Home, settings: Settings, kwapso: BadgeCheck } as const
 // The lucide component for each team SIDEBAR page in the rail — the same concept
@@ -340,6 +341,68 @@ export function AppShell({
     }
   })
 
+  // THE RAIL'S CONTENTS — team switcher, the two nav groups, profile menu,
+  // collapse toggle. Unchanged from the hand-rolled version except for the
+  // outer wrapper: `ScreenShell`'s rail COLUMN now owns the paper fill and
+  // the `--rail-inset` padding (the same `--spine-*` tokens this file already
+  // read directly), so this node only has to own ITS OWN sticky/height
+  // behaviour and hand the column back its inset.
+  //
+  // STICKY, ONE WINDOW TALL, INSIDE A PADDED COLUMN. The shell's rail column
+  // pads itself (`p-[var(--rail-inset)]`) so the padding is spent once for
+  // any rail content, `Rail` included. A sticky child sized to the padded
+  // box would be shorter than the viewport by twice the inset, so this node
+  // cancels the column's padding with an equal negative margin and re-spends
+  // it on itself — the same trick, applied to a node the shell does not own,
+  // for the reason the ORIGINAL comment here named: without an explicit
+  // height a flex child stretches to the tallest column and the profile row
+  // drifts to the bottom of the document instead of the window.
+  const railContent = (
+    <div
+      data-rail-collapsed={collapsed ? "" : undefined}
+      className={`sticky top-0 flex h-[100svh] flex-col overflow-y-auto overflow-x-clip -m-[var(--rail-inset)] p-[var(--rail-inset)] ${collapsed ? "items-center" : ""}`}
+    >
+      <div className={collapsed ? "pb-3" : "pb-3"}>
+        <TeamSwitcher
+          active={active}
+          onCreateTeam={() => setCreating(true)}
+          collapsed={collapsed}
+        />
+      </div>
+      <nav className="flex flex-col gap-1">
+        {navGroups.map((group, i) => (
+          <React.Fragment key={group[0].slug}>
+            {/* The divider between the daily half and the occasional one. It
+                sits BETWEEN groups, never above the first or below the last. */}
+            {i > 0 && <Separator className="my-2" />}
+            {group.map(navButton)}
+          </React.Fragment>
+        ))}
+      </nav>
+      <div
+        className={`mt-auto flex min-w-0 flex-wrap items-center gap-2 pt-3 ${collapsed ? "flex-col" : "justify-between"}`}
+      >
+        {/* The theme control moved INTO this menu — see profile-menu.tsx. It
+            was the widest thing in a 240px rail and the reason the rail
+            grew a horizontal scrollbar. */}
+        <ProfileMenu active={active} />
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+          title={collapsed ? t("Expand") : t("Collapse")}
+          className="motion-hover rounded-[var(--radius)] p-2 text-[var(--spine-ink-quiet)] hover:bg-[var(--spine-chip-fill)] hover:text-[var(--spine-ink)]"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="size-4" />
+          ) : (
+            <PanelLeftClose className="size-4" />
+          )}
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     // THE LANGUAGE WRAPS THE WHOLE SHELL, so the nav, the breadcrumbs, every
     // routed screen and every dialog opened from one all read the same `t`.
@@ -347,159 +410,80 @@ export function AppShell({
     // component with no session: the preference arrives on `active.user`, which
     // this shell already has in hand before it paints.
     <LanguageProvider value={active.user?.language}>
-    <div className="flex min-h-[100svh]">
-      {/* Desktop sidebar (collapsible to an icon rail).
-       *
-       * PINNED TO THE WINDOW, NOT THE PAGE. The sidebar is a flex child of a
-       * min-h-screen row, so without an explicit height it stretches to the
-       * TALLEST column — the main one. On a long list that is thousands of
-       * pixels, and `mt-auto` then parks the profile / theme / collapse row at
-       * the bottom of the DOCUMENT instead of the bottom of the window. Home
-       * looked fine only because it is short enough to fit. The tell was the
-       * flash: the block rendered in view while the list was still empty, then
-       * left the screen the instant the rows arrived. h-[100svh] + sticky keeps
-       * the rail exactly one window tall whatever the main column does, and
-       * overflow-y-auto lets the nav scroll inside itself as modules are added
-       * rather than pushing the bottom row off again.
-       *
-       * AND `overflow-x-clip` BESIDE IT, for the reason spelled out over <main>
-       * below: CSS says an element with one axis scrollable and the other
-       * `visible` computes the visible one to `auto`, so `overflow-y` alone gave
-       * the RAIL a horizontal scrollbar the moment any child was wider than
-       * w-60 — which the kit's three-way mode toggle made the bottom row. Clip
-       * removes the scrollbar; the wrap on that row removes the overflow that
-       * caused it. */}
-      {/* THE RAIL IS A SURFACE, AND IT READS THE KIT'S SPINE TOKENS.
-       *
-       * It used to paint nothing at all — `border-r` and a hairline were the
-       * whole of it — so the app's spine stood on whatever the page ground
-       * happened to be, and its active row was `bg-muted`, a colour that means
-       * "quiet" everywhere else in the app. The kit's own screen-shell names
-       * this exact defect as a client complaint: "THE RAIL IS A CONTAINER AND
-       * IT IS SOFT PAPER … the build painted nothing here and got away with it
-       * only because the card behind it happened to be soft paper."
-       *
-       * The kit answers it with eight `--spine-*` names (tokens.css §7b, the
-       * three spines) that this app referenced ZERO times. They are read here
-       * exactly as the kit's own `screen-shell.tsx` reads them, and no
-       * `data-spine` is written: `paper` is the value on bare `:root`, which is
-       * the kit's own arrangement so a rail rendered outside a shell still
-       * paints. Both palettes follow, because both are defined on those names.
-       *
-       * The finished `Rail` composition is the destination — it is blocked
-       * today by the kit's brand-artwork bug (see the swap map §3), so what is
-       * adopted now is the SURFACE and the vocabulary. When the composition
-       * lands it inherits the same tokens and nothing here has to be repainted. */}
-      <aside
-        className={`hidden shrink-0 flex-col border-r bg-[var(--spine-fill)] text-[var(--spine-ink)] md:sticky md:top-0 md:flex md:h-[100svh] md:overflow-y-auto md:overflow-x-clip ${collapsed ? "w-16 items-center" : "w-60"}`}
-      >
-        <div className={collapsed ? "py-3" : "p-3"}>
-          <TeamSwitcher
-            active={active}
-            onCreateTeam={() => setCreating(true)}
-            collapsed={collapsed}
-          />
+    <div className="flex min-h-[100svh] flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
+      {/* Mobile top bar, an explicit height, because `--shell-top` above is a
+          promise about it. ScreenShell has no mobile-chrome concept of its
+          own (the rail simply disappears below `md`, by the kit's own
+          design law, no hamburger anywhere) — this stays exactly as bespoke
+          as it always was, rendered OUTSIDE the shell rather than inside its
+          header band, because it is a full-bleed, bg-card, bordered surface
+          and the header band's whole law is that it paints no fill of its
+          own. */}
+      <header className="bg-card sticky top-0 z-20 flex h-[3.75rem] min-w-0 items-center justify-between gap-2 overflow-hidden border-b px-4 md:hidden">
+        <div className="flex min-w-0 shrink items-center">
+          <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
         </div>
-        <nav className={`flex flex-col gap-1 ${collapsed ? "px-2" : "px-3"}`}>
-          {navGroups.map((group, i) => (
-            <React.Fragment key={group[0].slug}>
-              {/* The divider between the daily half and the occasional one. It
-                  sits BETWEEN groups, never above the first or below the last. */}
-              {i > 0 && <Separator className="my-2" />}
-              {group.map(navButton)}
-            </React.Fragment>
-          ))}
-        </nav>
-        <div
-          className={`mt-auto flex min-w-0 flex-wrap items-center gap-2 p-3 ${collapsed ? "flex-col" : "justify-between"}`}
-        >
-          {/* The theme control moved INTO this menu — see profile-menu.tsx. It
-              was the widest thing in a 240px rail and the reason the rail
-              grew a horizontal scrollbar. */}
+        <div className="flex min-w-0 shrink items-center gap-1">
+          {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
+              it lives in the shell rather than on any one page. It renders
+              nothing when nothing is running, which is most of the time. */}
+          {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
+          {/* THE THEME CONTROL IS NOT HERE, and it is the reason this bar used
+              to be wider than a phone. It is three segments the kit will not
+              collapse to an icon, and on a 375px screen it pushed the avatar
+              off the edge and the whole PAGE sideways with it. It lives in
+              Settings, under the text size, and in the profile menu. */}
           <ProfileMenu active={active} />
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
-            title={collapsed ? t("Expand") : t("Collapse")}
-            className="motion-hover rounded-[var(--radius)] p-2 text-[var(--spine-ink-quiet)] hover:bg-[var(--spine-chip-fill)] hover:text-[var(--spine-ink)]"
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="size-4" />
-            ) : (
-              <PanelLeftClose className="size-4" />
-            )}
-          </button>
         </div>
-      </aside>
+      </header>
 
-      {/* `--shell-top`. HOW FAR DOWN THE SHELL'S OWN CHROME REACHES, published
-       * once here and read by anything inside `<main>` that wants to pin itself
-       * (today: a record's collapsed title line and its tab strip — UI-RULEBOOK
-       * D3). On a phone the app bar below is sticky at the top of the window, so
-       * content pinned at 0 would slide UNDER it; on desktop that bar is not
-       * rendered at all and the offset is zero. In `rem` so it moves with the
-       * display-scale setting (S4) rather than being pinned to 16px.
-       *
-       * This is the shell half of L6: the frame owns z-20 and this variable, the
-       * in-content sticky layer takes z-10 and reads it. */}
-      <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
-        {/* Mobile top bar, an explicit height, because `--shell-top` above is a
-            promise about it. */}
-        <header className="bg-card sticky top-0 z-20 flex h-[3.75rem] min-w-0 items-center justify-between gap-2 overflow-hidden border-b px-4 md:hidden">
-          <div className="flex min-w-0 shrink items-center">
-            <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
+      {/* THE SHELL. `spine="paper"` preserves this app's existing look
+       * exactly — bare `:root` and `[data-spine="paper"]` share one block in
+       * tokens.css, which is what let this file read `--spine-fill` etc.
+       * directly for as long as it drew its own `<aside>`; `ScreenShell`'s
+       * own default is `spine="mango"` (a later client ruling this app has
+       * not adopted), so it has to be named here rather than left to the
+       * shell's default. `rail={null}` below `md`, via the shell's own
+       * breakpoint law, is what already made this adoptable at all — see
+       * COMPOSITION-MISMATCHES.md, the ScreenShell-family entry. */}
+      <ScreenShell
+        className="min-h-0 flex-1"
+        spine="paper"
+        rail={railContent}
+        railLabel={t("Sections")}
+        header={
+          /* Breadcrumbs — URL-derived, collapsing on small screens (library
+           * primitive). The host owns the router, so links route through
+           * onNavigate. The running timer sits on the same row on desktop
+           * (the mobile bar has its own copy above): one line present on
+           * every screen, showing nothing when nobody is timing anything. */
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              {breadcrumbs && breadcrumbs.length > 0 && (
+                /* The kit's Breadcrumbs renders real <a href> links; the shell
+                   intercepts the click so navigation stays soft (client-side)
+                   the way the old component's onNavigate did. */
+                <div
+                  onClickCapture={(e) => {
+                    const a = (e.target as HTMLElement).closest("a")
+                    if (!a) return
+                    const href = a.getAttribute("href")
+                    if (!href || !href.startsWith("/")) return
+                    e.preventDefault()
+                    ;(onNavigate ?? softNavigate)(href)
+                  }}
+                >
+                  <Breadcrumbs items={breadcrumbs} />
+                </div>
+              )}
+            </div>
+            <div className="hidden shrink-0 md:flex">
+              {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
+            </div>
           </div>
-          <div className="flex min-w-0 shrink items-center gap-1">
-            {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
-                it lives in the shell rather than on any one page. It renders
-                nothing when nothing is running, which is most of the time. */}
-            {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
-            {/* THE THEME CONTROL IS NOT HERE, and it is the reason this bar used
-                to be wider than a phone. It is three segments the kit will not
-                collapse to an icon, and on a 375px screen it pushed the avatar
-                off the edge and the whole PAGE sideways with it. It lives in
-                Settings, under the text size, and in the profile menu. */}
-            <ProfileMenu active={active} />
-          </div>
-        </header>
-
-        {/* Breadcrumbs — URL-derived, collapsing on small screens (library
-         * primitive). The host owns the router, so links route through onNavigate.
-         * The running timer sits on the same row on desktop (the mobile bar has
-         * its own copy above): one line that is present on every screen and shows
-         * nothing at all when nobody is timing anything. */}
-        <div className="flex items-center justify-between gap-2 px-4 pt-4 sm:px-6 lg:px-8">
-          <div className="min-w-0">
-            {breadcrumbs && breadcrumbs.length > 0 && (
-              /* The kit's Breadcrumbs renders real <a href> links; the shell
-                 intercepts the click so navigation stays soft (client-side)
-                 the way the old component's onNavigate did. */
-              <div
-                onClickCapture={(e) => {
-                  const a = (e.target as HTMLElement).closest("a")
-                  if (!a) return
-                  const href = a.getAttribute("href")
-                  if (!href || !href.startsWith("/")) return
-                  e.preventDefault()
-                  ;(onNavigate ?? softNavigate)(href)
-                }}
-              >
-                <Breadcrumbs items={breadcrumbs} />
-              </div>
-            )}
-          </div>
-          <div className="hidden shrink-0 md:flex">
-            {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
-          </div>
-        </div>
-
-        {/* THE PAGE GUTTERS (UI-RULEBOOK L1 / S2). One string, used here and by
-            the record header band so both align to the same left edge. `lg:px-8`
-            is 40px, the brand site's own `--margin--m`, and what `.nk-container`
-            computes to at every desktop width.
-
-            `overflow-x-clip`, NOT `overflow-x-hidden`. They look identical and
+        }
+      >
+        {/* `overflow-x-clip`, NOT `overflow-x-hidden`. They look identical and
             they are not: CSS says an element with `overflow-x: hidden` and a
             visible other axis computes `overflow-y` to `auto`, which makes this
             a SCROLL CONTAINER. A `position: sticky` child then sticks to a box
@@ -507,105 +491,104 @@ export function AppShell({
             what happened to the record header and tab strip (D3) the first time
             they were built. `clip` clips the same overflow and creates no scroll
             container, so the document stays the scroller and sticky works. */}
-        <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-8">
-          {children}
-        </main>
+        <div className="min-w-0 overflow-x-clip pb-24 md:pb-0">{children}</div>
+      </ScreenShell>
 
-        {/* Mobile bottom tabs — five slots, gated items hidden, and when there
-         * are more sections than slots the fifth becomes More. The rail beside
-         * this is `hidden md:flex`, so this bar is the ONLY way through the app
-         * on a phone or a tablet: anything it cannot reach cannot be reached. */}
-        <nav className="bg-card fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t px-2 py-1.5 md:hidden">
-          {bottomNav.map((item) => {
-            const Icon = item.Icon
-            const activeNav = isNavActive(item.path, here)
-            return (
-              <button
-                key={item.slug}
-                type="button"
-                onClick={() => goToSection(item.path)}
-                aria-current={activeNav ? "page" : undefined}
-                /* `min-w-0` + a box for the label: this bar is up to six
-                   `flex-1` slots on 375px, so a label like "Knowledge base"
-                   has ~59px and overflows it. The portal's bar carries the
-                   measured numbers for the same defect. */
-                className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 text-badge font-medium ${
-                  activeNav ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <Icon className="size-5 shrink-0" />
-                <span className="w-full text-center leading-tight">{item.title}</span>
-              </button>
-            )
-          })}
-
-          {overflowNav.length > 0 && (
+      {/* Mobile bottom tabs — five slots, gated items hidden, and when there
+       * are more sections than slots the fifth becomes More. The rail beside
+       * this is dropped entirely below `md` by the shell's own breakpoint
+       * law, so this bar is the ONLY way through the app on a phone or a
+       * tablet: anything it cannot reach cannot be reached. */}
+      <nav className="bg-card fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t px-2 py-1.5 md:hidden">
+        {bottomNav.map((item) => {
+          const Icon = item.Icon
+          const activeNav = isNavActive(item.path, here)
+          return (
             <button
+              key={item.slug}
               type="button"
-              onClick={() => setMoreOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={moreOpen}
-              /* Active when the section you are ON lives in here — otherwise
-                 the bar shows nothing highlighted and the app looks lost. */
-              aria-current={
-                overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
-              }
+              onClick={() => goToSection(item.path)}
+              aria-current={activeNav ? "page" : undefined}
+              /* `min-w-0` + a box for the label: this bar is up to six
+                 `flex-1` slots on 375px, so a label like "Knowledge base"
+                 has ~59px and overflows it. The portal's bar carries the
+                 measured numbers for the same defect. */
               className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 text-badge font-medium ${
-                overflowNav.some((i) => isNavActive(i.path, here))
-                  ? "text-foreground"
-                  : "text-muted-foreground"
+                activeNav ? "text-foreground" : "text-muted-foreground"
               }`}
             >
-              <MoreHorizontal className="size-5 shrink-0" />
-              <span className="w-full text-center leading-tight">{t("More")}</span>
+              <Icon className="size-5 shrink-0" />
+              <span className="w-full text-center leading-tight">{item.title}</span>
             </button>
-          )}
-        </nav>
+          )
+        })}
 
-        {/* EVERYTHING ELSE, on a phone. It lists EVERY section, not only the
-         * ones the bar could not fit, and in the desktop rail's own groups — so
-         * "where is Work logs?" has one answer on both, and a person who learns
-         * the app on a laptop is not relearning it on a phone. Redundant by
-         * design: four entries appear twice, which costs a little space and buys
-         * predictability. */}
-        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-          <SheetContent side="bottom" className="max-h-[85svh] overflow-y-auto md:hidden">
-            <SheetHeader>
-              <SheetTitle>{t("All sections")}</SheetTitle>
-            </SheetHeader>
-            <nav className="mt-4 flex flex-col gap-1 pb-2">
-              {navGroups.map((group, i) => (
-                <React.Fragment key={group[0].slug}>
-                  {i > 0 && <Separator className="my-2" />}
-                  {group.map((item) => {
-                    const Icon = item.Icon
-                    const activeNav = isNavActive(item.path, here)
-                    return (
-                      <button
-                        key={item.slug}
-                        type="button"
-                        onClick={() => {
-                          setMoreOpen(false)
-                          goToSection(item.path)
-                        }}
-                        aria-current={activeNav ? "page" : undefined}
-                        className={`motion-hover flex items-center gap-2 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium ${
-                          activeNav
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                        }`}
-                      >
-                        <Icon className="size-4 shrink-0" />
-                        {item.title}
-                      </button>
-                    )
-                  })}
-                </React.Fragment>
-              ))}
-            </nav>
-          </SheetContent>
-        </Sheet>
-      </div>
+        {overflowNav.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            /* Active when the section you are ON lives in here — otherwise
+               the bar shows nothing highlighted and the app looks lost. */
+            aria-current={
+              overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
+            }
+            className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 text-badge font-medium ${
+              overflowNav.some((i) => isNavActive(i.path, here))
+                ? "text-foreground"
+                : "text-muted-foreground"
+            }`}
+          >
+            <MoreHorizontal className="size-5 shrink-0" />
+            <span className="w-full text-center leading-tight">{t("More")}</span>
+          </button>
+        )}
+      </nav>
+
+      {/* EVERYTHING ELSE, on a phone. It lists EVERY section, not only the
+       * ones the bar could not fit, and in the desktop rail's own groups — so
+       * "where is Work logs?" has one answer on both, and a person who learns
+       * the app on a laptop is not relearning it on a phone. Redundant by
+       * design: four entries appear twice, which costs a little space and buys
+       * predictability. */}
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent side="bottom" className="max-h-[85svh] overflow-y-auto md:hidden">
+          <SheetHeader>
+            <SheetTitle>{t("All sections")}</SheetTitle>
+          </SheetHeader>
+          <nav className="mt-4 flex flex-col gap-1 pb-2">
+            {navGroups.map((group, i) => (
+              <React.Fragment key={group[0].slug}>
+                {i > 0 && <Separator className="my-2" />}
+                {group.map((item) => {
+                  const Icon = item.Icon
+                  const activeNav = isNavActive(item.path, here)
+                  return (
+                    <button
+                      key={item.slug}
+                      type="button"
+                      onClick={() => {
+                        setMoreOpen(false)
+                        goToSection(item.path)
+                      }}
+                      aria-current={activeNav ? "page" : undefined}
+                      className={`motion-hover flex items-center gap-2 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium ${
+                        activeNav
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      {item.title}
+                    </button>
+                  )
+                })}
+              </React.Fragment>
+            ))}
+          </nav>
+        </SheetContent>
+      </Sheet>
 
       {/* Not rendered while creation is closed — a dialog that can only ever be
           refused by the door is worse than no dialog (shared/product.ts). */}

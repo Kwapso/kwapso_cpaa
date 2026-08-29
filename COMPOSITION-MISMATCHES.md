@@ -108,10 +108,15 @@ app-wide sidebar (`web/components/app-shell.tsx`). That check stopped at
 "does ScreenShell draw a rail" and never read whether the rail's CONTENTS
 were forced. They are not: `screen-shell.tsx`'s own header states, verbatim,
 `rail={null}` is a real, documented opt-out ("nothing in the repo needs it
-today" — because every current call site has one to pass), and the shell
-"does not draw the rail's CONTENTS" in either case — it owns only the
-column's placement, width and full-height paper fill. Passing this app's own
-nav as the `rail` node, or `null`, produces no duplicate chrome.
+today" — because every current call site has one to pass). A peer
+independently confirmed this by RENDERING each of the six with `rail={null}`
+and diffing the DOM against the default, rather than reading the prop
+comment: zero `nav`/`aside` elements and no 13rem column in the markup at
+all on every one of them (the whole rail branch is `{railNode ? (…) : null}`
+in the shell's own source) — not an empty gutter, not a duplicated
+landmark, the column is gone outright. Passing this app's own nav as the
+`rail` node, or `null`, produces no duplicate chrome, confirmed both by
+reading and by rendering.
 
 What survives past that correction, and is the reason this is `[~]` and not
 `[x]`: **`ScreenShell` is a per-route composition, and `AppShell` is a
@@ -187,12 +192,19 @@ grant it" well AND the `Request` link are drawn from ONE conditional block
 gated on `grantor !== undefined` — there is no way to get the well without
 the button (`Request`'s `onClick` is unconditional inside that block, so
 `onRequest` alone does not neutralize it; only omitting `grantor` does).
-Omitting `grantor` entirely removes the self-service affordance cleanly,
-while keeping the denial sentence, the blurred page-behind layer and a
-`Back` button. This is a real fit for the client portal's `NoAccess` screen.
-If the portal still wants to name a contact, that has to be prose in the
-description text, not the interactive grantor row. Not prototyped this
-pass.
+Passing `grantor={null}` removes the self-service affordance cleanly, while
+keeping the denial sentence, the blurred page-behind layer and a `Back`
+button. **Update from a peer's render-probe sweep:** the composition's
+DEFAULT parameter (`grantor = DEFAULT_GRANTOR`) meant an app that merely
+*omitted* the prop, rather than passing `null` explicitly, would still have
+rendered a real name and a live `Request` link — a genuine kit bug (the
+prop's own doc said "undefined draws no grantor block at all," which was
+never true against the actual default), now fixed upstream (kit v1.2.4/
+v1.2.5) so `grantor={null}` is the clean, confirmed-by-rendering opt-out.
+Pass `null` explicitly, not nothing. This is a real fit for the client
+portal's `NoAccess` screen. If the portal still wants to name a contact,
+that has to be prose in the description text, not the interactive grantor
+row. Not prototyped this pass.
 
 ### `templates/stat-strip.tsx` — CORRECTED, partially adoptable
 
@@ -206,20 +218,34 @@ big-number tiles (via the generic `BandCard` wrapper) already are by hand.
 This is a real candidate to replace those specific tiles with the kit's own
 component rather than a hand-rolled one — not a candidate for the tiles that
 already carry a real chart, which stay exactly as `pulse.tsx`'s law says.
-Not prototyped this pass; needs a scan of which `pulse.tsx`/`impact-panel.tsx`
-tiles are number-only today before swapping any in.
+Confirmed by a peer's render probe: `StatStrip` with figures and no `spark`
+draws no chart element at all. Not prototyped this pass; needs a scan of
+which `pulse.tsx`/`impact-panel.tsx` tiles are number-only today before
+swapping any in.
 
-## [!] Confirmed mismatches, re-examined and unchanged (10)
+### `templates/form-screen.tsx` (+ `templates/multi-step-form.tsx`) — CORRECTED, per a peer's render probe
 
-### `templates/form-screen.tsx` (+ `templates/multi-step-form.tsx`)
+The first pass rejected this outright: the composition is a side-sheet, this
+app's `FormShell` (`shared/web/form-shell.tsx`, 32+ call sites) is a centred
+`Dialog`, and the kit's own doc header states the UX position in words ("a
+centred modal is for confirmations only"). A peer rendered `FormScreen` with
+`surface="page"` rather than reading the prop table, and found it draws a
+**plain div** — no dialog role, no sheet, no scrim. The side-sheet chrome
+lives entirely in `surface="panel"`; `surface="page"` is the form BODY
+alone. That is the same grain this app already found for records
+(`RecordChrome`, not `DetailScreen`'s `ScreenShell` wrapper) — the lower-
+level content composes into `FormShell`'s own centred `Dialog`, and the
+side-sheet-vs-centred-modal disagreement never has to be litigated because
+`FormScreen`'s outer sheet is simply never used. Not prototyped this pass;
+next step is reading what `surface="page"` actually expects as its steps/
+fields contract and whether it fits `FormShell`'s own field-rendering, before
+touching any of the 32+ call sites. `multi-step-form` still has nothing to
+attach to (no wizard exists in the app) and is unaffected by this correction.
 
-Re-checked for an opt-out: none exists. The side-sheet-vs-centred-dialog
-disagreement is drawn into the composition's own layout, not gated by a
-prop, and the kit's own doc header states the UX position in words ("a
-centred modal is for confirmations only") rather than as a configurable
-default. `FormShell` (`shared/web/form-shell.tsx`, 32+ call sites) is a
-centred `Dialog` on purpose. `multi-step-form` inherits this and also has no
-wizard anywhere in the app to hang it on regardless.
+## [!] Confirmed mismatches, re-examined and unchanged (6)
+
+Four groups below, plus `ArchiveConfirmationDialog` and `StepperHero` for
+stories, each recorded once under its sibling's entry rather than twice.
 
 ### `overlays/import.tsx`, `templates/import-flow.tsx`, `overlays/import-proposal.tsx`
 
@@ -246,7 +272,10 @@ also live-drives the screen underneath it through a "screen trace" mechanism
 the kit has no concept of. Letting someone type in the same table the agent
 is actively manipulating is a real correctness question (whose edit wins),
 not a styling preference — this is a product decision about concurrent
-agent/user control of one screen, not a prop the kit exposes either way.
+agent/user control of one screen, not a prop the kit exposes either way. A
+peer's render probe confirms the kit's half is real, not just documented:
+`Assistant open` renders `role="dialog"` but never `aria-modal="true"` — it
+genuinely does not trap focus.
 
 ### `overlays/export.tsx`
 
@@ -254,7 +283,10 @@ Re-checked: `columns` is not optional, and the composition's whole premise
 (a scope choice + a column picker + a format choice) has no reduced mode.
 This app's actual export is a one-click `<a href>` honoring the current
 filter querystring server-side — a deliberately simpler shape, confirmed
-unchanged.
+unchanged. A peer's render probe agrees: `ExportScreen` with no `formats`
+and no `columns` still draws the scope radio — the one HELD verdict out of
+six re-tested by rendering. Export really is a scope decision in this
+composition, not an omitted default.
 
 ### `overlays/filter-builder.tsx`
 
@@ -263,31 +295,29 @@ structurally carries an operator slot and the AND-chained, add/remove-row
 interaction model has no analog in this app's single-valued, closed-
 vocabulary facet chips (`shared/web/screen-engine/filter-bar.tsx`). Omitting
 the operator list does not collapse the composition into a chip row; it just
-leaves the operator dropdown emptier. Confirmed unchanged.
+leaves the operator dropdown emptier. A peer tested this rather than
+inferring it: `operators={[]}` with one condition still renders 2
+comboboxes, same as a real `operators` list — the control is there either
+way, just empty. There is no escape hatch. Confirmed unchanged.
 
-### `overlays/access-denied.tsx`'s cousin, `overlays/delete-confirmation.tsx`'s `ArchiveConfirmationDialog`
+`ArchiveConfirmationDialog` (the mandatory-reason sibling of
+`DeleteConfirmationDialog`) and `StepperHero` for `story-status-stepper.tsx`
+(the 4-stage door mismatch) are also still real, unresolved mismatches, but
+each is recorded once already — under the `[~]`/`[x]` entry for its sibling
+composition — rather than duplicated here.
 
-See `[~]` above — the split verdict is recorded there, not duplicated here.
-
-### `templates/stepper-hero.tsx` for `story-status-stepper.tsx`
-
-See `[x]` above — recorded once, not duplicated here.
-
-## [ ] No current app equivalent (4)
+## [ ] No current app equivalent (3)
 
 `templates/multi-step-form.tsx` — no wizard forms exist anywhere in the app
-(also inherits the `form-screen` mismatch above).
+(also inherits the `form-screen` mismatch above). A peer's render probe adds
+a second, independent confirmation: `MultiStepForm` itself warns at runtime
+when no step depends on an earlier one — the kit's own component agreeing
+there is no wizard here to hang it on.
 
 `templates/search-results.tsx` — assumes a global "search everything from
 anywhere" command-palette. No such control exists anywhere in either front
 door; the only search-like control (`record-picker.tsx`) is a per-field
 relation picker inside a form, not global search.
-
-`overlays/bulk-edit.tsx` — requires a row-selection mechanism (checkboxes
-persisting across a list, an edit panel reporting "changes N records").
-Nothing in `shared/web/screen-engine/` or either front door has any row-
-selection UI at all. Adopting this means building a cross-cutting selection
-primitive first — not a scoped swap.
 
 `overlays/quick-view.tsx` — wants a Space/click-to-peek dialog instead of
 navigating. The app's real row activation
@@ -296,19 +326,46 @@ navigate straight to the full record, with no peek pattern anywhere.
 Adopting this means changing established navigation behavior across the
 engine, not adding a missing piece.
 
-## [?] Needs a human call (1)
+## [?] Needs a human call (3)
 
 **`templates/sign-in.tsx`** — landed. The other lane shipped
 `sign-in-system` (the agency login now renders the kit's `LoginRoute`
 through `web/components/auth-card.tsx`) after this file's first pass flagged
 the asset-import blocker as stale. See UI-GAPS.md rows 2 and 23.
 
-`templates/rail.tsx` remains parked, not scheduled, per the owner's own
+**`templates/rail.tsx`** remains parked, not scheduled, per the owner's own
 review of staging live — but see the ScreenShell-family entry above: the
 question this file now needs decided is no longer "should `Rail` replace
 `AppShell`'s nav," it's "should `AppShell` itself be rebuilt on
 `ScreenShell`," which is a bigger and different question than the one
-`rail.tsx` originally posed alone.
+`rail.tsx` originally posed alone. **One stated reason for parking it was
+wrong, corrected by a peer's render probe**: `mark`, `wordmark` and
+`tagline` are all `React.ReactNode` slots at the rail's head and each takes
+an arbitrary node — rendered live with a real button in each slot — so the
+team switcher (a multi-tenant requirement this app's sidebar carries) has a
+home in `Rail` after all. The mobile half of the original reason still
+holds: `ScreenShell` drops the rail entirely below `md` by design and draws
+no hamburger anywhere, so the mobile top-bar and bottom-tab-bar stay bespoke
+regardless of whether `Rail` is adopted. The verdict (parked, not scheduled,
+a deliberate future attempt) is unchanged — only the stated reason for half
+of it was.
+
+**`overlays/bulk-edit.tsx`** — CORRECTED from `[ ]` to `[?]`. The first pass
+said this "requires a row-selection mechanism... nothing in
+`shared/web/screen-engine/` or either front door has any row-selection UI
+at all... adopting this means building a cross-cutting selection primitive
+first." That reason is **inverted**: `BulkEditScreen` IS the selection
+primitive, not a consumer of one waiting to be built. A peer's render probe
+(after first getting a false negative from `input[type=checkbox]` — the kit
+uses Radix's `[role=checkbox]`, and the empty-records case renders exactly
+one selection mark, the header select-all, proving the corrected selector
+can actually tell a difference): the open composition renders 7 selection
+marks across its own rows, and passing `selectedIds` brings up its own
+"selected" panel. It brings the rows, the marks, the select-all and the
+panel — nothing has to be built first. What is left is not a structural
+mismatch, it's a product question this app has never been asked: does it
+want bulk edit on any collection at all. Filed as a human call, not a
+rejection.
 
 ## The kit's real `CollectionFrame` primitive (not a template — a component;
 carried here because it is the other half of the "kit overrides the app"
@@ -340,9 +397,22 @@ names the precedent for `SortControl` sharing the `viewSwitch` slot) rather
 than the bespoke header markup it draws today. All of the DATA logic
 (`selectRows`, facets, the remembered-question state) is unaffected — this
 is a presentation-layer rewrite of one file, but that one file is the visual
-contract of every collection screen in both doors. Not prototyped this pass;
-recommending the same dedicated-branch treatment as the rail question, given
-the reach, rather than rolling it into this batch.
+contract of every collection screen in both doors.
+
+**Prototyped and verified, one caller, not yet rolled out further.** Commit
+`989dea7e`: a `useKitPanel` flag (default `false`) on the engine's
+`CollectionFrame`, wired temporarily to the roles collection only, verified
+at 390/768/1280/1920, both themes, plus a live search interaction, then
+reverted so every other call site is byte-identical. Two real bugs surfaced
+by the screenshots and fixed before commit: passing `config.showCount`
+straight into the kit's `heading`+`count` Badge drew an ORPHANED count chip
+on a title-less collection — a second count for the one collection, which is
+what R16 exists to catch — and the fix's own first draft then clipped the
+search input on a phone by fighting it for space inside one flex slot; both
+are written up in the commit message rather than repeated here. `empty-
+collection` and `no-results` (the other lane's states work, hosted in this
+same engine file) are its next callers, per the planner's sequencing —
+not rolled out to the other five list-recipe call sites yet either.
 
 ## The `screens/`+`states/` lane's pass, 2026-08-29 — the pattern behind every rejection below
 
@@ -558,6 +628,88 @@ as-is, recorded as a question the owner may want to answer once, in one
 word: the kit says a client portal never shows a social sign-in row; this
 app ships Google on the portal per SCOPE ch.06 because it proves identity
 without granting access. Keep ours, or change the kit's law?
+
+## Components (KIT-COVERAGE.md's checklist, from screens_collections's pass)
+
+Findings from a bottom-up component sweep (Detail and examples, Collection
+views, Forms and data, Notes and notifications, Feedback and overlay, Data
+display), reported by a peer for this file since it now covers the whole
+catalogue's "why not," not just the 23 compositions it started with.
+
+**Shipped, not a finding:** `brand` — `web-portal/components/portal-shell.tsx`
+now renders the kit's real `Logotype`/`AuthPhotograph` instead of the
+`auth-artwork.tsx` shim, verified by probe-compile after UI-GAPS row 23's
+asset-url fix landed. Committed `2eebb832`.
+
+**Confirmed mismatches:**
+- `form` — `FormShell` is already this app's own locked, machine-checked
+  law (R4, `forms-use-formshell`: "the one wrapper every form renders
+  through"), and the kit's `Form` states the identical job description for
+  itself. Adopting it would build a second seam for a role one already
+  fills.
+- `import-wizard` — the same "one file, one table, manual column mapping"
+  mismatch already on record for the import trio, one primitive layer
+  down (`ImportWizard` composes `Form`+`Field`+`Select` for the mapping
+  step this app's agentic import has no place for).
+- `progress`, `progress-dashboard` — `pulse.tsx`'s own locked law ("big
+  NUMBER or CHART, nothing else") already cited for `stat-strip`, ruling
+  out a third shape. No progress-bar/dashboard concept exists anywhere in
+  the app's savings/hours/margin screens.
+- `notifications` — no bell/inbox concept anywhere in either front door
+  (grepped both). This app's live-update model is realtime in-place sync,
+  not a notification log. A real gap, but a new FEATURE, not a swap.
+- `tree`, `stopwatch` — no current app equivalent (no hierarchical UI
+  outside the already-adopted flowchart/process-maps; work logs are
+  entered retrospectively, never clocked).
+- Most of Collection views (kanban, calendar-view, spreadsheet, matrix,
+  swimlane, timeline, agenda, gallery, split, queue, chat, tiles, map,
+  compare, flowdetail, copilot-overlay — ~16 types) — no current app
+  equivalent. The recipe engine's view-type union has a fixed set (list/
+  table, card-grid, activity-feed, etc.) and none of these has an obvious
+  existing collection to attach to. This was an architecture-level read
+  (the engine's own type union), not a per-composition render — flagged as
+  worth a second look if anyone disagrees with treating it as one category
+  rather than 16 individual verdicts, since only `brand` among this whole
+  batch was actually rendered before being decided.
+
+**Not a real gap:** `notes` reads `[ ]` in KIT-COVERAGE.md but is a census
+blind spot — `Comments` (already `[x]`) imports `Notes` internally
+(`shared/ui/components/comments/comments.tsx:87`) and is built directly on
+top of it. The coverage script only counts direct import strings, so it
+can't see a transitive one. Worth a rot-check-style note if the script ever
+grows a "transitively used" column.
+
+**Too big for a same-session swap, flagged for its own dedicated pass:**
+`detail-view` — a whole "record overview panel" primitive (header + avatar
++ kv + sections + aside + footer). Adopting it for real would mean
+restructuring the many hand-composed `*-detail.tsx` files, which might
+genuinely reduce real duplication but is scoped work, not a batch item. Not
+picked up this pass.
+
+**`checklist` — CLOSED, no current app equivalent.** Two candidates
+considered, both real mismatches rather than one render-check away from
+fitting:
+- `work-panels.tsx`'s `TodosPanel` (client to-dos) has no tick/checkbox at
+  all — completion is a "Done" badge only, and the sole staff action on an
+  open row is Withdraw. These are things staff is WAITING ON THE CLIENT
+  for; only the client's own action closes one. `checklist`'s whole
+  interaction model is a person ticking a mark to move a row open→done —
+  wiring that on here would offer a control that lies about who can press
+  it.
+- `tasks-screen.tsx`'s "Ours to do" list (real staff tasks, genuine
+  tick-to-complete via `task-detail.tsx`'s `onToggleDone`) is closer in
+  spirit but already deliberately richer than `checklist`'s fixed
+  5-column row (mark/number/title/owner/when): six server-driven view tabs
+  with exact R14/R16 counts, priority, assignee, department glyph, due
+  date. `checklist` has no slot for most of that — adopting it would be a
+  downgrade, not a fit.
+
+Filed in the same bucket as most of Collection views.
+
+`screen-renderer` and `collection-frame` are left alone here — the app's
+own files under those names do a different job from their kit namesakes
+(see the warning at the top of this file), and `collection-frame` is the
+subject of this file's own `useKitPanel` prototype above.
 
 ## Why this file exists
 
