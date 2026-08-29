@@ -547,6 +547,35 @@ with `tone="bare"` `inset={false}`, unconditionally: this frame never
 renders anywhere else in this app. Re-verified at all four widths, both
 themes, after the fix.
 
+**A fourth bug — the double-box was still real, just invisible, and a
+peer's deeper detector is what caught it** (commit `230d1cfb`). The
+`tone="bare"` fix above stopped the FRAME's own redundant fill, but never
+removed the surrounding `CollectionCard` — the app's own `<Card>` box
+(`web/components/deep-link/screen-bits.tsx`'s `SectionWithCreate`) was
+still wrapping the kit panel, five DOM levels down. A peer's first probe
+walked only four ancestors and reported clean; re-run unbounded with a
+canary nested deep enough to prove it, it found the real nesting on both
+roles and tickets. It costs nothing visible TODAY only because
+`CollectionCard`'s fill and the kit panel's fill are the same token
+(`bg-surface-panel`) — measured, not assumed: card 974px/radius 27/no
+shadow, panel 902px/radius 27/no shadow, 36px of dead inset between them.
+The kit's own `tone` doc calls soft-paper-on-soft-paper "the broken
+combination... the active folder tab has nothing to be seen against" —
+today's invisibility is a coincidence of tokens, not a settled state, and
+the day either screen grows a folder tab it would surface as a tab bug
+with no visible cause. Not a kit bug (the kit never composes its frame
+inside a `Card`; it drops straight into `ScreenShell`'s own off-beige
+body, which is what makes the panel readable at all) — the in-rule fix was
+always app-side, per this entry's own first-pass reasoning
+("`CollectionCard` also stripped... "). Fixed for real this time:
+`SectionWithCreate` takes a `useKitPanel` prop that skips `CollectionCard`
+outright. Caught a second, related bug in the same pass — with the box
+gone, the header's own icon-only create button and the panel's own
+labelled one were both rendering for the READY state (not the deliberately
+doubled empty-state mangos) — fixed by skipping the header's button too
+when `useKitPanel` is on. Re-verified live, all four widths, both themes,
+both collections, both of Tickets' tabs.
+
 **`empty-collection`'s genuinely-empty half — ADOPTED** (commit `960ae29e`).
 `states/empty-collection.tsx`'s own `emptyBody` register (Headline + Text +
 Button, "left-aligned, type only… no dashed placeholder rectangle") is
