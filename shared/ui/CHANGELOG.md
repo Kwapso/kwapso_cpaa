@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.2.7 — 2026-08-29
+
+### Fixed — `Stopwatch` advertised `children` and threw them away
+
+`StopwatchProps` extends the div props, so the TYPE said children were
+accepted; the render writes its own explicit JSX children, and explicit
+children beat a spread, so anything a caller passed was discarded in silence.
+`children` is now omitted from the interface: the type tells the truth.
+
+### Added — `Stopwatch leading`, because a second clock makes the first ambiguous
+
+One stopwatch needs no name. Two running at once are two durations and nothing
+else, and a name in a `title` tooltip is invisible on a phone. There was
+nowhere to put the name, so the consuming app hand-drew a near-identical pill
+beside this one — a duplicated component, which is what makes this a gap
+rather than a preference.
+
+`leading` is a PLACEMENT, not a drawing: nothing styles the node, the same way
+`ScreenShell` places a rail and `CollectionFrame` places a toolbar. The pill's
+fill, radius, glyph and disc are untouched, and `undefined` renders nothing at
+all — not an empty wrapper. The three default renders (plain, readOnly,
+disabled) were captured through the consuming app's React before and after and
+are BYTE-IDENTICAL.
+
 ## v1.2.6 — 2026-08-29
 
 ### Fixed — three comments that compiled the class they forbid
