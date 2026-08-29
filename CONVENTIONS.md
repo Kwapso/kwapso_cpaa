@@ -959,6 +959,57 @@ defect first.
   sent, because a player told there are more bytes than arrived stalls waiting
   for them and one told there are fewer throws away what it has.
 
+- **A MEASUREMENT PROVES NOTHING UNTIL THE INSTRUMENT HAS BEEN SHOWN IT CAN
+  FAIL.** Run the canary FIRST — a case that must come back positive and, where
+  it is cheap, one that must come back negative. If the canary is silent the
+  measurement is not evidence, however confident the number looks.
+
+  This is not the same convention as the four above. Those are about writing a
+  CHECK that can go red. This is about the ad-hoc measurement you take while
+  investigating — the grep, the probe, the browser evaluate — which nobody
+  reviews and which decides what you do next.
+
+  Earned five times in one day, 29 Aug 2026, on one lane:
+
+  · **A STALE CACHE.** `next build` reused a cached stylesheet, so a CSS fix
+    read as "no effect". Reported to two other lanes as unfixable with the
+    cause unknown. `rm -rf web/.next` flipped the answer. Clear the framework
+    cache before believing a build.
+  · **A HIDDEN TAB.** The Browser pane runs at `document.hidden === true`:
+    `requestAnimationFrame` never fires and CSS animations never tick, so a
+    Radix surface never receives the `animationend` it unmounts on. A known
+    kit bug "reproduced" perfectly there — node still present 1.2s after a
+    140ms animation, focus stranded — and was entirely an artefact. A PLAIN
+    canary animation owing nothing to the component, stuck in the same tab
+    with no events, is what caught it. Anything animation-driven must be
+    measured somewhere that paints; Playwright does, the pane does not, and
+    fronting the tab does not fix it.
+  · **A TRUNCATED VALUE.** `boxShadow` sliced at 50 characters, and Tailwind's
+    leading transparent placeholders filled all fifty — so a field carrying a
+    perfectly good hairline read as edgeless, and nearly shipped as a bug
+    report against the kit.
+  · **THE WRONG ALGORITHM.** Accessible names computed from `textContent`,
+    which is not the accessible-name algorithm: a button named by its image's
+    `alt` looked nameless. Use the browser's own computation
+    (`Accessibility.getFullAXTree` over CDP), not a hand-rolled approximation
+    of a spec.
+  · **A POLLUTED CANARY.** Having switched to the real computation, the probe
+    INJECTED an unnamed button as its negative canary and then counted its own
+    injection as the finding. A canary that changes the population it measures
+    is a second bug wearing the first one's clothes.
+
+  And a related one that is about identity rather than truth: **a count cannot
+  name its source.** Grepping a built artefact for a real symbol tells you it
+  is present, never which of N files put it there — so it cannot distinguish
+  "my fix did nothing" from "my fix worked and a second source is still feeding
+  it". Plant a SENTINEL instead: a unique token that could only have come from
+  the file under suspicion, rebuild, and grep for the sentinel. One build per
+  candidate answers it outright, and it is how root markdown was cleared and
+  `shared/rules/registry.ts` convicted in two builds.
+
+  The habit costs a minute per measurement. On the day above it caught five
+  wrong answers, two of which had already been sent to other lanes.
+
 ## Scale + idempotency + filter patterns (R14 · R17 · R19)
 These three are machine-checked; write them the house way so the build stays green.
 
