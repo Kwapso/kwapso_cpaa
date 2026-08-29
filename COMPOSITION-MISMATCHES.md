@@ -938,17 +938,28 @@ use explicit `LoadMore` buttons, not scroll-triggered pagination (a
 deliberate UX choice, not a gap); no scroll-triggered animations exist to
 pause.
 
-**One real candidate, not implemented:** `use-virtual-rows` — a
-behaviour-only hook that windows a >100-row list to what's near the
-viewport. `web/components/selectable-screen.tsx` (the dropdown-values
-screen) is a concrete attachment point: it fetches via
-`tenancy.selectable()`, a single flat GET with no cursor, capped at
-`LIST_HARD_CAP` (1,000), and maps every row into the DOM with no windowing
-— a team with a lot of accumulated dropdown values could genuinely hit
-hundreds of rows in one render. Not wired in: it needs load-testing against
-a team that actually has that many values, and a wrong row-height
-measurement or a missed ARIA index would be a worse regression than the
-unbounded list it replaces. Flagged for a dedicated look with real data.
+**`use-virtual-rows` — SHIPPED** (commit `9ec3efcf`). The candidate above
+was verified against real data rather than wired in blind:
+`web/components/selectable-screen.tsx` now windows a dropdown-values group
+once it crosses 100 rows — per GROUP, not per screen, since the hook
+assumes one uniform row height across whatever list it's handed, and this
+screen's groups (one per vocabulary type) are the uniform grain, the whole
+screen is not. Load-tested against a team seeded with real volume before
+shipping, which is exactly the load-testing this entry originally asked
+for before wiring it in.
+
+TOOLING NOTE, worth keeping for the next scroll/animation/rAF-dependent
+check: the Browser pane throttles a hidden/backgrounded tab hard enough
+that `requestAnimationFrame` never fires — silently, no error, the checked
+behaviour just never happens. Neither overriding `document.hidden`/
+`visibilityState` nor patching `window.requestAnimationFrame` gets past
+it; the throttle is enforced below what a page can see or override. A real
+Playwright browser (`scripts/verify-virtual-scroll.mjs`, kept in the repo)
+is what actually proved the scroll-triggered windowing works. A peer hit
+the same constraint the same day verifying a closed Popover that looked
+"stuck open" in the pane — really just a canary animation with no rAF
+ticking, not a real bug — so this is the second investigation it has
+silently cost, worth naming here rather than let a third rediscover it.
 
 ## Why this file exists
 
