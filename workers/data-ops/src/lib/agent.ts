@@ -326,6 +326,17 @@ const RECORD_CHARS = 40_000
  * the line, which is what a threshold wants. */
 const LIST_ROWS = 8
 
+/** HOW MANY ROWS A LIST ANSWER MUST KEEP, whatever else is in the payload. Five
+ * because it is enough to answer "which is the most recent" or "name a few", and
+ * small enough that no realistic tally can justify crowding it out. */
+const ROW_FLOOR = 5
+
+/** How big a field has to be before it counts as a TALLY worth dropping to make
+ * room. Above this it is a sidecar (a per-client breakdown, a per-status count);
+ * below it, it is `total` or `hasMore` and dropping it would take the answer
+ * with it. */
+const SIDECAR_CHARS = 200
+
 /** WHAT ONE TURN MAY READ, in total characters of tool result.
  *
  * The record budget is thirty times the summary budget, and a turn may take
@@ -396,8 +407,39 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS): str
       ? whole
       : `${whole.slice(0, allowance)}\n[Trimmed here: the result was longer than ${allowance} characters, so what is above is incomplete.]`
   const [key, list] = rows
-  const rest = { ...(data as Record<string, unknown>), [key]: [] as unknown[] }
-  let budget = RESULT_CHARS - JSON.stringify(rest).length
+  // THE TAIL GREW UNTIL THERE WAS NO ROOM FOR ROWS, which is this file's own
+  // earlier fix rotting rather than a new kind of fault. "Drop ROWS, never the
+  // tail" was right when the tail was `total`, `hasMore` and `nextCursor` —
+  // about eighty characters. `list_help_tickets` then grew `byType`, `byStatus`
+  // and `byAccount`, and on the real staging book those TALLIES are 1,709 of the
+  // 2,000-character budget: measured 29 Aug 2026, the door answered 35,963
+  // characters and ONE ticket reached the model, and in the live turn (whose
+  // rows carry more fields still) it was NONE. The model was told 2,045 tickets
+  // exist and handed none of them, so it asked again, six times, at one AI unit
+  // each, until it hit the step cap — 358,767 input tokens to resolve one ticket
+  // it had already named.
+  //
+  // So the rule gains its missing half: the rows are the ANSWER and a tally is
+  // commentary, so when the commentary will not leave room for a floor of rows,
+  // THE COMMENTARY GOES — and is named, so the model knows it existed rather
+  // than believing the door does not report it.
+  const asked = data as Record<string, unknown>
+  const roomFor = (n: number): number =>
+    list.slice(0, n).reduce<number>((sum, row) => sum + JSON.stringify(row).length + 1, 0)
+  const sidecars = Object.entries(asked)
+    .filter(([k, v]) => k !== key && JSON.stringify(v).length > SIDECAR_CHARS)
+    .sort((a, b) => JSON.stringify(b[1]).length - JSON.stringify(a[1]).length)
+  const dropped: string[] = []
+  const rest = () => ({
+    ...Object.fromEntries(Object.entries(asked).filter(([k]) => !dropped.includes(k))),
+    [key]: [] as unknown[],
+  })
+  const need = roomFor(ROW_FLOOR)
+  for (const [name] of sidecars) {
+    if (RESULT_CHARS - JSON.stringify(rest()).length >= need) break
+    dropped.push(name)
+  }
+  let budget = RESULT_CHARS - JSON.stringify(rest()).length
   const kept: unknown[] = []
   for (const row of list) {
     const size = JSON.stringify(row).length + 1 // + the separating comma
@@ -406,8 +448,12 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS): str
     budget -= size
   }
   return (
-    JSON.stringify({ ...(data as Record<string, unknown>), [key]: kept }) +
-    `\n[${kept.length} of ${list.length} ${key} are shown; the rest were dropped to fit. Every other field above is complete and counts the whole set, not what is shown.]`
+    JSON.stringify({ ...rest(), [key]: kept }) +
+    `\n[${kept.length} of ${list.length} ${key} are shown; the rest were dropped to fit.` +
+    (dropped.length
+      ? ` ${dropped.join(", ")} ${dropped.length === 1 ? "was" : "were"} left out to make room for the rows — ask for that tally on its own if you need it.`
+      : "") +
+    ` Every other field above is complete and counts the whole set, not what is shown.]`
   )
 }
 
