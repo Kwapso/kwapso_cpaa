@@ -39,7 +39,7 @@ Regenerate the ticks with:
 
 - [x] `clamp`
 - [x] `typography`
-- [ ] `title`
+- [x] `title`
 - [ ] `article-body`
 
 ## Space and motion
@@ -100,11 +100,11 @@ Regenerate the ticks with:
 
 ## Folder shapes
 
-- [ ] `folder`
+- [x] `folder`
 
 ## Navigation
 
-- [ ] `breadcrumb`
+- [x] `breadcrumb`
 - [x] `breadcrumbs`
 - [x] `pagination`
 - [x] `status-stepper`
@@ -121,18 +121,18 @@ Regenerate the ticks with:
 
 - [x] `sort-control`
 - [x] `table`
-- [ ] `use-virtual-rows`
+- [x] `use-virtual-rows`
 - [ ] `visibility`
 - [ ] `data-preview-table`
 - [x] `description-list`
 
 ## Data display
 
-- [ ] `progress`
+- [x] `progress`
 - [ ] `progress-dashboard`
 - [x] `stat-grid`
 - [ ] `tree`
-- [ ] `stopwatch`
+- [x] `stopwatch`
 
 ## Feedback and overlay
 
@@ -146,7 +146,7 @@ Regenerate the ticks with:
 
 ## Notes and notifications
 
-- [ ] `notes`
+- [x] `notes`
 - [ ] `notifications`
 - [x] `comments`
 - [x] `ticket-thread`
@@ -182,7 +182,7 @@ Regenerate the ticks with:
 - [x] `flowchart`
 - [ ] `flowdetail`
 - [x] `collection-frame`
-- [ ] `screen-renderer`
+- [x] `screen-renderer`
 - [ ] `copilot-overlay`
 - [x] `agent-chat`
 
@@ -237,10 +237,10 @@ Regenerate the ticks with:
 - [ ] `templates/main-screen`
 - [ ] `templates/multi-step-form`
 - [ ] `templates/portal-home`
-- [ ] `templates/rail`
+- [x] `templates/rail`
 - [x] `templates/record-chrome`
 - [ ] `templates/record-route`
-- [ ] `templates/screen-shell`
+- [x] `templates/screen-shell`
 - [ ] `templates/search-results`
 - [x] `templates/sign-in`
 - [ ] `templates/stat-strip`
@@ -254,4 +254,4 @@ Regenerate the ticks with:
 
 ---
 
-**Components 67/115 · Compositions 6/47**
+**Components 75/115 · Compositions 8/47**
