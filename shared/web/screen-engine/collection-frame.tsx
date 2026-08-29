@@ -21,7 +21,6 @@
 
 import * as React from "react"
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/foundations/icons"
-import { kitIcon } from "./tabs-view"
 
 import { facetOptions, selectRows } from "./collection"
 import { useRemembered } from "@shared/web/remembered"
@@ -39,6 +38,7 @@ import {
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
+import { ShapeStateBody, type ShapeStateCopy } from "@shared/ui/compositions/states/states"
 
 /** THE SECTION'S OWN CREATE ACTION, published to the collection inside it.
  *
@@ -87,6 +87,9 @@ function CollectionFrame<T>({
   modal = false,
   memoryKey,
   className,
+  state = "ready",
+  copy,
+  errorAction,
 }: {
   config: CollectionConfig
   data: T[]
@@ -118,6 +121,21 @@ function CollectionFrame<T>({
    * portal), so this is inert there. */
   memoryKey?: string
   className?: string
+  /**
+   * Loading, or a failed read. Law 4: the header (search/filter/sort) stays
+   * drawn and only the rows region swaps — the same rule the record screens
+   * were just migrated to (RecordScreen's `state`). Omit for a caller not yet
+   * passing one; `"ready"` is the default and every existing call site keeps
+   * behaving exactly as it did before this prop existed. A caller in
+   * `"loading"`/`"error"` may pass `data={[]}` — it is never read as "the
+   * collection is empty" the way it would have been before, because
+   * `filtered.length === 0` is only consulted once `state` is `"ready"`.
+   */
+  state?: "ready" | "loading" | "error"
+  /** Per-locale words for the loading/empty/no-results/error registers. */
+  copy?: Partial<ShapeStateCopy>
+  /** The one next step offered on a failed read (a Retry button, typically). */
+  errorAction?: React.ReactNode
 }) {
   const t = useT()
   const createAction = React.useContext(CreateActionContext)
@@ -413,7 +431,24 @@ function CollectionFrame<T>({
           )
         })()}
 
-      {filtered.length === 0 ? (
+      {state === "loading" ? (
+        // LAW 4, THE SAME RULE THE RECORD SCREENS WERE JUST MIGRATED TO
+        // (RecordScreen's `state`, 73414c58 and its rollout): the header above
+        // — search, filters, sort — stays drawn from what the app already
+        // knows, and only this region swaps. `filtered.length` is not
+        // consulted here on purpose: a `data={[]}` passed in because the
+        // fetch has not answered yet must never be read as "the collection is
+        // empty", which is exactly the claim a caller with no loading state
+        // had no way to avoid making.
+        <ShapeStateBody shape="collectionScreen" state="loading" copy={copy} />
+      ) : state === "error" ? (
+        <ShapeStateBody
+          shape="collectionScreen"
+          state="error"
+          copy={copy}
+          action={errorAction}
+        />
+      ) : filtered.length === 0 ? (
         // ── THE ZERO STATE, AND IT IS TWO STATES ──────────────────────────
         //
         // It used to be one: a dashed box saying "No tickets yet." whether the
@@ -425,38 +460,53 @@ function CollectionFrame<T>({
         // pointing at "New ticket" when a filter is hiding twelve of them would
         // be worse than the grey line it replaces.
         //
+        // Drawn through the kit's own composition (`ShapeStateBody`, shape
+        // "collectionScreen") rather than the hand-rolled dashed box this used
+        // to be — the same register the record screens' empty/error states
+        // already draw through. `filtered` picks empty vs no-results for it;
+        // it is never guessed, ch27's own rule for exactly this switch.
+        //
         // The action is the section's own button, published by the host above
         // (see `CollectionCreateActionProvider`) — the same word and the same
         // glyph, so the zero state cannot invent a second name for one act.
-        // Where no host published one, this is the sentence alone, as before.
-        <div className="flex flex-col items-center gap-3 rounded-[var(--radius)] border border-dashed px-6 py-12 text-center">
-          {/* aria-hidden by construction: the sentence under it already says
-              what this is. The icon comes from the kit's set by name; a name
-              the kit lacks renders nothing, same contract as the old
-              DynamicIcon fallback. */}
-          {config.emptyIcon ? (
-            <span aria-hidden className="block w-fit text-muted-foreground [&_svg]:size-8">
-              {kitIcon(config.emptyIcon)}
-            </span>
-          ) : null}
-          {/* THE HEADING. It was 14px grey body copy, which is the register the
-              app uses for a footnote — on a screen whose only content it is. */}
-          <p className="text-base font-medium text-foreground">
-            {narrowed ? t("Nothing matched.") : t(config.emptyText)}
-          </p>
-          {narrowed ? (
-            <p className="text-sm text-muted-foreground">
-              {t("Try fewer words, or clear the filters.")}
-            </p>
-          ) : (
-            createAction && (
-              <Button onClick={createAction.onCreate} className="mt-1 gap-1">
-                {createAction.icon}
-                {createAction.label}
-              </Button>
-            )
-          )}
-        </div>
+        // A NO-RESULTS zero state offers a way out where one can be run safely
+        // — "Clear filters", the exact handler the filter bar's own control
+        // runs — rather than the dead end of a sentence with nothing to press.
+        // ONLY when a FACET is set: `SearchInput` owns its displayed text
+        // itself (`defaultValue`, uncontrolled), so a button that reset the
+        // remembered `query` too would tell the reader the box was cleared
+        // while the letters they typed stayed on screen. A search-only
+        // narrowing keeps the plain sentence, same as before this change.
+        //
+        // NO ICON HERE ANY MORE — `config.emptyIcon` (a per-recipe glyph) has
+        // no seam into `ShapeStateBody`: the composition's own law is "it
+        // never draws a mark of its own", which is the kit's considered
+        // reading of ch27.21's "no empty-box drawing, no mascot … type and one
+        // button carry it". Dropping the icon is that law, not a shim I could
+        // not find; a recipe's `emptyIcon` is simply unread from here now.
+        <ShapeStateBody
+          shape="collectionScreen"
+          state="empty"
+          filtered={narrowed}
+          copy={{ emptyTitle: t(config.emptyText), ...copy }}
+          action={
+            narrowed
+              ? Object.keys(facetValues).length > 0 && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
+                  >
+                    {t("Clear filters")}
+                  </Button>
+                )
+              : createAction && (
+                  <Button onClick={createAction.onCreate} className="gap-1">
+                    {createAction.icon}
+                    {createAction.label}
+                  </Button>
+                )
+          }
+        />
       ) : (
         renderItems(visible)
       )}
