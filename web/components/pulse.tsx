@@ -82,7 +82,10 @@ const chartLoading = () => (
   <Skeleton className="w-full rounded-[var(--radius)]" style={{ height: BAND_HEIGHT }} />
 )
 
-const StageChart = dynamic(() => chartModule().then((m) => m.StageChart), {
+/** Exported (unlike WeeksChart below) because sprint-detail.tsx now draws its
+ * own done/still-open split with the same shape — a fixed set of counted
+ * categories — one sprint at a time rather than one bar per stage. */
+export const StageChart = dynamic(() => chartModule().then((m) => m.StageChart), {
   ssr: false,
   loading: chartLoading,
 })
