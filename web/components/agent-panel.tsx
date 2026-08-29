@@ -20,6 +20,7 @@ import { Check, History, Paperclip, Plus, X } from "@shared/ui/foundations/icons
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import {
   Sheet,
   SheetContent,
@@ -198,27 +199,35 @@ export function AgentPanel({
                 header
                 headerActions={
                   <>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={() => setHistoryOpen(true)}
-                      disabled={chat.busy}
-                      title={t("Past conversations")}
-                      aria-label={t("Past conversations")}
-                    >
-                      <History className="size-5" aria-hidden />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          onClick={() => setHistoryOpen(true)}
+                          disabled={chat.busy}
+                          aria-label={t("Past conversations")}
+                        >
+                          <History className="size-5" aria-hidden />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("Past conversations")}</TooltipContent>
+                    </Tooltip>
                     {chat.items.length > 0 && (
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={chat.newChat}
-                        disabled={chat.busy}
-                        title={t("New chat")}
-                        aria-label={t("New chat")}
-                      >
-                        <Plus className="size-5" aria-hidden />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={chat.newChat}
+                            disabled={chat.busy}
+                            aria-label={t("New chat")}
+                          >
+                            <Plus className="size-5" aria-hidden />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("New chat")}</TooltipContent>
+                      </Tooltip>
                     )}
                   </>
                 }

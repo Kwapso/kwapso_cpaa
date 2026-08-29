@@ -40,6 +40,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { Choice } from "@shared/ui/components/choice/choice"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -374,21 +375,18 @@ export function GoogleScopeDialog({
         <Field config={kindsField} shape="group" className={fieldSpacing}>
           <div className="flex flex-col gap-2">
             {GOOGLE_EVENT_TYPES.map((kind) => (
-              <label
+              <Choice
                 key={kind}
-                className="flex cursor-pointer items-start gap-2 rounded-[var(--radius)] border p-3 text-left"
+                className="rounded-[var(--radius)] border p-3"
+                label={t(EVENT_KINDS[kind].title)}
+                description={t(EVENT_KINDS[kind].description)}
               >
                 <Checkbox
                   checked={kinds.includes(kind)}
                   onCheckedChange={() => toggleKind(kind)}
                   disabled={busy}
-                  className="mt-0.5"
                 />
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-sm font-medium">{t(EVENT_KINDS[kind].title)}</span>
-                  <span className="text-muted-foreground text-xs">{t(EVENT_KINDS[kind].description)}</span>
-                </span>
-              </label>
+              </Choice>
             ))}
           </div>
           {kinds.length === 0 && (
@@ -405,22 +403,21 @@ export function GoogleScopeDialog({
        * otherwise. This is that sentence, and it is opt-in because it is not
        * free. */}
       <Field config={forgetField} shape="group" className={fieldSpacing}>
-        <label className="flex cursor-pointer items-start gap-2 rounded-[var(--radius)] border p-3 text-left">
+        <Choice
+          className="rounded-[var(--radius)] border p-3"
+          label={t("Let go of what was already read")}
+          description={
+            service === "gmail"
+              ? t("The assistant stops answering from any mail it has already read, and reads your mailbox again from the start under the new answer. That takes a while and it costs some of the team's AI allowance.")
+              : t("The assistant stops answering from any calendar entry it has already read, and reads your calendar again from the start under the new answer. That takes a while and it costs some of the team's AI allowance.")
+          }
+        >
           <Checkbox
             checked={values.forget === true}
             onCheckedChange={(on) => setValues((v) => ({ ...v, forget: on === true }))}
             disabled={busy}
-            className="mt-0.5"
           />
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-sm font-medium">{t("Let go of what was already read")}</span>
-            <span className="text-muted-foreground text-xs">
-              {service === "gmail"
-                ? t("The assistant stops answering from any mail it has already read, and reads your mailbox again from the start under the new answer. That takes a while and it costs some of the team's AI allowance.")
-                : t("The assistant stops answering from any calendar entry it has already read, and reads your calendar again from the start under the new answer. That takes a while and it costs some of the team's AI allowance.")}
-            </span>
-          </span>
-        </label>
+        </Choice>
         <p className="text-muted-foreground mt-1.5 text-xs">
           {t("Leave it off and what kwapso already read stays answerable. Only what it reads from now on follows the new answer.")}
         </p>

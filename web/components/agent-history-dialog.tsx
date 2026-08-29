@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from "@shared/ui/components/dialog/dialog"
 import { ScrollArea } from "@shared/ui/components/scroll-area/scroll-area"
+import { Clamp } from "@shared/ui/components/clamp/clamp"
 
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"
@@ -81,11 +82,11 @@ export function AgentHistoryDialog({
                     disabled={busy}
                     className="hover:bg-muted flex w-full flex-col items-start gap-1 rounded-[var(--radius)] p-2 text-left disabled:text-ink-disabled"
                   >
-                    <span className="line-clamp-1 text-sm font-medium">
+                    <Clamp lines={1} collapsible={false} className="text-sm font-medium">
                       {thread.id === currentThreadId
                         ? t("{title} · current", { title: thread.title || t("Conversation") })
                         : thread.title || t("Conversation")}
-                    </span>
+                    </Clamp>
                     <span className="text-muted-foreground text-xs">
                       {formatActivityWhen(thread.lastMessageAt ?? thread.createdAt)}
                     </span>

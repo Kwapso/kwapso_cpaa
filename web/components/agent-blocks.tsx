@@ -22,7 +22,8 @@
 import * as React from "react"
 
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
-import { Progress } from "@shared/ui/components/progress/progress"
+import { KpiProgress } from "@shared/ui/components/kpi-progress/kpi-progress"
+import { Spacer } from "@shared/ui/components/spacer/spacer"
 import {
   Table,
   TableBody,
@@ -95,7 +96,7 @@ function MetricBlock({ block }: { block: Extract<AgentBlock, { kind: "metric" }>
 
 /** ONE NUMBER COMPARED ACROSS A FEW THINGS. Horizontal, because the labels are
  * account and person names — vertical bars would turn every one of them into a
- * rotated stub. Each bar is the library Progress primitive driven to a percentage
+ * rotated stub. Each row is the library KpiProgress, its bar driven to a percentage
  * of the largest value in the block.
  *
  * A NEGATIVE VALUE IS REAL HERE (a step that got slower, a month that fell), so the
@@ -117,23 +118,15 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
     <BlockFrame title={block.title}>
       <div className="flex flex-col gap-4">
         {block.rows.map((r, i) => (
-          <div key={i} className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 items-baseline justify-between gap-2">
-              <span className="truncate text-sm text-foreground" title={r.label}>
-                {r.label}
-              </span>
-              <span
-                className={`shrink-0 text-sm font-medium tabular-nums ${
-                  r.value < 0 ? "text-destructive" : "text-foreground"
-                }`}
-              >
-                {show(r.value)}
-              </span>
-            </div>
-            {/* max can be 0 when every value is 0 — a flat set of empty bars is the
-                honest picture, and it keeps the division out of NaN. */}
-            <Progress value={max === 0 ? 0 : (Math.abs(r.value) / max) * 100} className="h-1.5" />
-          </div>
+          // max can be 0 when every value is 0 — a flat set of empty bars is the
+          // honest picture, and it keeps the division out of NaN.
+          <KpiProgress
+            key={i}
+            label={r.label}
+            value={show(r.value)}
+            percent={max === 0 ? 0 : (Math.abs(r.value) / max) * 100}
+            color={r.value < 0 ? "var(--destructive)" : undefined}
+          />
         ))}
       </div>
     </BlockFrame>
@@ -284,7 +277,7 @@ function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) 
                   {onward.label && <span className="min-w-0 text-xs text-muted-foreground">{onward.label}</span>}
                 </div>
               )}
-              {!onward && next && <div className="h-2" />}
+              {!onward && next && <Spacer size="2" />}
             </div>
           )
         })}
