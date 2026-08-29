@@ -16,9 +16,22 @@
 // SQL that reads them) → a tenancy door announces what it changed by PUBLISHING
 // that table (R1 guarantees every mutation publishes) → so a door whose publish
 // names a fence input is a fence write → and any catalogued tool posting to it
-// must DECLARE confirm: true. Add a door tomorrow that writes account_links and
-// a tool that reaches it, and this goes red until the tool confirms — even if
-// the runtime derivation's name-matching missed it.
+// must confirm BOTH WAYS. Add a door tomorrow that writes account_links and a
+// tool that reaches it, and this goes red until the tool confirms — even if the
+// runtime derivation's name-matching missed it.
+//
+// "MUST CONFIRM" USED TO MEAN "must declare the literal `true`", and on 29 Aug
+// 2026 that stopped being expressible for two of these doors: twenty-one
+// (de)activate tools collapsed into one `set_record_active` over RECORD_TOGGLES,
+// so the tool on the contact-link and portal-login doors declares a PREDICATE —
+// it has to, because the same tool also archives an account, which does not ask
+// both ways. Reading a declared boolean is no longer the question.
+//
+// So the check RUNS the rule instead, through `requiresConfirm`, in both
+// directions. That is strictly stronger than what it replaced: a literal `true`
+// was a promise about the declaration, and this is the answer the agent will
+// actually get at the moment somebody unlinks a company — the same move R22 made
+// when it stopped reading `buildBody` and started running it.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -27,8 +40,9 @@ import { describe, expect, it } from "vitest"
 import { indexFunctions } from "@shared/rules/seam-scan"
 import { stripComments } from "@shared/rules/source-scan"
 import { FENCE_INPUTS } from "@shared/workers/account-scope"
-import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
-import { isPrivilegeWrite } from "@shared/workers/tool-gates"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
+import { alwaysConfirms, isPrivilegeWrite } from "@shared/workers/tool-gates"
+import { requiresConfirm, TOOL_CATALOG } from "../../data-ops/src/lib/tools"
 import { ROUTES } from "../src/index"
 
 const SHARED = join(__dirname, "..", "..", "..", "shared", "workers")
@@ -93,21 +107,39 @@ describe("every machine write that changes the account fence confirms", () => {
     expect(fenceDoors.size, "the account spine writes the fence from several doors").toBeGreaterThanOrEqual(6)
   })
 
-  it("every catalogued tool on one of those doors DECLARES confirm: true", () => {
+  it("every catalogued tool on one of those doors CONFIRMS, both ways", () => {
+    /** Every input that reaches this door through a tool, filled in the way the
+     * agent would fill it. A tool with one path takes one shape; the collapsed
+     * `set_record_active` takes one per RECORD_TOGGLES entry pointing here, so a
+     * multi-door tool is asked about the door in hand and not about the family. */
+    const callsOn = (route: string): { name: string; input: Record<string, unknown> }[] => {
+      const [method, path] = route.split(" ")
+      const out: { name: string; input: Record<string, unknown> }[] = []
+      for (const tool of TOOL_CATALOG) {
+        if (tool.method !== method) continue
+        if (tool.path === path && !tool.routes) out.push({ name: tool.name, input: {} })
+        if (!tool.routes?.includes(path)) continue
+        for (const [record, entry] of Object.entries(RECORD_TOGGLES))
+          if (entry.path === path) out.push({ name: tool.name, input: { record } })
+      }
+      return out
+    }
+
     let checked = 0
     for (const [route, table] of fenceDoors) {
-      const [method, path] = route.split(" ")
-      const tool = SHARED_TOOLS.find((t) => t.method === method && t.path === path)
-      if (!tool) continue // a door no machine surface reaches has no panel to show
-      checked++
-      expect(
-        isPrivilegeWrite({ name: tool.name, path: tool.path, schema: tool.schema, write: tool.agent.write }),
-        `${tool.name} posts to ${route}, which writes ${table} — the account fence reads that, so the runtime derivation must call it an access write`
-      ).toBe(true)
-      expect(
-        tool.agent.confirm,
-        `${tool.name} writes ${table}, an input to the account fence — a silent one widens what a client login can see. It must DECLARE confirm: true, not a predicate and not false`
-      ).toBe(true)
+      for (const call of callsOn(route)) {
+        checked++
+        const tool = TOOL_CATALOG.find((t) => t.name === call.name)!
+        expect(tool, `${call.name} must be in the agent's own catalogue`).toBeTruthy()
+        // BOTH DIRECTIONS. Unlinking takes a company away from a client login;
+        // RELINKING hands it straight back, and a rule that only asked about
+        // the destructive half ran the second one in silence.
+        for (const active of [true, false])
+          expect(
+            requiresConfirm(tool, { ...call.input, active }),
+            `${call.name}${call.input.record ? ` (record: ${String(call.input.record)})` : ""} posts to ${route}, which writes ${table} — an input to the account fence. A silent call widens what a client login can see, so it must stop for the panel with active:${active} as well.`
+          ).toBe(true)
+      }
     }
     expect(checked, "the machine surface must actually reach the fence doors").toBeGreaterThanOrEqual(6)
   })
@@ -125,13 +157,20 @@ describe("every machine write that changes the account fence confirms", () => {
     // intent is how the first confirm gap hid", pinning the very tool that could
     // re-point a client contact's address in silence. It is asserted from the
     // other side now, in grant-identity.test.ts, against FENCE_IDENTITY_INPUTS.
-    for (const name of ["set_account_active"]) {
-      const tool = SHARED_TOOLS.find((t) => t.name === name)!
-      expect(fenceDoors.has(`${tool.method} ${tool.path}`), `${name} writes no fence input`).toBe(false)
-      expect(
-        isPrivilegeWrite({ name: tool.name, path: tool.path, schema: tool.schema, write: tool.agent.write }),
-        `${name} touches no fence input and carries no identity column — it must not be swept up`
-      ).toBe(false)
-    }
+    // ARCHIVING A CUSTOMER is the control: same tool, same door family, and it
+    // must NOT be swept into asking both ways. Restoring one runs straight away.
+    const entry = RECORD_TOGGLES.account
+    expect(fenceDoors.has(`POST ${entry.path}`), "archiving an account writes no fence input").toBe(false)
+    expect(
+      alwaysConfirms(entry),
+      "archiving an account touches no fence input and carries no identity column — it must not be swept up"
+    ).toBe(false)
+    expect(
+      isPrivilegeWrite({ name: "", path: entry.path, schema: { properties: { id: {}, active: {} } }, write: true }),
+      "the runtime derivation must still say no about the accounts/active door itself"
+    ).toBe(false)
+    const tool = TOOL_CATALOG.find((t) => t.name === "set_record_active")!
+    expect(requiresConfirm(tool, { record: "account", active: true }), "restoring an account runs freely").toBe(false)
+    expect(requiresConfirm(tool, { record: "account", active: false }), "archiving one still asks").toBe(true)
   })
 })

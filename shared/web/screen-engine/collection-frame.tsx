@@ -20,7 +20,7 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, ChevronLeft, ChevronRight } from "@shared/ui/foundations/icons"
+import { ArrowUpDown } from "@shared/ui/foundations/icons"
 import { kitIcon } from "./tabs-view"
 
 import { facetOptions, selectRows } from "./collection"
@@ -30,6 +30,13 @@ import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 import { Button } from "@shared/ui/components/button/button"
 import { FilterBar } from "./filter-bar"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@shared/ui/components/pagination/pagination"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import {
   Popover,
@@ -37,6 +44,7 @@ import {
   PopoverTrigger,
 } from "@shared/ui/components/popover/popover"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { Text } from "@shared/ui/components/typography/typography"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
 
@@ -463,27 +471,39 @@ function CollectionFrame<T>({
 
       {!serverSide && config.itemsPerPage != null && pageCount > 1 && (
         <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-xs text-muted-foreground tabular-nums">
+          <Text as="span" size="caption" tone="tertiary" numeric>
             {t("Page {page} of {pages}", { page: current + 1, pages: pageCount })}
-          </span>
-          <div className="flex gap-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={current === 0}
-              onClick={() => goTo(current - 1)}
-            >
-              <ChevronLeft /> {t("Prev")}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={current >= pageCount - 1}
-              onClick={() => goTo(current + 1)}
-            >
-              {t("Next")} <ChevronRight />
-            </Button>
-          </div>
+          </Text>
+          <Pagination label={t("Pagination")} className="w-auto justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  label={t("Prev")}
+                  srLabel={t("Prev")}
+                  size="sm"
+                  disabled={current === 0}
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    goTo(current - 1)
+                  }}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  label={t("Next")}
+                  srLabel={t("Next")}
+                  size="sm"
+                  disabled={current >= pageCount - 1}
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    goTo(current + 1)
+                  }}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
     </div>

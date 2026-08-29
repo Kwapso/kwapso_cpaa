@@ -82,7 +82,10 @@ const chartLoading = () => (
   <Skeleton className="w-full rounded-[var(--radius)]" style={{ height: BAND_HEIGHT }} />
 )
 
-const StageChart = dynamic(() => chartModule().then((m) => m.StageChart), {
+/** Exported (unlike WeeksChart below) because sprint-detail.tsx now draws its
+ * own done/still-open split with the same shape — a fixed set of counted
+ * categories — one sprint at a time rather than one bar per stage. */
+export const StageChart = dynamic(() => chartModule().then((m) => m.StageChart), {
   ssr: false,
   loading: chartLoading,
 })
@@ -107,6 +110,13 @@ export const HoursByChart = dynamic(() => chartModule().then((m) => m.HoursByCha
 /** The weekly series, for a screen drawing it over ONE record rather than the
  * whole team. Same picture, same lazy boundary, rows the caller has shaped. */
 export const RecordWeeksChart = dynamic(() => chartModule().then((m) => m.WeeksChart), {
+  ssr: false,
+  loading: chartLoading,
+})
+/** The margin panel's own picture — sold, our time by role, tools, margin.
+ * Same lazy boundary as the four above, so the Rates tab only pays for
+ * Recharts on the account that opens it. */
+export const MarginChart = dynamic(() => chartModule().then((m) => m.MarginChart), {
   ssr: false,
   loading: chartLoading,
 })

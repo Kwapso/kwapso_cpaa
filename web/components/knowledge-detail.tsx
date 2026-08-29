@@ -27,6 +27,7 @@ import { useRemembered } from "@shared/web/remembered"
 import { Paperclip, Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
+import { RecordScreen, STICKY_TABS } from "@/components/record-chrome"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
@@ -224,32 +225,19 @@ export function KnowledgeDetailScreen({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-2xl font-medium">
-            <span className="truncate">{item.title}</span>
-            {!item.active && (
-              <Badge variant="secondary" className="text-muted-foreground text-badge">
-                {t("Not in use")}
-              </Badge>
-            )}
-            {item.visibility === "private" && (
-              <Badge variant="secondary" className="text-badge">
-                {t("Private to you")}
-              </Badge>
-            )}
-            {item.visibility === "app" && (
-              <Badge variant="secondary" className="text-badge">
-                {item.visibleToAppName ?? t("Limited to one app")}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {KNOWLEDGE_KIND[item.kind] ?? item.kind} · {filedUnder}
-          </p>
-        </div>
-        {canEdit && (
+    <RecordScreen
+      collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}
+      chips={
+        <>
+          {!item.active && <Badge>{t("Not in use")}</Badge>}
+          {item.visibility === "private" && <Badge>{t("Private to you")}</Badge>}
+          {item.visibility === "app" && <Badge>{item.visibleToAppName ?? t("Limited to one app")}</Badge>}
+        </>
+      }
+      title={item.title}
+      status={filedUnder}
+      actions={
+        canEdit && (
           <Button
             variant="secondary"
             size="sm"
@@ -259,10 +247,11 @@ export function KnowledgeDetailScreen({
             <Pencil className="size-3.5" />
             {t("Edit")}
           </Button>
-        )}
-      </div>
-
+        )
+      }
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -419,6 +408,6 @@ export function KnowledgeDetailScreen({
         }}
         onSubmit={saveDetails}
       />
-    </div>
+    </RecordScreen>
   )
 }

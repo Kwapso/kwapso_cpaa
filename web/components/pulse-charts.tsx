@@ -27,6 +27,7 @@
 // this file is ever asked for.
 
 import { Chart } from "@shared/ui/components/chart/chart"
+import { moneyText } from "@shared/web/money"
 
 /** The band height every chart on a page-band shares. Restated here rather than
  * imported from pulse.tsx, because an import BACK would put this module in the
@@ -123,6 +124,40 @@ export function SprintBurndownChart({
           { key: "open", label: openLabel, color: "var(--chart-4)" },
         ]}
       legend
+      height={`${BAND_HEIGHT}px`}
+    />
+  )
+}
+
+/** WHAT AN ACCOUNT LEAVES US, PIECE BY PIECE — sold, minus our own time (one bar
+ * per role, so "our time" isn't one lump), minus tools, ending on the margin
+ * itself. The margin panel used to say all of this as a column of `<Line>` rows
+ * with a sign in front of the ones that subtract; the chart is that same
+ * subtraction read at a glance, negative bars and all — the one thing on this
+ * band that actually exercises Chart's negative-value handling
+ * (`--chart-negative`, the automatic zero rule), because every other chart here
+ * is a count or a duration and never goes below zero. `zeroLine` is forced on
+ * rather than left to auto-detect, so the rule is there even for an account
+ * whose margin happens to be positive this month.
+ *
+ * THE AXIS TAKES WHOLE-CURRENCY UNITS, NOT CENTS. `rows` still carries `cents`
+ * (the unit every money figure in this codebase is stored and passed in), but
+ * handing raw cents straight to the plot drew a "1,350,000" tick where a reader
+ * expects "13,500" — recharts has no idea a value is money and draws exactly
+ * what it is given. So the plotted value is divided down to whole units here,
+ * once, and `formatValue` multiplies back before handing off to the one money
+ * formatter (`moneyText`), so the axis and the tooltip agree on what they show. */
+export function MarginChart({ rows, label }: { rows: { label: string; cents: number }[]; label: string }) {
+  const data = rows.map((row) => ({ label: row.label, amount: row.cents / 100 }))
+  return (
+    <Chart
+      data={data}
+      type="bar"
+      xKey="label"
+      series={[{ key: "amount", label, color: "var(--chart-2)" }]}
+      legend={false}
+      zeroLine
+      formatValue={(value) => moneyText(Math.round(value * 100))}
       height={`${BAND_HEIGHT}px`}
     />
   )

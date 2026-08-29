@@ -12,6 +12,7 @@ import { ROUTES as CONTENT_ROUTES } from "../../content/src/index"
 import { ROUTES as DATAOPS_ROUTES } from "../../data-ops/src/index"
 import { TARGETS } from "../../data-ops/src/lib/targets"
 import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { GATELESS_WRITES, TOOL_GATES } from "@shared/workers/tool-gates"
 import { getMcpTool, MCP_TOOLS } from "../src/lib/tools"
@@ -149,14 +150,26 @@ describe("the shared tool catalog — contracts that must not silently drift", (
     const carried: string[] = []
     const missing: string[] = []
     const spurious: string[] = []
-    for (const s of SHARED_TOOLS) {
-      const t = getMcpTool(s.mcpName ?? s.name)
+    // BOTH PROJECTIONS. The shared catalogue is one of them; the record toggles
+    // are the other, generated straight from RECORD_TOGGLES since the agent
+    // collapsed its twenty-one into `set_record_active` (29 Aug 2026). A tool
+    // that stops for a person in the app must say so to a machine client
+    // whichever projection produced it — leaving the second one out would have
+    // let eighteen paused capabilities go silent under this very assertion.
+    const projected: { name: string; shouldPause: boolean }[] = [
+      ...SHARED_TOOLS.map((s) => ({ name: s.mcpName ?? s.name, shouldPause: Boolean(s.agent.confirm) })),
+      ...Object.keys(RECORD_TOGGLES).map((record) => ({
+        name: `set_${record}_active`,
+        shouldPause: RECORD_TOGGLES[record].confirm !== "never",
+      })),
+    ]
+    for (const p of projected) {
+      const t = getMcpTool(p.name)
       if (!t) continue
-      const shouldPause = Boolean(s.agent.confirm)
       const doesPause = t.description.includes(PAUSE)
-      if (shouldPause && doesPause) carried.push(t.name)
-      if (shouldPause && !doesPause) missing.push(t.name)
-      if (!shouldPause && doesPause) spurious.push(t.name)
+      if (p.shouldPause && doesPause) carried.push(t.name)
+      if (p.shouldPause && !doesPause) missing.push(t.name)
+      if (!p.shouldPause && doesPause) spurious.push(t.name)
     }
     expect(
       missing,
