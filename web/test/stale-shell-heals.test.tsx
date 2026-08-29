@@ -131,7 +131,7 @@ describe("a stale shell reaching for a deploy that is gone", () => {
     // No reload — a bug in a screen is not healed by fetching the screen again.
     expect(reload).not.toHaveBeenCalled()
     // beforeEach's window.location.href is an agency.kwapso.app (production) URL.
-    expect(screen.getByText("Something on our side broke.")).toBeTruthy()
+    expect(screen.getByText("Something broke")).toBeTruthy()
     expect(screen.queryByText("account_id is not defined")).toBeNull()
     expect(screen.queryByText(/the apps list/)).toBeNull()
   })
@@ -150,7 +150,7 @@ describe("a stale shell reaching for a deploy that is gone", () => {
         <Throws error={new Error("account_id is not defined")} />
       </ErrorBoundary>
     )
-    expect(screen.getByText("Something on our side broke.")).toBeTruthy()
+    expect(screen.getByText("Something broke")).toBeTruthy()
     expect(screen.getByText(/account_id is not defined/)).toBeTruthy()
     expect(screen.getByText(/the apps list/)).toBeTruthy()
   })

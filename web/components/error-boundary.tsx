@@ -120,8 +120,16 @@ function Broken({
       <PageFailureScreen
         variant="500"
         labels={{
-          headline: t("Something on our side broke."),
-          body: t("We've been told about it. Try again in a moment."),
+          // BORROWED, NOT WRITTEN. Both sentences already exist in the catalogue
+          // in all three languages. Two new ones would have shipped in English to
+          // anybody who chose German — the catalogue check only proves the
+          // extraction is CURRENT, not that every string has a translation — and
+          // the only way to translate them spends the owner's own API key, which
+          // is not something a crash screen is worth. The borrowed pair also says
+          // more than the pair they replace: "nothing is lost" is the sentence a
+          // person actually needs at the moment their screen has just died.
+          headline: t("Something broke"),
+          body: t("Something on our side isn't responding. Nothing is lost. Try again in a moment."),
           action: t("Try again"),
           // The composition's own 500 defaults are a placeholder error code
           // ("Error 8F31-A2") and a fabricated "your last save went through
