@@ -25,6 +25,38 @@
 // set, and stops. Run it first — it is how you learn what the real run will cost
 // before you agree to it.
 //
+// ── RUN IT TWICE A SIDE. ONE RUN EACH IS NOT A COMPARISON ───────────────────
+//
+// Measured on 29 Aug 2026, comparing the query-grammar branch against main, on
+// the shipped model (glm-5.3-flash), two runs each:
+//
+//   main      22/22, then 18/22
+//   branch    21/22, then 18/22
+//
+// The run-to-run variance is LARGER than the branch-to-branch difference. One
+// run each would have produced "21 against 22" and a written-up regression that
+// does not exist — and the second runs, which land in the same place, are the
+// only thing that says so. So: run it twice a side, and treat a single-run gap
+// of one or two as noise until a second run agrees with it.
+//
+// The low runs fail the same way on both sides — three knowledge questions
+// answered with NO tool call at all. That is glm flakiness, not routing, and it
+// is worth knowing separately because it predates any catalogue change and glm
+// is now the shipped model.
+//
+// ── IT ALSO PRICES A STEP ───────────────────────────────────────────────────
+//
+// Every question is ONE model call carrying the same preamble, so `in` divided
+// by the question count is the real tokenizer's answer to "what does a step of
+// this catalogue cost", which is the number `agent_usage_log.input_tokens` sums
+// over a turn. The same two runs above:
+//
+//   main      775,265 / 22 = 35,239 input tokens per step
+//   branch    727,855 / 22 = 33,084 input tokens per step   (−2,155, −6.1%)
+//
+// Uncached on purpose. The prompt cache is a separate effect on the same column,
+// so measuring a step without it is what keeps the two apart.
+//
 // ── WHAT IT COSTS ───────────────────────────────────────────────────────────
 //
 // One Claude turn per question, on the model the worker is configured with

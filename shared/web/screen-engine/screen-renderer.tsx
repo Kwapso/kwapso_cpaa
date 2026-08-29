@@ -110,6 +110,16 @@ export interface ScreenRendererProps {
   /** The host maps these to URL changes (it owns the router). */
   onIntent?: (intent: ScreenIntent) => void
   className?: string
+  /**
+   * Loading, or a failed read — forwarded to a `type: "list"` recipe's
+   * `CollectionFrame` (law 4: the header stays, only the rows region swaps).
+   * `"ready"` (the default) is exactly today's behaviour, so every existing
+   * caller is unaffected until it starts passing this. Not yet threaded
+   * through `type: "detail"` recipes or a `list` BLOCK nested inside a custom
+   * layout — this is the list-screen half of the same rollout the record
+   * screens already got (73414c58 and its follow-ups).
+   */
+  state?: "ready" | "loading" | "error"
 }
 
 /* -------------------------------- helpers -------------------------------- */
@@ -534,7 +544,8 @@ function renderList(
   data: ScreenData,
   rights: ScreenRights,
   onAction: ScreenRendererProps["onAction"],
-  onIntent?: ScreenRendererProps["onIntent"]
+  onIntent?: ScreenRendererProps["onIntent"],
+  state?: ScreenRendererProps["state"]
 ): React.ReactNode {
   const fields = recipe.fields.filter(
     (f) => gateState(rights, f.gate) !== "hidden"
@@ -626,6 +637,7 @@ function renderList(
       data={rows}
       memoryKey={recipe.binding.module}
       searchKeys={fields.map((f) => f.column)}
+      state={state}
       renderItems={(page) =>
         display === "cards" ? (
           /* The kit's CardGrid is the LAYOUT; the cards are children. A card
@@ -831,6 +843,7 @@ function ScreenRenderer({
   presentation,
   onIntent,
   className,
+  state,
 }: ScreenRendererProps) {
   const t = useT()
   const mode: ScreenPresentation =
@@ -847,7 +860,7 @@ function ScreenRenderer({
 
   const content =
     recipe.type === "list" ? (
-      renderList(t, recipe, data, rights, onAction, onIntent)
+      renderList(t, recipe, data, rights, onAction, onIntent, state)
     ) : recipe.type === "detail" ? (
       renderDetail(recipe, data, rights, onAction, onIntent)
     ) : recipe.type === "edit" || recipe.type === "add" ? (

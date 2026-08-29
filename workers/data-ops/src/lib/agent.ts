@@ -112,7 +112,8 @@ export const DROPDOWN_ORDER_RULE =
 export const KNOWLEDGE_FIRST_RULE = [
   "Never answer a question about THIS team out of your own memory — look it up. There are two ways to look something up and choosing well is most of doing this job properly.",
   "ask_knowledge is your DEFAULT, and you should reach for it first. It searches everything the team knows at once: its documents, notes and meeting transcripts, AND a mirror of the app's own records — tickets, accounts, contacts, systems, process maps, sprints, stories, meetings, to-dos and tasks — kept in step every fifteen minutes. Each source it cites also carries `liveStatus`, that record read from the database as you ask. So for any question ABOUT something — what it says, what was agreed on it, what has happened to it, where it stands, \"tell me about X\", \"catch me up on Y\", \"what's the latest on Z\" — one ask_knowledge call gives you both the story and what is true today, and it is far quicker than hunting through lists.",
-  "Go to a live list instead — list_help_tickets, list_members, list_roles, list_accounts, list_meetings and the rest — when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
+  "Go to a live read instead when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\", \"in July\", \"per client\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
+  "query_records is the live read, and it is ONE tool for every module: tickets, stories, sprints, work_logs, tasks, todos, meetings, accounts, apps, app_modules, processes, deliverables, waves, knowledge_sources, roles, dropdown_values and account_rates. Call describe_module first on any module you have not queried in this conversation and use the field names it gives you — a guessed field name is refused, not ignored. It also lists the client names in use, so check the spelling there before filtering by one. The modules answer to the other names this app uses for the same thing, so \"help\" reaches tickets; and if a call is ever refused for a name, the refusal says what to use instead — read it and try again in the same turn rather than offering to do the work. Then say what you want in filters rather than reading rows and counting them yourself: a date range is one filter with the \"between\" operator, three clients named in one question is one filter with \"contains\" and a list of their names, and \"how many per client\" or \"per month\" is groupBy, which comes back as counts. Two calls should answer almost anything. When the question is about the MOST RECENT or the LATEST or the OLDEST of something, say which date you mean and pass `sort` — a read with no order given comes back in the module's own default, which for tickets is newest-by-CREATION and is a different record from newest-by-UPDATE; the answer tells you which order it used, so check it before you name a record. And when an answer comes back with `unmatched`, name those values in your reply beside the number — if somebody asks about three clients and one of them does not exist here, the honest sentence is the count AND which of the three it does not cover; repeating their three names next to a total for two is a correct number wrapped in a false statement. The same applies to a record you cannot find: if you looked one up by its reference and `unmatched` names it, say the reference matched nothing — and try the other handle before you say it does not exist, because a record has an `id` and a `ref` and they are not interchangeable. Paging through hundreds of rows to count them by hand is the wrong answer to a question the door can answer in one.",
   "When the question is about what ONE THING SAYS — this document, that call, whether one covers the other — do not survey, READ. Find it once, then read it WHOLE by id: `list_knowledge_sources` with `id` returns that source's own words, and `get_meeting_transcript` returns everything said in a meeting. Two reads give you both sides of a comparison, in full, and a whole transcript is a normal thing to be handed. Listing the same collection again with different wording returns material you have already seen, and you have a limited number of steps to spend — so spend them on reading the thing, not on finding it twice.",
   "Never guess, never invent data, and never tell the user you can't check — pick the door, call the tool, then answer plainly from what comes back.",
 ].join(" ")
@@ -140,7 +141,7 @@ export const KNOWLEDGE_CITATION_RULE = [
   // the same list twice, and the model finally has somewhere better to put the
   // attribution: on the claim itself.
   CITE_RULE,
-  "You can also add, correct and remove sources when asked (add_knowledge_source, update_knowledge_source, set_knowledge_source_active) — the same rights the person has, no more.",
+  "You can also add, correct and remove sources when asked (add_knowledge_source, update_knowledge_source, and set_record_active with record \"knowledge_source\" to take one away or give it back) — the same rights the person has, no more.",
 ].join(" ")
 
 /**
@@ -325,6 +326,17 @@ const RECORD_CHARS = 40_000
  * the line, which is what a threshold wants. */
 const LIST_ROWS = 8
 
+/** HOW MANY ROWS A LIST ANSWER MUST KEEP, whatever else is in the payload. Five
+ * because it is enough to answer "which is the most recent" or "name a few", and
+ * small enough that no realistic tally can justify crowding it out. */
+const ROW_FLOOR = 5
+
+/** How big a field has to be before it counts as a TALLY worth dropping to make
+ * room. Above this it is a sidecar (a per-client breakdown, a per-status count);
+ * below it, it is `total` or `hasMore` and dropping it would take the answer
+ * with it. */
+const SIDECAR_CHARS = 200
+
 /** WHAT ONE TURN MAY READ, in total characters of tool result.
  *
  * The record budget is thirty times the summary budget, and a turn may take
@@ -395,8 +407,39 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS): str
       ? whole
       : `${whole.slice(0, allowance)}\n[Trimmed here: the result was longer than ${allowance} characters, so what is above is incomplete.]`
   const [key, list] = rows
-  const rest = { ...(data as Record<string, unknown>), [key]: [] as unknown[] }
-  let budget = RESULT_CHARS - JSON.stringify(rest).length
+  // THE TAIL GREW UNTIL THERE WAS NO ROOM FOR ROWS, which is this file's own
+  // earlier fix rotting rather than a new kind of fault. "Drop ROWS, never the
+  // tail" was right when the tail was `total`, `hasMore` and `nextCursor` —
+  // about eighty characters. `list_help_tickets` then grew `byType`, `byStatus`
+  // and `byAccount`, and on the real staging book those TALLIES are 1,709 of the
+  // 2,000-character budget: measured 29 Aug 2026, the door answered 35,963
+  // characters and ONE ticket reached the model, and in the live turn (whose
+  // rows carry more fields still) it was NONE. The model was told 2,045 tickets
+  // exist and handed none of them, so it asked again, six times, at one AI unit
+  // each, until it hit the step cap — 358,767 input tokens to resolve one ticket
+  // it had already named.
+  //
+  // So the rule gains its missing half: the rows are the ANSWER and a tally is
+  // commentary, so when the commentary will not leave room for a floor of rows,
+  // THE COMMENTARY GOES — and is named, so the model knows it existed rather
+  // than believing the door does not report it.
+  const asked = data as Record<string, unknown>
+  const roomFor = (n: number): number =>
+    list.slice(0, n).reduce<number>((sum, row) => sum + JSON.stringify(row).length + 1, 0)
+  const sidecars = Object.entries(asked)
+    .filter(([k, v]) => k !== key && JSON.stringify(v).length > SIDECAR_CHARS)
+    .sort((a, b) => JSON.stringify(b[1]).length - JSON.stringify(a[1]).length)
+  const dropped: string[] = []
+  const rest = () => ({
+    ...Object.fromEntries(Object.entries(asked).filter(([k]) => !dropped.includes(k))),
+    [key]: [] as unknown[],
+  })
+  const need = roomFor(ROW_FLOOR)
+  for (const [name] of sidecars) {
+    if (RESULT_CHARS - JSON.stringify(rest()).length >= need) break
+    dropped.push(name)
+  }
+  let budget = RESULT_CHARS - JSON.stringify(rest()).length
   const kept: unknown[] = []
   for (const row of list) {
     const size = JSON.stringify(row).length + 1 // + the separating comma
@@ -405,8 +448,12 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS): str
     budget -= size
   }
   return (
-    JSON.stringify({ ...(data as Record<string, unknown>), [key]: kept }) +
-    `\n[${kept.length} of ${list.length} ${key} are shown; the rest were dropped to fit. Every other field above is complete and counts the whole set, not what is shown.]`
+    JSON.stringify({ ...rest(), [key]: kept }) +
+    `\n[${kept.length} of ${list.length} ${key} are shown; the rest were dropped to fit.` +
+    (dropped.length
+      ? ` ${dropped.join(", ")} ${dropped.length === 1 ? "was" : "were"} left out to make room for the rows — ask for that tally on its own if you need it.`
+      : "") +
+    ` Every other field above is complete and counts the whole set, not what is shown.]`
   )
 }
 
@@ -943,7 +990,9 @@ async function runPlanLoop(
   loopOpts: { prepaid?: boolean; fold?: boolean } = {},
   emit?: Emit
 ): Promise<ChatOutcome> {
-  const model = selectModel(env)
+  // The thread id is the affinity key: every step of this turn re-sends the same
+  // 37.6K preamble, and only a shared key lands them on the GPU still holding it.
+  const model = selectModel(env, threadId)
   // WHAT THIS CALLER CAN ACTUALLY DO, in one read, so the preamble stops paying
   // to describe doors that are certain to refuse them (toolSpecs' own note has
   // the arithmetic). Fail OPEN: an unreadable sheet means the whole catalogue,
@@ -1322,7 +1371,7 @@ export async function confirmAndRun(
     // and reads the same tool list this caller was offered, so the explanation
     // cannot name a tool they were never shown. Fail open, as everywhere else.
     const held = await rightsSheet(cfg, guard).catch(() => undefined)
-    const note = await failureWrapUp(selectModel(env), convo, toolSpecs(held), tally)
+    const note = await failureWrapUp(selectModel(env, opts.threadId), convo, toolSpecs(held), tally)
     emit?.({ t: "text", d: note })
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: note, source: opts.source })
     // Fold into the propose row (not a separate row) — APPENDING the actions

@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest"
 
 import { describePayload, fieldLabel, pendingCall } from "@shared/workers/confirm-payload"
 import { TEAM_MODULE_CATALOG } from "@shared/team-modules"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
 import { getTool, requiresConfirm, TOOL_CATALOG, type AgentTool } from "../src/lib/tools"
 
 /** A sample input for a tool, built from the tool's OWN schema — so the coverage
@@ -55,11 +56,26 @@ function sampleInput(tool: AgentTool): Record<string, unknown> {
  * confirm only when the input is the destructive one, and that is exactly the
  * call whose payload has to be readable. */
 const CONFIRMING: [AgentTool, Record<string, unknown>][] = TOOL_CATALOG.flatMap((t) =>
-  [sampleInput(t), { ...sampleInput(t), active: false, dryRun: false }]
+  candidateInputs(t)
     .filter((input) => requiresConfirm(t, input))
     .slice(0, 1)
     .map((input): [AgentTool, Record<string, unknown>] => [t, input])
 )
+
+/** The inputs a tool might confirm on. One tool, one pair of directions —
+ * EXCEPT `set_record_active`, which is twenty-one acts behind one name, so it is
+ * asked about each RECORD it covers. A single sample would have filled `record`
+ * with the string "sample record", which is no record at all, and the panel that
+ * actually opens when somebody unlinks a company would have gone unchecked. */
+function candidateInputs(t: AgentTool): Record<string, unknown>[] {
+  const base = sampleInput(t)
+  if (t.name !== "set_record_active")
+    return [base, { ...base, active: false, dryRun: false }]
+  return Object.keys(RECORD_TOGGLES).flatMap((record) => [
+    { ...base, record, active: false },
+    { ...base, record, active: true },
+  ])
+}
 
 describe("the confirm panel shows the payload it asks an admin to approve", () => {
   it("finds the confirming tools (the derivation itself must not go quiet)", () => {
@@ -67,7 +83,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     expect(names.length, names.join(", ")).toBeGreaterThanOrEqual(12)
     // The ones that only confirm on the way DOWN must be in the set, or their
     // payload would go unchecked precisely when it matters.
-    for (const n of ["set_brand_asset_active", "set_dropdown_active", "set_help_status_by_filter"])
+    for (const n of ["set_record_active", "set_help_status_by_filter"])
       expect(names, `${n} must be covered in its destructive direction`).toContain(n)
   })
 
@@ -193,7 +209,11 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
   })
 
   it("carries the summary AND the payload together — one seam, so they can't drift", () => {
-    const call = pendingCall(getTool("set_role_active")!, { roleId: "01ROLE", active: false }, { "01ROLE": "Sub Admin" })
+    const call = pendingCall(
+      getTool("set_record_active")!,
+      { record: "role", roleId: "01ROLE", active: false },
+      { "01ROLE": "Sub Admin" }
+    )
     expect(call.summary).toBe("Deactivate the Sub Admin role")
     expect(call.details).toEqual(["Role: Sub Admin", "Switched on: No"])
   })

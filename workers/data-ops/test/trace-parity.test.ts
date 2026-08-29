@@ -6,17 +6,47 @@
 
 import { describe, expect, it } from "vitest"
 
-import { SCREENLESS_WRITE_TOOLS, traceFor } from "../../../web/lib/agent-trace"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
+import { SCREENLESS_TOGGLE_RECORDS, SCREENLESS_WRITE_TOOLS, traceFor } from "../../../web/lib/agent-trace"
 import { TOOL_CATALOG } from "../src/lib/tools"
+
+/** The inputs a tool can be traced with. One per tool, EXCEPT the collapsed
+ * `set_record_active`, which performs twenty-one different acts and therefore
+ * owes twenty-one different screens — asking it once with no record named would
+ * check one twenty-first of what it does, which is how a collapse loses a screen
+ * quietly. */
+const IDS = { id: "x", roleId: "x", userId: "x", inviteId: "x", helpId: "x", batchId: "x", appId: "x" }
+function callsFor(name: string): { label: string; input: Record<string, unknown> }[] {
+  if (name !== "set_record_active") return [{ label: name, input: IDS }]
+  return Object.keys(RECORD_TOGGLES)
+    .filter((r) => !SCREENLESS_TOGGLE_RECORDS.includes(r))
+    .map((record) => ({ label: `${name} (record: ${record})`, input: { ...IDS, record } }))
+}
 
 describe("screen-trace parity: the co-pilot can show every write on a real screen", () => {
   it("every write tool traces to a screen (or is explicitly screenless)", () => {
     for (const t of TOOL_CATALOG) {
       if (!t.write || t.identityBlocked) continue
       if (SCREENLESS_WRITE_TOOLS.includes(t.name)) continue
-      const target = traceFor(t.name, { id: "x", roleId: "x", userId: "x", inviteId: "x", helpId: "x", batchId: "x" }, "team1")
-      expect(target, `write tool "${t.name}" must map to a screen in agent-trace.ts (or join SCREENLESS_WRITE_TOOLS with a reason)`).not.toBeNull()
-      expect(target?.path.startsWith("/t/team1"), `"${t.name}" must target the team host`).toBe(true)
+      for (const call of callsFor(t.name)) {
+        const target = traceFor(t.name, call.input, "team1")
+        expect(target, `write tool "${call.label}" must map to a screen in agent-trace.ts (or join SCREENLESS_WRITE_TOOLS / SCREENLESS_TOGGLE_RECORDS with a reason)`).not.toBeNull()
+        expect(target?.path.startsWith("/t/team1"), `"${call.label}" must target the team host`).toBe(true)
+      }
+    }
+  })
+
+  it("every record kind the collapsed toggle covers is judged (screened or reasoned)", () => {
+    // The collapse's own tripwire: a record added to RECORD_TOGGLES that is
+    // neither mapped nor reasoned would otherwise vanish from the loop above.
+    const judged = new Set(Object.keys(RECORD_TOGGLES))
+    expect(judged.size, "the toggle map has gone empty").toBeGreaterThan(15)
+    for (const record of judged) {
+      const screened = traceFor("set_record_active", { ...IDS, record }, "team1") !== null
+      expect(
+        screened !== SCREENLESS_TOGGLE_RECORDS.includes(record),
+        `record "${record}" must EITHER map to a screen OR be listed in SCREENLESS_TOGGLE_RECORDS with a reason — never both, never neither`
+      ).toBe(true)
     }
   })
 
@@ -37,8 +67,10 @@ describe("screen-trace parity: the co-pilot can show every write on a real scree
     // No trace may carry query params — the field doesn't exist, so no dialog can open.
     for (const t of TOOL_CATALOG) {
       if (!t.write || t.identityBlocked) continue
-      const target = traceFor(t.name, { id: "x", roleId: "x", userId: "x", inviteId: "x", helpId: "x", batchId: "x" }, "tm")
-      expect(Object.keys(target ?? {}), `"${t.name}" trace must be path/highlight only (no dialog query)`).not.toContain("query")
+      for (const call of callsFor(t.name)) {
+        const target = traceFor(t.name, call.input, "tm")
+        expect(Object.keys(target ?? {}), `"${call.label}" trace must be path/highlight only (no dialog query)`).not.toContain("query")
+      }
     }
   })
 

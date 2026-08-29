@@ -12,6 +12,7 @@
 // need the catalogue).
 
 import { FENCE_IDENTITY_INPUTS, FENCE_INPUTS, FENCED_ROW_OWNERS } from "./account-scope"
+import type { RecordToggle } from "./record-toggles"
 
 /** The permission each WRITE needs (module:right) — every write tool on either machine
  * surface, not just the shared ones. The door ENFORCES it; this is the developer hint the
@@ -54,7 +55,12 @@ export const TOOL_GATES: Record<string, string> = {
   create_dropdown_value: "selectable_data:create",
   update_dropdown_value: "selectable_data:edit",
   set_dropdown_default: "selectable_data:edit",
-  set_dropdown_active: "selectable_data:delete",
+  // KEYED BY THE MCP NAME since the collapse (29 Aug 2026). The agent's
+  // canonical name for this act is now `set_record_active` with record
+  // `dropdown_value`, and the only surface that still publishes a tool of its
+  // own here is the MCP one — where the name has always been
+  // `set_dropdown_value_active`. So the key follows the tool that exists.
+  set_dropdown_value_active: "selectable_data:delete",
   // WHAT WE HANDED OVER. Its own module, never `processes` — filing a handover
   // doc against a system is a different grant from editing the system itself.
   create_deliverable: "deliverables:create",
@@ -292,6 +298,8 @@ export const TOOL_GATES: Record<string, string> = {
  * also appears in TOOL_GATES, or that is no longer a write tool, turns the build red, so
  * the list can only shrink. */
 export const GATELESS_WRITES: Record<string, string> = {
+  set_record_active:
+    "it is ONE tool over twenty-one doors (RECORD_TOGGLES) — switch a record off, or back on — and those doors ask for twenty-one different rights, from accounts:delete to staff_profiles:delete. There is no single module:right to name, so the gate travels with the door instead: each entry carries its own `gate` string, `toMcpTool` publishes it in the tool's own description, and `alwaysConfirms` reads it to decide whether that particular record is an access write. The door still enforces the right, exactly as it did when there were twenty-one tools.",
   run_import_batch:
     "binding:'SELF', it runs the attached-in-chat batch INSIDE data-ops rather than posting to a door, and the rows it writes go through each target module's OWN gated door one at a time (the batch doors themselves open with requireAnyImportRight, which is an ANY-of set, not one module:right). So there is no single gate to name, and isPrivilegeWrite is answered by what it does: an import writes records, never who may do what.",
 }
@@ -364,6 +372,27 @@ function touchesAccountFence(tool: { path: string; schema?: Record<string, unkno
  *     the door it posts to, so an agent-only tool can't slip through by being
  *     absent from TOOL_GATES) — who can DO what;
  *   • or its door writes an input to the account fence — who can SEE whose. */
+/** DOES THIS TOGGLE ASK BOTH WAYS? — the collapsed `set_record_active` asking
+ * the same question the twenty-one separate tools each answered for themselves.
+ *
+ * It may only UPGRADE what the entry declares. `RecordToggle.confirm` reproduces
+ * exactly what each door did before the collapse (a refactor must not quietly
+ * loosen a panel), and this adds the DERIVED half on top: a toggle whose gate
+ * lands on a privilege module, or whose door writes an input to the account
+ * fence, confirms both ways whether or not anybody remembered to write "always".
+ * That is the same reasoning `isPrivilegeWrite` applies to every other write —
+ * a name list locks the ones you thought of and waves through the next one —
+ * reaching a tool that no longer has one path of its own to be judged by. */
+export function alwaysConfirms(entry: RecordToggle): boolean {
+  if (entry.confirm === "always") return true
+  return isPrivilegeWrite({
+    name: "",
+    path: entry.path,
+    write: true,
+    schema: { properties: { [entry.idField]: {}, active: {} } },
+  })
+}
+
 export function isPrivilegeWrite(tool: {
   name: string
   path: string

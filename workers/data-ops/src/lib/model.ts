@@ -207,39 +207,76 @@ function toCalls(raw: OpenAiToolCall[] | undefined): ToolCall[] {
  *
  * Swapping the brain is one edit here, or the AGENT_MODEL var.
  */
-export function selectModel(env: Env): Model {
-  return new WorkersAiModel(env, env.AGENT_MODEL || DEFAULT_AGENT_MODEL)
+export function selectModel(env: Env, sessionKey?: string): Model {
+  return new WorkersAiModel(env, env.AGENT_MODEL || DEFAULT_AGENT_MODEL, sessionKey)
 }
 
 /** The model the assistant runs on. Named here rather than only in wrangler so a
  * worker deployed with no vars still has a working assistant.
  *
- * IT WAS glm-5.3-flash FOR ABOUT AN HOUR, and the swap back is worth recording
- * because the reason was not quality. glm answered the routing bench 21/22 and
- * cost a third of gpt-oss; then, with production already down, it began refusing
- * every request carrying our catalogue. Measured immediately, five consecutive
- * calls at three catalogue sizes each:
+ * IT WENT gpt-oss -> glm -> gpt-oss -> glm, and only the last hop was about the
+ * model. On 28 Aug glm began refusing every request carrying our catalogue —
+ * 0/15 against gpt-oss's 15/15, AiError 3048 / HTTP 503, same body, same minute,
+ * over both the binding and the REST door. Cloudflare had production down at the
+ * time. That was an OUTAGE being read as a verdict, and the comment that replaced
+ * it said so: "glm is worth revisiting when it is stable."
  *
- *     glm-5.3-flash    0/15   AiError 3048, "Unknown internal error", HTTP 503
- *     gpt-oss-120b    15/15
+ * Revisited 29 Aug, four consecutive calls each, same 6.6K prefix:
  *
- * Same body, same minute, over both the binding and the REST door — so it is
- * Cloudflare's side, not a shape we send. A model that is cheaper and slightly
- * better at choosing a tool is worth nothing if it will not answer, and an
- * assistant is not a place to find that out twice. gpt-oss-120b is still 2.6x
- * cheaper than the Anthropic path it replaced, reasons, calls tools, and holds
- * 128K — enough for the 46K preamble and a whole document beside it.
+ *     glm-5.3-flash   4/4 answered   cached 0, 6592, 6592, 6592   (99.6% after the first)
+ *     gpt-oss-120b    4/4 answered   cached 0, 0, 0, 0
  *
- * glm is worth revisiting when it is stable; `AGENT_MODEL` is the one edit. */
-export const DEFAULT_AGENT_MODEL = "@cf/openai/gpt-oss-120b"
+ * The availability is back AND the caching is the whole point: gpt-oss-120b has
+ * no cached-token rate at all, so every step of every turn re-reads the 37.6K
+ * preamble at full price. glm bills a cached token at $0.03/M against $0.15
+ * fresh, so the same preamble costs a fifth once warm — and the prefill it skips
+ * is the latency, not just the money.
+ *
+ * The header below is what makes that real; without it the cache is 0 forever
+ * and NOTHING SAYS SO. */
+export const DEFAULT_AGENT_MODEL = "@cf/zai-org/glm-5.3-flash"
 
 class WorkersAiModel implements Model {
   readonly canActWithTools = true
   readonly canStream = true
   constructor(
     private env: Env,
-    readonly name: string
+    readonly name: string,
+    /** Cloudflare caches a prompt PREFIX, but only when the request lands on the
+     *  GPU that still holds it, and the only thing that steers it there is this
+     *  header. One value per conversation (the thread id), so a turn's every step
+     *  — which share a 37.6K preamble byte for byte — go to the same instance.
+     *
+     *  Undefined is legal and means "no affinity", which is right for a one-shot
+     *  call with nothing to reuse. It is NOT right for a turn, and the failure is
+     *  silent: no error, no warning, just full price forever. That is why
+     *  prompt-cache.test.ts asserts the header leaves the building. */
+    private sessionKey?: string
   ) {}
+
+  /** The options every call shares. Omitted entirely when there is no key, so a
+   *  one-shot call sends no empty header.
+   *
+   *  MEASURED, AND IT DOES NOT WORK THROUGH THE BINDING — 29 Aug 2026. This is
+   *  Cloudflare's own documented shape (third argument, extraHeaders,
+   *  x-session-affinity) and over the REST door it caches 99.6%: eight calls on
+   *  the shipped prompt gave cached 0, 33216, 33216, 33216 with the header.
+   *  Through `env.AI.run` on deployed staging, five consecutive steps behind a
+   *  near-identical 27K prefix reported:
+   *
+   *      {"prompt_tokens":26806,...,"prompt_tokens_details":{"cached_tokens":0}}
+   *      ... 27117, 27185, 26839, 27604 — cached_tokens 0 every time
+   *
+   *  So the field IS reported by the binding and is genuinely zero: the meter
+   *  works and the cache is not hitting. The header stays because it is correct,
+   *  costs nothing, and starts working the day the binding forwards it. The
+   *  alternative — calling the REST door from the worker with a token — is a new
+   *  secret and a second code path for the same call, and is the owner's decision
+   *  rather than a silent one. Delete this note the day a deployed turn reports a
+   *  non-zero cached_tokens. */
+  private affinity(): Record<string, unknown> {
+    return this.sessionKey ? { extraHeaders: { "x-session-affinity": this.sessionKey } } : {}
+  }
 
   /** THE BINDING RETURNS TWO DIFFERENT THINGS and getting that wrong is a silent
    *  outage, which is exactly how this shipped the first time: `env.AI.run(model,
@@ -250,7 +287,8 @@ class WorkersAiModel implements Model {
   async complete(messages: ChatMessage[], tools: ToolSpec[]): Promise<ModelReply> {
     const data = (await this.env.AI.run(
       this.name as never,
-      workersAiBody({ messages, tools, stream: false }) as never
+      workersAiBody({ messages, tools, stream: false }) as never,
+      this.affinity() as never
     )) as {
       choices?: { message?: { content?: string; tool_calls?: OpenAiToolCall[] } }[]
       usage?: WorkersAiUsage
@@ -272,7 +310,7 @@ class WorkersAiModel implements Model {
     const res = (await this.env.AI.run(
       this.name as never,
       workersAiBody({ messages, tools, stream: true }) as never,
-      { returnRawResponse: true } as never
+      { returnRawResponse: true, ...this.affinity() } as never
     )) as unknown as Response
     if (!(res instanceof Response)) throw modelHttpError(502, "the AI binding streamed no response")
     if (!res.ok) throw modelHttpError(res.status, await res.text().catch(() => ""))

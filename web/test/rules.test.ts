@@ -2401,6 +2401,7 @@ describe("RULES — the laws of the base", () => {
       "kit-supplies-the-ui", // R39: the UI-package census below, derived from what the kit itself imports
       "reachable-bytes", // R40: web/test/reachable-bytes.test.ts — the write census (off the wrangler bucket bindings) walked to the render
       "picked-files-are-sent", // R41: web/test/picked-files-are-sent.test.ts — R40's sibling, where nothing is stored at all
+      "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

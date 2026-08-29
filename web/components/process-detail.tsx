@@ -334,8 +334,24 @@ export function ProcessDetailScreen({
     toast.success(editingStep ? t("Step updated.") : t("Step added."))
   }
 
-  if (detailQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the process.")}</p>
-  if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58). No empty branch: this door never
+  // returns a null record, only data or an error.
+  if (detailQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the process.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(processKey(processId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (detailQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
 
   const { process, versions, commentsTotal, saving, savingsCaption, auditDate, revisionDates, links } =
     detailQ.data

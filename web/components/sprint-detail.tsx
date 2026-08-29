@@ -51,6 +51,10 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
+// The same picture the sprints LIST already draws per row (SprintBurndownChart)
+// — reused here as a one-sprint slice of it, for the "Work inside it" row that
+// used to be text only. Through pulse.tsx's own seam (R39); no new Chart call.
+import { BandCard, StageChart } from "@/components/pulse"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
@@ -134,10 +138,32 @@ export function SprintDetailScreen({
     }
   }
 
-  if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprint.")}</p>
-  if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (sprintsQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the sprint.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(sprintsKey(teamId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (sprintsQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   const sprint = sprintsQ.data.find((s) => s.id === sprintId) ?? null
-  if (!sprint) return <p className="text-muted-foreground text-sm">{t("That sprint no longer exists.")}</p>
+  if (!sprint)
+    return (
+      <RecordScreen
+        title={t("Sprint")}
+        state="empty"
+        copy={{ emptyTitle: t("That sprint no longer exists."), emptyDescription: "" }}
+      />
+    )
 
   const kindOption = sprintTypes.find((o) => o.value === sprint.sprintType)
   const kindLine = !sprint.sprintType
@@ -329,7 +355,22 @@ export function SprintDetailScreen({
             )
           if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
-          return <OverviewList items={overviewItems} />
+          return (
+            <div className="flex flex-col gap-6">
+              <OverviewList items={overviewItems} />
+              {sprint.storyCount > 0 && (
+                <BandCard title={t("Work inside it")}>
+                  <StageChart
+                    rows={[
+                      { label: t("Done"), count: done },
+                      { label: t("Still open"), count: sprint.openStoryCount },
+                    ]}
+                    label={t("Stories")}
+                  />
+                </BandCard>
+              )}
+            </div>
+          )
         }}
       />
 

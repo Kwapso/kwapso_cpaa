@@ -35,6 +35,7 @@ import {
 import { MoreHorizontal } from "@shared/ui/foundations/icons"
 
 import { RecordChrome } from "@shared/ui/compositions/templates/record-chrome"
+import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/states"
 
 import { RecordMark } from "@shared/web/record-mark"
 import { formatRelative } from "@shared/web/format"
@@ -258,6 +259,10 @@ export function RecordScreen({
   actions,
   headerExtra,
   children,
+  state,
+  copy,
+  emptyAction,
+  errorAction,
 }: {
   /** The record type's glyph, when the type has one. */
   mark?: string | null
@@ -280,8 +285,30 @@ export function RecordScreen({
   actions?: React.ReactNode
   /** Anything the module wants under the identity row — a status stepper. */
   headerExtra?: React.ReactNode
-  /** The TabsView and its panels. */
-  children: React.ReactNode
+  /** The TabsView and its panels. Ignored while `state` is not `"ready"` — the
+   * kit replaces this region with its own register — so a loading/error/empty
+   * caller may pass `null` rather than building a panel it knows won't show. */
+  children?: React.ReactNode
+  /**
+   * Loading, empty or error — swaps ONLY the region `children` occupies; the
+   * header band (title, chips, actions) stays drawn (RecordChrome's law 4).
+   * Because this app hands its whole TabsView to `children` rather than using
+   * `RecordChrome`'s own `tabs` array (see this file's header, "THE TABS GO IN
+   * panel, NOT tabs"), the swap takes the tab strip WITH it — there is no
+   * partial state where the strip shows and the content spins. That is a
+   * known, accepted trade against a bigger one: keeping exactly one tab-strip
+   * implementation in the app, rather than a second one RecordChrome would
+   * otherwise need to own. Omit `state` (the default) for a screen that has
+   * not been migrated to it yet; its own early return still works exactly as
+   * before.
+   */
+  state?: ShapeState
+  /** Per-locale words for the three states above. */
+  copy?: Partial<ShapeStateCopy>
+  /** The one next step offered by the empty register. */
+  emptyAction?: React.ReactNode
+  /** The retry offered by the error register. */
+  errorAction?: React.ReactNode
 }) {
   return (
     <RecordChrome
@@ -298,6 +325,10 @@ export function RecordScreen({
          and the Activity tab feed them from our own doors — so the kit's footer
          stays off rather than drawing an empty second one. */
       footerVisible={false}
+      state={state}
+      copy={copy}
+      emptyAction={emptyAction}
+      errorAction={errorAction}
     />
   )
 }

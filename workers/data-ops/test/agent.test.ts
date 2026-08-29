@@ -18,9 +18,9 @@ describe("step/confirm summaries resolve ids to human names", () => {
   const names = { "01ROLE": "Sub Admin", "01USER": "Jane Doe" }
 
   it("names a role by title (not a ULID) when resolved", () => {
-    expect(getTool("set_role_active")!.summarize({ roleId: "01ROLE", active: false }, names)).toBe(
-      "Deactivate the Sub Admin role"
-    )
+    expect(
+      getTool("set_record_active")!.summarize({ record: "role", roleId: "01ROLE", active: false }, names)
+    ).toBe("Deactivate the Sub Admin role")
     expect(getTool("set_role_permissions")!.summarize({ roleId: "01ROLE", value: {} }, names)).toBe(
       "Set access rights for the Sub Admin role"
     )
@@ -33,9 +33,9 @@ describe("step/confirm summaries resolve ids to human names", () => {
   })
 
   it("falls back to the raw id when a name can't be resolved (never throws)", () => {
-    expect(getTool("set_role_active")!.summarize({ roleId: "01ROLE", active: true })).toBe(
-      "Activate role 01ROLE"
-    )
+    expect(
+      getTool("set_record_active")!.summarize({ record: "role", roleId: "01ROLE", active: true })
+    ).toBe("Activate role 01ROLE")
     expect(getTool("invite_member")!.summarize({ email: "sam@x.com", roleId: "01ROLE" })).toBe(
       "Invite sam@x.com as role 01ROLE"
     )
@@ -100,17 +100,27 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
 
   it("(de)activate toggles confirm ONLY when turning something OFF (input-aware)", () => {
     // Deactivating an existing record is destructive → confirm; reactivating is not.
-    // set_role_active is NOT in this list: it writes to member_roles, so the
+    // The `role` record is NOT in this list: it writes to member_roles, so the
     // derived privilege rule makes it confirm both ways (a reactivated role hands
-    // its rights back to everyone holding it).
-    for (const name of ["set_brand_asset_active", "set_dropdown_active"]) {
-      const t = getTool(name)!
-      expect(requiresConfirm(t, { active: false }), `${name} deactivate must confirm`).toBe(true)
-      expect(requiresConfirm(t, { active: true }), `${name} activate runs freely`).toBe(false)
+    // its rights back to everyone holding it) — asserted just below.
+    const t = getTool("set_record_active")!
+    for (const record of ["brand_asset", "dropdown_value", "app", "meeting"]) {
+      expect(requiresConfirm(t, { record, active: false }), `${record} deactivate must confirm`).toBe(true)
+      expect(requiresConfirm(t, { record, active: true }), `${record} activate runs freely`).toBe(false)
       // A missing/omitted `active` deactivates (buildBody sends active:false), so it
       // must confirm too — the predicate mirrors buildBody's `active === true`.
-      expect(requiresConfirm(t, {}), `${name} with no active deactivates → confirm`).toBe(true)
+      expect(requiresConfirm(t, { record }), `${record} with no active deactivates → confirm`).toBe(true)
     }
+    // BOTH WAYS for the access writes, derived rather than declared.
+    for (const record of ["role", "portal_access", "contact_link"])
+      for (const active of [true, false])
+        expect(
+          requiresConfirm(t, { record, active }),
+          `${record} is an access write — it asks with active:${active} too`
+        ).toBe(true)
+    // …and an unrecognised record asks, because a question nobody has an answer
+    // to is answered in the safe direction.
+    expect(requiresConfirm(t, { record: "nonsense", active: true })).toBe(true)
   })
 
   it("never confirms a read", () => {

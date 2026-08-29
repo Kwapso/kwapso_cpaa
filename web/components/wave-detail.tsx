@@ -149,8 +149,24 @@ export function WaveDetailScreen({
     }
   }
 
-  if (waveQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the wave.")}</p>
-  if (waveQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58). No empty branch: this door never
+  // returns a null record, only data or an error.
+  if (waveQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the wave.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(waveOneKey(waveId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (waveQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   const { wave, sprints, overlaps } = waveQ.data
 
   // The sprints this client has that are not already in this package. A sprint

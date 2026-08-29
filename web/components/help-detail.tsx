@@ -389,13 +389,41 @@ export function HelpDetailScreen({
     }
   }
 
-  if (ticketsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the ticket.")}</p>
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — a prototype
+  // of that wiring, on this screen only, per the plan agreed with the planner:
+  // change RecordScreen's signature and this screen's guards, nothing wider,
+  // and report before touching the other detail screens. Each branch below
+  // still returns before the "ready" body (nothing after it assumes `ticket`),
+  // so no hook order changed and no other guard moved.
+  if (ticketsQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the ticket.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(`help:${teamId}`)}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   // …AND NOT WHILE THE BY-ID READ IS STILL GOING. "That ticket no longer exists"
   // is a claim, and a claim made before the only read that could disprove it has
   // answered is a lie that happens to be quick.
   if (ticketsQ.data === undefined || (!inPage && oneQ.data === undefined && !oneQ.error))
-    return <Skeleton variant="list" lines={4} />
-  if (!ticket) return <p className="text-muted-foreground text-sm">{t("That ticket no longer exists.")}</p>
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  if (!ticket)
+    return (
+      <RecordScreen
+        title={t("Ticket")}
+        state="empty"
+        copy={{
+          emptyTitle: t("That ticket no longer exists."),
+          emptyDescription: "",
+        }}
+      />
+    )
 
   // WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
   // ordinary team member and used to be offered here, which would have put a

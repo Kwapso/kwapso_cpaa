@@ -13,10 +13,52 @@
 
 import { describe, expect, it } from "vitest"
 
+import { QUERY_MODULES } from "@shared/workers/query-grammar"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
-import { toolSpecs } from "../src/lib/tools"
+import { REPLACED_BY_QUERY, toolSpecs } from "../src/lib/tools"
 
 const names = (held?: ReadonlySet<string>) => new Set(toolSpecs(held).map((t) => t.name))
+
+describe("the tools the GRAMMAR replaced are gone from this surface, and only those", () => {
+  // `query_records` asks any module a question, so a tool whose whole job was
+  // "give me this collection, narrowed by these three words" became a second way
+  // of saying something the grammar says better — and a second way is not free
+  // where every definition is re-sent on every model step.
+  //
+  // The bar for a line in REPLACED_BY_QUERY is that the grammar is a STRICT
+  // SUPERSET of that door's own narrowing. These hold the two halves of it: the
+  // name must still be a real shared read, and the module must still be one the
+  // grammar can actually be asked about — so a line cannot outlive the
+  // capability that replaced it, which is how a diet turns into a gap.
+  it("every replaced tool is still a real shared READ", () => {
+    for (const name of Object.keys(REPLACED_BY_QUERY)) {
+      const shared = SHARED_TOOLS.find((t) => t.name === name)
+      expect(shared, `${name} is listed as replaced but is no longer a shared tool — delete the line`).toBeDefined()
+      expect(shared!.method, `${name} is a write; the grammar replaces reads only`).toBe("GET")
+    }
+  })
+
+  it("every reason names a module the grammar can be asked about", () => {
+    for (const [name, why] of Object.entries(REPLACED_BY_QUERY)) {
+      expect(why.length, `${name} needs a reason someone can disagree with`).toBeGreaterThan(40)
+      const named = Object.keys(QUERY_MODULES).filter((m) => why.includes(`\`${m}\``))
+      expect(
+        named.length,
+        `${name}'s reason must name the query module that replaced it, in backticks — it says: ${why}`
+      ).toBe(1)
+    }
+  })
+
+  it("…and none of them is still offered to the model", () => {
+    const offered = new Set(toolSpecs().map((t) => t.name))
+    for (const name of Object.keys(REPLACED_BY_QUERY))
+      expect(offered.has(name), `${name} is listed as replaced but is still in the catalogue`).toBe(false)
+    // The replacement itself must be there, or the diet is just a loss.
+    expect(offered.has("query_records")).toBe(true)
+    expect(offered.has("describe_module")).toBe(true)
+  })
+})
 
 describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
   it("no argument means the whole catalogue, exactly as before", () => {

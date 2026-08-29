@@ -135,6 +135,20 @@ Today it covers:
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
   the write families proper are under **Write**:
+  - **asking, rather than listing** — `describe_module` and `query_records`. One
+    read tool over every module a caller may read: `describe_module` answers with
+    the fields, their types and an enum's values (including the ones the team
+    edits, read live off its own dropdown list), and `query_records` takes
+    filters, an optional grouped count, an order and a cursor and answers through
+    the same paged shape as every other list. It exists because the list tools
+    enumerate a question's COMBINATIONS and still could not express a DATE RANGE
+    or a GROUPED COUNT: "how many tickets did we resolve in July, per client" was
+    a page-walk of 1,820 rows and is now one call. Same gate as the module's own
+    list door, same rows, better question — and the door builds the SQL, so a
+    caller composes a request and never a statement. Its ops are eq, ne, in,
+    notIn, gt, gte, lt, lte, between, contains, isNull and notNull. The list
+    tools below are unchanged and stay the shortest path to "give me this
+    collection".
   - identity and rights, `whoami`, `my_permissions`, `get_team`
   - people and access, `list_members`, `list_roles`, `list_invites`,
     `list_portal_access`
@@ -213,7 +227,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **267 doors, 214 with a tool, 53 with a written reason**, the
+  red build. Today: **269 doors, 216 with a tool, 53 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -234,7 +248,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 214, **190 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 216, **192 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -321,6 +335,16 @@ Today it covers:
   re-imported.
 - **Write, deterministic create / edit / deactivate** (free, no AI; each needs the
   matching role right, e.g. `member_roles:create`):
+  - **`set_record_active`, the generic form.** Every `set_<record>_active` tool below
+    (roles, accounts, dropdown values, process maps, and the rest — twenty-one in
+    all) is also reachable through this one tool: `record` names which kind
+    (`account`, `role`, `dropdown_value`, …), `id` is that record's id (a role takes
+    `roleId`, a deliverable also needs `appId`), `active` says which way. Both forms
+    stay published side by side — the named ones are the pinned external contract
+    (added first, and a script calling `set_account_active` keeps working forever),
+    the generic one is for an integration that would rather send one shape for
+    every record kind than remember twenty-one names. Same map, same doors, same
+    confirm rule, either way.
   - the team, `update_team` (rename the team this token is pinned to; needs `teams:edit`)
   - roles, `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
   - members, `set_member_role`, `remove_member` (people join via **invite**)
