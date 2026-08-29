@@ -33,6 +33,7 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
@@ -344,6 +345,16 @@ export function TicketsCollection({
                       rights={rights}
                       onAction={onAction}
                       onIntent={onIntent}
+                      useKitPanel
+                      band={
+                        helpScope === "archived" ? (
+                          <Text as="p" size="sm" tone="secondary">
+                            {t(
+                              "Archived tickets keep their history and stay searchable. They don't count toward the figures above."
+                            )}
+                          </Text>
+                        ) : undefined
+                      }
                     />
                   </SectionWithCreate>
                   <LoadMore

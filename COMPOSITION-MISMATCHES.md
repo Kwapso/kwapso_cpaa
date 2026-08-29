@@ -183,6 +183,78 @@ Prototyped on `experiment/screen-shell-appshell` (`b84d208d`, `fab6965e`
 after rebasing on the `shell-nav.test.ts` fix), landed on this branch by
 merge after the planner's review.
 
+### The other five ScreenShell-family templates — collected now that the rail objection is gone
+
+The six-composition family's rejection was the duplicate-rail objection.
+That fell for all six at once (above). Read the remaining five individually
+rather than assuming the correction makes all of them fit — it doesn't,
+evenly.
+
+**`templates/record-route.tsx` and `templates/detail-screen.tsx` —
+ALREADY REALIZED, no new import needed.** Read both in full: each is
+nothing but `ScreenShell` (header slot left EMPTY — override 73 moved
+records off a separate header band entirely, "everything the record needs
+to say lives in `RecordChrome`'s body pane") wrapping `RecordChrome`;
+`record-route.tsx` additionally wires `stages` into `StepperHero`'s hero
+slot and computes "Edit steps down to secondary while a stage is
+highlighted" (ruling 26: never two mangos). This app already assembles
+exactly that shape, out of the same two-to-three parts, already adopted
+individually: `AppShell` is now `ScreenShell` (this file), every record
+screen composes `RecordChrome` through the `RecordScreen` host seam
+(`web/components/record-chrome.tsx`), and `StepperHero` is in the hero
+slot wherever a record has stages worth showing (`help-status-stepper.tsx`,
+this session). There is no additional composition to import — the shape
+these two templates document is already built, from parts, under different
+file names. The one real difference is a decision already made rather than
+a gap: `AppShell`'s `ScreenShell` header carries a persistent
+breadcrumb+timer row on every screen including records, where
+`record-route`/`detail-screen`'s reference leaves that band empty. That's
+this app's own choice (one header treatment everywhere) against the kit's
+(records get none) — not a technical mismatch, and reversing it would be a
+product call, not an adoption.
+
+**`templates/main-screen.tsx` and `templates/collection-screen.tsx` — MOSTLY
+REALIZED; one real, unbuilt architecture question.** `collection-screen.tsx`
+literally renders `MainScreen` internally ("RENDERS `MainScreen` rather than
+assembling chrome of its own") — same finding covers both. Structure:
+`ScreenShell` wrapping `CollectionFrame` with `tone="bare"` `inset={false}`
+— the EXACT fix this file's own `useKitPanel` entry above landed
+independently, confirmed correct by reading the kit's own reference
+afterward rather than before. What's NOT yet built: `MainScreen`'s header
+band carries a real, PER-SCREEN heading (eyebrow, title, a meta line, header
+actions, via the kit's `Title` component) — this app's collection headings
+(`CollectionHeading`) render INSIDE the body instead, because `AppShell`'s
+`ScreenShell` header is currently generic (the same breadcrumb+timer row on
+every screen, threaded in via one `breadcrumbs` prop from
+`deep-link-screen.tsx`) rather than carrying per-screen content. Making the
+header genuinely per-screen would mean widening that one prop channel from
+"a breadcrumb array" to "arbitrary per-screen header content" — plausible
+(the channel already exists and is already per-route), but real, scoped
+architecture work on the same file the rail question already touched, not
+folded into this pass. Recording it here as the one concrete next question
+for whoever picks this back up, rather than a vague "more to check."
+
+**`templates/portal-home.tsx` — no gain, verdict unchanged.** Reread in
+full: this composition isn't in the design artifact at all — the kit's own
+header says so ("the honest first sentence is that the kit does not draw
+this screen... assembled from the rules the kit DOES state about the
+portal"). `web-portal/components/home-screen.tsx` already implements the
+identical, portal-specific spec (three-thing "waiting on you," the
+three-series savings chart, the scoped ambient field) natively. Nothing
+here to adopt that isn't already built, independent of the rail-family
+correction.
+
+**Net effect on the family's count:** two of six templates
+(`screen-shell.tsx` itself, landed) are truly new; two more
+(`record-route.tsx`, `detail-screen.tsx`) describe a shape this app had
+already assembled from already-adopted parts before today, under other
+names; two (`main-screen.tsx`/`collection-screen.tsx`, one finding) are
+mostly there with one real open question; one (`portal-home.tsx`) has
+nothing to gain. None of the five is imported directly and none will show
+in `KIT-COVERAGE.md`'s count as a result — a different shape of the same
+"the census can't see it" problem this file already tracks, this time by
+recomposition rather than a transitive import.
+
 ## [~] Adoptable — a real opt-out exists, not yet rolled out
 
 ### `overlays/delete-confirmation.tsx` — split verdict
@@ -573,7 +645,11 @@ already-existing Archived tab (`helpScope === "archived"`, itself a
 pre-existing, working, server-backed scope — not new), verified rendering
 correctly with no double-box even nested inside the kit's own shell (the
 third combination of the day: archive band + kit frame + kit shell), then
-reverted. Commit `a4548833`.
+reverted for the prototype commit (`a4548833`). **Turned on for real on
+Tickets** in a follow-up commit (`4c1d2f9d`) — `useKitPanel` and the band
+are now live on `tickets-collection.tsx`, verified at all four widths, both
+themes, on both the All-tickets and Archived tabs (the band wraps to three
+clean lines on a phone with no clipping).
 
 (2) and (3) are confirmed, not assumed, to be per-collection surgery: both
 need each collection's own `renderItems`/column definitions to know it's
@@ -583,9 +659,11 @@ lane's file), and every one of the 20+ collections defines its columns
 differently. Stopped here per the planner's own condition ("if the rollout
 starts needing per-screen surgery rather than one seam change, stop and
 tell me") rather than open dozens of files to chase full parity with the
-composition. The band is real, available, and not yet turned on for any
-screen; (2)/(3) are not built and would be a deliberate, scoped, per-
-collection decision — not a batch item.
+composition. The band is real and now live on Tickets; the other 19
+archive tabs can adopt the same `band` prop later with no new engine work,
+which is what makes it a seam rather than a one-off. (2)/(3) are not built
+and would be a deliberate, scoped, per-collection decision — not a batch
+item.
 
 **`states/new-empty-record.tsx` (`NewEmptyRecordScreen`)** has no standalone
 screen to replace at all — every record-detail file
