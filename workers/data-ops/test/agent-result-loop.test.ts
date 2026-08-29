@@ -63,6 +63,94 @@ const page = (rows: number) => ({
   nextCursor: "eyJrIjoiMjAyNi0wOC0xNCIsImkiOiIwMUpRIn0",
 })
 
+describe("…and then the SUMMARY grew, and the rows were what went", () => {
+  // THE SAME BUG, THE OTHER WAY ROUND, thirteen days later. The fix above says
+  // "drop ROWS, never the tail", and it was right when the tail was `total`,
+  // `hasMore` and `nextCursor` — about eighty characters. `list_help_tickets`
+  // then grew three TALLIES, and on the real staging book `byAccount` alone is
+  // 1,422 characters of the 2,000-character budget.
+  //
+  // Measured against the live book on 29 Aug 2026: the door answered 35,963
+  // characters with fifty tickets, and ONE row reached the model. In the real
+  // turn — whose rows carry more fields than this fixture — it was NONE: the
+  // model was told 2,045 tickets exist and handed none of them, so it asked
+  // again, six times, at one AI unit each, until it hit the step cap. 358,767
+  // input tokens to resolve one ticket it had already named by reference.
+  //
+  // A guard is not wrong because its assumption rotted; but an assumption that
+  // rots silently is the thing to fix. The rows are the ANSWER and a tally is
+  // commentary, so the commentary is what goes — and it is NAMED, so the model
+  // knows the tally exists rather than concluding the door does not report it.
+
+  /** The JSON half of a trimmed answer, without its trailing note. */
+  const trimmed = (data: unknown): string => {
+    const out = trimResult(data)
+    return out.slice(0, out.lastIndexOf("\n["))
+  }
+
+  /** The shape the ticket door really answers with now: the page, the counts —
+   * and a per-client breakdown one entry per company, which is what grew. */
+  const withTallies = (rows: number, clients: number) => ({
+    tickets: Array.from({ length: rows }, (_, i) => ticket(i)),
+    total: 2045,
+    totalCapped: false,
+    hasMore: true,
+    nextCursor: "eyJrIjoiMjAyNi0wOC0xM1QxMToxMDoxMC4xNzFaIn0",
+    mineTotal: 314,
+    byType: { Extra: 227, Issue: 471, Question: 326, Request: 931, Requirements: 30 },
+    byStatus: { in_progress: 3, new: 440, resolved: 1597, triaged: 3, ready: 2 },
+    byAccount: Array.from({ length: clients }, (_, i) => ({
+      accountId: `01JACCOUNT${String(i).padStart(16, "0")}`,
+      accountName: `Client Company Number ${i}`,
+      open: 40 - i,
+      total: 200 - i,
+    })),
+  })
+
+  it("a tally costs the answer NO rows — that is the whole property", () => {
+    // Stated as an equality rather than a floor, because a floor is a target and
+    // this is a guarantee: whatever a page of these rows can fit, it fits the
+    // same number whether or not the door also carries a per-client breakdown.
+    // (These fixture rows are fat — a real ticket row is about a third the size,
+    // which is why the live door fits five and this fits two.)
+    const withCounts = JSON.parse(trimmed(withTallies(50, 24)))
+    const without = JSON.parse(trimmed(page(50)))
+    expect(withCounts.tickets.length, "the tally must not cost a single row").toBe(
+      without.tickets.length
+    )
+    expect(withCounts.tickets.length, "…and there must be rows at all").toBeGreaterThan(0)
+    expect(withCounts.byAccount, "the biggest tally is what made room").toBeUndefined()
+    // The answer's own numbers survive — they are what a count question wants.
+    expect(withCounts.total).toBe(2045)
+    expect(withCounts.hasMore).toBe(true)
+    expect(withCounts.nextCursor).toBeTruthy()
+  })
+
+  it("it SAYS which tally it left out, so the model does not think the door lacks one", () => {
+    const out = trimResult(withTallies(50, 24))
+    expect(out).toContain("byAccount")
+    expect(out).toMatch(/left out to make room for the rows/)
+  })
+
+  it("a small tail is never dropped — the old behaviour, unchanged", () => {
+    // The guard only fires when the tail really would crowd the rows out. A page
+    // with no tallies keeps every field it had, or this fix would be a second
+    // bug wearing the first one's clothes.
+    const out = trimResult(page(50))
+    const seen = JSON.parse(out.slice(0, out.lastIndexOf("\n[")))
+    expect(seen.total).toBe(37)
+    expect(seen.hasMore).toBe(true)
+    expect(out).not.toMatch(/left out to make room/)
+    expect(seen.tickets.length).toBeGreaterThan(0)
+  })
+
+  it("a result that already fits is untouched, tallies and all", () => {
+    const small = withTallies(1, 2)
+    expect(JSON.stringify(small).length).toBeLessThan(2000)
+    expect(trimResult(small)).toBe(JSON.stringify(small))
+  })
+})
+
 describe("trimResult: the summary survives, the rows are what go", () => {
   it("the OLD trim really did delete the answer — this is the bug, in one line", () => {
     const whole = JSON.stringify(page(50))
