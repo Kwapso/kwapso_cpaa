@@ -18,7 +18,8 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
-import { CircleStop, Play, Timer } from "@shared/ui/foundations/icons"
+import { Stopwatch } from "@shared/ui/components/stopwatch/stopwatch"
+import { CircleStop, Play } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -139,39 +140,35 @@ export function TimerBar({
       {running.map((timer) => {
         // Elapsed at the moment the SERVER answered, plus the wall time since —
         // so a tab left open overnight is right, not an hour of re-renders out.
+        // Passed to Stopwatch as a CONTROLLED value (in ms), so its own display
+        // rides this bar's 1s tick rather than ticking a second clock itself.
         const since = Math.max(0, Math.floor((Date.now() - Date.parse(timer.startedAt)) / 1000))
         const elapsed = Number.isFinite(since) ? since : timer.elapsedSeconds
         return (
-          <div
+          <Stopwatch
             key={timer.id}
-            className={`flex items-center gap-1 rounded-pill border px-2 py-0.5 text-xs ${
-              timer.runaway ? "border-destructive/40 text-destructive" : ""
-            }`}
-          >
-            <button
-              type="button"
-              className="flex items-center gap-1 font-medium"
-              title={timer.targetLabel ?? t("Open what this is timing")}
-              onClick={() => onNavigate?.(targetPath(timer, teamId))}
-            >
-              <Timer className="size-3.5" />
-              {/* WHICH RECORD, then how long. The name is what tells two running
-                  clocks apart; the duration is what people watch. `tabular-nums`
-                  stays on the DIGITS only, so the name is not letter-spaced like
-                  a spreadsheet. */}
-              <span className="max-w-[9ch] truncate sm:max-w-[14ch]">{badgeName(timer)}</span>
-              <span className="tabular-nums">{clockFrom(elapsed)}</span>
-            </button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              aria-label={t("Stop the timer")}
-              onClick={() => stop(timer.id)}
-            >
-              <CircleStop className="size-3.5" />
-            </Button>
-          </div>
+            running
+            elapsed={elapsed * 1000}
+            onRunningChange={(next) => {
+              if (!next) void stop(timer.id)
+            }}
+            label={badgeName(timer)}
+            stopLabel={t("Stop the timer")}
+            // WHICH RECORD — the name is what tells two running clocks apart;
+            // the kit's own clock glyph and count answer "how long". Its own
+            // click, not the pill's, is what returns to what it is timing —
+            // the stop disc alongside it needs a target of its own.
+            leading={
+              <button
+                type="button"
+                onClick={() => onNavigate?.(targetPath(timer, teamId))}
+                className="max-w-[9ch] truncate font-medium sm:max-w-[14ch]"
+              >
+                {badgeName(timer)}
+              </button>
+            }
+            className={timer.runaway ? "border border-destructive/40 text-destructive" : undefined}
+          />
         )
       })}
     </div>
