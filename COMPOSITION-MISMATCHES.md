@@ -217,8 +217,10 @@ big-number tiles (via the generic `BandCard` wrapper) already are by hand.
 This is a real candidate to replace those specific tiles with the kit's own
 component rather than a hand-rolled one — not a candidate for the tiles that
 already carry a real chart, which stay exactly as `pulse.tsx`'s law says.
-Not prototyped this pass; needs a scan of which `pulse.tsx`/`impact-panel.tsx`
-tiles are number-only today before swapping any in.
+Confirmed by a peer's render probe: `StatStrip` with figures and no `spark`
+draws no chart element at all. Not prototyped this pass; needs a scan of
+which `pulse.tsx`/`impact-panel.tsx` tiles are number-only today before
+swapping any in.
 
 ### `templates/form-screen.tsx` (+ `templates/multi-step-form.tsx`) — CORRECTED, per a peer's render probe
 
@@ -277,7 +279,10 @@ Re-checked: `columns` is not optional, and the composition's whole premise
 (a scope choice + a column picker + a format choice) has no reduced mode.
 This app's actual export is a one-click `<a href>` honoring the current
 filter querystring server-side — a deliberately simpler shape, confirmed
-unchanged.
+unchanged. A peer's render probe agrees: `ExportScreen` with no `formats`
+and no `columns` still draws the scope radio — the one HELD verdict out of
+six re-tested by rendering. Export really is a scope decision in this
+composition, not an omitted default.
 
 ### `overlays/filter-builder.tsx`
 
