@@ -115,6 +115,9 @@ async function ask(label, module, request) {
             .map((g) => `${g.label ?? Object.values(g.key)[0]}=${g.count}`)
             .join(", ")}`
         : `, ${answer.page.rows.length} rows`) +
+      (answer.unmatched?.length
+        ? `\n   NAMED NOTHING: ${answer.unmatched.map((u) => `${u.field}=${u.values.join("/")}`).join(", ")}`
+        : "") +
       `\n   ${chars} chars back (~${Math.round(chars / CHARS_PER_TOKEN)} tokens), ${Date.now() - started}ms`
   )
   return { answer, chars }
@@ -135,6 +138,9 @@ const open = await ask(
       // with a space matches nothing — the company is called "FluClinic" — which
       // is the honest behaviour of a substring search and worth seeing.
       { field: "accountId", op: "contains", value: ["flu", "confia", "horst"] },
+      // "horst" is in here ON PURPOSE. It names no client in this base, and the
+      // answer has to SAY so rather than quietly counting two — see `Unmatched`
+      // in the engine for the sentence that made that a requirement.
       { field: "status", op: "ne", value: "resolved" },
     ],
     groupBy: ["accountId"],
@@ -154,6 +160,10 @@ console.log(
     `   ${combined} open across ${open.answer.groups.length} clients ` +
     `(${open.answer.groups.map((g) => `${g.label}: ${g.count}`).join(", ")})\n` +
     `   ${july.answer.total} resolved in July 2026, across all clients\n` +
+    (open.answer.unmatched?.length
+      ? `   …and the answer says which of the names asked about is not a client here: ` +
+        `${open.answer.unmatched.flatMap((u) => u.values).join(", ")}\n`
+      : "") +
     `   tool output the model has to read: ${open.chars + july.chars} chars ` +
     `(~${Math.round((open.chars + july.chars) / CHARS_PER_TOKEN)} tokens)`
 )
