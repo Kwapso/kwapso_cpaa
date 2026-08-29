@@ -200,10 +200,29 @@ export interface AccessDeniedScreenProps
    * inert. Undefined draws nothing behind — never an invented page.
    */
   behind?: React.ReactNode;
-  /** The person to ask. Undefined draws no grantor block at all. */
-  grantor?: AccessGrantor;
-  /** The support reference the Request carries. */
-  reference?: string;
+  /**
+   * The person to ask.
+   *
+   * DEFAULTS TO THE KIT'S SPECIMEN, and `null` is the opt-out — the same
+   * shape `ScreenShell` uses for `rail`, and for the same reason: a screen
+   * handed nothing should still draw as a screen, and an application that
+   * genuinely has nobody to name needs a way to say so.
+   *
+   * IT SAID `Undefined draws no grantor block at all` FOR AS LONG AS IT HAS
+   * EXISTED AND IT NEVER DID. The default below made the documented empty
+   * register (state 7) unreachable, so an application that supplied no
+   * grantor shipped "Member name · workspace owner" — an invented person —
+   * to a real reader on a real denial, which is exactly what state 7 says is
+   * worse than none. `null` is now that state, and the words are true.
+   */
+  grantor?: AccessGrantor | null;
+  /**
+   * The support reference the Request carries. `null` draws no reference —
+   * for a product that has no support-reference concept, which otherwise got
+   * the specimen "4182-AC" printed at a reader who can do nothing with it.
+   * The footnote's slot stays, so the way out stays at the row's end.
+   */
+  reference?: string | null;
   /** Whether the denial is up. Controlled so a router can own it. */
   open?: boolean;
   /** The denial closed — the reader pressed Back. */
@@ -228,7 +247,7 @@ export interface AccessDeniedScreenProps
  *                      Back is the way out and Request is the ask.
  *  6. loading        — the Request in flight is `Button loading`, which keeps
  *                      its own fill. Nothing else here waits.
- *  7. empty          — no `grantor` renders no grantor block. A denial with
+ *  7. empty          — `grantor={null}` renders no grantor block. A denial with
  *                      nobody to ask still says what is out of reach, which
  *                      is the honest picture; an invented name would be
  *                      worse than none.
@@ -260,6 +279,7 @@ function AccessDeniedScreen({
   behind,
   grantor = DEFAULT_GRANTOR,
   reference = "4182-AC",
+  /* `null` on either is the opt-out; `undefined` keeps the specimen. */
   open = true,
   onOpenChange,
   onRequest,
@@ -347,7 +367,12 @@ function AccessDeniedScreen({
             </DialogDescription>
           </DialogHeader>
 
-          {grantor === undefined ? null : (
+          {/* `undefined` never reaches here — the destructure defaults it to
+              the specimen — so `null` is what the opt-out has to be read on.
+              `undefined` is kept in the test anyway: it is the honest reading
+              of "there is nobody to name", and a later commit that drops the
+              default should not have to remember to come back here. */}
+          {grantor === null || grantor === undefined ? null : (
             /* THE NESTED WELL. The artifact draws the grantor inside a well
                on the modal, not bare on it: `DialogContent` is `--popover`
                (off-beige) and law 3 alternates the tone on nesting, so the
@@ -410,8 +435,16 @@ function AccessDeniedScreen({
               `between` is the kit's two-ended row. Narrow drops the reference
               with the well's label and Back takes the full measure. */}
           <ActionRow align="between" className="mt-6 items-center">
+            {/* The slot is kept even when there is no reference, so `between`
+                still faces the way out at the row's end rather than pulling it
+                to the start. Same shape as the narrow render, which hides
+                these words and keeps Back where it was. */}
             <Hint className="hidden sm:block">
-              {words.referenceLabel} {reference}
+              {reference === null ? null : (
+                <>
+                  {words.referenceLabel} {reference}
+                </>
+              )}
             </Hint>
             {/* ONE WAY OUT, IN PAPER. There is no mango on this screen. */}
             <Button variant="secondary" className="max-sm:w-full" onClick={onBack}>

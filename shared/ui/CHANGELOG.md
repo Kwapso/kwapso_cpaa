@@ -1,5 +1,95 @@
 # Changelog
 
+## v1.2.5 — 2026-08-29
+
+Five bugs, no design. Every one found by RUNNING the kit under the consuming
+app's toolchain (Next + jsdom) rather than by reading it — which is the one
+toolchain this repository's own `tsc` and Vite build cannot see.
+
+### Fixed — the shipped `@source` scanned PROSE, and compiled it
+
+`foundations/tokens/tokens.css` named three bare DIRECTORIES. Tailwind's own
+file walk reads markdown, so `components/PATTERN.md` — the law-book, which
+quotes class names in order to FORBID them — was compiled into every
+consumer's stylesheet. Two of the results are not valid CSS:
+
+    .text-\[length\:var\(--text-\*\)\] { font-size: var(--text-*) }
+    .hover\:bg-\[…\]:hover              { background-color: … }
+
+The first is a parse error reported on every build of both kwapso front
+doors ("Unexpected token Delim('*')"). Beside them came `rounded-sm`, `-md`,
+`-xl` and `-2xl` — the four box radii PATTERN.md exists to forbid and the
+app's own R31 forbids again — emitted because the law-book names them.
+
+The globs now say `**/*.{ts,tsx}`, which is what `demo/demo.css`,
+`mini-app/mini.css` and `verify/entry.css` have said all along; the shipped
+scan was the only one that did not. Measured with `source(none)` so nothing
+else could be the cause: the directory form emits **71 lines the code form
+does not, and the code form emits nothing the directory form does not.** A
+strict subtraction of prose.
+
+**And the globs were only half of it, which is why v1.2.5 exists.** A
+consumer that writes `@import "tailwindcss"` WITHOUT `source(none)` also gets
+Tailwind's automatic content walk — the consumer's own, rooted at their
+project, reading markdown, reaching this vendored kit whatever the globs say.
+Measured: tightening the globs cleaned a `source(none)` build and changed
+NOTHING in the kwapso app's real Next build, which reported the same parse
+error. So `@source not "../../**/*.md"` states the exclusion where it cannot
+be forgotten, one line covering every consumer either way — and THAT is what
+made the warning go from the app's build.
+
+### Fixed — `BrandRoute` threw in every consumer's test run
+
+`compositions/screens/brand.tsx` called `window.matchMedia` bare. `typeof
+window === "undefined"` does not catch jsdom, which HAS a window and, by
+default, no `matchMedia` — so any unit test an application writes about its
+brand screen died with "window.matchMedia is not a function". Two other
+files here already guard the same call the same way
+(`overlays/delete-confirmation`, `overlays/quick-view`); this was the odd
+one out. A missing `matchMedia` now means no palette-change event, which the
+MutationObserver and the sentinel poll beside it already cover.
+
+### Fixed — `AccessDeniedScreen` had no way to say "there is nobody to ask"
+
+The prop said `Undefined draws no grantor block at all` and state 7 said
+`an invented name would be worse than none`, and neither was reachable:
+`grantor` defaulted to the specimen, so an application that supplied none
+shipped **"Member name · workspace owner" and support reference "4182-AC"**
+to a real reader on a real denial. `grantor={null}` and `reference={null}`
+are now the opt-out — the same shape `ScreenShell` uses for `rail`, and the
+documented empty register is reachable for the first time. The default is
+unchanged, so nothing that renders today moves.
+
+### Fixed — ten user-visible strings no application could translate
+
+A string written into a render is a string that ships in English to somebody
+who chose another language, on a screen that looks finished. Three screens
+had one, and in every case every NEIGHBOURING string was already a prop —
+they were missed, not decided:
+
+* `LoginRoute` wrote `emailLabel="Work email"`, byte-for-byte `SignIn`'s own
+  default for the same prop, so the literal added nothing and cost the route
+  the prop. `emailLabel`, `emailHelp`, `codeLabel`, `backLabel` and
+  `resendLabel` are now forwarded — the same four its portal sibling,
+  `PortalLoginRoute`, has exposed through `labels` all along.
+* `HomeRoute` wrote `countLabel`, `searchLabel` and `bodyLabel`. All three
+  are ACCESSIBLE names, so the cost fell on the one reader who cannot see
+  the screen.
+* `OnboardingRoute` wrote ten: five `<Field label>`s, two help lines, a
+  select placeholder and the appearance badge three times. They arrive as
+  `fieldLabels`, a partial over `OnboardingFieldLabels`.
+
+Every default is the word that shipped, and the eight affected default
+renders were proved **byte-identical** before and after under the app's own
+React.
+
+### Fixed — `QuickView` logged a Radix warning into every console
+
+The one of five dialog overlays with neither a `DialogDescription` nor an
+explicit `aria-describedby={undefined}`. A peek has no summary line above
+its facts, so the honest half of Radix's contract is the one taken rather
+than inventing a sentence to quieten a log.
+
 ## Unreleased — 2026-08-26
 
 **controls/ and structures/ merge into components/.** Client ruling,

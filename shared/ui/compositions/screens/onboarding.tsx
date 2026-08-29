@@ -139,6 +139,10 @@ export interface OnboardingRouteProps
   onStepSelect?: (step: OnboardingStepId) => void;
   /** The rail's three names. */
   stepLabels?: Record<OnboardingStepId, string>;
+  /** The words INSIDE the steps — the field labels, their help lines, the
+   *  timezone placeholder and the appearance badge. Partial: name only what
+   *  moves. See `OnboardingFieldLabels`. */
+  fieldLabels?: Partial<OnboardingFieldLabels>;
   /** Accessible name for the rail. */
   stepsLabel?: string;
   /**
@@ -236,6 +240,52 @@ const DESCRIPTIONS: Partial<Record<OnboardingStepId, string>> = {
     "Pick a theme, a spine and a text size — shown, not described. This is " +
     "yours alone: it changes nothing for anyone else on the account.",
   work: "Claim the accounts you own. Anything you miss can be handed to you later.",
+};
+
+/**
+ * THE WORDS INSIDE THE THREE STEPS, WHICH THIS SCREEN USED TO OWN.
+ *
+ * Ten user-visible strings were written as literals in the render — five
+ * `<Field label>`s, two `help` lines, a Select placeholder and the appearance
+ * badge three times — on a screen whose step names, titles, descriptions and
+ * every button already arrive as props. Nothing distinguished them from their
+ * neighbours; they were simply the ones nobody lifted, and an application
+ * translating this screen could translate the frame around them and not one
+ * word inside it.
+ *
+ * The kit still owns the DEFAULTS, so a screen handed nothing reads exactly
+ * as it read before. 27.14's own word for the appearance badge is "Picked",
+ * and it stays the default here for that reason.
+ */
+export interface OnboardingFieldLabels {
+  /** The name field. */
+  name: string;
+  /** The line under it. */
+  nameHelp: string;
+  /** The timezone field. */
+  timezone: string;
+  /** The line under it. */
+  timezoneHelp: string;
+  /** The empty timezone select. */
+  timezonePlaceholder: string;
+  /** The appearance step's three groups. */
+  theme: string;
+  sidebar: string;
+  textSize: string;
+  /** The badge on the option that is set — 27.14's word. */
+  picked: string;
+}
+
+const FIELD_LABELS: OnboardingFieldLabels = {
+  name: "Your name",
+  nameHelp: "How you appear on a ticket and in the log.",
+  timezone: "Timezone",
+  timezoneHelp: "Used for due dates and for the sprint boundary.",
+  timezonePlaceholder: "Pick a timezone",
+  theme: "Theme",
+  sidebar: "Sidebar",
+  textSize: "Text size",
+  picked: "Picked",
 };
 
 /* Obviously-fictional system content. */
@@ -357,6 +407,7 @@ function OnboardingRoute({
   step = "identity",
   onStepSelect,
   stepLabels = STEP_LABELS,
+  fieldLabels,
   stepsLabel = "Onboarding steps",
   formatStep = (position, total) => `Step ${position} of ${total}`,
   titles = TITLES,
@@ -395,11 +446,14 @@ function OnboardingRoute({
     label: stepLabels[id],
   }));
 
+  /* One merge, the same shape `PortalLoginRoute` uses for its own labels. */
+  const words: OnboardingFieldLabels = { ...FIELD_LABELS, ...fieldLabels };
+
   const owned = new Set(ownedAccounts ?? []);
 
   const identityFields = (
     <React.Fragment>
-      <Field label="Your name" help="How you appear on a ticket and in the log.">
+      <Field label={words.name} help={words.nameHelp}>
         {(control) => (
           <Input
             {...control}
@@ -416,11 +470,11 @@ function OnboardingRoute({
           />
         )}
       </Field>
-      <Field label="Timezone" help="Used for due dates and for the sprint boundary.">
+      <Field label={words.timezone} help={words.timezoneHelp}>
         {(control) => (
           <Select value={timezone} onValueChange={onTimezoneChange}>
             <SelectTrigger {...control}>
-              <SelectValue placeholder="Pick a timezone" />
+              <SelectValue placeholder={words.timezonePlaceholder} />
             </SelectTrigger>
             <SelectContent>
               {timezones.map((zone) => (
@@ -441,36 +495,36 @@ function OnboardingRoute({
      the mango "Picked" badge on the one that is set. */
   const appearanceFields = (
     <React.Fragment>
-      <Field label="Theme">
+      <Field label={words.theme}>
         {(control) => (
           <AppearanceOptionGroup
             {...control}
             options={THEMES}
             value={theme}
             onValueChange={onThemeChange}
-            badgeLabel="Picked"
+            badgeLabel={words.picked}
           />
         )}
       </Field>
-      <Field label="Sidebar">
+      <Field label={words.sidebar}>
         {(control) => (
           <AppearanceOptionGroup
             {...control}
             options={SPINES}
             value={spine}
             onValueChange={onSpineChange}
-            badgeLabel="Picked"
+            badgeLabel={words.picked}
           />
         )}
       </Field>
-      <Field label="Text size">
+      <Field label={words.textSize}>
         {(control) => (
           <AppearanceOptionGroup
             {...control}
             options={SCALES}
             value={scale}
             onValueChange={onScaleChange}
-            badgeLabel="Picked"
+            badgeLabel={words.picked}
           />
         )}
       </Field>

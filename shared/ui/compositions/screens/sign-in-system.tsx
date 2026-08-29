@@ -112,6 +112,30 @@ export interface LoginRouteProps
    */
   formatCodeSent?: (email: string) => React.ReactNode;
 
+  /**
+   * THE FIELD LABELS AND THE TWO WAYS BACK, WHICH THIS ROUTE USED TO OWN.
+   *
+   * `emailLabel` was written into the call below as the literal "Work email"
+   * — the only hardcoded visible string in any of the six auth screens — so
+   * an application had no way to say it in another language, on a screen
+   * whose whole job is to be the first thing a person reads. The inner
+   * `SignIn` already defaults it to the same two words, so forwarding
+   * `undefined` renders exactly what shipped before; the other three are its
+   * neighbours, unreachable for the same reason and defaulted the same way.
+   *
+   * Left undefined every one of these is `SignIn`'s own default, which is
+   * what this route drew before it exposed them.
+   */
+  emailLabel?: string;
+  /** One line under the address field, before anything is wrong. */
+  emailHelp?: React.ReactNode;
+  /** The digits field's label. */
+  codeLabel?: string;
+  /** The way back to the address step. */
+  backLabel?: React.ReactNode;
+  /** Send the code again. */
+  resendLabel?: React.ReactNode;
+
   /** The address. Controlled, so the code step can say it out loud. */
   email?: string;
   /** Address changed. */
@@ -205,10 +229,15 @@ function LoginRoute({
   formatCodeSent = defaultFormatCodeSent,
   email = "",
   onEmailChange,
+  emailLabel,
+  emailHelp,
   emailError,
   code,
   onCodeChange,
+  codeLabel,
   codeError,
+  backLabel,
+  resendLabel,
   onSubmit,
   continueLabel = "Continue",
   submitting = false,
@@ -246,11 +275,18 @@ function LoginRoute({
       description={step === "email" ? emailDescription : codeDescription}
       email={email}
       onEmailChange={onEmailChange}
-      emailLabel="Work email"
+      /* FORWARDED, NOT WRITTEN. This read `emailLabel="Work email"`, which is
+         byte-for-byte `SignIn`'s own default for the same prop — so the
+         literal added nothing and cost the route the prop. */
+      emailLabel={emailLabel}
+      emailHelp={emailHelp}
       emailError={emailError}
       code={code}
       onCodeChange={onCodeChange}
+      codeLabel={codeLabel}
       codeError={codeError}
+      backLabel={backLabel}
+      resendLabel={resendLabel}
       codeSentLine={step === "code" ? formatCodeSent(email) : undefined}
       onSubmit={onSubmit}
       continueLabel={continueLabel}
