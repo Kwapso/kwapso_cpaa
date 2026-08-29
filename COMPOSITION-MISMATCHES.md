@@ -1006,7 +1006,63 @@ the same constraint the same day verifying a closed Popover that looked
 ticking, not a real bug — so this is the second investigation it has
 silently cost, worth naming here rather than let a third rediscover it.
 
-## Why this file exists
+## The remaining `screens/`+`states/` compositions — a kit-side sweep, 2026-08-29
+
+Only one `screens/` file (`not-found.tsx`, above) and the four `states/`
+files this lane's own `useKitPanel` entry already covers had been looked at
+before today, out of 18 `screens/` + 5 `states/` = 23 total — the rest sat
+uncovered, on neither side. A peer swept all 23 from the KIT side (rendered
+every one, not read the props table) and reports it here rather than commit
+it, since this file has one owner. The headline: **there is no kit-side
+blocker in any of the 23.**
+
+- **Required props:** of 23 files, exactly two exported components have
+  one — `settings.tsx`'s `AppearanceOptionGroup` (`options`, a
+  sub-primitive, not the route itself) and `states.tsx`'s `ShapeStateBody`
+  (`shape`, `state` — the shared register this file's own adoptions already
+  use internally). All 18 `screens/` compositions take ZERO required props.
+  None demands a data shape this app would have to invent — the exact
+  discriminator that killed the import trio and `bulk-edit`'s original
+  (wrong) reason elsewhere in this file.
+- **All 23 render** from `{}` alone, 3–57KB of markup each, and survive all
+  four state registers (loading/error/empty/ready) — a 188-render sweep,
+  not a spot check.
+- **No unreachable copy.** A hardcoded-string census across all 47
+  compositions found three offenders (`home`, `onboarding`,
+  `sign-in-system`) — all in this set, all fixed upstream in kit v1.2.4.
+  Nothing else here writes a sentence this app couldn't translate, so
+  R28/R33 blocks none of the 23.
+- **No doc-vs-implementation contradictions** — the same census found one
+  across all 47 (`access-denied`'s `grantor` default), already fixed and
+  already folded into this file above.
+- Eleven of the 23 accept `rail` (the `rail={null}` opt-out this file
+  already verified applies identically); seventeen have a `labels`/`copy`
+  seam.
+
+**One caveat left for a human, not fixed upstream:** `settings.tsx` renders
+"Record title" and "Status · 4 open" as literal English inside its
+text-size preview thumbnail. It's `aria-hidden="true"` (a screen reader
+never meets it — the kit is asserting "this is a picture of type, not
+words"), but a reader using any other language SEES it. Whether a type
+specimen is copy or decoration is a real design call, defensible either
+way — left for the owner, not fixed on one engineer's judgement. Worth a
+line here if `settings` is ever adopted.
+
+**What this is not:** not "adopt all 23." Several are product decisions
+(a brand reference page, a company hub, an archive band screen) for the
+owner, not a rendering question, and portal sign-in already has a named
+conflict elsewhere in this file. What the sweep settles is narrower: for
+these 23, there is nothing left to DISCOVER on the kit side, so nobody has
+to re-derive it, and any blocker that surfaces during actual adoption is
+kit-side to fix the same day rather than app-side to work around.
+
+**The two probes are available on request.** Nested-same-tone-surface
+detection (the double-box class of bug this file's own `useKitPanel` entry
+found and fixed by hand) and accessible-name-from-the-browser's-own-
+computation, both carrying an injected canary so a zero-result actually
+means something. `useKitPanel` is now live on one real collection (roles,
+`65728b64`) — worth pointing both probes at it rather than leaving that
+offer unused.
 
 A recorded mismatch is a result, not a stall. Without this list, the next
 lane (or the next session) re-reads all 23 signatures from zero and either
