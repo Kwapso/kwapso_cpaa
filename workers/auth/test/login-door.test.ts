@@ -44,7 +44,7 @@ describe("no login code ever leaves through anything but the inbox", () => {
 
   it("the web client has no code-toast path left", () => {
     const files = [
-      { path: join(ROOT, "web", "components", "temp", "auth-card.tsx"), rel: "auth-card.tsx" },
+      { path: join(ROOT, "web", "components", "auth-card.tsx"), rel: "auth-card.tsx" },
       {
         path: join(ROOT, "web", "components", "email-change-dialog.tsx"),
         rel: "email-change-dialog.tsx",
