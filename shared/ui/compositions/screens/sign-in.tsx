@@ -219,6 +219,10 @@ function AuthShell({
   footer,
   ...props
 }: AuthShellProps) {
+  /* Tested once, read twice — by the grid and by the panel — so the two can
+     never disagree about whether there is a photograph. See the class below. */
+  const hasMedia = media !== null && media !== undefined;
+
   return (
     <div
       data-slot="auth-shell"
@@ -226,7 +230,16 @@ function AuthShell({
         /* The window, not the parent. See the header. */
         "relative grid min-h-dvh w-full min-w-0 bg-background",
         "gap-[var(--space-6)] p-[var(--space-6)]",
-        "md:grid-cols-2 lg:gap-[var(--space-7)] lg:p-[var(--space-7)]",
+        /* ONE COLUMN WHEN THERE IS NO PHOTOGRAPH. This was an unconditional
+           `md:grid-cols-2`, the same fault `SignIn` carried: `media={null}`
+           removed the panel and left the grid still two columns, so the
+           content sat in the first of them with an empty half beside it.
+           Four screens reach this frame — sign-in, invite-acceptance,
+           link-sent and session-expired — so any of them passing `null` drew
+           it. The inset above is why this half was less visible than
+           `SignIn`'s: the words were pinned left but never flush. */
+        hasMedia ? "md:grid-cols-2" : null,
+        "lg:gap-[var(--space-7)] lg:p-[var(--space-7)]",
         className,
       )}
       {...props}
@@ -240,7 +253,7 @@ function AuthShell({
           rather than unmounted on purpose: the <img> inside is
           `loading="lazy"`, and a lazy image with no layout box is never
           fetched, so a phone downloads none of it. */}
-      {media === null || media === undefined ? null : (
+      {!hasMedia ? null : (
         <div
           data-slot="auth-shell-media"
           className="relative hidden min-w-0 overflow-hidden rounded-[var(--radius)] md:block"

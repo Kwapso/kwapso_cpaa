@@ -557,6 +557,12 @@ function SignIn({
       </form>
     );
 
+  /* `undefined` cannot reach here — the destructure defaults it to
+     `AuthPhotograph` — so `null` is how a door says "no photograph", and it
+     has to decide the COLUMN COUNT as well as whether the panel renders.
+     Tested once, read twice, so the grid and the panel can never disagree. */
+  const hasMedia = media !== null && media !== undefined;
+
   return (
     <div
       data-slot="sign-in"
@@ -572,7 +578,30 @@ function SignIn({
            ch27.19 — is stated verbatim as "a signed-out session replaces the
            whole window". The shell is therefore the window, and the window is
            `dvh`. Track 3A, GAPS-TRACK3A.md T3A-1. */
-        "relative grid min-h-dvh w-full min-w-0 gap-[var(--space-7)] md:grid-cols-2",
+        "relative grid min-h-dvh w-full min-w-0 gap-[var(--space-7)]",
+        /* THE PAGE INSET, WHICH THIS SHAPE NEVER HAD. `AuthShell` — the frame
+           the other four signed-out screens share — states it in words ("the
+           page inset steps 24 → 32", ch05's "24–32px card inset" range) and
+           draws it. This shape drew none, so its content sat flush against the
+           viewport: measured at 1710 the title's right edge was 0px from the
+           window, and on a 390 phone it touched BOTH edges. That was true with
+           a photograph and without one, so it is not the media bug below — it
+           is this shape missing its sibling's stated inset. Same tokens, same
+           breakpoint, deliberately, rather than a number invented here. */
+        "p-[var(--space-6)] lg:p-[var(--space-7)]",
+        /* ONE COLUMN WHEN THERE IS NO PHOTOGRAPH, WHICH IS WHAT `media`'S OWN
+           DOC HAS PROMISED ALL ALONG: "Pass a node to override, or `null` to
+           draw a single column." It never delivered it — this was an
+           unconditional `md:grid-cols-2`, so `null` drew a two-column grid with
+           one empty column and pinned every word to the left half. Measured at
+           1710: content 840 wide at x=0, 870px of nothing beside it.
+
+           THE PROMISE WAS DOCUMENTED AND NOT ENFORCED, which is this kit's
+           third instance of one shape in a day — the `@source` advice in
+           PATTERN.md §10 that asked consumers to remember, `AccessDeniedScreen`
+           promising an empty register its default made unreachable, and now
+           this. A sentence in a doc is not a mechanism. */
+        hasMedia ? "md:grid-cols-2" : null,
         className,
       )}
       {...props}
@@ -583,7 +612,7 @@ function SignIn({
           `hidden` rather than unmounted is deliberate: the <img> inside is
           `loading="lazy"`, and a lazy image with no layout box is never
           fetched, so a phone pays nothing for a picture it will not see. */}
-      {media === null || media === undefined ? null : (
+      {!hasMedia ? null : (
         <div data-slot="sign-in-media" className="hidden min-w-0 md:block">
           {media}
         </div>
