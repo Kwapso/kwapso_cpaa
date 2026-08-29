@@ -96,63 +96,69 @@ below) — `shared/web/screen-engine/collection-frame.tsx`, wired to the kit's
 `ShapeStateBody`. Committed `3115b132`, merged `e9b6c157`. Full detail
 unchanged from the first pass; see git history rather than repeat it here.
 
+**The ScreenShell-owns-the-rail family (6 templates) — LANDED.**
+`templates/detail-screen.tsx`, `record-route.tsx`, `collection-screen.tsx`,
+`main-screen.tsx`, `screen-shell.tsx` and `portal-home.tsx` were first
+rejected because all six compose `ScreenShell`, which draws a rail, and
+this app already has one persistent, app-wide sidebar
+(`web/components/app-shell.tsx`). That check never read whether the rail's
+CONTENTS were forced — they are not: `rail={null}` is a real, documented
+opt-out, confirmed both by reading the prop doc and by a peer's render
+probe (zero `nav`/`aside` elements, no 13rem column in the markup, for all
+six). What survived that correction was a real, different question:
+`ScreenShell` is a per-route composition and `AppShell` is the persistent
+one R37 requires — using the templates as documented (each instantiating
+its own `<ScreenShell rail={…}>` per screen) would remount the rail's DOM
+on every navigation even though the outer app-wide shell never unmounts.
+
+Resolved by composing bare `screen-shell.tsx` ONCE, at the layout level —
+`web/components/app-shell.tsx` now renders `<ScreenShell spine="paper"
+rail={…}>{children}</ScreenShell>` instead of its own hand-rolled
+`<aside>`/`<div>` structure, with the rail's actual content (TeamSwitcher,
+both nav groups, ProfileMenu, the collapse toggle) re-homed as the `rail`
+node, byte-identical otherwise. `spine="paper"` is explicit — the shell's
+own default is `spine="mango"`, a later ruling this app hasn't adopted.
+
+VERIFIED NAVIGATING, not at rest, because a bad prototype here looks fine
+in a still frame and only fails on navigation
+(`scripts/lane-shots/verify-screen-shell-appshell.mjs`): an `ElementHandle`
+for the rail's root node was captured on initial load, then four real
+in-app navigations were driven (Home → Accounts → Tickets → Stories →
+Home), re-querying the same selector after each click and comparing
+against the ORIGINAL handle with `===` — object identity, not a "looks the
+same" check. PASS on all four; R37 holds. Also verified at 390/768/1280/
+1920, both themes. The sticky-height risk this integration raised (a bare
+flex rail column stretches to the tallest sibling — the exact "flash" bug
+the removed `<aside>` comment described) is solved by the rail content
+cancelling the shell column's own `--rail-inset` padding with an equal
+negative margin and re-spending it on itself, so it can carry its own
+`sticky top-0 h-[100svh] overflow-y-auto` independent of a column the shell
+owns.
+
+Caught two real mistakes before landing: an arbitrary `pb-20` (80px, not on
+the kit's admitted spacing scale — `design-scale.test.ts` caught it) where
+the old code's `pb-24` (96px, admitted) was the value actually needed; and
+`web/test/shell-nav.test.ts` had two assertions that string-matched the old
+`<aside>` tag directly, which failed against the new shape even though the
+property they guard (rail is one window tall, pinned, scrolls internally)
+still held — fixed on main (`4bc9b1f9`) to find the rail by what it does
+rather than by its tag, so it now passes on either shape.
+
+**One known, accepted consequence, not a bug to "fix" later:** on a screen
+with nothing to show in the header slot (no breadcrumbs, no running timer —
+e.g. Home on a phone), `ScreenShell` still spends the header band's density
+padding, because it only checks whether the `header` prop is a truthy
+node, not whether what's inside it renders anything. Gating `header` on
+content would also drop the desktop `TimerBar` row on breadcrumb-less
+pages — trading a cosmetic gap for a functional loss — so it stays. A
+record page (RecordChrome draws its own header inside the body, not this
+slot) shows no such gap.
+
+Prototyped on `experiment/screen-shell-appshell` (`b84d208d`, `fab6965e`
+after rebasing on the `shell-nav.test.ts` fix), landed on this branch by
+merge after the planner's review.
+
 ## [~] Adoptable — a real opt-out exists, not yet rolled out
-
-### The ScreenShell-owns-the-rail family (6 templates)
-
-**CORRECTED.** The first pass rejected `templates/detail-screen.tsx`,
-`record-route.tsx`, `collection-screen.tsx`, `main-screen.tsx`,
-`screen-shell.tsx` and `portal-home.tsx` because all six compose
-`ScreenShell`, which draws a rail, and this app already has one persistent,
-app-wide sidebar (`web/components/app-shell.tsx`). That check stopped at
-"does ScreenShell draw a rail" and never read whether the rail's CONTENTS
-were forced. They are not: `screen-shell.tsx`'s own header states, verbatim,
-`rail={null}` is a real, documented opt-out ("nothing in the repo needs it
-today" — because every current call site has one to pass). A peer
-independently confirmed this by RENDERING each of the six with `rail={null}`
-and diffing the DOM against the default, rather than reading the prop
-comment: zero `nav`/`aside` elements and no 13rem column in the markup at
-all on every one of them (the whole rail branch is `{railNode ? (…) : null}`
-in the shell's own source) — not an empty gutter, not a duplicated
-landmark, the column is gone outright. Passing this app's own nav as the
-`rail` node, or `null`, produces no duplicate chrome, confirmed both by
-reading and by rendering.
-
-What survives past that correction, and is the reason this is `[~]` and not
-`[x]`: **`ScreenShell` is a per-route composition, and `AppShell` is a
-persistent one.** R37 requires the post-auth app's shell to mount once and
-never unmount (`deep-link-screen.tsx`); `AppShell` satisfies that by sitting
-above the router and never re-rendering its own rail/nav DOM as the route
-changes underneath it. The six `ScreenShell`-composing templates are each
-meant to be the WHOLE PAGE a route/screen component returns — so using them
-as documented (per-screen, each instantiating its own `<ScreenShell rail={…}>`)
-would mount and unmount the rail's DOM on every navigation, even though the
-OUTER app-wide shell never unmounts. That is a real regression class this
-app does not have today (a stable rail instance across navigation — no
-remount flicker, no lost scroll position, no interrupted team-switcher
-state), not a duplicate-chrome problem, and it survives the rail-content
-correction.
-
-The tractable version of this adoption is composing bare `screen-shell.tsx`
-**once, at the persistent layout level** — i.e. rebuilding `AppShell`'s own
-markup to use `ScreenShell`'s four-level paper-law arrangement (the
-off-beige page / soft-paper rail / off-beige body pane it documents at
-length) with this app's own nav content as the `rail` node — rather than
-adopting the five higher templates (`MainScreen`, `DetailScreen`,
-`CollectionScreen`, `RecordRoute`, `PortalHome`) as per-screen wrappers.
-Those five each also bundle header-band and body assumptions this app
-already renders through `RecordChrome`/the collection engine, which is a
-second-order integration question on top of the rail one.
-
-**Not prototyped this pass.** This is the highest blast-radius single change
-available in the whole checklist — the one piece of chrome present on every
-screen in both doors — and a bad prototype is expensive to notice (it would
-look right at rest and only show a remount on navigation, which a static
-screenshot at four widths cannot catch; it needs a soft-navigation check,
-not a screenshot). Recommending a dedicated pass: its own branch, the same
-four-width/two-theme screenshots PLUS an explicit "does the rail's DOM node
-identity survive an in-app navigation" check, reported before any merge —
-not folded into a batch with the rest of this file.
 
 ### `overlays/delete-confirmation.tsx` — split verdict
 
@@ -334,11 +340,13 @@ through `web/components/auth-card.tsx`) after this file's first pass flagged
 the asset-import blocker as stale. See UI-GAPS.md rows 2 and 23.
 
 **`templates/rail.tsx`** remains parked, not scheduled, per the owner's own
-review of staging live — but see the ScreenShell-family entry above: the
-question this file now needs decided is no longer "should `Rail` replace
-`AppShell`'s nav," it's "should `AppShell` itself be rebuilt on
-`ScreenShell`," which is a bigger and different question than the one
-`rail.tsx` originally posed alone. **One stated reason for parking it was
+review of staging live. The bigger question it used to be entangled with —
+"should `AppShell` itself be rebuilt on `ScreenShell`" — is now SETTLED
+(see `[x]` above: it has landed), which actually sharpens what's left of
+this one: `AppShell`'s rail COLUMN is the kit's own now, and only its
+CONTENTS (the nav buttons, drawn by this app's own `navButton` function)
+are still hand-rolled rather than the kit's `Rail` composition. **One
+stated reason for parking it was
 wrong, corrected by a peer's render probe**: `mark`, `wordmark` and
 `tagline` are all `React.ReactNode` slots at the rail's head and each takes
 an arbitrary node — rendered live with a real button in each slot — so the
@@ -413,6 +421,17 @@ are written up in the commit message rather than repeated here. `empty-
 collection` and `no-results` (the other lane's states work, hosted in this
 same engine file) are its next callers, per the planner's sequencing —
 not rolled out to the other five list-recipe call sites yet either.
+
+**A third bug, found only after the ScreenShell family landed** (commit
+`ca10f067`): the planner's own flagged risk — "a collection drawn through
+the kit's panel INSIDE the kit's shell is a combination neither prototype
+tested" — was real. `KitCollectionFrame`'s default `tone="page"` plus its
+default inset drew a visible second box once `AppShell` started nesting
+this frame inside `ScreenShell`'s already off-beige, already-padded body
+pane — exactly the nesting the kit's own `tone` doc names by name. Fixed
+with `tone="bare"` `inset={false}`, unconditionally: this frame never
+renders anywhere else in this app. Re-verified at all four widths, both
+themes, after the fix.
 
 ## The `screens/`+`states/` lane's pass, 2026-08-29 — the pattern behind every rejection below
 
@@ -732,6 +751,53 @@ Filed in the same bucket as most of Collection views.
 own files under those names do a different job from their kit namesakes
 (see the warning at the top of this file), and `collection-frame` is the
 subject of this file's own `useKitPanel` prototype above.
+
+### Folder shapes, Navigation, Filter and search, Tables and lists
+
+Picked up by a peer after finishing their assigned six and confirming the
+top ten were someone else's — nobody had explicitly owned these four
+groups.
+
+**Another census blind spot**, same shape as `notes`→`Comments`: `folder`
+shows unchecked but `tabs.tsx` (already `[x]`) imports it internally for
+the `variant="folder"` tab strip already in use
+(`web/components/deep-link/screen-bits.tsx`'s `SectionWithCreate`,
+`folderTabs` slot). Already adopted, just not directly.
+
+**No current need**, not a mismatch: `breadcrumb` (the composable 7-part
+version) — this app has exactly one `Breadcrumbs` call site
+(`web/components/app-shell.tsx`), a plain URL-derived array with no
+per-crumb customization, and the already-adopted `breadcrumbs` one-prop
+wrapper handles it completely. The lower-level parts exist for a Next
+`<Link>` via `asChild`, a mark, or a non-route step — none apply here.
+
+**Confirmed mismatch, same family already documented:** `data-preview-table`
+— `DataTable` plus per-row confidence/error marks for a single-table
+import review. `web/components/import-screen.tsx` has no table at all in
+its review step (Badge-only, card-based), consistent with
+AGENTIC-IMPORT.md's real shape (multi-table, agent-proposed, FK-resolved) —
+one more layer down on the same root mismatch as the import trio.
+
+**No fit, three considered:** `visibility` (`VisibilityProvider`/
+`useIsVisible`, a shared `IntersectionObserver`). The kit's own three
+stated use cases are each already handled a different way here: `Image`/
+`Video` use native `loading="lazy"`, not this hook (confirmed neither
+imports it internally, so no transitive adoption either); long collections
+use explicit `LoadMore` buttons, not scroll-triggered pagination (a
+deliberate UX choice, not a gap); no scroll-triggered animations exist to
+pause.
+
+**One real candidate, not implemented:** `use-virtual-rows` — a
+behaviour-only hook that windows a >100-row list to what's near the
+viewport. `web/components/selectable-screen.tsx` (the dropdown-values
+screen) is a concrete attachment point: it fetches via
+`tenancy.selectable()`, a single flat GET with no cursor, capped at
+`LIST_HARD_CAP` (1,000), and maps every row into the DOM with no windowing
+— a team with a lot of accumulated dropdown values could genuinely hit
+hundreds of rows in one render. Not wired in: it needs load-testing against
+a team that actually has that many values, and a wrong row-height
+measurement or a missed ARIA index would be a worse regression than the
+unbounded list it replaces. Flagged for a dedicated look with real data.
 
 ## Why this file exists
 
