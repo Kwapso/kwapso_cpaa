@@ -340,7 +340,7 @@ you discover months later.
 | `TEST_LOGIN_KEY` | auth (**NON-PRODUCTION ONLY**) | the test-login door's own secret, its holder can sign in as ANY account on that environment. Deliberately a different name from `ADMIN_KEY` so the maintenance-key rollout can never arm it, and the door refuses outright when the worker's `ENVIRONMENT` var is `production`. |
 | `INTERNAL_KEY` | auth, tenancy, content, gateway, mcp | shared secret gating auth's `/internal/*` doors. tenancy + content call `/internal/send-email`; the **gateway** forwards client error beacons to `/internal/log-error` (a DIFFERENT reason, the gateway sends no email but still needs the key, or web errors never reach `error_logs`). The **mcp** worker uses it to mint team-pinned sessions (`/internal/mcp-session`). MUST match across all five. |
 | `GOOGLE_CONNECT_CLIENT_ID` + `GOOGLE_CONNECT_CLIENT_SECRET` + `GOOGLE_TOKEN_KEY` | content | *optional, but all-or-nothing*, the per-person Google **connections** (Drive / Gmail / Calendar / Chat). A DIFFERENT OAuth client from the sign-in one above (`kwapso sync`, the one carrying the sensitive scopes); `GOOGLE_TOKEN_KEY` is 32 random bytes base64 (`openssl rand -base64 32`) and is what the stored refresh tokens are encrypted under, so a dump of the table without it is a list of email addresses. With any one of the three missing, the Connect button is not offered and the rest of the product is untouched, deliberate, so a half-configured environment never walks somebody through a consent screen and then fails to keep what they granted. Redirect URIs, scopes and the rotation consequence: OPERATIONS.md § *Google connections*. |
-| `ANTHROPIC_API_KEY` | data-ops | **required for the assistant.** The agent's brain is Claude. Unset, `selectModel` throws `unconfigured` and every screen says the assistant is not set up here — there is no fallback engine, on purpose: the old one answered from a much weaker model with nobody told. |
+| ~~`ANTHROPIC_API_KEY`~~ | — | **Gone.** The assistant ran on Claude until 29 Aug 2026, when the owner disabled the key and the Anthropic transport was deleted. The brain is now Workers AI (`AGENT_MODEL`, default `@cf/zai-org/glm-5.3-flash`) over the `AI` binding, so there is no key to set and nothing to forget. A fresh environment gets a working assistant from the binding alone. |
 
 **Vars** (plain config in `wrangler.jsonc`, not secret):
 
@@ -356,7 +356,8 @@ you discover months later.
   leave it unset and agent-sent invite links point at the internal binding host.
 - `auth` → `APP_ORIGIN` / `EMAIL_FROM`, pinned to the author's URLs/domain; update
   them if yours differ.
-- `data-ops` → `AGENT_MODEL` (default `claude-sonnet-5`), `AGENT_EFFORT` (default
+- `data-ops` → `AGENT_MODEL` (default `@cf/zai-org/glm-5.3-flash`, a Workers AI
+  model id — there is no Anthropic path any more), `AGENT_EFFORT` (default
   `low`), `AGENT_FREE_DAILY` (**the app's own daily allowance**, how many free assistant
   actions a team gets each day; code default 25, but the checked-in wrangler var sets
   **50** in both environments, so 50 is what a team really gets), `WORKERS_AI_MODEL` (the keyless fallback).
@@ -547,7 +548,7 @@ prereqs → npm install → wrangler login → npm run check
   → d1 create (core, both envs) → migrations apply (core 0001–00NN)
   → r2 bucket create (media × 4 × 2 envs)
   → vectorize create + 9 metadata indexes × 2 envs (BEFORE any ingest)
-  → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY, INTERNAL_KEY, [ANTHROPIC], [TEST_LOGIN_KEY on non-prod auth]) + set vars (PUBLIC_APP_URL, AGENT_*)
+  → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY, INTERNAL_KEY, [TEST_LOGIN_KEY on non-prod auth]) + set vars (PUBLIC_APP_URL, AGENT_*)
   → npm run deploy:staging  (builds web/ + web-portal/, then
                              realtime→auth→tenancy→content→data-ops→mcp→gateway→portal-gateway) → smoke
   → sign in (test-login on staging) → first team (creates its DB) → migrate-teams as needed  (catalog self-heals; seed-targets optional)

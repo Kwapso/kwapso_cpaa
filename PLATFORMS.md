@@ -32,7 +32,8 @@ code. A port = back these five with the target platform's primitives.
 Two more are **already provider-agnostic seams** (swap by config, no port):
 
 - **Email**, one sender in `auth` (Resend today; any SMTP/API works). BOOTSTRAP §4.
-- **The AI agent brain**. `AGENT_MODEL` var (Claude when `ANTHROPIC_API_KEY` is set,
+- **The AI agent brain**. `AGENT_MODEL` var (a Workers AI model id, default
+  `@cf/zai-org/glm-5.3-flash`; the Anthropic path was deleted 29 Aug 2026,
   else the keyless fallback). Point it at any provider's model.
 
 **The multi-tenancy decision is the crux of any port.** Cloudflare gives cheap

@@ -17,7 +17,7 @@ under **two front doors**: `gateway` (the agency app, `web/`) and `portal-gatewa
 surface: personal access tokens (hashed, shown-once, team-pinned, revocable;
 managed under Settings → Access tokens) bridged to short-lived team-pinned
 sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's model is
-swappable but no longer silent: Claude when `ANTHROPIC_API_KEY` is set, and with
+swappable but no longer silent: a Workers AI model named by `AGENT_MODEL`, and with
 no key there is no assistant at all rather than a quietly weaker one; it confirms on destructive + bulk actions and is metered
 by a credit quota, **the app's own daily allowance** (the `AGENT_FREE_DAILY` var:
 code default 25, both environments ship **50**, and staging's
