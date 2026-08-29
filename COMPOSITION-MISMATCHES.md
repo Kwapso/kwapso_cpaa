@@ -573,7 +573,11 @@ already-existing Archived tab (`helpScope === "archived"`, itself a
 pre-existing, working, server-backed scope — not new), verified rendering
 correctly with no double-box even nested inside the kit's own shell (the
 third combination of the day: archive band + kit frame + kit shell), then
-reverted. Commit `a4548833`.
+reverted for the prototype commit (`a4548833`). **Turned on for real on
+Tickets** in a follow-up commit (`4c1d2f9d`) — `useKitPanel` and the band
+are now live on `tickets-collection.tsx`, verified at all four widths, both
+themes, on both the All-tickets and Archived tabs (the band wraps to three
+clean lines on a phone with no clipping).
 
 (2) and (3) are confirmed, not assumed, to be per-collection surgery: both
 need each collection's own `renderItems`/column definitions to know it's
@@ -583,9 +587,11 @@ lane's file), and every one of the 20+ collections defines its columns
 differently. Stopped here per the planner's own condition ("if the rollout
 starts needing per-screen surgery rather than one seam change, stop and
 tell me") rather than open dozens of files to chase full parity with the
-composition. The band is real, available, and not yet turned on for any
-screen; (2)/(3) are not built and would be a deliberate, scoped, per-
-collection decision — not a batch item.
+composition. The band is real and now live on Tickets; the other 19
+archive tabs can adopt the same `band` prop later with no new engine work,
+which is what makes it a seam rather than a one-off. (2)/(3) are not built
+and would be a deliberate, scoped, per-collection decision — not a batch
+item.
 
 **`states/new-empty-record.tsx` (`NewEmptyRecordScreen`)** has no standalone
 screen to replace at all — every record-detail file
