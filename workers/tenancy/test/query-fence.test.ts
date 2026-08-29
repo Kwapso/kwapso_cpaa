@@ -54,7 +54,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
-import { QUERY_MODULES } from "@shared/workers/query-grammar"
+import { canonicalModule, MODULE_ALIASES, QUERY_MODULES } from "@shared/workers/query-grammar"
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "./spine-harness"
 
@@ -126,7 +126,6 @@ describe("R24: no query names the agency's own cost, by any handle", () => {
     "internal_role_rates",
     "internal-rates",
     "internalRates",
-    "commercials",
     "rates",
     "__proto__",
     "constructor",
@@ -150,6 +149,23 @@ describe("R24: no query names the agency's own cost, by any handle", () => {
       // attempt is an allowed one rather than another guess.
       expect(text).toContain("tickets")
     })
+
+  it("`commercials` reaches the CHARGE card and says which one it gave you", async () => {
+    // WHERE THE LINE IS, stated as a test rather than left to reading. Since
+    // aliases arrived, `commercials` — the RIGHT that gates money — resolves to
+    // `account_rates`, what a client is CHARGED. That is correct and it is not a
+    // hole: the alias lands on a module the allow-list already declared, and the
+    // agency's own cost is not in that list to be landed on. What would be wrong
+    // is answering silently, so the reply names the module it actually gave.
+    const { status, text } = await query("?module=commercials")
+    expect(status).toBe(200)
+    const body = JSON.parse(text) as Record<string, unknown>
+    expect(body.module, "the caller is told WHICH money they were given").toBe("account_rates")
+    expect(body.askedAs).toBe("commercials")
+    expect(text).toContain(CHARGED_LABEL)
+    expect(text, "and not one word about our own cost").not.toContain(SECRET_LABEL)
+    expect(text).not.toContain(String(SECRET_CENTS))
+  })
 
   it("a FIELD name cannot reach another table either", async () => {
     // The second surface a grammar offers: the module is allowed, the field is
@@ -205,6 +221,43 @@ describe("R24: no query names the agency's own cost, by any handle", () => {
       makeEnv(() => holder.db as DatabaseSync, IDS.staffUser)
     )
     expect(await list.text()).not.toContain("internal")
+  })
+})
+
+describe("an alias widens what a caller may SAY, never what they may READ", () => {
+  // Aliases arrived on 29 Aug 2026 so `help` would reach `tickets`. They are the
+  // one thing added since that could quietly re-open this door: a second map a
+  // request value is looked up in. Two properties keep them harmless — every
+  // alias resolves to a module that was ALREADY in the allow-list, and no alias
+  // may name a table the allow-list does not already expose.
+  it("every alias lands on a module the allow-list already declared", () => {
+    for (const [alias, key] of Object.entries(MODULE_ALIASES))
+      expect(Object.keys(QUERY_MODULES), `${alias} resolves to "${key}"`).toContain(key)
+  })
+
+  it("no alias names a table that is not already queryable", () => {
+    const queryable = new Set(Object.values(QUERY_MODULES).map((m) => m.table))
+    for (const alias of Object.keys(MODULE_ALIASES))
+      if (alias.includes("_") || queryable.has(alias))
+        expect(
+          !alias.startsWith("internal"),
+          `"${alias}" is an alias naming the agency's own money (R24)`
+        ).toBe(true)
+    // …said the other way round, which is the assertion that actually bites:
+    // the internal tables resolve to nothing, by every route into the lookup.
+    for (const name of ["internal_rates", "internal_role_rates", "internalRates", "internal-rates"])
+      expect(canonicalModule(name), `"${name}" must resolve to no module at all`).toBeUndefined()
+  })
+
+  it("and the door still refuses them, through the alias path", async () => {
+    // The behavioural half, because the two above are about the map and this is
+    // about the door: a caller holding every right still gets nothing.
+    for (const handle of ["internal_rates", "internal_role_rates", "INTERNAL_RATES", "internal-rates"]) {
+      const { status, text } = await query(`?module=${encodeURIComponent(handle)}`)
+      expect(text, "the agency's own cost came back through an alias").not.toContain(SECRET_LABEL)
+      expect(text).not.toContain(String(SECRET_CENTS))
+      expect(status).toBe(400)
+    }
   })
 })
 

@@ -561,13 +561,105 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
   },
 }
 
-/** The module a caller named, or undefined. `hasOwnProperty`, not bracket
- * access: `?module=__proto__` resolves an INHERITED member on a bare object
- * literal, which then reads as a live module and 500s inside the engine. The
- * same class of fault the activity feed's generic record scope was fixed for. */
+/** THE OTHER NAMES THE SAME THING GOES BY — derived, never hand-listed.
+ *
+ * WHY THIS EXISTS, and it is worth reading before touching it. On 29 Aug 2026
+ * the assistant was asked the owner's own question on staging and failed on the
+ * first call: it asked for `describe_module("help")`, this map calls that module
+ * `tickets`, and the door refused. That was not the model being stupid — it was
+ * the model counting. `list_help_tickets`, `set_help_status`, the API path
+ * `/api/content/help`, the permission string on every role's sheet and the MCP
+ * tool names ALL say help; CLAUDE.md says so deliberately (the section's LABEL
+ * is Tickets, the module, tables, path and tool names stay `help` on purpose).
+ * The grammar introduced the ONE place where the label is the name, and the
+ * model reasonably followed the other forty signals.
+ *
+ * So a module answers to the names it already has elsewhere: its PERMISSION
+ * module and its TABLE. Both are read off `QUERY_MODULES` itself, so a module
+ * added tomorrow brings its own aliases and nobody has to remember. Two rules
+ * keep it honest:
+ *   · a name that is already a module KEY is never an alias (a key always wins);
+ *   · a name claimed by TWO modules is no alias at all — `work` covers stories,
+ *     sprints, work logs, tasks and waves, and guessing which one somebody meant
+ *     would be worse than saying "which of these?".
+ *
+ * An alias can only ever resolve to a module that is already in the allow-list,
+ * so this widens what a caller may SAY and not one row of what they may READ
+ * (asserted in workers/tenancy/test/query-fence.test.ts). */
+export const MODULE_ALIASES: Record<string, string> = (() => {
+  const claims = new Map<string, string[]>()
+  for (const [key, mod] of Object.entries(QUERY_MODULES))
+    for (const other of [mod.module, mod.table]) {
+      if (other === key || Object.prototype.hasOwnProperty.call(QUERY_MODULES, other)) continue
+      claims.set(other, [...new Set([...(claims.get(other) ?? []), key])])
+    }
+  return Object.fromEntries(
+    [...claims].filter(([, keys]) => keys.length === 1).map(([alias, keys]) => [alias, keys[0]])
+  )
+})()
+
+/** A name reduced to what a person meant by it: no case, no separators. Lets
+ * `Tickets`, `TICKETS` and `dropdown-values` land where they were aimed. */
+const plain = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "")
+
+/** The module a caller named, or undefined — by its own name, by a name it goes
+ * by elsewhere, or by the same name spelled loosely.
+ *
+ * `hasOwnProperty`, not bracket access: `?module=__proto__` resolves an
+ * INHERITED member on a bare object literal, which then reads as a live module
+ * and 500s inside the engine. The same class of fault the activity feed's
+ * generic record scope was fixed for — and now guarded on the alias map too,
+ * which is a second bare object literal a request value reaches. */
 export function queryModule(name: string | undefined): QueryModule | undefined {
   if (!name) return undefined
-  return Object.prototype.hasOwnProperty.call(QUERY_MODULES, name) ? QUERY_MODULES[name] : undefined
+  if (Object.prototype.hasOwnProperty.call(QUERY_MODULES, name)) return QUERY_MODULES[name]
+  if (Object.prototype.hasOwnProperty.call(MODULE_ALIASES, name))
+    return QUERY_MODULES[MODULE_ALIASES[name]]
+  const loose = plain(name)
+  const key =
+    Object.keys(QUERY_MODULES).find((k) => plain(k) === loose) ??
+    Object.keys(MODULE_ALIASES).find((a) => plain(a) === loose)
+  if (!key) return undefined
+  return QUERY_MODULES[key] ?? QUERY_MODULES[MODULE_ALIASES[key]]
+}
+
+/** The CANONICAL name of whatever a caller named — echoed back in every answer,
+ * so a caller who reached the right module by the wrong name learns the right
+ * one instead of using the wrong one for the rest of the conversation. */
+export function canonicalModule(name: string | undefined): string | undefined {
+  const mod = queryModule(name)
+  if (!mod) return undefined
+  return Object.keys(QUERY_MODULES).find((k) => QUERY_MODULES[k] === mod)
+}
+
+/** THE NEAREST THING TO WHAT THEY ASKED FOR, for a refusal that can be acted on.
+ *
+ * A dead end costs a whole turn: the assistant that hit one on the owner's
+ * question read the refusal, worked out the right name from it, and then OFFERED
+ * to do the work rather than retrying. Naming the nearest candidate in the
+ * refusal itself is the difference between a wall and a correction — the same
+ * shape as `choices` above, where an empty result could not say which kind of
+ * empty it was. Prefix and containment only: no edit distance, because a
+ * confident wrong suggestion is worse than none — and where the name covers
+ * SEVERAL modules, all of them come back rather than one chosen arbitrarily. */
+export function suggestModule(name: string | undefined): string[] {
+  if (!name) return []
+  const loose = plain(name)
+  if (!loose) return []
+  // A PERMISSION MODULE THAT COVERS SEVERAL. `work` is stories, sprints, work
+  // logs, tasks and waves, so it is deliberately not an alias — but it is also
+  // the most likely thing somebody types, and naming all five is a better answer
+  // than picking one of them and sounding sure.
+  const covered = Object.entries(QUERY_MODULES)
+    .filter(([, mod]) => plain(mod.module) === loose || plain(mod.table) === loose)
+    .map(([key]) => key)
+  if (covered.length) return covered
+  const names = [...Object.keys(QUERY_MODULES), ...Object.keys(MODULE_ALIASES)]
+  const hit =
+    names.find((n) => plain(n).startsWith(loose) || loose.startsWith(plain(n))) ??
+    names.find((n) => plain(n).includes(loose) || loose.includes(plain(n)))
+  const canonical = hit ? canonicalModule(hit) : undefined
+  return canonical ? [canonical] : []
 }
 
 /** A module's field by the name the model uses. Same reasoning, one level down:
