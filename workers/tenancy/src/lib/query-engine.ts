@@ -78,6 +78,9 @@ export type ParsedClause = { fields: QueryField[]; op: QueryOp; values: Param[] 
 
 export type ParsedQuery = {
   where: ParsedClause[]
+  /** true when the module's put-away rows were hidden, as its own list door
+   * hides them — false when the caller asked about that field themselves. */
+  everyday: boolean
   groupBy: QueryField[]
   select: QueryField[]
   /** "How many?" and nothing else — the total, with no rows at all.
@@ -252,7 +255,20 @@ export function parseQuery(
 
   if (input.countOnly !== undefined && typeof input.countOnly !== "boolean")
     bad("`countOnly` is true or false.")
+  // THE MODULE'S EVERYDAY LIST, unless the caller said otherwise. A `where` that
+  // names the put-away field is a deliberate question about it — "the archived
+  // ones", "both" — and is answered exactly as asked. Anything else means what
+  // the module's own list door means by the word.
+  const asksAboutPutAway =
+    !!mod.putAway && where.some((c) => c.fields.some((f) => f.name === mod.putAway!.field))
+  const everyday = !!mod.putAway && !asksAboutPutAway
+  if (everyday) {
+    const field = queryField(mod, mod.putAway!.field)
+    if (!field) bad("This module's everyday list names a field it does not have.")
+    where.push({ fields: [field as QueryField], op: "isNull", values: [] })
+  }
   return {
+    everyday,
     where,
     groupBy,
     select,
@@ -429,6 +445,10 @@ export type Unmatched = { field: string; values: string[] }
 export type QueryAnswer = {
   page: Page<Row>
   total: number
+  /** true when put-away rows were left out, as the module's list door leaves
+   * them out. Reported, never assumed: a caller must be able to tell "there are
+   * none" from "there are none on the list". */
+  everyday: boolean
   groups: QueryGroup[] | null
   groupsTruncated: boolean
   /** the filter values that named nothing — empty when everything resolved */
@@ -485,6 +505,7 @@ export async function runQuery(
       total: await totalPromise,
       groups,
       groupsTruncated: truncated,
+      everyday: q.everyday,
       unmatched: await unmatchedPromise,
       sort: "",
       dir: "desc",
@@ -500,6 +521,7 @@ export async function runQuery(
       total: await totalPromise,
       groups: null,
       groupsTruncated: false,
+      everyday: q.everyday,
       unmatched: await unmatchedPromise,
       sort: "",
       dir: "desc",
@@ -535,6 +557,7 @@ export async function runQuery(
     total: await totalPromise,
     groups: null,
     groupsTruncated: false,
+    everyday: q.everyday,
     unmatched: await unmatchedPromise,
     sort: ordering.name,
     dir: ordering.dir,

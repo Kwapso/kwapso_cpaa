@@ -209,6 +209,9 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
           }
         : {}),
       ...(f.bulky ? { bulky: true } : {}),
+      ...(mod.putAway?.field === f.name
+        ? { hidesRowsUnlessAsked: true, note: mod.putAway.reason }
+        : {}),
       ...(f.note ? { note: f.note } : {}),
     })),
   })
@@ -268,6 +271,10 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
     // nothing is a fact about the answer, not a detail of how it was computed —
     // see `Unmatched` in the engine for the sentence that made it necessary.
     ...(answer.unmatched.length ? { unmatched: answer.unmatched } : {}),
+    // WHICH ROWS THIS COUNTED. `live` is the module's everyday list — what its
+    // own screens and its own list door mean by the word — and saying so is what
+    // lets a caller tell "there are none" from "there are none on the list".
+    ...(mod.putAway ? { view: answer.everyday ? "live" : "as asked" } : {}),
     ...(answer.sort ? { sort: answer.sort, dir: answer.dir } : {}),
   })
 }
