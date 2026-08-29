@@ -143,6 +143,25 @@ export type QueryModule = {
   labelColumn: string
   /** the field NAME rows come back in when nobody asked for an order. */
   defaultSort: string
+  /** ROWS THIS MODULE'S OWN LIST DOOR HIDES UNLESS ASKED — and therefore rows
+   * "the tickets" does not mean.
+   *
+   * A ticket that has been put away still exists, still answers by id, and is
+   * still the most recently touched row in the table. It is not, however, on the
+   * list, and every screen and the module's own list door agree about that
+   * (`archiveClause` in workers/content/src/lib/help.ts defaults to
+   * `archived_at IS NULL`). Until 29 Aug 2026 this grammar did not: it returned
+   * everything, so `query_records` and `list_help_tickets` disagreed about what
+   * "the tickets" ARE — and the disagreement showed up as the assistant naming
+   * two different "most recently updated" tickets depending on which door the
+   * question happened to reach.
+   *
+   * DECLARED, never assumed. Only modules whose own door really hides these rows
+   * carry it: `accounts` and `apps` list their deactivated rows (ordered last),
+   * so they have none and must not grow one. A caller who mentions the field in
+   * their own `where` is asking about it deliberately and gets exactly what they
+   * asked for. */
+  putAway?: { field: string; reason: string }
   fields: QueryField[]
 }
 
@@ -194,6 +213,11 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The team's tickets — what a client asked for, and where it has got to.",
     labelColumn: "ref",
     defaultSort: "createdAt",
+    putAway: {
+      field: "archivedAt",
+      reason:
+        "the tickets door's own everyday list is `archived_at IS NULL` — a ticket that has been put away is still a record and is not on the list",
+    },
     fields: [
       ID,
       { name: "ref", column: "ref", type: "text", identity: true, note: "the human reference, e.g. TIC-0000042" },
@@ -351,6 +375,11 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The meetings list — when we met a client, and what was agreed.",
     labelColumn: "title",
     defaultSort: "startsAt",
+    putAway: {
+      field: "deactivatedAt",
+      reason:
+        "the meetings door hides cancelled meetings unless `view` says otherwise (workers/content/src/lib/meetings.ts) — a cancelled meeting is history, not the list",
+    },
     fields: [
       ID,
       { name: "ref", column: "ref", type: "text", identity: true },
