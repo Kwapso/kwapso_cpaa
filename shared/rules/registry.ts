@@ -396,6 +396,15 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "declared-readers",
     status: "enforced",
   },
+  {
+    id: "R43",
+    dimension: "ai",
+    law: "Agent/MCP TOOL-SET parity. A tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line — and the reverse.",
+    why:
+      "R19/R22's coverage census only asks whether a door has a tool on SOME machine surface, so a door with an agent tool and no MCP tool (or the reverse) passes that census trivially — the asymmetry the owner's own sentence names (\"same thing an agent can do, same thing from MCP\") was never itself checked. Every one of the 25 agent-only and 23 mcp-only tools turned out to be a real, written decision (MCP.md §3), but the comment introducing the agent's own AGENT_ONLY array had drifted to naming four of them while twenty-five existed — a law that stops looking when a block grows is a law that rewards growing it quietly.",
+    checkId: "agent-mcp-tool-parity",
+    status: "enforced",
+  },
 ]
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly

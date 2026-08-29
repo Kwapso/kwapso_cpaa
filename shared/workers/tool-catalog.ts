@@ -236,6 +236,76 @@ export type SharedTool = {
  * audit row; the asymmetry is documented in MCP.md, not a capability gap. */
 export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------------- reads --------------------------------- */
+  /* --------------------------- ASKING, RATHER THAN LISTING --------------------
+   *
+   * TWO TOOLS THAT REPLACED FIFTY. `shared/workers/query-grammar.ts` carries the
+   * reasoning; the short version is that the catalogue used to enumerate a
+   * question's COMBINATIONS as separate tools, and it still could not express
+   * "how many did we resolve in July" — the ticket door parsed twelve filters,
+   * every one single-valued and not one of them a date. So the model was given
+   * fifty read tools costing 9,013 tokens on every step and, for a real
+   * question, no way to answer but to page 1,820 rows by hand.
+   *
+   * The owner's ruling on 27 Aug 2026: if the permission matrix says a caller
+   * may read a module, expose HOW TO QUERY it and let the model compose the
+   * question. These two are that. The door builds the SQL; the model never
+   * writes any.
+   */
+  {
+    name: "describe_module",
+    summary:
+      "What can I ask about this module? Give it `module` and it answers with every field you may filter, group or sort by — the field's name, its type (text, number, date, boolean, id or enum), the values an enum accepts, and what an id points at. Call it BEFORE query_records on a module you have not queried this conversation, and never guess a field name: a wrong one is refused, not ignored. With no `module` at all it lists the modules this caller may read, one line each. Enum values that the team edits themselves (ticket types, sprint types, industries) are read live from their own dropdown list, so they are the words actually in use rather than the words that shipped.",
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/query/describe",
+    schema: obj({ module: S }),
+    buildQuery: (i) => (str(i, "module") ? `?module=${encodeURIComponent(str(i, "module"))}` : ""),
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "module") ? `See what ${str(i, "module")} can be asked` : "See what can be queried"),
+    },
+  },
+  {
+    name: "query_records",
+    summary:
+      "Ask a module a question — the one read tool. `module` names what to ask (describe_module lists them and their fields). `where` is a list of filters, each an object of field, op and value, ANDed together; a filter's field may be a LIST of field names, and then any one of them matching satisfies it — which is how a search box works (look in the title, the reference and the description at once); the ops are eq, ne, in, notIn, gt, gte, lt, lte, between, contains, isNull and notNull. Dates work: between takes two values and includes both days, so a whole month is one filter, and a bare date like 2026-07-31 covers that entire day rather than its first instant. in, notIn and between take a list; contains takes one piece of text OR a list, matching any of them. On a field that points at another record (a client, an app), eq and in also accept that record's NAME, and contains matches part of it — so three clients named in a question are ONE filter and need no lookup first. `groupBy` is a list of one or two field names and turns the answer into counts: the reply then carries `groups`, each with its key, a readable label where the field points at a record, and a count — which is how 'how many per client' or 'per month' is one call instead of a page-walk. `countOnly` true answers with the NUMBER and no rows at all — use it for every 'how many' question, because a page of fifty rows you are only going to count is thousands of tokens you have to read to ignore. `fields` narrows what comes back (long text is left out unless you name it). `sort` and `dir` order it, `cursor` walks it. The reply always carries `records`, an exact `total` over the SAME filters (`totalCapped` true means the count stopped at its ceiling), `hasMore` and an opaque `nextCursor` to pass straight back. You only ever see rows your role may already read, and the door refuses a client login.",
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/query",
+    schema: obj(
+      {
+        module: S,
+        where: { type: "array" },
+        groupBy: { type: "array" },
+        fields: { type: "array" },
+        countOnly: B,
+        sort: S,
+        dir: S,
+        cursor: S,
+      },
+      ["module"]
+    ),
+    buildQuery: (i) => {
+      const q = [`module=${encodeURIComponent(str(i, "module"))}`]
+      // The three list-shaped arguments travel as JSON in the query string. The
+      // door caps the text at the boundary before it parses it (R20), so a
+      // giant `where` is a clean 400 rather than a stalled worker.
+      for (const key of ["where", "groupBy", "fields"])
+        if (Array.isArray(i[key])) q.push(`${key}=${encodeURIComponent(JSON.stringify(i[key]))}`)
+      if (i.countOnly === true) q.push("countOnly=true")
+      if (str(i, "sort")) q.push(`sort=${encodeURIComponent(str(i, "sort"))}`)
+      if (str(i, "dir")) q.push(`dir=${encodeURIComponent(str(i, "dir"))}`)
+      if (str(i, "cursor")) q.push(`cursor=${encodeURIComponent(str(i, "cursor"))}`)
+      return `?${q.join("&")}`
+    },
+    agent: {
+      write: false,
+      summarize: (i) =>
+        Array.isArray(i.groupBy) && i.groupBy.length
+          ? `Count ${str(i, "module")} by ${(i.groupBy as unknown[]).join(" and ")}`
+          : `Look up ${str(i, "module")}`,
+    },
+  },
   {
     name: "list_members",
     summary: "List the team's members, with their roles. Pass `id` (a member's user id) to fetch just that one member.",
@@ -434,18 +504,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
-    name: "set_account_active",
-    summary: "Archive an account (active:false) or restore it (active:true), never deleted; every record it carries survives.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true, // destructive only when ARCHIVING
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} account ${str(i, "id")}`,
-    },
-  },
-  {
     name: "link_contact",
     summary:
       "Say that a person is a contact of an account: `accountId` is the company, `personAccountId` is the person's own account row (create it first with create_account if it isn't there). The same person can be a contact of more than one account.",
@@ -463,21 +521,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     // permission changes hands, which is exactly why the old privilege-module
     // list waved it through. See the note above SHARED_TOOLS.
     agent: { write: true, confirm: true, summarize: (i) => `Link ${str(i, "personAccountId")} to account ${str(i, "accountId")}` },
-  },
-  {
-    name: "set_contact_link_active",
-    summary:
-      "Unlink a contact from an account (active:false) or link them back (active:true), by the CONTACT LINK's id, get_account returns it. The person's own account is untouched either way.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/links/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    // FENCE WRITE (account_links) → confirm BOTH ways. Unlinking takes a company
-    // away from a client login; RELINKING hands it straight back, which the old
-    // "destructive only" predicate ran silently. See the note above SHARED_TOOLS.
-    agent: {
-      write: true, confirm: true,
-      summarize: (i) => `${i.active === true ? "Relink" : "Unlink"} contact link ${str(i, "id")}`,
-    },
   },
 
   /* ------------------------------ portal access ---------------------------- */
@@ -524,20 +567,6 @@ export const SHARED_TOOLS: SharedTool[] = [
         `Give ${accountLabel(i, "personAccountId", names)} a login on ${accountLabel(i, "accountId", names)}`,
     },
   },
-  {
-    name: "set_portal_access_active",
-    summary:
-      "Revoke a portal login (active:false) or restore it (active:true), by the PORTAL ACCESS row's id, get_account and list_portal_access both return it. The login dies; every record stays.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/portal-users/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    // PRIVILEGE WRITE (portal_users) → confirm BOTH ways: revoking takes sight
-    // of a customer's world away, restoring hands it back.
-    agent: {
-      write: true, confirm: true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Revoke"} portal access ${str(i, "id")}`,
-    },
-  },
 
   /* --------------------------------- roles --------------------------------- */
   {
@@ -567,20 +596,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     // PRIVILEGE WRITE (member_roles) → confirm. Renaming isn't a grant, but a
     // rename is how a grant gets socially engineered ("call Viewer Admin").
     agent: { write: true, confirm: true, summarize: (i, names) => `Rename ${roleLabel(i, names)} to "${str(i, "title")}"` },
-  },
-  {
-    name: "set_role_active",
-    summary: "Switch a role off (deactivate, holders keep access) or back on (reactivate), never deleted.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/active",
-    schema: obj({ roleId: S, active: B }, ["roleId", "active"]),
-    buildBody: (i) => ({ roleId: str(i, "roleId"), active: i.active === true }),
-    agent: {
-      write: true,
-      // PRIVILEGE WRITE (member_roles) → confirm BOTH ways. Deactivating removes
-      // access; REACTIVATING hands it back to everyone still holding the role.
-      confirm: true,
-      summarize: (i, names) => `${i.active === true ? "Activate" : "Deactivate"} ${roleLabel(i, names)}`,
-    },
   },
   {
     name: "set_role_permissions",
@@ -676,20 +691,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       confirm: (i) => i.isDefault !== true,
       summarize: (i) =>
         `${i.isDefault === true ? "Make" : "Stop treating"} dropdown value ${str(i, "id")} ${i.isDefault === true ? "one of the defaults" : "as one of the defaults"}`,
-    },
-  },
-  {
-    name: "set_dropdown_active",
-    mcpName: "set_dropdown_value_active",
-    summary:
-      "Switch a dropdown value off (deactivate) or back on (reactivate), never deleted. A value marked as one of the team's defaults refuses to switch off — take the mark off with `set_dropdown_default` first.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true, // destructive only when DEACTIVATING
-      summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} dropdown value ${str(i, "id")}`,
     },
   },
 
@@ -1213,21 +1214,6 @@ export const SHARED_TOOLS: SharedTool[] = [
   // happened, so the status it moved was a second source of truth for a question
   // the clock answers, and it is retired.
   {
-    name: "set_meeting_active",
-    summary:
-      "Cancel a meeting (`active`: false) or put it back (true), by id. Nothing is deleted, the record and its notes survive, because 'didn't we speak in March?' has to stay answerable.",
-    binding: "CONTENT", method: "POST", path: "/api/content/meetings/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      // Cancelling is this module's delete, so it pauses for a yes/no exactly as
-      // the other three (de)activate toggles do; putting one back does not.
-      confirm: (i) => i.active === false,
-      summarize: (i) => `${i.active === false ? "Cancel" : "Reinstate"} meeting ${str(i, "id")}`,
-    },
-  },
-  {
     name: "get_meeting_transcript",
     summary:
       "What was SAID in a meeting, by `id` — the transcript's own words, kept on the record rather than fetched from Google, so any colleague who may read meetings can read it. READ `found` FIRST. `found` false means this meeting has no words on file, which is FINAL: the meeting is real, you did not guess the wrong id, and asking again — here or about another meeting — will not produce any. `message` says what to do instead, in words, and is the sentence to repeat rather than to work around. Most meetings have no transcript, so ask `list_meetings` for the ones that have words before hunting through them, and use `read_meeting_transcript` to go and look for one. When `found` is true, `text` carries the words, `capturedAt` when they were taken, `foundBy` which of the three hunts found them, `url` opens the document where they live, and `note` is present only when the transcript was longer than one record may hold and says so in words.",
@@ -1636,24 +1622,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Correct knowledge source ${str(i, "id")}` },
   },
   {
-    name: "set_knowledge_source_active",
-    summary:
-      "Take a source away from the assistant (active:false) or give it back (active:true), by id. Nothing is deleted: the row and its history survive, its searchable pieces do not, and the sweep will not quietly re-add a source somebody took away.",
-    binding: "CONTENT", method: "POST", path: "/api/content/knowledge/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      // DESTRUCTIVE ONLY WHEN TAKING AWAY — the same predicate the three other
-      // (de)activate toggles carry. Removing a source changes what every future
-      // answer can be built from, which is the blast radius that earns a panel;
-      // giving one back does not.
-      confirm: (i) => i.active !== true,
-      summarize: (i) =>
-        `${i.active === true ? "Give the assistant back" : "Take away the assistant's sight of"} source ${str(i, "id")}`,
-    },
-  },
-  {
     name: "sync_knowledge",
     summary:
       "Bring the knowledge base into step with the app's own rows, tickets, accounts, apps, stories and sprints, one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
@@ -1753,19 +1721,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the app "${str(i, "name")}"` },
   },
-  {
-    name: "set_app_active",
-    summary:
-      "Archive an app (`active: false`) or restore it (`active: true`). Never deleted, its maps, its versions and every saving computed from them stay exactly where they are. An archived app drops out of the value figures.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} app ${str(i, "id")}`,
-    },
-  },
   // WHAT WE HANDED OVER ON AN APP — its own module, so a token whose role opens
   // apps does not automatically reach the handover shelf, and one that reaches
   // the shelf does not automatically edit the app. Internal: like the brand
@@ -1804,19 +1759,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S, appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["id", "appId", "title"]),
     buildBody: (i) => ({ id: str(i, "id"), ...deliverableBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit deliverable ${str(i, "id")}` },
-  },
-  {
-    name: "set_deliverable_active",
-    summary:
-      "Archive a deliverable (`active: false`) or put it back (`active: true`). Never deleted, and the file behind it is never thrown away either way, restoring one whose bytes had gone would hand back a broken link.",
-    binding: "CONTENT", method: "POST", path: "/api/content/deliverables/active",
-    schema: obj({ id: S, appId: S, active: B }, ["id", "appId", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), appId: str(i, "appId"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} deliverable ${str(i, "id")}`,
-    },
   },
   {
     // SHOWING ONE TO THE CLIENT, on the machine surface. It is here rather than
@@ -1893,19 +1835,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Edit the module "${str(i, "name")}"` },
   },
   {
-    name: "set_app_module_active",
-    summary:
-      "Switch a module off (`active: false`) or back on (`active: true`). Never deleted: every ticket already filed against it keeps naming it and still reads correctly — it simply stops being offered on the ticket form.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Switch on" : "Switch off"} module ${str(i, "id")}`,
-    },
-  },
-  {
     name: "list_processes",
     summary:
       "List process maps, a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps), `archived` ('no' for the maps still in use, 'yes' for the ones put away — a map is archived, never deleted). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'app' or 'steps' (the longest map first). The order is the DOOR's, so it spans every map rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
@@ -1968,18 +1897,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Rename a department to "${str(i, "name")}"` },
   },
   {
-    name: "set_client_department_active",
-    summary:
-      "Switch a department off, or bring it back. `active` false retires it; true restores it. Nothing is deleted — a retired department is still the one an old map was drawn against.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true, confirm: false,
-      summarize: (i) => (i.active === true ? "Bring a department back" : "Switch a department off"),
-    },
-  },
-  {
     name: "list_client_roles",
     summary:
       "The roles inside a client's own company — the jobs their people do. `accountId` narrows to one client. Each carries `name`, `centsPerHour` (what an hour of that role costs THE CLIENT, null when nobody has said yet — which is not the same as free), whether it is `active`, the `departmentIds` it sits in (a role can be in several) and the `peopleIds` holding it. Answers `roles` and an exact `total`.",
@@ -2033,18 +1950,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: {
       write: true, confirm: false,
       summarize: (i) => (i.attached === true ? "Put somebody on a role" : "Take somebody off a role"),
-    },
-  },
-  {
-    name: "set_client_role_active",
-    summary:
-      "Switch a role off, or bring it back. Nothing is deleted: a retired role is still the one a two-year-old map was drawn against, and deleting it would quietly turn that map's saving into nothing.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true, confirm: false,
-      summarize: (i) => (i.active === true ? "Bring a role back" : "Switch a role off"),
     },
   },
   {
@@ -2113,18 +2018,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
-    name: "set_client_tool_active",
-    summary:
-      "Switch a tool off, or bring it back. Nothing is deleted — its price history is what an old map reads to cost itself.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true, confirm: false,
-      summarize: (i) => (i.active === true ? "Bring a tool back" : "Switch a tool off"),
-    },
-  },
-  {
     name: "create_process",
     summary:
       "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way. `roleName` is WHOSE hours this takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_impact) — a map created without one counts its hours and reports no money at all, so name it here rather than leaving it for update_process.",
@@ -2152,19 +2045,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       roleName: sent(i, "roleName"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the process "${str(i, "name")}"` },
-  },
-  {
-    name: "set_process_active",
-    summary:
-      "Archive a process map (`active: false`) or restore it (`active: true`). Never deleted: every version, every step and the whole conversation survive, and an archived map simply stops counting toward the value figures.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} process map ${str(i, "id")}`,
-    },
   },
   {
     name: "add_process_step",
@@ -2274,15 +2154,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S, name: S, goal: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), goal: sent(i, "goal") }),
     agent: { write: true, confirm: false, summarize: (i) => `Rename the wave to "${str(i, "name")}"` },
-  },
-  {
-    name: "set_wave_active",
-    summary:
-      "Switch a wave off, or bring it back (by `id`). Never a delete: the sprints inside it keep their history, and a package a client paid for stays readable.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: { write: true, confirm: true, summarize: (i) => `${i.active === true ? "Bring back" : "Switch off"} a wave` },
   },
   {
     name: "set_sprint_wave",
@@ -2421,19 +2292,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: true, summarize: (i) => `Change the rate for ${str(i, "label")}` },
   },
   {
-    name: "set_account_rate_active",
-    summary:
-      "Deactivate a rate (`active: false`) or bring it back (`active: true`). Never deleted, what an account was charged last year has to stay true.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/rates/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: true,
-      summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} rate ${str(i, "id")}`,
-    },
-  },
-  {
     name: "list_internal_rates",
     summary:
       "What an hour of OUR OWN work costs us, by kind of work. INTERNAL: this is the agency's own cost, it is never shown to a client under any setting, and the one marked `isDefault` is the rate a margin applies to logged time whose kind of work is not yet named.",
@@ -2469,18 +2327,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       isDefault: typeof i.isDefault === "boolean" ? i.isDefault : undefined,
     }),
     agent: { write: true, confirm: true, summarize: (i) => `Change our internal rate for ${str(i, "label")}` },
-  },
-  {
-    name: "set_internal_rate_active",
-    summary: "Deactivate one of our own cost lines (`active: false`) or bring it back. Never deleted.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: true,
-      summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} internal rate ${str(i, "id")}`,
-    },
   },
   {
     name: "read_margin",
@@ -2561,19 +2407,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildBody: (i) => ({ id: str(i, "id"), ...brandAssetBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit brand asset ${str(i, "id")}` },
   },
-  {
-    name: "set_brand_asset_active",
-    summary:
-      "Archive a brand asset, or put it back. The FILE is never deleted either way, restoring an asset whose bytes had been thrown away would hand back a broken link.",
-    binding: "CONTENT", method: "POST", path: "/api/content/brand-assets/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} brand asset ${str(i, "id")}`,
-    },
-  },
 
   {
     name: "list_meeting_purposes",
@@ -2599,18 +2432,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S, name: S, department: S, description: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), ...meetingPurposeBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit meeting purpose ${str(i, "id")}` },
-  },
-  {
-    name: "set_meeting_purpose_active",
-    summary: "Archive a meeting purpose, or put it back, never deleted.",
-    binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} meeting purpose ${str(i, "id")}`,
-    },
   },
 
   {
@@ -2642,18 +2463,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i) => `Write ${memberLabel(i)}'s staff profile`,
     },
   },
-  {
-    name: "set_staff_profile_active",
-    summary: "Take a staff profile down, or put it back, never deleted.",
-    binding: "CONTENT", method: "POST", path: "/api/content/staff/profiles/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Take down"} staff profile ${str(i, "id")}`,
-    },
-  },
 
   {
     name: "list_staff_certificates",
@@ -2680,18 +2489,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S, userId: S, title: S, issuer: S, issuedOn: S, expiresOn: S, fileUrl: S }, ["id", "title"]),
     buildBody: (i) => ({ id: str(i, "id"), userId: opt(i, "userId"), ...certificateBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit certificate ${str(i, "id")}` },
-  },
-  {
-    name: "set_staff_certificate_active",
-    summary: "Archive a certificate, or put it back, never deleted.",
-    binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} certificate ${str(i, "id")}`,
-    },
   },
 ]
 

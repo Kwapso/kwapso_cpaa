@@ -29,6 +29,50 @@ const str = (input: Record<string, unknown>, key: string): string => {
   return typeof v === "string" ? v : ""
 }
 
+/** THE COLLAPSED TOGGLE, TRANSLATED BACK INTO THE ACT IT PERFORMS.
+ *
+ * Twenty-one (de)activate tools became one `set_record_active` on 29 Aug 2026,
+ * and every screen each of them landed on was already mapped, one case at a
+ * time, below. So the RECORD resolves to the old act's name and the switch is
+ * untouched: twenty-one mappings kept, rather than twenty-one mappings rewritten
+ * — which is the version of this change that cannot quietly lose a screen.
+ *
+ * A record whose screen does not exist is absent here and lands in
+ * SCREENLESS_TOGGLE_RECORDS instead, with the same reasons those tools carried. */
+const TOGGLE_TRACE: Record<string, string> = {
+  account: "set_account_active",
+  contact_link: "set_contact_link_active",
+  portal_access: "set_portal_access_active",
+  role: "set_role_active",
+  dropdown_value: "set_dropdown_active",
+  app: "set_app_active",
+  app_module: "set_app_module_active",
+  process: "set_process_active",
+  wave: "set_wave_active",
+  account_rate: "set_account_rate_active",
+  internal_rate: "set_internal_rate_active",
+  meeting: "set_meeting_active",
+  knowledge_source: "set_knowledge_source_active",
+  deliverable: "set_deliverable_active",
+  brand_asset: "set_brand_asset_active",
+  meeting_purpose: "set_meeting_purpose_active",
+}
+
+/** The record kinds `set_record_active` covers that have NO screen to drive to.
+ * The same split the individual tools were on, and the same reason: a staff
+ * profile, a certificate and the three client-organisation lists are read on the
+ * page of whoever they belong to, and the toggle names only the ROW — an id for
+ * a client role says nothing about whose role it is, so there is no company to
+ * drive to and inventing a URL that resolves to nothing would be worse than
+ * staying put. */
+export const SCREENLESS_TOGGLE_RECORDS: string[] = [
+  "staff_profile",
+  "staff_certificate",
+  "client_department",
+  "client_role",
+  "client_tool",
+]
+
 /** Map a WRITE tool + its input to the screen + dialog the manual path uses. Returns
  * null for reads (and anything without a first-class screen), so the caller skips the
  * on-screen move. `teamId` is the effective team the tool ran against. */
@@ -37,7 +81,20 @@ export function traceFor(
   input: Record<string, unknown>,
   teamId: string
 ): TraceTarget | null {
-  switch (tool) {
+  // One tool, twenty-one acts: resolve the record it names back to the act, then
+  // fall through the map that already knew where each of those lands.
+  const named = str(input, "record")
+  // hasOwnProperty, not bracket access: a record of "__proto__" resolves an
+  // INHERITED member on a bare object literal, and while nothing here could build
+  // a URL out of it, the house rule is that a request value never reaches a
+  // lookup unguarded — this is the fourth place that class of fault was fixed.
+  const act =
+    tool === "set_record_active"
+      ? Object.prototype.hasOwnProperty.call(TOGGLE_TRACE, named)
+        ? TOGGLE_TRACE[named]
+        : ""
+      : tool
+  switch (act) {
     /* ------------------------------- invites ------------------------------- */
     // Invite → the invites list, where the new pending invite appears live. (Not the
     // InviteDialog — the agent already sent the invite; an empty add form would just
@@ -383,8 +440,6 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   // panel can drive there; when it says only which row, it cannot, and inventing
   // a URL that resolves to nothing would be worse than staying put.
   "update_staff_certificate",
-  "set_staff_certificate_active",
-  "set_staff_profile_active",
   // THE EIGHT CLIENT-ORGANISATION EDITS, and it is the SAME split as the three
   // above rather than a second excuse. A department, a role and a tool are read
   // on the company they belong to, and these tools name only the ROW — an id for
@@ -393,13 +448,10 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   // when the tool says whose it is, land there; when it says only which row,
   // stay put rather than invent a URL that resolves to nothing.
   "update_client_department",
-  "set_client_department_active",
   "update_client_role",
   "set_client_role_person",
-  "set_client_role_active",
   "update_client_tool",
   "set_client_tool_price",
-  "set_client_tool_active",
   // EVERY GOOGLE WRITE. All of them change something in GOOGLE — a file in a
   // Drive folder, a draft or a label in a mailbox, an event in a calendar, a message
   // in a space — and kwapso has no screen showing any of those, deliberately: a

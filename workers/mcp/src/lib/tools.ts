@@ -16,7 +16,8 @@
 
 import { GuardError } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
-import { checkArgTypes, N, obj, S } from "@shared/workers/tool-args"
+import { B, checkArgTypes, N, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
 import type { Env } from "../env"
@@ -30,6 +31,15 @@ export type McpTool = {
   path: string
   buildBody?: (input: Record<string, unknown>) => Record<string, unknown>
   buildQuery?: (input: Record<string, unknown>) => string
+  /** The other doors this ONE tool forwards to — mirrors AgentTool's own
+   * `routes`/`route` (workers/data-ops/src/lib/tools.ts), the same pattern one
+   * level further out. `path` above stays the canonical door for catalog.test.ts's
+   * per-tool drift guard; `routes` is every door this tool can actually reach, and
+   * record-toggles.test.ts proves each one by RUNNING `route`, not by reading the
+   * list beside it. */
+  routes?: string[]
+  /** Which of them THIS call goes to. A tool without one forwards to `path`. */
+  route?: (input: Record<string, unknown>) => { binding: "TENANCY" | "CONTENT"; path: string }
 }
 
 /** Project a shared endpoint into an McpTool: the neutral wiring + the shared
@@ -289,7 +299,112 @@ const MCP_ONLY: McpTool[] = [
 ]
 
 /** The MCP's full catalog: every shared endpoint (projected) + the MCP-only tools. */
-export const MCP_TOOLS: McpTool[] = [...SHARED_TOOLS.map(toMcpTool), ...MCP_ONLY]
+/** SWITCHING A RECORD OFF, OR BACK ON — twenty-one tools, generated from the
+ * ONE map (`RECORD_TOGGLES`) that also feeds the agent's single
+ * `set_record_active`.
+ *
+ * WHY THE TWO SURFACES DIFFER HERE, deliberately and for the first time. The
+ * agent re-sends its whole catalogue on every model step, so twenty-one names
+ * for one operation was about 2,500 tokens per step of pure repetition. An MCP
+ * client fetches `tools/list` ONCE and then calls by name — it pays nothing per
+ * step, and a tool name on that surface is an external contract somebody has
+ * scripts against (`set_dropdown_value_active` is pinned by catalog.test.ts for
+ * exactly that reason). So the collapse happens where it saves money and does
+ * not happen where it would only break things.
+ *
+ * The names are `set_<record>_active`, which reproduces every historical name on
+ * this surface EXACTLY — the dropdown one included, because the record is
+ * `dropdown_value` and the published name was always
+ * `set_dropdown_value_active`. Nothing was renamed to make this fit.
+ *
+ * One declaration, two projections: the same relationship the shared catalogue
+ * already has with its two surfaces, one level of shape further apart. */
+const RECORD_TOGGLE_TOOLS: McpTool[] = Object.entries(RECORD_TOGGLES).map(([record, e]) => {
+  const name = `set_${record}_active`
+  const gate = TOOL_GATES[name]
+  return {
+    name,
+    // The same two additions `toMcpTool` makes to a shared tool: the developer
+    // permission hint, and the sentence that stands in for the panel this
+    // surface has no way to show.
+    description:
+      (gate ? `${e.summary} Needs ${gate}.` : e.summary) +
+      (e.confirm === "never"
+        ? ""
+        : " Destructive or access-widening: confirm with a person before calling this."),
+    inputSchema: obj(
+      e.needsAppId
+        ? { [e.idField]: S, appId: S, active: B }
+        : { [e.idField]: S, active: B },
+      e.needsAppId ? [e.idField, "appId", "active"] : [e.idField, "active"]
+    ),
+    binding: e.binding,
+    method: "POST",
+    path: e.path,
+    buildBody: (i: Record<string, unknown>) => ({
+      [e.idField]: str(i, e.idField),
+      active: i.active === true,
+      ...(e.needsAppId ? { appId: str(i, "appId") } : {}),
+    }),
+  }
+})
+
+/** THE GENERIC FORM, BESIDE THE TWENTY-ONE NAMED ONES — not instead of them.
+ * R43 (workers/mcp/test/agent-mcp-tool-parity.test.ts) makes MCP a STRICT
+ * SUPERSET of the agent's own catalog: every capability the agent has, MCP has
+ * too, under some name. The agent's `set_record_active` (one tool, twenty-one
+ * doors, `route`-resolved) had no MCP counterpart at all — not because the
+ * capability was missing (all twenty-one doors are individually here), but
+ * because nothing published the GENERIC shape. Publishing it costs nothing on
+ * this surface (no per-step re-send) and gives an outside integration the same
+ * "one call, any record kind" shape the agent has, which it may reasonably
+ * want even though the twenty-one named calls remain the primary, pinned
+ * contract. Same map, same router, same body-builder as the agent's own —
+ * declared once in `@shared/workers/record-toggles`, projected twice. */
+const RECORD_ACTIVE_GENERIC: McpTool = {
+  name: "set_record_active",
+  description:
+    "Switch a record off, or back on, across any of the twenty-one record kinds this surface also " +
+    "publishes as named tools (set_account_active, set_role_active, …) — this is the same operation, " +
+    "generic. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, " +
+    "app, app_module, process, wave, client_department, client_role, client_tool, account_rate, " +
+    "internal_rate, meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile " +
+    "or staff_certificate. `id` is that record's id — except a role, which takes `roleId` — and a " +
+    "deliverable also needs `appId`. `active` false switches it off (archive, deactivate, revoke, " +
+    "cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED, and " +
+    "calling it twice changes nothing the second time. Each kind needs its own module's right — see " +
+    "the matching set_<kind>_active tool's description for its exact gate. Destructive or " +
+    "access-widening for SOME record kinds, never for others: confirm with a person before calling " +
+    "this unless you already know the kind you are calling it for is one of the ones that runs straight " +
+    "through.",
+  inputSchema: obj({ record: S, id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
+  binding: "TENANCY",
+  method: "POST",
+  path: "/api/tenancy/accounts/active",
+  routes: Object.values(RECORD_TOGGLES).map((e) => e.path),
+  route: (i) => {
+    const entry = recordToggle(str(i, "record"))
+    return entry
+      ? { binding: entry.binding, path: entry.path }
+      : { binding: "TENANCY" as const, path: "/api/tenancy/accounts/active" }
+  },
+  buildBody: (i) => {
+    const entry = recordToggle(str(i, "record"))
+    const id = str(i, entry?.idField ?? "id") || str(i, "id") || str(i, "roleId")
+    return {
+      [entry?.idField ?? "id"]: id,
+      active: i.active === true,
+      ...(entry?.needsAppId ? { appId: str(i, "appId") } : {}),
+    }
+  },
+}
+
+export const MCP_TOOLS: McpTool[] = [
+  ...SHARED_TOOLS.map(toMcpTool),
+  ...RECORD_TOGGLE_TOOLS,
+  RECORD_ACTIVE_GENERIC,
+  ...MCP_ONLY,
+]
 
 export function getMcpTool(name: string): McpTool | undefined {
   return MCP_TOOLS.find((t) => t.name === name)
@@ -331,11 +446,16 @@ export async function forwardTool(
   // can send `{"name":{}}`, and coercing that would create a record actually called
   // "[object Object]" through a door doing exactly what it was told.
   const timeoutMs = LONG_RUNNING.has(tool.name) ? LONG_DOOR_TIMEOUT_MS : DOOR_TIMEOUT_MS
+  // A tool with `route` (today, only set_record_active) picks its real door PER
+  // CALL from the input, the same way the agent's own executor does — `path`/
+  // `binding` above stay the canonical fallback for the drift guard and for
+  // every ordinary tool, which never sets `route` and takes this branch for free.
+  const dest = tool.route ? tool.route(input) : { binding: tool.binding, path: tool.path }
   let res: Response
   try {
     checkArgTypes(tool.inputSchema, input)
-    res = await forwardToDoor(env[tool.binding], {
-      path: tool.path,
+    res = await forwardToDoor(env[dest.binding], {
+      path: dest.path,
       method: tool.method,
       cookie,
       traceId,
