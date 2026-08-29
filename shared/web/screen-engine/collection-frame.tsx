@@ -100,6 +100,7 @@ function CollectionFrame<T>({
   copy,
   errorAction,
   useKitPanel = false,
+  band,
 }: {
   config: CollectionConfig
   data: T[]
@@ -158,6 +159,20 @@ function CollectionFrame<T>({
    * markup until this is verified and rolled out on purpose.
    */
   useKitPanel?: boolean
+  /**
+   * PROTOTYPE, ONE COLLECTION (Tickets). One line of standing, inside the
+   * panel, above the toolbar — the kit's `band` slot
+   * (`components/collection-frame/collection-frame.tsx`), which its own doc
+   * says exactly one composition draws: `states/archive.tsx`'s "the band
+   * states the consequences in one line: history kept, still searchable,
+   * not counted in the figures." A host passes this only while its own
+   * archived/put-away tab is the one open; `useKitPanel` is required
+   * because the band has nowhere to go in the legacy header. See
+   * COMPOSITION-MISMATCHES.md's archive entry for what this does and does
+   * NOT cover — the row-ink quieting and the Status/Updated → Archived
+   * by/Archived column swap are NOT this prop, and are not built here.
+   */
+  band?: React.ReactNode
 }) {
   const t = useT()
   const createAction = React.useContext(CreateActionContext)
@@ -422,6 +437,7 @@ function CollectionFrame<T>({
         // top of it would be a level of the nesting that is not there."
         tone="bare"
         inset={false}
+        band={band}
         heading={config.title || undefined}
         rule={Boolean(config.title)}
         search={searchBox}

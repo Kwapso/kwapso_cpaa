@@ -121,6 +121,17 @@ export interface ScreenRendererProps {
    * screens already got (73414c58 and its follow-ups).
    */
   state?: "ready" | "loading" | "error"
+  /**
+   * PROTOTYPE, ONE COLLECTION (Tickets — see COMPOSITION-MISMATCHES.md's
+   * archive entry). Forwarded to a `type: "list"` recipe's `CollectionFrame`
+   * — `useKitPanel` draws the kit's own header/toolbar/panel chrome instead
+   * of this engine's hand-rolled one, and `band` is the kit's one-line
+   * "standing" slot above the toolbar, inside the panel (a host passes it
+   * only while its own archived/put-away tab is the open one). Both default
+   * to off/undefined, so every existing caller is unaffected.
+   */
+  useKitPanel?: boolean
+  band?: React.ReactNode
 }
 
 /* -------------------------------- helpers -------------------------------- */
@@ -546,7 +557,9 @@ function renderList(
   rights: ScreenRights,
   onAction: ScreenRendererProps["onAction"],
   onIntent?: ScreenRendererProps["onIntent"],
-  state?: ScreenRendererProps["state"]
+  state?: ScreenRendererProps["state"],
+  useKitPanel?: ScreenRendererProps["useKitPanel"],
+  band?: ScreenRendererProps["band"]
 ): React.ReactNode {
   const fields = recipe.fields.filter(
     (f) => gateState(rights, f.gate) !== "hidden"
@@ -639,6 +652,8 @@ function renderList(
       memoryKey={recipe.binding.module}
       searchKeys={fields.map((f) => f.column)}
       state={state}
+      useKitPanel={useKitPanel}
+      band={band}
       renderItems={(page) =>
         display === "cards" ? (
           /* The kit's CardGrid is the LAYOUT; the cards are children. A card
@@ -845,6 +860,8 @@ function ScreenRenderer({
   onIntent,
   className,
   state,
+  useKitPanel,
+  band,
 }: ScreenRendererProps) {
   const t = useT()
   const mode: ScreenPresentation =
@@ -861,7 +878,7 @@ function ScreenRenderer({
 
   const content =
     recipe.type === "list" ? (
-      renderList(t, recipe, data, rights, onAction, onIntent, state)
+      renderList(t, recipe, data, rights, onAction, onIntent, state, useKitPanel, band)
     ) : recipe.type === "detail" ? (
       renderDetail(recipe, data, rights, onAction, onIntent)
     ) : recipe.type === "edit" || recipe.type === "add" ? (

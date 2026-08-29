@@ -557,8 +557,35 @@ in in place of one file: "archive" here is a *tab* embedded separately
 inside 20+ collection screens (`tickets-collection.tsx`, `work-panels.tsx`,
 `account-detail-panels.tsx`, `contact-detail.tsx`, and others), each
 swapping its own columns/rows in place. `ArchiveScreen` itself has zero call
-sites outside its own module. Adopting it is a per-collection rollout, not a
-state swap.
+sites outside its own module.
+
+**UPDATE, prototyped on Tickets — one real piece of it IS one seam.**
+`ArchiveScreen`'s composed structure is really three separable laws: (1) a
+one-line "band" stating archiving's consequences, inside the panel above
+the toolbar (the kit's own `band` slot — its doc names `states/archive.tsx`
+as the only composition that draws one); (2) archived rows going quiet in
+ink only (secondary/tertiary, no strikethrough); (3) the Status/Updated →
+Archived by/Archived column swap. Only (1) is generic — it needs nothing
+the engine doesn't already have. Added as a new `band` prop on
+`CollectionFrame`'s `useKitPanel` branch (and threaded through
+`ScreenRendererProps`/`renderList`), wired temporarily to Tickets'
+already-existing Archived tab (`helpScope === "archived"`, itself a
+pre-existing, working, server-backed scope — not new), verified rendering
+correctly with no double-box even nested inside the kit's own shell (the
+third combination of the day: archive band + kit frame + kit shell), then
+reverted. Commit `a4548833`.
+
+(2) and (3) are confirmed, not assumed, to be per-collection surgery: both
+need each collection's own `renderItems`/column definitions to know it's
+rendering the archived view and style/reshape accordingly — Tickets'
+own fields partly live in a recipe in `web/lib/screens.ts` (a different
+lane's file), and every one of the 20+ collections defines its columns
+differently. Stopped here per the planner's own condition ("if the rollout
+starts needing per-screen surgery rather than one seam change, stop and
+tell me") rather than open dozens of files to chase full parity with the
+composition. The band is real, available, and not yet turned on for any
+screen; (2)/(3) are not built and would be a deliberate, scoped, per-
+collection decision — not a batch item.
 
 **`states/new-empty-record.tsx` (`NewEmptyRecordScreen`)** has no standalone
 screen to replace at all — every record-detail file
