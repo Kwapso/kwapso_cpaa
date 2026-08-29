@@ -651,6 +651,72 @@ describe("a field answers to the word the app uses for it, in any case", () => {
   })
 })
 
+describe("'the tickets' means the same thing at both doors", () => {
+  // THE BUG BEHIND THE BUG, and it is the opposite of what it looked like. The
+  // assistant was reported for naming the wrong "most recently updated ticket".
+  // It was not wrong: the two tickets above it in `ORDER BY updated_at` are
+  // ARCHIVED, and the tickets door's everyday list is `archived_at IS NULL` —
+  // every screen agrees, and so does list_help_tickets. THIS grammar did not. It
+  // returned everything, so the same question reached two doors and got two
+  // different records depending on which one it happened to take.
+  //
+  // A disagreement about what the noun MEANS is worse than a wrong sort,
+  // because both answers are defensible and neither door is visibly at fault.
+  beforeEach(() => {
+    db().exec(`UPDATE help SET archived_at = '2026-08-20T00:00:00.000Z' WHERE id IN ('T1','T5');`)
+  })
+
+  it("a put-away ticket is not on the list, exactly as its own door has it", async () => {
+    const { body } = await ask(q({ module: "tickets", countOnly: true }))
+    expect(body.total, "thirteen tickets, two of them put away").toBe(11)
+    expect(body.view, "and the answer says WHICH rows it counted").toBe("live")
+  })
+
+  it("…and is still reachable the moment somebody asks about it", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "archivedAt", op: "notNull" }], countOnly: true })
+    )
+    expect(body.total).toBe(2)
+    expect(body.view, "a caller who named the field is answered exactly as asked").toBe("as asked")
+  })
+
+  it("a caller who asks for BOTH gets both", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "id", op: "notNull" }, { field: "archivedAt", op: "isNull" }], countOnly: true })
+    )
+    expect(body.total).toBe(11)
+    const all = await ask(
+      q({ module: "tickets", where: [{ field: "archivedAt", op: "isNull" }], countOnly: true })
+    )
+    expect(all.body.total).toBe(11)
+  })
+
+  it("the newest LIVE ticket is what a most-recent question gets", async () => {
+    // T1 is archived above, so the answer must skip it — which is the whole
+    // disagreement, reduced to one assertion.
+    const { body } = await ask(
+      q({ module: "tickets", sort: "updatedAt", dir: "desc", fields: ["id"] })
+    )
+    const ids = (body.records as { id: string }[]).map((r) => r.id)
+    expect(ids).not.toContain("T1")
+    expect(ids).not.toContain("T5")
+  })
+
+  it("only a module whose OWN door hides these rows may declare it", () => {
+    // `accounts` and `apps` list their deactivated rows (ordered last), so they
+    // must NOT grow a putAway — a grammar that hid rows its door shows would be
+    // the same bug pointing the other way.
+    for (const [name, mod] of Object.entries(QUERY_MODULES)) {
+      if (!mod.putAway) continue
+      expect(["tickets", "meetings"], `${name} declares putAway — is that really its door's default?`).toContain(name)
+      expect(mod.fields.some((f) => f.name === mod.putAway!.field), `${name}.${mod.putAway!.field}`).toBe(true)
+      expect(mod.putAway!.reason.length, `${name} needs a reason naming the door it follows`).toBeGreaterThan(40)
+    }
+    expect(QUERY_MODULES.accounts.putAway, "the accounts door lists deactivated rows").toBeUndefined()
+    expect(QUERY_MODULES.apps.putAway, "the apps door lists deactivated rows").toBeUndefined()
+  })
+})
+
 describe("THE NEWEST ROW IS REALLY THE NEWEST — the property, not the ticket", () => {
   // A CONFIDENTLY WRONG RECORD, PROPOSED FOR A WRITE. On staging on 29 Aug 2026
   // the assistant answered "which ticket was updated most recently?" with the
