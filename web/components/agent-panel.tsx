@@ -71,7 +71,19 @@ export function AgentPanel({
   }, [open, canUse])
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    // `modal={false}` — matches the kit's own composition law for this
+    // surface (overlays/assistant.tsx: "never modal, never traps focus…
+    // you can type in a table while it's open", already logged as a
+    // deliberate divergence in COMPOSITION-MISMATCHES.md). A modal Sheet has
+    // Radix lock body scroll on open; the sticky nav rail's `position:
+    // sticky` then computes against `<body>` as its scrolling ancestor
+    // instead of the real viewport, so it detaches while the assistant is
+    // open. Non-modal never locks body scroll, so the rail is never
+    // disturbed — this is the "stop being modal" fix, not the fallback of
+    // decoupling the rail from body's scroll state. Outside-click-to-dismiss
+    // and Escape-to-close both survive `modal={false}` (Radix's own
+    // behaviour, not reimplemented here).
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       {/* : the Radix panel itself takes focus on open — without this,
        * pressing Enter/arrows draws the browser's focus ring around the WHOLE
        * slide-in (the owner's "weird outline"). Harmless but ugly; the effect

@@ -122,7 +122,7 @@ describe("a stale shell reaching for a deploy that is gone", () => {
     expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy()
   })
 
-  it("leaves an ordinary render error exactly as it was", () => {
+  it("tells a production host the same honest, generic thing — never the raw error", () => {
     render(
       <ErrorBoundary label="the apps list">
         <Throws error={new Error("account_id is not defined")} />
@@ -130,7 +130,28 @@ describe("a stale shell reaching for a deploy that is gone", () => {
     )
     // No reload — a bug in a screen is not healed by fetching the screen again.
     expect(reload).not.toHaveBeenCalled()
-    expect(screen.getByText("account_id is not defined")).toBeTruthy()
-    expect(screen.getByText(/Something broke in the apps list/)).toBeTruthy()
+    // beforeEach's window.location.href is an agency.kwapso.app (production) URL.
+    expect(screen.getByText("Something on our side broke.")).toBeTruthy()
+    expect(screen.queryByText("account_id is not defined")).toBeNull()
+    expect(screen.queryByText(/the apps list/)).toBeNull()
+  })
+
+  // SABOTAGE: drop the isDiagnosableHost() gate from Broken →
+  //   × shows the raw error and which screen it was in
+  //     TestingLibraryElementError: Unable to find an element with the text: account_id is not defined
+  it("shows the raw error and which screen it was in, on a staging host", () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: { reload, href: "https://agency-staging.kwapso.app/apps/01KZXD6DQZSEYS5D39QHHDAM9T" },
+    })
+    render(
+      <ErrorBoundary label="the apps list">
+        <Throws error={new Error("account_id is not defined")} />
+      </ErrorBoundary>
+    )
+    expect(screen.getByText("Something on our side broke.")).toBeTruthy()
+    expect(screen.getByText(/account_id is not defined/)).toBeTruthy()
+    expect(screen.getByText(/the apps list/)).toBeTruthy()
   })
 })

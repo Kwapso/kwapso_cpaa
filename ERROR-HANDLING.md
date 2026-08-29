@@ -22,9 +22,14 @@ trick as the swappable AI-import interface).
   has occurred" overlay.
 - **Client render errors, `<ErrorBoundary>`** wraps risky subtrees (the team
   panels. UPDATED 2026-06-21: the team area is now the screen-engine-rendered
-  `/t/<teamId>/<module>/<id>` subtree). On a render throw it shows the **real
-  message inline** (no white screen) and calls `reportError` with the component
-  stack.
+  `/t/<teamId>/<module>/<id>` subtree). On a render throw it shows the kit's
+  whole-page `PageFailureScreen` (chapter 21, 500) with one honest, generic
+  sentence — **the same one on every host** — and calls `reportError` with the
+  component stack. UPDATED 2026-08-29: the raw `error.message` used to render
+  inline for everybody; the owner ruled a production visitor should see exactly
+  what staff see, nothing more. The raw message still renders, but only when
+  `window.location`'s host is `localhost`/`127.0.0.1` or contains `staging` —
+  the diagnostic value stayed, gated to the hosts that are ours.
 - **Both gateways, `/api/log/client`.** Each front end has its own door on its own
   origin: the agency gateway carries one for `web/`, the portal gateway carries one
   for `web-portal/`. Both do the same two things, log the beacon (`console.error`,
