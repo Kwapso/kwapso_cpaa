@@ -93,6 +93,22 @@ export type QueryField = {
    * `in` then match the referenced record's NAME as well as its id, and a
    * `groupBy` on it comes back labelled. */
   ref?: string
+  /** LIST THE NAMES A CALLER CAN ACTUALLY FILTER ON, in `describe_module`.
+   *
+   * Only the names IN USE on the module being described — the clients who have
+   * tickets, not every company in the book — so it stays small and answers the
+   * question a caller really has. It exists because of a real confusion: asked
+   * about "flu clinic", a substring search returns nothing, because the company
+   * is called "FluClinic"; and asked about "HORSt", nothing, because no such
+   * client exists. Both are the honest behaviour of a substring match and both
+   * look identical to a caller — an empty result that says nothing about which
+   * of the two happened. Reading the list first turns a confusing empty answer
+   * into an obvious one.
+   *
+   * Gated: the names come out only if the caller may read the module they
+   * belong to. A field marked here whose target the caller cannot read simply
+   * comes back without them. */
+  choices?: boolean
   /** one short line for `describe_module`, where the column's meaning is not
    * obvious from its name. */
   note?: string
@@ -137,6 +153,7 @@ const ACCOUNT: QueryField = {
   column: "account_id",
   type: "id",
   ref: "accounts",
+  choices: true,
   note: "the client this belongs to",
 }
 const APP: QueryField = { name: "appId", column: "app_id", type: "id", ref: "apps" }

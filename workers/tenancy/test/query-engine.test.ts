@@ -379,6 +379,46 @@ describe("R14: the read is bounded, and it pages by key", () => {
   })
 })
 
+describe("describe_module names the clients you can actually filter on", () => {
+  async function describe(qs: string) {
+    const request = new Request(`https://tenancy/api/tenancy/query/describe${qs}`, {
+      headers: { Cookie: "session=x" },
+    })
+    const res = await worker.fetch(request, makeEnv(() => holder.db as DatabaseSync, IDS.staffUser))
+    return { status: res.status, body: JSON.parse(await res.text()) as Record<string, unknown> }
+  }
+
+  it("lists the names IN USE, not every company in the book", async () => {
+    // A_OTHER has tickets; the harness's own accounts do not. The point of "in
+    // use" is that the list answers "what can I filter THIS module by".
+    const { status, body } = await describe("?module=tickets")
+    expect(status).toBe(200)
+    const field = (body.fields as { name: string; inUse?: string[] }[]).find((f) => f.name === "accountId")!
+    expect(field.inUse!.sort()).toEqual([
+      "Confia Seguros",
+      "Delaval Nordic",
+      "Flu Clinic GmbH",
+      "HORSt Logistik",
+    ])
+  })
+
+  it("a caller who may not read the clients is not told their names", async () => {
+    // The names belong to the accounts module, so they ride that module's own
+    // read right — the field still describes itself, it simply says nothing it
+    // has no business saying.
+    db().exec(`UPDATE role_permissions SET can_read = 0 WHERE role_id = '${IDS.adminRole}' AND module = 'accounts';`)
+    const { body } = await describe("?module=tickets")
+    const field = (body.fields as { name: string; inUse?: string[] }[]).find((f) => f.name === "accountId")!
+    expect(field.inUse, "the client list is the accounts module's to give").toBeUndefined()
+    expect(field.name, "…and the field itself still describes itself").toBe("accountId")
+  })
+
+  it("a module with no client column simply has no list", async () => {
+    const { body } = await describe("?module=roles")
+    for (const f of body.fields as { inUse?: string[] }[]) expect(f.inUse).toBeUndefined()
+  })
+})
+
 describe("'how many?' comes back as a number and nothing else", () => {
   it("countOnly answers with the total and no rows", async () => {
     const { status, body } = await ask(
