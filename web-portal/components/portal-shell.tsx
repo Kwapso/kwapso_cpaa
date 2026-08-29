@@ -26,6 +26,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppearanceMenu } from "@shared/web/appearance-menu"
 import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spacer } from "@shared/ui/components/spacer/spacer"
 import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
@@ -178,7 +179,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
             onSwitched={refresh}
             onSwitching={setSwitching}
           />
-          <div className="flex-1" />
+          <Spacer axis="inline" grow />
           {/* Beside the light/dark toggle, not behind a fourth nav entry: the
            * three destinations below are fixed by design, and a language is the
            * same class of thing as a theme — a personal display preference,
