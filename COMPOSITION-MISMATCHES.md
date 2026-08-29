@@ -272,7 +272,10 @@ also live-drives the screen underneath it through a "screen trace" mechanism
 the kit has no concept of. Letting someone type in the same table the agent
 is actively manipulating is a real correctness question (whose edit wins),
 not a styling preference — this is a product decision about concurrent
-agent/user control of one screen, not a prop the kit exposes either way.
+agent/user control of one screen, not a prop the kit exposes either way. A
+peer's render probe confirms the kit's half is real, not just documented:
+`Assistant open` renders `role="dialog"` but never `aria-modal="true"` — it
+genuinely does not trap focus.
 
 ### `overlays/export.tsx`
 
@@ -292,7 +295,10 @@ structurally carries an operator slot and the AND-chained, add/remove-row
 interaction model has no analog in this app's single-valued, closed-
 vocabulary facet chips (`shared/web/screen-engine/filter-bar.tsx`). Omitting
 the operator list does not collapse the composition into a chip row; it just
-leaves the operator dropdown emptier. Confirmed unchanged.
+leaves the operator dropdown emptier. A peer tested this rather than
+inferring it: `operators={[]}` with one condition still renders 2
+comboboxes, same as a real `operators` list — the control is there either
+way, just empty. There is no escape hatch. Confirmed unchanged.
 
 `ArchiveConfirmationDialog` (the mandatory-reason sibling of
 `DeleteConfirmationDialog`) and `StepperHero` for `story-status-stepper.tsx`
@@ -300,21 +306,18 @@ leaves the operator dropdown emptier. Confirmed unchanged.
 each is recorded once already — under the `[~]`/`[x]` entry for its sibling
 composition — rather than duplicated here.
 
-## [ ] No current app equivalent (4)
+## [ ] No current app equivalent (3)
 
 `templates/multi-step-form.tsx` — no wizard forms exist anywhere in the app
-(also inherits the `form-screen` mismatch above).
+(also inherits the `form-screen` mismatch above). A peer's render probe adds
+a second, independent confirmation: `MultiStepForm` itself warns at runtime
+when no step depends on an earlier one — the kit's own component agreeing
+there is no wizard here to hang it on.
 
 `templates/search-results.tsx` — assumes a global "search everything from
 anywhere" command-palette. No such control exists anywhere in either front
 door; the only search-like control (`record-picker.tsx`) is a per-field
 relation picker inside a form, not global search.
-
-`overlays/bulk-edit.tsx` — requires a row-selection mechanism (checkboxes
-persisting across a list, an edit panel reporting "changes N records").
-Nothing in `shared/web/screen-engine/` or either front door has any row-
-selection UI at all. Adopting this means building a cross-cutting selection
-primitive first — not a scoped swap.
 
 `overlays/quick-view.tsx` — wants a Space/click-to-peek dialog instead of
 navigating. The app's real row activation
@@ -323,19 +326,46 @@ navigate straight to the full record, with no peek pattern anywhere.
 Adopting this means changing established navigation behavior across the
 engine, not adding a missing piece.
 
-## [?] Needs a human call (1)
+## [?] Needs a human call (3)
 
 **`templates/sign-in.tsx`** — landed. The other lane shipped
 `sign-in-system` (the agency login now renders the kit's `LoginRoute`
 through `web/components/auth-card.tsx`) after this file's first pass flagged
 the asset-import blocker as stale. See UI-GAPS.md rows 2 and 23.
 
-`templates/rail.tsx` remains parked, not scheduled, per the owner's own
+**`templates/rail.tsx`** remains parked, not scheduled, per the owner's own
 review of staging live — but see the ScreenShell-family entry above: the
 question this file now needs decided is no longer "should `Rail` replace
 `AppShell`'s nav," it's "should `AppShell` itself be rebuilt on
 `ScreenShell`," which is a bigger and different question than the one
-`rail.tsx` originally posed alone.
+`rail.tsx` originally posed alone. **One stated reason for parking it was
+wrong, corrected by a peer's render probe**: `mark`, `wordmark` and
+`tagline` are all `React.ReactNode` slots at the rail's head and each takes
+an arbitrary node — rendered live with a real button in each slot — so the
+team switcher (a multi-tenant requirement this app's sidebar carries) has a
+home in `Rail` after all. The mobile half of the original reason still
+holds: `ScreenShell` drops the rail entirely below `md` by design and draws
+no hamburger anywhere, so the mobile top-bar and bottom-tab-bar stay bespoke
+regardless of whether `Rail` is adopted. The verdict (parked, not scheduled,
+a deliberate future attempt) is unchanged — only the stated reason for half
+of it was.
+
+**`overlays/bulk-edit.tsx`** — CORRECTED from `[ ]` to `[?]`. The first pass
+said this "requires a row-selection mechanism... nothing in
+`shared/web/screen-engine/` or either front door has any row-selection UI
+at all... adopting this means building a cross-cutting selection primitive
+first." That reason is **inverted**: `BulkEditScreen` IS the selection
+primitive, not a consumer of one waiting to be built. A peer's render probe
+(after first getting a false negative from `input[type=checkbox]` — the kit
+uses Radix's `[role=checkbox]`, and the empty-records case renders exactly
+one selection mark, the header select-all, proving the corrected selector
+can actually tell a difference): the open composition renders 7 selection
+marks across its own rows, and passing `selectedIds` brings up its own
+"selected" panel. It brings the rows, the marks, the select-all and the
+panel — nothing has to be built first. What is left is not a structural
+mismatch, it's a product question this app has never been asked: does it
+want bulk edit on any collection at all. Filed as a human call, not a
+rejection.
 
 ## The kit's real `CollectionFrame` primitive (not a template — a component;
 carried here because it is the other half of the "kit overrides the app"
