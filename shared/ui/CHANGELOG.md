@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.2.6 — 2026-08-29
+
+### Fixed — three comments that compiled the class they forbid
+
+The last of v1.2.4/v1.2.5's tail, and the sharpest form of it. Tailwind scans
+every file it is pointed at, source and prose alike, and it cannot tell an
+explanation from an intention. So `components/card/card.tsx` saying *there is
+no fifth radius and X is re-pointed at 24, so it is never reached* — and two
+comments in `tokens.css` doing the same — **emitted X**, which after v1.2.5
+was the only thing left in a consuming app's whole build asking for a third
+box radius. Measured in the kwapso app's real stylesheet, both doors.
+
+All three now DESCRIBE the step instead of spelling it, with the reason
+recorded at card.tsx's header so the next person does not undo it. Nothing
+about any radius changed; the value was always 24.
+
 ## v1.2.5 — 2026-08-29
 
 Five bugs, no design. Every one found by RUNNING the kit under the consuming

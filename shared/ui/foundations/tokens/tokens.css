@@ -338,7 +338,8 @@
      marks and selection controls, 4 on a bar, a heat cell or the rotated
      decision node — "a bar is not a box". A third box radius is forbidden,
      so the seven-step ladder flattens onto three values. Everything the
-     apps draw at rounded-lg today lands at 24.                            */
+     apps draw at that middle step today lands at 24. (Named rather than
+     spelled: this comment is scanned — see card.tsx's header.)            */
   --radius:               1.5rem;      /* 24 · cards, panels, sections, rows */
   --radius-sm:            0.25rem;     /* 4  · bars, heat cells, nodes       */
   --radius-md:            0.375rem;    /* 6  · marks, selection controls     */
@@ -1664,8 +1665,9 @@
    10 · TAILWIND v4 BRIDGE
    Everything above is plain CSS and works with no build step. This block
    only teaches Tailwind's utility namespace where the tokens live, so
-   `bg-background`, `text-muted-foreground`, `rounded-lg`, `shadow-md`,
-   `p-6` and friends resolve to kwapso values.
+   `bg-background`, `text-muted-foreground`, the radius and shadow steps,
+   `p-6` and friends resolve to kwapso values. (The radius step is named
+   rather than spelled: this comment is scanned — see card.tsx's header.)
 
    `inline` matters: it makes the utilities reference the runtime custom
    properties above rather than snapshotting a value, which is what lets a

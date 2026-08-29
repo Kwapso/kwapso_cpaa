@@ -1,6 +1,57 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* THIS REPOSITORY'S OWN LAW-BOOK IS NOT A STYLESHEET SOURCE.
+ *
+ * `@import "tailwindcss"` without `source(none)` switches on Tailwind's
+ * automatic content detection, and that walk reads every source file it can
+ * reach — INCLUDING the files whose job is to QUOTE a class in order to
+ * FORBID it. `shared/rules/registry.ts` names three off-vocabulary radius
+ * steps inside R31's own law and its own `why`, and Tailwind compiled all
+ * three: the only thing in the whole build asking for a third box radius was
+ * the rule that exists to forbid one.
+ *
+ * The kit had the identical bug one layer down. `shared/ui/components/
+ * PATTERN.md` quotes an arbitrary font-size utility with a WILDCARD in the
+ * token name, which is not valid CSS, and it arrived as "Unexpected token
+ * Delim" on every build of both doors. That half is fixed upstream at kit
+ * v1.2.5, whose `tokens.css` now scans code rather than directories and
+ * excludes markdown outright. This line is the half that is ours, because
+ * the file is ours and it is `.ts`, which no markdown exclusion can reach.
+ *
+ * AND NO CLASS IS SPELLED IN THIS COMMENT, WHICH IS NOT FUSSINESS. The first
+ * draft of it quoted the offending utility in order to explain the bug, and
+ * Tailwind compiled the explanation — the invalid rule came back, emitted by
+ * the fix. A stylesheet is scanned by the thing it configures. Describe the
+ * class; never write it.
+ *
+ * NARROW ON PURPOSE. It names ONE file, not a folder and not an extension.
+ * `registry.ts` is rule DATA — it renders nothing, it writes no class, and it
+ * is the only file in this repository that quotes a utility it forbids.
+ * Excluding `shared/` or every `.ts` wholesale would be the silent failure
+ * this class of bug keeps producing: a wrong `@source` compiles to a SMALLER
+ * stylesheet, never to an error, so nothing goes red and screens arrive
+ * naked.
+ *
+ * MEASURED WITH A SENTINEL, because counting real classes cannot tell you
+ * which file they came from. A unique utility planted in `registry.ts`
+ * reaches the built CSS; the same string planted in a root `.md` does not —
+ * so root markdown was never scanned and this one file is the whole of what
+ * is left. AND CLEAR `.next` BEFORE BELIEVING A RESULT: an earlier pass
+ * concluded `@source not` "has no effect from globals.css" off a build that
+ * had reused a cached stylesheet. It works. */
+@source not "../../shared/rules/registry.ts";
+
+/* AND NEITHER IS A TEST FILE. Same walk, same shape, second source: a suite
+ * that asserts ABOUT a class writes that class as a string, and Tailwind
+ * cannot tell an assertion from a render — so `rules.test.ts`, whose whole
+ * job is to catch off-vocabulary radii, was emitting two of them. A test is
+ * never rendered by the product, so nothing it names can be the only reason
+ * a class is needed; if it were, the app would not be using it. Proved with
+ * the same sentinel: a unique utility planted in a test file reaches the
+ * built stylesheet, and does not once this line is here. */
+@source not "../../{web,web-portal}/test/**";
+
 /* THE theme — the tokens, both palettes and the motion utilities. ONE master
  * copy, now IN this repo at shared/ui/styles.css; this app never carries its
  * own. It also carries the @source line that tells Tailwind to scan the
