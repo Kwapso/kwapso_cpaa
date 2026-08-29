@@ -120,25 +120,38 @@ describe("the shell's own chrome stays on screen", () => {
   // several-thousand-pixel document and left the screen the moment the rows
   // arrived — visible on Home (short) and nowhere else. Height + sticky are what
   // make `mt-auto` mean what it reads as.
-  const asideTag = () => {
+  // FOUND BY THE ELEMENT, NOT BY ITS TAG. This used to slice from `<aside`,
+  // which stopped meaning anything the day the rail moved inside the kit's
+  // ScreenShell and became a plain node in the shell's own column — the
+  // PROPERTY held and the test failed anyway, which is a test measuring its
+  // method rather than its subject. The rail is now identified by what makes
+  // it the rail: one element carrying all three of the behaviours below. The
+  // breakpoint prefix is gone with the `<aside>` too — the shell drops the
+  // rail below `md` itself, so the classes no longer need `md:` to say so.
+  const railClasses = () => {
     const src = read("components/app-shell.tsx")
-    const open = src.indexOf("<aside")
-    expect(open, "app-shell must still render an <aside> rail").toBeGreaterThan(-1)
-    return src.slice(open, src.indexOf(">", open))
+    const line = src
+      .split("\n")
+      .find((l) => l.includes("sticky") && l.includes("h-[100svh]") && l.includes("overflow-y-auto"))
+    expect(
+      line,
+      "one element must carry the rail's height, its pinning and its own scroll — whatever tag draws it"
+    ).toBeDefined()
+    return line ?? ""
   }
 
   it("the desktop rail is exactly one window tall, and pinned there", () => {
-    const tag = asideTag()
-    expect(tag, "the rail must be one window tall — without it, it stretches to the page")
-      .toContain("md:h-[100svh]")
-    expect(tag, "the rail must stay pinned as the main column scrolls").toContain("md:sticky")
+    const cls = railClasses()
+    expect(cls, "the rail must be one window tall — without it, it stretches to the page")
+      .toMatch(/h-\[100svh\]/)
+    expect(cls, "the rail must stay pinned as the main column scrolls").toMatch(/sticky/)
   })
 
   it("a rail taller than the window scrolls inside itself, not off the bottom", () => {
     // Every new module adds a nav row. Past ~a dozen on a short screen the rail
     // overflows, and without this the bottom row is clipped exactly as before.
-    expect(asideTag(), "the rail must scroll internally once the nav outgrows it")
-      .toContain("md:overflow-y-auto")
+    expect(railClasses(), "the rail must scroll internally once the nav outgrows it")
+      .toMatch(/overflow-y-auto/)
   })
 
   it("the bottom row is still the thing being held down there", () => {

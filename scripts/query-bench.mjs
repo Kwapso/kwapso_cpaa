@@ -220,14 +220,21 @@ const newest = await ask("the most recently UPDATED ticket, asked of the door", 
   dir: "desc",
   fields: ["id", "ref", "updatedAt"],
 })
+// THE ORACLE IS THE TICKETS DOOR'S OWN MEANING, not a bare MAX. A ticket that
+// has been put away is still the most recently touched row in the table and is
+// NOT on the list — `archived_at IS NULL` is what every screen and
+// list_help_tickets mean by "the tickets", and on 29 Aug 2026 a bare MAX oracle
+// reported the grammar as wrong when the grammar was the thing that had just
+// been brought into line with it.
 const [maxRow] = await sql(
   team.database_id,
-  "SELECT id, ref FROM help ORDER BY updated_at DESC LIMIT 1"
+  "SELECT id, ref FROM help WHERE archived_at IS NULL ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 1"
 )
 const firstRow = newest.answer.page.rows[0]
 console.log(
   `\n══ THE MOST RECENT IS THE MOST RECENT\n` +
     `   database says  ${maxRow.id}  ${maxRow.ref ?? "(no reference)"}\n` +
     `   the door says  ${firstRow?.id}  ${firstRow?.ref ?? "(no reference)"}\n` +
-    `   ${firstRow?.id === maxRow.id ? "SAME RECORD" : "*** DIFFERENT RECORD — the door is not answering the question ***"}`
+    `   ${firstRow?.id === maxRow.id ? "SAME RECORD" : "*** DIFFERENT RECORD — the door is not answering the question ***"}\n` +
+    `   (both mean the everyday list: a put-away ticket is a record, not a row on the list)`
 )
