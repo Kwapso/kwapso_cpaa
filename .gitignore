@@ -93,3 +93,4 @@ glide/r2-manifest.json
 
 # Claude Code skills live globally in ~/.claude/skills/ — never vendored here
 /skills/
+.lane-shots-archive/
