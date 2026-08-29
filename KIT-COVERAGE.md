@@ -223,7 +223,7 @@ Regenerate the ticks with:
 - [ ] `screens/settings`
 - [ ] `screens/sign-in`
 - [ ] `screens/sign-in-portal`
-- [ ] `screens/sign-in-system`
+- [x] `screens/sign-in-system`
 - [ ] `screens/splash`
 - [ ] `states/archive`
 - [ ] `states/empty-collection`
@@ -254,4 +254,4 @@ Regenerate the ticks with:
 
 ---
 
-**Components 61/115 · Compositions 2/47**
+**Components 61/115 · Compositions 3/47**
