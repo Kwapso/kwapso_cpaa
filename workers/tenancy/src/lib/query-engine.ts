@@ -505,7 +505,16 @@ export async function runQuery(
       dir: "desc",
     }
 
-  const ordering = resolveOrdering(sortMenu(mod), mod.defaultSort, q.sort, q.dir)
+  // THE SORT NAME GOES THROUGH THE SAME DOOR THE FILTER NAMES DO. `where`
+  // accepted a field by its column, its loose spelling or its other name from
+  // the day the aliases landed; `sort` did not, so `sort: "updated"` — the word
+  // `list_help_tickets` documents — was refused while `where` on the same field
+  // was fine. Two vocabularies for one set of fields, and the refusal is how a
+  // "most recently updated" question silently became a "most recently created"
+  // one (measured against the live book, 29 Aug 2026: different first row, and
+  // the wrong one reads perfectly).
+  const asked = queryField(mod, q.sort)
+  const ordering = resolveOrdering(sortMenu(mod), mod.defaultSort, asked?.name ?? q.sort, q.dir)
   const after = keysetAfter(decodeCursor(q.cursor, ordering.sig), ordering.expr, ordering.dir, "t.id")
   // R14 — this collection GROWS, so it pages by key rather than stopping at a
   // cap; PAGE_SIZE + 1, where the spare row is how `toPage` learns there is

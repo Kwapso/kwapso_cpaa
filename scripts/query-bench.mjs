@@ -207,3 +207,27 @@ console.log(
     `   — which is where "flu clinic" becomes "FluClinic", and where "horst" is ` +
     `visibly not a client rather than an empty result that says nothing.`
 )
+
+/* ── THE NEWEST ROW IS REALLY THE NEWEST, against the live book ──────────── */
+
+// A most-recent query that returns the SECOND most recent reads as correct
+// forever unless something checks the actual maximum. On 29 Aug 2026 one did
+// exactly that on staging and then proposed resolving the wrong ticket, so this
+// asks the database for the maximum and the door for its first row, and says
+// whether they are the same record.
+const newest = await ask("the most recently UPDATED ticket, asked of the door", "tickets", {
+  sort: "updatedAt",
+  dir: "desc",
+  fields: ["id", "ref", "updatedAt"],
+})
+const [maxRow] = await sql(
+  team.database_id,
+  "SELECT id, ref FROM help ORDER BY updated_at DESC LIMIT 1"
+)
+const firstRow = newest.answer.page.rows[0]
+console.log(
+  `\n══ THE MOST RECENT IS THE MOST RECENT\n` +
+    `   database says  ${maxRow.id}  ${maxRow.ref ?? "(no reference)"}\n` +
+    `   the door says  ${firstRow?.id}  ${firstRow?.ref ?? "(no reference)"}\n` +
+    `   ${firstRow?.id === maxRow.id ? "SAME RECORD" : "*** DIFFERENT RECORD — the door is not answering the question ***"}`
+)

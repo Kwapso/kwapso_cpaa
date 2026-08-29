@@ -630,10 +630,17 @@ describe("a field answers to the word the app uses for it, in any case", () => {
     expect(body.total).toBe(4)
   })
 
-  it("every field alias resolves somewhere and shadows nothing", () => {
+  it("every field alias resolves somewhere, shadows nothing, and is NEEDED", () => {
     for (const [alias, target] of Object.entries(FIELD_ALIASES)) {
       const modules = Object.values(QUERY_MODULES).filter((m) => m.fields.some((f) => f.name === target))
       expect(modules.length, `"${alias}" points at "${target}", which is no module's field`).toBeGreaterThan(0)
+      // A field's own COLUMN and a loose spelling of its name already resolve
+      // without a line here. An alias that duplicates one of those is dead
+      // weight, and a dead exemption is what every ratchet in this base forbids.
+      const reachedAnyway = modules.some((m) =>
+        m.fields.some((f) => f.name === target && (f.column === alias || f.name.toLowerCase() === alias))
+      )
+      expect(reachedAnyway, `"${alias}" already resolves as a column or a spelling — delete the line`).toBe(false)
       // …and where a module really HAS a field by the alias's own name, the
       // real one wins. Asserted rather than reasoned about.
       for (const mod of Object.values(QUERY_MODULES)) {
@@ -641,6 +648,82 @@ describe("a field answers to the word the app uses for it, in any case", () => {
         if (real) expect(queryField(mod, alias)).toBe(real)
       }
     }
+  })
+})
+
+describe("THE NEWEST ROW IS REALLY THE NEWEST — the property, not the ticket", () => {
+  // A CONFIDENTLY WRONG RECORD, PROPOSED FOR A WRITE. On staging on 29 Aug 2026
+  // the assistant answered "which ticket was updated most recently?" with the
+  // SECOND most recent — and then faithfully proposed resolving that one. Had
+  // anybody confirmed, the wrong ticket would have been resolved, and the wrong
+  // answer read perfectly: "no reference number and no title" was a true
+  // statement about the record it found.
+  //
+  // A most-recent query that returns the second-most-recent reads as correct
+  // forever unless something checks the actual maximum. So this checks the
+  // maximum, for every date field on every module, against the same rows.
+  it("sorting by any date field puts the real extreme first", async () => {
+    let checked = 0
+    for (const [name, mod] of Object.entries(QUERY_MODULES)) {
+      for (const field of mod.fields.filter((f) => f.type === "date")) {
+        const { status, body } = await ask(
+          q({ module: name, sort: field.name, dir: "desc", fields: ["id", field.name] })
+        )
+        // The harness's role holds most rights but not every one; a module this
+        // caller may not read is not this property's business. Refusals are the
+        // gate working, and query-fence.test.ts is where they are proved.
+        if (status === 403) continue
+        expect(status, `${name}.${field.name}`).toBe(200)
+        const rows = body.records as Record<string, unknown>[]
+        if (rows.length < 2) continue
+        const values = rows
+          .map((r) => r[field.column] as string | null)
+          .filter((v): v is string => typeof v === "string")
+        if (values.length < 2) continue
+        checked++
+        expect(
+          values[0],
+          `${name} sorted by ${field.name} desc: the first row is not the greatest value in the page`
+        ).toBe([...values].sort().reverse()[0])
+      }
+    }
+    // A sweep that skipped everything passes exactly like a sweep that proved
+    // something. This is the one line that tells them apart.
+    expect(checked, "the ordering sweep compared nothing — it has gone blind").toBeGreaterThan(3)
+  })
+
+  it("the answer SAYS which order it used, so a default is never mistaken for a choice", async () => {
+    // The trap that produced the wrong ticket is not a broken sort — it is an
+    // ABSENT one. A caller who asks for no order gets the module's default, and
+    // for tickets that is newest-by-CREATION, whose first row is a different
+    // record from newest-by-UPDATE. Nothing can guess which they meant; the
+    // answer can and does say which it gave.
+    const defaulted = await ask(q({ module: "tickets", fields: ["id"] }))
+    expect(defaulted.body.sort).toBe(QUERY_MODULES.tickets.defaultSort)
+    const asked = await ask(q({ module: "tickets", sort: "updatedAt", dir: "desc", fields: ["id"] }))
+    expect(asked.body.sort).toBe("updatedAt")
+    expect(asked.body.dir).toBe("desc")
+  })
+
+  it("a sort name resolves exactly like a filter name — column, spelling, alias", async () => {
+    // `where` accepted a field by its column and its other names from the day
+    // aliases landed; `sort` did not. So `sort: "updated"` — the word
+    // list_help_tickets documents — was REFUSED, and a refused ordering is how
+    // "most recently updated" silently became "most recently created".
+    const first = async (sort: string) => {
+      const { status, body } = await ask(q({ module: "tickets", sort, dir: "desc", fields: ["id"] }))
+      expect(status, sort).toBe(200)
+      return (body.records as { id: string }[])[0]?.id
+    }
+    const canonical = await first("updatedAt")
+    for (const spelling of ["updated_at", "updated", "updatedat"])
+      expect(await first(spelling), `"${spelling}" must reach the same order`).toBe(canonical)
+  })
+
+  it("a sort name that is nothing at all still refuses, and lists what it could be", async () => {
+    const { status, body } = await ask(q({ module: "tickets", sort: "whenever" }))
+    expect(status).toBe(400)
+    expect(String(body.message)).toContain("updatedAt")
   })
 })
 
