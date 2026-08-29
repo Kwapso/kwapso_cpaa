@@ -255,7 +255,25 @@ class WorkersAiModel implements Model {
   ) {}
 
   /** The options every call shares. Omitted entirely when there is no key, so a
-   *  one-shot call sends no empty header. */
+   *  one-shot call sends no empty header.
+   *
+   *  MEASURED, AND IT DOES NOT WORK THROUGH THE BINDING — 29 Aug 2026. This is
+   *  Cloudflare's own documented shape (third argument, extraHeaders,
+   *  x-session-affinity) and over the REST door it caches 99.6%: eight calls on
+   *  the shipped prompt gave cached 0, 33216, 33216, 33216 with the header.
+   *  Through `env.AI.run` on deployed staging, five consecutive steps behind a
+   *  near-identical 27K prefix reported:
+   *
+   *      {"prompt_tokens":26806,...,"prompt_tokens_details":{"cached_tokens":0}}
+   *      ... 27117, 27185, 26839, 27604 — cached_tokens 0 every time
+   *
+   *  So the field IS reported by the binding and is genuinely zero: the meter
+   *  works and the cache is not hitting. The header stays because it is correct,
+   *  costs nothing, and starts working the day the binding forwards it. The
+   *  alternative — calling the REST door from the worker with a token — is a new
+   *  secret and a second code path for the same call, and is the owner's decision
+   *  rather than a silent one. Delete this note the day a deployed turn reports a
+   *  non-zero cached_tokens. */
   private affinity(): Record<string, unknown> {
     return this.sessionKey ? { extraHeaders: { "x-session-affinity": this.sessionKey } } : {}
   }
