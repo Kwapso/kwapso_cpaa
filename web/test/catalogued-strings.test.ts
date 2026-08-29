@@ -199,6 +199,8 @@ describe("R28 · what the one definition can see", () => {
 // reasoned line here, and the list is a ratchet: an entry that no longer
 // offends turns the build red, so it can only shrink.
 const UNWALKED_OK: Record<string, string> = {
+  "shared/workers/query-grammar.ts":
+    "the machine query grammar — what a MODEL may ask a module, and the words in it are FIELD NAMES and the other names a field answers to ('reference' for `ref`, 'name' for `title`), not copy. Nothing here reaches a screen: no front door imports it, the two doors that read it live on the tenancy worker, and its only human-facing prose is the one-line module summaries a MODEL reads in describe_module. Translating a field name would break the filter it names. The extractor is right that a quoted word sits in a position it watches; it is wrong about who reads it.",
   "shared/workers/record-link.ts":
     "R30's email button labels — 'Open the ticket', 'Open your requests'. A WORKER composes them into a message, for the recipient's own front door, and no front door imports this file. They are held by R30, not by a screen, and the pipeline that would translate them is the worker's per-request translator rather than the build-time catalogue. Widening R28 to reach them would put the email census under a law written about screens.",
 }
