@@ -410,6 +410,19 @@ function whereSql(
  * module has no second switch) — null meaning "no narrowing", never "unchecked". */
 export type Fence = { column: string; value: string } | null
 
+/** THE DOOR'S ANSWER TO "how much of this module may they see", asked per module
+ * rather than once — because a read of `accounts` is not the only place the
+ * accounts fence has to bite. `findUnmatched` looks a filter value up in the
+ * REFERENCED table to tell "no rows matched" from "no such thing", and on a
+ * fenced module that lookup is an existence oracle: a caller without
+ * `contacts:read` filtering `parentAccountId contains "Marta Ruiz"` got silence
+ * (she is here) and the same filter on an invented name got an `unmatched` row
+ * (she is not). One bit per guess, on exactly the people the fence exists for.
+ *
+ * `hasRight` is memoised per request, so asking per module costs one sheet read
+ * however many modules a question touches. */
+export type FenceFor = (mod: QueryModule) => Promise<Fence>
+
 /** The fence ANDed onto the caller's own question. One function, applied once,
  * to the one clause `runQuery` builds everything from. */
 function fenced(
@@ -489,12 +502,14 @@ export async function runQuery(
    * the `unmatched` lookup. Riding the WHERE is the whole point: a fence checked
    * beside the rows is a fence three of those four reads can forget, and this
    * door answers "how many" far more often than it hands back a page. */
-  fence: Fence = null
+  fenceFor: FenceFor = async () => null
 ): Promise<QueryAnswer> {
-  const where = fenced(whereSql(q, refs), fence)
+  const where = fenced(whereSql(q, refs), await fenceFor(mod))
   // WHAT NAMED NOTHING — worked out alongside the count rather than after it, so
-  // no return path below can hand back a total without it.
-  const unmatchedPromise = findUnmatched(cfg, guard, mod, q, refs)
+  // no return path below can hand back a total without it. It gets the RESOLVER
+  // rather than this module's fence: its lookups run against the REFERENCED
+  // table, which has a fence of its own.
+  const unmatchedPromise = findUnmatched(cfg, guard, mod, q, refs, fenceFor)
   // R14/R16 — the exact total, bounded by the ONE counting ceiling, over exactly
   // the question the rows themselves answer.
   const totalPromise = countCollection(
@@ -635,9 +650,18 @@ async function findUnmatched(
   guard: MemberGuard,
   mod: QueryModule,
   q: ParsedQuery,
-  refs: Record<string, QueryModule>
+  refs: Record<string, QueryModule>,
+  fenceFor: FenceFor
 ): Promise<Unmatched[]> {
   const NAME_OPS: QueryOp[] = ["eq", "in", "contains"]
+  /** ` AND <col> = ?` for a fenced table, or nothing — the same clause the rows
+   * are narrowed by, so a name this caller may not see reads as a name that is
+   * not here. That is the correct answer to give them: it is what the accounts
+   * LIST door already says. */
+  const fenceOn = async (m: QueryModule): Promise<{ sql: string; params: string[] }> => {
+    const f = await fenceFor(m)
+    return f ? { sql: ` AND ${f.column} = ?`, params: [f.value] } : { sql: "", params: [] }
+  }
   const out: Unmatched[] = []
   for (const c of q.where) {
     if (!NAME_OPS.includes(c.op) || !c.values.length) continue
@@ -648,14 +672,15 @@ async function findUnmatched(
         // The SAME predicate the filter itself used, asked of the referenced
         // table alone — so "matched nothing" here means exactly what it means
         // there. Bounded: the caller's own value list is already capped.
+        const refFence = await fenceOn(ref)
         const rows = await d1Query<{ label: string | null }>(
           cfg,
           guard.databaseId,
           `SELECT DISTINCT ${ref.labelColumn} AS label FROM ${ref.table}
-            WHERE ${needles.map(() => `LOWER(${ref.labelColumn}) LIKE ? ESCAPE '\\'`).join(" OR ")}
-              OR id IN (${holes(needles.length)})
+            WHERE (${needles.map(() => `LOWER(${ref.labelColumn}) LIKE ? ESCAPE '\\'`).join(" OR ")}
+              OR id IN (${holes(needles.length)}))${refFence.sql}
             LIMIT ${VALUES_PER_CLAUSE * 4}`,
-          [...needles.map((n) => `%${likeLiteral(n).toLowerCase()}%`), ...needles]
+          [...needles.map((n) => `%${likeLiteral(n).toLowerCase()}%`), ...needles, ...refFence.params]
         )
         const labels = rows.map((r) => (r.label ?? "").toLowerCase())
         const missed = needles.filter((n) => !labels.some((l) => l.includes(n.toLowerCase())))
@@ -670,19 +695,20 @@ async function findUnmatched(
       // turn after naming it.
       if (field.identity) {
         const exact = c.op !== "contains"
+        const ownFence = await fenceOn(mod)
         const rows = await d1Query<{ v: string | null }>(
           cfg,
           guard.databaseId,
           `SELECT DISTINCT ${field.column} AS v FROM ${mod.table}
-            WHERE ${needles
+            WHERE (${needles
               .map(() =>
                 exact
                   ? `LOWER(${field.column}) = ?`
                   : `LOWER(${field.column}) LIKE ? ESCAPE '\\'`
               )
-              .join(" OR ")}
+              .join(" OR ")})${ownFence.sql}
             LIMIT ${VALUES_PER_CLAUSE * 4}`,
-          needles.map((n) => (exact ? n.toLowerCase() : `%${likeLiteral(n).toLowerCase()}%`))
+          [...needles.map((n) => (exact ? n.toLowerCase() : `%${likeLiteral(n).toLowerCase()}%`)), ...ownFence.params]
         )
         const found = rows.map((r) => (r.v ?? "").toLowerCase())
         const missed = needles.filter((n) =>
