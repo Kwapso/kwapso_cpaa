@@ -83,6 +83,40 @@ describe("driveFileText — one file's refusal is not the folder's", () => {
     })
   })
 
+  // AND THE REFUSAL IS WRITTEN DOWN. The test above proves the caller hears it;
+  // it passed for months while nobody else could. This is the only
+  // `google_access_lost` raised outside `googleFetch`, so it was the only one
+  // that reached a person without reaching a log — and on 30 Aug 2026 the owner
+  // reported seeing its sentence repeatedly against connections that were
+  // provably healthy (twelve live rows, every scope granted, `last_error` NULL,
+  // the sweep green, and no `access_lost` in forty-eight hours of Workers Logs).
+  // Every one of those readings was correct. The event simply had nowhere to go.
+  //
+  // What is asserted is the TAIL, not the throw — delete the `console.error` in
+  // `driveFileText` and this goes red while the test above stays green, which is
+  // the whole distinction being locked.
+  it("and says so in the log, because this refusal used to reach a person and no diagnostic", async () => {
+    stubGoogle({ mimeType: "text/plain", download: { status: 401 } })
+    const said: string[] = []
+    const real = console.error
+    console.error = (...a: unknown[]) => void said.push(a.map(String).join(" "))
+    try {
+      await expect(driveFileText(env, "tok", "file4")).rejects.toMatchObject({
+        code: "google_access_lost",
+      })
+    } finally {
+      console.error = real
+    }
+    const line = said.find((s) => s.includes("401"))
+    expect(line, "a 401 mid-read must leave a line naming the call and the file").toBeDefined()
+    // The file id is what makes the line actionable: the 2026-08-17 incident was
+    // ONE awkward file stopping a whole folder, and "which file" was the question
+    // nobody could answer.
+    expect(line).toContain("file4")
+    // Never the token. The header carried it; the log must not.
+    expect(said.join(" ")).not.toContain("tok")
+  })
+
   it("keeps treating a file with no text representation as empty", async () => {
     stubGoogle({ mimeType: "image/png", download: { status: 415 } })
     expect(await driveFileText(env, "tok", "picture")).toBe("")

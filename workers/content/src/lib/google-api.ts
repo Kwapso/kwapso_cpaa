@@ -659,8 +659,33 @@ export async function driveFileText(env: ReaderEnv, token: string, fileId: strin
   // A 401 IS about the grant: the token stopped being accepted between the
   // metadata call above and this one, and the caller has to hear that rather
   // than watch the rest of the folder quietly become empty strings.
-  if (res.status === 401)
+  //
+  // AND IT SAYS SO IN THE LOG, because until 30 Aug 2026 this was the only
+  // `google_access_lost` in the product that left NO TRACE ANYWHERE. Every other
+  // one is either raised by `googleFetch` — which logs the call, the status and
+  // Google's own reason a few lines above — or by a failed refresh, which writes
+  // `last_error` onto the connection so the settings card goes red. This one did
+  // neither: a raw `fetch` here, a clean GuardError out, and the worker's central
+  // catch never sees a GuardError.
+  //
+  // WHAT THAT COST, measured the day it was found. The owner reported getting
+  // "connect it again in Settings" repeatedly, and the evidence contradicted him
+  // in four places at once: twelve live connections across three people, every
+  // scope granted, `last_error` NULL on all of them, the sweep green every
+  // fifteen minutes, and not one `access_lost` in forty-eight hours of Workers
+  // Logs. Every one of those readings was correct. The single path that could
+  // produce his sentence was also the single path that could not be seen, so an
+  // hour of diagnosis bought a negative and the bug kept its hiding place.
+  //
+  // The caller's answer is unchanged. The query string is dropped for the same
+  // reason `googleFetch` drops it — that is where a person's search words live —
+  // and the token is never printed.
+  if (res.status === 401) {
+    console.error(
+      `google GET ${new URL(url).origin}${new URL(url).pathname} → 401 (drive file text, id ${id})`
+    )
     throw new GuardError(409, "google_access_lost", "Google wouldn't allow that any more. Connect it again in Settings.")
+  }
   // A 403 IS NOT, and this line used to treat them alike. The metadata call
   // ahead of this one goes through googleFetch, which throws on 401/403 — so the
   // token is already proven good ON THIS FILE, and a refusal here is about the
