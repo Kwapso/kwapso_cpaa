@@ -575,7 +575,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           sorts={translatedSorts("knowledge", t)}
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
           listKey={knowledgeKey(teamId as string)}
-          placeholder={t("Search the knowledge base…")}
+          placeholder={t("Search…")}
           matches={{
             none: t("No sources match"),
             one: t("1 source matches"),

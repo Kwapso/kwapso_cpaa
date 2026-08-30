@@ -421,6 +421,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "composition-coverage",
     status: "enforced",
   },
+  {
+    id: "R46",
+    dimension: "ui",
+    law: "EVERY KIT COMPONENT AND FOUNDATION RESOLVES TO A REACHED ADOPTION OR A REASONED, ROT-CHECKED EXEMPTION. The kit at `shared/ui/` ships 115 components and 3 foundations (icons, tokens, motion) — 118 named parts, the owner's own count, and his own instruction: \"all 118 components should be imported, and if you're not using some, I understand that, but there should be nothing hard-coded.\" A part is REACHED, not merely imported: `computeReachability` (`scripts/kit-coverage.mjs`) seeds from every kit reference either front door or `shared/web/` makes, in EITHER language the kit ships in — a JS/TS `from \"@shared/ui/…\"` or a CSS `@import \"…\"` — then closes over the kit's OWN cross-references (a component that imports another, a stylesheet that imports another) until nothing new appears, so a part reached only through another adopted part, or only through a stylesheet, still counts. Every part the walk does not reach is claimed by a line in `KIT_COMPONENT_EXEMPT` naming the one sentence a non-technical reader can check — no surface in the app has this shape, or adopting it would break another law. Rot-checked BOTH ways: a part the walk NOW reaches loses its exemption, and a part with no exemption and no reach fails the build — so the list can only shrink.",
+    why: "Counting only JS/TS import lines undercounted in the SAME direction seven times in one day, and always by dropping a real adoption rather than inventing a false one: six parts reach the app only through another kit part it has already adopted (`notes` through Comments, `folder` through Tabs, `title` through the kit's own `record-detail`, `progress` through `file-upload`, `gallery` and `checklist` picked up by two other lanes overnight with nobody re-running the census to notice), and `motion` reaches both front doors only through a CSS `@import` in their own `globals.css` — a reference no JS-import grep can see in either direction, because there is no import LINE in that language for it to miss. Canaried both ways: deleting the `@import` from both `globals.css` drops the reached-foundations count from 3/3 to 2/3, and restoring it recovers 3/3. A census that misses seven real adoptions cannot tell an unimported part from a badly-walked one, so the exemption list this law rot-checks is only honest once the walk it is checked against actually follows both languages the kit speaks — the same lesson R39's own deny-list learned about a THIRD dependency (an icon pack) arriving by a route nobody grepped for, applied here to the SECOND language a stylesheet speaks.",
+    checkId: "component-coverage",
+    status: "enforced",
+  },
 ]
 
 /** R44 — the ceiling. Per translated language, the number of extracted strings
@@ -434,6 +442,93 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   de: 307,
   es: 307,
   ca: 307,
+}
+
+/** R46 — the reviewed exemptions. A component or foundation here is not
+ * reached by the app today, each with the one sentence a non-technical reader
+ * can check: no surface in the app has this shape, or adopting it would break
+ * another law. Rot-checked both ways in `web/test/rules.test.ts` — an entry
+ * the walk now reaches turns the build red until the line is deleted, and a
+ * part with neither a reach nor a line here does the same. Keyed by the kit's
+ * own directory name (`components/<name>` or `foundations/<name>`), the same
+ * id `computeReachability` produces. */
+export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
+  "components/gantt":
+    "sprints render as a flat list plus one burndown bar (web/components/sprints-screen.tsx); nothing shows parallel per-app or per-owner lanes across periods for gantt's lane-per-record shape to draw.",
+  "components/heatmap":
+    "no screen aggregates \"which record did how much work each period\" as a grid — work-log views are single-series (one record's weeks, or one week's people, web/components/work-logs-panel.tsx), never a record×period matrix.",
+  "components/pulse-band":
+    "a confirmed name collision, not a gap: web/components/pulse.tsx exports its own PulseBand, a StatGrid-plus-two-bar-charts dashboard band with no day-of-week axis at all — unrelated in shape to the kit's day-by-week density strip. Nothing in the app tracks per-day-of-week workload.",
+  "components/donut":
+    "explicitly rejected in the app's own comment: web/components/pulse-charts.tsx documents that every comparison chart (hours by person, by app, by stage) stays a bar \"deliberately not a pie: … a bar is the only chart anybody reads a comparison off reliably.\"",
+  "components/rings":
+    "no single-KPI-against-a-target or part-of-a-whole metric exists anywhere that isn't already a bar comparison — the app's eleven charts are all multi-category bars or time-series areas (web/components/pulse-charts.tsx).",
+  "components/radar":
+    "no feature compares one record across several independent dimensions at once — every metric the app tracks (hours, margin, savings, stage counts) is a single measure over time or over a group, which the existing bar/area charts already cover.",
+  "components/progress-toggle":
+    "both progress readouts in the app are plain text (web/components/sprints-screen.tsx's \"3 of 11 done\") or a continuous bar (KpiProgress, web/components/tasks-screen.tsx) — never discrete done/undone segments for this pill row to draw.",
+  "components/article-body":
+    "a real duplicate exists (shared/web/rich-text-view.tsx's hand-rolled PROSE class, reused across 14 detail screens) but the swap is not mechanical: ArticleBody styles a `blockquote` as a 24px serif pull-quote, \"one per page\" by editorial rule, and this app's blockquotes are ordinary quoted replies inside a ticket or meeting note — applying the kit's pull-quote treatment to those would be wrong, not neutral. Needs a design decision (an override, or accepting the treatment) before the swap, not a blind one.",
+  "components/container":
+    "adopting it would break R29: web/components/deep-link-screen.tsx's own `max-w-[1600px]` line is the sole machine-checked page-width owner for the agency front door, and Container's own presets (app 1240 / marketing 1200 / document 960) don't even offer that width.",
+  "components/signature":
+    "the app's one approval flow, PortalApprovalBand (web-portal/components/ticket-screen.tsx), is a click-to-approve button with a caption — not a drawn, canvas signature capture. No sign-off flow in the app asks for one.",
+  "components/rating":
+    "no star icon and no rating concept exists anywhere in either front door's UI code.",
+  "components/hover-card":
+    "every floating panel in the app (web/components/record-picker.tsx and others) is deliberately click-triggered via the kit's own Popover — nothing opens a preview on hover, so there is no candidate to swap.",
+  "components/aspect-ratio":
+    "the one ratio-boxed image (web/components/deliverables-panel.tsx) applies the plain `aspect-video` Tailwind utility directly to a single thumbnail — one site, not a reusable wrapper's job.",
+  "components/video":
+    "no `<video>` element exists anywhere in web/, web-portal/, or shared/web/.",
+  "components/web-embed":
+    "the only `<iframe>` in the codebase is a sanitizer test fixture (web/test/stored-html.test.tsx) proving embeds get stripped — not a real embedded-content surface.",
+  "components/visibility":
+    "a confirmed name collision, not a gap: shared/web/screen-engine/visibility.tsx evaluates config-driven permission RULES against a row/user/app context; the kit's part answers a different question, \"is this on screen,\" via a shared IntersectionObserver. Different signatures, different jobs — CLAUDE.md documents the collision by name.",
+  "components/data-preview-table":
+    "the import flow's own locked law (AGENTIC-IMPORT.md, dated 2026-07-04) is \"one plan, one confirm,\" never a per-row checkbox grid — data-preview-table's whole shape is the interaction this app deliberately does not offer.",
+  "components/progress-dashboard":
+    "multi-metric displays are already assembled from StatGrid + KpiProgress + Chart (web/components/pulse.tsx, work-logs-panel.tsx, agent-blocks.tsx) — nothing needs this component's specific stacked-bars shape.",
+  "components/tree":
+    "no nested/hierarchical disclosure exists in the app — process branching (web/components/step-form-dialog.tsx) renders as a flowchart DAG through the kit's own Flowchart, not a tree, and the kit's own Comments is explicitly one level deep.",
+  "components/notifications":
+    "the app relies on the kit's own `sonner` toasts for the moment and `activity-feed` for the history — no bell icon or notification-center composition exists anywhere for this to replace.",
+  "components/form":
+    "adopting it would break R4: shared/web/form-shell.tsx (every dialog form's required shell) is built from Button + Dialog only and draws a pinned-footer DIALOG; the kit's form.tsx draws a page-section form with no dialog chrome at all. Different shapes solving different problems, not substitutes.",
+  "components/import-wizard":
+    "the flow structurally matches (AGENTIC-IMPORT.md's own upload→plan→review→run→report diagram), but web/components/import-screen.tsx is a 530-line working, critical flow carrying business logic the composite has no slot for (sample-file links, import history, CSV-injection-safe rejection export, per-step predicted rejections). Rebuilding it on the kit part is a large, risky rewrite, not a swap — deferred pending dedicated time, not rejected on fit.",
+  "components/kanban":
+    "zero drag-and-drop infrastructure (no dnd-kit or equivalent) exists anywhere in the app; sprints and stories deliberately track state by date rather than by status column (web/components/sprints-screen.tsx's own comment).",
+  "components/calendar-view":
+    "its documented blocker (no click prop, UI-GAPS.md #22) was fixed upstream in kit v1.2.9 — CalendarViewProps now carries onSelectDay/onSelectEvent/onSelectItem. Not yet adopted: web/components/record-calendar.tsx is 452 lines backing three screens (tasks, meetings, sprints), a bounded rebuild but not a same-sitting one. The gap moved from the library to here; UI-GAPS.md #22 records the update.",
+  "components/spreadsheet":
+    "rate cards and time logs (web/components/internal-rate-card.tsx, time-panel.tsx) are list-based with edits through a separate dialog, exactly the \"hours, invoices\" content the kit's own header names — but adopting it means re-architecting a working dialog-based edit flow into inline cell-editing, not a swap.",
+  "components/matrix":
+    "work-logs-panel.tsx deliberately renders hours by week/person/kind as three independent 1D bar charts, each failing on its own when it has nothing to say — no two-dimensional record×period cross-tab exists for this to replace.",
+  "components/swimlane":
+    "no two-axis grouping (a status column further split by a second axis like assignee) exists anywhere in the app — story and sprint state is shown one dimension at a time.",
+  "components/timeline":
+    "the app's only history surfaces are the vertical ActivityFeed (already adopted) and Chart-based burndown/line charts — nothing draws a horizontal dated-event spine.",
+  "components/agenda":
+    "record-calendar.tsx already hand-rolls its own day-by-day agenda mode instead of importing this part — the same deferred-adoption story as calendar-view, since Agenda is a thin wrapper over CalendarView's own agenda view.",
+  "components/split":
+    "architecturally inconsistent on purpose: the app's convention is a list screen navigating to a full-page deep-link detail (web/components/deep-link-screen.tsx); a persistent, non-URL-addressable two-pane master-detail contradicts that by design, not by oversight.",
+  "components/queue":
+    "the ticket triage tab (web/components/tickets-collection.tsx) is a plain filtered list with per-row Edit/Reply/Open buttons — not a one-record-at-a-time decide/skip sitting.",
+  "components/chat":
+    "no human-to-human messaging feature exists — the app's two thread UIs (the AI assistant, ticket conversations) are both already-adopted, different kit parts (agent-chat, ticket-thread) solving a different problem.",
+  "components/tiles":
+    "the home screen (web/components/screens/home-screen.tsx) uses PulseBand/StatGrid small KPI cards plus a links list — not a big-number wall-screen tile grid.",
+  "components/map":
+    "no lat/lng, address-mapping, or map integration exists anywhere in web/, web-portal/, or shared/web/.",
+  "components/compare":
+    "no 2-4 record side-by-side comparison screen exists anywhere in the app.",
+  "components/flowdetail":
+    "a fundamental mismatch: process steps are editable in this app (web/components/process/steps-panel.tsx has onEditStep/canEdit), and flowdetail's click-a-step panel is read-only by design — the app already adopted plain Flowchart directly instead (web/components/process-flowchart.tsx).",
+  "components/copilot-overlay":
+    "documented and deliberate: web/components/agent-host.tsx names copilot-overlay in its own comment, explaining that only the launcher's PLACEMENT was reused (it has to clear the phone's bottom nav bar, which the kit's own corner-pinned launcher does not account for) — the panel was rebuilt because agent-panel.tsx needs RunSteps and citation pills the kit's overlay does not model.",
+  "components/detail-view":
+    "a documented architecture choice, not an oversight: UI-CONVENTIONS.md §2b rules that bespoke `*-detail.tsx` screens are host-composed from TabsView + ActivityFeed + DescriptionList + Card precisely because each carries a control the screen engine (and this generic template) has no block for.",
 }
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly

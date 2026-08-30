@@ -219,9 +219,7 @@ export function StaffPanel({
               per-person figure would need its own COUNT(*) and this panel is not
               where somebody comes to ask it. */}
           {formatCount(teamCertTotal) ? (
-            <span className="bg-muted text-muted-foreground rounded-pill px-2 py-0.5 text-xs font-medium">
-              {formatCount(teamCertTotal)}
-            </span>
+            <Badge variant="secondary">{formatCount(teamCertTotal)}</Badge>
           ) : null}
         </h2>
         {mayAdd && (

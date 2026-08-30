@@ -37,7 +37,9 @@ import {
   BASE_LAW_CEILING,
   BASE_REPOSITORY,
   LAW_ID_ORIGIN,
+  KIT_COMPONENT_EXEMPT,
 } from "@shared/rules/registry"
+import { computeReachability, kitInventory } from "../../scripts/kit-coverage.mjs"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
@@ -2405,6 +2407,7 @@ describe("RULES — the laws of the base", () => {
       "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
       "translation-ceiling", // R44: web/test/translation-ceiling.test.ts — per-language untranslated count vs the pinned, only-falling ceiling
       "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
+      "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -3012,4 +3015,83 @@ describe("every tab value has an icon in the vocabulary", () => {
     ).toEqual([])
   })
 
+})
+
+// R46 — EVERY KIT COMPONENT AND FOUNDATION RESOLVES TO A REACHED ADOPTION OR A
+// REASONED, ROT-CHECKED EXEMPTION.
+//
+// `computeReachability` is imported from the SAME file `scripts/kit-coverage.mjs`
+// regenerates KIT-COVERAGE.md from, not reimplemented here — a check and a
+// human-facing checklist computed by two copies of one algorithm is how they
+// drift and disagree about which is true. The walk it runs follows BOTH
+// languages the kit ships in (a JS/TS `from "@shared/ui/…"`, a CSS
+// `@import "…"`), closing over the kit's own cross-references until nothing
+// new appears. See RULES.md R46 for why counting only JS/TS imports missed
+// `motion` and six others.
+describe("R46 — every kit component and foundation is reached, or a reasoned exemption", () => {
+  it("component-coverage: no unreached component or foundation without a live KIT_COMPONENT_EXEMPT line", () => {
+    const { components, foundations } = kitInventory()
+    const { reached } = computeReachability()
+
+    const reachedComponents = new Set(
+      [...reached].filter((id) => id.startsWith("components/")).map((id) => id.slice("components/".length))
+    )
+    const reachedFoundations = new Set(
+      [...reached].filter((id) => id.startsWith("foundations/")).map((id) => id.slice("foundations/".length))
+    )
+
+    // THE LOAD-BEARING CANARY. `motion` reaches the app ONLY through a CSS
+    // `@import` in both front doors' globals.css — never a JS/TS import. If
+    // this assertion ever goes false, the reachability walk has stopped
+    // following CSS `@import` and the census is back to undercounting the
+    // way it did before 30 Aug 2026 (RULES.md R46's own origin story).
+    // Canaried by hand at the time this law was written: deleting the
+    // `@import` line from both globals.css dropped `foundations/motion` out
+    // of `reached` and restoring it brought it back — this assertion is that
+    // same canary, kept, so it fires on every future run rather than once.
+    expect(
+      reachedFoundations.has("motion"),
+      "foundations/motion must be reached — it arrives ONLY through a CSS @import " +
+        "(web/app/globals.css, web-portal/app/globals.css), never a JS/TS import. False " +
+        "here means the reachability walk stopped following CSS @import."
+    ).toBe(true)
+
+    const offenders: string[] = []
+    for (const c of components) {
+      if (reachedComponents.has(c)) continue
+      if (KIT_COMPONENT_EXEMPT[`components/${c}`]) continue
+      offenders.push(`components/${c}`)
+    }
+    for (const f of foundations) {
+      if (reachedFoundations.has(f)) continue
+      if (KIT_COMPONENT_EXEMPT[`foundations/${f}`]) continue
+      offenders.push(`foundations/${f}`)
+    }
+    expect(
+      offenders,
+      `these kit parts are not reached by the app and carry no KIT_COMPONENT_EXEMPT line:\n` +
+        offenders.map((o) => `  ${o}`).join("\n") +
+        `\n\nEither adopt it (a real place in the app this belongs), or add a one-sentence, ` +
+        `reasoned line to KIT_COMPONENT_EXEMPT naming why the app has no such surface, or why ` +
+        `adopting it would break another law.`
+    ).toEqual([])
+
+    // The ratchet, both ways: an exemption for a part that is now reached, or
+    // for a part that no longer exists in the kit at all, is a record of an
+    // argument nobody is having — so the list can only shrink.
+    const allIds = new Set([
+      ...components.map((c) => `components/${c}`),
+      ...foundations.map((f) => `foundations/${f}`),
+    ])
+    const stale = Object.keys(KIT_COMPONENT_EXEMPT).filter((id) => {
+      if (!allIds.has(id)) return true
+      const name = id.slice(id.indexOf("/") + 1)
+      return id.startsWith("components/") ? reachedComponents.has(name) : reachedFoundations.has(name)
+    })
+    expect(
+      stale,
+      `KIT_COMPONENT_EXEMPT pins a part that is now reached, or that no longer exists — ` +
+        `delete the line: ${stale.join(", ")}`
+    ).toEqual([])
+  })
 })

@@ -22,7 +22,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff, Loader2 } from "@shared/ui/foundations/icons"
+import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff } from "@shared/ui/foundations/icons"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -106,14 +106,11 @@ function ValueRow({
             size="sm"
             variant="ghost"
             onClick={() => void saveRename(v.id)}
-            disabled={savingId === v.id}
+            loading={savingId === v.id}
+            loadingLabel={null}
             aria-label={t("Save")}
           >
-            {savingId === v.id ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Check className="size-4" />
-            )}
+            <Check className="size-4" />
           </Button>
           <Button
             size="sm"

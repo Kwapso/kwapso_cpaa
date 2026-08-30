@@ -53,7 +53,7 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
     <RememberedScreen memory={memory}>
       <PagedFind<Row>
         listKey={listKey}
-        placeholder="Search the knowledge base…"
+        placeholder="Search knowledge base…"
         matches={{ none: "No sources match", one: "1 source matches", many: "{count} sources match" }}
         facets={translatedFacets("knowledge", (s) => s)}
         fetchPage={fetchPage}
@@ -64,7 +64,7 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
   )
 }
 
-const box = () => screen.getByPlaceholderText("Search the knowledge base…") as HTMLInputElement
+const box = () => screen.getByPlaceholderText("Search knowledge base…") as HTMLInputElement
 
 beforeEach(() => forgetEverything())
 afterEach(cleanup)
@@ -99,7 +99,7 @@ describe("she comes back to the question she left", () => {
     render(
       <PagedFind<Row>
         listKey={listKey}
-        placeholder="Search the knowledge base…"
+        placeholder="Search knowledge base…"
         matches={{ none: "No sources match", one: "1 source matches", many: "{count} sources match" }}
         facets={translatedFacets("knowledge", (s) => s)}
         fetchPage={door.fetchPage}
