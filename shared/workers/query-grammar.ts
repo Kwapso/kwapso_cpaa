@@ -435,12 +435,38 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "title", column: "title", type: "text" },
       { name: "agenda", column: "agenda", type: "text", bulky: true },
       { name: "notes", column: "notes", type: "text", bulky: true },
+      // THE GUEST LIST, MATCHED AS TEXT — the mirror Google column, not a new
+      // capability. The door's own `q` filter (workers/content/src/lib/
+      // meetings.ts, `whereFor`) searches title, agenda, notes AND this column
+      // together, because 251 of 458 live meetings carry a guest list against 4
+      // with an agenda — "the one with Aparna" is how a person actually names a
+      // call. Without this field a multi-field `contains` here could reach the
+      // door's title/agenda/notes search and nothing else, missing the column
+      // that finds most meetings. `bulky`, like agenda and notes beside it: a
+      // guest list is JSON and can run long.
+      {
+        name: "guests",
+        column: "google_attendees_json",
+        type: "text",
+        bulky: true,
+        note: "the Google guest list, mirrored as JSON — a name or an address in it is a substring like any other",
+      },
       { name: "location", column: "location", type: "text" },
-      { name: "startsAt", column: "starts_at", type: "date" },
+      {
+        name: "startsAt",
+        column: "starts_at",
+        type: "date",
+        note: "filter with gte/lt/between to ask for an upcoming window, this week, or one calendar month — the door's own `view` and `month` filters, both expressed here as an ordinary date range",
+      },
       { name: "endsAt", column: "ends_at", type: "date" },
       { name: "purposeId", column: "purpose_id", type: "id" },
       { name: "fromCalendar", column: "from_calendar", type: "boolean" },
-      { name: "transcriptCapturedAt", column: "transcript_captured_at", type: "date" },
+      {
+        name: "transcriptCapturedAt",
+        column: "transcript_captured_at",
+        type: "date",
+        note: "set when the transcript was captured — notNull means this meeting has words on file (the door's own `transcript=yes`/`no` filter)",
+      },
       ACCOUNT,
       APP,
       CREATED,

@@ -306,8 +306,8 @@ const CF_RATES = {
   "@cf/ibm-granite/granite-4.0-h-micro": [0.017, 0.112],
   "@cf/meta/llama-4-scout-17b-16e-instruct": [0.27, 0.85],
 }
-const rate = CF_MODEL ? CF_RATES[CF_MODEL] : null
-if (CF_MODEL && !rate) console.log(`(no published rate on file for ${CF_MODEL} — cost not computed)`)
+const rate = CF_RATES[runModel] ?? null
+if (!rate) console.log(`(no published rate on file for ${runModel} — cost not computed)`)
 const usd = rate
   ? (spend.input * rate[0] + spend.output * rate[1]) / 1_000_000
   : (spend.input * 3 + spend.cacheWrite * 3.75 + spend.cacheRead * 0.3 + spend.output * 15) / 1_000_000

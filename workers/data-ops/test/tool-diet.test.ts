@@ -17,6 +17,10 @@ import { QUERY_MODULES } from "@shared/workers/query-grammar"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
 import { REPLACED_BY_QUERY, toolSpecs } from "../src/lib/tools"
+// The same census R19/R22/R27 stand on (workers/mcp/test/door-census.ts),
+// reused rather than re-scanned — a second scan of the same source is exactly
+// the drift this repo's own header warns about.
+import { DOORS, doorParams, fnBody, moduleLibSources, routesSource, type Door } from "../../mcp/test/door-census"
 
 const names = (held?: ReadonlySet<string>) => new Set(toolSpecs(held).map((t) => t.name))
 
@@ -58,6 +62,116 @@ describe("the tools the GRAMMAR replaced are gone from this surface, and only th
     expect(offered.has("query_records")).toBe(true)
     expect(offered.has("describe_module")).toBe(true)
   })
+})
+
+/** THE STRICT-SUPERSET BAR, CHECKED — the sentence at the top of
+ * `REPLACED_BY_QUERY` in tools.ts states it and nothing before this enforced
+ * it: "every parameter it parses maps to a declared field". The tests above
+ * prove the module NAME is real and the tool is gone; neither ever asked
+ * whether the grammar can actually SAY what the door's own `q` search says.
+ *
+ * `q` is the case that matters, because it is the one filter these doors
+ * spread across SEVERAL columns rather than one. Deleting the `guests` field
+ * this fold was built to add left every other check in this file green — the
+ * name is still real, the module is still named, the tool is still gone — so
+ * the gap it closes was provable only by reading the door's OWN source for
+ * which columns its `q` really touches. That is what this does, the same way
+ * R19 derives a tool's obligations: off disk, never hand-listed.
+ *
+ * TWO HOPS, not one. A door's handler does not build its own WHERE clause —
+ * `getMeetings` calls `listMeetings`, and `listMeetings` calls `whereFor`,
+ * which is where the LIKE clause actually lives (`getAccounts` →
+ * `listAccounts` → `accountsWhere`, `getApps` → `listApps` → `appsWhere`, the
+ * same shape three times). One hop would read the door's own handler and find
+ * nothing; this follows calls into the module's lib source until the trail
+ * goes cold. */
+function reachableLibBodies(door: Door): string {
+  const libSrcs = moduleLibSources(door)
+  const calledNames = (src: string) => [...new Set([...src.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g)].map((m) => m[1]))]
+  const bodies: string[] = []
+  const seen = new Set<string>()
+  let frontier = calledNames(fnBody(routesSource(door), door.handler))
+  // Bounded rather than fully recursive: the real call chains here are two
+  // hops deep, and a bound stops a false match (a name that happens to
+  // collide with an unrelated function elsewhere) from wandering forever.
+  for (let hop = 0; hop < 4 && frontier.length; hop++) {
+    const next: string[] = []
+    for (const name of frontier) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      const src = libSrcs.find((s) => fnBody(s, name))
+      if (!src) continue
+      const body = fnBody(src, name)
+      bodies.push(body)
+      next.push(...calledNames(body))
+    }
+    frontier = next
+  }
+  return bodies.join("\n")
+}
+
+/** Every column a LIKE clause compares — `LOWER(m.title) LIKE ?`, `p.name LIKE
+ * ?`, bare `name LIKE ?` all included, because the three folded doors that
+ * take `q` spell it three different ways (meetings lower-folds and aliases,
+ * processes aliases without folding, accounts does neither). */
+function likeColumns(src: string): string[] {
+  return [
+    ...new Set(
+      [...src.matchAll(/(?:LOWER\()?(?:[a-zA-Z_]\w*\.)?([a-zA-Z_]\w*)\)?\s*LIKE\s*\?/g)].map((m) => m[1])
+    ),
+  ]
+}
+
+describe("the strict-superset bar: a folded door's own `q` search, read off its source", () => {
+  const withQ = Object.entries(REPLACED_BY_QUERY).flatMap(([toolName, why]) => {
+    const shared = SHARED_TOOLS.find((t) => t.name === toolName)
+    const door = shared && DOORS.find((d) => d.method === shared.method && d.path === shared.path)
+    if (!door || !doorParams(door).includes("q")) return []
+    const modName = Object.keys(QUERY_MODULES).find((m) => why.includes(`\`${m}\``))
+    return modName ? [{ toolName, door, modName }] : []
+  })
+
+  it("finds the doors this half of the law actually governs (must not go blind)", () => {
+    // Pinned so a future refactor that renames a handler silently drops a door
+    // out of the census is a failing count, not a check that quietly checks
+    // nothing. Grows only when a new folded tool takes a `q`.
+    //
+    // `list_apps` IS NOT HERE, and it is a gap in `doorParams` rather than in
+    // this check or in the grammar: `getApps` (workers/tenancy/src/routes/
+    // processes.ts) reads `const params = new URL(request.url).searchParams`
+    // and then `params.get("q")` — `doorParams`'s own regex looks for the
+    // literal text `searchParams.get(`, so a door that names the variable
+    // anything else is invisible to it, exactly as `getAppModules` two
+    // handlers below it is. Checked by hand instead: `appsWhere`
+    // (workers/tenancy/src/lib/processes.ts) is `name LIKE ? ESCAPE '\\'`
+    // alone, and `QUERY_MODULES.apps` already declares `name` — no capability
+    // loss, just an oracle that cannot see this one door. Flagged separately
+    // rather than patched here, because `doorParams` is R19/R22/R27's shared
+    // oracle and widening it belongs in its own reviewed change, not folded
+    // silently into a fix for a different law.
+    expect(withQ.map((w) => w.toolName)).toEqual(
+      expect.arrayContaining(["list_accounts", "list_processes", "list_meetings"])
+    )
+  })
+
+  for (const { toolName, door, modName } of withQ) {
+    it(`${toolName}'s "q" reaches every column the grammar can express on \`${modName}\``, () => {
+      const cols = likeColumns(reachableLibBodies(door))
+      expect(
+        cols.length,
+        `${toolName}'s door takes "q" but no LIKE clause turned up within four calls of its handler — ` +
+          `the scan's own reach needs widening before this check means anything for it`
+      ).toBeGreaterThan(0)
+      const declared = new Set(QUERY_MODULES[modName].fields.map((f) => f.column))
+      const missing = cols.filter((c) => !declared.has(c))
+      expect(
+        missing,
+        `${toolName}'s "q" reaches column(s) ${missing.join(", ")} on \`${modName}\` that the grammar has ` +
+          `no field for — folding this tool into query_records without one is exactly the capability loss ` +
+          `this check exists to catch (declare the missing field, or take the tool back out of REPLACED_BY_QUERY)`
+      ).toEqual([])
+    })
+  }
 })
 
 describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
