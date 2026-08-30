@@ -456,11 +456,23 @@ export const RULES_REGISTRY: Rule[] = [
  * The third, "Ask about this record…", has no translated equivalent at any
  * length, so it is one string of real debt spent on purpose. THAT is the whole
  * point of the ceiling: not that it never moves, but that moving it is a line in
- * a diff with a reason beside it. */
+ * a diff with a reason beside it.
+ *
+ * LOWERED 308 -> 0, 30 Aug 2026 (feat/i18n-fill), including the debt above —
+ * "Ask about this record…" now has all three. All 308 were translated in one
+ * run through the app's OWN Cloudflare allowance (`@cf/openai/gpt-oss-120b`
+ * over the `ai/run` REST door, `scripts/i18n-translate-workers-ai.mjs`), never
+ * the owner's ANTHROPIC_API_KEY, grounded in `shared/glossary.ts` and written
+ * to `shared/i18n-seed.ts` (never `shared/i18n-catalogue.ts`, which says
+ * DO-NOT-HAND-EDIT and means it). Every one was checked mechanically —
+ * placeholders survive, "kwapso" survives, no invented trailing full stop —
+ * and a 20-string sample across both shapes and languages was read by hand.
+ * The ceiling can rise again the same way it did before: a reasoned line in
+ * this comment, on the day something is deliberately shipped untranslated. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 308,
-  es: 308,
-  ca: 308,
+  de: 0,
+  es: 0,
+  ca: 0,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
