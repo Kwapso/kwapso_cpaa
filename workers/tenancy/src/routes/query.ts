@@ -38,7 +38,7 @@ import {
   queryModule,
   suggestModule,
 } from "@shared/workers/query-grammar"
-import { parseQuery, runQuery, type Fence } from "../lib/query-engine"
+import { parseQuery, runQuery, type Fence, type FenceFor } from "../lib/query-engine"
 import type { Env } from "../env"
 
 /** HOW MANY NAMES `describe_module` LISTS for one reference field (R14: a hard
@@ -229,11 +229,13 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
  *
  * `{ self: true }` is the caller's own user id — the tasks door's narrowing,
  * which replaces whatever assignee was asked for with the person asking. */
-async function rowFence(cfg: D1Rest, guard: MemberGuard, mod: QueryModule): Promise<Fence> {
-  const n = mod.narrow
-  if (!n) return null
-  if (await hasRight(cfg, guard, n.right[0], n.right[1])) return null
-  return { column: n.column, value: typeof n.value === "string" ? n.value : guard.userId }
+function rowFence(cfg: D1Rest, guard: MemberGuard): FenceFor {
+  return async (mod: QueryModule): Promise<Fence> => {
+    const n = mod.narrow
+    if (!n) return null
+    if (await hasRight(cfg, guard, n.right[0], n.right[1])) return null
+    return { column: n.column, value: typeof n.value === "string" ? n.value : guard.userId }
+  }
 }
 
 /**
@@ -276,7 +278,9 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
   // lives, and applied INSIDE the one WHERE clause the engine builds all four of
   // its reads from, so the page, the exact total, the grouped counts and the
   // unmatched lookup are narrowed by construction rather than each remembering.
-  const fence = await rowFence(cfg, guard, mod)
+  // A RESOLVER rather than one fence, because `findUnmatched` looks values up in
+  // the REFERENCED table too, and that table has a fence of its own.
+  const fence = rowFence(cfg, guard)
 
   const parsed = parseQuery(mod, {
     // Each capped AT the boundary (R20, positionally), then parsed — a

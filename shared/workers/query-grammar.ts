@@ -368,10 +368,6 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The agency's own admin — a piece of work with nobody's ticket behind it.",
     labelColumn: "title",
     defaultSort: "createdAt",
-    narrow: {
-      right: ["all_tasks", "read"],
-      column: "assignee_id",
-      value: { self: true },
       reason:
         "GET /api/content/tasks replaces whatever assignee was asked for with the caller's own " +
         "user id when they lack `all_tasks:read` (getTasks, routes/todos.ts) — narrowed rather " +

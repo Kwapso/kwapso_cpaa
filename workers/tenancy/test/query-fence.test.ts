@@ -416,6 +416,31 @@ describe("the second switch: a right that narrows rows narrows them here too", (
       expect(r.body.total).toBe(0)
     })
 
+    it("`unmatched` does not become an existence oracle for the people", async () => {
+      // THE FENCE'S OWN BLIND SPOT, and the reason the door hands the engine a
+      // RESOLVER rather than one clause. `findUnmatched` exists to tell "no rows
+      // matched" from "no such thing" — it looks the value up in the referenced
+      // table. On a fenced module that lookup answers a question the caller may
+      // not ask: filter `parentAccountId contains "Marta Ruiz"` and silence means
+      // she is here; filter an invented name and `unmatched` comes back. One bit
+      // per guess, about exactly the people this right withholds. Measured before
+      // the fix, on this fixture, and it returned exactly that pair.
+      withoutRight("contacts")
+      const person = db().prepare("SELECT name FROM accounts WHERE account_type='individual' LIMIT 1").get() as { name: string }
+      const probe = async (v: string) =>
+        (await ask(`?module=accounts&countOnly=true&where=${encodeURIComponent(JSON.stringify([{ field: "parentAccountId", op: "contains", value: v }]))}`))
+          .body.unmatched
+      expect(person.name, "the fixture must really hold a person to hunt for").toBeTruthy()
+      expect(
+        await probe(person.name),
+        `"${person.name}" is a person this caller may not enumerate — reporting her as MATCHED tells them she is here`
+      ).toEqual([{ field: "parentAccountId", values: [person.name] }])
+      expect(
+        await probe("Zzyzx Nonexistent"),
+        "a name that is genuinely absent must read the same way, or the difference is the leak"
+      ).toEqual([{ field: "parentAccountId", values: ["Zzyzx Nonexistent"] }])
+    })
+
     it("WITH contacts:read the same caller gets the people (the positive control)", async () => {
       const r = await ask("?module=accounts")
       expect(r.status).toBe(200)
