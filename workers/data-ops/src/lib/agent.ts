@@ -530,6 +530,54 @@ function fence(result: ToolResult, allowance?: number): string {
  *
  * Per TURN, never across turns: the loop makes one of these and throws it away,
  * so asking the same question again in the next message really does re-read. */
+/** THE SAME TOOL, OVER AND OVER, WITH THE ARGUMENTS NUDGED EACH TIME.
+ *
+ * `repeatGuard` below catches a BYTE-IDENTICAL read and answers it from the first
+ * one. It cannot catch this, and this is the expensive shape: on 30 Aug 2026 the
+ * owner asked about one meeting and the model called `list_meetings` twelve times
+ * — a different page or filter each time, so every call was a fresh key — until
+ * MAX_STEPS ran out and the turn ended with "I took several steps and paused
+ * here." Twelve assistant credits, no answer, and his own screenshot of a column
+ * of identical-looking step rows.
+ *
+ * He asked the right question about it: why page the whole collection instead of
+ * asking the knowledge base and then confirming with ONE narrowed read. The
+ * prompt already says exactly that. The model did it anyway, which is what makes
+ * a guard the right layer rather than more words in the preamble.
+ *
+ * READS ONLY, and the safety argument is `repeatGuard`'s: a read is idempotent
+ * and it has already been answered several times this turn, so declining the next
+ * one loses nothing that was not already handed over. A WRITE always runs — a
+ * seam that silently swallowed a second write would be deciding something the
+ * door and the confirm panel exist to decide.
+ *
+ * It does not lower MAX_STEPS or end the turn. It replaces ONE call's result with
+ * a sentence naming the cheaper route, so the model still has its remaining steps
+ * and now has something to do with them. */
+const SAME_TOOL_LIMIT = 4
+
+export function pagingGuard() {
+  const calls = new Map<string, number>()
+  return {
+    /** null to run normally, or the sentence to hand back instead. */
+    check: (write: boolean, name: string): string | null => {
+      if (write) return null
+      const n = (calls.get(name) ?? 0) + 1
+      calls.set(name, n)
+      if (n <= SAME_TOOL_LIMIT) return null
+      return (
+        `You have called ${name} ${n} times in this turn, each time for another page. ` +
+        `Stop paging: it spends a step per page and the answer is not in the next one. ` +
+        `Ask the door the question instead — a filter narrows to the rows you mean, ` +
+        `\`total\` is the exact count without reading the rows, and \`groupBy\` returns ` +
+        `counts per client or per month. If you are looking for what was SAID or AGREED ` +
+        `rather than for a row, ask_knowledge searches the transcripts and documents and ` +
+        `is the right door for that. Use what you already have from the calls above.`
+      )
+    },
+  }
+}
+
 export function repeatGuard() {
   const seen = new Map<string, string>()
   // Key order must not make two identical calls look different, so the fields are
@@ -739,6 +787,7 @@ type StepCtx = {
   names: Record<string, string>
   /** this turn's already-run READS, so an identical one answers from the first. */
   repeats: ReturnType<typeof repeatGuard>
+  paging: ReturnType<typeof pagingGuard>
   /** what this turn may still hand the model in tool-result text. Per-TURN, like
    * `repeats`, so it is made outside the loop and the step context carries it. */
   budget: ReturnType<typeof readBudget>
@@ -785,6 +834,22 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
       source: ctx.source,
     })
     return { message: { role: "tool", content: cached, toolCallId: tc.id, toolName: tc.name }, ok: true }
+  }
+  // THE SAME TOOL AGAIN, ARGUMENTS NUDGED — see pagingGuard. The step row is still
+  // emitted and still written, for the same reason the repeat above is: the model
+  // really did ask, and a trail that hid it would make the next one invisible.
+  const nudge = t ? ctx.paging.check(!!t.write, tc.name) : null
+  if (nudge !== null) {
+    const capped = `${summary} — asked again; narrowing is cheaper than the next page`
+    emit?.({ t: "step_start", tool: tc.name, summary: capped, ids: traceIds(tc.input) })
+    emit?.({ t: "step_end", tool: tc.name, ok: true, summary: capped })
+    await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
+      role: "tool",
+      content: nudge,
+      toolCallsJson: JSON.stringify([{ tool: tc.name, summary: capped, status: "done" }]),
+      source: ctx.source,
+    })
+    return { message: { role: "tool", content: nudge, toolCallId: tc.id, toolName: tc.name }, ok: true }
   }
   emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
   const result: ToolResult = t
@@ -1013,6 +1078,10 @@ async function runPlanLoop(
   // happens ACROSS steps — call a tool, get a model turn back, call the identical
   // tool again — so a guard rebuilt each iteration would never see the repeat.
   const repeats = repeatGuard()
+  // ONE per turn, beside `repeats`, so the count accumulates ACROSS steps — which
+  // is the whole point: the twelve calls that burned the owner's turn were twelve
+  // separate steps, not twelve calls inside one.
+  const paging = pagingGuard()
   const budget = readBudget()
 
   // ONE narration seam: everything the assistant says flows out as a `text` event —
@@ -1230,7 +1299,7 @@ async function runPlanLoop(
       emit && reply.toolCalls.some((tc) => hasNameableId(tc.input))
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
-    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, budget, emit }
+    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
       const { message, ok } = await runToolCall(stepCtx, tc)
@@ -1339,7 +1408,7 @@ export async function confirmAndRun(
   // loop ran the call (see runToolCall: writes title the row, reads ride along quietly).
   // A fresh guard: these are the CONFIRMED calls, which are writes — the guard
   // never touches a write — and the plan this turn resumes into gets its own.
-  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), budget: readBudget(), emit }
+  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), paging: pagingGuard(), budget: readBudget(), emit }
   const toolMsgs: ChatMessage[] = []
   let failed = false
   for (const tc of calls) {

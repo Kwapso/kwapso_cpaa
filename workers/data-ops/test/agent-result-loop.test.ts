@@ -22,7 +22,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { readBudget, repeatGuard, trimResult } from "../src/lib/agent"
+import { pagingGuard, readBudget, repeatGuard, trimResult } from "../src/lib/agent"
 import type { ToolCall } from "../src/lib/model"
 
 /** A ticket shaped like the door's own row (help.ts TICKET_COLS) — thirty-odd
@@ -341,5 +341,54 @@ describe("repeatGuard: the same read twice in one turn is answered once", () => 
     // A new guard is what the loop builds per turn — asking again next message must
     // really re-read, or the assistant would answer from a stale list for ever.
     expect(repeatGuard().recall(false, read({ scope: "all" }))).toBeNull()
+  })
+})
+
+// THE SHAPE repeatGuard CANNOT CATCH — the owner's turn on 30 Aug 2026.
+//
+// He asked about ONE meeting. The model called `list_meetings` twelve times, a
+// different page or filter each time, so every call was a fresh key and every one
+// ran. MAX_STEPS is 12, so the turn ended on "I took several steps and paused
+// here": twelve of the team's assistant credits spent, no answer given, and a
+// column of identical-looking step rows in his screenshot.
+//
+// His own question was the right one — why page a whole collection instead of
+// asking the knowledge base and confirming with one narrowed read. The preamble
+// already says that. Saying it again was not going to work, which is why the guard
+// sits in the loop rather than in the prompt.
+describe("pagingGuard — the same tool again, arguments nudged", () => {
+  it("lets a read through up to the limit, then hands back the cheaper route", () => {
+    const g = pagingGuard()
+    for (let i = 1; i <= 4; i++)
+      expect(g.check(false, "list_meetings"), `call ${i} must still run`).toBeNull()
+    const nudge = g.check(false, "list_meetings")
+    expect(nudge, "the fifth is answered instead of run").not.toBeNull()
+    // The sentence has to be ACTIONABLE, not a scolding — it names the three
+    // cheaper doors, because a model told only to stop has nothing to do next.
+    expect(nudge).toContain("total")
+    expect(nudge).toContain("groupBy")
+    expect(nudge).toContain("ask_knowledge")
+  })
+
+  it("counts per tool, so a varied turn is not punished for being varied", () => {
+    const g = pagingGuard()
+    for (let i = 0; i < 5; i++) g.check(false, "list_meetings")
+    // A different tool starts its own count: reading meetings a lot must not stop
+    // the model reading an account once.
+    expect(g.check(false, "get_account")).toBeNull()
+  })
+
+  it("never withholds a WRITE, however many times it is called", () => {
+    const g = pagingGuard()
+    // The same argument repeatGuard makes: a read is idempotent so declining one
+    // loses nothing, and a write is not — swallowing a second write would be this
+    // seam deciding something the door and the confirm panel exist to decide.
+    for (let i = 0; i < 20; i++) expect(g.check(true, "update_account")).toBeNull()
+  })
+
+  it("is per turn — the next message really does read again", () => {
+    const g = pagingGuard()
+    for (let i = 0; i < 6; i++) g.check(false, "list_meetings")
+    expect(pagingGuard().check(false, "list_meetings")).toBeNull()
   })
 })
