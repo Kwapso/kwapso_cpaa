@@ -37,14 +37,25 @@ export function CollectionHeading({
   /** the exact server total (undefined while loading → the chip renders nothing). */
   total: number | undefined
 }) {
-  // ARBITRATION (R16 iii): the hook is called ABOVE the early return — a counted
-  // tab strip wins and this heading stands down entirely.
+  // ARBITRATION (R16 iii): a counted tab strip wins THE COUNT. It does not win
+  // the page's name.
+  //
+  // This used to `return null` here, and that is how the Sprints screen shipped
+  // with no title at all while every screen beside it had one — the owner found
+  // it on 30 Aug 2026 and asked the right question: how did this get past rules
+  // this strict. It got past them because it OBEYED them. R16 says a collection
+  // shows its count exactly once, and deleting the entire heading satisfies that
+  // sentence perfectly. Nothing anywhere said a page must have a name, so nothing
+  // objected. A check right about what it checks and silent about what matters.
+  //
+  // So the badge stands down and the heading stays. Every tabbed screen —
+  // sprints, tasks, and any other that grows a counted strip — gets its name
+  // back, from one change, because they all came here for it.
   const t = useT()
-  const standsDown = useCountStandsDown()
-  if (standsDown) return null
+  const countStandsDown = useCountStandsDown()
 
   const title = TEAM_SECTIONS.find((s) => s.key === sectionKey)?.title ?? sectionKey
-  const badge = formatCount(total)
+  const badge = countStandsDown ? "" : formatCount(total)
   // The vocabulary is keyed by concept, and every section key is one — but the
   // lookup is defensive rather than asserted: a section that outgrows the map
   // should lose its glyph, not its heading.

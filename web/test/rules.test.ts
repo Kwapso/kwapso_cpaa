@@ -1551,17 +1551,36 @@ describe("RULES — the laws of the base", () => {
       expect(rendered, `sidebar collection "${s.key}" must render a CollectionHeading (R16 ii)`).toBe(true)
     }
 
-    // (iii) THE ARBITRATION — the context exists; the heading consults it ABOVE
-    // its early return and returns null when marked; the tab host marks badged
-    // panels only; a file with both a counted tab and a heading imports the seam.
+    // (iii) THE ARBITRATION — the context exists; the heading consults it and
+    // gives up ITS COUNT when marked; the tab host marks badged panels only; a
+    // file with both a counted tab and a heading imports the seam.
+    //
+    // THIS CLAUSE USED TO REQUIRE THE BUG. It asserted the heading contained
+    // `return null` after the hook — so the law did not merely fail to catch six
+    // anonymous screens, it MANDATED them. The owner found Sprints with no title
+    // on 30 Aug 2026 and asked how it got past rules this strict; this is the
+    // answer, written down where the next person will meet it.
+    //
+    // R16 is about the COUNT appearing exactly once. Deleting the whole heading
+    // satisfies that and costs the page its name, which no law was watching. So
+    // what is asserted now is the narrower, true thing: the arbitration decides
+    // the BADGE. The name is not the count's to take, and
+    // `web/test/a-page-keeps-its-name.test.tsx` renders the component both ways
+    // to prove it.
     const counted = read(join(WEB, "components", "counted-tabs.tsx"))
     expect(counted).toContain("createContext")
     expect(counted).toContain("CountedAbove")
     const heading = read(join(WEB, "components", "collection-heading.tsx"))
     const hookAt = heading.indexOf("useCountStandsDown()")
-    const returnAt = heading.indexOf("return null")
     expect(hookAt, "the heading must consult the arbitration hook").toBeGreaterThan(-1)
-    expect(returnAt, "the heading must stand down (return null) when marked").toBeGreaterThan(hookAt)
+    expect(
+      /const badge = \w*[Ss]tandsDown \? "" : formatCount\(/.test(heading),
+      "the arbitration must decide the BADGE — a heading that returns null takes the page's name with it"
+    ).toBe(true)
+    expect(
+      /if \(\w*[Ss]tandsDown\) return null/.test(heading),
+      "the heading must NOT disappear when a strip owns the count: that is how six screens shipped anonymous"
+    ).toBe(false)
     const host = read(join(WEB, "components", "deep-link-screen.tsx"))
     expect(host, "the tab host marks badged panels via CountedTabs").toContain("<CountedTabs badged=")
     for (const f of componentFiles()) {
