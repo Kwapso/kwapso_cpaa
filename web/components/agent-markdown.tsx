@@ -69,6 +69,40 @@ function Line({ escaped }: { escaped: string }) {
 }
 
 function Block({ block }: { block: MdBlock }) {
+  // A TABLE SCROLLS IN ITS OWN BOX. The assistant panel is 327px wide on a phone
+  // and a three-column table is not going to fit; the alternative — letting it
+  // widen the panel — pushes the whole conversation sideways. `min-w-0` on the
+  // wrapper is what actually lets it shrink inside the flex column above.
+  if ("rows" in block) {
+    return (
+      <div className="my-2 min-w-0 overflow-x-auto">
+        <table className="w-full border-collapse text-left text-caption">
+          {block.head.length > 0 && (
+            <thead>
+              <tr>
+                {block.head.map((c, i) => (
+                  <th key={i} className="border-b px-2 py-1 font-[var(--font-weight-medium)] whitespace-nowrap">
+                    <Line escaped={c} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {block.rows.map((row, r) => (
+              <tr key={r}>
+                {row.map((c, i) => (
+                  <td key={i} className="border-b px-2 py-1 align-top">
+                    <Line escaped={c} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
   // `"items" in block` rather than a test on `tag` — see the note in
   // markdown-html.ts: a discriminant that is itself a union of literals cannot
   // be narrowed away, so the paragraph branch below would not see its `lines`.

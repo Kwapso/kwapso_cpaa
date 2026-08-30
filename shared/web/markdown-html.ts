@@ -51,6 +51,9 @@ export function inline(escaped: string): string {
 export type MdBlock =
   | { tag: "p" | "h3" | "h4"; lines: string[] }
   | { tag: "ul" | "ol"; items: string[] }
+  /** A GFM pipe table. `head` may be empty for a headerless table; every row is
+   *  padded to the widest, so a ragged table cannot produce a ragged DOM. */
+  | { tag: "table"; head: string[]; rows: string[][] }
 
 // Group escaped lines into paragraphs, HEADINGS and lists. Consecutive "- "/"* "
 // lines become one <ul>; "1." lines one <ol>; a "#"-prefixed line becomes a
@@ -75,7 +78,48 @@ export function mdBlocks(text: string): MdBlock[] {
     list = null
   }
 
-  for (const line of lines) {
+  // A TABLE IS THE ONE BLOCK THAT NEEDS LOOKAHEAD. GFM says a header row is only
+  // a header because the NEXT line is a delimiter (`|---|:--:|`), so a line full
+  // of pipes is prose until the line after it says otherwise. That is why this
+  // is an index loop and the others were not: without the lookahead, "a | b" in
+  // an ordinary sentence would open a table.
+  //
+  // Until 2026-08-30 there was no table block at all, so the assistant's tables
+  // fell through to the paragraph branch and reached the owner as raw pipes and
+  // dashes joined by <br> — which is what a table looks like when nothing knows
+  // it is one. The model was right to emit one; two columns of "contact / is
+  // this the main stakeholder" is a table and nothing else.
+  const cells = (line: string): string[] =>
+    line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((c) => c.trim())
+  const isDelimiter = (line: string): boolean =>
+    /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/.test(line) && line.includes("-")
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.includes("|") && i + 1 < lines.length && isDelimiter(lines[i + 1])) {
+      flushPara()
+      flushList()
+      const head = cells(line)
+      const rows: string[][] = []
+      i += 2
+      for (; i < lines.length && lines[i].includes("|") && lines[i].trim() !== ""; i++)
+        rows.push(cells(lines[i]))
+      i--
+      // Ragged rows are normal from a model. Pad rather than drop, so a short row
+      // is a blank cell and never a shifted column.
+      const width = Math.max(head.length, ...rows.map((r) => r.length), 1)
+      out.push({
+        tag: "table",
+        head: head.length ? [...head, ...Array(width - head.length).fill("")] : [],
+        rows: rows.map((r) => [...r, ...Array(width - r.length).fill("")]),
+      })
+      continue
+    }
     const bullet = /^\s*[-*]\s+(.*)$/.exec(line)
     const numbered = /^\s*\d+\.\s+(.*)$/.exec(line)
     const heading = /^(#{1,6})\s+(.*\S)\s*$/.exec(line)
@@ -116,10 +160,22 @@ export function toHtml(text: string): string {
     // `"items" in b` rather than a test on `tag`: a member whose discriminant is
     // itself a union of literals ("ul" | "ol") cannot be narrowed AWAY by two
     // inequalities, so the paragraph branch would not see its own `lines`.
-    .map((b) =>
-      "items" in b
+    .map((b) => {
+      // Tables first: `"rows" in b` for the same reason `"items" in b` is used
+      // below — a discriminant that is itself a union of literals cannot be
+      // narrowed away by inequalities.
+      if ("rows" in b) {
+        const head = b.head.length
+          ? `<thead><tr>${b.head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead>`
+          : ""
+        const body = b.rows
+          .map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`)
+          .join("")
+        return `<table>${head}<tbody>${body}</tbody></table>`
+      }
+      return "items" in b
         ? `<${b.tag}>${b.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${b.tag}>`
         : `<${b.tag}>${b.lines.map(inline).join("<br>")}</${b.tag}>`
-    )
+    })
     .join("")
 }
