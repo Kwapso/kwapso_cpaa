@@ -132,13 +132,12 @@ function StepBox({
   return (
     <div className={`relative rounded-[var(--radius)] border p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
       {chip ? (
-        <span
-          className={`float-right ms-2 rounded-pill px-2 py-0.5 text-[0.625rem] font-medium ${
-            side === "old" ? "bg-muted text-muted-foreground" : "bg-foreground text-background"
-          }`}
+        <Badge
+          variant={side === "old" ? "secondary" : "inverse"}
+          className="float-right ms-2 h-auto py-0.5 text-[0.625rem]"
         >
           {chip}
-        </span>
+        </Badge>
       ) : null}
       <p className="text-sm font-medium">{step.name}</p>
       <p className="text-muted-foreground mt-1 text-xs">

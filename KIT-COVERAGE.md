@@ -12,15 +12,21 @@ is one part, and headline/text/hint are three exports of typography. Nothing he
 asked for is missing and nothing in the kit went unnamed.
 
 `[x]` = the app REACHES it — directly, or through another part it already
-reaches. Counting only the app's own import lines understated this SIX times in
-one day, always the same way: `notes` arrives through Comments, `folder` through
-tabs, `title` through the kit's own record-detail, `progress` through file-upload,
-`motion` through both doors' stylesheets. Each was found by hand and filed as a
-footnote while the headline stayed wrong. 26 parts are reached that way today.
-The walk cannot over-count: nothing enters without a path back to a file the app
+reaches, in EITHER language the kit ships in. Counting only the app's own JS/TS
+import lines understated this SEVEN times in one day: six parts arrive through
+another kit part (`notes` through Comments, `folder` through tabs, `title`
+through the kit's own record-detail, `progress` through file-upload, two more
+filed as footnotes), and `motion` arrives through a CSS `@import` in both front
+doors' globals.css — a reference no JS-import grep can see at all, in either
+direction. 7 parts are reached that way today, JS or CSS. The
+walk cannot over-count: nothing enters without a path back to a file the app
 itself names, which is why `heatmap` stays unadopted even though `pulse-band`
-imports it — pulse-band is not reached either. `[ ]` = not reached. `(absent)` = named
-it and the kit has no such part, which is worth knowing rather than silently dropping.
+imports it — pulse-band is not reached either. `[ ]` = not reached. `(absent)` =
+named it and the kit has no such part, which is worth knowing rather than
+silently dropping.
+
+Regenerate with `node scripts/kit-coverage.mjs` — one command, no /tmp
+preparation, never edited by hand.
 
 ## Charts and graphs
 
@@ -173,11 +179,11 @@ it and the kit has no such part, which is worth knowing rather than silently dro
 - [ ] `swimlane`
 - [ ] `timeline`
 - [ ] `agenda`
-- [ ] `gallery`
+- [x] `gallery`
 - [ ] `split`
 - [ ] `queue`
 - [x] `activity-feed`
-- [ ] `checklist`
+- [x] `checklist`
 - [ ] `chat`
 - [x] `run-steps`
 - [ ] `tiles`
@@ -253,9 +259,10 @@ it and the kit has no such part, which is worth knowing rather than silently dro
 ## Foundations
 
 - [x] `icons`
+- [x] `motion`
 - [x] `tokens`
-- [ ] `motion` — the owner named motions; check what actually animates
 
 ---
 
-**Components 75/115 · Compositions 8/47**
+**Components 77/115 · Foundations 3/3 · Compositions 8/47**
+**Components + foundations combined (the owner's "118"): 80/118**
