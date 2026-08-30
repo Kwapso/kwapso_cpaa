@@ -437,11 +437,30 @@ export const RULES_REGISTRY: Rule[] = [
  * choosing a language what to expect. Pinned rather than computed inline so a
  * change to it is a reviewed line in a diff: raising it silently is exactly the
  * drift the law exists to catch, so the check requires the true count to equal
- * this number exactly, in both directions. Measured 2026-08-30. */
+ * this number exactly, in both directions. Measured 2026-08-30.
+ *
+ * RAISED 307 -> 308 the same day, deliberately, and this is what a raise has to
+ * look like. Three mobile placeholders were SHORTENED to stop them overflowing a
+ * 375px field — and all three of the long originals were translated while none of
+ * the short replacements was, so a width fix was quietly buying itself three
+ * English sentences on a German screen. R44 caught it; nobody raised the pin to
+ * make the build green.
+ *
+ * Two of the three cost nothing in the end, because the catalogue already had a
+ * shorter sentence that says the same thing: "Search…" became "Search" and
+ * "Ask the knowledge base…" became "Ask the knowledge base", both existing keys,
+ * both translated in all three languages. Borrowing a sentence the app can
+ * already say is always cheaper than writing a new one, and it is the same move
+ * the error screen made last week.
+ *
+ * The third, "Ask about this record…", has no translated equivalent at any
+ * length, so it is one string of real debt spent on purpose. THAT is the whole
+ * point of the ceiling: not that it never moves, but that moving it is a line in
+ * a diff with a reason beside it. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 307,
-  es: 307,
-  ca: 307,
+  de: 308,
+  es: 308,
+  ca: 308,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
