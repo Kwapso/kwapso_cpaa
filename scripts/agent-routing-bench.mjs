@@ -10,8 +10,10 @@
 // ── WHY IT CAN JUDGE A BRANCH ───────────────────────────────────────────────
 //
 // `systemFor` and `toolSpecs` are IMPORTED FROM THE WORKING TREE, and the model
-// is built by the shipped `selectModel`. So the prompt under test is the file
-// you just edited and the catalogue is the one the worker will send. Run it on
+// runs on the model the DEPLOYMENT pins (read off wrangler.jsonc, not off
+// model.ts's inert constant). So the prompt under test is the file you just
+// edited, the catalogue is the one the worker will send, and the model is the
+// one that answers the owner. Run it on
 // `main`, run it on your branch, read the difference. (The same property
 // kb-bench.mjs has, for the retrieval half.)
 //
@@ -68,6 +70,7 @@
 import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -78,7 +81,7 @@ const VERBOSE = process.argv.includes("--verbose")
 
 const { systemFor } = await import(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
 const { toolSpecs } = await import(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
-const { selectModel } = await import(join(REPO, "workers", "data-ops", "src", "lib", "model.ts"))
+const { DEFAULT_AGENT_MODEL } = await import(join(REPO, "workers", "data-ops", "src", "lib", "model.ts"))
 
 /* ------------------------------ the question set ------------------------- */
 
@@ -147,21 +150,51 @@ const judge = (want, tools) => {
 const system = systemFor(null)
 const tools = toolSpecs()
 
+/** THE MODEL THE DEPLOYMENT ACTUALLY RUNS — read off wrangler.jsonc, never off
+ * model.ts's constant. `selectModel` is `env.AGENT_MODEL || DEFAULT_AGENT_MODEL`
+ * and both environments pin AGENT_MODEL, so the constant is inert; a bench that
+ * reads it measures a model nobody runs. That happened: three runs of a routing
+ * question were scored against glm-5.3-flash while every deployed turn was on
+ * gpt-oss-120b, and the two disagree completely on this question (6/6 against
+ * 1/5). Refuses rather than guesses if the pin is missing or the environments
+ * disagree — a bench that quietly falls back is the failure it exists to catch. */
+function deployedModel() {
+  const src = readFileSync(join(REPO, "workers", "data-ops", "wrangler.jsonc"), "utf8")
+  const pinned = [...src.matchAll(/"AGENT_MODEL":\s*"([^"]+)"/g)].map((m) => m[1])
+  if (!pinned.length) throw new Error("no AGENT_MODEL pin in wrangler.jsonc — refusing to guess which model ships")
+  if (new Set(pinned).size !== 1)
+    throw new Error(`environments disagree on AGENT_MODEL (${[...new Set(pinned)].join(" vs ")}) — fix the config before benchmarking`)
+  return pinned[0]
+}
+const ACCOUNT_HINT = process.env.CLOUDFLARE_ACCOUNT_ID || "the kwapso Cloudflare account"
+const runModel = process.env.BENCH_CF_MODEL || deployedModel()
+
 if (DRY) {
   console.log(`system prompt   ${system.length.toLocaleString()} chars  (~${Math.round(system.length / 4).toLocaleString()} tokens)`)
   const toolChars = JSON.stringify(tools).length
   console.log(`tool catalogue  ${tools.length} tools, ${toolChars.toLocaleString()} chars  (~${Math.round(toolChars / 4).toLocaleString()} tokens)`)
   console.log(`questions       ${QUESTIONS.length}  (${QUESTIONS.filter((q) => q.want === "knowledge").length} knowledge, ${QUESTIONS.filter((q) => q.want === "live").length} live)`)
-  const prefix = Math.round((system.length + toolChars) / 4)
-  const est = (prefix * 3.75 + prefix * (QUESTIONS.length - 1) * 0.3 + QUESTIONS.length * 300 * 15) / 1_000_000
-  console.log(`estimated spend ~$${est.toFixed(2)}  (one cache write, ${QUESTIONS.length - 1} cache reads, ~300 output tokens each)`)
+  // WHICH MODEL, AND THEREFORE WHOSE BILL. Said here rather than assumed,
+  // because the answer changed and this line did not: `selectModel` reads
+  // `env.AGENT_MODEL || DEFAULT_AGENT_MODEL` and wrangler.jsonc pins
+  // AGENT_MODEL in both environments, so the shipped assistant runs on a
+  // WORKERS AI model and bills Cloudflare NEURONS. There is no Anthropic
+  // spend on that path at all.
+  //
+  // This block used to print an Anthropic dollar estimate — "one cache write,
+  // 21 cache reads" — for a run that cannot take that path, and on 30 Aug 2026
+  // a lane budgeted against it and reported a spend of $0.43 that was never
+  // charged to anybody. A stale number is worse than no number, because
+  // somebody plans with it.
+  console.log(`model           ${runModel}${runModel === DEFAULT_AGENT_MODEL ? "" : `  (wrangler's pin; model.ts's ${DEFAULT_AGENT_MODEL} is inert)`}`)
+  console.log(
+    `spend           Cloudflare NEURONS on ${ACCOUNT_HINT}, not the Anthropic key.` +
+      ` Measured 30 Aug 2026: ~880 neurons per question on gpt-oss-120b with this` +
+      ` catalogue, so ~${(QUESTIONS.length * 880).toLocaleString()} for this run.` +
+      ` Read the real figure off the line the run prints when it finishes.`
+  )
   process.exit(0)
 }
-
-const key = process.env.BENCH_CF_MODEL
-  ? "" // a Cloudflare-hosted run needs no Anthropic key at all
-  : process.env.ANTHROPIC_API_KEY ||
-    execSync("security find-generic-password -s anthropic-api-key -w").toString().trim()
 
 /* WORKERS AI, for comparing a Cloudflare-hosted model against Claude on the SAME
  * questions, the SAME prompt and the SAME 192-tool catalogue. The newer models
@@ -216,13 +249,9 @@ function workersAiModel(name) {
   }
 }
 
-const CF_MODEL = process.env.BENCH_CF_MODEL || ""
-const model = CF_MODEL ? workersAiModel(CF_MODEL) : selectModel({
-  ANTHROPIC_API_KEY: key,
-  AGENT_MODEL: process.env.AGENT_MODEL || "claude-sonnet-5",
-  AGENT_EFFORT: process.env.AGENT_EFFORT || "low",
-  AGENT_PROMPT_CACHE: process.env.AGENT_PROMPT_CACHE || "1h",
-    })
+// One path, because there is only one: every model this can reach is a Workers
+// AI model, so the run goes over the REST door with the account token.
+const model = workersAiModel(runModel)
 
 const spend = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }
 const rows = []
