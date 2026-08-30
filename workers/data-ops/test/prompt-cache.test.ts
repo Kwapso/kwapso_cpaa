@@ -206,10 +206,35 @@ describe("the affinity header", () => {
     expect(seen[0]?.options?.extraHeaders).toBeUndefined()
   })
 
-  it("runs on a model that HAS a cached rate — the header is worthless without one", () => {
-    // gpt-oss-120b answers perfectly and caches nothing, ever; measured 0 cached
-    // tokens across four calls behind an identical prefix. A model with no cached
-    // rate turns this whole file into decoration.
-    expect(DEFAULT_AGENT_MODEL).toBe("@cf/zai-org/glm-5.3-flash")
+  // THIS ASSERTION USED TO PIN THE ENGINE TO glm, and it was wrong — green, and
+  // asserting the wrong intent, which is the failure CLAUDE.md's planning ritual
+  // names in point 6.
+  //
+  // Its reasoning was "the header is worthless on a model with no cached rate, so
+  // the default must be a model that has one". The premise is true and the
+  // conclusion does not follow: the cached rate is about MONEY, and the engine is
+  // chosen on LATENCY. Re-measured 30 Aug 2026 against a real 40-tool catalogue,
+  // three runs each — gpt-oss 2429/2583/3363ms with no cache at all; glm
+  // 7168/8868/9751ms cold, and 3809-5879ms once its cache reaches 99.5% with the
+  // affinity header. glm WARM is slower than gpt-oss COLD. And the note in
+  // model.ts records that the header does nothing through `env.AI.run` anyway,
+  // which is the door the deployed worker uses.
+  //
+  // Worse, the assertion was inert as a safety net: `wrangler.jsonc` had pinned
+  // AGENT_MODEL to gpt-oss since 28 Aug and the var wins in `selectModel`, so
+  // this test was pinning a constant that no deployed turn ever read. It passed
+  // for two days while describing an assistant nobody was running.
+  //
+  // What is asserted instead is the property this file actually protects: the
+  // header goes out when there is a conversation to pin. Whether the engine of
+  // the day bills a cached rate is a separate decision, and whether it MATCHES
+  // the deployment is locked in no-quiet-downgrade.test.ts, off the wrangler
+  // config, which is the check that would have caught the drift.
+  it("the header is sent for a pinned conversation, whatever engine is current", async () => {
+    const { env, seen } = spyEnv()
+    await selectModel(env, "thread_A").complete([{ role: "user", content: "hi" }], [])
+    const sent = (seen[0]?.options?.extraHeaders as Record<string, string>)?.["x-session-affinity"]
+    expect(sent, "a turn's steps must be steerable to one instance").toBe("thread_A")
+    expect(DEFAULT_AGENT_MODEL, "an engine must still be named in code").toBeTruthy()
   })
 })
