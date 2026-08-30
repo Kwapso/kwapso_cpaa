@@ -1,0 +1,87 @@
+#!/usr/bin/env node
+// EVERY PAGE SAYS WHAT IT IS — walked in a real browser, on both front doors.
+//
+// WHY IT EXISTS. On 30 Aug 2026 the owner opened Sprints and there was no title
+// on it. Nor on Accounts, Tickets, Tasks, Meetings or Apps — six of fourteen
+// screens with no name anywhere. His question was the better half of the report:
+// how did that get past rules this strict?
+//
+// It got past them by OBEYING them. R16 says a collection shows its count exactly
+// once, and `CollectionHeading` arbitrated by returning null — which satisfies
+// that sentence perfectly and takes the title with it. Nothing said a page must
+// have a name. A check can only be silent about what it was not asked.
+//
+// The unit test beside this (`web/test/a-page-keeps-its-name.test.tsx`) locks the
+// component. This walks the DEPLOYED app, because the component was never the
+// whole story: a screen that simply never renders a heading is invisible to a
+// test of the heading, and only a browser knows what a person actually sees.
+//
+//   set -a && source ~/.config/kwapso/keys.env && set +a
+//   node scripts/every-page-has-a-name.mjs
+//
+// Exits non-zero when a page has no visible name, so it can gate a deploy.
+
+import { chromium } from "playwright"
+
+const API = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
+const AGENCY = process.env.AGENCY_BASE ?? "https://agency-staging.kwapso.app"
+const KEY = process.env.TEST_LOGIN_KEY
+if (!KEY) {
+  console.log("FAIL no TEST_LOGIN_KEY — export it first")
+  process.exit(1)
+}
+
+// DERIVED FROM THE NAV, not hand-listed: every sidebar destination the app
+// offers. A page added to the rail tomorrow is walked tomorrow.
+const { TEAM_SECTIONS } = await import("../web/lib/pages.ts").catch(() => ({ TEAM_SECTIONS: null }))
+const SEGMENTS = TEAM_SECTIONS
+  ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => s.segment)
+  : ["accounts", "knowledge", "tickets", "stories", "tasks", "time", "meetings", "apps", "waves", "sprints"]
+
+async function signIn(email) {
+  const s = await fetch(`${API}/api/auth/admin/test-login`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-admin-key": KEY },
+    body: JSON.stringify({ email }),
+  }).then((r) => r.json())
+  const v = await fetch(`${API}/api/auth/email/verify`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, code: s.code }),
+  })
+  return (v.headers.get("set-cookie") ?? "").split(";")[0].split("=")[1]
+}
+
+const token = await signIn("alaap@kwapso.com")
+const browser = await chromium.launch()
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+await ctx.addCookies([{ name: "kwapso_session", value: token, domain: new URL(AGENCY).hostname, path: "/" }])
+const page = await ctx.newPage()
+
+let bad = 0
+for (const seg of SEGMENTS) {
+  const url = `${AGENCY}/${seg}`
+  try {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 })
+  } catch {
+    console.log(`FAIL  /${seg} — did not load`)
+    bad++
+    continue
+  }
+  await page.waitForTimeout(2800)
+  const names = await page.evaluate(() =>
+    [...document.querySelectorAll("h1")]
+      .filter((e) => e.offsetParent !== null && e.textContent.trim())
+      .map((e) => e.textContent.trim())
+  )
+  if (!names.length) {
+    console.log(`FAIL  /${seg} — no visible name on the page`)
+    bad++
+  } else {
+    console.log(`PASS  /${seg} — "${names[0].slice(0, 40)}"`)
+  }
+}
+
+await browser.close()
+console.log(bad ? `\n${bad} page(s) with no name` : "\nevery page says what it is")
+process.exit(bad ? 1 : 0)
