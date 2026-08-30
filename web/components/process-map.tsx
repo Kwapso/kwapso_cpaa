@@ -129,13 +129,11 @@ function StepBox({
         {t("Not in this version")}
       </div>
     )
+  const chipVariant = side === "old" ? "secondary" : "inverse"
   return (
     <div className={`relative rounded-[var(--radius)] border p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
       {chip ? (
-        <Badge
-          variant={side === "old" ? "secondary" : "inverse"}
-          className="float-right ms-2 h-auto py-0.5 text-[0.625rem]"
-        >
+        <Badge variant={chipVariant} className="float-right ms-2 h-auto py-0.5 text-[0.625rem]">
           {chip}
         </Badge>
       ) : null}
@@ -187,15 +185,15 @@ export function ProcessMap({
         // chip instead.
         <div className="text-muted-foreground flex flex-col gap-1 text-xs font-medium lg:grid lg:grid-cols-2 lg:gap-3">
           <span>
-            <span className="bg-muted text-muted-foreground me-1.5 rounded-pill px-2 py-0.5 text-[0.625rem]">
+            <Badge variant="secondary" className="me-1.5 h-auto py-0.5 text-[0.625rem]">
               {leftShort}
-            </span>
+            </Badge>
             {leftLabel}
           </span>
           <span>
-            <span className="bg-foreground text-background me-1.5 rounded-pill px-2 py-0.5 text-[0.625rem]">
+            <Badge variant="inverse" className="me-1.5 h-auto py-0.5 text-[0.625rem]">
               {rightShort}
-            </span>
+            </Badge>
             {rightLabel}
           </span>
         </div>

@@ -25,7 +25,7 @@ So this is **not** a post-launch nicety. It ships before the agency moves in.
 
 ## 0 · The rules you cannot break
 
-- `CLAUDE.md` holds the Laws of the Base, R1–R44, **machine-checked**.
+- `CLAUDE.md` holds the Laws of the Base, R1–R46, **machine-checked**.
   `npm run check` must exit 0; a law without its check cannot ship.
 - **Capture the real exit code**: `npm run check > /tmp/x.log 2>&1; echo $?`. A
   piped run reports the pipe's status, not npm's.
