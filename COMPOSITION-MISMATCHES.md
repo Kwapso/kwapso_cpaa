@@ -9,6 +9,145 @@ and `states/` findings from the second lane's pass, so one file answers "why
 did this one stop" for the whole catalogue rather than two files each
 answering half.
 
+## FINAL RESOLUTION — 47 of 47, decided (2026-08-30)
+
+Everything below this section is the record of how each verdict was reached —
+kept in place because, per this file's own rule, "a record of why something
+was rejected is only useful while it is true," and several of these records
+are still exactly that record. This section is the answer itself: every one
+of the 47 files under `shared/ui/compositions/` now has a verdict, enforced
+by **R44** (`shared/rules/registry.ts`'s `COMPOSITION_EXEMPT`, checked by
+`composition-coverage` in `web/test/rules.test.ts`) so the count cannot
+silently regress the next time the kit ships a 48th file or an app screen
+quietly duplicates one.
+
+**What changed to close the gap from 37 to 47, and why three earlier verdicts moved:**
+
+- **The missing ten**, never individually decided before today: nine
+  `screens/` files (`brand`, `company-hub`, `home`, `onboarding`, `portal-home`,
+  `portal-impact`, `profile`, `settings`, `sign-in-system`) and
+  `templates/record-chrome.tsx` — the last one is the single strangest gap in
+  the whole file, because it is infrastructure this document has been calling
+  "already-adopted" by name in a dozen places (`RecordChrome`, the host seam
+  every record screen composes) without ever giving the kit file it comes from
+  its own line.
+- **A factual correction**: `templates/sign-in.tsx` was credited with the
+  agency login "landing" — it did not. Direct-import grep proves the agency
+  door renders `screens/sign-in-system.tsx`'s `LoginRoute`; `templates/sign-in.tsx`
+  is a separate, real adoption of its own (`AuthPhotograph`, used by the
+  portal shell for its sign-in artwork). Both are adopted; neither should have
+  been credited for the other.
+- **Three retractions**, each because a deeper structural check ran where the
+  2026-08-29 pass only checked an optional prop. On record because, as this
+  file already says once, the retraction matters as much as the finding:
+  - `overlays/access-denied.tsx` — `grantor={null}` really is a clean opt-out
+    (that finding holds), but the composition's non-optional premise (a Dialog
+    over the actual requested screen, blurred behind it) has no real call site
+    in either door: the agency's denial is an inline sentence inside a
+    persistent shell with no page-behind concept, and the portal's is a total,
+    whole-session denial with no screen behind it at all. Downgraded `[~]` → `[!]`.
+  - `overlays/delete-confirmation.tsx` — `confirmWord={null}` really is a
+    clean opt-out for the one-press case (that finding holds too), but
+    `recordNumber` is a REQUIRED prop baked into the dialog's own title
+    sentence, and this app's actual deactivate targets (roles, accounts,
+    members) have no record-number vocabulary at all — and the composition's
+    whole premise is irreversible deletion, where this app's law is
+    deactivate-never-delete. Downgraded `[~]` → `[!]`.
+  - `templates/stat-strip.tsx` — the `spark`-is-optional finding was correct
+    but incomplete: `pulse.tsx` already draws its headline numbers through the
+    kit's own `StatGrid` component directly, the exact primitive this
+    composition is built on top of, and the one thing it would add — a
+    per-tile mini-chart — is precisely the numbers/chart fusion `pulse.tsx`'s
+    own law forbids on these tiles. Reclassified `[~]` → realized differently.
+  - `templates/form-screen.tsx` stays `[!]` but the reason moved: `surface="page"`
+    really is a bare div (confirmed twice now), so the dialog-vs-sheet
+    objection is resolved — but the composition's real value over `FormShell`
+    is a required-fields-by-name summary and a changed-fields-by-name dirty
+    band, and none of `FormShell`'s 32+ callers track fields by name today.
+    That is a real, scoped feature to build, not a chrome swap behind one flag.
+  - `screens/session-expired.tsx` was filed under a `[!]` heading despite its
+    own text already saying "there is no current app equivalent to compare
+    against at all" — reclassified to `[ ]`, a real, unscoped finding rather
+    than a mismatch.
+  - `templates/portal-home.tsx`, `templates/record-route.tsx`,
+    `templates/detail-screen.tsx`, `templates/main-screen.tsx`,
+    `templates/collection-screen.tsx` were filed under the `[x] Adopted`
+    heading despite each one's own text saying the file itself is not
+    imported — the job is done, natively or by composing other
+    already-adopted kit parts under different names. Relabelled as their own
+    outcome, **realized differently**, rather than counted as adoptions the
+    direct-import census could ever verify.
+
+**The verdict vocabulary, six outcomes now that "realized differently" is
+named as its own kind of answer rather than folded into "adopted" or "mismatch":**
+
+| Mark | Meaning |
+|---|---|
+| `[x]` | Adopted — a direct `@shared/ui/compositions/...` import in `web/`, `web-portal/` or `shared/web/`. |
+| `[=]` | Realized differently — this app already does the identical job, natively or by composing other already-adopted kit parts under other names; importing this exact file would duplicate working code. |
+| `[!]` | Genuine structural mismatch, checked against the file's own required props and documented behaviour. |
+| `[ ]` | A real gap — the app has nothing serving this job — with a stated reason: permanent (a model that rules it out) or a live finding. |
+| `[?]` | A genuine two-sided question, with a recommendation. |
+
+**The 47, one row each** (full reasoning for every non-adopted file lives in
+`COMPOSITION_EXEMPT`, `shared/rules/registry.ts` — this is the pointer the
+build itself checks against):
+
+| Composition | Verdict | Why |
+|---|---|---|
+| `overlays/access-denied.tsx` | `[!]` | No real call site for a dialog-over-the-blurred-page: neither door has "one denied module, real page still open behind it." |
+| `overlays/assistant.tsx` | `[!]` | Kit's assistant is non-modal by design; this app's `AgentPanel` is deliberately modal because it live-drives the screen underneath. |
+| `overlays/bulk-edit.tsx` | `[?]` | The selection primitive is real and unblocked; recommend not adopting yet — no collection performs a bulk write today. |
+| `overlays/delete-confirmation.tsx` | `[!]` | `recordNumber` required, no numbered-record vocabulary here; whole premise is irreversible delete, this app only deactivates. |
+| `overlays/export.tsx` | `[!]` | `columns` not optional; this app's export is a one-click filtered `<a href>`, no scope/column picker exists. |
+| `overlays/filter-builder.tsx` | `[!]` | AND-chained condition rows have no analog in this app's single-valued closed-vocabulary facet chips. |
+| `overlays/import-proposal.tsx` | `[!]` | Same root as the import trio — no manual per-column mapping UI to plug a review step into. |
+| `overlays/import.tsx` | `[!]` | Five-step manual-mapping wizard; this app's import is agentic, multi-table, FK-resolving. |
+| `overlays/quick-view.tsx` | `[ ]` | Permanent — every row's Enter/Space navigates straight to the record; no peek pattern anywhere. |
+| `screens/brand.tsx` | `[ ]` | A real, minor finding — no staff-facing design-token reference page exists; the Brand library is a different, client-asset concept. |
+| `screens/company-hub.tsx` | `[!]` | `account-detail.tsx` already does this job with a different anatomy (tabs, rate cards, companies-vs-people split). |
+| `screens/home.tsx` | `[!]` | Kit embeds a live ticket queue inline; this app's home shows figures plus link-out cards — a different product decision. |
+| `screens/invite-acceptance.tsx` | `[!]` | Assumes one pre-account invite screen; this app's real flow is a post-sign-in inbox of every pending invite. |
+| `screens/link-sent.tsx` | `[!]` | Built around a magic link on a possibly different device; this app sends a 6-digit code, same device, same form. |
+| `screens/not-found.tsx` | `[!]` | Built for one bad record inside a fine collection; this app's `<NotFound />` fires with no collection context at all. |
+| `screens/onboarding.tsx` | `[!]` | Kit's 3-step tour has no analog; this app's onboarding is a single-step name/photo form wired to closed-team-creation logic. |
+| `screens/page-failure.tsx` | `[x]` | Adopted — the portal's whole-page failure takeover. |
+| `screens/portal-boot.tsx` | `[!]` | Its two registers are the already-rejected static splash and the already-adopted page-failure screen. |
+| `screens/portal-home.tsx` | `[=]` | Route wrapper around `templates/portal-home.tsx`'s already-realized shape. |
+| `screens/portal-impact.tsx` | `[!]` | Kit's is a flat progress report; this app's `/impact` is an interactive App→Process→Step drill-down with pricing. |
+| `screens/profile.tsx` | `[!]` | This app edits via a popup dialog beside a summary + activity feed; the kit is an inline full-page form. |
+| `screens/session-expired.tsx` | `[ ]` | A real, unscoped finding — nothing persists identity or a return destination across a 401 today. |
+| `screens/settings.tsx` | `[!]` | Kit assumes one six-tab Settings screen; this app deliberately scattered the same settings across three destinations. |
+| `screens/sign-in-portal.tsx` | `[?]` | One real law disagreement (no social row) vs. SCOPE ch.06's Google row; recommend keeping the app's Google row. |
+| `screens/sign-in-system.tsx` | `[x]` | Adopted — confirmed by direct import: the agency login renders this file's `LoginRoute`. |
+| `screens/sign-in.tsx` | `[!]` | Magic-link-only shell, the opposite of this app's code-based sign-in; its `AuthShell` sibling has no live route either. |
+| `screens/splash.tsx` | `[!]` | Kit's boot screen is a static, non-animated mark; this app's is a deliberate, dated, owner-motivated looping animation. |
+| `states/archive.tsx` | `[x]` | Adopted, partially and for real — the consequence-band is shipped live on Tickets; the other two laws are scoped per-collection work. |
+| `states/empty-collection.tsx` | `[x]` | Adopted, partially and for real — the `emptyBody` register is live; the figure-strip/zero-badge half needs unbuilt engine concepts. |
+| `states/new-empty-record.tsx` | `[!]` | A real equivalent exists, just scattered across every record-detail file rather than unified. |
+| `states/no-results.tsx` | `[!]` | A real, richer register exists in the kit, but it needs an unbuilt engine computation; the current plain sentence is not a dead end. |
+| `states/states.tsx` | `[x]` | Adopted — `ShapeStateBody` is the shared engine's loading/error/empty register. |
+| `templates/collection-screen.tsx` | `[=]` | Renders `MainScreen` internally; shares that file's already-realized finding. |
+| `templates/detail-screen.tsx` | `[=]` | `ScreenShell` + `RecordChrome`, already assembled under other names; this app's persistent header is a deliberate difference, not a gap. |
+| `templates/form-screen.tsx` | `[!]` | Its real value (field-name-aware validation summary) needs state no form in this app tracks today — a feature to build, not a chrome swap. |
+| `templates/import-flow.tsx` | `[!]` | Same root as the import trio. |
+| `templates/main-screen.tsx` | `[=]` | `ScreenShell` + `CollectionFrame(tone="bare")`, already reached independently; the one open question was decided not pursued. |
+| `templates/multi-step-form.tsx` | `[ ]` | Permanent — no wizard-style form exists anywhere; confirmed by the kit's own runtime warning. |
+| `templates/portal-home.tsx` | `[=]` | `web-portal/components/home-screen.tsx` already implements the identical spec natively. |
+| `templates/rail.tsx` | `[?]` | Parked per the owner's own review; recommend adopting — the render-probe already proved the team switcher fits its slots. |
+| `templates/record-chrome.tsx` | `[x]` | Adopted — confirmed by direct import; the record-detail host seam every record screen composes through. |
+| `templates/record-route.tsx` | `[=]` | `ScreenShell` + `RecordChrome` + `StepperHero`, already assembled under other names. |
+| `templates/screen-shell.tsx` | `[x]` | Adopted and landed — `AppShell` now composes this directly, verified navigating (R37 object-identity check). |
+| `templates/search-results.tsx` | `[ ]` | A real finding — no global search exists anywhere; worth the owner's separate consideration. |
+| `templates/sign-in.tsx` | `[x]` | Adopted — confirmed by direct import: the portal shell's `AuthPhotograph`. |
+| `templates/stat-strip.tsx` | `[=]` | `pulse.tsx` already draws its numbers through the kit's own `StatGrid`, the primitive this file wraps; its one addition is forbidden here by house law. |
+| `templates/stepper-hero.tsx` | `[x]` | Adopted — the ticket status track, verified live at all four widths, both themes. |
+
+**Tally: 9 adopted, 6 realized differently, 24 mismatch, 3 owner's-call, 5 real
+gaps = 47.** Every one decided; none left for the next lane to re-discover.
+
+---
+
 **Reading this file:** `[x]` means the composition fits and was adopted. `[~]`
 means it is now judged ADOPTABLE — a real opt-out or override was found on
 re-examination — but has not been rolled out yet; each one names what a
