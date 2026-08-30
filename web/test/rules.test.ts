@@ -2402,6 +2402,7 @@ describe("RULES — the laws of the base", () => {
       "reachable-bytes", // R40: web/test/reachable-bytes.test.ts — the write census (off the wrangler bucket bindings) walked to the render
       "picked-files-are-sent", // R41: web/test/picked-files-are-sent.test.ts — R40's sibling, where nothing is stored at all
       "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
+      "translation-ceiling", // R44: web/test/translation-ceiling.test.ts — per-language untranslated count vs the pinned, only-falling ceiling
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
