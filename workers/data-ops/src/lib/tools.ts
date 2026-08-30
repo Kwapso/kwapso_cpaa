@@ -696,13 +696,22 @@ const AGENT_ONLY: AgentTool[] = [
  * THE BAR FOR A LINE HERE is that the grammar is a STRICT SUPERSET of the door's
  * own narrowing — every parameter it parses maps to a declared field, and it
  * offers no derived view (`scope=mine`, `view=overdue`, `when=current`) that a
- * filter cannot express. Seven list tools deliberately stay: `list_help_tickets`
+ * filter cannot express. Six list tools deliberately stay: `list_help_tickets`
  * (`scope=mine` is a join through who is staffed to an app), `list_work_logs`
  * (the same, and the model has no way to name "me"), `list_stories`,
- * `list_todos`, `list_tasks`, `list_sprints` and `list_meetings` (each carries a
- * derived view or a month), and `list_knowledge_sources`, which returns a
- * SOURCE'S OWN WORDS when given an id and is the one read the prompt sends the
- * model to for reading a document whole.
+ * `list_todos` and `list_sprints` (each carries a derived view or a month), and
+ * `list_knowledge_sources`, which returns a SOURCE'S OWN WORDS when given an id
+ * and is the one read the prompt sends the model to for reading a document
+ * whole.
+ *
+ * `list_meetings` USED TO BE AN EIGHTH — its `view`, `month` and `transcript`
+ * are exactly this same "derived view or a month" shape, and stayed for it. What
+ * was NOT a derived view was `q`: the door's own multi-field search reaches the
+ * guest list (workers/content/src/lib/meetings.ts's `whereFor` — 251 of 458 live
+ * meetings carry one against 4 with an agenda), and the grammar had no field for
+ * it, so folding this tool in would have silently narrowed what a caller could
+ * search. Fixed by declaring `guests` beside `title`/`agenda`/`notes` in
+ * `QUERY_MODULES.meetings` — now a strict superset, and this is the ninth line.
  *
  * Rot-checked by `workers/data-ops/test/tool-diet.test.ts`: every name here must
  * still be a shared GET tool, and its module must still be one the grammar can
@@ -717,6 +726,8 @@ export const REPLACED_BY_QUERY: Record<string, string> = {
   list_dropdown_values: "query_records on `dropdown_values` — by id, by type, or the whole vocabulary",
   list_account_rates: "query_records on `account_rates` — accountId, and it can now answer across clients rather than one at a time",
   list_roles: "query_records on `roles` — by id or the whole list, with the deactivated ones filterable rather than merely present",
+  list_meetings:
+    "query_records on `meetings` — accountId, appId and purposeId narrow it directly; `view=upcoming`/`week` and `month` are `startsAt` gte/lt/between; `transcript=yes`/`no` is `transcriptCapturedAt` notNull/isNull; `view=all` is asking about `deactivatedAt` yourself, exactly as the door's own everyday-list default works; and `q` is a multi-field contains over title, agenda, notes and the new `guests` field, which is the door's own guest-list search",
 }
 
 /** The agent's full catalog: every shared endpoint (projected, less the list
