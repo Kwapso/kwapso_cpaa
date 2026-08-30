@@ -901,8 +901,23 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                learning the same thing, and neither component invents a second
                shape. */
             className={cn(
-              "flex min-w-0 items-end gap-2 bg-card ps-4 pe-2 py-2",
-              grown ? "rounded-[var(--radius)]" : "rounded-pill",
+              "flex min-w-0 items-end gap-2 bg-card pe-2 py-2",
+              // THE INSET FOLLOWS THE SHAPE, for the same reason the radius does.
+              //
+              // A pill and a rounded rectangle do not need the same leading
+              // padding to LOOK the same. On a rectangle the edge is a straight
+              // line and 16px reads as 16px. On a pill the edge is an arc that
+              // sweeps away above and below the text, so the same 16px reads as
+              // crowded — the eye measures to the nearest ink, not to the
+              // bounding box. Reported twice by the owner on 30 Aug 2026, on a
+              // composer that measured a correct-looking 16px both times, which
+              // is why measuring it did not settle it.
+              //
+              // So the pill state gets 20px and the grown state keeps 16px, off
+              // the same `grown` flag the radius already reads. One shape
+              // decision, two properties following it, and no second source of
+              // truth about which state the composer is in.
+              grown ? "ps-4 rounded-[var(--radius)]" : "ps-5 rounded-pill",
             )}
           >
             <Textarea
