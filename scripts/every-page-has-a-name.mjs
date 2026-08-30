@@ -68,7 +68,17 @@ for (const seg of SEGMENTS) {
     bad++
     continue
   }
-  await page.waitForTimeout(2800)
+  // WAIT FOR THE NAME, do not sleep at it. A fixed pause is a flaky oracle: on
+  // 30 Aug this check reported four pages nameless that had been fine minutes
+  // earlier, purely because they were slower to render that run. A check that
+  // fails when the app is slow teaches everyone to re-run it until it is green,
+  // which is worse than not having it.
+  await page
+    .waitForFunction(
+      () => [...document.querySelectorAll("h1")].some((e) => e.offsetParent !== null && e.textContent.trim()),
+      { timeout: 20000 }
+    )
+    .catch(() => undefined)
   const names = await page.evaluate(() =>
     [...document.querySelectorAll("h1")]
       .filter((e) => e.offsetParent !== null && e.textContent.trim())
