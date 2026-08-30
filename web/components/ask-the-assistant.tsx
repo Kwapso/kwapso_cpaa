@@ -112,7 +112,7 @@ export function AskTheAssistant({
         <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder={context ? t("Ask about this record…") : t("Ask the knowledge base…")}
+          placeholder={context ? t("Ask about this record…") : t("Ask the knowledge base")}
           aria-label={t("Ask the knowledge base")}
         />
         <Button type="submit" disabled={!question.trim()} className="shrink-0 gap-1">
