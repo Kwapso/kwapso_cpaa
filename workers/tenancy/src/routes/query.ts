@@ -22,11 +22,13 @@
 // gateway's allow-list.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { d1Query } from "@shared/workers/d1-rest"
-import { GuardError, requireRight, rightsSheet, teamContext } from "@shared/workers/gating"
+import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { GuardError, hasRight, requireRight, rightsSheet, teamContext } from "@shared/workers/gating"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { queryText, TEXT_LIMITS } from "@shared/workers/validate"
+import type { MemberGuard } from "@shared/workers/gating"
+import type { QueryModule } from "@shared/workers/query-grammar"
 import {
   canonicalModule,
   MODULE_ALIASES,
@@ -36,7 +38,7 @@ import {
   queryModule,
   suggestModule,
 } from "@shared/workers/query-grammar"
-import { parseQuery, runQuery } from "../lib/query-engine"
+import { parseQuery, runQuery, type Fence, type FenceFor } from "../lib/query-engine"
 import type { Env } from "../env"
 
 /** HOW MANY NAMES `describe_module` LISTS for one reference field (R14: a hard
@@ -217,6 +219,25 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
   })
 }
 
+/** THE SECOND SWITCH, resolved off the module's own declaration.
+ *
+ * `hasRight` and never `requireRight`, exactly as the two list doors this
+ * mirrors do it: without the second right the collection still answers, it is
+ * simply smaller. Refusing outright would take a developer's client list away
+ * in order to withhold its address book, which is the opposite of what was
+ * asked for.
+ *
+ * `{ self: true }` is the caller's own user id — the tasks door's narrowing,
+ * which replaces whatever assignee was asked for with the person asking. */
+function rowFence(cfg: D1Rest, guard: MemberGuard): FenceFor {
+  return async (mod: QueryModule): Promise<Fence> => {
+    const n = mod.narrow
+    if (!n) return null
+    if (await hasRight(cfg, guard, n.right[0], n.right[1])) return null
+    return { column: n.column, value: typeof n.value === "string" ? n.value : guard.userId }
+  }
+}
+
 /**
  * GET /api/tenancy/query — ask a module a question.
  *
@@ -244,6 +265,22 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
   // door is a better question over rows the caller could already read one screen
   // at a time; it is not a wider set of rows.
   await requireRight(cfg, guard, mod.module, "read")
+  // …AND THE SECOND SWITCH, where the module has one. Two modules are governed
+  // by two rights: the module's own opens the collection, and a second decides
+  // how much of it you see (`contacts:read` over the people in the customer
+  // spine, `all_tasks:read` over whose tasks the tasks list means). Their own
+  // list doors resolve it with `hasRight` and narrow the rows; this door asked
+  // for `module:read` and knew nothing about it, so a Developer holding
+  // `accounts:read` without `contacts:read` got all 108 people here and 0 on
+  // the screen — measured on staging, 30 Aug 2026.
+  //
+  // Resolved HERE, where every other permission decision on this door already
+  // lives, and applied INSIDE the one WHERE clause the engine builds all four of
+  // its reads from, so the page, the exact total, the grouped counts and the
+  // unmatched lookup are narrowed by construction rather than each remembering.
+  // A RESOLVER rather than one fence, because `findUnmatched` looks values up in
+  // the REFERENCED table too, and that table has a fence of its own.
+  const fence = rowFence(cfg, guard)
 
   const parsed = parseQuery(mod, {
     // Each capped AT the boundary (R20, positionally), then parsed — a
@@ -261,7 +298,7 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
 
   // The reference tables a filter or a labelled group may reach — resolved from
   // the SAME allow-list, so a `ref` that names nothing declared simply is not one.
-  const answer = await runQuery(cfg, guard, mod, parsed, QUERY_MODULES)
+  const answer = await runQuery(cfg, guard, mod, parsed, QUERY_MODULES, fence)
   const canonical = canonicalModule(name)!
   return pagedJson("records", { ...answer.page, total: answer.total }, {
     module: canonical,

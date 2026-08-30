@@ -743,7 +743,12 @@ describe("THE NEWEST ROW IS REALLY THE NEWEST — the property, not the ticket",
         const rows = body.records as Record<string, unknown>[]
         if (rows.length < 2) continue
         const values = rows
-          .map((r) => r[field.column] as string | null)
+          // BY THE FIELD'S NAME, which is what the rows now carry. This read
+          // `r[field.column]` until 30 Aug 2026, when the door started answering
+          // in the words it publishes rather than the database's — and the
+          // blindness guard at the bottom is the only reason that showed up as a
+          // failure instead of a sweep that quietly compared nothing.
+          .map((r) => r[field.name] as string | null)
           .filter((v): v is string => typeof v === "string")
         if (values.length < 2) continue
         checked++
