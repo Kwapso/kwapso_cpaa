@@ -405,6 +405,24 @@ function whereSql(
   return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
 }
 
+/** WHAT THE CALLER'S SECOND RIGHT LEAVES THEM. Resolved by the door from the
+ * module's own `narrow` declaration, or null when they hold the right (or the
+ * module has no second switch) — null meaning "no narrowing", never "unchecked". */
+export type Fence = { column: string; value: string } | null
+
+/** The fence ANDed onto the caller's own question. One function, applied once,
+ * to the one clause `runQuery` builds everything from. */
+function fenced(
+  where: { sql: string; params: Param[] },
+  fence: Fence
+): { sql: string; params: Param[] } {
+  if (!fence) return where
+  return {
+    sql: `(${where.sql}) AND t.${fence.column} = ?`,
+    params: [...where.params, fence.value],
+  }
+}
+
 /** The sort menu a module offers: every declared field, ordered by its own
  * column. Built FROM the grammar rather than written beside it, so a field
  * cannot be filterable and un-orderable. Dates land newest-first; the rest A→Z. */
@@ -465,9 +483,15 @@ export async function runQuery(
   guard: MemberGuard,
   mod: QueryModule,
   q: ParsedQuery,
-  refs: Record<string, QueryModule>
+  refs: Record<string, QueryModule>,
+  /** THE SECOND SWITCH, resolved by the door and ANDed into the ONE clause every
+   * read below is built from — the rows, the exact total, the grouped counts and
+   * the `unmatched` lookup. Riding the WHERE is the whole point: a fence checked
+   * beside the rows is a fence three of those four reads can forget, and this
+   * door answers "how many" far more often than it hands back a page. */
+  fence: Fence = null
 ): Promise<QueryAnswer> {
-  const where = whereSql(q, refs)
+  const where = fenced(whereSql(q, refs), fence)
   // WHAT NAMED NOTHING — worked out alongside the count rather than after it, so
   // no return path below can hand back a total without it.
   const unmatchedPromise = findUnmatched(cfg, guard, mod, q, refs)
@@ -552,8 +576,12 @@ export async function runQuery(
       LIMIT ${limit + 1}`,
     [...where.params, ...after.params]
   )
+  // THE CURSOR IS CUT FIRST, off the raw row. `ordering.key` reads the sort
+  // COLUMN, so the page has to be taken before the row is renamed — then the
+  // rows that survive are spoken back in the grammar's own words.
+  const page = toPage(rows, limit, (r) => [ordering.key(r), String(r.id)], ordering.sig)
   return {
-    page: toPage(rows, limit, (r) => [ordering.key(r), String(r.id)], ordering.sig),
+    page: { ...page, rows: page.rows.map((r) => present(q.select, r)) },
     total: await totalPromise,
     groups: null,
     groupsTruncated: false,
@@ -562,6 +590,31 @@ export async function runQuery(
     sort: ordering.name,
     dir: ordering.dir,
   }
+}
+
+/** A ROW, IN THE WORDS THE CALLER WAS GIVEN.
+ *
+ * The whole grammar is written in the field's own name — `describe_module`
+ * publishes it, a filter names it, `sort` takes it, and a grouped answer keys
+ * by it (`[f.name, r[f.column]]`, thirty lines up). The ROW path alone handed
+ * back the database's spelling: `account_type`, `help_type`, `title_en`,
+ * `resolved_at`. No screen on either front door reads this route, so the only
+ * callers were the two machine surfaces — and a model that asks for
+ * `fields: ["accountType"]` and reads `row.accountType` got `undefined` out of
+ * a 200, which is indistinguishable from an empty column.
+ *
+ * The TYPE is honoured on the way out too, for the one case where SQLite's
+ * storage and the published type disagree: a `boolean` field is a 0 or a 1 in
+ * the column, and `commercialsVisible: 0` is a number a reader has to know to
+ * reinterpret. Everything else is passed through untouched — this maps names,
+ * it does not transform data. */
+function present(select: QueryField[], row: Row): Row {
+  const out: Row = { id: row.id }
+  for (const f of select) {
+    const v = row[f.column]
+    out[f.name] = f.type === "boolean" && (v === 0 || v === 1) ? v === 1 : v
+  }
+  return out
 }
 
 /** WHICH OF THE CALLER'S OWN WORDS NAMED NOTHING.

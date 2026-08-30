@@ -292,7 +292,7 @@ export function buildSpineDb(): DatabaseSync {
   // the "not Bergman" assertion as well as by id.
   db.exec(`
     INSERT INTO apps (id, account_id, name, url, stage, tool_cost_cents_per_month, created_at, creator_id)
-      VALUES ('${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch', 'https://dispatch.example', 'live', 42000, '2026-02-01', '${IDS.staffUser}');
+      VALUES ('${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch', 'https://dispatch.example', 'Development', 42000, '2026-02-01', '${IDS.staffUser}');
     INSERT INTO app_modules (id, app_id, account_id, name, mark, description, created_at, creator_id)
       VALUES ('${IDS.victimModule}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch board', '🚚', 'Where their drivers are assigned', '2026-02-01', '${IDS.staffUser}');
     INSERT INTO processes (id, app_id, account_id, name, description, created_at, creator_id)

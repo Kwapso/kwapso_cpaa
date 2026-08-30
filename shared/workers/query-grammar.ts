@@ -162,6 +162,45 @@ export type QueryModule = {
    * their own `where` is asking about it deliberately and gets exactly what they
    * asked for. */
   putAway?: { field: string; reason: string }
+  /** A SECOND RIGHT THAT NARROWS WHICH ROWS THIS MODULE MEANS.
+   *
+   * Some modules are governed by TWO switches, not one: the module's own right
+   * opens the collection, and a second right decides how much of it you see.
+   * `shared/team-modules.ts` calls these "a switch over a SIGHT, not over a
+   * record" and there are two — `contacts:read` ("may this role enumerate our
+   * customers' people") and `all_tasks:read` ("the whole team's list, or your
+   * own"). Each module's own list door applies its narrowing with `hasRight`
+   * and NOT `requireRight`, on purpose: without the second right the collection
+   * still answers, it is simply smaller.
+   *
+   * THIS DOOR IS GENERIC, so it asked for `module:read` and knew nothing about
+   * the second switch — and it is the only accounts read and the only tasks
+   * read the assistant has, because nine `list_*` tools were retired into it.
+   * Measured against live staging on 30 Aug 2026, as a real Developer holding
+   * `accounts:read` without `contacts:read` and `work:read` without
+   * `all_tasks:read`: the tickets door gave that person 0 people and 82 tasks,
+   * and this door gave the same person all 108 people by name, email and phone,
+   * and all 256 tasks. Both 200s, both silent.
+   *
+   * Declared HERE, beside the module, so a new query module cannot be added
+   * without answering the question — and derived-checked by
+   * query-fence.test.ts, which reads each module's own list door off disk and
+   * fails when a door narrows by a right this line does not name.
+   *
+   * The predicate RIDES THE `WHERE` (see `runQuery`), which is what makes the
+   * rows, the exact total and every grouped count agree by construction: they
+   * are three reads built from one clause, exactly as R17's current-status
+   * predicate rides the UPDATE rather than being checked beside it. */
+  narrow?: {
+    /** the right that, when HELD, lifts the narrowing — `[module, right]`. */
+    right: readonly [string, "read"]
+    /** the column the narrowing constrains. */
+    column: string
+    /** what it is constrained to: a literal value, or the caller's own user id. */
+    value: string | { self: true }
+    /** which door this mirrors, and what it withholds — for the next reader. */
+    reason: string
+  }
   fields: QueryField[]
 }
 
@@ -329,6 +368,16 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The agency's own admin — a piece of work with nobody's ticket behind it.",
     labelColumn: "title",
     defaultSort: "createdAt",
+    narrow: {
+      right: ["all_tasks", "read"],
+      column: "assignee_id",
+      value: { self: true },
+      reason:
+        "GET /api/content/tasks replaces whatever assignee was asked for with the caller's own " +
+        "user id when they lack `all_tasks:read` (getTasks, routes/todos.ts) — narrowed rather " +
+        "than refused, because 'show me Ana's tasks' from somebody who may not see them has a " +
+        "perfectly good answer: yours.",
+    },
     fields: [
       ID,
       { name: "ref", column: "ref", type: "text", identity: true },
@@ -405,6 +454,16 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The customer spine — the companies and the people inside them.",
     labelColumn: "name",
     defaultSort: "name",
+    narrow: {
+      right: ["contacts", "read"],
+      column: "account_type",
+      value: "entity",
+      reason:
+        "GET /api/tenancy/accounts and /accounts/detail hand back `individualTotal: 0` and " +
+        "`links: []` to a caller without `contacts:read` (contactSight, routes/accounts.ts). " +
+        "The address book is somebody's personal data; seeing who we work with is a separate " +
+        "grant from seeing that we work with them.",
+    },
     fields: [
       ID,
       { name: "name", column: "name", type: "text" },
@@ -412,7 +471,17 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
         name: "accountType",
         column: "account_type",
         type: "enum",
-        values: ["entity", "person"],
+        // THE VALUES THE COLUMN REALLY HOLDS. `person` was declared here and is
+        // written nowhere: the create door validates `entity`/`individual`
+        // (routes/accounts.ts), the list door filters on `individual`, the seed
+        // writes `individual`, and this door's OWN grouped answer hands
+        // `individual` back. So the assistant, told by describe_module to
+        // filter by `person`, got 200 with a total of 0 and no `unmatched`
+        // beside it — a confident, false "this team has no contacts" over 108
+        // real people — while `individual`, the value it had just been given,
+        // was refused as invalid. Locked by query-vocabulary.test.ts, which
+        // reads the column itself rather than this line.
+        values: ["entity", "individual"],
         note: "a company, or a person inside one",
       },
       { name: "parentAccountId", column: "parent_account_id", type: "id", ref: "accounts" },
