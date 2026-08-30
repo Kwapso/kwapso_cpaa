@@ -408,12 +408,33 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R44",
     dimension: "ui",
+    law: "A CATALOGUED STRING MUST BE ANSWERED, UP TO A CEILING THAT ONLY FALLS. R28 makes `shared/i18n-strings.json` exactly the set of English sentences the app says; R33 makes every one of those positions ask for its translation. Neither asks whether the ASKING is ever ANSWERED — a string can be extracted, wrapped in `t(...)`, and still have no entry anywhere in `overlay(CATALOGUE, SEED)` for a translated language, which is a silent English sentence on a screen that otherwise looks finished. Per translated language, the count of extracted strings with no non-empty entry — the same predicate `coverage()` already uses — is pinned in `TRANSLATION_CEILING`. The check computes the true count fresh, off the same three files, and requires it to equal the pin exactly: an untranslated string added past the ceiling fails the build (a regression), and a ceiling left higher than the true count after a translation lands fails it too (a stale pin hiding the next regression behind the improvement it never recorded). The pin can fall; it can never rise without the count behind it rising too.",
+    why: "Not a hard zero. `shared/i18n-catalogue.ts` says a missing translation degrades to English on screen, which is a sentence rather than a bug — an app can ship one language ahead of the rest without being broken, and it does today by 307 strings in three languages, mostly the process-map and Google-connections screens built after the last translation pass. A hard zero here would turn every ordinary feature PR red the moment it adds one new label, and a red build that fires on unrelated work is a build people learn to route around — which is worse than no law, because the next accidental regression hides behind the routine one. A ceiling that can only fall keeps the debt VISIBLE and BOUNDED without making it un-shippable: adding untranslated copy is still free, but it is no longer free to hide, because the pin has to move in the same diff and a reviewer sees it move.",
+    checkId: "translation-ceiling",
+    status: "enforced",
+  },
+  {
+    id: "R45",
+    dimension: "ui",
     law: "EVERY KIT COMPOSITION IS DECIDED. All 47 files under `shared/ui/compositions/` (the pinned kit's screen-shaped assemblies, one directory level above its components) are derived off disk, and each one resolves to EITHER an adoption this app actually reaches — a direct `@shared/ui/compositions/...` import in `web/`, `web-portal/` or `shared/web/` — OR a reasoned entry in `COMPOSITION_EXEMPT`, naming why not: a genuine structural mismatch, a shape already assembled from other already-adopted kit parts under a different name, a real gap this app should or should never have, or a question left for the owner. The two acceptable outcomes are adopted, or DELIBERATELY not used for a stated reason — a composition nobody looked at, or hand-rolled screen UI that quietly duplicates one, is the only unacceptable result. Rot-checked both ways, so the exemption list can only shrink: a composition with neither an import nor an exemption turns the build red, and an exemption whose composition is now directly imported turns it red too.",
     why: "The owner's own words, 30 Aug 2026: \"make sure that we get 47 out of 47 compositions... if there are some compositions that we don't use, I completely get that, but flag those... there should be nothing that we have hard-coded unless it's some kind of composition that does not exist.\" Two lanes had worked through 37 of the 47 by hand, in prose, with no check behind it — which meant the count could regress the moment a new composition landed in a kit update, or the moment somebody hand-rolled a screen that duplicated one, and nothing would say so. The census is deliberately a DIRECT-IMPORT string match, the same shape as R39's: it undercounts a genuine transitive adoption (a composition reached only through another kit part), but an undercount fails safe into \"go write the exemption down\", where an over-count would let a real gap hide behind a stale claim.",
     checkId: "composition-coverage",
     status: "enforced",
   },
 ]
+
+/** R44 — the ceiling. Per translated language, the number of extracted strings
+ * (`shared/i18n-strings.json`) with no non-empty entry in `overlay(CATALOGUE,
+ * SEED)` — the exact predicate `coverage()` already uses to tell a person
+ * choosing a language what to expect. Pinned rather than computed inline so a
+ * change to it is a reviewed line in a diff: raising it silently is exactly the
+ * drift the law exists to catch, so the check requires the true count to equal
+ * this number exactly, in both directions. Measured 2026-08-30. */
+export const TRANSLATION_CEILING: Record<string, number> = {
+  de: 307,
+  es: 307,
+  ca: 307,
+}
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly
  * because the kit does not expose what it needs. Each is a GAP IN THE KIT
@@ -1816,7 +1837,7 @@ export const STORED_FILES: {
   },
 ]
 
-/** R44 — every one of the 47 files under `shared/ui/compositions/` that this app
+/** R45 — every one of the 47 files under `shared/ui/compositions/` that this app
  * does not directly import, with why. Full reasoning for each lives in
  * COMPOSITION-MISMATCHES.md; this is the rot-checked pointer the build reads.
  * Four shapes of reason, and the sentence says which:

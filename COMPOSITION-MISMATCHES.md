@@ -16,7 +16,7 @@ kept in place because, per this file's own rule, "a record of why something
 was rejected is only useful while it is true," and several of these records
 are still exactly that record. This section is the answer itself: every one
 of the 47 files under `shared/ui/compositions/` now has a verdict, enforced
-by **R44** (`shared/rules/registry.ts`'s `COMPOSITION_EXEMPT`, checked by
+by **R45** (`shared/rules/registry.ts`'s `COMPOSITION_EXEMPT`, checked by
 `composition-coverage` in `web/test/rules.test.ts`) so the count cannot
 silently regress the next time the kit ships a 48th file or an app screen
 quietly duplicates one.

@@ -2403,7 +2403,8 @@ describe("RULES — the laws of the base", () => {
       "reachable-bytes", // R40: web/test/reachable-bytes.test.ts — the write census (off the wrangler bucket bindings) walked to the render
       "picked-files-are-sent", // R41: web/test/picked-files-are-sent.test.ts — R40's sibling, where nothing is stored at all
       "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
-      "composition-coverage", // R44: the direct-import census above, over the 47 files in shared/ui/compositions/
+      "translation-ceiling", // R44: web/test/translation-ceiling.test.ts — per-language untranslated count vs the pinned, only-falling ceiling
+      "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -2951,7 +2952,7 @@ describe("every tab value has an icon in the vocabulary", () => {
     ).toEqual([])
   })
 
-  // R44 — EVERY KIT COMPOSITION IS DECIDED.
+  // R45 — EVERY KIT COMPOSITION IS DECIDED.
   //
   // The 47 files under shared/ui/compositions/ are read off disk, never hand-
   // listed — a kit update that adds a 48th is caught the same run it lands,
@@ -2965,7 +2966,7 @@ describe("every tab value has an icon in the vocabulary", () => {
   // entries) is real adoption this grep cannot see — but the failure mode of
   // undercounting is "write the exemption down", never "believe a gap is
   // closed that isn't".
-  it("composition-coverage: every kit composition is adopted or exempted, with a reason (R44)", () => {
+  it("composition-coverage: every kit composition is adopted or exempted, with a reason (R45)", () => {
     const compDir = join(ROOT, "shared", "ui", "compositions")
     const all = sourceFiles(compDir, { extensions: [".tsx"], relativeTo: compDir })
       .filter((f) => !/\.test\.tsx$/.test(f.rel))
@@ -2988,7 +2989,7 @@ describe("every tab value has an icon in the vocabulary", () => {
     const undecided = all.filter((f) => !reached.has(f) && !(f in COMPOSITION_EXEMPT))
     expect(
       undecided,
-      `these kit compositions are neither imported nor decided (R44). Adopt one, or add a reasoned ` +
+      `these kit compositions are neither imported nor decided (R45). Adopt one, or add a reasoned ` +
         `COMPOSITION_EXEMPT line naming why not:\n  ${undecided.join("\n  ")}`
     ).toEqual([])
 
