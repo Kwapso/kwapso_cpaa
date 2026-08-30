@@ -233,8 +233,45 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  * is the latency, not just the money.
  *
  * The header below is what makes that real; without it the cache is 0 forever
- * and NOTHING SAYS SO. */
-export const DEFAULT_AGENT_MODEL = "@cf/zai-org/glm-5.3-flash"
+ * and NOTHING SAYS SO.
+ *
+ * ── AND ON 30 AUG THE DEFAULT WENT BACK TO gpt-oss, because the paragraph above
+ *    measured the wrong thing and the deployment had been quietly right all along.
+ *
+ * `wrangler.jsonc` has pinned `AGENT_MODEL` to gpt-oss-120b since 28 Aug, in both
+ * environments. So the 29 Aug revisit changed this constant and changed NOTHING a
+ * person experiences: the var wins in `selectModel`, and every turn the owner has
+ * complained about was gpt-oss. A default that disagrees with the deployment is
+ * not a preference, it is a decision nobody is making.
+ *
+ * Re-measured against the shape that actually failed — 49KB, 40 tools, a real
+ * preamble, which is what "carrying our catalogue" meant. The 29 Aug numbers came
+ * from a 6.6K prefix with NO TOOLS, so they never re-tested the thing that broke.
+ * Both models are healthy and both call tools 3/3. What separates them is speed:
+ *
+ *     gpt-oss-120b            2429ms  2583ms  3363ms      cached 0 (it has no rate)
+ *     glm-5.3-flash           7168ms  8868ms  9751ms      cached 0
+ *     glm + affinity header  10368ms  4691ms  5879ms  3809ms   cached 0, 9600, 11776, 11776
+ *
+ * The cache is real over REST and reaches 99.5% — and glm WARM is still slower
+ * than gpt-oss COLD. The caching argument was about money, and it was read as
+ * though it were about latency. Worse, the note below this one records that the
+ * affinity header does nothing through `env.AI.run`, which is the door the worker
+ * actually uses — so shipping glm would have bought the 7-10s column and no cache
+ * at all.
+ *
+ * The owner's "the assistant is still replying very slowly" is therefore NOT a
+ * wrong model. gpt-oss is the fast one and it is the one deployed. The remaining
+ * cost is structural: gpt-oss has no cached-token rate, so every step of every
+ * turn re-reads the whole preamble at full price, and a turn is several steps.
+ * The lever is fewer steps or a smaller preamble, not a swap.
+ *
+ * One earlier confound, recorded so nobody repeats it: at `max_tokens` 128 glm
+ * returns `finish_reason: "length"` with an empty `content` and a filled
+ * `reasoning_content`, and emits no tool call — it spends the budget thinking. It
+ * reads exactly like "glm cannot use our tools" and it is not. Give it room
+ * before you judge it. */
+export const DEFAULT_AGENT_MODEL = "@cf/openai/gpt-oss-120b"
 
 class WorkersAiModel implements Model {
   readonly canActWithTools = true

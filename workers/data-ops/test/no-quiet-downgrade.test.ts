@@ -47,9 +47,19 @@ describe("one engine, chosen in one place, with no hatch beside it", () => {
   })
 
   it("AGENT_MODEL swaps the engine, and nothing else can", () => {
-    expect(selectModel({ ...(env as object), AGENT_MODEL: "@cf/openai/gpt-oss-120b" } as never).name).toBe(
-      "@cf/openai/gpt-oss-120b"
-    )
+    // THE OVERRIDE VALUE MUST NOT BE THE DEFAULT, and on 30 Aug 2026 it briefly
+    // was. This asserted the var swapped the engine to gpt-oss-120b — and when
+    // the default became gpt-oss-120b, the test passed with the `env.AGENT_MODEL
+    // ||` deleted from `selectModel` entirely. Proved by doing exactly that: the
+    // escape hatch was gone and all twelve tests stayed green, because the
+    // expected value and the fallback value were the same string.
+    //
+    // So the override is exercised with a model this repo does NOT default to,
+    // and the test says so out loud rather than relying on whoever edits the
+    // default next to notice.
+    const other = "@cf/zai-org/glm-5.3-flash"
+    expect(other, "pick an override the default is not, or this proves nothing").not.toBe(DEFAULT_AGENT_MODEL)
+    expect(selectModel({ ...(env as object), AGENT_MODEL: other } as never).name).toBe(other)
   })
 
   it("no second engine is left in the agentic seam to be wired back in", () => {
@@ -123,5 +133,42 @@ describe("what came back from the model door, classified once", () => {
     expect(retryAfterSeconds("nothing here")).toBeUndefined()
     // Over an hour is not a wait, it is a different sentence.
     expect(retryAfterSeconds('{"retry-after": 86400}')).toBeUndefined()
+  })
+})
+
+// THE DEFAULT AND THE DEPLOYMENT MUST NAME THE SAME ENGINE.
+//
+// The test above proves a worker with no var gets the default. It says nothing
+// about whether that default is the engine anybody actually runs — and for two
+// days it was not. `wrangler.jsonc` pinned AGENT_MODEL to gpt-oss-120b on 28 Aug
+// in BOTH environments; on 29 Aug the constant in model.ts was changed to
+// glm-5.3-flash on the strength of a caching measurement. `selectModel` reads
+// `env.AGENT_MODEL || DEFAULT_AGENT_MODEL`, so the var won, the constant was
+// inert, and every turn the owner judged was gpt-oss while the code said glm.
+//
+// That is worse than either choice being wrong. A default that disagrees with
+// the deployment means the model is decided in two places, one of which nobody
+// can see from the other, and a fresh environment silently gets a DIFFERENT
+// assistant from the one this team has been measuring. Re-measured on 30 Aug
+// against a real 40-tool catalogue, gpt-oss is ~3x faster per step than glm even
+// with glm's cache warm — the numbers are in model.ts above the constant.
+//
+// Read off the DISK, from the config the deploy actually uses, so the two cannot
+// drift again without this going red. The parse is deliberately blunt: a regex
+// for the var, every occurrence, because both the top-level block and the env
+// block carry one and BOTH have to agree.
+describe("the code default and the shipped config name the same engine", () => {
+  const CONFIG = readFileSync(join(__dirname, "..", "wrangler.jsonc"), "utf8")
+
+  it("every AGENT_MODEL in wrangler.jsonc is the default this file declares", () => {
+    const pinned = [...CONFIG.matchAll(/"AGENT_MODEL"\s*:\s*"([^"]+)"/g)].map((m) => m[1])
+    expect(pinned.length, "the config should still pin the engine in both environments").toBeGreaterThan(0)
+    for (const value of pinned)
+      expect(
+        value,
+        `wrangler.jsonc runs ${value} but model.ts defaults to ${DEFAULT_AGENT_MODEL} — ` +
+          "the var wins at runtime, so the constant is inert and a fresh environment gets a " +
+          "different assistant from the one anybody has measured. Change both, or neither."
+      ).toBe(DEFAULT_AGENT_MODEL)
   })
 })

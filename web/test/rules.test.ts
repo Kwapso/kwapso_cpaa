@@ -15,6 +15,7 @@ import {
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
   CLIENT_REACHABLE_EXEMPT,
+  COMPOSITION_EXEMPT,
   DEAF_EXEMPT,
   FORM_DIALOGS,
   GLOSSARY_SYNONYMS,
@@ -2405,6 +2406,7 @@ describe("RULES — the laws of the base", () => {
       "picked-files-are-sent", // R41: web/test/picked-files-are-sent.test.ts — R40's sibling, where nothing is stored at all
       "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
       "translation-ceiling", // R44: web/test/translation-ceiling.test.ts — per-language untranslated count vs the pinned, only-falling ceiling
+      "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
     ])
     for (const r of RULES_REGISTRY) {
@@ -2950,6 +2952,66 @@ describe("every tab value has an icon in the vocabulary", () => {
     expect(
       stale,
       `UI_PACKAGE_EXEMPT pins a file that no longer imports one — delete the line: ${stale.join(", ")}`
+    ).toEqual([])
+  })
+
+  // R45 — EVERY KIT COMPOSITION IS DECIDED.
+  //
+  // The 47 files under shared/ui/compositions/ are read off disk, never hand-
+  // listed — a kit update that adds a 48th is caught the same run it lands,
+  // because it is neither a direct import nor an entry in COMPOSITION_EXEMPT.
+  //
+  // "Reached" is a DIRECT import string, the same shape as R39's kit-package
+  // census: `@shared/ui/compositions/<dir>/<file>` somewhere in web/,
+  // web-portal/ or shared/web/. This undercounts on purpose — a composition
+  // reached only by being composed from other already-adopted kit parts under
+  // a different name (COMPOSITION-MISMATCHES.md's "realized differently"
+  // entries) is real adoption this grep cannot see — but the failure mode of
+  // undercounting is "write the exemption down", never "believe a gap is
+  // closed that isn't".
+  it("composition-coverage: every kit composition is adopted or exempted, with a reason (R45)", () => {
+    const compDir = join(ROOT, "shared", "ui", "compositions")
+    const all = sourceFiles(compDir, { extensions: [".tsx"], relativeTo: compDir })
+      .filter((f) => !/\.test\.tsx$/.test(f.rel))
+      .map((f) => f.rel)
+    expect(all.length, "the compositions walk found an unexpected count — the derivation broke").toBe(47)
+
+    const reached = new Set<string>()
+    for (const f of sourceFiles(
+      [join(ROOT, "web"), join(ROOT, "web-portal"), join(ROOT, "shared", "web")],
+      { extensions: [".ts", ".tsx"], relativeTo: ROOT, skipTests: true }
+    )) {
+      for (const m of f.source.matchAll(/@shared\/ui\/compositions\/([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/g)) {
+        reached.add(`${m[1]}.tsx`)
+      }
+    }
+    expect(reached.size, "found zero direct composition imports — the scan broke, this app has adopted several")
+      .toBeGreaterThan(0)
+
+    // i · every composition is EITHER reached OR named, with a reason.
+    const undecided = all.filter((f) => !reached.has(f) && !(f in COMPOSITION_EXEMPT))
+    expect(
+      undecided,
+      `these kit compositions are neither imported nor decided (R45). Adopt one, or add a reasoned ` +
+        `COMPOSITION_EXEMPT line naming why not:\n  ${undecided.join("\n  ")}`
+    ).toEqual([])
+
+    // ii · the ratchet, forward: an exemption for a composition now directly
+    // reached is stale — the adoption made the recorded reason moot.
+    const nowAdopted = Object.keys(COMPOSITION_EXEMPT).filter((f) => reached.has(f))
+    expect(
+      nowAdopted,
+      `these COMPOSITION_EXEMPT entries name a composition now directly imported — delete the line, ` +
+        `it is adopted for real:\n  ${nowAdopted.join("\n  ")}`
+    ).toEqual([])
+
+    // iii · the ratchet, backward: an exemption naming a file that no longer
+    // exists in the kit is a record of an argument nobody is having.
+    const allSet = new Set(all)
+    const stale = Object.keys(COMPOSITION_EXEMPT).filter((f) => !allSet.has(f))
+    expect(
+      stale,
+      `these COMPOSITION_EXEMPT entries match no file under shared/ui/compositions/ — delete the line:\n  ${stale.join("\n  ")}`
     ).toEqual([])
   })
 
