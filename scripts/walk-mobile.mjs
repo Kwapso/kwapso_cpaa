@@ -102,6 +102,29 @@ function stubFor(door, url) {
     linksTotal: 1,
   }
   if (/tenancy\/impact/.test(p)) return { savedSecondsPerMonth: 396000, caption: null, apps: [{ id: "app_1", name: "CONFIA", savedSecondsPerMonth: 288000, processes: [] }] }
+  // A POPULATED knowledge base — the smoke team's own is empty (kwapso-cpaa-a7,
+  // 30 Aug 2026), which renders the collection's search bar with nothing beside
+  // it to overflow. Real rows, real title lengths, so the search bar and the
+  // card frame are measured under the same content a real team would show.
+  if (/content\/knowledge\b(?!\/ask)/.test(p)) {
+    const sources = Array.from({ length: 6 }, (_, i) => ({
+      id: `src_${i}`,
+      kind: i % 2 ? "meeting" : "file",
+      originTable: null, originRowId: null, compartment: "agency", accountId: null,
+      appId: null, ticketId: null, sprintId: null, recordDate: null,
+      title: [
+        "Bergman GmbH: dispatch window and the Stripe webhook change",
+        "Q3 kickoff — Confia onboarding and the process map handover",
+        "FluClinic: changing the Stripe webhook, quick notes",
+        "Padelbase train-the-trainer workshops, quarterly cadence",
+        "HOGO x Claude math — meeting records and transcript",
+        "Internal review: what changed since the last audit",
+      ][i],
+      summary: "What was said, in a sentence or two, about the thing this source is from.",
+      body: null, bodyBytes: 1200, bodyTruncated: false, sourceUrl: null,
+    }))
+    return { sources, total: sources.length, nextCursor: null, count: sources.length }
+  }
   const last = p.split("/").filter(Boolean).pop() ?? ""
   return { [last]: [], rows: [], items: [], total: 0, nextCursor: null, count: 0 }
 }
@@ -182,6 +205,31 @@ const PROBE = (labelsByLang) => {
     }
   }
 
+  /* IS A PLACEHOLDER WIDER THAN THE FIELD THAT HOLDS IT, AT REST. `scrollWidth`
+     is meaningless here — a native input never scrolls its placeholder, it just
+     clips it dead at the padding edge with no ellipsis, so the existing `cut`
+     walk (which every one of these elements is excluded from; `input`/`textarea`
+     are not in its selector list at all) cannot see this class of defect either.
+     Measured the same way the nav-label check measures a word against its slot:
+     a canvas in the field's own computed font. */
+  const placeholderOverflow = []
+  for (const el of document.querySelectorAll("input[placeholder],textarea[placeholder]")) {
+    const cs = getComputedStyle(el)
+    if (cs.display === "none" || cs.visibility === "hidden") continue
+    const r = el.getBoundingClientRect()
+    if (r.width === 0) continue
+    const innerWidth = r.width - parseFloat(cs.paddingLeft || "0") - parseFloat(cs.paddingRight || "0") -
+      parseFloat(cs.borderLeftWidth || "0") - parseFloat(cs.borderRightWidth || "0")
+    const ctx2d = document.createElement("canvas").getContext("2d")
+    ctx2d.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+    const ink = Math.ceil(ctx2d.measureText(el.placeholder).width)
+    if (ink > innerWidth) {
+      placeholderOverflow.push(
+        `${el.tagName.toLowerCase()}["${el.placeholder.slice(0, 40)}${el.placeholder.length > 40 ? "…" : ""}"] ${ink}px in ${Math.round(innerWidth)}px`
+      )
+    }
+  }
+
   let bar = null
   /* THE BOTTOM BAR, not the first `<nav>` in the document. The agency shell
      renders its desktop rail first and hides it with `md:flex`, so at 375 that
@@ -198,9 +246,22 @@ const PROBE = (labelsByLang) => {
   if (nav) {
     const nr = nav.getBoundingClientRect()
     const items = [...nav.querySelectorAll("a,button")].map((a) => a.getBoundingClientRect())
+    // A NEGATIVE z-index CANNOT PAINT OVER THE NAV, whatever its box overlaps —
+    // that is what negative means, and this check was reporting one on every
+    // screen in both themes: `AmbientBackground`, mounted `anchor="fixed"` at
+    // `-z-10` so the living background stays put while the page scrolls
+    // (web/app/layout.tsx), `pointer-events-none` and `aria-hidden` by its own
+    // design (shared/ui/components/ambient-background/ambient-background.tsx —
+    // "decoration ... must never" intercept anything). Sixteen standing
+    // findings from one always-present, always-behind, always-inert layer is
+    // exactly how a real OVER-NAV finding would stop getting anyone's
+    // attention. Position overlap is necessary but not sufficient; z-order is
+    // the other half of "over," and a bare Y-range check cannot see it.
     const over = [...document.querySelectorAll("body *")]
       .filter((el) => {
         if (getComputedStyle(el).position !== "fixed") return false
+        const z = parseInt(getComputedStyle(el).zIndex, 10)
+        if (Number.isFinite(z) && z < 0) return false
         const r = el.getBoundingClientRect()
         return r.width > 0 && r.height > 0 && r.bottom > nr.top + 4 && r.top < nr.bottom - 4 && !el.contains(nav) && !nav.contains(el)
       })
@@ -234,7 +295,14 @@ const PROBE = (labelsByLang) => {
     }
   }
 
-  return { page: d.scrollWidth, viewport: window.innerWidth, wide: wide.slice(0, 6), cut: cut.slice(0, 8), bar }
+  return {
+    page: d.scrollWidth,
+    viewport: window.innerWidth,
+    wide: wide.slice(0, 6),
+    cut: cut.slice(0, 8),
+    placeholderOverflow: placeholderOverflow.slice(0, 8),
+    bar,
+  }
 }
 
 /* ── the walk ──────────────────────────────────────────────────────────── */
@@ -277,12 +345,35 @@ for (const door of doors) {
       const dismiss = page.getByRole("button", { name: /got it|not now/i }).first()
       if (await dismiss.count().catch(() => 0)) { await dismiss.click().catch(() => {}); await page.waitForTimeout(300) }
 
+      // TYPE INTO EVERY VISIBLE TEXT FIELD BEFORE MEASURING. A field that only
+      // overflows once it holds content is invisible to a check that reads the
+      // page at rest — which is what this walk did until 30 Aug 2026, and a
+      // search bar that does not expand for a longer query is exactly that
+      // class of defect. A real Playwright `fill`, so React sees the same
+      // input event a person's keyboard would send, not a synthetic one this
+      // check invented. Long and specific rather than a filler string, because
+      // the owner's own words were "a bigger search query" and a repeated
+      // character wraps or truncates differently than an ordinary sentence
+      // does. Reuses the existing WIDER-THAN-PHONE and TEXT-CUT walks below —
+      // they already scan every element on the page, so typed content that
+      // overflows a box that does not expand shows up there with no second
+      // detector to keep in step with the first.
+      const QUERY = "the dispatch window we agreed with Bergman last quarter"
+      const fields = await page.locator('input[type="text"], input[type="search"], input:not([type]), textarea').all()
+      for (const f of fields) {
+        if (!(await f.isVisible().catch(() => false))) continue
+        if (await f.isDisabled().catch(() => false)) continue
+        await f.fill(QUERY).catch(() => {})
+      }
+      if (fields.length) await page.waitForTimeout(300)
+
       const at = `${door} ${scheme} ${path}`
       const r = await page.evaluate(PROBE, NAV_LABELS[door]).catch(() => null)
       if (!r) { findings.push(`UNREADABLE ${at}`); await page.close(); continue }
 
       if (r.page > r.viewport + 1) findings.push(`WIDER-THAN-PHONE ${at}  ${r.page}>${r.viewport} :: ${r.wide.join(" | ")}`)
       if (r.cut.length) findings.push(`TEXT-CUT   ${at}  ${r.cut.join(" | ")}`)
+      if (r.placeholderOverflow.length) findings.push(`PLACEHOLDER ${at}  ${r.placeholderOverflow.join(" | ")}`)
       if (errs.length) findings.push(`PAGE-ERROR ${at}  ${errs[0]}`)
       if (r.bar) {
         if (r.bar.over.length) findings.push(`OVER-NAV   ${at}  ${r.bar.over.join(" | ")}`)

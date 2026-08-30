@@ -77,7 +77,7 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
   return render(
     <PagedFind<Row>
       listKey={listKey}
-      placeholder="Search the knowledge base…"
+      placeholder="Search knowledge base…"
       matches={{
         none: "No sources match",
         one: "1 source matches",

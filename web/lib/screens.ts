@@ -473,7 +473,7 @@ const knowledgeListRecipe: ScreenRecipe = {
   // 170 of them, because two of them were on page one.
   collection: listCollection(
     "Nothing in the knowledge base yet.",
-    "Search the knowledge base…",
+    "Search knowledge base…",
     [],
     { paged: true }
   ),
