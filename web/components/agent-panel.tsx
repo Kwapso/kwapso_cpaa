@@ -111,7 +111,21 @@ export function AgentPanel({
         * closes with "no token changed and no component changed. This is a
         * composition law", and the drawer's `--popover` surface is a recorded
         * decision of its own (GAPS-A.md OVL-1). */}
-      <SheetContent side="right" className="flex w-full flex-col gap-0 bg-surface-panel p-0 sm:max-w-lg">
+      {/* WIDER ON A BIG SCREEN, BECAUSE THE ANSWERS ARE DOCUMENTS, NOT CHAT QUIPS.
+       * The kit caps a message bubble at 62% of the panel (agent-chat.tsx, its
+       * ruling 36) — the right rule for a conversation and untouched here. But
+       * 62% of a 576px sheet is a 324px bubble, and the owner reported a table
+       * inside one wrapping every second word. Measured on staging 31 Aug 2026:
+       * a two-column table of prose rendered 295px wide with 150px columns.
+       * The cap is not the thing to fight; the SHEET is ours. At `4xl` the same
+       * table measures 455px with a 305px prose column and reads properly, and
+       * plain answers gain a real measure instead of a 324px gutter. Small
+       * screens keep `lg` — below that the panel is most of the display and a
+       * wider one buys nothing. */}
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col gap-0 bg-surface-panel p-0 sm:max-w-lg lg:max-w-4xl"
+      >
         {/* NO className. The kit's own SheetHeader already reserves the room:
          * `pe-[var(--space-9)]` for the drawer's absolute close ✕, and
          * `shadow-[var(--hairline-under)]` for the rule under it.

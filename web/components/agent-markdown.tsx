@@ -73,10 +73,18 @@ function Block({ block }: { block: MdBlock }) {
   // and a three-column table is not going to fit; the alternative — letting it
   // widen the panel — pushes the whole conversation sideways. `min-w-0` on the
   // wrapper is what actually lets it shrink inside the flex column above.
+  // AND IT NEEDS A FLOOR, OR IT CRUSHES INSTEAD OF SCROLLING. `w-full` alone
+  // obeys whatever room it is given, so `overflow-x-auto` never engaged:
+  // measured on staging 31 Aug 2026, a two-column table sat at 295px with cells
+  // wrapping every second word, and the wrapper reported NO overflow at all,
+  // because the table had already shrunk to fit it. `max-content` is the wrong
+  // floor in the other direction — the same table went to 2757px, one unwrapped
+  // line per cell. 28rem is a readable minimum for two columns; past that the
+  // wrapper does its job and the reader scrolls.
   if ("rows" in block) {
     return (
       <div className="my-2 min-w-0 overflow-x-auto">
-        <table className="w-full border-collapse text-left text-caption">
+        <table className="w-full min-w-[28rem] border-collapse text-left text-caption">
           {block.head.length > 0 && (
             <thead>
               <tr>
