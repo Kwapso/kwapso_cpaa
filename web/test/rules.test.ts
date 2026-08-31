@@ -342,35 +342,54 @@ describe("RULES — the laws of the base", () => {
   // Reported by the owner on 18 Aug 2026: "all detail screens should be clickable
   // and accessible if there are records displaying on the calendar". They were
   // not, on any of the three screens that have one, and the reason was
-  // structural rather than an oversight — the library's `CalendarView` draws an
-  // event as a plain `<div>` and takes no click prop of any kind, so a screen
-  // could not have wired one if it wanted to. "+6 more" was a second `<div>`,
-  // naming six records with no way to reach one.
+  // structural rather than an oversight — the library's `CalendarView` used to
+  // draw an event as a plain `<div>` and take no click prop of any kind, so a
+  // screen could not have wired one if it wanted to. "+6 more" was a second
+  // `<div>`, naming six records with no way to reach one.
+  //
+  // REBUILT 30 Aug 2026 on the kit's own `CalendarView` + `Agenda` (kit v1.2.9
+  // added `onSelectDay` / `onSelectEvent` / `onSelectItem`, UI-GAPS #22's fix).
+  // The host no longer draws its own `<button>` chip — the kit does, once it is
+  // handed `onSelectEvent` — so the lock now reads for the WIRING rather than
+  // for hand-rolled markup: the host must still turn every click into an
+  // `onOpen(id)`, the overflow must still be one more clickable thing rather
+  // than the kit's own dead more-line, and the day it opens must still list rows
+  // that open too.
   //
   // The check therefore holds TWO things, because either alone can go quietly
-  // wrong: no screen may render the library's calendar directly (it is a picture,
-  // not a way in), and the host's own must keep the two controls that make it a
-  // way in — an entry that is a BUTTON, and an overflow that OPENS THE DAY.
+  // wrong: no screen may render the kit's calendar or agenda directly (it is a
+  // picture, not a way in, without the host's wiring), and the host's own must
+  // keep the two paths that make it a way in — an entry that calls `onOpen`, and
+  // an overflow that OPENS THE DAY instead of naming records nobody can reach.
   it("one-calendar: every calendar is the host's, and every record on it opens", () => {
     const host = join(WEB, "components", "record-calendar.tsx")
     const src = stripComments(read(host))
-    // i · the entry is a control, and it opens the record it names.
-    expect(src, "an entry must be a <button> — a div cannot be reached by keyboard or click").toMatch(
-      /<button[\s\S]*onClick=\{\(\) => onOpen\(entry\.id\)\}/
+    // i · an entry opens the record it names, through the kit's own click prop.
+    expect(src, "the month grid must open a record via onSelectEvent → onOpen").toMatch(
+      /onSelectEvent=\{[\s\S]*?onOpen\(event\.id\)/
     )
-    // ii · the overflow opens the day rather than naming records nobody can reach.
-    expect(src, '"+N more" must be a control that opens the day').toMatch(
-      /<button[\s\S]*onClick=\{\(\) => setOpenDay\(key\)\}/
+    expect(src, "the agenda must open a record via onItemSelect → onOpen").toMatch(
+      /onItemSelect=\{[\s\S]*?onOpen\(item\.id\)/
+    )
+    // ii · the overflow opens the day rather than naming records nobody can reach
+    // — composed as one more clickable event, since the kit's own more-line
+    // (`formatMoreEvents`) is text with no click of any kind.
+    expect(src, '"+N more" must be a chip whose click opens the day').toMatch(
+      /OVERFLOW_ID[\s\S]*?setOpenDay\(day\.key\)/
     )
     expect(src, "…and the day it opens lists rows that open too").toContain("<DayRows")
-    // iii · nothing else draws a calendar. Derived from the imports themselves,
-    // so a fourth screen that grows one is caught the day it is written.
+    // iii · nothing else draws a calendar or an agenda. Derived from the imports
+    // themselves, so a fourth screen that grows one is caught the day it is written.
     const offenders = componentFiles()
       .filter((f) => f !== host)
-      .filter((f) => stripComments(read(f)).includes("collections/calendar-view/calendar-view"))
+      .filter(
+        (f) =>
+          stripComments(read(f)).includes("components/calendar-view/calendar-view") ||
+          stripComments(read(f)).includes("components/agenda/agenda")
+      )
     expect(
       offenders,
-      `use <RecordCalendar> — the library calendar cannot open a record (UI-GAPS #22): ${offenders.join(", ")}`
+      `use <RecordCalendar> — the kit's calendar/agenda need the host's wiring to open a record (UI-GAPS #22): ${offenders.join(", ")}`
     ).toEqual([])
     // iv · and every screen that shows one wires it to the engine's open intent.
     const wired = componentFiles().filter((f) => read(f).includes("<RecordCalendar"))

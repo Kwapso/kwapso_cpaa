@@ -172,13 +172,13 @@ preparation, never edited by hand.
 - [x] `list`
 - [ ] `kanban`
 - [x] `card-grid`
-- [ ] `calendar-view`
+- [x] `calendar-view`
 - [x] `data-table`
 - [ ] `spreadsheet`
 - [ ] `matrix`
 - [ ] `swimlane`
 - [ ] `timeline`
-- [ ] `agenda`
+- [x] `agenda`
 - [x] `gallery`
 - [ ] `split`
 - [ ] `queue`
@@ -264,5 +264,5 @@ preparation, never edited by hand.
 
 ---
 
-**Components 77/115 · Foundations 3/3 · Compositions 8/47**
-**Components + foundations combined (the owner's "118"): 80/118**
+**Components 79/115 · Foundations 3/3 · Compositions 8/47**
+**Components + foundations combined (the owner's "118"): 82/118**

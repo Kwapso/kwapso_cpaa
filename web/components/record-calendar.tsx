@@ -3,28 +3,35 @@
 // THE CALENDAR — one component, every calendar screen, and every record on it
 // opens.
 //
-// WHY IT IS HERE AND NOT THE LIBRARY'S. The library's `CalendarView` draws a
-// month grid on which nothing is clickable: an event is a plain `<div>`, the
-// component exposes no `onSelect` / `onEventClick` of any kind, and "+6 more" is
-// a second `<div>` naming records that no gesture can reach. So a task on the
-// grid was a picture of a task, and the six hidden behind "+6 more" were a
-// sentence about records with no way in. The library is lego and this repo does
-// not edit it (UI-GAPS #22 carries the exact prop it should grow, so the owner
-// can hand it over), so the grid is composed here from primitives the library
-// DOES provide — the same reason `role-detail.tsx` and `paged-find.tsx` are
-// host-composed.
+// REBUILT ON THE KIT (30 Aug 2026). UI-GAPS #22's blocker — the library's
+// `CalendarView` took no click prop of any kind, so a record on the grid was a
+// picture of a record — was fixed upstream in kit v1.2.9: `CalendarViewProps`
+// now carries `onSelectDay` / `onSelectEvent` / `onSelectItem`. This file is
+// now composed from `CalendarView` (the month grid) and `Agenda` (the day-by-day
+// list, itself a thin wrapper over `CalendarView`'s own `agenda` view) rather
+// than hand-rolling both — the same reason `role-detail.tsx` reaches for the
+// kit's parts instead of drawing its own.
 //
-// TWO WAYS TO READ ONE MONTH. The GRID is for a desktop, where a thousand pixels
-// can hold a month at a glance. The AGENDA is that same month as a list, day by
-// day, and it is what a PHONE opens on: a month grid at 375px is six rows of
-// cells about three characters wide, which is not information. Both open records
-// the same way and both show the same period, so flipping between them is a
-// change of shape and never a change of subject.
+// WHY A CELL IS NEVER A BUTTON. The kit makes a day cell a real `<button>` when
+// `onSelectDay` is given, wrapping its event chips — and a chip becomes its OWN
+// `<button>` when `onSelectEvent` is given, which would nest a button inside a
+// button. So this file never sets `onSelectDay`: only entries are clickable,
+// exactly as before, and the overflow ("+N more") is composed as one more
+// `CalendarEvent` per day rather than a second, unclickable line the kit draws
+// on its own — the same "+6 more must open something" reasoning UI-GAPS #22
+// raised in the first place.
 //
-// WHAT IT DELIBERATELY IS NOT. It is not a scheduler: nothing here drags, and no
-// record moves by being dropped on a day. A calendar in this app is a way IN to
-// records that already have a date; the date itself is changed on the record's
-// own form, where it is validated at the door like every other field.
+// TWO WAYS TO READ ONE MONTH, unchanged. The GRID is for a desktop, where a
+// thousand pixels can hold a month at a glance. The AGENDA is that same month
+// as a list, day by day, and it is what a PHONE opens on: a month grid at
+// 375px is six rows of cells about three characters wide, which is not
+// information. Both open records the same way and both show the same period,
+// so flipping between them is a change of shape and never a change of subject.
+//
+// WHAT IT DELIBERATELY IS NOT. It is not a scheduler: nothing here drags, and
+// no record moves by being dropped on a day. A calendar in this app is a way
+// IN to records that already have a date; the date itself is changed on the
+// record's own form, where it is validated at the door like every other field.
 
 import * as React from "react"
 
@@ -37,11 +44,14 @@ import {
 } from "@shared/ui/components/dialog/dialog"
 import { List } from "@shared/web/list-compat"
 import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
+import { CalendarView, type CalendarDay, type CalendarEvent } from "@shared/ui/components/calendar-view/calendar-view"
+import { Agenda, type AgendaDay } from "@shared/ui/components/agenda/agenda"
 import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"
 import { useT } from "@shared/web/language"
+import type { Vars } from "@shared/i18n"
 
 /* ------------------------------- what it takes ---------------------------- */
 
@@ -70,7 +80,10 @@ type Mode = "month" | "agenda"
 // the library's own calendar (`accentIndex`) rather than imported, because the
 // library exports the component and not the helper — so the grid keeps exactly
 // the colours it shipped with, and a department that was chart-3 yesterday is
-// chart-3 today.
+// chart-3 today. The kit's own chip `tone`/`dot` are a small fixed enum
+// (status words, not an arbitrary hash), which cannot carry "one colour per
+// department" — so the dot is drawn into the chip's own `label` node instead,
+// the one slot the kit hands the caller whole.
 const ACCENTS = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4", "bg-chart-5"]
 
 function accentClass(value: string): string {
@@ -129,37 +142,52 @@ function monthLabel(month: Date): string {
   return month.toLocaleDateString(undefined, { month: "long", year: "numeric" })
 }
 
+// Monday first, matching `monthSquares`. The kit's own `quietColumns` default
+// ([5, 6], the last two) is exactly right for this order — Saturday and Sunday.
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
   // 5 Jan 1970 was a Monday, so this is Mon…Sun with no magic numbers.
   new Date(1970, 0, 5 + i).toLocaleDateString(undefined, { weekday: "short" })
 )
 
-/* -------------------------------- the entry ------------------------------- */
+/* ------------------------------ the overflow ------------------------------- */
 
-/** ONE RECORD ON THE GRID, and the whole point of this file: a `<button>`, not a
- * `<div>`. Keyboard-reachable, named for a screen reader, and it opens the
- * record — which is what the library's version could not do at any price. */
-function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: (id: string) => void }) {
-  const t = useT()
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(entry.id)}
-      title={entry.title}
-      aria-label={t("Open {name}", { name: entry.title })}
-      className="bg-accent hover:bg-muted motion-hover flex w-full items-center gap-1 rounded-pill px-1.5 py-0.5 text-left text-xs"
-    >
-      {entry.accent ? (
-        <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${accentClass(entry.accent)}`} />
-      ) : null}
-      <span className="truncate">{entry.title}</span>
-    </button>
-  )
+// The sentinel id for the "+N more" chip this file adds to a day's own events.
+// Unique only WITHIN one day's array (it is a React key there, and the
+// argument `onSelectEvent` is handed back), never across the grid.
+const OVERFLOW_ID = "__overflow__"
+
+/** One day's events, capped at `maxPerDay`, with the hidden count folded into
+ * one more `CalendarEvent` rather than left as the kit's own dead more-line
+ * (`formatMoreEvents` only changes the WORDS; the kit draws no click for it).
+ * So the overflow is a real chip too, and `onSelectEvent` tells it apart from a
+ * record by its id. */
+function buildDayEvents(
+  entries: CalendarEntry[],
+  maxPerDay: number,
+  t: (english: string, vars?: Vars) => string
+): CalendarEvent[] {
+  const shown = entries.slice(0, maxPerDay)
+  const hidden = entries.length - shown.length
+  const events: CalendarEvent[] = shown.map((e) => ({
+    id: e.id,
+    title: e.title,
+    tone: "quiet",
+    label: (
+      <span className="flex min-w-0 items-center gap-1">
+        {e.accent ? (
+          <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${accentClass(e.accent)}`} />
+        ) : null}
+        <span className="min-w-0 truncate">{e.title}</span>
+      </span>
+    ),
+  }))
+  if (hidden > 0) {
+    events.push({ id: OVERFLOW_ID, tone: "quiet", label: t("+{n} more", { n: hidden }) })
+  }
+  return events
 }
 
-/** A day's records as a LIST — the shape the agenda is made of and the shape the
- * "+N more" dialog opens into. One renderer, so a record read on a phone and the
- * same record read out of a crowded square carry the same two lines. */
+/** A day's records as a LIST — the shape the "+N more" dialog opens into. */
 function DayRows({
   entries,
   onOpen,
@@ -195,7 +223,6 @@ export function RecordCalendar({
   entries,
   onOpen,
   emptyText,
-  unloaded,
   maxPerDay = 3,
   onMonthChange,
 }: {
@@ -206,25 +233,18 @@ export function RecordCalendar({
   onOpen: (id: string) => void
   /** what an empty month says, in the screen's own noun */
   emptyText: string
-  /** R14 — WHAT IS NOT LOADED. On a keyset-PAGED collection the rows in hand are
-   *  the newest page, so a month starting before the oldest loaded record is not
-   *  a month with nothing in it, it is a month nobody has read yet. A screen over
-   *  a paged collection passes the sentence (and its Load more) here, and the
-   *  calendar shows it exactly on the months that are lying. A BOUNDED collection
-   *  passes nothing, because there is nothing beyond what is drawn. */
-  unloaded?: React.ReactNode
   /** how many entries a square shows before it collapses to "+N more" */
   maxPerDay?: number
   /** WHICH MONTH IS ON SCREEN, told to the host as `YYYY-MM`, on mount and on
    * every move.
    *
    * The calendar owns the month — a person moves it with the arrows, and that is
-   * the right place for it. But a screen over a PAGED collection cannot answer
-   * for a month it was never given: the meetings list pages newest-first, so the rows in
-   * hand are the furthest-out future and the month being drawn is usually not
-   * among them. Without this, the grid renders whatever happened to be loaded and
-   * calls the rest an empty month. So the calendar says what it is showing, and
-   * the screen goes and gets it. */
+   * the right place for it. But a screen over a collection that answers "what's
+   * in this month" one month at a time (meetings-screen.tsx's own `monthQ`)
+   * cannot answer for a month it was never given, so the calendar says what it
+   * is showing and the screen goes and gets it. Without this the grid would
+   * render whatever happened to already be in hand and call the rest an empty
+   * month — R14's failure mode, not this file's to reintroduce. */
   onMonthChange?: (month: string) => void
 }) {
   const t = useT()
@@ -254,13 +274,6 @@ export function RecordCalendar({
     return map
   }, [entries])
 
-  // THE OLDEST RECORD WE HOLD. On a paged collection this is the horizon: before
-  // it, an empty square means "not read yet" rather than "nothing happened".
-  const oldestLoaded = React.useMemo(
-    () => entries.reduce<string | null>((min, e) => (min === null || e.day < min ? e.day : min), null),
-    [entries]
-  )
-
   const mode: Mode = picked ?? (isPhone ? "agenda" : "month")
   const squares = monthSquares(month)
   const monthStart = dayKey(startOfMonth(month))
@@ -270,13 +283,50 @@ export function RecordCalendar({
   const inMonth = entries
     .filter((e) => e.day.slice(0, 7) === monthStart.slice(0, 7))
     .sort((a, b) => (a.day === b.day ? a.title.localeCompare(b.title) : a.day.localeCompare(b.day)))
-  const agendaDays = [...new Set(inMonth.map((e) => e.day))]
-  // R14 again: say it only where it is true. A month wholly inside the loaded
-  // window is not hiding anything, and a sentence on every month would be noise
-  // people learn to ignore — which is how a true one gets missed.
-  const beyondHorizon = unloaded != null && oldestLoaded != null && monthStart < oldestLoaded
+  const agendaDayKeys = [...new Set(inMonth.map((e) => e.day))]
 
   const dayEntries = openDay ? (byDay.get(openDay) ?? []) : []
+
+  // THE GRID'S OWN CELLS. Never `onSelectDay` — see the file header on nested
+  // buttons — so a cell stays a plain `<div>` and only its chips (and the
+  // overflow chip) are real buttons.
+  const calendarDays: CalendarDay[] = squares.map((d) => {
+    const key = dayKey(d)
+    return {
+      key,
+      label: d.getDate(),
+      dateTime: key,
+      events: buildDayEvents(byDay.get(key) ?? [], maxPerDay, t),
+      outside: d.getMonth() !== month.getMonth(),
+      today: key === today,
+    }
+  })
+
+  // THE AGENDA'S OWN DAYS — the same records, grouped and ordered exactly as
+  // the grid buckets them, handed to the kit's `Agenda` rather than drawn here.
+  const agendaKitDays: AgendaDay[] = agendaDayKeys.map((day) => ({
+    key: day,
+    label: `${formatDayKey(day)}${day === today ? ` · ${t("Today")}` : ""}`,
+    items: (byDay.get(day) ?? []).map((e) => ({
+      id: e.id,
+      title: (
+        <span className="flex min-w-0 items-center gap-1.5">
+          {e.accent ? (
+            <span aria-hidden className={`size-2 shrink-0 rounded-pill ${accentClass(e.accent)}`} />
+          ) : null}
+          <span className="min-w-0 truncate">{e.title}</span>
+        </span>
+      ),
+      who: e.detail,
+    })),
+  }))
+
+  const emptyState = (
+    <p className="text-muted-foreground flex items-center gap-2 text-sm">
+      <CalendarRange aria-hidden className="size-4 shrink-0" />
+      {emptyText}
+    </p>
+  )
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -340,94 +390,28 @@ export function RecordCalendar({
       </div>
 
       {mode === "month" ? (
-        <>
-          <div className="text-muted-foreground grid grid-cols-7 gap-1 text-center text-xs">
-            {WEEKDAYS.map((w) => (
-              <div key={w} className="py-1">
-                {w}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {squares.map((d) => {
-              const key = dayKey(d)
-              const here = byDay.get(key) ?? []
-              const hidden = here.length - maxPerDay
-              return (
-                <div
-                  key={key}
-                  className={[
-                    // THROUGH THE TOKENS, not through two hexes (R32). The hover
-                    // line was `#a8a59f`, a grey that exists in no palette here —
-                    // C10 says there is ONE ink stepped by opacity and never a
-                    // grey ramp, so it is the ink at 30%. Today's fill was
-                    // `#ffe9b0`, which is `brand.accentHex.surface` written out
-                    // by hand: the same soft mango `--secondary` already resolves
-                    // to, so a rebrand now reaches the calendar like everything
-                    // else. Mango is still never a border, which is the rule this
-                    // square was drawn to obey.
-                    "motion-hover flex min-h-20 flex-col gap-1 rounded-[var(--radius)] border p-1.5 hover:border-foreground/30 hover:bg-accent",
-                    d.getMonth() === month.getMonth() ? "" : "opacity-40",
-                    key === today ? "bg-secondary" : "",
-                  ].join(" ")}
-                >
-                  <div
-                    className={`text-right text-xs ${key === today ? "text-foreground font-medium" : ""}`}
-                  >
-                    {d.getDate()}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {here.slice(0, maxPerDay).map((e) => (
-                      <EntryChip key={e.id} entry={e} onOpen={onOpen} />
-                    ))}
-                    {hidden > 0 && (
-                      // "+6 more" USED TO BE DEAD TEXT — a line naming six records
-                      // with no way to reach any of them, which is worse than not
-                      // mentioning them. It is a button now, and it opens the day.
-                      <Button
-                        variant="link"
-                        type="button"
-                        onClick={() => setOpenDay(key)}
-                        className="text-muted-foreground hover:text-foreground text-xs"
-                      >
-                        {t("+{n} more", { n: hidden })}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </>
+        <CalendarView
+          view="month"
+          weekdayLabels={WEEKDAYS}
+          days={calendarDays}
+          maxEvents={maxPerDay + 1}
+          onSelectEvent={(event, day) => {
+            if (event.id === OVERFLOW_ID) setOpenDay(day.key)
+            else onOpen(event.id)
+          }}
+          emptyState={emptyState}
+          label={t("Calendar")}
+        />
       ) : (
         // THE AGENDA — the same month, day by day, every row a way in. This is
-        // what a calendar is FOR on a phone: what is on, in the order it happens,
-        // with room for the second line the grid has to throw away.
-        <div className="flex flex-col gap-4">
-          {agendaDays.length === 0 ? (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
-              <CalendarRange aria-hidden className="size-4 shrink-0" />
-              {emptyText}
-            </p>
-          ) : (
-            agendaDays.map((day) => (
-              <section key={day} className="flex flex-col gap-2">
-                <h3
-                  className={`text-micro uppercase ${
-                    day === today ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {formatDayKey(day)}
-                  {day === today ? ` · ${t("Today")}` : ""}
-                </h3>
-                <DayRows entries={byDay.get(day) ?? []} onOpen={onOpen} />
-              </section>
-            ))
-          )}
-        </div>
+        // what a calendar is FOR on a phone: what is on, in the order it happens.
+        <Agenda
+          days={agendaKitDays}
+          onItemSelect={(item) => onOpen(item.id)}
+          emptyState={emptyState}
+          label={t("Agenda")}
+        />
       )}
-
-      {beyondHorizon && <div className="flex flex-col gap-2">{unloaded}</div>}
 
       {/* THE DAY, opened from "+N more". Everything on that day, not just the
           overflow: a person who clicked "+6 more" on a square showing three is
