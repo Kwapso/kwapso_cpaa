@@ -262,6 +262,11 @@ function chatThreads(messages: ChatMessage[]): ChatMessage[] {
       // "Somebody in this space" is not attributed, and saying it is would be
       // the one thing this lane must never do.
       senderNamed: ordered.every((m) => m.senderNamed),
+      // AND WAS ANYBODY HUMAN IN IT? True only when EVERY voice was an app —
+      // one human line anywhere in the thread makes the conversation a person's.
+      // `every` over an empty group cannot arise: a group with no messages was
+      // dropped above.
+      senderIsApp: ordered.every((m) => m.senderIsApp),
       text: ordered.map((m) => `${m.sender}: ${m.text}`).join("\n"),
       // AS RECENT AS ITS LAST REPLY, which is what the sweep's cursor orders by.
       createdAt: last.createdAt,
@@ -572,6 +577,10 @@ export async function readGoogleMaterial(
             ownerUserId: guard.userId,
             // The space says whose it is, exactly as a Drive folder does.
             accountId: space.accountId,
+            // NOBODY HUMAN EVER SPOKE IN THIS ONE. Decided by `chatThreads` off
+            // Google's own sender type and carried through; the knowledge lane
+            // retires on it (lib/knowledge-google.ts, the chat kind).
+            appOnly: message.senderIsApp,
           })
       }
     // WRITTEN DOWN ONCE, AT THE END. Everything this sweep learned, from every

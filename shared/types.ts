@@ -2222,4 +2222,14 @@ export type GoogleItem = {
    * folder it came out of), and asking again downstream would be guessing at
    * text instead of reading a decision. Null = the agency's own compartment. */
   accountId: string | null
+  /** TRUE WHEN NO PERSON EVER SPOKE IN IT — every voice was an app. Chat only,
+   * and absent (undefined) on every other service, which read as "a person was
+   * involved" and is the safe default for a kind that cannot tell.
+   *
+   * Carried WITH the item for exactly the reason the shelf and the account are:
+   * the thing that knows whether a human was in a conversation is the read that
+   * fetched the messages, and re-deciding it downstream would mean reading the
+   * TEXT — which is the one thing that must never decide this (lib/knowledge-google.ts,
+   * the chat kind's `retired`). */
+  appOnly?: boolean
 }

@@ -1284,6 +1284,63 @@ export async function gmailSendDraft(
  * in the sender's thread; these two headers are what every OTHER mail client on
  * the receiving side reads, and without them the answer lands in the recipient's
  * inbox as a separate conversation. */
+/**
+ * A HEADER VALUE THAT SURVIVES THE WIRE — RFC 2047, and it is not optional.
+ *
+ * ── THE BUG THIS ENDS ────────────────────────────────────────────────────────
+ *
+ * MIME headers are SEVEN-BIT. `Content-Type: …; charset=UTF-8` two lines below
+ * describes the BODY and says nothing whatever about the headers, which is the
+ * trap: the message looks correctly declared, and it is — for the half that was
+ * never broken. A subject with a non-ASCII character in it went onto the wire as
+ * raw UTF-8 bytes in a header field, where no charset applies, and every
+ * receiver falls back to Latin-1/CP1252. So "— sweep" left as bytes E2 80 94 and
+ * came back read as three separate characters.
+ *
+ * MEASURED ON STAGING, 31 Aug 2026, in the knowledge base itself, because the
+ * Gmail sweep then files what the app sent:
+ *   sent     "kwapso sweep 2026-08-17T12-50-42-898Z — sweep"
+ *   stored   "kwapso sweep 2026-08-17T12-50-42-898Z Ã¢Â€Â” sweep"
+ *   and its reply, having been through the loop a second time,
+ *            "Re: kwapso sweep … ÃƒÂƒÃ‚Â¢ÃƒÂ‚Ã¢Â‚Â¬ÃƒÂ‚Ã¢Â€Â  sweep"
+ *
+ * The reply carrying MORE layers than the message is the signature of the fault:
+ * each round trip mangles what the last one mangled. It is not a display
+ * problem. Those are the bytes a client's mail server received, and the em dash
+ * is the least of it — a client named Zöllner or Dauerbäck gets their own name
+ * mangled in the subject line of every mail this app sends them.
+ *
+ * ── WHAT THIS DOES ───────────────────────────────────────────────────────────
+ *
+ * Pure ASCII is left EXACTLY as it was — encoding it would be a change to every
+ * mail the app has ever sent, for no gain, and an encoded word is harder for a
+ * human reading raw source. Anything else becomes one base64 encoded word.
+ * Deliberately whole-value rather than per-word: an encoded word may not exceed
+ * 75 characters, so a long subject is split on a UTF-8 CHARACTER boundary and
+ * the pieces are joined by a fold, which is what RFC 2047 § 2 requires — a
+ * multi-byte character split across two words is the classic way of fixing this
+ * bug and introducing it again one layer down.
+ */
+function encodeHeaderValue(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (!/[^\u0000-\u007F]/.test(value)) return value
+  const bytes = new TextEncoder().encode(value)
+  // 75 total, less `=?UTF-8?B?` (10) and `?=` (2), rounded DOWN to a multiple of
+  // 4 base64 characters, which is 3 source bytes each.
+  const perWord = 45
+  const words: string[] = []
+  for (let i = 0; i < bytes.length; i += perWord) {
+    const slice = bytes.subarray(i, i + perWord)
+    let binary = ""
+    for (const b of slice) binary += String.fromCharCode(b)
+    words.push(`=?UTF-8?B?${btoa(binary)}?=`)
+  }
+  // A FOLD, not a space: consecutive encoded words are joined by CRLF + a space,
+  // and the receiver drops the whitespace BETWEEN two encoded words — which is
+  // the only way to carry a value whose own text contains no convenient break.
+  return words.join("\r\n ")
+}
+
 function encodeMessage(input: {
   to: string
   subject: string
@@ -1293,8 +1350,17 @@ function encodeMessage(input: {
 }): string {
   const header = (v: string) => v.replaceAll(/[\r\n]+/g, " ").trim()
   const text =
+    // `To:` IS DELIBERATELY LEFT ALONE, and the reason is worth the four lines.
+    // An encoded word may not wrap an ADDRESS — only the display name beside one
+    // — so `=?UTF-8?B?…?=` over the whole value hides the `<addr@host>` from the
+    // receiving parser and the mail is not delivered at all. That is a strictly
+    // worse failure than a mangled name. It also needs no encoding in practice:
+    // a `to` from the send door is a bare address, which is ASCII by
+    // construction, and a `to` from `gmailReply` is the original message's own
+    // `From` header, which its sender's own MTA already encoded correctly. If a
+    // display name ever does need encoding here, encode THAT part alone.
     `To: ${header(input.to)}\r\n` +
-    `Subject: ${header(input.subject)}\r\n` +
+    `Subject: ${encodeHeaderValue(header(input.subject))}\r\n` +
     (input.inReplyTo ? `In-Reply-To: ${header(input.inReplyTo)}\r\n` : "") +
     (input.references ? `References: ${header(input.references)}\r\n` : "") +
     "Content-Type: text/plain; charset=UTF-8\r\n" +
@@ -1962,6 +2028,13 @@ export type ChatMessage = {
    * `ChatSpace.named`. A screen that cannot tell Google's word from ours is a
    * screen that will one day present a guess as a fact. */
   senderNamed: boolean
+  /** TRUE WHEN GOOGLE SAYS AN APP SAID IT (`sender.type === "BOT"`), whatever it
+   * is called. Read INDEPENDENTLY of the naming fallback above, so a bot with a
+   * real `displayName` — which never reaches the "An app" branch — is still
+   * known to be a bot. The alternative, matching the string "An app", would be
+   * matching our own prose: the label is ours, not Google's, and a renamed label
+   * would silently switch the flag off. */
+  senderIsApp: boolean
   text: string
   createdAt: string | null
   /** THE CONVERSATION THIS MESSAGE IS PART OF (`spaces/…/threads/…`), or "".
@@ -2334,18 +2407,23 @@ export function chatMessageUrl(messageName: string): string | null {
 function toChatSender(
   raw: unknown,
   members?: Map<string, string>
-): { sender: string; senderNamed: boolean } {
+): { sender: string; senderNamed: boolean; senderIsApp: boolean } {
   const s = (raw ?? {}) as Record<string, unknown>
+  // WHAT GOOGLE SAYS THIS SPEAKER IS, decided BEFORE any of the naming
+  // fallbacks below and independently of all of them. Naming and being-an-app
+  // are two different facts about a sender, and the old code could only report
+  // the second one when it had failed to establish the first.
+  const senderIsApp = str(s.type) === "BOT"
   const given = str(s.displayName)
-  if (given) return { sender: given, senderNamed: true }
+  if (given) return { sender: given, senderNamed: true, senderIsApp }
   // THE MEMBERSHIP, which is the half Google leaves off a message. Looked up by
   // the sender's own resource name, so a hit is Google's word for who this is
   // and carries `senderNamed: true` exactly as a `displayName` would.
   const fromMembers = members?.get(str(s.name))
-  if (fromMembers) return { sender: fromMembers, senderNamed: true }
+  if (fromMembers) return { sender: fromMembers, senderNamed: true, senderIsApp }
   const type = str(s.type)
   const described = type === "BOT" ? "An app" : type === "HUMAN" ? "Somebody in this space" : ""
-  return { sender: described || str(s.name), senderNamed: false }
+  return { sender: described || str(s.name), senderNamed: false, senderIsApp }
 }
 
 /**
@@ -2380,6 +2458,9 @@ export async function chatPost(token: string, spaceName: string, text: string): 
     // OUR OWN NAME, and `named` because it is: we know exactly who said this one.
     sender: "kwapso",
     senderNamed: true,
+    // WE ARE AN APP. Said plainly here rather than left to default, because this
+    // is the very post that comes back round as a notification echo.
+    senderIsApp: true,
     text: str(data.text) || text,
     createdAt: str(data.createTime) || null,
     thread: str((data.thread as Record<string, unknown> | undefined)?.name),

@@ -37,6 +37,9 @@ const holder = vi.hoisted(() => ({
   /** What one Drive file's text comes back as, when a test needs to CHANGE it
    * between sweeps. Empty by default, so every other test sees the fixture. */
   driveText: new Map<string, string>(),
+  /** Extra chat messages one test wants and the others must not see. Empty by
+   * default, so every count in this file stays what it was. */
+  chat: [] as Record<string, unknown>[],
 }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
@@ -151,6 +154,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         space: "spaces/AAA",
         sender: "Aurora",
         senderNamed: true,
+        senderIsApp: false,
         thread: "spaces/AAA/threads/T1",
         url: "https://chat.google.com/room/AAA/MSG_2",
         text: "second thing said",
@@ -161,11 +165,13 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         space: "spaces/AAA",
         sender: "Ana",
         senderNamed: true,
+        senderIsApp: false,
         thread: "spaces/AAA/threads/T1",
         url: "https://chat.google.com/room/AAA/MSG_1",
         text: "first thing said",
         createdAt: "2026-08-03T10:00:00.000Z",
       },
+      ...holder.chat,
     ] }),
   }
 })
@@ -280,6 +286,7 @@ beforeEach(() => {
   holder.unlisted.clear()
   holder.binned.clear()
   holder.events = []
+  holder.chat = []
   holder.driveText.clear()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
@@ -436,6 +443,116 @@ describe("what actually gets read", () => {
     expect(threads[0].body.match(/Ana:/g)?.length, "attributed once, not twice").toBe(1)
     // AND IT LINKS BACK, which was null from the day Chat was written.
     expect(threads[0].source_url).toBe("https://chat.google.com/room/AAA/MSG_1")
+  })
+
+  // ── THE APP READING ITS OWN NOTIFICATIONS BACK IN ──────────────────────────
+  //
+  // kwapso posts "*Request* created by _X_ in the Portal" into a Chat space and
+  // the Chat sweep files it as knowledge. A closed loop, and on staging it was
+  // 21 live sources carrying nothing, competing for retrieval slots with the
+  // team's real material.
+  //
+  // The three tests below are ONE decision looked at from three sides, and the
+  // middle one is the reason the discriminator is the speaker rather than the
+  // words: on staging NINE threads opened with that exact notification line and
+  // then carried the team's reply to it. A format filter scores well on the
+  // first test and deletes the team's own diagnostic record on the second.
+
+  /** A message in the shared space, said by whoever the test says said it. */
+  const said = (id: string, at: string, who: string, isApp: boolean, text: string) => ({
+    id: `spaces/AAA/messages/${id}`,
+    space: "spaces/AAA",
+    sender: who,
+    senderNamed: !isApp,
+    senderIsApp: isApp,
+    thread: `spaces/AAA/threads/${id}`,
+    url: `https://chat.google.com/room/AAA/${id}`,
+    text,
+    createdAt: at,
+  })
+  const NOTIFICATION = "An app: *⚠️ Issue* created by _Paras Maroo_ in the Portal"
+  /** One chat thread's source row, with the columns this rule actually turns on
+   * — `sources()` above selects neither, and reading an absent column back as
+   * `undefined` is how a test like this passes while proving nothing. */
+  const thread = (id: string) =>
+    db()
+      .prepare(
+        `SELECT deactivated_at, deactivator_id, updated_at, body FROM knowledge_sources
+           WHERE origin_row_id = ?`
+      )
+      .get(`${IDS.staffUser}:spaces/AAA/threads/${id}`) as
+      | { deactivated_at: string | null; deactivator_id: string | null; updated_at: string; body: string }
+      | undefined
+
+  it("a chat thread nobody human ever spoke in is retired, not filed", async () => {
+    holder.chat = [said("ECHO", "2026-08-04T09:00:00.000Z", "An app", true, NOTIFICATION)]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const echo = thread("ECHO")
+    // FILED, then switched off — never skipped. A skipped row is one the cursor
+    // never visits again, which is how it could never come back.
+    expect(echo, "the notification is still a row, because nothing here deletes").toBeTruthy()
+    expect(echo?.deactivated_at, "…and it is switched off").not.toBeNull()
+    // BY THE APP, not by a person — which is what lets the sweep revive it.
+    expect(echo?.deactivator_id).toBeNull()
+  })
+
+  it("a thread the team REPLIED in is kept, though every word of the notification is still in it", async () => {
+    // THE FALSE POSITIVE THIS RULE EXISTS TO AVOID, in the owner's own data: the
+    // body opens with the notification, contains "in the Portal", and is then
+    // the team diagnosing a client's issue in the open. A filter reading the
+    // TEXT cannot tell this from the test above; a filter reading the SPEAKER
+    // cannot confuse them.
+    holder.chat = [
+      said("MIXED", "2026-08-04T09:00:00.000Z", "An app", true, NOTIFICATION),
+      {
+        ...said("MIXED_R", "2026-08-04T09:05:00.000Z", "Chilavert George", false,
+          "I have fixed the issue that caused these emails"),
+        // the SAME thread as the notification — a reply, not a new conversation
+        thread: "spaces/AAA/threads/MIXED",
+      },
+    ]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mixed = thread("MIXED")
+    expect(mixed?.deactivated_at, "one human line makes the conversation a person's").toBeNull()
+    expect(mixed?.body).toContain("in the Portal")
+    expect(mixed?.body).toContain("I have fixed the issue")
+  })
+
+  it("and when somebody finally answers the notification, the conversation comes back", async () => {
+    holder.chat = [said("LATER", "2026-08-04T09:00:00.000Z", "An app", true, NOTIFICATION)]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(thread("LATER")?.deactivated_at, "retired on the first sweep").not.toBeNull()
+
+    // A person replies. The condition that retired it has stopped being true, so
+    // the engine revives it — the same self-healing the calendar lane's
+    // placeholders get the day the meeting actually happens. The rule needs
+    // nobody to notice it was wrong.
+    holder.chat = [
+      said("LATER", "2026-08-04T09:00:00.000Z", "An app", true, NOTIFICATION),
+      {
+        ...said("LATER_R", "2026-08-04T10:00:00.000Z", "Aurora Thalassa", false, "pls review this"),
+        thread: "spaces/AAA/threads/LATER",
+      },
+    ]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const back = thread("LATER")
+    expect(back?.deactivated_at, "a reply brings the conversation back").toBeNull()
+    expect(back?.body).toContain("pls review this")
+  })
+
+  it("retiring an echo twice writes once (R17)", async () => {
+    holder.chat = [said("TWICE", "2026-08-04T09:00:00.000Z", "An app", true, NOTIFICATION)]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const first = thread("TWICE")?.deactivated_at
+    expect(first, "there is a retired row to re-retire").toBeTruthy()
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    // THE MOMENT IT WAS RETIRED, not the moment the row was last touched. The
+    // engine upserts every row it reads, so `updated_at` moves on every sweep by
+    // design and proves nothing here — asserting on it would be asserting the
+    // wrong intent. `deactivated_at` is written only by the retire branch, and
+    // its predicate rides the UPDATE (`WHERE deactivated_at IS NULL`), so a
+    // second sweep moves zero rows and the stamp does not advance.
+    expect(thread("TWICE")?.deactivated_at, "a second sweep does not re-retire it").toBe(first)
   })
 
   it("two colleagues who named the same folder get a row each, so neither decides the other's shelf", async () => {

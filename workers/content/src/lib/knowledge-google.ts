@@ -492,6 +492,62 @@ export function googleIngestKinds(
             // AND IT LINKS BACK. This was `null` — so Chat was the one Google
             // kind the assistant could quote and nobody could go and read.
             sourceUrl: item.url,
+            // ── THE APP READING ITS OWN NOTIFICATIONS BACK IN ────────────────
+            //
+            // kwapso posts into a Chat space ("*Request* created by _K. Stehlik_
+            // in the Portal"); the Chat sweep then files that post as knowledge.
+            // A closed loop. These are genuinely distinct threads with correct
+            // composite keys, so this is not duplication and dedup is the wrong
+            // tool: every one is a real, separate, worthless conversation, and
+            // each occupies a retrieval slot a real question needs. The ticket
+            // it announces is already in the base as a `ticket` source with the
+            // actual words on it.
+            //
+            // MEASURED ON STAGING, 31 Aug 2026: 21 such threads, every one live,
+            // across four spaces —
+            //   "HOGO — An app"      "An app: *💭 Request* created by _K. Stehlik_ in the Portal"
+            //   "Rest-o — An app"    "An app: 🐛 *Bug Reported*: @Ishita Goyal"
+            //   "FluClinic — An app" "An app: 📤 Task ready for your review @Ishita Goyal"
+            //
+            // ── WHY THE DISCRIMINATOR IS THE SPEAKER AND NOT THE WORDS ───────
+            //
+            // The obvious filter is the message FORMAT, and it is the dangerous
+            // one. In the same four spaces sit NINE threads that open with that
+            // exact notification line and then carry the team's reply to it:
+            //
+            //   "An app: *⚠️ Issue* created by _Paras Maroo_ in the Portal
+            //    Aurora Thalassa: @Chilavert George pls review this
+            //    Chilavert George: these two emails are sent by me, when I was
+            //      working on the stripe workflow.
+            //    Chilavert George: I have fixed the issue that caused these emails"
+            //
+            // That is a decision made in the open with the reasoning attached —
+            // precisely what the knowledge base is FOR. Every one of those nine
+            // bodies contains the notification line and the words "in the
+            // Portal", so a format filter deletes the team's own diagnostic
+            // record and leaves a green build behind it. The SPACE discriminates
+            // nothing either: HOGO, FluClinic, Assecuranz and Rest-o each hold
+            // both kinds.
+            //
+            // So the test is WHO SPOKE, over the WHOLE thread, and it never
+            // reads the body at all — which is why no human sentence can trip
+            // it, whatever it says about the Portal. `appOnly` is Google's own
+            // `sender.type`, folded across every message by `chatThreads`.
+            //
+            // WHAT A FALSE POSITIVE COSTS, because a knowledge base that
+            // silently drops real material is worse than one carrying noise: a
+            // space where an app posts something genuinely useful that no human
+            // ever replies to — an alerting, CI or form-response bot — is
+            // retired unread. I judge that acceptable and reversible, and it is
+            // the real cost rather than a nil one. Reversible twice over: this
+            // RETIRES rather than skips, so the row and its history survive
+            // (deactivate-never-delete), and the moment one person replies the
+            // condition stops being true, the sweep meets a live row and the
+            // engine revives it (`sweepKind`) — exactly as the calendar lane's
+            // placeholders come back the day the meeting happens. A person who
+            // excluded it by hand still keeps that decision; `deactivator_id`
+            // is what separates the two.
+            retired: item.appOnly === true,
             ...fencing(item),
           }))
         ),
