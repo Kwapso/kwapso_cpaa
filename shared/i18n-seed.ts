@@ -3170,4 +3170,75 @@ export const SEED: Catalogue = {
     es: "Nada mapeado todavía.",
     ca: "Res assignat encara.",
   },
+
+  /* ── The import wizard, written by hand 2026-08-31 (feat/import-on-kit-wizard)
+   * The screen moved onto the kit's own five-step ImportWizard, which named two
+   * steps that had never been on screen before (the plan, and the write itself),
+   * so the rail's five words and the run step's own lines are new copy.
+   * HAND-WRITTEN RATHER THAN GENERATED, because R44's ceiling is 0 in all three
+   * languages and scripts/i18n-translate.mjs spends the owner's personal key —
+   * a lane may not raise the ceiling to pay for its own feature. Same register
+   * as the rest of this file: Sie in German, tú in Spanish and Catalan, sentence
+   * case, the same word for the same thing throughout. ─────────────────────── */
+  "Your files": { de: "Ihre Dateien", es: "Tus archivos", ca: "Els teus fitxers" },
+  "Match the columns": { de: "Spalten zuordnen", es: "Empareja las columnas", ca: "Fes coincidir les columnes" },
+  "Check and commit": { de: "Prüfen und starten", es: "Revisa y confirma", ca: "Revisa i confirma" },
+  "Writing": { de: "Schreiben", es: "Escribiendo", ca: "S'està escrivint" },
+  "The report": { de: "Der Bericht", es: "El informe", ca: "L'informe" },
+  "Import steps": { de: "Import-Schritte", es: "Pasos de la importación", ca: "Passos de la importació" },
+  "Importing your data": {
+    de: "Ihre Daten werden importiert",
+    es: "Importando tus datos",
+    ca: "S'estan important les teves dades",
+  },
+  "Writing {count} row(s). Each one is checked exactly as if you typed it in yourself.": {
+    de: "{count} Zeile(n) werden geschrieben. Jede wird genau so geprüft, als hätten Sie sie selbst eingetippt.",
+    es: "Escribiendo {count} fila(s). Cada una se comprueba exactamente como si la hubieras escrito tú.",
+    ca: "S'estan escrivint {count} fila(es). Cadascuna es comprova exactament com si l'haguessis escrit tu.",
+  },
+  "{files} file(s) · {rows} row(s). Planning uses the assistant (a few credits), so you can review before anything is written.": {
+    de: "{files} Datei(en) · {rows} Zeile(n). Die Planung nutzt den Assistenten (ein paar Credits), damit Sie alles prüfen können, bevor etwas geschrieben wird.",
+    es: "{files} archivo(s) · {rows} fila(s). La planificación usa el asistente (unos pocos créditos), así puedes revisarlo antes de que se escriba nada.",
+    ca: "{files} fitxer(s) · {rows} fila(es). La planificació fa servir l'assistent (uns quants crèdits), així ho pots revisar abans que s'escrigui res.",
+  },
+  "{skipped} of {total} row(s) will be skipped": {
+    de: "{skipped} von {total} Zeile(n) werden übersprungen",
+    es: "Se omitirán {skipped} de {total} fila(s)",
+    ca: "S'ometran {skipped} de {total} fila(es)",
+  },
+  "And {count} more — download the list above.": {
+    de: "Und {count} weitere — laden Sie die Liste oben herunter.",
+    es: "Y {count} más: descarga la lista de arriba.",
+    ca: "I {count} més: descarrega la llista de dalt.",
+  },
+  "Rejected rows ({count})": {
+    de: "Abgelehnte Zeilen ({count})",
+    es: "Filas rechazadas ({count})",
+    ca: "Files rebutjades ({count})",
+  },
+  "Imported {count} row(s).": {
+    de: "{count} Zeile(n) importiert.",
+    es: "Se han importado {count} fila(s).",
+    ca: "S'han importat {count} fila(es).",
+  },
+  "Couldn't read that file.": {
+    de: "Diese Datei konnte nicht gelesen werden.",
+    es: "No se pudo leer ese archivo.",
+    ca: "No s'ha pogut llegir aquest fitxer.",
+  },
+  /* The run step's error register. No full stop on the eyebrow or the title —
+   * they are labels, not sentences, and the kit draws them as such. The sibling
+   * entry "The import didn't finish." (with a full stop) is the toast, and both
+   * are live: this one heads the register, that one is said in passing. */
+  "The import stopped": {
+    de: "Der Import wurde angehalten",
+    es: "La importación se ha detenido",
+    ca: "La importació s'ha aturat",
+  },
+  "The import didn't finish": {
+    de: "Der Import wurde nicht abgeschlossen",
+    es: "La importación no ha terminado",
+    ca: "La importació no ha acabat",
+  },
+  "Back to the plan": { de: "Zurück zum Plan", es: "Volver al plan", ca: "Torna al pla" },
 }

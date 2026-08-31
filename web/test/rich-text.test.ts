@@ -226,7 +226,12 @@ const NOT_USER_TYPED: Record<string, string> = {
   // one entry covers `team.logoUrl` and `ctx?.team?.logoUrl` alike.
   "brand.logoUrl": "shared/brand.ts — a build-time constant, not a field anyone fills in",
   "download.href": "a screen-recipe constant (the export route we wrote)",
-  "dataOps.importSampleHref(t.tableKey)": "an app-built URL from a catalogue key",
+  // Keyed on the expression TEXT, local variable and all, so renaming the
+  // binding invalidates the pin. It used to read `t.tableKey`, where `t` was
+  // the target being mapped and SHADOWED the translator in the same JSX —
+  // the rename to `s` is what made this line go red, and the shadow is worth
+  // not putting back.
+  "dataOps.importSampleHref(s.tableKey)": "an app-built URL from a catalogue key",
   // Uploads: the server writes these as `/media/<key>` (auth/profile.ts,
   // tenancy/teams.ts) — no caller ever supplies the string. `photo`/`logo` are the
   // object/data URL of the file the user just picked in THIS session.

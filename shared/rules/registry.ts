@@ -513,18 +513,12 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "the only `<iframe>` in the codebase is a sanitizer test fixture (web/test/stored-html.test.tsx) proving embeds get stripped — not a real embedded-content surface.",
   "components/visibility":
     "a confirmed name collision, not a gap: shared/web/screen-engine/visibility.tsx evaluates config-driven permission RULES against a row/user/app context; the kit's part answers a different question, \"is this on screen,\" via a shared IntersectionObserver. Different signatures, different jobs — CLAUDE.md documents the collision by name.",
-  "components/data-preview-table":
-    "the import flow's own locked law (AGENTIC-IMPORT.md, dated 2026-07-04) is \"one plan, one confirm,\" never a per-row checkbox grid — data-preview-table's whole shape is the interaction this app deliberately does not offer.",
   "components/progress-dashboard":
     "multi-metric displays are already assembled from StatGrid + KpiProgress + Chart (web/components/pulse.tsx, work-logs-panel.tsx, agent-blocks.tsx) — nothing needs this component's specific stacked-bars shape.",
   "components/tree":
     "no nested/hierarchical disclosure exists in the app — process branching (web/components/step-form-dialog.tsx) renders as a flowchart DAG through the kit's own Flowchart, not a tree, and the kit's own Comments is explicitly one level deep.",
   "components/notifications":
     "the app relies on the kit's own `sonner` toasts for the moment and `activity-feed` for the history — no bell icon or notification-center composition exists anywhere for this to replace.",
-  "components/form":
-    "adopting it would break R4: shared/web/form-shell.tsx (every dialog form's required shell) is built from Button + Dialog only and draws a pinned-footer DIALOG; the kit's form.tsx draws a page-section form with no dialog chrome at all. Different shapes solving different problems, not substitutes.",
-  "components/import-wizard":
-    "the flow structurally matches (AGENTIC-IMPORT.md's own upload→plan→review→run→report diagram), but web/components/import-screen.tsx is a 530-line working, critical flow carrying business logic the composite has no slot for (sample-file links, import history, CSV-injection-safe rejection export, per-step predicted rejections). Rebuilding it on the kit part is a large, risky rewrite, not a swap — deferred pending dedicated time, not rejected on fit.",
   "components/kanban":
     "zero drag-and-drop infrastructure (no dnd-kit or equivalent) exists anywhere in the app; sprints and stories deliberately track state by date rather than by status column (web/components/sprints-screen.tsx's own comment).",
   "components/calendar-view":
