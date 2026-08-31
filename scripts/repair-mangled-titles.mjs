@@ -62,7 +62,17 @@
 //
 // Production needs BOTH extra flags and is refused otherwise.
 
-import { execSync } from "node:child_process"
+import "./lib/shared-alias.mjs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
+
+// THE SAME TABLE THE SWEEP USES, loaded the way every script here loads shipped
+// worker code: a top-level `await import`, because a STATIC import of `@shared/*`
+// is resolved before `shared-alias.mjs` has had a chance to register its hook.
+const { mendMojibake, MOJIBAKE_MARKER } = await import(
+  join(dirname(fileURLToPath(import.meta.url)), "..", "shared", "workers", "mojibake.ts")
+)
 
 const APPLY = process.argv.includes("--apply")
 const PRODUCTION = process.argv.includes("--production")
@@ -75,44 +85,21 @@ if (PRODUCTION && !CONFIRMED) {
   process.exit(1)
 }
 
-/** EVERY REPAIR CARRIES THE SOURCE OF ITS TRUTH. A line without one does not
- * belong here — that is the whole discipline of this file. */
-const REPAIRS = [
-  {
-    from: "Ãlaap",
-    to: "Alaap",
-    why:
-      "The Google account's own display name, mangled upstream. Ground truth from OUTSIDE the " +
-      "mangled data, twice: a meeting-notes email in this same base writes 'Alaap Kanchawala' in " +
-      "plain ASCII, and the core `users` row for alaap@kwapso.com reads first_name 'Alaap'. " +
-      "The lost byte cannot be recovered — 'Á', 'Í', 'Ï', 'Ð' and 'Ý' all collapse to 'Ã' when " +
-      "CP1252 drops their second byte — so this restores the name the app itself uses rather " +
-      "than choosing between five accents nobody can distinguish from here.",
-  },
-  {
-    from: "ÃƒÂƒÃ‚Â¢ÃƒÂ‚Ã¢Â‚Â¬ÃƒÂ‚Ã¢Â€Â ",
-    to: "—",
-    why:
-      "An em dash that went through the send/receive loop TWICE. Ground truth is this repo: " +
-      "scripts/google-sweep.mjs sends `${tag} — sweep`. Longest pattern first, so it is " +
-      "matched before its own single-round prefix below.",
-  },
-  {
-    from: "Ã¢Â€Â”",
-    to: "—",
-    why:
-      "The same em dash, one round of mangling. Same ground truth: scripts/google-sweep.mjs.",
-  },
-]
+// THE TABLE IS NOT DEFINED HERE ANY MORE. It lives in `shared/workers/mojibake.ts`
+// and is applied by the SWEEP, on the way in, because these kinds are windowed:
+// the upsert sets `title = excluded.title` every tick, so a row repaired here is
+// mangled again fifteen minutes later. This script is now for the rows that have
+// already fallen out of Google's window and will never be swept again — the
+// sweep cannot reach them, and only a direct write can.
+//
+// Two readers, one table: an entry added for the sweep is an entry this repair
+// gets, and neither can drift from the other.
 
 /** The one sequence that says a row is damaged. Every repair above contains it,
  * and the verification at the end counts it. */
-const MARKER = "Ã"
+const MARKER = MOJIBAKE_MARKER
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = PRODUCTION
   ? process.env.KB_CORE_PROD || "e55a2c0f-346a-4056-b01c-7869a8b253dc"
   : process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7"
@@ -194,12 +181,7 @@ for (const team of teams) {
     continue
   }
 
-  const mend = (v) => {
-    if (typeof v !== "string") return v
-    let out = v
-    for (const r of REPAIRS) out = out.split(r.from).join(r.to)
-    return out
-  }
+  const mend = (v) => (typeof v === "string" ? mendMojibake(v) : v)
 
   const changed = hit
     .map((r) => ({

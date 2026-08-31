@@ -106,7 +106,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         threadId: "TH_1",
         from: "Luis Vera <luis@bergman.example>",
         to: "me@kwapso.app",
-        subject: "Re: the dispatch screen",
+        subject: "Re: the dispatch screen — Ãlaap Kanchawala",
         snippet: "a snippet",
         date: "Tue, 4 Aug 2026 10:04:00 +0000",
             url: "https://mail.example/MAIL_1",
@@ -118,11 +118,11 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       threadId: "TH_1",
       from: "Luis Vera <luis@bergman.example>",
       to: "me@kwapso.app",
-      subject: "Re: the dispatch screen",
+      subject: "Re: the dispatch screen — Ãlaap Kanchawala",
       snippet: "a snippet",
       date: "Tue, 4 Aug 2026 10:04:00 +0000",
       url: "https://mail.example/MAIL_1",
-      text: "We agreed on the fourth of August to park the reporting work.",
+      text: "We agreed on the fourth of August to park the reporting work. Ãlaap Kanchawala was in the room.",
     }),
     calendarList: async () => ({
       truncated: false,
@@ -415,6 +415,40 @@ describe("what actually gets read", () => {
     const mail = byTitle("Re: the dispatch screen") as SourceRow
     expect(mail.body).toContain("park the reporting work")
     expect(mail.body, "the hundred-character snippet is not what answers a question").not.toBe("a snippet")
+  })
+
+  // ── THE NAME GOOGLE ITSELF SPELLS WRONG ───────────────────────────────────
+  //
+  // Google's profile carries the owner's display name mis-decoded, and writes
+  // that spelling into everything it composes — an invitation's subject, a
+  // transcript's attendee list, a chat roster. 311 rows on staging, 2026-08-31.
+  //
+  // A DATABASE REPAIR CANNOT HOLD IT, which is why the mend is here and not in a
+  // script. These kinds are `windowed`: the sweep re-reads what Google currently
+  // holds every fifteen minutes and the upsert sets `title = excluded.title`
+  // unconditionally, so a row repaired at noon is mangled again by quarter past.
+  // Correcting the name on the Google account fixes what Google composes from
+  // now on and cannot reach a subject line already sent — 268 of those 311 are
+  // frozen text that every sweep faithfully re-reads.
+  it("mends the display name Google itself mangled, in the title AND the body", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Re: the dispatch screen") as SourceRow
+
+    // The TITLE is the mail's own subject, and the BODY arrives later, through
+    // hydration — two different exits from `slice`, and the mend has to sit on
+    // both. Asserting only one would pass with the other still broken.
+    expect(mail.title, "the subject line").toContain("Alaap Kanchawala")
+    expect(mail.body, "and the body, which arrives through hydration").toContain("Alaap Kanchawala")
+    expect(`${mail.title} ${mail.body}`, "and nothing mangled is left").not.toContain("Ã")
+
+    // …and the mend is NARROW. It repairs known strings with a named source of
+    // truth and leaves every other word exactly as Google sent it — an em dash
+    // it never learned to mend must survive untouched, or "mend" has quietly
+    // become "rewrite".
+    expect(mail.title, "the rest of the subject is Google's, verbatim").toContain(
+      "Re: the dispatch screen —"
+    )
+    expect(mail.body).toContain("park the reporting work")
   })
 
   it("a Chat CONVERSATION is one source, attributed line by line, with a link back", async () => {

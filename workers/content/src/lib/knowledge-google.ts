@@ -47,6 +47,7 @@
 
 import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
+import { mendMojibake } from "@shared/workers/mojibake"
 import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
 import type { Env } from "../env"
 import { accessTokenFor, googleScope, listConnections, listNamedSources } from "./google"
@@ -269,6 +270,34 @@ export function googleIngestKinds(
    * no business being made to hold a set it will not read. */
   seen?: Map<GoogleService, Set<string>>
 ): IngestKind[] {
+  /** WHAT GOOGLE SENT, WITH THE KNOWN DAMAGE MENDED — see shared/workers/mojibake.
+   *
+   * Google's own profile carries the owner's display name mis-decoded ("Ãlaap"),
+   * and writes that spelling into everything it composes: an invitation's subject
+   * line, a transcript's attendee list, a chat roster. 311 rows on staging.
+   *
+   * IT HAS TO HAPPEN HERE RATHER THAN IN A REPAIR SCRIPT. These four kinds are
+   * `windowed`: the sweep re-reads what Google currently holds every fifteen
+   * minutes and the upsert sets `title = excluded.title` unconditionally, so a
+   * row repaired in the database is mangled again by the next tick. Correcting
+   * the name on the Google account — which the owner has done — fixes everything
+   * composed FROM NOW ON and cannot reach a subject line already sent. Of the
+   * 311, only the 43 chat threads are rebuilt from the live directory and heal
+   * themselves; the other 268 are frozen text that every sweep faithfully
+   * re-reads.
+   *
+   * AND IT SITS ON THE ONE EXIT ALL FOUR LANES SHARE, not on each of the four
+   * mappers. A fifth lane added tomorrow is mended because it goes through
+   * `slice`, not because somebody remembered.
+   *
+   * Only known strings with a named source of truth are touched; anything else
+   * is left exactly as Google sent it. */
+  const mended = (r: IngestRow): IngestRow => ({
+    ...r,
+    title: mendMojibake(r.title),
+    body: mendMojibake(r.body),
+  })
+
   /** List cheaply, walk to the cursor, and only THEN pay for the bodies. A Drive
    * listing is one call for fifty files and their text is fifty more, so
    * hydrating before the slice would pay for forty-nine files this tick is not
@@ -287,7 +316,7 @@ export function googleIngestKinds(
     // "Google no longer has this" from "the cursor has already passed it".
     if (seen) seen.set(service, new Set(items.map((i) => i.externalId)))
     const wanted = afterCursor(inCursorOrder(toRows(items)), cursor).slice(0, limit)
-    if (!hydrate || wanted.length === 0) return wanted
+    if (!hydrate || wanted.length === 0) return wanted.map(mended)
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
@@ -298,7 +327,7 @@ export function googleIngestKinds(
       wanted.map((r) => byId.get(r.originRowId)).filter((i): i is GoogleItem => Boolean(i))
     )
     const textById = new Map(full.map((i) => [rowId(i), i.text]))
-    return wanted.map((r) => ({ ...r, body: textById.get(r.originRowId) || r.body }))
+    return wanted.map((r) => mended({ ...r, body: textById.get(r.originRowId) || r.body }))
   }
 
   return [
