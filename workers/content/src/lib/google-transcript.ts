@@ -175,6 +175,47 @@ async function fromAttachments(
  * file. Two things now stop it: `targetId` off the listing, so the id we keep is
  * the DOCUMENT's rather than the pointer's, and `withWords`, so a candidate
  * whose text we cannot read is not a hit at all. */
+/** Tolerance on the one rule below. A notes document is opened as the meeting
+ *  starts, and clocks and zones disagree by less than this. */
+const NOTES_HEAD_START_MS = 60 * 60 * 1000
+
+/**
+ * A MEETING'S NOTES CANNOT HAVE BEEN WRITTEN BEFORE THE MEETING HAPPENED, and
+ * that one sentence is the whole check.
+ *
+ * WHAT IT COSTS TO NOT HAVE IT, measured on staging 31 Aug 2026 and reported by
+ * the owner as "the assistant answered incorrectly": SEVEN of seven transcripts
+ * this route had ever attached were the wrong document. Every one. The search is
+ * by TITLE, and a recurring meeting has the same title every week, so the sort
+ * by most-recently-modified handed `⏩ Week planning` on 31 Aug the notes from
+ * 24 Aug — and the 28 Aug recap the notes from 21 Aug, and so on, each exactly
+ * one occurrence stale. Fuzzy titles failed the same way across different
+ * meetings: `FluClinic: Sync up` was given `FluClinic: Phase 2 and 3 tasks sync
+ * up`, five days older.
+ *
+ * NOBODY COULD HAVE SEEN IT. The door answered 200, a transcript was present,
+ * and the assistant summarised it faithfully — so a correct-looking answer
+ * described a meeting that was not the one asked about. There is no error
+ * anywhere in that chain, which is why it survived until a person who had been
+ * IN the meeting read the answer.
+ *
+ * WHY THIS IS THE RIGHT SHAPE rather than a smarter title match: it is a fact
+ * about the world, not a heuristic about strings. Notes are written during or
+ * after their meeting, never days before it. And it FAILS CLOSED — a rejected
+ * candidate leaves this route with nothing rather than with something wrong, and
+ * route 3 still runs. A missing transcript is a visible absence; a confidently
+ * wrong one is not.
+ */
+export function notesCouldBelongTo(modifiedTime: string | null, eventStart: string): boolean {
+  // No stamp on either side is not evidence of a mismatch — let the candidate
+  // through and let the routes that read words decide.
+  if (!modifiedTime || !eventStart) return true
+  const modified = Date.parse(modifiedTime)
+  const started = Date.parse(eventStart)
+  if (Number.isNaN(modified) || Number.isNaN(started)) return true
+  return modified >= started - NOTES_HEAD_START_MS
+}
+
 async function fromNamedFolders(
   env: Env,
   cfg: D1Rest,
@@ -190,7 +231,12 @@ async function fromNamedFolders(
     for (const term of [event.summary, event.meetingCode].filter(Boolean)) {
       const hits = (await driveList(token, folders, term as string))
         .filter((f) => TRANSCRIPT_NAME.test(f.name))
-        .sort((a, b) => (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? ""))
+        .filter((f) => notesCouldBelongTo(f.modifiedTime, event.start))
+        // EARLIEST QUALIFYING, not most recent. Once anything older than the
+        // meeting is gone, the remaining candidate closest to it is this
+        // meeting's; sorting the other way hands a recurring title its most
+        // recently EDITED notes, which is any week but this one.
+        .sort((a, b) => (a.modifiedTime ?? "").localeCompare(b.modifiedTime ?? ""))
       const first = hits[0]
       if (first) {
         const found = await withWords(env, cfg, guard, first, {

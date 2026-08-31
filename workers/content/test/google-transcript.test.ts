@@ -62,20 +62,27 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
   }
 })
 
-import { findTranscript } from "../src/lib/google-transcript"
+import { findTranscript, notesCouldBelongTo } from "../src/lib/google-transcript"
 
-const file = (id: string, name: string, targetId: string | null = null) => ({
+const file = (
+  id: string,
+  name: string,
+  targetId: string | null = null,
+  modifiedTime: string | null = null
+) => ({
   id,
   name,
   webViewLink: `https://drive.example/${id}`,
   targetId,
+  modifiedTime,
 })
 
 /** A calendar entry, with only the fields the hunt reads. */
-const meeting = (attachments = world.attachments) =>
-  ({ id: "EV1", summary: "Weekly sync", meetingCode: "abc-defg-hij", attachments }) as never
+const meeting = (attachments = world.attachments, start = "") =>
+  ({ id: "EV1", summary: "Weekly sync", meetingCode: "abc-defg-hij", attachments, start }) as never
 
-const hunt = () => findTranscript({} as never, {} as never, {} as never, meeting())
+const hunt = (start = "") =>
+  findTranscript({} as never, {} as never, {} as never, meeting(world.attachments, start))
 
 beforeEach(() => {
   world.attachments = []
@@ -153,5 +160,74 @@ describe("route 1 — the strongest proof still has to be readable", () => {
     world.text.set("DOC", "the folder had it after all")
 
     expect((await hunt())?.foundBy).toBe("drive")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AND A TRANSCRIPT IS ITS OWN MEETING'S WORDS, WHICH IS A SECOND THING ENTIRELY.
+//
+// Reported by the owner on 2026-08-31 as "the assistant answered incorrectly"
+// about that morning's ⏩ Week planning. It had not: it summarised the attached
+// document faithfully, and the attached document was the notes from ⏩ Week
+// planning SEVEN DAYS EARLIER. Route 2 searches by TITLE, a recurring meeting
+// wears the same title every week, and the sort took the most recently MODIFIED
+// hit — so every recurrence was handed a previous occurrence's notes.
+//
+// Measured on staging that day: seven of the seven transcripts this route had
+// ever filed were the wrong document. 31 Aug got 24 Aug, 28 Aug got 21 Aug,
+// 24 Aug got 17 Aug, 21 Aug got 14 Aug; and across different meetings with
+// similar names, `FluClinic: Sync up` got `FluClinic: Phase 2 and 3 tasks sync
+// up`, five days older. A hundred per cent failure rate, invisible: the door
+// answered 200, a transcript was present, and the summary read perfectly.
+describe("a meeting's notes cannot predate the meeting", () => {
+  const start = "2026-08-31T10:00:00Z"
+
+  it("rejects the previous occurrence of a recurring meeting", () => {
+    // The exact case the owner hit: this week's meeting, last week's notes.
+    expect(notesCouldBelongTo("2026-08-24T11:00:00Z", start)).toBe(false)
+  })
+
+  it("accepts notes written during or after the meeting", () => {
+    expect(notesCouldBelongTo("2026-08-31T10:30:00Z", start)).toBe(true)
+    expect(notesCouldBelongTo("2026-08-31T18:00:00Z", start)).toBe(true)
+    expect(notesCouldBelongTo("2026-09-02T09:00:00Z", start)).toBe(true)
+  })
+
+  it("allows an hour of head start, because notes open as the meeting does", () => {
+    expect(notesCouldBelongTo("2026-08-31T09:30:00Z", start)).toBe(true)
+    expect(notesCouldBelongTo("2026-08-31T08:30:00Z", start)).toBe(false)
+  })
+
+  it("does not judge what it cannot read — a missing or unparsable stamp passes", () => {
+    // Silence is not evidence of a mismatch. Let the routes that read WORDS
+    // decide, rather than dropping a candidate on a stamp Google did not send.
+    expect(notesCouldBelongTo(null, start)).toBe(true)
+    expect(notesCouldBelongTo("2026-08-24T11:00:00Z", "")).toBe(true)
+    expect(notesCouldBelongTo("not a date", start)).toBe(true)
+  })
+
+  it("leaves the route with NOTHING rather than with the wrong document", async () => {
+    world.folders = [{ id: "S1", active: true, kind: "folder", externalId: "FOLDER" }]
+    world.driveHits = [file("LAST_WEEK", "Weekly sync - Transcript", null, "2026-08-24T11:00:00Z")]
+    world.text.set("LAST_WEEK", "notes from the meeting a week before this one")
+
+    // Fails CLOSED. A visible absence is recoverable; a confident wrong answer
+    // is what nobody can see.
+    expect(await hunt(start)).toBeNull()
+  })
+
+  it("picks the nearest qualifying notes, not the most recently edited", async () => {
+    world.folders = [{ id: "S1", active: true, kind: "folder", externalId: "FOLDER" }]
+    world.driveHits = [
+      // Someone edited an older week's notes today — newest modifiedTime of all,
+      // and still the wrong meeting. The old sort chose exactly this one.
+      file("EDITED_OLD", "Weekly sync - Transcript", null, "2026-09-20T12:00:00Z"),
+      file("THIS_ONE", "Weekly sync - Transcript", null, "2026-08-31T10:45:00Z"),
+    ]
+    world.text.set("EDITED_OLD", "an older week, touched again later")
+    world.text.set("THIS_ONE", "the words actually said at this meeting")
+
+    const found = await hunt(start)
+    expect(found?.text).toBe("the words actually said at this meeting")
   })
 })
