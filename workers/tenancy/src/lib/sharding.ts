@@ -21,7 +21,12 @@ import {
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { brand } from "@shared/brand"
-import { CRON_ALERT_CAP, CRON_GROWTH_CAP, RETENTION_DELETE_CAP } from "@shared/workers/limits"
+import {
+  CRON_ALERT_CAP,
+  CRON_GROWTH_CAP,
+  OWNED_DB_CAP,
+  RETENTION_DELETE_CAP,
+} from "@shared/workers/limits"
 import { sendBrandedEmail } from "@shared/workers/notify"
 import type { Env } from "../env"
 
@@ -75,10 +80,37 @@ const MOVE_CLAIM_STALE_MS = 10 * 60 * 1000
  * whose 10GB ceiling takes the whole product down rather than one tenant. It
  * could never raise an alarm, because it does not begin with "team-".
  *
- * So the filter is gone rather than widened: an app owns its Cloudflare account
- * (BOOTSTRAP.md), so "every database this listing returns" IS "every database we
- * run", and a database added tomorrow is watched the day it exists instead of the
- * day someone remembers to add its prefix here.
+ * So the `team-` filter is gone rather than widened. But what replaced it was
+ * NO filter, on the reasoning that "an app owns its Cloudflare account
+ * (BOOTSTRAP.md), so every database this listing returns IS every database we
+ * run" — and that sentence is false here, which is how this shipped.
+ *
+ * ── THE ACCOUNT IS SHARED. MEASURED, 31 AUG 2026 ────────────────────────────
+ *
+ * 16 databases on the Kwapso account and ELEVEN belong to two other products
+ * (rest-o and Base One). Our nightly cron was sizing all of them: 13 of the 17
+ * rows in `db_growth` named a database that is not ours, in BOTH cores, and
+ * three of those name databases the other company has since DELETED — our table
+ * is the last remaining record of them. The alarm loop would have opened a
+ * `db_alerts` row against a foreign id and logged "D1 SIZE ALARM: <their
+ * database> … Run the module mover", which is an instruction pointed at another
+ * company's production data. It has never fired: nothing on the account is
+ * within 1.5% of the 8 GiB line. Metadata pollution today, that tomorrow.
+ *
+ * ── AND A NAME CANNOT SEPARATE THEM ─────────────────────────────────────────
+ *
+ * The other products' per-team databases are named `team-<ulid>` too — the same
+ * convention, because they are forks of this same base. So the fix is not a
+ * better prefix. Ownership is read from OUR OWN RECORD of what we made: the core
+ * `teams` table, plus core itself. `ourDatabases` below.
+ *
+ * WHAT THAT COSTS, said plainly: a database of ours that is in no team row and
+ * is not core — some future analytics or archive database — is NOT watched until
+ * someone claims it, which is the maintenance burden the prefix filter was
+ * removed to escape. The tick logs the count it did not claim so the gap is
+ * visible rather than silent, and that is the honest trade: failing to watch a
+ * database we have not built yet is recoverable, and telling a human to run a
+ * data mover against another company's production database is not.
  *
  * BOUNDED WORK PER TICK. The scan itself is cheap, but every ALARMING database
  * costs a core-DB read plus an insert, and nobody is watching a cron: a tick that
@@ -90,7 +122,20 @@ export async function checkDatabaseSizes(
   env: Env,
   cfg: D1Rest
 ): Promise<{ checked: number; alerted: string[]; capped: boolean; sampled: number }> {
-  const databases = await d1ListDatabases(cfg)
+  const everything = await d1ListDatabases(cfg)
+  // OURS ONLY, AND BEFORE ANYTHING READS A SIZE. The subtraction sits here, above
+  // both the growth write and the alarm loop, so neither can be given a database
+  // we do not own — rather than in each of them, where a third reader added later
+  // would start from the unfiltered list again.
+  const databases = await ourDatabases(env, everything)
+  const skipped = everything.length - databases.length
+  if (skipped > 0)
+    // COUNTED, NEVER NAMED. Knowing the listing held databases we did not claim is
+    // ours to know; writing another company's database names into our logs is the
+    // very thing this function stopped doing.
+    console.log(
+      `[sharding] sized ${databases.length} of ${everything.length} databases on the account; ${skipped} are not ours`
+    )
   const alerted: string[] = []
   let capped = false
   // The trend first, because it is what turns a POSITION into a WARNING — and
@@ -133,6 +178,55 @@ export async function checkDatabaseSizes(
     alerted.push(db.name)
   }
   return { checked: databases.length, alerted, capped, sampled }
+}
+
+/**
+ * WHICH OF THE ACCOUNT'S DATABASES ARE OURS — read from our own record of what
+ * we made, never from a name.
+ *
+ * TWO SOURCES, AND THE SECOND IS NOT A SPECIAL CASE. Every team database we ever
+ * created is a row in core's `teams` table, because creating one is what writes
+ * the row (`createTeam`). Core ITSELF is in no team row and is the single most
+ * important database to watch, so it is claimed from `CORE_DATABASE_ID` — the
+ * uuid of the binding this worker is already talking through, spelled out in the
+ * same wrangler file three lines from the binding, and held to it by
+ * test/db-ownership.test.ts.
+ *
+ * DEACTIVATED TEAMS COUNT. A switched-off team's database still exists, still
+ * holds its rows and still grows toward the same 10 GB ceiling — "deactivate,
+ * never delete" is exactly why it must stay watched. So the read carries no
+ * `deactivated_at` predicate, deliberately.
+ *
+ * FAILS CLOSED. If the teams read throws, this claims nothing beyond core rather
+ * than falling back to the whole listing: a night with no growth readings is a
+ * gap somebody can see in the table, and a night that alarms on somebody else's
+ * production database is not recoverable by noticing it afterwards.
+ */
+export async function ourDatabases<T extends { uuid: string }>(
+  env: Env,
+  everything: T[]
+): Promise<T[]> {
+  const mine = new Set<string>()
+  if (env.CORE_DATABASE_ID) mine.add(env.CORE_DATABASE_ID)
+  try {
+    // R14: hard cap — OWNED_DB_CAP, sized to the ceiling of the listing this
+    // filters rather than to a screenful, because truncating here would drop one
+    // of OUR databases out of the watch (limits.ts says why at length).
+    const rows = await env.DB.prepare(
+      `SELECT database_id FROM teams WHERE database_id IS NOT NULL LIMIT ${OWNED_DB_CAP}`
+    ).all<{ database_id: string }>()
+    const results = rows.results ?? []
+    if (results.length >= OWNED_DB_CAP)
+      console.error(
+        `[sharding] ourDatabases hit the ${OWNED_DB_CAP} ceiling — the ownership set is INCOMPLETE and some of our own databases are going unwatched.`
+      )
+    for (const r of results) if (r.database_id) mine.add(r.database_id)
+  } catch (e) {
+    console.error(
+      `[sharding] could not read the teams table to decide which databases are ours; claiming core only. ${String(e)}`
+    )
+  }
+  return everything.filter((d) => mine.has(d.uuid))
 }
 
 /** TONIGHT'S SIZE, BESIDE LAST NIGHT'S — so "how long have I got" is answerable.

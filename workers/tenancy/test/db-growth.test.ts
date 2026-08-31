@@ -124,11 +124,20 @@ describe("the nightly tick records readings, bounded and biggest-first", () => {
     })
   }
 
-  /** A core DB that records the growth upserts it was handed. */
-  function fakeCoreDb() {
+  /** A core DB that records the growth upserts it was handed, and says which
+   * databases are OURS.
+   *
+   * The account is shared with other products, so the tick subtracts anything
+   * core's `teams` table does not claim (test/db-ownership.test.ts). `stubAccount`
+   * numbers its databases `u0…uN-1`, so claiming all of them is what keeps these
+   * tests measuring what they were written to measure — the BOUND and the
+   * biggest-first ordering, not the ownership rule. */
+  function fakeCoreDb(owned: string[]) {
     const growth: unknown[][] = []
+    const rows = owned.map((database_id) => ({ database_id }))
     const db = {
       prepare(sql: string) {
+        if (sql.includes("FROM teams")) return { all: async () => ({ results: rows }) }
         return {
           bind(...params: unknown[]) {
             if (sql.includes("INSERT INTO db_growth")) growth.push(params)
@@ -144,9 +153,12 @@ describe("the nightly tick records readings, bounded and biggest-first", () => {
     return { db: db as unknown as Env["DB"], growth }
   }
 
+  /** The uuids `stubAccount(n)` hands out. */
+  const allOf = (n: number) => Array.from({ length: n }, (_, i) => `u${i}`)
+
   it("writes a reading even when nothing alarms", async () => {
     stubAccount(3)
-    const core = fakeCoreDb()
+    const core = fakeCoreDb(allOf(3))
     const result = await checkDatabaseSizes({ DB: core.db } as Env, CFG)
     expect(result.alerted, "nothing is near the cap").toEqual([])
     expect(
@@ -158,7 +170,7 @@ describe("the nightly tick records readings, bounded and biggest-first", () => {
   it("bounds the readings at CRON_GROWTH_CAP and takes the LARGEST", async () => {
     const total = CRON_GROWTH_CAP + 50
     stubAccount(total)
-    const core = fakeCoreDb()
+    const core = fakeCoreDb(allOf(total))
     await checkDatabaseSizes({ DB: core.db } as Env, CFG)
     expect(core.growth.length, "a growth watch must not become the thing that grows").toBe(
       CRON_GROWTH_CAP
@@ -182,6 +194,10 @@ describe("the nightly tick records readings, bounded and biggest-first", () => {
     const inserted: string[] = []
     const db = {
       prepare(sql: string) {
+        // The one database in this fixture is ours, so the subtraction is not what
+        // is under test here — the growth write failing is.
+        if (sql.includes("FROM teams"))
+          return { all: async () => ({ results: [{ database_id: "u0" }] }) }
         return {
           bind(...params: unknown[]) {
             if (sql.includes("INSERT INTO db_growth")) throw new Error("no such table: db_growth")

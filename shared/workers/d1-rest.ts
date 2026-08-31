@@ -209,7 +209,21 @@ export async function d1DeleteDatabase(
   await cf(cfg, `/d1/database/${databaseId}`, undefined, "DELETE")
 }
 
-/** Every database in the account (id, name, size) — feeds the 80% alarms. */
+/** Every database in the ACCOUNT (id, name, size) — feeds the 80% alarms.
+ *
+ * ── THE ACCOUNT IS NOT THE APP, AND THE CALLER MUST DO THAT SUBTRACTION ──────
+ *
+ * This lists what the Cloudflare ACCOUNT holds, which is not the same set as
+ * "databases this app runs" and the API offers no owner filter — there is no
+ * parameter here to add. On 31 Aug 2026 the Kwapso account held 16 databases and
+ * ELEVEN of them belonged to two other products sharing the account; their
+ * per-team databases are named `team-<ulid>` exactly as ours are, so no name
+ * test separates them either.
+ *
+ * A caller that treats this answer as "ours" writes another company's database
+ * names into our tables and can raise an alarm naming their production database.
+ * See `ourDatabases` in tenancy's sharding.ts, which subtracts using the core
+ * `teams` table — our own record of what we made — and never a prefix. */
 export async function d1ListDatabases(
   cfg: D1Rest
 ): Promise<{ uuid: string; name: string; file_size: number | null }[]> {

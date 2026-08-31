@@ -38,11 +38,20 @@ function stubAccount(teamDbs: number, extra: string[] = []) {
   )
 }
 
-/** A core DB that answers "no open alert" and counts the alarm rows written. */
-function fakeCoreDb() {
+/** A core DB that answers "no open alert", counts the alarm rows written, and
+ * says WHICH databases are ours.
+ *
+ * `owned` is not decoration. The Cloudflare account is shared with other
+ * products, so `checkDatabaseSizes` now subtracts anything that is not in core's
+ * own `teams` table (see test/db-ownership.test.ts). A fixture that claimed
+ * nothing would make every test here assert zero, and a fixture that claimed
+ * everything would hide the subtraction — so each test below states its estate. */
+function fakeCoreDb(owned: string[] = []) {
   const inserted: string[] = []
+  const rows = owned.map((database_id) => ({ database_id }))
   const db = {
     prepare(sql: string) {
+      if (sql.includes("FROM teams")) return { all: async () => ({ results: rows }) }
       return {
         bind(...params: unknown[]) {
           if (sql.includes("INSERT INTO db_alerts")) inserted.push(String(params[2]))
@@ -58,15 +67,19 @@ function fakeCoreDb() {
   return { db: db as unknown as Env["DB"], inserted }
 }
 
+/** The uuids `stubAccount` gives its team databases and its `extra` ones. */
+const teamIds = (n: number) => Array.from({ length: n }, (_, i) => `u${i}`)
+const extraIds = (n: number) => Array.from({ length: n }, (_, i) => `x${i}`)
+
 describe("the nightly size check does bounded work per tick", () => {
   it("stops at the alarm ceiling and says the run was capped", async () => {
     const over = CRON_ALERT_CAP + 20
     stubAccount(over)
-    const { db, inserted } = fakeCoreDb()
+    const { db, inserted } = fakeCoreDb(teamIds(over))
 
     const result = await checkDatabaseSizes({ DB: db } as Env, CFG as never)
 
-    expect(result.checked, "it still SEES every team database").toBe(over)
+    expect(result.checked, "it still SEES every team database of OURS").toBe(over)
     expect(inserted.length, "but writes at most CRON_ALERT_CAP alarms").toBe(CRON_ALERT_CAP)
     expect(result.alerted.length).toBe(CRON_ALERT_CAP)
     expect(result.capped, "a capped run must report itself, not look complete").toBe(true)
@@ -74,7 +87,7 @@ describe("the nightly size check does bounded work per tick", () => {
 
   it("alarms on everything and reports NOT capped when it fits", async () => {
     stubAccount(3)
-    const { db, inserted } = fakeCoreDb()
+    const { db, inserted } = fakeCoreDb(teamIds(3))
 
     const result = await checkDatabaseSizes({ DB: db } as Env, CFG as never)
 
@@ -94,25 +107,43 @@ describe("the nightly size check does bounded work per tick", () => {
 describe("the nightly check watches the SHARED core database too", () => {
   it("alarms on kwapso-core when it crosses the threshold", async () => {
     stubAccount(1, ["kwapso-core"])
-    const { db, inserted } = fakeCoreDb()
+    const { db, inserted } = fakeCoreDb(teamIds(1))
 
-    const result = await checkDatabaseSizes({ DB: db } as Env, CFG as never)
+    // Core is claimed by CORE_DATABASE_ID — it is in no team row, which is
+    // precisely why the old `team-` prefix could never see it.
+    const result = await checkDatabaseSizes(
+      { DB: db, CORE_DATABASE_ID: extraIds(1)[0] } as Env,
+      CFG as never
+    )
 
     expect(result.alerted, "the core database raises an alarm like any other").toContain("kwapso-core")
     expect(inserted).toContain("kwapso-core")
     expect(result.checked, "and it is counted among what was checked").toBe(2)
   })
 
-  it("watches anything else the account holds, without being told its name", async () => {
-    // The filter is GONE rather than widened to a second prefix: an app owns its
-    // Cloudflare account, so a database added tomorrow is watched the day it
-    // exists rather than the day someone remembers to name it here.
+  it("does NOT watch a database nobody claimed — the deliberate cost of a shared account", async () => {
+    // THIS TEST USED TO ASSERT THE OPPOSITE, and its old name said why: "watches
+    // anything else the account holds, without being told its name", on the
+    // reasoning that an app owns its Cloudflare account so a database added
+    // tomorrow is watched the day it exists. That reasoning is false here — the
+    // account is shared with two other products — and this test passing is what
+    // made the bug look intended.
+    //
+    // The cost is real and is not hidden: a future database of ours that is
+    // neither core nor a team row goes unwatched until somebody claims it. That
+    // is the maintenance burden the prefix filter was dropped to escape, taken
+    // back on purpose, because the alternative is alarming on another company's
+    // production database. The tick logs how many it did not claim so the gap is
+    // visible; `some-future-store` below is exactly that case.
     stubAccount(0, ["kwapso-core", "some-future-store"])
-    const { db } = fakeCoreDb()
+    const { db } = fakeCoreDb([])
 
-    const result = await checkDatabaseSizes({ DB: db } as Env, CFG as never)
+    const result = await checkDatabaseSizes(
+      { DB: db, CORE_DATABASE_ID: extraIds(1)[0] } as Env,
+      CFG as never
+    )
 
-    expect(result.alerted.sort()).toEqual(["kwapso-core", "some-future-store"])
+    expect(result.alerted, "core is claimed; the unclaimed one is not").toEqual(["kwapso-core"])
   })
 })
 

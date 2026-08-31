@@ -51,6 +51,11 @@
     "AGENT_FREE_DAILY": "50",
     "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
+    // THE CORE DATABASE'S OWN UUID — the same id as the `DB` binding above, said
+    // again because a D1 binding does not expose its id and the nightly growth
+    // watch must recognise core in a listing of the whole shared account.
+    // db-ownership.test.ts reads both out of this file and fails if they drift.
+    "CORE_DATABASE_ID": "e55a2c0f-346a-4056-b01c-7869a8b253dc",
     // The public web origin the SPA is served on — used for links in outbound
     // emails (invite CTA). NOT request-derived, so agent-sent invites are correct.
     "PUBLIC_APP_URL": "https://agency.kwapso.app",
@@ -121,6 +126,8 @@
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
+        // Staging's own core, for the growth watch. See the production note.
+        "CORE_DATABASE_ID": "1df02340-fc91-4cac-8ccb-d19528dcd9f7",
         // The public staging web origin — used for invite-email links.
         "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
         // The staging portal, for the same one email.

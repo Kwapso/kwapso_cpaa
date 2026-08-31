@@ -93,6 +93,21 @@ export const PORTAL_ROOTS_CAP = 50
  * "incomplete", which the caller can at least survive. */
 export const D1_LIST_PAGE_CAP = 100
 
+/** Team databases the nightly watch will claim as OURS in one tick.
+ *
+ * THIS CAP FAILS THE OPPOSITE WAY FROM EVERY OTHER ONE IN THIS FILE, which is
+ * why it is its own number rather than `LIST_HARD_CAP`. The others bound WORK:
+ * hitting them means a screen shows fewer rows and the next tick continues.
+ * Hitting this one means a database that IS ours is not recognised as ours, so
+ * the growth watch quietly stops watching it — the failure the watch exists to
+ * prevent, caused by the watch.
+ *
+ * So it is sized to the ceiling of the thing it filters (`D1_LIST_PAGE_CAP` ×
+ * 100 databases) rather than to a comfortable screenful: a team whose database
+ * cannot appear in the listing at all does not need claiming. Reaching it is
+ * logged loudly for the same reason. */
+export const OWNED_DB_CAP = 10_000
+
 /** Teams one knowledge-sweep tick will visit. The sweep runs every 15 minutes
  * and does a BOUNDED slice per team (INGEST_SOURCES_PER_TICK), so this is the
  * ceiling on the whole tick's work: past it the remaining teams wait for the

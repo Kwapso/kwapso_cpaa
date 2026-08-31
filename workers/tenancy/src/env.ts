@@ -11,6 +11,20 @@ export type Env = {
 
   /** Cloudflare account id (plain var) — for creating/querying team DBs. */
   CF_ACCOUNT_ID: string
+  /** THE UUID OF THE DATABASE `DB` ABOVE IS BOUND TO, spelled out.
+   *
+   * A D1 binding does not expose its own id, and the nightly growth watch has to
+   * recognise core in a listing of the whole Cloudflare ACCOUNT — core is the
+   * one database that is ours but is in no team row, and the most important one
+   * to watch (it is the only one strangers can grow, and its ceiling takes the
+   * whole product down rather than one tenant).
+   *
+   * Set per env in wrangler vars, three lines from the binding it names, and
+   * `workers/tenancy/test/db-ownership.test.ts` reads BOTH out of that file and
+   * refuses to let them drift. Optional in the type only so a test env need not
+   * set it; unset means core is simply not claimed, which loses a reading and
+   * can never claim somebody else's database by mistake. */
+  CORE_DATABASE_ID?: string
   /** The public WEB origin the SPA is served on (the gateway's public URL),
    *  used for links in outbound emails. Set per env in wrangler vars. */
   PUBLIC_APP_URL?: string
