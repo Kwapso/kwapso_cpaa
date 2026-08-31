@@ -235,6 +235,25 @@ export interface ImportWizardProps
   uploadHint?: React.ReactNode;
   /** Replace the whole upload step. */
   uploadContent?: React.ReactNode;
+  /**
+   * A node BENEATH the zone, inside the upload step but OUTSIDE `FileUpload`.
+   * For what a reader needs beside the act of choosing a file rather than as
+   * part of it — a template to download before they prepare one, a record of
+   * what was imported last time.
+   *
+   * NOT A SUBSTITUTE FOR `hint`, AND NOT A WORKAROUND FOR ONE. `hint` is one
+   * quiet line about the format ("CSV, up to 10 MB") and it renders as a `<p>`
+   * INSIDE the zone. Both of those are load-bearing and neither is a style
+   * choice: a list of links or a table of past runs inside a `<p>` is invalid
+   * markup, so what the caller wrote is not what the browser builds; and
+   * anything drawn inside the dashed target reads as part of the drop area,
+   * which a history of previous runs is not. Those two hold whatever the zone
+   * does about clicks.
+   *
+   * Ignored when `uploadContent` is given — a caller replacing the whole step
+   * draws its own everything.
+   */
+  uploadAside?: React.ReactNode;
 
   /* ---- step 2 · plan ------------------------------------------------------ */
   /**
@@ -422,6 +441,7 @@ const ImportWizard = React.forwardRef<HTMLElement, ImportWizardProps>(
       uploadPrompt,
       uploadHint,
       uploadContent,
+      uploadAside,
       mappings,
       onMappingChange,
       guessedLabel = "Guessed",
@@ -504,6 +524,22 @@ const ImportWizard = React.forwardRef<HTMLElement, ImportWizardProps>(
         .map((entry) => entry.mapping);
     }, [mappings]);
 
+    /* Built once and read from the two branches of the upload step, so the
+       element a caller gets is the same one whether or not an aside is
+       present. */
+    const zone = (
+      <FileUpload
+        files={files}
+        accept={accept}
+        multiple={multiple}
+        prompt={uploadPrompt}
+        hint={uploadHint}
+        loading={loading}
+        onFilesSelected={onFilesSelected}
+        onRemove={onFileRemove}
+      />
+    );
+
     const commitLabel = current === "review" ? startLabel : finished ? finishLabel : continueLabel;
 
     return (
@@ -563,18 +599,22 @@ const ImportWizard = React.forwardRef<HTMLElement, ImportWizardProps>(
         ) : (
           <div data-slot="import-wizard-panel" className="min-w-0">
             {current === "upload" ? (
-              uploadContent ?? (
-                <FileUpload
-                  files={files}
-                  accept={accept}
-                  multiple={multiple}
-                  prompt={uploadPrompt}
-                  hint={uploadHint}
-                  loading={loading}
-                  onFilesSelected={onFilesSelected}
-                  onRemove={onFileRemove}
-                />
-              )
+              uploadContent ??
+              /* The aside is a SIBLING of the zone, never a child, for the two
+                 structural reasons in `uploadAside`'s own note. The wrapper is
+                 drawn only when there is something to wrap, so a caller that
+                 passes no aside gets the same single element it got before —
+                 the step's markup is unchanged rather than nearly unchanged. */
+              (uploadAside !== undefined && uploadAside !== null ? (
+                <div className="flex min-w-0 flex-col gap-[var(--space-5)]">
+                  {zone}
+                  <div data-slot="import-wizard-upload-aside" className="min-w-0">
+                    {uploadAside}
+                  </div>
+                </div>
+              ) : (
+                zone
+              ))
             ) : null}
 
             {current === "plan" ? (

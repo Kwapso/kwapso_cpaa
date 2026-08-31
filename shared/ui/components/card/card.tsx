@@ -342,8 +342,31 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
         "lg:px-[var(--space-7)] lg:pt-[var(--space-7)]",
         /* Same-tone card separation — ch02's carve-out. The artifact draws it
            as `inset 0 -1px 0 var(--hair)`, never a `border` (review 1A · fix
-           2); `--hairline-under` is that string, named. */
-        "shadow-[var(--hairline-under)]",
+           2); `--hairline-under` is that string, named.
+
+           ONLY WHEN SOMETHING FOLLOWS IT, which is what this rule has always
+           been FOR. This component's own sentence above says it "carries the
+           hairline that separates it from the BODY", and chapter 13's caption
+           — transcribed at the top of this file — is "header, body, and
+           footer are hairline-separated inside one 24px shell", which the
+           file's own law restates as "one shell, TWO hairlines". Every one of
+           those sentences presumes a region on the other side of the line.
+
+           It drew unconditionally, so a header-only card — a shape this kit
+           DEMONSTRATES, in four of the seven card specimens in its own demo —
+           put a rule along the bottom of the card with nothing beneath it to
+           separate from. Measured by a consuming app on real data: where a
+           row of cards stretches to its tallest member and a title wraps to
+           two lines, the header becomes the full height of the card and the
+           hairline lands 0px from the card's own bottom edge — exactly
+           coincident with the shell, reading as a second border in a slightly
+           lighter tone.
+
+           `:not(:last-child)` is the whole fix: no prop, no value, no colour,
+           no spacing, and no caller changes. A header followed by a body OR a
+           footer still draws it, because in both cases there is something to
+           separate from. */
+        "[&:not(:last-child)]:shadow-[var(--hairline-under)]",
         className,
       )}
       {...props}

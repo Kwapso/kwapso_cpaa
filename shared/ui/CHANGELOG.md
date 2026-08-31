@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.2.13 — 2026-08-31
+
+Three, from three lanes, batched so a consuming app syncs once. Two are the
+same shape: a rule the file's own words make CONDITIONAL, drawn
+unconditionally.
+
+**v1.2.12 IS A DUD — DO NOT SYNC IT.** It points at the same commit as v1.2.11
+and carries nothing of its own. I created it by accident: a malformed shell
+heredoc executed the tag command before the commit existed, and it reached the
+remote before I caught it. It is left in place rather than deleted, because
+deleting a pushed tag on a shared remote is destructive and other lanes watch
+this repository. Syncing it is harmless — you get v1.2.11 — but you get none of
+the three changes below.
+
+### Fixed — the upload zone opened the file picker for a caller's own controls
+
+The dashed zone carries `onClick={open}` and `hint` renders INSIDE it, so an
+anchor or a button passed to `hint` fired the OS file picker as well as doing
+its own job, and the caller could not prevent it because the caller does not own
+the zone. THIS FILE ALREADY KNEW: its own Browse button calls
+`event.stopPropagation()` before `open()` for exactly this reason. The courtesy
+was never extended to a consumer's controls. A click that landed on a control is
+now that control's click, which also stops the hidden input's own programmatic
+`click()` bubbling back and re-entering `open()`.
+
+### Fixed — `CardHeader` drew its under-hairline with nothing beneath it
+
+Its own sentence says it "carries the hairline that separates it from the BODY";
+chapter 13's caption, transcribed at the top of the same file, is "header, body,
+and footer are hairline-separated inside one 24px shell"; the file's own law
+restates it as "one shell, TWO hairlines". All three presume a region on the
+other side of the line.
+
+It drew unconditionally. A header-only card is a shape THIS KIT DEMONSTRATES —
+four of the seven card specimens in its own demo have a header and no content —
+so the kit drew a separator against nothing in more than half its own examples.
+Measured by a consuming app on real data: where a row of cards stretches to its
+tallest member and a title wraps to two lines, the rule lands 0px from the
+card's own bottom edge, reading as a second border in a lighter tone.
+
+`:not(:last-child)` is the whole fix — no prop, no value, no colour, no caller
+change. A header followed by a body OR a footer still draws it.
+
+### Added — `ImportWizard uploadAside`
+
+A node beneath the zone and OUTSIDE `FileUpload`, for what a reader needs beside
+choosing a file rather than as part of it. Not a workaround for the click bug
+above: `hint` renders as a `<p>`, so a list or a table inside it is invalid
+markup and the browser builds a different tree than the caller wrote; and
+anything inside the dashed target reads as part of the drop area. Both hold
+whatever the zone does about clicks. `undefined` renders the same single element
+as before.
+
 ## v1.2.10 — 2026-08-31
 
 ### Fixed — `ArticleBody` advertised `dangerouslySetInnerHTML` and refused it

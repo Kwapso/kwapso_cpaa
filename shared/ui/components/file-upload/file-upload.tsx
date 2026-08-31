@@ -341,6 +341,34 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
       inputRef.current?.click();
     };
 
+    /* THE ZONE IS CLICK-TO-BROWSE, AND A CONTROL INSIDE IT IS NOT THE ZONE.
+       The whole dashed box carries `onClick={open}`, so every click within it
+       bubbles up and opens the OS file picker — including a click on something
+       a CALLER put there. `hint` renders inside this box, so an anchor or a
+       button passed to it opens the picker as well as doing its own job, and
+       the caller cannot prevent it because the caller does not own the zone.
+
+       THIS FILE ALREADY KNEW. Its own Browse button calls
+       `event.stopPropagation()` before `open()` for exactly this reason — the
+       hazard was understood and handled locally, for the one control the kit
+       ships, and never extended to the ones a consumer supplies. So this is
+       not a new policy; it is the existing one applied where it was missing.
+
+       A click that landed on a control is that control's click. It also stops
+       the hidden input's own programmatic `click()` from bubbling back here
+       and re-entering `open()`. */
+    const openFromZone = (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          'a[href], button, input, select, textarea, label, [role="button"], [role="link"]',
+        )
+      ) {
+        return;
+      }
+      open();
+    };
+
     const emit = (list: FileList | null) => {
       if (!list || list.length === 0) return;
       onFilesSelected?.(Array.from(list));
@@ -395,7 +423,7 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={open}
+            onClick={openFromZone}
             className={cn(zoneVariants({ state }))}
           >
             {/* Visually hidden rather than `hidden`: a hidden input is not
