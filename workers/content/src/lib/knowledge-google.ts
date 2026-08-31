@@ -503,7 +503,8 @@ export function googleIngestKinds(
             // it announces is already in the base as a `ticket` source with the
             // actual words on it.
             //
-            // MEASURED ON STAGING, 31 Aug 2026: 21 such threads, every one live,
+            // MEASURED ON STAGING, 31 Aug 2026: 96 chat sources, of which 21 are
+            // such threads — every one live — and 6 are the mixed case below,
             // across four spaces —
             //   "HOGO — An app"      "An app: *💭 Request* created by _K. Stehlik_ in the Portal"
             //   "Rest-o — An app"    "An app: 🐛 *Bug Reported*: @Ishita Goyal"
@@ -512,7 +513,7 @@ export function googleIngestKinds(
             // ── WHY THE DISCRIMINATOR IS THE SPEAKER AND NOT THE WORDS ───────
             //
             // The obvious filter is the message FORMAT, and it is the dangerous
-            // one. In the same four spaces sit NINE threads that open with that
+            // one. In the same four spaces sit SIX threads that open with that
             // exact notification line and then carry the team's reply to it:
             //
             //   "An app: *⚠️ Issue* created by _Paras Maroo_ in the Portal

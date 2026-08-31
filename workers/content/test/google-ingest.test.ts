@@ -454,7 +454,7 @@ describe("what actually gets read", () => {
   //
   // The three tests below are ONE decision looked at from three sides, and the
   // middle one is the reason the discriminator is the speaker rather than the
-  // words: on staging NINE threads opened with that exact notification line and
+  // words: on staging SIX threads opened with that exact notification line and
   // then carried the team's reply to it. A format filter scores well on the
   // first test and deletes the team's own diagnostic record on the second.
 
