@@ -857,22 +857,49 @@ export async function captureTranscript(
   // The duration is the meeting's own: an hour on the meeting is an hour off the
   // day, and inventing a finer figure out of a transcript's timestamps would be
   // inventing a fact. A meeting with no end runs the default hour.
+  //
+  // AND ONE PER PERSON PER MEETING, EVER — the predicate rides the INSERT (R17).
+  //
+  // This used to lean entirely on the claim above: `transcript_captured_at IS
+  // NULL` moves one row once, so the loop below ran once, so nobody was billed
+  // twice. That is true exactly as long as NOTHING EVER CLEARS THAT COLUMN — and
+  // on 2026-08-31 clearing it became the necessary repair, because seven
+  // meetings had been matched to the wrong document and the only way to let the
+  // corrected hunt run again is to un-claim them. The claim guards the
+  // TRANSCRIPT; it was never guarding the HOURS, and the difference is invisible
+  // until the day somebody needs the first without the second.
+  //
+  // Left alone, that repair would have added 18.25 billable hours across 21 work
+  // logs that nobody worked, silently, to a client's account. So the guard now
+  // sits where the risk is: a person already logged against this meeting is not
+  // logged again, whatever else has been reset. `logsWritten` counts what the
+  // database actually accepted rather than how many people were in the room —
+  // a re-capture honestly reports zero.
   const staff = await ourStaffAmong(env, guard.teamId, event.attendees.map((a) => a.email))
   const endsAt = meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString()
   const seconds = Math.max(0, Math.round((Date.parse(endsAt) - Date.parse(meeting.startsAt)) / 1000))
-  for (const person of staff)
-    await d1ExecScript(
+  let logsWritten = 0
+  for (const person of staff) {
+    const wrote = await d1Query<{ id: string }>(
       cfg,
       guard.databaseId,
       `INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, user_name, kind, note,
          started_at, ended_at, seconds, billable, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlString(id)}, ${sqlString(person.userId)}, ${sqlString(person.name)}, ${sqlString(MEETING_LOG_KIND)}, ${sqlString(`In "${meeting.title}"`)}, ${sqlString(meeting.startsAt)}, ${sqlString(endsAt)}, ${seconds}, 1, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+SELECT ${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlString(id)}, ${sqlString(person.userId)}, ${sqlString(person.name)}, ${sqlString(MEETING_LOG_KIND)}, ${sqlString(`In "${meeting.title}"`)}, ${sqlString(meeting.startsAt)}, ${sqlString(endsAt)}, ${seconds}, 1, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)}
+ WHERE NOT EXISTS (
+   SELECT 1 FROM work_logs
+    WHERE target_table = 'meetings' AND target_id = ${sqlString(id)}
+      AND user_id = ${sqlString(person.userId)} AND kind = ${sqlString(MEETING_LOG_KIND)}
+ )
+RETURNING id`
     )
+    if (wrote[0]) logsWritten++
+  }
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting transcript read",
-    description: `${actor.name} read the transcript of "${meeting.title}", and ${staff.length} ${
-      staff.length === 1 ? "person's time was" : "people's time was"
+    description: `${actor.name} read the transcript of "${meeting.title}", and ${logsWritten} ${
+      logsWritten === 1 ? "person's time was" : "people's time was"
     } logged`,
     relatedTable: "meetings",
     relatedRowId: id,
@@ -882,7 +909,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
     fileId: found.fileId,
     fileName: found.name,
     foundBy: found.foundBy,
-    logsWritten: staff.length,
+    logsWritten,
     // The one note worth carrying up: a transcript longer than a row may hold
     // was CUT, and the person is told so rather than left to discover that the
     // assistant only knows the first half of the conversation.
