@@ -42,6 +42,17 @@ export function inline(escaped: string): string {
     })
     .replace(/\*\*([^*]+)\*\*/g, (_m, b: string) => `<strong>${b}</strong>`)
     .replace(/(^|[^*])\*([^*\n]+)\*/g, (_m, pre: string, i: string) => `${pre}<em>${i}</em>`)
+    // ONE TAG COMES BACK, AND ONLY THIS ONE. Models write `<br>` inside a table
+    // cell because a cell has no other way to hold two lines — GFM has no
+    // newline in a pipe row. Everything arrives escaped, so those reached the
+    // owner as the literal text "<br>": twelve of them in one answer about a
+    // meeting on 31 Aug 2026, which is what made a correct answer read as
+    // broken. The reversal is deliberately the narrowest possible — the exact
+    // escaped spelling of a void `br` with NO attributes, so nothing carrying
+    // an `onerror`, an `href` or any other payload can round-trip through it,
+    // and every other tag stays text. Do not widen this to a list of "safe"
+    // tags; the safety here is that there is exactly one and it takes nothing.
+    .replace(/&lt;br\s*\/?&gt;/gi, "<br />")
 }
 
 /** One block of a markdown string: a paragraph, a heading, or a list. Its lines

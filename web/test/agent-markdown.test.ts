@@ -80,4 +80,32 @@ describe("AgentMarkdown toHtml — XSS-safe", () => {
     expect(html).not.toContain("<img")
     expect(html).not.toMatch(/<[^>]*\son\w+\s*=/i)
   })
+
+  // A cell has no other way to hold two lines — GFM has no newline in a pipe
+  // row — so a model writes `<br>`. Escaped, that reached the owner as the
+  // literal text "<br>", twelve times in one answer, which is what made a
+  // correct answer read as broken.
+  it("turns <br> in a cell into a real line break", () => {
+    const html = toHtml("| who | points |\n|---|---|\n| Ana | first<br>second |")
+    expect(html).toContain("first<br />second")
+    expect(html).not.toContain("&lt;br&gt;")
+  })
+
+  it("accepts the spellings a model actually writes", () => {
+    expect(toHtml("| a |\n|---|\n| x<br/>y |")).toContain("x<br />y")
+    expect(toHtml("| a |\n|---|\n| x<br />y |")).toContain("x<br />y")
+    expect(toHtml("| a |\n|---|\n| x<BR>y |")).toContain("x<br />y")
+  })
+
+  // THE REVERSAL IS ONE TAG AND IT TAKES NOTHING. If this ever goes red, the
+  // allowance has been widened and the escape boundary is no longer a boundary.
+  it("brings back no other tag, and no br carrying anything", () => {
+    const withAttr = toHtml("| a |\n|---|\n| x<br onload=alert(1)>y |")
+    expect(withAttr).not.toMatch(/<br[^/>]*\son\w+/i)
+    expect(withAttr).toContain("&lt;br")
+    for (const tag of ["<script", "<img", "<a href=\"javascript:", "<iframe", "<style"]) {
+      const html = toHtml(`| a |\n|---|\n| ${tag}>bad</> |`)
+      expect(html).not.toContain(tag)
+    }
+  })
 })
