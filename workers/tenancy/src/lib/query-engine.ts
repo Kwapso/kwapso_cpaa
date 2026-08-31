@@ -660,6 +660,22 @@ function present(select: QueryField[], row: Row): Row {
  *
  * One small read per eligible filter, and only for the ops where a value is a
  * NAME rather than a range: nothing here runs for a date or a number. */
+/** ` AND <col> = ?` for a fenced table, or nothing — the same clause the rows
+ * are narrowed by, so a name this caller may not see reads as a name that is
+ * not here. That is the correct answer to give them: it is what the accounts
+ * LIST door already says.
+ *
+ * MODULE-SCOPED rather than a closure inside `findUnmatched`, after
+ * `findUnlinked` copied this exact lookup shape WITHOUT it — the fence this
+ * guards against is the existence-oracle bug findUnmatched's own ref branch
+ * was fixed for two days earlier, and the closure sat forty lines from the
+ * copy with nothing forcing the second call site to reach for it. One
+ * function, both callers, so a THIRD copy cannot leave it out again. */
+async function fenceOn(fenceFor: FenceFor, m: QueryModule): Promise<{ sql: string; params: string[] }> {
+  const f = await fenceFor(m)
+  return f ? { sql: ` AND ${f.column} = ?`, params: [f.value] } : { sql: "", params: [] }
+}
+
 async function findUnmatched(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -669,14 +685,6 @@ async function findUnmatched(
   fenceFor: FenceFor
 ): Promise<Unmatched[]> {
   const NAME_OPS: QueryOp[] = ["eq", "in", "contains"]
-  /** ` AND <col> = ?` for a fenced table, or nothing — the same clause the rows
-   * are narrowed by, so a name this caller may not see reads as a name that is
-   * not here. That is the correct answer to give them: it is what the accounts
-   * LIST door already says. */
-  const fenceOn = async (m: QueryModule): Promise<{ sql: string; params: string[] }> => {
-    const f = await fenceFor(m)
-    return f ? { sql: ` AND ${f.column} = ?`, params: [f.value] } : { sql: "", params: [] }
-  }
   const out: Unmatched[] = []
   for (const c of q.where) {
     if (!NAME_OPS.includes(c.op) || !c.values.length) continue
@@ -687,7 +695,7 @@ async function findUnmatched(
         // The SAME predicate the filter itself used, asked of the referenced
         // table alone — so "matched nothing" here means exactly what it means
         // there. Bounded: the caller's own value list is already capped.
-        const refFence = await fenceOn(ref)
+        const refFence = await fenceOn(fenceFor, ref)
         const rows = await d1Query<{ label: string | null }>(
           cfg,
           guard.databaseId,
@@ -710,7 +718,7 @@ async function findUnmatched(
       // turn after naming it.
       if (field.identity) {
         const exact = c.op !== "contains"
-        const ownFence = await fenceOn(mod)
+        const ownFence = await fenceOn(fenceFor, mod)
         const rows = await d1Query<{ v: string | null }>(
           cfg,
           guard.databaseId,
@@ -784,14 +792,20 @@ async function findUnlinked(
   if (!ref) return null
   const value = String(clause.values[0])
   // The linked record's own NAME — the same lookup findUnmatched's ref branch
-  // makes, because "does this name show up elsewhere, unlinked" needs the
-  // name, not the id.
+  // makes, and FENCED THE SAME WAY: a caller filtering an account id outside
+  // their own fence must not have that account's name resolved for them, or
+  // this becomes the existence-oracle findUnmatched was fixed for two days
+  // earlier, one function along. An account they may not see resolves to no
+  // name, which is what makes the rest of this function return null and no
+  // `unlinked` appear — the correct behaviour falls out rather than being a
+  // special case.
+  const refFence = await fenceOn(fenceFor, ref)
   const named = await d1Query<{ label: string | null }>(
     cfg,
     guard.databaseId,
     // R14: one row by primary key.
-    `SELECT ${ref.labelColumn} AS label FROM ${ref.table} WHERE id = ? LIMIT 1`,
-    [value]
+    `SELECT ${ref.labelColumn} AS label FROM ${ref.table} WHERE id = ?${refFence.sql} LIMIT 1`,
+    [value, ...refFence.params]
   )
   const name = named[0]?.label
   if (!name) return null

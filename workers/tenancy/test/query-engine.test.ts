@@ -1040,4 +1040,35 @@ describe("staleCheck: a client-scoped read says when more may exist, unlinked", 
       .all() as { id: string }[]
     expect(rows.map((r) => r.id).sort()).toEqual(["M_UNLINKED_1", "M_UNLINKED_2"])
   })
+
+  // THE FENCE FINDING, 31 Aug 2026: findUnlinked's ref-name lookup was built
+  // unfenced, copied from BEFORE findUnmatched's own ref branch was fixed for
+  // exactly this shape two days earlier (the comment at query-engine.ts's
+  // fenceOn: "a name this caller may not see reads as a name that is not
+  // here"). The real fence in this codebase for the accounts module is its
+  // own `narrow` — a caller without contacts:read sees only entity-type
+  // accounts, never individual ones (an address book is somebody's personal
+  // data). So the reproduction is: an INDIVIDUAL account only contacts:read
+  // would reveal, a caller who has lost that right, and an unlinked meeting
+  // that plainly names them.
+  it("a caller without contacts:read gets no unlinked hint about an account only that right would let them see", async () => {
+    db().exec(`
+      INSERT INTO accounts (id, account_type, name, created_at) VALUES ('A_PERSON', 'individual', 'Marta Ruiz', '2026-01-01');
+      INSERT INTO meetings (id, title, account_id, starts_at, created_at)
+        VALUES ('M_PERSON', 'Marta Ruiz sync', NULL, '2026-08-28T10:00:00.000Z', '2026-08-28T10:00:00.000Z');
+      UPDATE role_permissions SET can_read = 0 WHERE role_id = '${IDS.adminRole}' AND module = 'contacts';
+    `)
+    const { status, body } = await ask(
+      q({ module: "meetings", where: [{ field: "accountId", op: "eq", value: "A_PERSON" }] })
+    )
+    expect(status).toBe(200)
+    // No meeting is actually linked to A_PERSON (M_PERSON's account_id is
+    // NULL), so `total` is 0 regardless of the fence — the property under
+    // test is `unlinked`, which a caller who COULD see this account's name
+    // would get (M_PERSON names "Marta Ruiz"), and a fenced caller must not:
+    // resolving the name at all would be the existence-oracle bug one
+    // function over, read through a new door.
+    expect(body.total).toBe(0)
+    expect(body.unlinked).toBeUndefined()
+  })
 })
