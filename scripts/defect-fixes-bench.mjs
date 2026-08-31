@@ -70,8 +70,32 @@
 //    tried here first and never produced a single broadened follow-up call in
 //    5 trials — the model answered straight from the stale row every time.
 //    That is why the fix moved into the DOOR rather than staying a sentence:
-//    see the query-engine.ts header for the shape, and the note below for
-//    whether the model actually reads the new field once it exists.
+//    see the query-engine.ts header for the shape.
+//
+//    VERIFIED IT SHIPS (npm run check, 5 new tests in query-engine.test.ts,
+//    mutation-proved). THEN ONE BENCH ROUND, `BENCH_ONLY=defect1_staleness`,
+//    to answer the only question that mattered once the field existed: does
+//    the model actually read it? Same synthetic conversation as before, one
+//    change — the FLUCLINIC_MEETINGS_RESULT fixture now carries the real
+//    shape the door actually returns (`records`, not the old fixture's
+//    `meetings` — its own long-standing inaccuracy) plus `unlinked: {count:
+//    3}`, the real number measured on staging, and the tool's own
+//    description (tool-catalog.ts) tells the model to look for and use it.
+//
+//      round 8 (payload carries `unlinked`, description documents it)   0/5
+//
+// A payload field the model never reads is exactly the dead weight this
+// verification step existed to catch, and it caught it: none of the five
+// replies mentioned the field, the count, or anything resembling the hedge,
+// and two of the five made the SAME single-meeting follow-up call defect 2's
+// scenario measures, ignoring the `unlinked` count sitting one field over in
+// the same tool result. Reported rather than chased with a ninth round — the
+// door change stands on its own merits (an honest field a caller who reads
+// JSON, a human or another system, can act on even if this one model does
+// not yet), but it should not be reported to the owner as "fixed" for the
+// chat experience specifically. Whether that needs a NINTH round of prompt
+// work, a differently-shaped field, or acceptance that this model will not
+// use it without being forced to, is the next call — not made here.
 import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
@@ -104,8 +128,14 @@ const tools = toolSpecs()
 // id, its two ACCOUNT-LINKED meetings (6 Aug, no transcript; 22 Jul, no
 // transcript) and the real get_meeting_transcript "not found" message text.
 
+// UPDATED after query-engine.ts's staleCheck shipped: `records` (not
+// `meetings` — that was this fixture's own inaccuracy; query_records answers
+// through pagedJson("records", …) regardless of module) now carries the real
+// `unlinked` field the door actually computes for this exact query shape
+// (accountId eq A_FLU… on a module that declares staleCheck) — three, the
+// real count measured on staging 31 Aug 2026.
 const FLUCLINIC_MEETINGS_RESULT = JSON.stringify({
-  meetings: [
+  records: [
     {
       id: "01KZXFK9KMCRKVJ1B3RM0JBS5D",
       title: "Validation FluClinic",
@@ -126,6 +156,7 @@ const FLUCLINIC_MEETINGS_RESULT = JSON.stringify({
     },
   ],
   total: 2,
+  unlinked: { count: 3 },
 })
 
 const NO_TRANSCRIPT_RESULT = JSON.stringify({
@@ -176,7 +207,7 @@ const SCENARIOS = [
       const t = text.toLowerCase()
       const namesDate = /6 aug|august 6|2026-08-06|06 aug/.test(t)
       const hedges =
-        /not (yet )?(been )?(linked|tagged)|hasn'?t been (linked|tagged)|may (not )?be (more recent|newer|others)|more recent .* (not|un)linked|broader search|search (by|for) name|without the account filter/.test(
+        /not (yet )?(been )?(linked|tagged)|hasn'?t been (linked|tagged)|may (not )?be (more recent|newer|others)|more recent .* (not|un)linked|broader search|search (by|for) name|without the account filter|unlinked|3 more|three more/.test(
           t
         )
       const broadened = toolCalls.some((c) => {
@@ -255,7 +286,8 @@ function workersAiModel(name) {
 const model = workersAiModel(runModel)
 const spend = { input: 0, output: 0 }
 
-for (const s of SCENARIOS) {
+const ONLY = process.env.BENCH_ONLY
+for (const s of ONLY ? SCENARIOS.filter((s) => s.key === ONLY) : SCENARIOS) {
   console.log(`\n=== ${s.key} ===`)
   let passed = 0
   for (let i = 0; i < TRIALS; i++) {
