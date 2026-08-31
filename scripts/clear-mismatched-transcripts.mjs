@@ -67,24 +67,59 @@ import { readFileSync } from "node:fs"
 const APPLY = process.argv.includes("--apply")
 const PRODUCTION = process.argv.includes("--production")
 const CONFIRMED = process.argv.includes("--yes-production")
+/** Find and discard work logs a re-hunt wrote twice. See the guard note below. */
+const FIX_DUPLICATES = process.argv.includes("--fix-duplicates")
 
 if (PRODUCTION && !CONFIRMED) {
   console.error("Refusing production without --yes-production. Ask the owner, then pass both flags.")
   process.exit(1)
 }
 
-// THE GUARD MUST BE IN THE CODE BEFORE THE DATA IS TOUCHED. Read off the source
-// rather than assumed: this script's whole safety argument is that a re-capture
-// cannot double anybody's hours, and that is a property of the deployed worker,
-// not of this file.
-const CAPTURE_SRC = new URL("../workers/content/src/lib/meetings.ts", import.meta.url)
-if (!readFileSync(CAPTURE_SRC, "utf8").includes("WHERE NOT EXISTS (")) {
-  console.error(
-    "Refusing to run: workers/content/src/lib/meetings.ts has no NOT EXISTS guard on the meeting\n" +
-      "work-log insert. Clearing a transcript without it re-bills every person in the room.\n" +
-      "See transcript-end-to-end.test.ts › 'a re-hunt … does not bill anybody twice'."
-  )
-  process.exit(1)
+// ── THE GUARD THIS SCRIPT ORIGINALLY CHECKED WAS THE WRONG ARTEFACT ─────────
+//
+// It read `meetings.ts` off the disk and said "it checks". It does not. Clearing
+// a transcript un-claims a meeting, and the CRON re-hunts it within minutes — in
+// the DEPLOYED worker, which is a different thing from the file in this working
+// copy. On 2026-08-31 the first run of this script proved it: the clear was
+// applied at 14:58, the source check passed because the fix was written, the
+// autopilot re-hunted at 15:03:53 against a worker that did not yet carry it, and
+// four people were billed for the same meeting twice.
+//
+// Four logs and four hours, on one meeting, fully recoverable — and exactly the
+// failure this codebase keeps finding: an instrument right about what it checks
+// and silent about what matters. The check was true. The worker was old.
+//
+// There is no honest way to ask the running worker which code it carries — its
+// health door answers `{ok:true}` and nothing more. So the guarantee becomes an
+// explicit, informed step instead of a false automatic one, and the script
+// COUNTS THE DAMAGE afterwards rather than trusting that there is none.
+const SRC_HAS_GUARD = readFileSync(
+  new URL("../workers/content/src/lib/meetings.ts", import.meta.url),
+  "utf8"
+).includes("WHERE NOT EXISTS (")
+const GUARD_DEPLOYED = process.argv.includes("--guard-deployed")
+
+if (APPLY && !FIX_DUPLICATES) {
+  if (!SRC_HAS_GUARD) {
+    console.error(
+      "Refusing: workers/content/src/lib/meetings.ts has no NOT EXISTS guard on the meeting\n" +
+        "work-log insert, so a re-hunt re-bills every person in the room.\n" +
+        "See transcript-end-to-end.test.ts › 'a re-hunt … does not bill anybody twice'."
+    )
+    process.exit(1)
+  }
+  if (!GUARD_DEPLOYED) {
+    console.error(
+      "Refusing without --guard-deployed.\n\n" +
+        "  The guard is in this working copy. That is NOT the question. The cron re-hunts a\n" +
+        "  cleared meeting within minutes, in the DEPLOYED worker, and if that worker predates\n" +
+        "  the guard every person in the room is billed a second time. It happened on the first\n" +
+        "  run of this script.\n\n" +
+        "  Deploy content first, then re-run with --guard-deployed. If it goes wrong anyway,\n" +
+        "  `--fix-duplicates` finds and discards the phantom logs."
+    )
+    process.exit(1)
+  }
 }
 
 const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
@@ -146,10 +181,70 @@ export function transcriptOwnDay(text) {
   return null
 }
 
+/** EVERY PERSON LOGGED MORE THAN ONCE AGAINST ONE MEETING.
+ *
+ * `captureTranscript` writes one work log per person per meeting and never a
+ * second — so a duplicate here is not a judgement call, it is a row that could
+ * only have been written by a re-hunt against a worker without the guard. That
+ * makes it safe to report as damage rather than as a question.
+ *
+ * The pair is ordered by `created_at`: the FIRST is the real one and everything
+ * after it is the phantom. */
+async function duplicateMeetingLogs(db) {
+  return await sql(
+    db,
+    `SELECT w.id, w.target_id, w.user_id, w.user_name, w.seconds, m.title,
+            substr(w.created_at, 1, 19) AS written
+       FROM work_logs w JOIN meetings m ON m.id = w.target_id
+      WHERE w.target_table = 'meetings' AND w.kind = 'Meeting' AND w.discarded_at IS NULL
+        AND EXISTS (
+          SELECT 1 FROM work_logs o
+           WHERE o.target_table = 'meetings' AND o.kind = 'Meeting' AND o.discarded_at IS NULL
+             AND o.target_id = w.target_id AND o.user_id = w.user_id AND o.created_at < w.created_at
+        )
+      ORDER BY m.title, w.user_name, w.created_at`
+  )
+}
+
 const where = PRODUCTION ? "PRODUCTION" : "staging"
 console.log(`clear-mismatched-transcripts — ${where}${APPLY ? "" : "  (DRY RUN, nothing will be written)"}\n`)
 
 const teams = await sql(CORE, "SELECT id, name, database_id FROM teams WHERE database_id IS NOT NULL")
+
+if (FIX_DUPLICATES) {
+  let found = 0
+  for (const team of teams) {
+    await proveTeamDatabase(team.database_id, team.name)
+    const dupes = await duplicateMeetingLogs(team.database_id)
+    if (!dupes.length) {
+      console.log(`  ${team.name}: no duplicated meeting logs`)
+      continue
+    }
+    found += dupes.length
+    const hours = dupes.reduce((n, d) => n + d.seconds, 0) / 3600
+    console.log(`  ${team.name}: ${dupes.length} phantom logs, ${hours.toFixed(2)} hours\n`)
+    for (const d of dupes) console.log(`    ${d.written}  ${d.user_name} — "${d.title}"`)
+    console.log("")
+    if (!APPLY) continue
+    for (const d of dupes)
+      // DISCARDED, NOT DELETED — the house rule, and `seconds = 0` is what takes
+      // the hour off every total (`insights.ts` sums `discarded_at IS NULL`).
+      // The row stays so there is a record that a phantom was written.
+      await sql(
+        team.database_id,
+        `UPDATE work_logs SET discarded_at = ?, seconds = 0, updated_at = ?
+          WHERE id = ? AND discarded_at IS NULL`,
+        [new Date().toISOString(), new Date().toISOString(), d.id]
+      )
+    console.log(`    discarded ${dupes.length}\n`)
+  }
+  console.log(
+    APPLY
+      ? `discarded ${found} phantom meeting logs on ${where}.`
+      : `${found} phantom meeting logs on ${where}. Re-run with --apply.`
+  )
+  process.exit(0)
+}
 
 let flagged = 0
 let unreadable = 0
