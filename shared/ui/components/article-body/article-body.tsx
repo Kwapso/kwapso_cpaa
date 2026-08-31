@@ -331,6 +331,46 @@ const ArticleBody = React.forwardRef<HTMLDivElement, ArticleBodyProps>(
        empty. */
     const state = loading ? "loading" : error ? "error" : !hasBody || empty ? "empty" : "default";
 
+    /* PROSE THAT ARRIVES AS SANITISED HTML RATHER THAN AS NODES.
+       This interface extends the div props, so it has always ADVERTISED
+       `dangerouslySetInnerHTML` — and the render below writes its own children
+       (an eyebrow, a heading, a register, `children`), so React refused the
+       combination outright: "Can only set one of `children` or
+       `props.dangerouslySetInnerHTML`". The type accepted what the
+       implementation could not deliver, which is the same fault `Stopwatch`
+       carried at v1.2.7 with `children`.
+
+       It matters here more than it did there. The kit's own Notes editor emits
+       HTML, so a body that arrives as a string is the ORDINARY case for
+       user-authored prose, not an exotic one — and the alternative a consumer
+       is forced into, wrapping the string in one div, silently kills the
+       vertical rhythm: every rule that spaces this prose is a DIRECT-child
+       selector (`[&>*+*]`, `[&>*+:is(h2,h3)]`…), and a single wrapper leaves
+       the root with one child for them to act on. Measured, not assumed: the
+       wrapped render puts exactly 1 element under the root.
+
+       So when a caller injects, the root takes the HTML and draws nothing of
+       its own. No eyebrow, no heading, no register — React forbids children
+       beside injected markup, and a caller supplying the whole body is not
+       asking for them. Every other caller is untouched: this branch is not
+       entered unless `dangerouslySetInnerHTML` is actually present.
+
+       IT ADDS NO CLASS, NO COLOUR AND NO SPACING. The prose treatment, the
+       measure and the size are the same variants the normal path resolves. */
+    const injected = (props as { dangerouslySetInnerHTML?: { __html: string } })
+      .dangerouslySetInnerHTML;
+    if (injected) {
+      return (
+        <Root
+          ref={ref as React.Ref<HTMLDivElement>}
+          data-slot="article-body"
+          data-state="default"
+          className={cn(articleBodyVariants({ size, measure }), className)}
+          {...props}
+        />
+      );
+    }
+
     return (
       <Root
         ref={ref as React.Ref<HTMLDivElement>}

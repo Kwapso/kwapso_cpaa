@@ -3863,6 +3863,12 @@
       "reason": "The kit designs three series colours (sky, forest, poppy) and says they cycle. 4 and 5 are placeholders repeating 1 and 2, so a five-series chart currently shows two indistinguishable pairs.",
       "recommendation": "Two dedicated data-safe hues need a kit ruling. Never mango (brand, not data) and never grey (reads as disabled).",
       "severity": "known-limitation"
+    },
+    {
+      "item": "A non-editorial quote register on ArticleBody",
+      "reason": "ArticleBody draws every `blockquote` as ruling 13's pull-quote — SerrifCondensed at the h3 step on --tracking-serif, 24px, `my-[var(--space-8)]`, \"one per page\" by editorial rule — and there is no second register and no way to opt out: the treatment is unconditional descendant CSS on the root, and ArticleBodyProps carries no variant for it. The kit's law-book does not rule on quotes at all: `blockquote` appears in none of docs/RULES.md, PATTERN.md, BUILD-A-COMPONENT.md, BUILD-A-SCREEN.md or TOKENS.md, and the only other component that draws one (typography's `Headline as=\"blockquote\"`) is documented as the same pull-quote. THE CASE THAT HAS NO ANSWER: a quoted reply inside a ticket or a meeting note — several per page, none of them editorial. `notes.tsx` names \"a quoted reply\" as a fully-composed row a call site supplies, which is the kit's model for a THREAD; it does not cover a quote a person typed mid-prose inside one body, which is what a consuming app receives when its editor emits HTML.",
+      "recommendation": "A second register on ArticleBody, selected by a prop, for a quote that is a QUOTED PASSAGE rather than an editorial pull-quote — sans, body step, quiet ink, marked by a rule rather than by the serif — with the editorial rule kept as the default so nothing that draws a pull-quote today changes. Which of the two is the default, and what the non-editorial one looks like, is a design decision and is why this is logged rather than guessed (BUILD-A-COMPONENT: \"A logged gap is fine. A guess that looks like law is not.\"). The kwapso app is holding a one-line app-side override against this entry and deletes it the day the register ships.",
+      "severity": "known-limitation"
     }
   ],
   "iconSizesNote": "28 is the sixth and was admitted by client ruling T2, 2026-08-23: 27.42 draws the module wall's icon at 28 and the ladder had five. Snapping the tile to 24 or 32 was the alternative and was declined.",

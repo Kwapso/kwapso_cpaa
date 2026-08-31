@@ -497,10 +497,7 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
   "components/radar":
     "no feature compares one record across several independent dimensions at once — every metric the app tracks (hours, margin, savings, stage counts) is a single measure over time or over a group, which the existing bar/area charts already cover.",
   "components/progress-toggle":
-    "both progress readouts in the app are plain text (web/components/sprints-screen.tsx's \"3 of 11 done\") or a continuous bar (KpiProgress, web/components/tasks-screen.tsx) — never discrete done/undone segments for this pill row to draw.",
-  "components/article-body":
-    "a real duplicate exists (shared/web/rich-text-view.tsx's hand-rolled PROSE class, reused across 14 detail screens) but the swap is not mechanical: ArticleBody styles a `blockquote` as a 24px serif pull-quote, \"one per page\" by editorial rule, and this app's blockquotes are ordinary quoted replies inside a ticket or meeting note — applying the kit's pull-quote treatment to those would be wrong, not neutral. Needs a design decision (an override, or accepting the treatment) before the swap, not a blind one.",
-  "components/container":
+    "both progress readouts in the app are plain text (web/components/sprints-screen.tsx's \"3 of 11 done\") or a continuous bar (KpiProgress, web/components/tasks-screen.tsx) — never discrete done/undone segments for this pill row to draw.",  "components/container":
     "adopting it would break R29: web/components/deep-link-screen.tsx's own `max-w-[1600px]` line is the sole machine-checked page-width owner for the agency front door, and Container's own presets (app 1240 / marketing 1200 / document 960) don't even offer that width.",
   "components/signature":
     "the app's one approval flow, PortalApprovalBand (web-portal/components/ticket-screen.tsx), is a click-to-approve button with a caption — not a drawn, canvas signature capture. No sign-off flow in the app asks for one.",

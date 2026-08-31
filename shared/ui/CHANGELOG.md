@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.2.10 — 2026-08-31
+
+### Fixed — `ArticleBody` advertised `dangerouslySetInnerHTML` and refused it
+
+The interface extends the div props, so it has always ADVERTISED the prop; the
+render writes its own children, so React refused the combination outright —
+*"Can only set one of `children` or `props.dangerouslySetInnerHTML`"*. Same
+fault `Stopwatch` carried at v1.2.7 with `children`: a type accepting what the
+implementation cannot deliver.
+
+It matters more here. The kit's own Notes editor emits HTML, so a body that
+arrives as a string is the ORDINARY case for user-authored prose — and the
+workaround a consumer is forced into, wrapping the string in one div, silently
+kills the vertical rhythm, because every rule that spaces this prose is a
+DIRECT-child selector (`[&>*+*]`, `[&>*+:is(h2,h3)]`…). Measured: a wrapped
+render leaves exactly one element under the root for them to act on.
+
+When a caller injects, the root now takes the HTML and draws nothing of its own.
+No class, no colour and no spacing is added — the prose treatment, the measure
+and the size are the same variants the normal path resolves — and the branch is
+not entered unless the prop is actually present, so no existing caller moves.
+
+### Logged — a non-editorial quote register (manifest.json → notDelivered)
+
+`ArticleBody` draws every `blockquote` as ruling 13's pull-quote, one per page
+by editorial rule, with no second register and no opt-out. The law-book does not
+rule on quotes at all. A quoted reply inside a ticket or a meeting note — several
+per page, none editorial — has no answer, and inventing one would be a guess that
+looks like law. Logged with a recommendation so it can be closed in one edit.
+
 ## v1.2.9 — 2026-08-29
 
 ### Fixed — `media={null}` never drew the single column its own doc promised
