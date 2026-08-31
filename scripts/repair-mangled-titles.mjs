@@ -70,7 +70,7 @@ import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 // THE SAME TABLE THE SWEEP USES, loaded the way every script here loads shipped
 // worker code: a top-level `await import`, because a STATIC import of `@shared/*`
 // is resolved before `shared-alias.mjs` has had a chance to register its hook.
-const { mendMojibake, MOJIBAKE_MARKER } = await import(
+const { mendMojibake, MOJIBAKE_MARKER, MOJIBAKE_REPAIRS } = await import(
   join(dirname(fileURLToPath(import.meta.url)), "..", "shared", "workers", "mojibake.ts")
 )
 
@@ -253,6 +253,51 @@ for (const team of teams) {
   console.log(`    wrote ${changed.length} rows`)
 }
 
+// ── THE SECOND COLUMN, WHICH IS A DIFFERENT DOOR ────────────────────────────
+//
+// `meetings.transcript_text` holds a Meet transcript, and a Meet transcript is
+// Google-composed text carrying the same mis-decoded display name in its
+// attendee line. It is NOT a knowledge_sources row and it is not swept by a
+// Google lane — the `meeting` kind REBUILDS its knowledge body from this column
+// on every tick.
+//
+// So repairing the knowledge row alone is worse than useless: it looks fixed and
+// is re-mangled on the next sweep, from the column nobody repaired. Measured on
+// 2026-08-31, that took twelve minutes. Capture now mends on the way in
+// (`captureTranscript`), which handles every transcript from here; this pass is
+// for the ones already stored.
+for (const team of teams) {
+  const rows = await sql(
+    team.database_id,
+    `SELECT id, title FROM meetings WHERE transcript_text LIKE ? ORDER BY starts_at`,
+    [`%${MARKER}%`]
+  )
+  if (!rows.length) {
+    console.log(`  ${team.name}: no transcript carries "${MARKER}"`)
+    continue
+  }
+  console.log(`\n  ${team.name}: ${rows.length} stored transcripts carry "${MARKER}"`)
+  if (!APPLY) continue
+  for (const r of rows) {
+    // Mended in SQLite rather than read-and-written back: a transcript runs to a
+    // megabyte and there is no reason to move it across the wire twice. The
+    // replacements are the same table, applied longest-first for the same reason.
+    const replaced = MOJIBAKE_REPAIRS.reduce(
+      (expr, rep) => `replace(${expr}, ${JSON.stringify(rep.from)}, ${JSON.stringify(rep.to)})`,
+      "transcript_text"
+    )
+    // R17: the predicate rides the UPDATE, so a second run matches nothing.
+    await sql(
+      team.database_id,
+      `UPDATE meetings SET transcript_text = ${replaced} WHERE id = ? AND transcript_text LIKE ?`,
+      [r.id, `%${MARKER}%`]
+    )
+  }
+  console.log(`    mended ${rows.length} transcripts`)
+  // The `meeting` kind re-reads this column and will notice the text changed, so
+  // the knowledge row and its chunks re-index on the next sweep without help.
+}
+
 // ── THE COUNT, READ BACK OFF THE DATABASE ───────────────────────────────────
 console.log("")
 let remaining = 0
@@ -271,7 +316,9 @@ console.log(
 )
 if (APPLY && remaining === 0)
   console.log(
-    `\nNOTE: the Google kinds are windowed — the sweep re-reads Google every tick and the upsert\n` +
-      `overwrites the title. Rows still inside Google's window WILL come back mangled until the\n` +
-      `display name is corrected on the Google account itself. See the header of this file.`
+    `\nThe sweep no longer undoes this. The Google kinds are windowed — every tick re-reads what\n` +
+      `Google currently holds and the upsert overwrites the title — so until 2026-08-31 this repair\n` +
+      `was a treadmill. The mend now runs on the way IN (shared/workers/mojibake.ts, applied in\n` +
+      `knowledge-google.ts), which is what makes a repaired row stay repaired. This script is for\n` +
+      `the rows that have already fallen out of Google's window and will never be swept again.`
   )

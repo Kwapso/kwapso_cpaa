@@ -22,6 +22,7 @@
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { mendMojibake } from "@shared/workers/mojibake"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { accessTokenFor } from "./google"
 import { type CalendarEvent } from "./google-api"
@@ -821,7 +822,15 @@ export async function captureTranscript(
   // can read a candidate before calling it a transcript (google-transcript.ts),
   // so reaching this line means there are words; and a meeting whose transcript
   // could not be read stays unclaimed and is tried again next time.
-  const words = capToRow(found.text)
+  // MENDED ON THE WAY IN, for the same reason the Google sweep mends (R-note in
+  // shared/workers/mojibake.ts): a Meet transcript is Google-composed text and
+  // carries the display name Google itself mis-decodes, right there in the
+  // attendee line. It has to happen HERE rather than in the knowledge row,
+  // because the `meeting` kind rebuilds its body from this column on every
+  // sweep — a knowledge row repaired directly was re-mangled twelve minutes
+  // later, from a transcript captured after the Google-lane mend shipped. The
+  // four Google lanes were not the only door Google's text comes through.
+  const words = capToRow(mendMojibake(found.text))
 
   // THE CLAIM, AND IT IS THE WHOLE OF THE IDEMPOTENCE. Everything below happens
   // exactly once because this statement moves exactly one row exactly once. It

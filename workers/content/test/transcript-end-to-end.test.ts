@@ -187,8 +187,14 @@ const OURS = "staff@kwapso.app"
 const THEIRS = "nadia@bergman.example"
 
 /** WHAT WAS SAID. One sentence nothing else in the fixture says, so an answer
- * built from it can only have come from the transcript. */
+ * built from it can only have come from the transcript.
+ *
+ * IT OPENS WITH THE ATTENDEE LINE, mangled exactly as Google writes it. A Meet
+ * transcript is Google-composed text and carries the display name Google itself
+ * mis-decodes; without this the fixture was cleaner than any real transcript in
+ * the base and could not have caught the gap it now covers. */
 const WHAT_WAS_SAID =
+  "Attendees\r\nÃlaap Kanchawala, Marta Reyes\r\n" +
   "Marta confirmed the dispatch desk will stop using the shared spreadsheet on the first Monday of April, " +
   "and asked us to keep the old supplier codes visible for one more quarter."
 
@@ -518,6 +524,29 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
   //
   // The claim guards the TRANSCRIPT. It was never guarding the HOURS, and the
   // difference is invisible until the day you need the first without the second.
+  // ── THE DOOR THE FIRST MEND MISSED ────────────────────────────────────────
+  //
+  // `knowledge-google.ts` mends Google's mis-spelling of the owner's name on the
+  // four Google sweep lanes. A Meet transcript does not come through any of them
+  // — it arrives here, through `captureTranscript`, and lands in
+  // `meetings.transcript_text`, which the `meeting` kind then rebuilds its
+  // knowledge body from on every sweep.
+  //
+  // So repairing the knowledge row directly does nothing: on 2026-08-31 one was
+  // repaired at 15:05 and re-mangled at 15:15 from a transcript captured after
+  // the Google-lane mend had already shipped. Mending the COLUMN is what holds,
+  // and this is the test that says the two doors are not the same door.
+  it("mends the name Google mangled in the transcript itself, not just the sweep lanes", async () => {
+    const id = await sweepCalendar()
+    await readTranscript(id)
+
+    const stored = (await transcriptOnScreen(id)).text ?? ""
+    expect(stored, "the attendee line Google wrote").toContain("Alaap Kanchawala")
+    expect(stored, "and nothing mangled is left in the words themselves").not.toContain("Ã")
+    // Narrow, not a rewrite: everything else the transcript says is untouched.
+    expect(stored).toContain("first Monday of April")
+  })
+
   it("a re-hunt after the transcript is cleared does not bill anybody twice", async () => {
     const id = await sweepCalendar()
     await readTranscript(id)
