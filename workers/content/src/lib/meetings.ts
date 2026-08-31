@@ -1502,11 +1502,23 @@ export async function readTranscript(
   const looked = row.transcript_captured_at !== null
   return {
     found,
+    // WRITTEN AS A FACT, NEVER AS AN INSTRUCTION WITH A TOOL'S NAME IN IT.
+    // Measured on staging 31 Aug 2026: this sentence used to say "use
+    // read_meeting_transcript" and "ask list_meetings", and the assistant
+    // relayed both, verbatim, to a person who has no tool to run — "you'll
+    // need a transcript (run read_meeting_transcript for this meeting)". A
+    // system-prompt rule telling it not to do that lost to this sentence every
+    // time it was tried (three phrasings, 0/5 each): a concrete instruction
+    // sitting in the exact text being read beats a general rule about not
+    // repeating instructions. So the instruction moved out of the DATA — this
+    // field states what is true (a transcript can still be captured; whether
+    // one exists is a fact on the row) and leaves picking a tool to the model,
+    // which already has every tool's own description for that.
     message: found
       ? "These are the words that were said. Read them; do not ask for them again."
       : looked
         ? "We went and found a transcript for this meeting and it had no words in it. There is nothing to read here and there will not be — do not ask again, and do not try another meeting on the assumption you had the wrong one."
-        : "No transcript has been captured for this meeting. The meeting is real and this is its final answer — asking again, or asking about another meeting, will not produce words. To go and look for one, use read_meeting_transcript. To find the meetings that DO have words, ask list_meetings for the ones with a transcript.",
+        : "No transcript has been captured for this meeting. The meeting is real and this is its final answer — asking again, or asking about another meeting, will not produce words. One may still be found and captured from Google if it exists there. To find meetings that already have a transcript on file, check whether each one's transcript has been captured.",
     text,
     note: row.transcript_note,
     url: row.transcript_url,

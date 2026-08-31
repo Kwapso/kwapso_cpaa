@@ -338,8 +338,20 @@ describe("a meeting that has no words SAYS so, and the list can find the ones th
     // NOT AN EMPTY STRING, and not a shrug. It has to be actionable prose or the
     // model does what it did: try again.
     expect(body.message.length).toBeGreaterThan(40)
-    expect(body.message).toMatch(/read_meeting_transcript/)
-    expect(body.message).toMatch(/list_meetings/)
+    // NEVER A TOOL'S NAME (defect 2, measured on staging 31 Aug 2026): this
+    // message used to say "use read_meeting_transcript" and "ask
+    // list_meetings", and the assistant relayed both verbatim to a person who
+    // has no tool to run. A system-prompt rule against that lost to this
+    // sentence every time it was tried (0/5, three phrasings) — a concrete
+    // instruction sitting in the data the model is reading beat a general rule
+    // about not repeating instructions. So the fact moved into the message
+    // and the tool name moved out: what's true (it may still be captured from
+    // Google; other meetings can be checked by whether theirs is captured),
+    // never which identifier to call.
+    expect(body.message).not.toMatch(/read_meeting_transcript/)
+    expect(body.message).not.toMatch(/list_meetings/)
+    expect(body.message).toMatch(/Google/)
+    expect(body.message).toMatch(/captured/)
   })
 
   it("a captured transcript answers found: true, with the words", async () => {
