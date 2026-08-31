@@ -441,6 +441,24 @@ export function googleIngestKinds(
       table: "google_chat",
       label: "Chat conversations",
       windowed: true,
+      // 3 SINCE 31 AUG 2026 — the app-only retirement below. It changes no TEXT,
+      // so nothing here needs re-embedding; what it needs is for the sweep to
+      // MEET the conversations it has already filed, and a cursor is exactly what
+      // stops that. A windowed kind does rewind on its own — but only on a tick
+      // that finds nothing new (`sweepKind`: `rows.length === 0`), and a space
+      // receiving a trickle of messages consumes every tick without ever
+      // rewinding. Measured on staging: 90 minutes and seven ticks after the
+      // deploy, not one of the 21 notification threads had been re-read, and
+      // there was no hour at which it was going to happen. Unbounded, not slow.
+      //
+      // WHAT THE BUMP COSTS, measured rather than assumed, because this lane
+      // first declined to bump on the belief that it would re-embed the lot:
+      // one upsert per conversation and NO embedding call, since every hash is
+      // unchanged and the hash-skip returns before `indexSource`. On staging,
+      // three re-read chat sources kept `indexed_at` values an hour older than
+      // the `updated_at` the re-read gave them. `knowledge-coverage.test.ts`
+      // holds both halves down now — the rewind, and the skip.
+      //
       // 2 SINCE 20 AUG 2026 — the unit changed from a space to a thread and the
       // body changed with it, so every stored cursor has to rewind. Without the
       // bump the sweep kept the position it had reached over the OLD rows, found
@@ -448,7 +466,7 @@ export function googleIngestKinds(
       // a hundred while reporting itself caught up. Measured live: `read: 1,
       // indexed: 1, caughtUp: true` against five spaces holding fifty messages
       // each.
-      textVersion: 2,
+      textVersion: 3,
       // ONE SOURCE PER CONVERSATION — not per message, and no longer per space.
       //
       // PER MESSAGE was wrong for the reason this comment has always given: a

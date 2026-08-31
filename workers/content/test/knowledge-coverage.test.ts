@@ -557,6 +557,49 @@ describe("changing what a kind SAYS really does re-index what is already there",
     expect(after.n).toBe(before.n)
   })
 
+  it("…and a bump on rows whose TEXT did not change re-READS them without re-embedding", async () => {
+    // THE OTHER HALF OF WHAT A BUMP COSTS, and it reverses a real decision.
+    //
+    // On 31 Aug 2026 a lane declined to bump a kind's `textVersion` — the one
+    // thing that would have made a behaviour change reach rows already filed —
+    // because "a bump re-reads and re-embeds every row of that kind: real AI
+    // spend, to change nothing". The first half is true. The second is not, for
+    // any row whose text is unchanged: the bump rewinds the cursor, the sweep
+    // meets the row again, recomputes the same hash, and the hash-skip returns
+    // before `indexSource` is ever called. The cost is one upsert.
+    //
+    // MEASURED ON STAGING BEFORE IT WAS WRITTEN HERE, which is how the error was
+    // found: three chat sources re-read at 08:04 kept `indexed_at` values of
+    // 06:15 and 07:03 — read, skipped, never embedded — while four rows that had
+    // genuinely gained replies re-indexed in the same tick. That contrast is the
+    // control; without it "nothing re-indexed" could just mean nothing ran.
+    //
+    // The test above stales every hash on purpose, so it can only ever prove the
+    // re-INDEX. This one changes nothing and proves the skip.
+    await sweepUntilCaughtUp()
+    const positions = db()
+      .prepare("SELECT kind, cursor FROM knowledge_ingest WHERE cursor IS NOT NULL")
+      .all() as { kind: string; cursor: string | null }[]
+    expect(positions.length, "no kind kept a position — this test would prove nothing").toBeGreaterThan(0)
+
+    // The cursors go back a version. The HASHES ARE LEFT ALONE — that is the
+    // whole difference from the test above.
+    db().exec("UPDATE knowledge_ingest SET cursor = REPLACE(cursor, 'v1|', 'v0|') WHERE cursor IS NOT NULL")
+
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge/sync")
+    const { results } = (await res.json()) as {
+      results: { kind: string; read: number; indexed: number }[]
+    }
+    const readAgain = results.reduce((n, r) => n + r.read, 0)
+    const reIndexed = results.reduce((n, r) => n + r.indexed, 0)
+
+    expect(readAgain, "the bump really did send the sweep back over filed rows").toBeGreaterThan(0)
+    expect(
+      reIndexed,
+      "…and not one of them was re-embedded, because none of their text changed"
+    ).toBe(0)
+  })
+
   it("a rollup catches a change in a row its own cursor cannot see", async () => {
     await sweepUntilCaughtUp()
     expect(sourceFor("accounts", IDS.victimAccount).body).not.toContain("The board is blank on Mondays")
@@ -601,8 +644,27 @@ describe("changing what a kind SAYS really does re-index what is already there",
     // reader SAYS — the words that go into the index and that a re-index would
     // rewrite. A comment says nothing to the index. Hashing it anyway means an
     // edit that changes no shipped text still demands a `textVersion` bump, and
-    // a bump re-reads and re-embeds every row of that kind in the base: real AI
-    // spend, to change nothing.
+    // a bump sends the sweep back over every row of that kind in the base.
+    //
+    // WHAT THAT COSTS, precisely, because the imprecise version of this sentence
+    // caused a wrong decision on 31 Aug 2026. It used to read "a bump re-reads
+    // and RE-EMBEDS every row … real AI spend, to change nothing", and a lane
+    // read it, believed it, and declined to bump a kind whose behaviour change
+    // therefore never reached a single row already filed.
+    //
+    // A bump re-READS every row. It re-EMBEDS only the rows whose text actually
+    // changed — which, when you have bumped because the reader now SAYS
+    // something different, is all of them, and that is the case this sentence
+    // was written for. When the reader says the same words as before, every hash
+    // matches and the skip below returns before `indexSource` is called: one
+    // upsert per row, no AI spend. Measured on staging that day — three chat
+    // sources re-read at 08:04 kept `indexed_at` of 06:15 and 07:03, while four
+    // rows that had genuinely gained replies re-indexed in the same tick — and
+    // the test two describes above now holds both halves down.
+    //
+    // So the instruction is unchanged and its price is not: bump when the words
+    // change, and do not talk yourself out of a bump you need on a cost that is
+    // only real when the words changed.
     //
     // THIRD TIME. It fired on 20 Aug 2026 for a slice that ran past the table's
     // end (see the `task` note in READER_DIGESTS, re-pinned at the SAME version
