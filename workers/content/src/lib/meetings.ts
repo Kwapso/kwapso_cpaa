@@ -1004,9 +1004,18 @@ const SERIES_HORIZON_DAYS = 28
 
 /** WHAT TO CALL AN ENTRY THAT NEVER GOT A NAME. Said once because the insert and
  * the refresh both need it and a row whose title changed on its second sync
- * would look like somebody had renamed it. */
+ * would look like somebody had renamed it.
+ *
+ * AND SAID ONCE IS ALSO WHY THE MEND BELONGS HERE. A calendar entry somebody
+ * named after a person carries Google's own mis-decoding of that person's name
+ * in its title — "Ãlaap / Alexander" sits in the meeting list looking like a
+ * typo somebody made. It is re-read from Google on every calendar sweep, so
+ * repairing the row is a treadmill for the same reason the sweep lanes were:
+ * this is the third door Google's text comes through, and a census of every
+ * TEXT column in the team database is what found it, after two rounds of
+ * fixing the doors I happened to remember. */
 function titleOf(event: CalendarEvent): string {
-  return event.summary || "A meeting with no title"
+  return mendMojibake(event.summary) || "A meeting with no title"
 }
 
 /** HOW FAR BACK THE LIVE WINDOW RE-READS, ON EVERY CALL.
