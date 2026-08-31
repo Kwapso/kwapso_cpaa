@@ -1036,7 +1036,21 @@ export const INGEST_KINDS: IngestKind[] = [
     // v4 SINCE 28 AUG 2026: the same for a meeting that HAS happened and still
     // has nothing written on it. Bumped for the same reason — the bump is what
     // sends the sweep back over rows already filed under the old rule.
-    textVersion: 4,
+    //
+    // v5 SINCE 31 AUG 2026: the mojibake mend reached `transcript_text`, and 39
+    // meetings' PASSAGES did not reach it. This lane is not `windowed` and is not
+    // a rollup — it walks a cursor forward and never looks behind itself — so
+    // nulling `content_hash` on a row the cursor has already passed changes
+    // nothing at all. 1,281 passages were left quoting a name the record itself
+    // no longer spells that way, permanently, and the count LOOKED like it was
+    // draining because the rows AHEAD of the cursor really were.
+    //
+    // A bump is the only thing that walks this lane back, which is what v3 and
+    // v4 above were both for. It is also cheap: the rewind re-READS every
+    // meeting and re-EMBEDS only the ones whose text actually changed, because
+    // the hash decides — so this costs one pass of reads and 39 rows of
+    // embedding, not 4,296.
+    textVersion: 5,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{

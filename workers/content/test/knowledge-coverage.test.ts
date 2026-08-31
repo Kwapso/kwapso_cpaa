@@ -768,7 +768,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // came out of the Team Assembly?" while the 92-chunk transcript was not. The
   // bump is not cosmetic: those rows sit behind this lane's cursor and only a
   // rewind re-decides them.
-  meeting: { version: 4, digest: "2429e9f9e1353766" },
+  // v5: the mojibake mend reached `meetings.transcript_text` and the PASSAGES
+  // built from it were left behind — 39 meetings, 1,281 chunks, all sitting
+  // behind this lane's cursor with `content_hash` nulled and nothing that would
+  // ever read them again. Same reason as v3, and the same lesson: on a
+  // forward-only lane, nulling the hash on a row the cursor has passed does
+  // NOTHING. Only a bump walks it back.
+  meeting: { version: 5, digest: "73fb4b8e98d1f6c4" },
   todo: { version: 1, digest: "e00d2b0c6bb86edb" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
