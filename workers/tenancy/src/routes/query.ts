@@ -308,6 +308,11 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
     // nothing is a fact about the answer, not a detail of how it was computed —
     // see `Unmatched` in the engine for the sentence that made it necessary.
     ...(answer.unmatched.length ? { unmatched: answer.unmatched } : {}),
+    // R1's staleCheck (query-grammar.ts): on a module that declares it, a
+    // query scoped to one client by `eq` can silently miss a newer row that
+    // plainly concerns them but nobody has linked yet — see `findUnlinked` in
+    // the engine. Absent whenever the check did not run or found nothing.
+    ...(answer.unlinked ? { unlinked: answer.unlinked } : {}),
     // WHICH ROWS THIS COUNTED. `live` is the module's everyday list — what its
     // own screens and its own list door mean by the word — and saying so is what
     // lets a caller tell "there are none" from "there are none on the list".

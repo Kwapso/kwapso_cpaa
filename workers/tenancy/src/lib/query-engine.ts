@@ -484,6 +484,12 @@ export type QueryAnswer = {
   groupsTruncated: boolean
   /** the filter values that named nothing — empty when everything resolved */
   unmatched: Unmatched[]
+  /** R1's staleCheck: rows that TEXT-match the client this query is scoped to
+   *  but carry no link to it — absent-means-nothing-to-say, like `unmatched`.
+   *  Present only on a module that declares `staleCheck` AND a query scoped
+   *  by that field with `eq`; null everywhere else, including when the check
+   *  ran and found nothing. */
+  unlinked: { count: number } | null
   sort: string
   dir: "asc" | "desc"
 }
@@ -510,6 +516,12 @@ export async function runQuery(
   // rather than this module's fence: its lookups run against the REFERENCED
   // table, which has a fence of its own.
   const unmatchedPromise = findUnmatched(cfg, guard, mod, q, refs, fenceFor)
+  // R1's staleCheck — a second read against the CALLER'S OWN where (not the
+  // fenced+ANDed `where` above, which already narrows to the client this
+  // finds rows OUTSIDE of), so it gets the raw clauses and resolves the fence
+  // itself. Absent (not run, or ran and found nothing) on every module that
+  // has not declared it.
+  const unlinkedPromise = findUnlinked(cfg, guard, mod, q, refs, fenceFor)
   // R14/R16 — the exact total, bounded by the ONE counting ceiling, over exactly
   // the question the rows themselves answer.
   const totalPromise = countCollection(
@@ -546,6 +558,7 @@ export async function runQuery(
       groupsTruncated: truncated,
       everyday: q.everyday,
       unmatched: await unmatchedPromise,
+      unlinked: await unlinkedPromise,
       sort: "",
       dir: "desc",
     }
@@ -562,6 +575,7 @@ export async function runQuery(
       groupsTruncated: false,
       everyday: q.everyday,
       unmatched: await unmatchedPromise,
+      unlinked: await unlinkedPromise,
       sort: "",
       dir: "desc",
     }
@@ -602,6 +616,7 @@ export async function runQuery(
     groupsTruncated: false,
     everyday: q.everyday,
     unmatched: await unmatchedPromise,
+    unlinked: await unlinkedPromise,
     sort: ordering.name,
     dir: ordering.dir,
   }
@@ -733,6 +748,65 @@ async function findUnmatched(
     }
   }
   return out
+}
+
+/** THE OTHER HALF OF A "for this client" READ (R1's `staleCheck`,
+ * query-grammar.ts): a query scoped by an EXACT ref filter only ever sees rows
+ * somebody has LINKED to that client, and on a module where linking is a
+ * person's own doing — never automatic — the row this call is about to hand
+ * back as "the latest" can be honestly wrong for what was meant. Measured on
+ * staging 31 Aug 2026: a meetings read scoped to one client answered from a
+ * 6-August row with nothing on it, while three more recent ones, each
+ * captured, each naming the client in its own text, carried no link at all.
+ *
+ * ONE EXTRA COUNT(*), and only when it could possibly matter: the module
+ * declares `staleCheck`, AND the caller's own `where` scopes that exact field
+ * with `eq` — a single client, the shape this was measured on. `in` and
+ * `contains` are left alone rather than guessed at; a caller filtering by
+ * several clients or by a text match is asking a different question. Rides
+ * the SAME fence every other read here does, for the same reason R17's
+ * predicate rides the UPDATE: a caller without the right to see a client
+ * cannot be told rows about them exist just because this count ran. */
+async function findUnlinked(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  mod: QueryModule,
+  q: ParsedQuery,
+  refs: Record<string, QueryModule>,
+  fenceFor: FenceFor
+): Promise<{ count: number } | null> {
+  const check = mod.staleCheck
+  if (!check) return null
+  const refField = queryField(mod, check.refField)
+  const clause = refField && q.where.find((c) => c.op === "eq" && c.fields.length === 1 && c.fields[0].name === refField.name)
+  if (!refField || !clause) return null
+  const ref = refField.ref ? refs[refField.ref] : undefined
+  if (!ref) return null
+  const value = String(clause.values[0])
+  // The linked record's own NAME — the same lookup findUnmatched's ref branch
+  // makes, because "does this name show up elsewhere, unlinked" needs the
+  // name, not the id.
+  const named = await d1Query<{ label: string | null }>(
+    cfg,
+    guard.databaseId,
+    // R14: one row by primary key.
+    `SELECT ${ref.labelColumn} AS label FROM ${ref.table} WHERE id = ? LIMIT 1`,
+    [value]
+  )
+  const name = named[0]?.label
+  if (!name) return null
+  const textFields = check.textFields.map((n) => queryField(mod, n)).filter((f): f is QueryField => !!f)
+  if (!textFields.length) return null
+  const needle = `%${likeLiteral(name.toLowerCase())}%`
+  const base = {
+    sql: `(${textFields
+      .map((f) => `LOWER(t.${f.column}) LIKE ? ESCAPE '\\'`)
+      .join(" OR ")}) AND (t.${refField.column} IS NULL OR t.${refField.column} != ?)`,
+    params: [...textFields.map(() => needle), value],
+  }
+  const where = fenced(base, await fenceFor(mod))
+  const count = await countCollection(cfg, guard.databaseId, `SELECT t.id FROM ${mod.table} t WHERE ${where.sql}`, where.params)
+  return count > 0 ? { count } : null
 }
 
 /** A grouped answer over a REFERENCE field comes back labelled — "Bergman S.A.",

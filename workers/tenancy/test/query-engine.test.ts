@@ -942,3 +942,102 @@ describe("THE QUESTION THIS LANE WAS OPENED BY, in two calls", () => {
     )
   })
 })
+
+// ── R1's staleCheck — "the latest meeting for this client" CAN be honestly
+// the wrong row, because linking a meeting to a client is a person's own doing
+// and nothing links it automatically. Reproduces the shape measured on staging
+// 31 Aug 2026: an account-linked row with nothing on it, and three unlinked
+// ones that plainly concern the same client sitting one text search away.
+describe("staleCheck: a client-scoped read says when more may exist, unlinked", () => {
+  // A DEDICATED account, spelled the way its own meetings are — "FluClinic",
+  // one word, exactly as the real staging client is named and exactly as its
+  // real meeting titles say it (workers/content/src/lib/meetings.ts's own
+  // comment: "FluClinic: Changing the Stripe Webhook" etc.). Kept separate
+  // from the shared CLIENTS fixture ("Flu Clinic GmbH") on purpose: the check
+  // matches on the account's own NAME, so the test's meeting text has to
+  // agree with the test's account name, not with an unrelated fixture's.
+  beforeEach(() => {
+    db().exec(`
+      -- spine-harness's grantAll() does not include "meetings" (no test here
+      -- had needed it before); this suite is the first meetings read, so it
+      -- grants its own.
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        VALUES ('${IDS.adminRole}_meetings', '${IDS.adminRole}', 'meetings', 1, 1, 1, 1);
+      INSERT INTO accounts (id, account_type, name, created_at) VALUES ('A_FC', 'entity', 'FluClinic', '2026-01-01');
+      -- LINKED: the only row an accountId=A_FC read can find on its own.
+      INSERT INTO meetings (id, title, account_id, starts_at, created_at)
+        VALUES ('M_LINKED', 'Validation FluClinic', 'A_FC', '2026-08-06T10:00:00.000Z', '2026-08-06T10:00:00.000Z');
+      -- UNLINKED, but the title names the client — the exact shape measured.
+      INSERT INTO meetings (id, title, account_id, starts_at, created_at)
+        VALUES ('M_UNLINKED_1', 'FluClinic: Changing the Stripe Webhook', NULL, '2026-08-25T10:00:00.000Z', '2026-08-25T10:00:00.000Z');
+      -- UNLINKED, and it is the NOTES rather than the title that names the client.
+      INSERT INTO meetings (id, title, notes, account_id, starts_at, created_at)
+        VALUES ('M_UNLINKED_2', 'Stripe integration QC', 'Discussed with FluClinic', NULL, '2026-08-27T10:00:00.000Z', '2026-08-27T10:00:00.000Z');
+      -- A DIFFERENT CLIENT ENTIRELY — must never be counted.
+      INSERT INTO meetings (id, title, account_id, starts_at, created_at)
+        VALUES ('M_OTHER', 'Confia catch-up', 'A_CONFIA', '2026-08-20T10:00:00.000Z', '2026-08-20T10:00:00.000Z');
+    `)
+  })
+
+  it("an accountId=eq read names the linked row's date AND that more may exist, unlinked", async () => {
+    const { status, body } = await ask(
+      q({
+        module: "meetings",
+        where: [{ field: "accountId", op: "eq", value: "A_FC" }],
+        sort: "startsAt",
+        dir: "desc",
+      })
+    )
+    expect(status).toBe(200)
+    // The scoped read is honest about what it found: one row, correctly the
+    // linked one, whatever its own date.
+    expect(body.total).toBe(1)
+    expect((body.records as { id: string }[])[0].id).toBe("M_LINKED")
+    // …AND it says there may be more it cannot see: the two unlinked rows
+    // that name the client, never the unrelated Confia meeting.
+    expect(body.unlinked).toEqual({ count: 2 })
+  })
+
+  it("a client with no unlinked mentions gets no unlinked field at all", async () => {
+    const { body } = await ask(
+      q({ module: "meetings", where: [{ field: "accountId", op: "eq", value: "A_CONFIA" }] })
+    )
+    // M_OTHER IS the linked row here — nothing else mentions Confia by name.
+    expect(body.total).toBe(1)
+    expect(body.unlinked).toBeUndefined()
+  })
+
+  it("a `contains` scope is left alone — the check only runs on an exact eq", async () => {
+    // Filtering "the client whose name contains flu" is already a text
+    // search; staleCheck exists for the EXACT-link case, not this one.
+    const { status, body } = await ask(
+      q({ module: "meetings", where: [{ field: "accountId", op: "contains", value: "flu" }] })
+    )
+    expect(status).toBe(200)
+    expect(body.unlinked).toBeUndefined()
+  })
+
+  it("a module with no staleCheck declared never carries the field", async () => {
+    // tickets has no staleCheck — an accountId=eq read there must not grow
+    // this field just because the shape looks similar.
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [{ field: "accountId", op: "eq", value: "A_FLU" }] })
+    )
+    expect(status).toBe(200)
+    expect(body.unlinked).toBeUndefined()
+  })
+
+  // MUTATION-SHAPED: the count is exactly two, not "some" — proving the SQL
+  // really excludes the linked row and the other client rather than merely
+  // finding "any row at all" that happens to satisfy a loose predicate.
+  it("the count excludes the linked row itself and the unrelated client, exactly", () => {
+    const rows = db()
+      .prepare(
+        `SELECT id FROM meetings
+          WHERE (LOWER(title) LIKE '%fluclinic%' OR LOWER(notes) LIKE '%fluclinic%')
+            AND (account_id IS NULL OR account_id != 'A_FC')`
+      )
+      .all() as { id: string }[]
+    expect(rows.map((r) => r.id).sort()).toEqual(["M_UNLINKED_1", "M_UNLINKED_2"])
+  })
+})

@@ -201,6 +201,37 @@ export type QueryModule = {
     /** which door this mirrors, and what it withholds — for the next reader. */
     reason: string
   }
+  /** WHETHER "THE LATEST X FOR THIS CLIENT" CAN BE HONESTLY THE WRONG ROW.
+   *
+   * A query scoped to one client by a `ref` field only ever sees rows somebody
+   * has LINKED to that client — and linking, on some modules, is a person's own
+   * doing, done by hand, never automatic. So a caller asking for "the latest
+   * meeting for FluClinic" can get a stale row back — correct for what was
+   * asked, silently wrong for what was meant — while a newer, unlinked row
+   * that plainly concerns the same client sits one text search away. Measured
+   * on staging 31 Aug 2026: the assistant answered from a 6-August meeting
+   * with nothing on it while three more recent ones, all captured, all
+   * mentioning the client by name, carried `accountId: null`.
+   *
+   * Declared here, opt-in and per module — like `narrow` and `putAway` beside
+   * it — because most modules do not have a field that gets linked by hand
+   * after the fact, and a check that ran everywhere would cost a query nobody
+   * asked for. `runQuery` spends ONE extra COUNT(*) — same performance class
+   * as the `total` every read already pays for — only when a query's `where`
+   * filters this exact field by `eq`/`in`, and only to answer one question:
+   * do rows exist that TEXT-match the filtered client's own name but are NOT
+   * linked to it? If so, the answer carries `unlinked: { count }`, the same
+   * absent-means-nothing-to-say shape `unmatched` already uses — never a
+   * guess about which specific row was meant, only that more than the linked
+   * set may exist. */
+  staleCheck?: {
+    /** the `ref` field's NAME (not its column — resolved through `queryField`,
+     *  same as `putAway.field`) that a caller scopes "for this client" queries by. */
+    refField: string
+    /** the field NAMES to search the client's own NAME across — the same set a
+     *  pre-grammar `q` search would have covered on this module. */
+    textFields: string[]
+  }
   fields: QueryField[]
 }
 
@@ -429,6 +460,15 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       reason:
         "the meetings door hides cancelled meetings unless `view` says otherwise (workers/content/src/lib/meetings.ts) — a cancelled meeting is history, not the list",
     },
+    // R1's staleCheck: `account_id` is set by a person editing the meeting,
+    // never by the calendar sync that creates most rows (workers/content/src/
+    // lib/meetings.ts's syncCalendar has no account-matching step at all, by
+    // design — the owner's ruling, 31 Aug 2026, is that a wrong guess is worse
+    // than an honest gap). So "the latest meeting for this client" scoped by
+    // `accountId` can silently miss a newer one nobody has linked yet — the
+    // same four fields `q` already searches are what a linked meeting's own
+    // text would have matched.
+    staleCheck: { refField: "accountId", textFields: ["title", "agenda", "notes", "guests"] },
     fields: [
       ID,
       { name: "ref", column: "ref", type: "text", identity: true },

@@ -18,36 +18,60 @@
 //   node --experimental-transform-types scripts/defect-fixes-bench.mjs --dry
 //   node --experimental-transform-types scripts/defect-fixes-bench.mjs
 //
-// ── MEASURED, 31 AUG 2026, ON @cf/openai/gpt-oss-120b ───────────────────────
+// ── DEFECT 2 IS A CLOSED, DEFINITIVE NEGATIVE RESULT — 31 AUG 2026, ON
+//    @cf/openai/gpt-oss-120b. READ THIS BEFORE TRYING AN EIGHTH ROUND.
 //
-// Three phrasings of each rule were tried and benched here, each 5 trials:
+// Seven rounds, each 5 trials, none of them moved "does the reply leak a real
+// tool name or say run/call" off 0/5:
 //
-//   defect1_staleness       0/5 baseline, 0/5, 0/5, 0/5 across three rewrites
-//   defect2_no_tool_names   0/5 baseline, 0/5, 0/5, 0/5 across three rewrites
+//   round 1  baseline (no change at all)                                0/5
+//   round 2  system-prompt rule, short ("never name a tool...")         1/5 (fluke — never replicated)
+//   round 3  system-prompt rule, + a concrete before/after example      0/5
+//   round 4  system-prompt rule, names the `message` field explicitly
+//            as "written for you, not to relay"                        0/5
+//   round 5  get_meeting_transcript's `message` field (meetings.ts)
+//            rewritten as a fact, no tool name in it at all             0/5
+//   round 6  round 5's rewrite, PLUS the tool's own static description
+//            (tool-catalog.ts) also stripped of the tool-name mention   0/5
+//   round 7  = round 6, re-confirmed after the stale `list_meetings`
+//            cross-reference was fixed in the same edit                 0/5
 //
-// No phrasing moved either number off zero — not worse, just no measured
-// effect, the same shape as the reverted KNOWLEDGE_FIRST_RULE superlative
-// (agent-routing-bench.mjs's own header). Both prompt additions were reverted
-// rather than shipped for a preamble cost with no proven benefit.
+// Rounds 2-4 were reverted (workers/data-ops/src/lib/agent.ts is back to its
+// pre-investigation state). Rounds 5-6 were KEPT — both are real, independent
+// improvements (a fact instead of an instruction; a stale `list_meetings`
+// reference from an unrelated fold, fixed) — but neither closed the leak, and
+// nothing in round 7 did either.
 //
-// THE REAL MECHANISM, found by reading what the model actually said: for
-// defect2, `get_meeting_transcript`'s own `message` field (shared/workers/
-// tool-catalog.ts) reads "...To go and look for one, use
-// read_meeting_transcript" — an instruction addressed to the MODEL, not the
-// user, and the model quotes it back verbatim almost every time regardless of
-// what the system prompt says not to do. A system-prompt sentence competing
-// against a concrete, tool-name-bearing instruction sitting in the message it
-// is actively reading loses. The more promising fix is likely in that message
-// text itself (rephrase it so no tool name appears in a sentence shaped like an
-// instruction) — untried here, since it is a tool-catalogue change and outside
-// this bench's own prompt-only brief.
+// THE READING: every text source that could plausibly be "the instruction the
+// model is echoing" was tried and removed — the system prompt, the runtime
+// `message` field, the tool's own schema description — and the leak did not
+// move once. That rules out "the model is quoting nearby text" as the
+// mechanism. What's left: a tool's NAME is in its JSON schema, sent on every
+// single step regardless of any description, and the model treats that
+// identifier as ordinary, correct vocabulary for describing what it's about to
+// do — the same reflex a coding assistant has saying "run npm install". No
+// content edit reaches that, because the content isn't where it comes from.
 //
-// For defect1, even the suggested fallback (an explicit "repeat the query
-// without the account filter before answering" instruction) never produced a
-// single broadened follow-up call in 5 trials — the model answered straight
-// from the stale row every time. Whether a MECHANICAL guard (comparable to
-// pagingGuard, checking the returned row's own staleness before the model ever
-// sees it) is worth building is a question for whoever picks this up next.
+// NOT BUILT: an output-side guard that scans the model's own reply for
+// tool-name-shaped strings before it reaches the user (pagingGuard's shape,
+// applied to content instead of call counts). Owner-adjacent call, 31 Aug
+// 2026: declined for now — new machinery on every turn's output path for a
+// symptom hit once, real risk of mangling a correct answer, and "too much
+// code is a defect" is a standing law here. Left as the honest next idea for
+// whoever revisits this, one they should weigh rather than reach for first:
+// tool names that read as ENGLISH PROSE rather than snake_case identifiers
+// might dissolve the reflex on its own, since the leak is arguably the names
+// being quotable at all — but R19, R22 and R27 all key off the literal name,
+// so that is a rename across the whole machine surface, not a today decision.
+//
+// ── DEFECT 1, BUILT — see query-grammar.ts's `staleCheck` and query-engine.ts's
+//    `unlinked` field. The suggested prompt-only fallback (an explicit "repeat
+//    the query without the account filter before answering" instruction) was
+//    tried here first and never produced a single broadened follow-up call in
+//    5 trials — the model answered straight from the stale row every time.
+//    That is why the fix moved into the DOOR rather than staying a sentence:
+//    see the query-engine.ts header for the shape, and the note below for
+//    whether the model actually reads the new field once it exists.
 import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
