@@ -29,6 +29,21 @@
 // 2026 the compose path measured 10 answers in 16 appending a source list the
 // prompt had told it not to write, so "the model was asked nicely" is not a
 // defence this base accepts any more.
+//
+// A KNOWN LIMIT, WRITTEN DOWN RATHER THAN FIXED (31 Aug 2026). R23 makes
+// retrieval hand back real passages and real sources — it does not, and cannot,
+// stop the model writing something ungrounded in the PROSE BETWEEN two marked
+// claims. Measured on staging: asked to summarise a meeting, the reply carried
+// six real citations, correctly marked, AND a specific enumeration ("the four
+// payment branches: flu-private, flu-com...") that appears in NO indexed
+// source at all — the real passage says only "the four payment branches",
+// unnamed. `splitCites` faithfully renders whatever the model wrote; it has no
+// way to know a run of unmarked text is invented rather than a fair paraphrase
+// of the passage either side of it, because the two look identical on the wire.
+// The mark proves a claim HAS a source; it says nothing about the sentence
+// standing next to it that has none. Closing this gap — verifying an unmarked
+// span against the passages it sits beside, or requiring a mark on any specific
+// enumerated detail — is a real project, not a line here.
 
 import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"
 

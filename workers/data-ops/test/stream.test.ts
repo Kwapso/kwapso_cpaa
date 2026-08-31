@@ -9,7 +9,8 @@
 import { describe, expect, it } from "vitest"
 
 import { sseFrame, terminalEvent } from "../src/routes/agent"
-import { parseOpenAiStream, toOpenAiMessages } from "../src/lib/model"
+import { finalAnswerText, TRUNCATED_TURN_NOTE } from "../src/lib/agent"
+import { parseOpenAiStream, selectModel, toOpenAiMessages } from "../src/lib/model"
 import type { ChatMessage } from "../src/lib/model"
 import type { ChatOutcome, StreamEvent } from "@shared/types"
 import type { AgentQuota } from "@shared/types"
@@ -252,5 +253,111 @@ describe("parseOpenAiStream: parses the chat-completions SSE into text + tool ca
       "data: [DONE]\n\n"
     const reply = await parseOpenAiStream(bodyOf(bad), () => {})
     expect(reply.toolCalls).toEqual([{ id: "c1", name: "list_roles", input: {} }])
+  })
+
+  // THE 31 AUG 2026 FINDING: `finish_reason` was parsed nowhere in this file, so
+  // a turn cut off by `max_tokens` — "length" rather than the model choosing to
+  // stop — looked identical to a clean, considered ending. Both branches this
+  // parser can take (a `finish_reason` on its own chunk, after content; one
+  // riding the final content chunk) are covered, because the real wire shape
+  // depends on the provider and this test must not pass by accident of which one
+  // it happened to fixture.
+  it("a chunk carrying finish_reason \"length\" (its own, after content) marks the reply truncated", async () => {
+    const cutMidWord = [
+      'data: {"choices":[{"delta":{"content":"the four payment branches (flu-private, flu-com"}}]}\n\n',
+      'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+      "data: [DONE]\n\n",
+    ].join("")
+    const reply = await parseOpenAiStream(bodyOf(cutMidWord), () => {})
+    expect(reply.text).toBe("the four payment branches (flu-private, flu-com")
+    expect(reply.truncated).toBe(true)
+  })
+
+  it("finish_reason riding the LAST content chunk also marks the reply truncated", async () => {
+    const cut = [
+      'data: {"choices":[{"delta":{"content":"cut off here"},"finish_reason":"length"}]}\n\n',
+      "data: [DONE]\n\n",
+    ].join("")
+    const reply = await parseOpenAiStream(bodyOf(cut), () => {})
+    expect(reply.truncated).toBe(true)
+  })
+
+  it("a clean stop is NOT truncated", async () => {
+    const clean = [
+      'data: {"choices":[{"delta":{"content":"All done."},"finish_reason":"stop"}]}\n\n',
+      "data: [DONE]\n\n",
+    ].join("")
+    const reply = await parseOpenAiStream(bodyOf(clean), () => {})
+    expect(reply.truncated).toBe(false)
+  })
+
+  it("a turn that ends on a tool call (finish_reason \"tool_calls\") is NOT truncated", async () => {
+    // The other real value this field takes — the model chose to act, it did not
+    // run out of room. Only "length" means the budget cut it off.
+    const toolEnd = [
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"list_roles","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+      "data: [DONE]\n\n",
+    ].join("")
+    const reply = await parseOpenAiStream(bodyOf(toolEnd), () => {})
+    expect(reply.truncated).toBe(false)
+  })
+})
+
+describe("WorkersAiModel.complete(): the non-streaming path reads finish_reason too", () => {
+  // Both transports carry the same wire shape here, so the same field has to be
+  // read the same way whether the turn streamed or not — a fix that only
+  // covered one path would leave the other silently wrong.
+  const modelWith = (finish_reason: string | undefined) =>
+    selectModel({
+      AI: {
+        run: async () => ({
+          choices: [{ message: { content: "cut off mid-w" }, finish_reason }],
+          usage: { prompt_tokens: 100, completion_tokens: 8192 },
+        }),
+      },
+    } as never)
+
+  it("finish_reason \"length\" marks the reply truncated", async () => {
+    const reply = await modelWith("length").complete([{ role: "user", content: "hi" }], [])
+    expect(reply.text).toBe("cut off mid-w")
+    expect(reply.truncated).toBe(true)
+  })
+
+  it("finish_reason \"stop\" does not", async () => {
+    const reply = await modelWith("stop").complete([{ role: "user", content: "hi" }], [])
+    expect(reply.truncated).toBe(false)
+  })
+
+  it("no finish_reason at all (an older or non-conforming provider) is NOT treated as truncated", async () => {
+    // Absence is not evidence of truncation — only the specific "length" value
+    // is. Defaulting the other way would falsely flag every such reply.
+    const reply = await modelWith(undefined).complete([{ role: "user", content: "hi" }], [])
+    expect(reply.truncated).toBe(false)
+  })
+})
+
+describe("finalAnswerText: a truncated turn says so, in the reply itself", () => {
+  it("a clean reply is returned untouched", () => {
+    expect(finalAnswerText({ text: "All set.", truncated: false })).toBe("All set.")
+  })
+
+  it("a truncated reply carries the honest note, appended after a blank line", () => {
+    const text = finalAnswerText({ text: "the four payment branches (flu-private, flu-com", truncated: true })
+    expect(text).toBe(`the four payment branches (flu-private, flu-com\n\n${TRUNCATED_TURN_NOTE}`)
+  })
+
+  it("an empty truncated reply still gets the greeting fallback AND the note", () => {
+    // Belt and braces: even the "say SOMETHING" fallback must not silently hide
+    // that the turn was cut off, however unlikely an empty-but-truncated reply is.
+    const text = finalAnswerText({ text: "  ", truncated: true })
+    expect(text).toBe(`Hi — how can I help with your team today?\n\n${TRUNCATED_TURN_NOTE}`)
+  })
+
+  // MUTATION PROOF: delete the `reply.truncated ?` branch and this goes red —
+  // the note the owner needed would vanish from a reply that ends mid-word.
+  it("mutation check: a truncated reply without the note is exactly what this catches", () => {
+    const text = finalAnswerText({ text: "cut off mid-w", truncated: true })
+    expect(text).not.toBe("cut off mid-w")
+    expect(text).toContain(TRUNCATED_TURN_NOTE)
   })
 })

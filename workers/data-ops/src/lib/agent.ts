@@ -457,6 +457,27 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS): str
   )
 }
 
+/** THE SAME PRINCIPLE AS trimResult's OWN NOTE, one step earlier in the pipeline
+ *  — a cut that isn't SAID is a cut nobody can act on. Measured on staging 31 Aug
+ *  2026: asked for the top three decisions from a meeting, the reply ended
+ *  "...isolate the four payment branches (flu-private, flu-com" with no ellipsis,
+ *  no error, and no sign anything was missing — `finish_reason` was "length" and
+ *  nothing anywhere read it. A reasoning model's hidden thinking spends the SAME
+ *  budget `max_tokens` caps (model.ts's own note on glm), so a long or
+ *  reasoning-heavy step can exhaust it before the visible answer is even done. */
+export const TRUNCATED_TURN_NOTE =
+  "…I ran out of room partway through that — ask me to continue and I'll pick up from here."
+
+/** The text of a turn that ended in prose (no tool calls). Folds in the honest
+ *  note when the model's own output budget ran out mid-answer, so "the model
+ *  finished" and "the model was cut off" can never look identical to a reader —
+ *  which is exactly how they looked before this existed. */
+export function finalAnswerText(reply: Pick<ModelReply, "text" | "truncated">): string {
+  // Some models return empty text on a bare greeting — always say SOMETHING.
+  const text = reply.text?.trim() || "Hi — how can I help with your team today?"
+  return reply.truncated ? `${text}\n\n${TRUNCATED_TURN_NOTE}` : text
+}
+
 /** A read of a HANDFUL of records: hand it over whole if it fits the turn's
  * allowance, and otherwise keep every row and shorten the longest text in each,
  * so the caller still learns what it asked about. Never returns an empty list. */
@@ -1233,10 +1254,11 @@ async function runPlanLoop(
     }
 
     if (!reply.toolCalls.length) {
-      // Some models return empty text on a bare greeting — always say SOMETHING.
-      const text = reply.text?.trim() || "Hi — how can I help with your team today?"
-      // Streamed text already went out as deltas; anything else still needs narrating.
+      const text = finalAnswerText(reply)
+      // Streamed text already went out as deltas — only the truncation note (if
+      // any) is new; anything else still needs narrating whole.
       if (!(streaming && reply.text?.trim())) say(text)
+      else if (reply.truncated) say(TRUNCATED_TURN_NOTE)
       await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: text, source: opts.source })
       await log()
       return { done: true, threadId, reply: text, quota }

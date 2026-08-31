@@ -34,8 +34,24 @@ export type ToolCall = { id: string; name: string; input: Record<string, unknown
 
 /** The model's reply: free text and/or tool calls to run, plus what the turn cost
  *  in tokens WHEN the provider reports it (Claude does; Workers AI does not, and
- *  an absent number is left absent rather than reported as zero). */
-export type ModelReply = { text: string; toolCalls: ToolCall[]; usage?: TokenUsage }
+ *  an absent number is left absent rather than reported as zero).
+ *
+ *  `truncated` is `finish_reason === "length"` — the model was still writing when
+ *  its `max_tokens` ran out, so `text` ends mid-thought (sometimes mid-word) with
+ *  nothing else in the reply saying so. Read in ONE place (readFinishReason) and
+ *  carried through both the complete() and stream() paths, so a step-cap failure
+ *  can never reach the caller looking identical to a clean stop. */
+export type ModelReply = { text: string; toolCalls: ToolCall[]; usage?: TokenUsage; truncated?: boolean }
+
+/** `finish_reason` DECIDES NOTHING BY ITSELF — it only tells the caller whether
+ *  `text` is the whole of what the model wrote. "length" is the one value that
+ *  matters here: the budget ran out mid-generation, not "the model chose to
+ *  stop" (`stop`) or "the model chose to call a tool" (`tool_calls`). Read this
+ *  way in both complete() and the SSE parser rather than compared inline twice,
+ *  so the two paths can never disagree about what counts as truncated. */
+function readFinishReason(reason: string | undefined): boolean {
+  return reason === "length"
+}
 
 /* ------------------------- the tool-result fence -------------------------- */
 
@@ -327,12 +343,18 @@ class WorkersAiModel implements Model {
       workersAiBody({ messages, tools, stream: false }) as never,
       this.affinity() as never
     )) as {
-      choices?: { message?: { content?: string; tool_calls?: OpenAiToolCall[] } }[]
+      choices?: { message?: { content?: string; tool_calls?: OpenAiToolCall[] }; finish_reason?: string }[]
       usage?: WorkersAiUsage
     }
-    const msg = data?.choices?.[0]?.message
+    const choice = data?.choices?.[0]
+    const msg = choice?.message
     if (!msg) throw modelHttpError(502, `the model returned no message: ${JSON.stringify(data).slice(0, 200)}`)
-    return { text: msg.content ?? "", toolCalls: toCalls(msg.tool_calls), usage: readUsage(data.usage) }
+    return {
+      text: msg.content ?? "",
+      toolCalls: toCalls(msg.tool_calls),
+      usage: readUsage(data.usage),
+      truncated: readFinishReason(choice?.finish_reason),
+    }
   }
 
   /** Stream the turn and parse the chat-completions SSE: each `data:` line is a
@@ -368,6 +390,7 @@ export async function parseOpenAiStream(
   let buffer = ""
   let text = ""
   let usage: TokenUsage | undefined
+  let finishReason: string | undefined
   const calls = new Map<number, ToolBuild>()
 
   for (;;) {
@@ -381,7 +404,10 @@ export async function parseOpenAiStream(
       const body = line.slice(5).trim()
       if (!body || body === "[DONE]") continue
       let ev: {
-        choices?: { delta?: { content?: string; tool_calls?: (OpenAiToolCall & { index?: number })[] } }[]
+        choices?: {
+          delta?: { content?: string; tool_calls?: (OpenAiToolCall & { index?: number })[] }
+          finish_reason?: string | null
+        }[]
         usage?: WorkersAiUsage
       }
       try {
@@ -390,6 +416,10 @@ export async function parseOpenAiStream(
         continue // a half-written chunk; the next read completes it
       }
       if (ev.usage) usage = readUsage(ev.usage)
+      // finish_reason arrives on its OWN chunk, after the last content delta —
+      // `delta` there is `{}`, not absent, so this has to read before the
+      // `!delta` guard below would otherwise skip it.
+      if (ev.choices?.[0]?.finish_reason) finishReason = ev.choices[0].finish_reason
       const delta = ev.choices?.[0]?.delta
       if (!delta) continue
       if (delta.content) {
@@ -413,6 +443,7 @@ export async function parseOpenAiStream(
       .sort((a, b) => a[0] - b[0])
       .map(([i, b]) => ({ id: b.id || `call_${i}`, name: b.name, input: parseArgs(b.json) })),
     usage,
+    truncated: readFinishReason(finishReason),
   }
 }
 
