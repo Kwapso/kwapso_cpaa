@@ -83,19 +83,40 @@
 //    description (tool-catalog.ts) tells the model to look for and use it.
 //
 //      round 8 (payload carries `unlinked`, description documents it)   0/5
+//      round 9 (description's wording mirrors `unmatched`'s own MUST-say
+//               pattern — the one proven case in this exact door — instead
+//               of a field left to be discovered)                       0/5
+//
+// Round 9 was the best remaining hypothesis and it was worth the one round:
+// `unmatched` works because its description doesn't just mention the field,
+// it says MUST and gives the sentence shape, in the SAME description this
+// tool already carries. Rewriting `unlinked`'s own sentence to match that
+// pattern exactly — MUST, same sentence as the count, a worked example — was
+// the cheapest test of "is this a wording problem or a field-shape problem"
+// available, and it used a pattern already proven in this file rather than
+// inventing a third approach. Still 0/5. So it is not that the field was
+// merely undocumented — a `MUST` sentence sitting right beside a working one
+// did not move it either, and the reasonable conclusion is that this
+// particular model does not reliably act on an instruction to relay a
+// SECOND, unscoped fact next to the one it was actually asked for, at least
+// not from a sibling JSON field, however it's described. HARD STOP here —
+// no round 10.
 //
 // A payload field the model never reads is exactly the dead weight this
-// verification step existed to catch, and it caught it: none of the five
-// replies mentioned the field, the count, or anything resembling the hedge,
-// and two of the five made the SAME single-meeting follow-up call defect 2's
-// scenario measures, ignoring the `unlinked` count sitting one field over in
-// the same tool result. Reported rather than chased with a ninth round — the
-// door change stands on its own merits (an honest field a caller who reads
-// JSON, a human or another system, can act on even if this one model does
-// not yet), but it should not be reported to the owner as "fixed" for the
-// chat experience specifically. Whether that needs a NINTH round of prompt
-// work, a differently-shaped field, or acceptance that this model will not
-// use it without being forced to, is the next call — not made here.
+// verification step existed to catch, and it caught it: none of the ten
+// trials across both rounds mentioned the field, the count, or anything
+// resembling the hedge, and several made the SAME single-meeting follow-up
+// call defect 2's scenario measures, ignoring the `unlinked` count sitting
+// one field over in the same tool result — the two defects share a
+// trajectory a real turn could hit at once, worth knowing for whoever works
+// either one next. Reported rather than chased further: the door change
+// stands on its own merits regardless of what this one model does with it —
+// an MCP caller, a script, a person reading the JSON, and every FUTURE model
+// get an honest signal that did not exist before, built at the data layer,
+// opt-in, bounded, mutation-proved through a real HTTP route against a real
+// database. What is unfixed is one specific chat model choosing to relay it.
+// Those are two different sentences, and this file should never be read as
+// saying only one of them.
 import "./lib/shared-alias.mjs"
 
 import { execSync } from "node:child_process"
