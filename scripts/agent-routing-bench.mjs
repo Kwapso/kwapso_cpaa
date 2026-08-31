@@ -69,10 +69,10 @@
 //
 import "./lib/shared-alias.mjs"
 
-import { execSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
@@ -203,10 +203,7 @@ if (DRY) {
  * shape @cf/meta/llama-* uses, and reading the wrong field makes a working model
  * look like one that never calls a tool. Checked against both before trusting it. */
 function workersAiModel(name) {
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-  const token =
-    process.env.CLOUDFLARE_API_TOKEN ||
-    execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+  const { account, token } = cloudflareCredentials()
   return {
     name,
     async complete(messages, tools) {

@@ -40,7 +40,7 @@
 // Production needs BOTH extra flags and is refused otherwise — it is owner-gated
 // (CLAUDE.md), and the approval that covers staging does not reach it.
 
-import { execSync } from "node:child_process"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const APPLY = process.argv.includes("--apply")
 const PRODUCTION = process.argv.includes("--production")
@@ -53,10 +53,7 @@ if (PRODUCTION && !CONFIRMED) {
   process.exit(1)
 }
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 /** The core to clean, and its OWN uuid — the same pair the worker is given as the
  * `DB` binding and `CORE_DATABASE_ID`, because this predicate has to mean exactly
  * what the code's does. */

@@ -46,10 +46,10 @@
 //
 import "./lib/shared-alias.mjs"
 
-import { execSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
@@ -58,10 +58,7 @@ const VERBOSE = process.argv.includes("--verbose")
  * See "WHAT IT COSTS" above and `composeScore` below. */
 const COMPOSE = process.argv.includes("--compose")
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging
 const INDEX = process.env.KB_INDEX || "kwapso-knowledge-staging"
 const TEAM_NAME = process.env.KB_TEAM || "Kwapso"

@@ -72,7 +72,7 @@
 // production holds no team data, so there is nothing there to retire and no
 // reason to build a door to it.
 
-import { execSync } from "node:child_process"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const APPLY = process.argv.includes("--apply")
 if (process.argv.includes("--production")) {
@@ -83,10 +83,7 @@ if (process.argv.includes("--production")) {
   process.exit(1)
 }
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7"
 const INDEX = process.env.KB_INDEX || "kwapso-knowledge-staging"
 /** What the sweep stamps when the APP retires a source (shared/brand.ts). */

@@ -41,9 +41,9 @@
 
 import "./lib/shared-alias.mjs"
 
-import { execSync } from "node:child_process"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const { fileShape, looksLikeProse, readsLikeWords } = await import(
@@ -59,10 +59,7 @@ if (PRODUCTION && !CONFIRMED) {
   process.exit(1)
 }
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = PRODUCTION
   ? process.env.KB_CORE_PROD || "e55a2c0f-346a-4056-b01c-7869a8b253dc"
   : process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7"
