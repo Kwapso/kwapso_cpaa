@@ -92,6 +92,14 @@ describe("and the RAIL collapse is a different control, untouched", () => {
   })
 })
 
+/** THE HEADINGS THE SHELL ACTUALLY DRAWS, read out of `NAV_GROUP_TITLE` rather
+ * than typed here — so this file follows a rename instead of failing on one. */
+function headings(): string[] {
+  const at = SHELL.indexOf("NAV_GROUP_TITLE")
+  const map = SHELL.slice(at, SHELL.indexOf("}", at))
+  return [...map.matchAll(/t\("([^"]+)"\)/g)].map((m) => m[1])
+}
+
 describe("the headings are copy, and are treated as copy", () => {
   it("every group's word asks for its translation (R33)", () => {
     const at = SHELL.indexOf("NAV_GROUP_TITLE")
@@ -99,5 +107,35 @@ describe("the headings are copy, and are treated as copy", () => {
     const map = SHELL.slice(at, SHELL.indexOf("}", at))
     for (const line of map.split("\n").filter((l) => l.includes(":") && !l.includes("Record<")))
       expect(line, `a rail heading that ships English: ${line.trim()}`).toMatch(/t\(/)
+  })
+
+  it("there is one heading per group and they are not the same word", () => {
+    expect(headings().length, "a group with no heading has no chevron to press").toBe(2)
+    expect(new Set(headings()).size, "two halves called the same thing is one half").toBe(2)
+  })
+
+  // ── AND THE ASSISTANT SAYS THE SAME WORDS THE SCREEN DOES ─────────────────
+  //
+  // `scripts/seed-knowledge-about-the-app.mjs` writes the app's own description
+  // of itself into the knowledge base — it is what the assistant reads when
+  // somebody asks what is in the menu. It described the two halves in PROSE
+  // ("what somebody opens most days") while the rail drew headings, and when the
+  // owner renamed the headings on 1 Sep 2026 the two silently disagreed: a person
+  // could be told about a group called "Every day" and then look at a rail headed
+  // "Frequent". A true sentence about an app that does not exist.
+  //
+  // Derived from the shell, so a future rename that updates only one of the two
+  // fails here rather than shipping.
+  it("the app's own description of its menu uses the screen's words", () => {
+    const seed = readFileSync(
+      join(__dirname, "..", "..", "scripts", "seed-knowledge-about-the-app.mjs"),
+      "utf8"
+    )
+    const body = stripComments(seed)
+    for (const word of headings())
+      expect(
+        body.includes(word),
+        `the rail is headed "${word}" and the assistant's description of the sidebar never says it`
+      ).toBe(true)
   })
 })

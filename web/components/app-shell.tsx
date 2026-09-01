@@ -404,19 +404,27 @@ export function AppShell({
   // for the reason the ORIGINAL comment here named: without an explicit
   // height a flex child stretches to the tallest column and the profile row
   // drifts to the bottom of the document instead of the window.
-  /** THE WORD ABOVE EACH GROUP. Sentence case here and drawn small-caps by the
-   * class, which is the kit's own arrangement — a string shouted in the source
-   * is a string a translator has to un-shout.
+  /** THE WORD ABOVE EACH GROUP — the owner's own two, 1 Sep 2026.
+   *
+   * They were "Every day" and "Now and then", which is what I reached for
+   * because `NavGroup` in pages.ts describes each half as a SENTENCE ("what
+   * somebody opens most days"). He asked for the adjectives instead, and they
+   * are better for a reason worth keeping: a heading in a 240px rail is a LABEL,
+   * not a description, and "NOW AND THEN" wraps onto two lines there while
+   * "Occasional" does not. One of them also now matches its own key exactly,
+   * which is one fewer thing to hold in your head when reading this file.
+   *
+   * Sentence case here and drawn small-caps by the class, which is the kit's own
+   * arrangement — a string shouted in the source is a string a translator has to
+   * un-shout.
    *
    * CHECKED AGAINST THE CATALOGUE BEFORE BEING CHOSEN, the way the source chips
-   * were: neither of these already means something else in this app, where
-   * "Daily" and "Occasional" would have been the obvious pair and "Daily" is the
-   * kind of bare adjective that collides. These name what `NavGroup` in
-   * pages.ts already says each half IS — what somebody opens most days, and what
-   * they open when they need it. */
+   * were and the way the Drive/Laufwerk collision taught: both of these are bare
+   * adjectives, which is the exact shape that collides, and neither already
+   * means anything else in this app. */
   const NAV_GROUP_TITLE: Record<NavGroup, string> = {
-    daily: t("Every day"),
-    occasional: t("Now and then"),
+    daily: t("Frequent"),
+    occasional: t("Occasional"),
   }
 
   const railContent = (

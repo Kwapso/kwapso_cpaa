@@ -3261,12 +3261,16 @@ export const SEED: Catalogue = {
   },
   /* ── THE RAIL'S TWO GROUPS (1 Sep 2026) ──────────────────────────────────
    *
-   * The words above each half of the sidebar. Hand-written because they are
-   * short adjectival phrases a generator renders stiffly, and because they must
-   * keep the register the rest of the rail is in: what somebody opens most days,
-   * and what they open when they need it. */
-  "Every day": { de: "Täglich", es: "A diario", ca: "Cada dia" },
-  "Now and then": { de: "Gelegentlich", es: "De vez en cuando", ca: "De tant en tant" },
+   * The words above each half of the sidebar, and they are the OWNER'S two: he
+   * replaced "Every day" and "Now and then" with the adjectives on the day they
+   * shipped. Hand-written here because a one-word heading is where a generator
+   * is least reliable — it has no sentence to take the register from — and
+   * because German wants one word for each of these and would be given a phrase.
+   *
+   * `Gelegentlich` is carried over unchanged from "Now and then": it was already
+   * the right German for this half, and the English moving does not move it. */
+  Frequent: { de: "Häufig", es: "Frecuente", ca: "Freqüent" },
+  Occasional: { de: "Gelegentlich", es: "Ocasional", ca: "Ocasional" },
 
   /* ── THE RELATIONSHIP MAP (1 Sep 2026) ───────────────────────────────────
    *

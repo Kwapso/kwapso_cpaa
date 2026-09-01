@@ -202,13 +202,20 @@ function screens() {
   return {
     title: "The screens in the agency app, and who can see each one",
     body:
-      `The agency app's sidebar has two halves with a divider between them. Above the ` +
-      `divider is what somebody opens most days; below it is what they open when they ` +
-      `need it. Every page is gated by a read right, so two people signed into the same ` +
-      `team can see different menus — that is the permission spine working, not a fault.` +
-      `\n\nEvery day:\n\n` +
+      // THE HEADINGS ARE THE SCREEN'S OWN WORDS, not a paraphrase. This source is
+      // what the assistant reads when somebody asks what is in the menu, so a
+      // person told about a group called "Every day" who then looks at a rail
+      // headed "Frequent" has been given a true sentence about an app that does
+      // not exist. Renamed with the rail on 1 Sep 2026 for exactly that reason —
+      // and it is the reason to check here whenever a heading moves.
+      `The agency app's sidebar has two halves, each with a heading and a collapse ` +
+      `chevron of its own. Above is "Frequent", what somebody opens most days; below ` +
+      `is "Occasional", what they open when they need it. Every page is gated by a ` +
+      `read right, so two people signed into the same team can see different menus — ` +
+      `that is the permission spine working, not a fault.` +
+      `\n\nFrequent:\n\n` +
       ["Home — the team, and the way in to everything else."].concat(daily.map(line)).join("\n\n") +
-      `\n\nWhen you need it:\n\n` +
+      `\n\nOccasional:\n\n` +
       rest.map(line).join("\n\n") +
       `\n\nSettings — your account, the team, its members, its roles and its invitations.` +
       `\n\nThe client portal is a different app at a different address, with four screens: ` +

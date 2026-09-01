@@ -20,10 +20,19 @@ export type NavItem = {
  * real destinations behind a More, and "show everything flat" is the fourteen-item
  * wall this replaces).
  *
- *   • "daily"      — what somebody opens most days: the work in hand, what clients
- *                    have asked for, who they are, and our own admin.
- *   • "occasional" — what somebody opens when they need it: the blocks work was
- *                    sold in, the systems it runs on, the maps, and the material.
+ *   • "daily"      — drawn as "Frequent". What somebody opens most days: the work
+ *                    in hand, what clients have asked for, who they are, and our
+ *                    own admin.
+ *   • "occasional" — drawn as "Occasional". What somebody opens when they need
+ *                    it: the blocks work was sold in, the systems it runs on, the
+ *                    maps, and the material.
+ *
+ * THE KEY AND THE HEADING ARE NOT THE SAME STRING, and `daily` is why. The key is
+ * what a destination DECLARES about itself and is a contract with the registry;
+ * the heading is copy, lives in the shell, and is translated. They agreed by
+ * accident until the owner renamed the headings on 1 Sep 2026, so this line says
+ * which is which rather than leaving the next reader to infer it from one of them
+ * happening to match.
  *
  * The grouping is a fact about a destination, so it lives beside the destination
  * rather than in the shell — the shell just draws whatever the registry says. */
