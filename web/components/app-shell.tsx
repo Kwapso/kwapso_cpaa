@@ -1011,12 +1011,26 @@ export function AppShell({
   // dropped from `ScreenShell`'s `className` below along with the reason
   // for it.
   //
-  // THE HALF-IN-HALF-OUT ITSELF is `right-0` (the column's true right edge,
-  // since this wrapper fills the column's whole width with no horizontal
-  // inset of its own) plus `translate-x-1/2` (shifts the control outward by
-  // exactly half of its own width) — the standard edge-badge technique, and
-  // the reason it reads as "on the line" rather than "inside the rail":
-  // half the control's box is left of that x, half is right of it.
+  // THE HALF-IN-HALF-OUT ITSELF is `right-0` (the column's true right edge)
+  // plus `translate-x-1/2` (shifts the control outward by exactly half of
+  // its own width) — the standard edge-badge technique, and the reason it
+  // reads as "on the line" rather than "inside the rail": half the control's
+  // box is left of that x, half is right of it.
+  //
+  // BUT `right-0` ONLY REACHES THE COLUMN'S TRUE EDGE IF THIS WRAPPER
+  // ACTUALLY FILLS THE COLUMN'S WHOLE WIDTH, and by default it does not:
+  // `screen-shell-rail` (the vendored column div, `RAIL_COLUMN` above) is a
+  // flex container padded on every side by `--rail-inset`, and a flex child
+  // with no width of its own stretches only to that container's CONTENT box
+  // — inset from the column's real, painted edge by `--rail-inset` on every
+  // side, same as any other padded box. Regression, found by measuring: this
+  // wrapper carried no correction for that, so `right-0` landed a whole
+  // `--rail-inset` short of the seam, and the straddle read as "inside the
+  // rail" instead of "on the line". `-me-[var(--rail-inset)]` cancels that
+  // one edge (inline-end only — nothing here depends on the left/start edge,
+  // so there is no need for `railContent`'s full `-m`/`p` cancel-and-respend
+  // round trip below), which is what actually earns "fills the column's
+  // whole width with no horizontal inset of its own".
   //
   // THE VERTICAL ANCHOR is a spacer exactly `--avatar-md` tall (the member
   // chip's own avatar size), pinned to the column's bottom padding
@@ -1037,7 +1051,7 @@ export function AppShell({
   // collapsed. Reading the same padding back in rather than guessing a pixel:
   // `calc(var(--rail-inset) + var(--space-1))` only when expanded.
   const railEdgeToggle = (
-    <div className="pointer-events-none sticky top-0 h-[100svh] -mt-[100svh]">
+    <div className="pointer-events-none sticky top-0 h-[100svh] -mt-[100svh] -me-[var(--rail-inset)]">
       <div
         className={`flex h-full flex-col justify-end ${
           collapsed ? "pb-[var(--rail-inset)]" : "pb-[calc(var(--rail-inset)+var(--space-1))]"

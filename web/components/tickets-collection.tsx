@@ -114,6 +114,8 @@ import type { TriageGap } from "@shared/triage-readiness"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { TriageReplyDialog } from "@/components/triage-reply-dialog"
 import {
+  accountsKey,
+  appModulesKey,
   helpFacetFilter,
   helpFacetKey,
   helpKey,
@@ -128,7 +130,7 @@ import { formatRelative } from "@shared/web/format"
 import { primeCache, invalidate,
   mergePage, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
-import type { HelpTicket, SelectableValue } from "@shared/types"
+import type { Account, AppModule, HelpTicket, SelectableValue } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** The two facets that are STAGES rather than kinds, and the tab each one is.
@@ -175,6 +177,28 @@ export function TicketsCollection({
     tenancy.selectable().then((r) => r.values)
   )
   const ticketMarks = markMap(selectableQ.data, MARK_GROUP.ticket)
+  // THE TWO NEW TOOLBAR FACETS (Client, Module) — read unconditionally, like
+  // Processes' own `appId` facet reads `appsKey` (processes-screen.tsx), because
+  // narrowing by either is a READ act available to anyone who can see this
+  // screen at all, not something gated behind creating a ticket. Modules are a
+  // BOUNDED, whole-team read (help-form-dialog.tsx reads the identical
+  // `appModulesKey` the same way, for the same reason: "a team's systems, not a
+  // feed"). Accounts is the one with a real caveat: `tenancy.accounts()` is
+  // page ONE of a GROWING_COLLECTIONS list (R14) — exactly the defect
+  // help-form-dialog.tsx's own account picker was rewritten off of ("offered
+  // the newest fifty companies and had no opinion about the rest"). This facet
+  // inherits that same limitation rather than fixing it: a live, searched
+  // facet option list is a capability `SearchableFacet` does not have today
+  // (shared/web/screen-engine/filter-bar.tsx's own header says the async
+  // option-provider was removed as dead code, and re-adding it is outside this
+  // fix's remit). Filed as a known gap rather than silently shipped as if it
+  // were complete.
+  const accountsQ = useCached<Account[]>(accountsKey(teamId), () =>
+    tenancy.accounts().then((r) => r.accounts)
+  )
+  const modulesQ = useCached<AppModule[]>(appModulesKey(teamId), () =>
+    tenancy.appModules().then((r) => r.modules)
+  )
   // THE RESTING CACHE — always the LIVE list now that Archived has moved off a
   // tab and onto the toolbar's Filter (see the header comment). It never holds
   // archived rows: those are an ACTIVE question, asked through `<PagedFind>`'s
@@ -316,18 +340,25 @@ export function TicketsCollection({
               }}
               sorts={translatedSorts("help", t)}
               defaultSort={COLLECTION_SORTS.help.defaultSort}
-              // THE ARCHIVED FILTER, and ONLY that. The recipe used to declare a
-              // Status select, which the frame answered over the loaded fifty;
-              // the tab strip above still narrows kind/stage AT THE DOOR (spread
-              // into `fetchPage` below, NOT through `facets` — see why below).
-              // Two controls on the SAME field would still be the clutter the
-              // accounts screen removed ("the Accounts tab is a bit confusing").
-              // Archived is a different, ORTHOGONAL field, and nothing else on
-              // this toolbar asks it, so it is the one entry in
-              // `COLLECTION_FILTERS.help` (field `view`) — the exact shape
-              // Accounts' own "Archived" toggle already uses beside its
-              // Companies/All tab.
-              facets={translatedFacets("help", t, {})}
+              // CLIENT, MODULE, ARCHIVED — the toolbar spec Aurora approved
+              // overnight (2026-09-01) names Client and Module as the ticket
+              // screen's own worked example of "real filter facet chips"; the
+              // Status select the old frame drew is still gone (the tab strip
+              // above still narrows kind/stage AT THE DOOR — spread into
+              // `fetchPage` below, NOT through `facets`, so there are never two
+              // controls asking the same field — "the Accounts tab is a bit
+              // confusing"). All three are rows/options `COLLECTION_FILTERS.help`
+              // now declares; Client and Module are filled in from the accounts
+              // and modules this screen reads above, Archived is the closed
+              // `view` vocabulary it always was.
+              facets={translatedFacets("help", t, {
+                accountId: (accountsQ.data ?? [])
+                  .filter((a) => a.active)
+                  .map((a) => ({ value: a.id, label: a.name })),
+                moduleId: (modulesQ.data ?? [])
+                  .filter((m) => m.active)
+                  .map((m) => ({ value: m.id, label: `${m.appName} · ${m.name}` })),
+              })}
               // "RAISE TICKET", AT THE RIGHT OF THE TOOLBAR — PagedFind's own
               // `actions` slot (client ruling, 2026-08-31). No Export/Import
               // beside it: unlike Accounts, tickets has no export or import

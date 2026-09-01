@@ -279,9 +279,18 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
 
 /** THE TYPE MARK, in the slot a lucide icon would have taken (UI-CONVENTIONS §5,
  * amended 17 Aug 2026). `aria-hidden`, never inside a sentence, and always
- * beside the type WORD — the eyebrow above the title on a detail, the group
- * heading or the TYPE column on a collection. `size` picks the row slot or the
- * header band's square (G3). */
+ * beside the type WORD — the group heading or the TYPE column on a
+ * collection.
+ *
+ * NOT CALLED FROM THIS FILE'S OWN HEADER BAND ANY MORE — client ruling,
+ * 2026-09-01, verbatim: "for now there are no - under no case - images on
+ * title. remove it everywhere" (see `RecordScreen`'s own `mark`/`leading`
+ * prop docs, below, and "THE MARK IS GONE FROM THIS HEADER TOO" further down
+ * this file). Left defined and exported rather than deleted: it is a general
+ * "a type word may carry a glyph" primitive (UI-CONVENTIONS §5's own scope
+ * says a collection's own group heading or TYPE column, neither of them a
+ * title), not itself a violation of "no images on title" — only a CALLER
+ * putting it beside a title would be, and this file no longer has one. */
 export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | "band" }) {
   // The one mark, with no picture to show — the box, the sizes and the
   // `aria-hidden` are the same decision everywhere and are made once
@@ -295,10 +304,14 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
 /** THE HEADER BAND (D2) — the ONE region on a detail screen that lets the
  * ambient field through (C4).
  *
- * Layout, left to right: the type mark or logo in a rounded square, then the
- * eyebrow / title / status column, then the action group pushed right. At most
- * one primary and one secondary button belong in `actions`; everything else is
- * a RecordActionsMenu at the end of it (B1).
+ * CURRENT LAYOUT, top to bottom (the overrides below this comment carry the
+ * full history): the identity pills row, then the title, then the subtitle
+ * where one exists, with `actions` sharing the title's own row, pushed to the
+ * inline end. No mark and no eyebrow draw here any more — both removed by
+ * later client rulings quoted below ("THE EYEBROW LEAVES AGAIN…" and "THE
+ * MARK IS GONE FROM THIS HEADER TOO…"). At most one primary and one secondary
+ * button belong in `actions`; everything else is a RecordActionsMenu at the
+ * end of it (B1).
  */
 /** THE RECORD DETAIL SCREEN — the kit's shape, adapted to this app's call sites.
  *
@@ -375,12 +388,30 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
  * because the breadcrumb sitting above this whole header already names the
  * record type and the collection ("Tickets · Kids training missing from the
  * website menu"), which is what "THE EYEBROW COMES BACK" answered before a
- * breadcrumb existed to answer it instead. This is NOT the condensed sticky
- * bar's own header (`condensed-title.tsx`, `CondensedTitleBar`) — that is a
- * separate, smaller bar that only appears once the page has scrolled past
- * this one, and its own spec (a later, separate client ruling) keeps BOTH the
- * eyebrow and the pills. The two headers are allowed to disagree because a
- * reader only ever sees one of them at a time.
+ * breadcrumb existed to answer it instead. This paragraph originally went on
+ * to say the condensed sticky bar (`condensed-title.tsx`, `CondensedTitleBar`)
+ * "keeps BOTH the eyebrow and the pills" and disagrees with this header on
+ * purpose — that was true for a few hours the same day and the two notes
+ * below are what replaced it.
+ *
+ * THE MARK IS GONE FROM THIS HEADER TOO, AND FOR GOOD — CLIENT RULING,
+ * 2026-09-01, LATER THE SAME DAY, OVERRIDING ANY EARLIER NUANCE, VERBATIM:
+ * "for now there are no - under no case - images on title. remove it
+ * everywhere." So "the mark where the type has one" a few lines up is no
+ * longer this file's own behaviour: `mark`/`leading` still arrive on
+ * `RecordScreen`'s own signature (every `*-detail.tsx` call site still passes
+ * one) but neither is read into anything rendered near a title any more,
+ * here or in the condensed bar — see the two props' own doc comments below
+ * for why the signature keeps them anyway.
+ *
+ * THE CONDENSED BAR NO LONGER DISAGREES WITH THIS ONE — same ruling,
+ * verbatim: "for the detail replicate the main: turn the breadcrumb + title
+ * in eyebrow title. do not include image nor pills." A detail screen's
+ * condensed bar now hands `CondensedTitleBar` only `eyebrow` and `title`,
+ * dropping the `pills` it briefly carried — the exact shape `CollectionHeading`
+ * (the main screen's own header) already used, so the two callers finally
+ * agree and `CondensedTitleBar` itself no longer has a `pills` (or `mark`)
+ * prop to disagree with (condensed-title.tsx).
  *
  * MECHANICALLY: `eyebrow` is dropped from the node this file builds for the
  * kit's `title` slot (never rendered in the full header again), and the
@@ -678,17 +709,17 @@ const IDENTITY_ROW =
    selector — needed because the pills used to render INSIDE that vendored
    span, below the title, which this file cannot hand-edit (R39).
    2026-09-01: the pills moved above the title, inside a node this file
-   builds itself (`identityChips`, in `RecordScreen`'s own body) — so the
-   pull is now a plain conditional class on that node directly, no
-   descendant selector needed, and lives beside its definition instead of up
-   here. See `identityChips`'s own comment for the current version, including
-   why the old rule's extra `mt-[var(--space-3)]` ("the gap under the image")
-   no longer applies now that the pills are the first line in the column
-   rather than the last. */
+   builds itself (`identityChips`, in `RecordScreen`'s own body), and a plain
+   conditional class on that node did the same pull without the descendant
+   selector.
+   LATER THE SAME DAY: the mark itself was removed from every title, full
+   stop ("THE MARK IS GONE FROM THIS HEADER TOO", above) — so there is no
+   mark edge left to pull the pills flush WITH, and `identityChips` (below)
+   no longer computes any such offset at all. This note stays only as the
+   pointer to why an offset class briefly existed here and does not any
+   more. */
 
 export function RecordScreen({
-  mark,
-  leading,
   eyebrow,
   recordNumber,
   collectionLabel,
@@ -708,10 +739,33 @@ export function RecordScreen({
   emptyAction,
   errorAction,
 }: {
-  /** The record type's glyph, when the type has one. */
+  /**
+   * The record type's glyph, when the type has one.
+   *
+   * NO LONGER READ BY THIS COMPONENT — CLIENT RULING, 2026-09-01, verbatim:
+   * "for now there are no - under no case - images on title. remove it
+   * everywhere." `RecordScreen` used to fold this into `headerMark` and hand
+   * it to both the kit's own `RecordChrome` (`mark`) and the condensed bar
+   * (`CondensedTitleBar`'s own former `mark` prop, now deleted outright,
+   * condensed-title.tsx); neither happens any more, so a value here renders
+   * nowhere. The PROP survives on this signature, unlike `eyebrow`'s own
+   * "the condensed bar still reads it" reason: here it is simply that every
+   * `*-detail.tsx` call site still passes one (`mark={appStageMark(app.stage)}`,
+   * `mark={kindMark}`…) and none of the thirteen of them needs to change for
+   * a ruling stated "for now" — removing the prop from this type would force
+   * a matching edit at every one of them to delete an argument that is
+   * already inert. `RecordMark`/`TypeMark`, the components a caller builds
+   * this value FROM, are untouched: they still draw a mark in every list row,
+   * tile and picker that isn't a title, which this ruling never reached.
+   */
   mark?: string | null
-  /** A logo or avatar, when the record has a real image — it replaces the mark
-   * in the same square (G3). */
+  /**
+   * A logo or avatar, when the record has a real image — it used to replace
+   * the mark in the same square (G3). NO LONGER READ, for the exact reason
+   * `mark`'s own doc comment above gives — same ruling, same signature-
+   * survives-anyway logic, same thirteen call sites (`leading={<AppMark …/>}`,
+   * `leading={<RecordMark …/>}`) left untouched.
+   */
   leading?: React.ReactNode
   /**
    * The bare record-TYPE word — "App", "Account", "Ticket". The glossary's own
@@ -729,10 +783,11 @@ export function RecordScreen({
    * relocated. The PROP survives on this signature, and every call site keeps
    * passing it, because `CondensedTitleBar` below is a SEPARATE header (the
    * small sticky bar that appears once scrolled past this one) with its OWN
-   * spec, reached only after scrolling — and that bar's spec is the opposite
-   * ruling, eyebrow AND pills both. Do not delete this prop or its call
-   * sites while chasing "no eyebrow, anywhere" — the condensed bar is the one
-   * remaining, intentional reader of it.
+   * spec, reached only after scrolling — and that bar keeps an eyebrow even
+   * though this full header does not (it dropped its own `pills`, the other
+   * thing it briefly carried, the same day — condensed-title.tsx). Do not
+   * delete this prop or its call sites while chasing "no eyebrow, anywhere"
+   * — the condensed bar is the one remaining, intentional reader of it.
    */
   eyebrow?: React.ReactNode
   /** The reference a person quotes on the phone. Drawn as the charcoal chip,
@@ -844,14 +899,16 @@ export function RecordScreen({
 
   // THE FULL HEADER'S ORDER, REVERSED — CLIENT RULING, 2026-09-01, against a
   // real screenshot of a Ticket detail screen. New order, top to bottom: the
-  // mark (unchanged, conditional on the record type having one), THEN the
   // pills row (the black ID chip, the status pill, the parent-record chip),
   // THEN the title, with no eyebrow anywhere in this block — see `eyebrow`'s
   // own doc comment above for why the prop still exists (the condensed bar
   // still wants it) while this block never reads it again. This reverses
   // "THE EYEBROW COMES BACK, NARROWER" (this file's header comment) rather
   // than refining it, and reverses override 73's "chips sit below the title"
-  // for the identity row specifically.
+  // for the identity row specifically. THE MARK NEVER APPEARS IN THIS ORDER
+  // AT ALL, as of later the same day — "THE MARK IS GONE FROM THIS HEADER
+  // TOO", this file's header comment — so the order is pills, title, subtitle
+  // and nothing above them.
   //
   // `min-w-0` + `break-words` on the title's own span is item 4 of an earlier
   // ruling: "set a max width of the title so there's a minimum margin between
@@ -862,45 +919,20 @@ export function RecordScreen({
   // URL-shaped app name, say), because nothing tells the browser it may break
   // one. `min-w-0` lets the title's flex item shrink below its content's natural
   // width in the first place, and `break-words` is what it shrinks INTO instead
-  // of pushing `actions` past the edge of the row.
-
-  // THE PILLS ROW, AND THE MARK, BOTH MOVED UP FROM FURTHER DOWN IN THIS
-  // FUNCTION — the title block below needs `identityChips` as its own FIRST
-  // child now, and the mark-edge pull needs `hasMark` before that, so both are
-  // computed here instead of after the title block the way they used to read.
-  // Nothing about either computation changed, only where it sits.
-  const headerMark = leading ?? (mark ? <TypeMark mark={mark} size="band" /> : null)
-  const hasMark = Boolean(headerMark)
-  const hasIdentity = recordNumber !== undefined || collectionLabel !== undefined || chips !== undefined
-  // PULLS THE PILLS FLUSH WITH THE MARK'S OWN LEFT EDGE — the same client
-  // ruling this file already carried ("place the aligned left under the
-  // image, like under the whole title thing"), reapplied directly on this
-  // row's own className now that the row is OUR OWN node rather than a class
-  // reaching sideways into a vendored `data-slot`. Before 2026-09-01 the pills
-  // rendered inside the kit's own `[data-slot=record-detail-meta]` span below
-  // the title, and `PILLS_UNDER_MARK` (deleted with this change) reached that
-  // span from outside; now the pills ride inside `title` itself (see
-  // `identityChips` below) and that kit span never renders at all — the kit
-  // is handed no `chips`/`recordNumber`/`collectionLabel` any more, so its own
-  // `hasIdentity` check is always false. Same figures as before, copied off
-  // `record-mark.tsx`'s own `BOX` (56 below `sm`, 72 at/above it) and
-  // `record-detail.tsx`'s own header comment ("14 between the mark and the
-  // text"), not invented.
+  // of pushing `actions` past the edge of the row. A LONG but BREAKABLE title
+  // needed a second fix on top of this one — see `TITLE_ACTIONS_SPLIT`'s own
+  // comment, below the component, for why `actions` could still end up wrapping
+  // onto a second line under a long multi-word title even with `min-w-0` here.
   //
-  // NO VERTICAL OFFSET NEEDED HERE, UNLIKE THE OLD RULE. `PILLS_UNDER_MARK`
-  // also added `mt-[var(--space-3)]` to answer the gap between the mark and a
-  // pills row that used to sit BELOW a whole title block, which could be
-  // shorter than the mark itself. The pills are now the FIRST line in the
-  // column beside the mark, level with the mark's own top edge (the header
-  // band is `items-start`), so there is no such gap to close.
+  // THE PILLS ROW — the title block below needs `identityChips` as its own
+  // FIRST child, so it is computed here, ahead of the title block, the same
+  // as before. IT NO LONGER COMPUTES A MARK-EDGE OFFSET: the mark this pull
+  // used to align under is gone (see this file's header comment, "THE MARK IS
+  // GONE FROM THIS HEADER TOO"), so `identityChips` is a plain `IDENTITY_ROW`
+  // now — no conditional class, no `hasMark`.
+  const hasIdentity = recordNumber !== undefined || collectionLabel !== undefined || chips !== undefined
   const identityChips = !hasIdentity ? undefined : (
-    <span
-      className={
-        hasMark
-          ? `${IDENTITY_ROW} -ms-[calc(3.5rem+var(--space-3h))] sm:-ms-[calc(72px+var(--space-3h))]`
-          : IDENTITY_ROW
-      }
-    >
+    <span className={IDENTITY_ROW}>
       {recordNumber !== undefined ? <Badge variant="inverse">{recordNumber}</Badge> : null}
       {collectionLabel !== undefined ? <Badge>{collectionLabel}</Badge> : null}
       {chips}
@@ -968,23 +1000,43 @@ export function RecordScreen({
   // `titleRef` sits on the OUTER node either way — the whole block (pills,
   // heading and subtitle) is what has to fully leave the viewport before the
   // condensed stand-in takes over.
+  //
+  // THE PILLS SIT FURTHER FROM THE TITLE THAN THE TITLE SITS FROM ITS OWN
+  // SUBTITLE — CLIENT RULING, 2026-09-01, pointing at a screenshot of a real
+  // record (Padelbase) as the correct reference: a visible gap between the
+  // pill row and the title, "in the current version pills are too close to
+  // title." Before this, ALL THREE lines (pills, title, subtitle) sat in one
+  // `flex-col gap-[var(--space-1h)]` column — one 6px gap reused for both
+  // relationships, which read as too tight for the pills-to-title seam and
+  // was never asked to change for the title-to-subtitle one. So the column
+  // splits in two: the pills get their own wrapper with a real
+  // `mb-[var(--space-3)]` (12px, doubling the old gap) under them, and a
+  // NESTED column keeps title+subtitle at the original tight
+  // `gap-[var(--space-1h)]` — the subtitle prop's own doc comment ("directly
+  // under the title") was never re-ruled on, so that pairing stays as close
+  // as it always was.
   const titleBlock =
     identityChips === undefined && subtitleLine === null ? (
       <span ref={titleRef} className="min-w-0 break-words">{clampRecordHeading(title)}</span>
     ) : (
-      <span ref={titleRef} className="flex min-w-0 flex-col gap-[var(--space-1h)]">
-        {identityChips}
-        <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
-        {subtitleLine}
+      <span ref={titleRef} className="flex min-w-0 flex-col">
+        {identityChips !== undefined ? (
+          <span className="mb-[var(--space-3)]">{identityChips}</span>
+        ) : null}
+        <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">
+          <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
+          {subtitleLine}
+        </span>
       </span>
     )
   // THE CONDENSED BAR'S OWN HEIGHT, MEASURED — not a fixed token any more.
-  // Since the condensed bar now carries the eyebrow and the pills row too
-  // (condensed-title.tsx, "THE SPEC REVERSED, DETAIL ONLY"), its real height
-  // depends on how many pills this record has and whether they wrap, which a
-  // constant can't answer. `usePublishCondensedHeight` measures the bar's own
-  // node and publishes it to `--record-tabs-top`, which `STICKY_TABS` reads
-  // (falling back to `0px` while not condensed).
+  // Even now that the condensed bar carries only `eyebrow` and `title` (see
+  // `CondensedTitleBar`'s own doc, condensed-title.tsx), a longer translated
+  // eyebrow word or a title long enough to wrap can still change its line
+  // count, which is not knowable until the browser has laid it out.
+  // `usePublishCondensedHeight` measures the bar's own node and publishes it
+  // to `--record-tabs-top`, which `STICKY_TABS` reads (falling back to `0px`
+  // while not condensed).
   const condensedBarRef = React.useRef<HTMLDivElement>(null)
   usePublishCondensedHeight("--record-tabs-top", condensed, condensedBarRef)
   return (
@@ -993,17 +1045,26 @@ export function RecordScreen({
     // renders it into (every `*-detail.tsx`'s `flex flex-col gap-6`), exactly
     // as if `RecordChrome` were still the sole child.
     <div className="contents">
+      {/* NO `mark`, NO `pills` — CLIENT RULING, 2026-09-01: "for the detail
+          replicate the main: turn the breadcrumb + title in eyebrow title.
+          do not include image nor pills." The condensed bar used to be handed
+          `headerMark` and `identityChips` too (a separate, later-reversed
+          ruling the same day gave it both); `CondensedTitleBar` no longer
+          even HAS those two props (condensed-title.tsx), so this call is the
+          same shape `CollectionHeading` already uses for the main screen's
+          own condensed bar — eyebrow and title, nothing else. */}
       <CondensedTitleBar
         ref={condensedBarRef}
-        mark={headerMark}
         eyebrow={eyebrow}
         title={title}
-        pills={identityChips}
         condensed={condensed}
       />
       <RecordChrome
-        className={`${FOOTER_TO_BOTTOM} ${RECORD_TITLE_SIZE} ${PANEL_BELOW_TABS}`}
-        mark={headerMark}
+        className={`${FOOTER_TO_BOTTOM} ${RECORD_TITLE_SIZE} ${PANEL_BELOW_TABS} ${TITLE_ACTIONS_SPLIT}`}
+        /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
+           HEADER TOO", this file's header comment. `headerMark` (the local
+           variable that used to fold `leading`/`mark` together) is deleted;
+           there is nothing left to pass here. */
         /* NO `chips`/`recordNumber`/`collectionLabel` HANDED TO THE KIT ANY
            MORE — see the comment above `identityChips`. The whole pills row
            rides inside `title` (below) instead, so the kit's own identity row
@@ -1033,6 +1094,56 @@ export function RecordScreen({
     </div>
   )
 }
+
+/** THE TITLE COLUMN NEVER YIELDS THE WHOLE ROW TO A LONG NAME — CLIENT
+ * RULING, 2026-09-01, verbatim: "i want that the space in screen for title
+ * is, f.e. 80% of the width. that we always reserve a % on the left for the
+ * buttons (so the current behaviour when long titles that the buttons go
+ * under is wrong)." `actions` sharing the title's own row (override 73) is
+ * what put Edit "aligned with the title" in the first place; a title long
+ * enough could still push it onto a SECOND line underneath, which is the
+ * defect this fixes.
+ *
+ * WHY A DESCENDANT SELECTOR. `title`/`actions` are threaded into the kit's
+ * `Title` primitive (shared/ui/components/title/title.tsx), one layer below
+ * `RecordDetail` — vendored and pinned (R39), so this file cannot hand-edit
+ * it the way `RECORD_TITLE_SIZE` above already explains for the same
+ * component. `Title`'s own row is a plain `flex flex-wrap items-end gap-4`:
+ * the eyebrow+heading wrapper is a bare `<div className="min-w-0">` with no
+ * `data-slot` of its own, and `actions` renders as `[data-slot=title-actions]`
+ * only when given. `[&_[data-slot=title]>div:not([data-slot=title-actions])]`
+ * reaches the FIRST kind of child by ruling OUT the one child that DOES carry
+ * a name, rather than by counting on it being first — `Title`'s own source
+ * always renders the heading wrapper before `actions` today, but "not the
+ * actions div" describes the same element without leaning on that order.
+ *
+ * THE MECHANICS. A wrapping flex row decides whether its items fit on ONE
+ * line using each item's flex-basis, not its post-shrink width — an item
+ * whose basis is `auto` (content) gets its own unbroken text width as that
+ * basis, so a long single-line title (its max-content width, before
+ * `break-words` ever gets a chance to run) can by itself already exceed the
+ * row, and `actions` — the sibling with nowhere else to go — is what wraps to
+ * a second line UNDER the title, exactly the client's complaint (the title's
+ * own `min-w-0` this file already sets, above, only lets it SHRINK once
+ * placed on a line; it does nothing to the placement decision itself).
+ * Setting the heading wrapper's basis to a real, definite value — `0%`, not
+ * `auto` — takes it out of that decision entirely (its hypothetical size for
+ * the fit test is now zero, so it never causes a wrap by itself); Tailwind's
+ * `flex-1` (`flex: 1 1 0%`) is both of those in one utility — grow, shrink,
+ * and the zero basis — so it lets the wrapper grow back to fill whatever room
+ * `actions` doesn't need, and `max-w-[80%]` is the ceiling the client asked
+ * for — even where `actions` is a single small button, the title is never
+ * handed the WHOLE row. `actions` keeps its own natural width — `shrink-0`
+ * guards it from ever losing the argument the title used to win by growing
+ * straight through it. Long text still wraps/clamps WITHIN the title's own
+ * shrunk column, via `min-w-0` + `break-words` (this component's own title
+ * span) and `clampRecordHeading` — this class only changes how much of the
+ * ROW that column may claim. */
+const TITLE_ACTIONS_SPLIT =
+  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:min-w-0 " +
+  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:max-w-[80%] " +
+  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:flex-1 " +
+  "[&_[data-slot=title-actions]]:shrink-0"
 
 /** THE TWO NUMBERS BOTH RULES BELOW SHARE, AS CUSTOM PROPERTIES RATHER THAN
  * LITERALS. Round two (below) escaped the tab strip with a flat `-mt-[170px]`

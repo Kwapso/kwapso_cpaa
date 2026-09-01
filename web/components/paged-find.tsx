@@ -428,7 +428,32 @@ export function PagedFind<T>({
           chips above whatever they are narrowing: what is on stays visible and
           removable in one press at every width, and the facet controls live
           behind its own "+ filter" slot. Putting it back inside the row above
-          would be the first step of theming it into the row it replaced. */}
+          would be the first step of theming it into the row it replaced.
+
+          TENSION, FLAGGED RATHER THAN OVERRIDDEN (2026-09-01). Aurora's
+          overnight toolbar spec — confirmed against a real Tickets mockup —
+          shows ONE row, always: search, then the real facet chips (Client,
+          Module), then "+ Filter", a separator, sort, an optional view
+          control, and create pinned to the row's far end. That is not this
+          shape: `<FilterBar>` (`shared/web/screen-engine/filter-bar.tsx`)
+          renders through the vendored kit's own `FilterBar`
+          (`shared/ui/components/filter-bar/filter-bar.tsx`), whose root is
+          hard-coded `w-full` — a flex item that consumes its whole row and so
+          can never sit beside `SearchInput`/`SortControl` above no matter how
+          this file arranges its own containers (measured, not assumed: a
+          `w-full` flex child forces the wrap the paragraph above this one
+          argues FOR). Overriding that width from here would need a
+          `className` passed through the adapter to the kit component, which
+          the adapter does not do today, and reaching past the adapter into
+          the vendored kit itself is the one thing R39 forbids outright. The
+          mockup's own "Client ▾ | Module ▾" reads as an always-visible
+          per-facet trigger, which is also a different interaction model from
+          this bar's "no chip until a facet is set, everything lives behind
+          one + Filter popover" — the shape the adapter's own header comment
+          says was a deliberate, recent convergence with the kit (not a
+          reskin). Reconciling the two is a kit-level or adapter-level
+          decision, not a `<PagedFind>` one, so it stays a flagged tension
+          rather than a hand-rolled row here. */}
       {showFilters && (
         <FilterBar
           facets={facets}

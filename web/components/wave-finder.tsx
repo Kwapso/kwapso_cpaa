@@ -156,53 +156,61 @@ export function WaveFinder({
     },
   ]
 
-  // THE BAR IS ITS OWN ROW, at every width. The kit's filter row is a full-width
-  // strip of chips above whatever they are narrowing — that is the shape her
-  // component is drawn in and the reason it reads on a phone (a one-line
-  // scroller) without a second layout. Squeezing it back into the control row
-  // would be the first step of theming it into the row it replaced.
+  // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
+  // approved that night, which supersedes this file's own earlier reasoning
+  // below). The filter bar used to be drawn as this row's own sibling BELOW
+  // it — the same shape her Apps screenshot caught: search+sort(+actions) on
+  // one line, the filter chips stranded on a second, disconnected one. The
+  // kit's chip row is still exactly what it always was (a full-width strip on
+  // its own, which is why it is wrapped in a non-growing flex box below
+  // rather than dropped in bare — a bare `w-full` child would still claim the
+  // rest of the line and push `actions` onto a line of its own, the same
+  // fault one level down), it is simply a FLEX ITEM of this one row now
+  // instead of a sibling block underneath it, the same technique the kit's
+  // OWN toolbar uses for its `filters` slot (`shared/ui/components/
+  // collection-frame/collection-frame.tsx`).
   return (
-    <div className="flex w-full flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={query.q}
-          onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
-          // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
-          // "Clear all", which was one control quietly owning two questions; the
-          // kit's bar says "Clear filters" and now means only that.
-          onClear={() => onChange({ ...query, q: "" })}
-          placeholder={t("Search waves…")}
-          className="w-full sm:w-56"
-        />
-        <SortControl
-          options={[
-            { value: "newest", label: t("Newest first") },
-            { value: "name", label: t("Name") },
-            { value: "client", label: t("Client") },
-            { value: "runs", label: t("When it runs") },
-            { value: "sprints", label: t("Sprints inside it") },
-          ]}
-          value={query.sortBy}
-          onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-          direction={query.dir}
-          onDirectionChange={(dir) => onChange({ ...query, dir })}
-          label={t("Sort by")}
-        />
-        {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
-      </div>
-      <FilterBar
-        facets={facets}
-        values={{ accountId: query.accountId, status: query.status }}
-        // Empty on purpose: both facets carry their own options, so there is
-        // nothing for the bar to derive from the rows on screen — and a client
-        // whose only wave is filtered out must not vanish from the filter.
-        data={[]}
-        onChange={(field, value) => onChange({ ...query, [field]: value })}
-        onClearFacets={() =>
-          onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
-        }
-        resultCount={resultCount}
+    <div className="flex w-full flex-wrap items-center gap-2">
+      <SearchInput
+        value={query.q}
+        onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
+        // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
+        // "Clear all", which was one control quietly owning two questions; the
+        // kit's bar says "Clear filters" and now means only that.
+        onClear={() => onChange({ ...query, q: "" })}
+        placeholder={t("Search waves…")}
+        className="w-full sm:w-56"
       />
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <FilterBar
+          facets={facets}
+          values={{ accountId: query.accountId, status: query.status }}
+          // Empty on purpose: both facets carry their own options, so there is
+          // nothing for the bar to derive from the rows on screen — and a client
+          // whose only wave is filtered out must not vanish from the filter.
+          data={[]}
+          onChange={(field, value) => onChange({ ...query, [field]: value })}
+          onClearFacets={() =>
+            onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
+          }
+          resultCount={resultCount}
+        />
+      </div>
+      <SortControl
+        options={[
+          { value: "newest", label: t("Newest first") },
+          { value: "name", label: t("Name") },
+          { value: "client", label: t("Client") },
+          { value: "runs", label: t("When it runs") },
+          { value: "sprints", label: t("Sprints inside it") },
+        ]}
+        value={query.sortBy}
+        onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+        direction={query.dir}
+        onDirectionChange={(dir) => onChange({ ...query, dir })}
+        label={t("Sort by")}
+      />
+      {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

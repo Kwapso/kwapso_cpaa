@@ -216,54 +216,61 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <ToolbarRow
-          search={
-            q.data.length > 0 && (
-              <>
-                <Input
-                  value={find}
-                  onChange={(e) => setFind(e.target.value)}
-                  placeholder={t("Search what we handed over…")}
-                  className="w-full sm:max-w-xs"
-                  aria-label={t("Search what we handed over…")}
-                />
-                <SortControl
-                  options={sortOptions}
-                  value={sort.by}
-                  onValueChange={(by) => {
-                    const opt = DELIVERABLE_SORTS.find((o) => o.value === by)
-                    setSort({ by, dir: opt?.defaultDir ?? "asc" })
-                  }}
-                  direction={sort.dir}
-                  onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                  label={t("Sort by")}
-                />
-              </>
-            )
-          }
-          actions={canCreate && <AddButton label={t("Add a deliverable")} onClick={() => setAddOpen(true)} />}
-        />
-        {/* THE FILTERS, ON THEIR OWN ROW — never squeezed back into the
-            control row above (FilterBar's own header comment). */}
-        {q.data.length > 0 && (
-          <FilterBar
-            facets={facets}
-            values={facetValues}
-            data={[]}
-            onChange={(field, value) =>
-              setFacetValues((prev) => {
-                const next = { ...prev }
-                if (value === "") delete next[field]
-                else next[field] = value
-                return next
-              })
-            }
-            onClearFacets={() => setFacetValues({})}
-            resultCount={rows.length}
-          />
-        )}
-      </div>
+      {/* ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
+          approved that night). `filters` used to be a `<FilterBar>` rendered
+          as this row's own sibling below it — the same shape her Apps
+          screenshot caught (search+sort on one row, a stranded filter chip
+          under it) — so it is `<ToolbarRow>`'s own `filters` slot now
+          (screen-bits.tsx), never a second row this call site draws for
+          itself. */}
+      <ToolbarRow
+        search={
+          q.data.length > 0 && (
+            <Input
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              placeholder={t("Search what we handed over…")}
+              className="w-full sm:max-w-xs"
+              aria-label={t("Search what we handed over…")}
+            />
+          )
+        }
+        filters={
+          q.data.length > 0 && (
+            <FilterBar
+              facets={facets}
+              values={facetValues}
+              data={[]}
+              onChange={(field, value) =>
+                setFacetValues((prev) => {
+                  const next = { ...prev }
+                  if (value === "") delete next[field]
+                  else next[field] = value
+                  return next
+                })
+              }
+              onClearFacets={() => setFacetValues({})}
+              resultCount={rows.length}
+            />
+          )
+        }
+        sort={
+          q.data.length > 0 && (
+            <SortControl
+              options={sortOptions}
+              value={sort.by}
+              onValueChange={(by) => {
+                const opt = DELIVERABLE_SORTS.find((o) => o.value === by)
+                setSort({ by, dir: opt?.defaultDir ?? "asc" })
+              }}
+              direction={sort.dir}
+              onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+              label={t("Sort by")}
+            />
+          )
+        }
+        actions={canCreate && <AddButton label={t("Add a deliverable")} onClick={() => setAddOpen(true)} />}
+      />
 
       {rows.length === 0 ? (
         q.data.length === 0 ? (

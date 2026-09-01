@@ -311,28 +311,24 @@ export function renderFolderTabs(strip: FolderTabStrip | undefined): React.React
  *    line is a no-op today — pinned here anyway, forcing the label to the
  *    SAME token the mark is forced to two lines up, so the two can never drift
  *    apart again on a future kit pull the way the thickness above already has.
- * 3. THE UNDERLINE'S ENDS ARE ROUNDED, ON BOTH DRAW PATHS. The kit's mark is
- *    hard-cornered on both — the indicator is a filled `span`, so a
- *    `rounded-*` class on it draws real rounded ends; the trigger's own inset
- *    shadow has no such easy fix, because an inset shadow's shape is confined
- *    by ITS OWN BOX's `border-radius`, so the fix is rounding the ACTIVE
- *    trigger's bottom corners (invisible on this variant — `TRIGGER_SKIN.line`
- *    never paints a fill — so the only visible effect is the shadow bar
- *    curving with it) rather than inventing a second element to draw over an
- *    inset shadow that cannot itself curve. R31 (`shared/rules/registry.ts`)
- *    gives this exact shape its own word: a short indicator BAR is not a box
- *    (`rounded-[var(--radius)]`) and not a pill-shaped control or chip
- *    (`rounded-pill`) — it is the same geometry the kit's own gantt, heatmap
- *    and flowchart bars already draw as `rounded-[var(--radius-bar)]`, so this
- *    mark joins that vocabulary rather than inventing a fourth spelling of
- *    "rounded" for one strip.
+ * 3. THE UNDERLINE'S ENDS STAY SQUARE. Rounded ends (via `--radius-bar`, the
+ *    kit's second radius exception — the indicator span carrying
+ *    `rounded-[var(--radius-bar)]` directly, the trigger's own inset shadow
+ *    reached indirectly by rounding the ACTIVE trigger's bottom corners so the
+ *    shadow it casts curves with them) shipped and was reverted the same
+ *    night: "very wrong, dont know what this upwards thing at the edges is.
+ *    revert to straight line." Both draw paths are back at flat corners — the
+ *    indicator carries no `rounded-*` class and the trigger's bottom corners
+ *    are unrounded again, so the inset shadow is a hard-cornered bar, matching
+ *    a resting tab. `--radius-bar` is unused again app-side; RADIUS_EXCEPTION
+ *    in `shared/rules/registry.ts` never carried an entry for it (R31 admits
+ *    any `rounded-[var(--radius…)]` bracket on the token alone), so there is
+ *    nothing to clean up there.
  * All three are scoped to `data-state=active` only; a resting tab is untouched. */
 const LINE_ACTIVE_MATCH =
   "[&_[data-slot=tabs-trigger][data-state=active]]:![color:var(--foreground)] " +
   "[&_[data-slot=tabs-trigger][data-state=active]]:!shadow-[inset_0_-0.1875rem_0_var(--foreground)] " +
-  "[&_[data-slot=tabs-trigger][data-state=active]]:!rounded-b-[var(--radius-bar)] " +
-  "[&_[data-slot=tabs-indicator]]:!h-[0.1875rem] " +
-  "[&_[data-slot=tabs-indicator]]:!rounded-[var(--radius-bar)]"
+  "[&_[data-slot=tabs-indicator]]:!h-[0.1875rem]"
 
 /** CLIENT RULING, 1 Sep 2026 — the FOLDER strip's own label (a collection
  * screen's own tabs) reads a size smaller than the LINE strip's
@@ -347,6 +343,44 @@ const FOLDER_LABEL_SIZE_MATCH =
   "[&_[data-slot=tabs-trigger]]:![font-size:var(--text-sm)] " +
   "[&_[data-slot=tabs-trigger]]:![line-height:var(--text-sm--line-height)] " +
   "[&_[data-slot=tabs-trigger]]:![letter-spacing:var(--text-sm--letter-spacing)]"
+
+/** CLIENT RULING, 1 Sep 2026 (screenshot + "this was on the pdf I fed you long
+ * ago") — "apart from colour, also play with the weight of the fonts": on
+ * BOTH strips the active tab should read visibly HEAVIER than its neighbours,
+ * not merely a different colour.
+ *
+ * It reads like a two-line fix and is really a one-line one, because the
+ * "active is heavier" half was never missing. The kit's own vendored
+ * `tabs.tsx` already forces the ACTIVE trigger to
+ * `font-[var(--font-weight-medium)]` (500) on both variants
+ * (`TRIGGER_SELECTED.line/.folder`, `TRIGGER_SELECTED_WITH_INDICATOR.line/
+ * .folder`) — that part shipped with the kit and needs no override here.
+ *
+ * The missing half is the RESTING side. Neither `TRIGGER_SKIN.line` nor
+ * `TRIGGER_SKIN.folder` sets a font-weight at all, so a resting tab inherits
+ * the page's ordinary, unset weight — which computes to the CSS default,
+ * `400`. And this system's Saans face ships exactly two weights, 300 and 500
+ * (tokens.css's own `@font-face` block, and its comment: "the weight numbers
+ * are not assumptions, each file's OS/2 usWeightClass was read off the
+ * binary"). `400` is not one of them, and the CSS font-matching algorithm's
+ * own rule for a desired weight in [400, 500] is to check weights ABOVE it
+ * first, up to and including 500 — so an unset `400` request silently resolves
+ * to the SAME `500` (Medium) face the active tab explicitly asks for. Both
+ * states were already painting the identical Medium face; only the ink
+ * differed, exactly as reported. There is nothing to un-pick on the active
+ * side, only a resting weight to actually state, on both variants (the kit
+ * never states one on either).
+ *
+ * Forced to `var(--font-weight-normal)` (300, this font's only lighter face)
+ * so a resting tab visibly drops to Light rather than quietly riding along at
+ * Medium — the same two named weights the kit's own active-tab rule already
+ * reaches for, so the pairing is Light/Medium everywhere a tab strip renders,
+ * never a third, invented step. App-side, not a kit edit, for the same R39
+ * reason as `LINE_ACTIVE_MATCH` above; unconditional on variant, because the
+ * bug it fixes is the kit's shared `TRIGGER_SKIN` gap and not a per-variant
+ * one. */
+const TAB_RESTING_WEIGHT =
+  "[&_[data-slot=tabs-trigger][data-state=inactive]]:!font-[var(--font-weight-normal)]"
 
 export function TabsView({
   config,
@@ -395,6 +429,7 @@ export function TabsView({
       variant={variant}
       className={cn(
         className,
+        TAB_RESTING_WEIGHT,
         variant === "line" && LINE_ACTIVE_MATCH,
         variant === "folder" && FOLDER_LABEL_SIZE_MATCH,
       )}
@@ -447,6 +482,69 @@ export function TabsView({
             )}
           </TabsTrigger>
         ))}
+        {/* THE FOLD CAP — restores ch14's inactive-tab-behind-the-card look on
+            a strip STICKY_FOLDER_TABS has made sticky, for the bare-strip case
+            (`FolderTabStrip`/`renderFolderTabs`, `!renderPanel`) where the card
+            is a SEPARATE element the caller owns (`CollectionCard`), not this
+            component's own `TabsContent`.
+
+            THE BUG (Aurora, 1 Sep 2026, screenshot: "the inactive tab should
+            be behind the folder body! now it's in front"). The kit's own
+            three-number stacking (`tabs.tsx` `TRIGGER_SKIN.folder`) reads an
+            inactive trigger at `z-[1]`, an active one at `z-[3]`, and asks the
+            CARD to sit at `z-[2]` between them — `CollectionCard`'s own
+            `attached` prop does exactly that. That only works when the two
+            triggers and the card are compared in ONE shared stacking context,
+            which held until tonight's sticky fix: `position: sticky` on
+            `<Tabs>` (`STICKY_FOLDER_TABS`) unconditionally opens a NEW stacking
+            context on `<Tabs>` — true regardless of z-index value, sticky and
+            fixed are the two positions that always do this — so from the
+            CARD's side of that boundary, the whole strip now paints as ONE
+            opaque unit at `<Tabs>`'s own z (10), never at its children's 1/2/3.
+            Card (z-2) can no longer land BETWEEN the two triggers; it is
+            either wholly above the strip or wholly below it, and it has to
+            stay wholly below (z-10) or the ACTIVE tab would lose its own
+            attached look the instant the strip scrolls and the card's top
+            edge slides underneath it. Confirmed live (`elementFromPoint`
+            hit-testing on a byte-for-byte reproduction of this DOM/CSS): removing
+            `z-10`, or lowering it, does not recover the 1-2-3 order — it only
+            trades "both tabs paint over the card" for "both tabs paint under
+            it", because the whole opaque unit still moves as one.
+
+            THE FIX. Stop asking an element OUTSIDE that new stacking context
+            to referee it. This span is a THIRD trigger-strip child, so it
+            shares `<Tabs>`'s own local context with the two real triggers —
+            the 1-2-3 comparison happens again, just entirely inside the
+            boundary sticky drew, with no dependency on the external card's
+            position or z-index at all. `absolute`+`bottom-0`, sized to
+            `--folder-tab-overlap` (the same room `TRIGGER_SKIN.folder`'s own
+            `pb-[var(--folder-tab-overlap)]` reserves and `LIST_SKIN.folder`'s
+            `mb-[calc(var(--folder-tab-overlap)*-1)]` pulls the real card up
+            into), painted in `--kw-folder-live` — the identical custom
+            property the active trigger's own `FOLDER_SHAPE_FILL.live` and the
+            kit's `TabsContent` panel both read — so its top edge is
+            indistinguishable from the real card's paper the instant the two
+            touch (zero gap, per `SectionWithCreate`'s own "no gap: the join").
+            `rounded-t-[var(--radius)]` matches the card's own top corners so
+            it reads as the same rounded-rectangle continuing, not a seam.
+            `z-[2]` between the triggers' own `z-[1]`/`z-[3]` reproduces ch14's
+            three papers; `pointer-events-none`+`aria-hidden` because it draws
+            nothing a person interacts with or should hear about — the card
+            underneath is still the thing anyone reads or clicks.
+
+            Scoped to `folder` + no `renderPanel`: a folder strip WITH a
+            `renderPanel` already carries its own kit-drawn `TabsContent`
+            (z-2) inside this same `<Tabs>`, so the 1-2-3 order was never
+            broken there — the card and both triggers already share `<Tabs>`'s
+            one context, sticky or not — and adding a second z-2 layer would
+            be pure redundancy. */}
+        {variant === "folder" && !renderPanel && (
+          <span
+            aria-hidden="true"
+            data-slot="tabs-folder-fold-cap"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[var(--folder-tab-overlap)] rounded-t-[var(--radius)] bg-[var(--kw-folder-live)]"
+          />
+        )}
       </TabsList>
       {renderPanel &&
         config.tabs.map((t) => (

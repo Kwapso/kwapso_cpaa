@@ -95,10 +95,25 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   // matches: `workers/content/src/routes/help.ts` calls it `view`
   // (`"live" | "archived"`), never `archived`, so the field says what the door
   // actually reads rather than copying a sibling screen's spelling.
-  help: [{ field: "view", label: "Archived", options: [
-    { value: "live", label: "No" },
-    { value: "archived", label: "Yes" },
-  ] }],
+  // CLIENT AND MODULE, added for the toolbar spec Aurora approved overnight
+  // (2026-09-01): the Tickets mockup she confirmed shows the toolbar's filter
+  // group as "Client ▾ | Module ▾ | + Filter", and this screen offered neither
+  // — `ticketFilterFrom` (workers/content/src/routes/help.ts) has parsed both
+  // `accountId` and `moduleId` since the door existed, so the door could always
+  // answer the question and nothing on the toolbar could ever ask it. Rows,
+  // not a closed vocabulary, exactly like `meetings.accountId` and
+  // `processes.appId` above: the door matches an id, and `tickets-collection.tsx`
+  // fills the options from the accounts/modules it already reads for this
+  // toolbar. Client leads (the mockup's own order), then Module, then the
+  // existing Archived view — unchanged.
+  help: [
+    { field: "accountId", label: "Client" },
+    { field: "moduleId", label: "Module" },
+    { field: "view", label: "Archived", options: [
+      { value: "live", label: "No" },
+      { value: "archived", label: "Yes" },
+    ] },
+  ],
   knowledge: [
     // WHAT A SOURCE IS. A closed vocabulary — the door allow-lists it against
     // KNOWLEDGE_KINDS — so every kind is offered whether or not one happens to

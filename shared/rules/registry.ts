@@ -559,11 +559,16 @@ export const CORPUS_EXEMPT: Record<string, string> = {
  * paths, still unreachable from this environment; the same 54 new strings
  * moved for all three languages, none of them ahead of the others. Lower all
  * three back to 0 the next time either script runs with real credentials —
- * it is a few minutes of spend, not a decision to leave open. */
+ * it is a few minutes of spend, not a decision to leave open.
+ *
+ * RAISED 114 -> 115 (all three), same night — the assistant's source-chips row
+ * gained a visible "Reading from" caption (client, 1 Sep 2026: the row read as
+ * unlabelled black pills with no context). One string, same two blocked
+ * credential paths. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 114,
-  es: 114,
-  ca: 114,
+  de: 115,
+  es: 115,
+  ca: 115,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

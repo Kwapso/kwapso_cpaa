@@ -696,63 +696,103 @@ function CollectionFrame<T>({
           // the app telling somebody a filter was on without telling them which.
           return (
             <>
-              {/* Mobile (< sm): ONE compact row — a stretching search field + a
-                  sort funnel. Left-to-right, never wrapping into stacked rows.
-                  The filter bar is its own row below, at every width. */}
-              <div className="flex items-center gap-2 sm:hidden">
-                {config.searchable ? (
-                  <SearchInput
-                    defaultValue={query}
-                    onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
-                    onClear={() => debouncedSetQuery("")}
-                    placeholder={mobilePlaceholder}
-                    className="min-w-0 flex-1"
-                  />
-                ) : (
-                  <div className="min-w-0 flex-1">{titleBlock}</div>
-                )}
-                {showSort && (
-                  <Popover modal={modal}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        aria-label={t("Sort")}
-                        className="size-8 shrink-0"
+              {/* Mobile (< sm): a stretching search field + a sort funnel,
+                  left-to-right and never wrapping — the box and its trigger
+                  are one control and stay glued together. Filters ride
+                  directly below, in the SAME `sm:hidden` block (never a
+                  fully separate element the way the old full-width sibling
+                  was): the kit's own chip row is a horizontal SCROLLER at
+                  this width (`filter-bar.tsx`'s own header), which cannot
+                  share a line with the search box, so it is the one
+                  legitimate second line here — connected to the row above
+                  it rather than floating disconnected from "the toolbar",
+                  and never present when there is nothing to filter. */}
+              <div className="flex flex-col gap-2 sm:hidden">
+                <div className="flex items-center gap-2">
+                  {config.searchable ? (
+                    <SearchInput
+                      defaultValue={query}
+                      onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+                      onClear={() => debouncedSetQuery("")}
+                      placeholder={mobilePlaceholder}
+                      className="min-w-0 flex-1"
+                    />
+                  ) : (
+                    <div className="min-w-0 flex-1">{titleBlock}</div>
+                  )}
+                  {showSort && (
+                    <Popover modal={modal}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          aria-label={t("Sort")}
+                          className="size-8 shrink-0"
+                        >
+                          <ArrowUpDown />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3"
                       >
-                        <ArrowUpDown />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="end"
-                      className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3"
-                    >
-                      {/* The same control the desktop layout renders (built
-                          once above) — just moved into a popover, since the
-                          phone header is ONE row: search + this trigger. */}
-                      {sortControl}
-                    </PopoverContent>
-                  </Popover>
-                )}
+                        {/* The same control the desktop layout renders (built
+                            once above) — just moved into a popover, since the
+                            phone header is ONE row: search + this trigger. */}
+                        {sortControl}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+                {filterBar}
               </div>
 
-              {/* ≥ sm: "inline" = title + search + sort on one wrapping row;
-                  "stacked" (default) = a title+search row with the sort on the
-                  row below. Sort is IN the header either way, never a bolted-on
-                  strip. */}
+              {/* ≥ sm: FILTERS NEVER ORPHAN INTO A ROW OF THEIR OWN ANY MORE
+                  (client ruling, 2026-09-01 — the toolbar spec Aurora
+                  approved that night): they ride in the SAME row as
+                  search, wrapping only when the viewport is genuinely too
+                  narrow, never a designed second tier. This file used to
+                  render `filterBar` once, after both branches below, as a
+                  full-width sibling row — exactly the shape the client's
+                  screenshot of the Apps screen caught: search+sort on one
+                  line, a stranded filter chip under it — and this file's own
+                  `headerLayout` doc claimed "inline" already put "title,
+                  search, and filters together on one wrapping row", which
+                  the code never actually did. `filterBar` is wrapped in its
+                  own non-growing flex box before it joins either row — the
+                  adapter's own outer `<div>` (`filter-bar.tsx`) is `w-full`
+                  by design (its chip row is meant to claim a whole line when
+                  it IS the line), and a bare `w-full` child inside this flex
+                  row would still claim the rest of it and push whatever
+                  comes after it (sort, in "inline") onto a line of its own —
+                  the same two-row shape one level down. The kit's OWN
+                  toolbar (`shared/ui/components/collection-frame/
+                  collection-frame.tsx`) wraps its own `filters` slot the
+                  identical way, for the identical reason.
+                  `headerLayout` still decides where SORT rides — "inline"
+                  keeps it beside search+filters on this one row; "stacked"
+                  (default) keeps it on its own row below, exactly as before
+                  this fix — that split is a title/sort decision this bug is
+                  not about, and it stays untouched. */}
               <div className="hidden sm:block">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {titleBlock}
                     {searchBox}
+                    {filterBar && (
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">{filterBar}</div>
+                    )}
                     {sortControl}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       {titleBlock}
-                      {searchBox}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {searchBox}
+                        {filterBar}
+                      </div>
                     </div>
                     {sortControl && (
                       <div className="flex flex-wrap items-center gap-2">
@@ -762,9 +802,6 @@ function CollectionFrame<T>({
                   </div>
                 )}
               </div>
-
-              {/* THE FILTERS, AT EVERY WIDTH, on their own full-width row. */}
-              {filterBar}
             </>
           )
         })()}

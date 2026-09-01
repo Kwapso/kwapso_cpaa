@@ -77,27 +77,37 @@ function SourceChips({
     articles: t("Knowledge articles"),
   }
   return (
-    <div
-      className="flex flex-wrap items-center gap-1.5 px-1"
-      role="group"
-      aria-label={t("Which sources the assistant reads")}
-    >
-      {SOURCE_CHIPS.map((chip) => {
-        const on = sources.includes(chip.key)
-        return (
-          <Toggle
-            key={chip.key}
-            size="sm"
-            variant="outline"
-            pressed={on}
-            disabled={disabled}
-            onPressedChange={() => onToggle(chip.key)}
-            aria-label={LABEL[chip.key] ?? chip.key}
-          >
-            {LABEL[chip.key] ?? chip.key}
-          </Toggle>
-        )
-      })}
+    <div className="flex flex-col gap-1 px-1">
+      {/* A VISIBLE caption, not just the group's aria-label — the owner saw
+       * this row on staging with no other context ("i dont understand what
+       * this black pills with sources are"): `aria-label` names the group for
+       * a screen reader but renders nothing a sighted person can read, so the
+       * row looked like unlabelled buttons. Styled like the app's other small
+       * section captions (e.g. `google-connections.tsx`'s `t("Google")`
+       * heading). */}
+      <span className="text-muted-foreground text-micro uppercase">{t("Reading from")}</span>
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        role="group"
+        aria-label={t("Which sources the assistant reads")}
+      >
+        {SOURCE_CHIPS.map((chip) => {
+          const on = sources.includes(chip.key)
+          return (
+            <Toggle
+              key={chip.key}
+              size="sm"
+              variant="outline"
+              pressed={on}
+              disabled={disabled}
+              onPressedChange={() => onToggle(chip.key)}
+              aria-label={LABEL[chip.key] ?? chip.key}
+            >
+              {LABEL[chip.key] ?? chip.key}
+            </Toggle>
+          )
+        })}
+      </div>
     </div>
   )
 }

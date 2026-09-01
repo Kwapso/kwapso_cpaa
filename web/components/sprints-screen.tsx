@@ -397,36 +397,43 @@ export function SprintsScreen({
   // something to search — a box over an empty collection cannot do anything,
   // so an empty sprints list falls back to the bare button-only toolbar it
   // always had (the same gate `waves-screen.tsx` puts on its own finder).
+  //
+  // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
+  // approved that night). `filters` used to be a `<FilterBar>` rendered as
+  // this row's own sibling below it — the same shape her Apps screenshot
+  // caught (search+actions on one row, a stranded filter chip under it) —
+  // so it is `<ToolbarRow>`'s own `filters` slot now (screen-bits.tsx),
+  // never a second row this call site draws for itself.
   const sprintToolbar =
     sprints.length > 0 ? (
-      <div className="flex flex-col gap-3">
-        <ToolbarRow
-          search={
-            <SearchInput
-              value={sprintQuery.q}
-              onChange={(e) => setSprintQuery((q) => ({ ...q, q: e.currentTarget.value }))}
-              onClear={() => setSprintQuery((q) => ({ ...q, q: "" }))}
-              // SAME PLACEHOLDER the "All sprints" tab's own search box uses
-              // (screens.ts's `sprintsListRecipe`) — one search box in one
-              // collection's words, wherever it appears.
-              placeholder={t("Search sprints…")}
-              className="w-56"
-            />
-          }
-          actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
-        />
-        <FilterBar
-          facets={sprintFacets}
-          values={{ state: sprintQuery.state, kind: sprintQuery.kind }}
-          // Empty on purpose: both facets carry their own options above,
-          // derived off the WHOLE collection rather than the narrowed one —
-          // see `sprintKindOptions`'s own note on why.
-          data={[]}
-          onChange={(field, value) => setSprintQuery((q) => ({ ...q, [field]: value }))}
-          onClearFacets={() => setSprintQuery((q) => ({ ...q, state: "", kind: "" }))}
-          resultCount={narrowedSprints.length}
-        />
-      </div>
+      <ToolbarRow
+        search={
+          <SearchInput
+            value={sprintQuery.q}
+            onChange={(e) => setSprintQuery((q) => ({ ...q, q: e.currentTarget.value }))}
+            onClear={() => setSprintQuery((q) => ({ ...q, q: "" }))}
+            // SAME PLACEHOLDER the "All sprints" tab's own search box uses
+            // (screens.ts's `sprintsListRecipe`) — one search box in one
+            // collection's words, wherever it appears.
+            placeholder={t("Search sprints…")}
+            className="w-56"
+          />
+        }
+        filters={
+          <FilterBar
+            facets={sprintFacets}
+            values={{ state: sprintQuery.state, kind: sprintQuery.kind }}
+            // Empty on purpose: both facets carry their own options above,
+            // derived off the WHOLE collection rather than the narrowed one —
+            // see `sprintKindOptions`'s own note on why.
+            data={[]}
+            onChange={(field, value) => setSprintQuery((q) => ({ ...q, [field]: value }))}
+            onClearFacets={() => setSprintQuery((q) => ({ ...q, state: "", kind: "" }))}
+            resultCount={narrowedSprints.length}
+          />
+        }
+        actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
+      />
     ) : (
       canCreate && <ToolbarRow actions={<AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />} />
     )

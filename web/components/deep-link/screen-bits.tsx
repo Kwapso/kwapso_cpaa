@@ -173,7 +173,25 @@ export function LoadError({ what }: { what: string }) {
  * BELOW any positioned sibling regardless of that sibling's z-index, folder tab
  * strip included, so with no stacking context of its own EVERY tab (inactive
  * ones too) painted in front of it. `attached` is the one class that was
- * missing, not a new colour or a new component. */
+ * missing, not a new colour or a new component.
+ *
+ * `attached` ALSO ADDS A LITTLE EXTRA HEADROOM AT THE TOP — client ruling,
+ * 1 Sep 2026: "great work in the main screen, however I'd like a bit of 'body
+ * of the folder' like space between the tab and the scrollable list." This is
+ * a DIFFERENT gap from the zero one `SectionWithCreate`'s `folderTabs` column
+ * and `PagedFind`'s own root both keep with NO `gap-*` class: that outer gap
+ * has to stay exactly zero, because the folder strip's negative
+ * `--folder-tab-overlap` margin needs its ACTUAL next sibling to melt into —
+ * "16 - 17.02 leaves ONE pixel of overlap where seventeen were meant: the tabs
+ * float, their feet show" (`SectionWithCreate`'s own `folderTabs` doc). This
+ * `pt-6` is entirely INSIDE that same card, below the overlap and below the
+ * seam where the active tab's fill already reads as continuous with the
+ * panel — it makes the fold itself no less flush, it only gives the fold's
+ * own body more air before the first row, the way a real folder's paper has
+ * some depth before whatever is filed inside it starts. Scoped to `attached`
+ * only: a `CollectionCard` with no folder strip above it (there are a few)
+ * keeps the plain, even `p-4` it always had — nothing about its own top asked
+ * for more room. */
 export function CollectionCard({
   children,
   attached = false,
@@ -183,7 +201,7 @@ export function CollectionCard({
 }) {
   return (
     <Card className={cn(attached && "relative z-[2]")}>
-      <CardContent className="p-4">{children}</CardContent>
+      <CardContent className={cn("p-4", attached && "pt-6")}>{children}</CardContent>
     </Card>
   )
 }
@@ -236,14 +254,45 @@ export function AddButton({
  * One seam now, so the fifth tab body that needs a bare toolbar reaches for
  * this instead of writing a fifth copy.
  *
- * `search` LEFT, `actions` RIGHT — `ml-auto` on the actions wrapper is what
- * pins them there whether or not a search box is present, so a button-only row
- * (Sprints' Overview/Calendar, Tasks' Calendar, Tickets' Triage) reads
- * identically to today's `flex justify-end`. There is no third slot: a caller
- * with something else to draw composes it beside this row, never inside it —
- * the same discipline `PagedFind`'s own toolbar keeps. */
+ * ONE ROW, ALWAYS (client ruling, 2026-09-01: the toolbar spec Aurora
+ * approved that night, generalised the way every toolbar shape here is —
+ * "not for one screen only, but the rules"). `search`, then `filters`, then
+ * `sort`, then `actions` pinned to the far right — never a second row, and
+ * `flex-wrap` on this one is an OVERFLOW fallback for a narrow viewport, not a
+ * designed two-tier layout.
+ *
+ * BEFORE THIS, `filters` DID NOT EXIST HERE — Apps and Sprints each rendered
+ * their own `<FilterBar>` as a sibling BELOW this row, which is exactly the
+ * client's screenshot: `[Search apps…] [Sort by] [Name ▾]` on one row, and a
+ * standalone dashed "Filter" chip floating, disconnected, on a second one.
+ * Two call sites is two chances to draw that shape by hand, so it is a slot of
+ * this component now, the same way `search` and `actions` already are.
+ *
+ * `filters` (and `sort`) are wrapped in their own non-growing flex box rather
+ * than rendered bare: `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`)
+ * renders `w-full` internally — the kit's own chip row is meant to claim a
+ * full line when it is the ONLY thing on it — and a bare `w-full` child inside
+ * this flex row would claim the rest of the line for itself and push
+ * `actions` onto a line of its own, which is the same two-row shape one level
+ * down. The kit's OWN toolbar (`shared/ui/components/collection-frame/
+ * collection-frame.tsx`) wraps its `filters` slot the identical way for the
+ * identical reason (`<div className="flex min-w-0 flex-wrap items-center
+ * gap-2">{filters}</div>`) — this is that same wrapper, so a bounded
+ * collection's bare toolbar and the kit panel's own toolbar read as the same
+ * control in two places.
+ *
+ * FOUR NAMED SLOTS, NOT A HARDCODED FOUR-UP ROW. Each is independently
+ * optional (a caller with no facets passes no `filters`, exactly as one with
+ * no search passes no `search`), and the ORDER is this component's, not the
+ * call site's — the same discipline the kit's own contract keeps. A `view`
+ * control (list/grid/calendar), where a screen genuinely offers more than one
+ * — is a fifth slot to add the same way, between `sort` and `actions`, the
+ * day a bounded screen actually needs one; nothing here is sized to today's
+ * four. */
 export function ToolbarRow({
   search,
+  filters,
+  sort,
   actions,
   className,
 }: {
@@ -251,6 +300,15 @@ export function ToolbarRow({
    * body has none (Sprints' Overview/Calendar, Tasks' Calendar, Tickets'
    * Triage) — the row is then the actions alone, still pinned right. */
   search?: React.ReactNode
+  /** The active-facet chips + "+ filter" affordance (`FilterBar`), between
+   * `search` and `sort` — the same position the design kit's own toolbar
+   * contract fixes (search → filters → … → actions). Omitted wherever a
+   * screen has no facets, exactly like `search`. */
+  filters?: React.ReactNode
+  /** The sort control, after `filters` and before the pinned-right
+   * `actions` — a `SortControl`, typically. Omitted wherever a screen has
+   * nothing to sort by. */
+  sort?: React.ReactNode
   /** THE ROW'S OWN ACTION BUTTONS (New/Import/Export…), pinned to the far
    * right — the same `ml-auto` `PagedFind`'s own toolbar uses for its
    * `actions` slot, so a bounded collection's bare toolbar and a paged one's
@@ -258,10 +316,12 @@ export function ToolbarRow({
   actions?: React.ReactNode
   className?: string
 }) {
-  if (!search && !actions) return null
+  if (!search && !filters && !sort && !actions) return null
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {search}
+      {filters && <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>}
+      {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
       {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )

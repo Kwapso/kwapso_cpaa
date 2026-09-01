@@ -311,48 +311,37 @@ export function AppsScreen({
             split is still computed over what the search left ("searched
             FIRST" above), so the box still narrows the collection and the
             tabs still divide what is left; only where the button is DRAWN has
-            moved a second time. Drawn through `<ToolbarRow>` (screen-bits.tsx)
-            rather than a hand-rolled `<div>`, so the button lands pinned right
-            by construction. */}
-        {(appsQ.data.length > 0 || canCreate) && (
-          <div className="mb-4 flex flex-col gap-2">
-            <ToolbarRow
-              search={
-                appsQ.data.length > 0 && (
-                  <>
-                    <div className="relative w-full sm:w-56">
-                      <Search
-                        className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                        aria-hidden
-                      />
-                      <Input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder={t("Search apps…")}
-                        className="pl-8"
-                      />
-                    </div>
-                    <SortControl
-                      options={sortOptions}
-                      value={sort.by}
-                      onValueChange={(by) => {
-                        const opt = APP_SORTS.find((o) => o.value === by)
-                        setSort({ by, dir: opt?.defaultDir ?? "asc" })
-                      }}
-                      direction={sort.dir}
-                      onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                      label={t("Sort by")}
-                    />
-                  </>
-                )
-              }
-              actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
-            />
-            {/* THE FILTERS, ON THEIR OWN ROW — the kit's own shape (FilterBar's
-                own header comment), never squeezed back into the control row
-                above. Options come from the WHOLE collection (see above), so
-                narrowing by one facet never hides the other's choices. */}
-            {appsQ.data.length > 0 && (
+            moved a second time.
+            ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec
+            Aurora approved that night): search, the filter chips, sort, then
+            the create button pinned right, ALL through `<ToolbarRow>`
+            (screen-bits.tsx). `filters` used to be a `<FilterBar>` drawn as
+            this row's own sibling below it — the client's screenshot of
+            exactly this screen ("Search apps… / Sort by / Name" on one row, a
+            stranded dashed "Filter" chip under it) — so it is a slot of the
+            row now instead of a second row beside it. Options come from the
+            WHOLE collection (see above), so narrowing by one facet never
+            hides the other's choices. */}
+        <ToolbarRow
+          className="mb-4"
+          search={
+            appsQ.data.length > 0 && (
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search apps…")}
+                  className="pl-8"
+                />
+              </div>
+            )
+          }
+          filters={
+            appsQ.data.length > 0 && (
               <FilterBar
                 facets={facets}
                 values={facetValues}
@@ -368,9 +357,25 @@ export function AppsScreen({
                 onClearFacets={() => setFacetValues({})}
                 resultCount={matching.length}
               />
-            )}
-          </div>
-        )}
+            )
+          }
+          sort={
+            appsQ.data.length > 0 && (
+              <SortControl
+                options={sortOptions}
+                value={sort.by}
+                onValueChange={(by) => {
+                  const opt = APP_SORTS.find((o) => o.value === by)
+                  setSort({ by, dir: opt?.defaultDir ?? "asc" })
+                }}
+                direction={sort.dir}
+                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+                label={t("Sort by")}
+              />
+            )
+          }
+          actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
+        />
         {shown.length === 0 ? (
           narrowed ? (
             <p className="text-muted-foreground text-sm">{t("No apps match that.")}</p>
