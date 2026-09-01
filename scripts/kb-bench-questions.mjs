@@ -209,6 +209,46 @@ export const QUESTIONS = [
     topic: ["Team Assembly"],
   },
 
+  // ── THE TWO THE OWNER ASKED ON 1 SEPTEMBER 2026, AND THE BASE FAILED ─────
+  //
+  // Permanent, both of them. They are here because he asked them of the live
+  // staging assistant and got nothing, and because each failed in a DIFFERENT
+  // layer from the one everybody blames first — retrieval measured 20/20 on the
+  // twenty questions above on the same day, and was innocent both times.
+  {
+    // COVERAGE. Nothing anywhere in the base said who his own colleagues are:
+    // `staff_profiles` carries a `user_id` and no name column at all, and the
+    // names live in the GLOBAL core database. R47's `person` kind is the fix,
+    // and this question is what stops it being quietly deleted later.
+    //
+    // IT IS ALSO THE NAME-MATCHING TEST. "Alex" reaches "Alexander Stadlmair"
+    // only if both words are in the passage — the lexical arm matches letters —
+    // so the kind writes every spelling a person types (`nameSpellings`), and
+    // this question is the only thing that proves it did.
+    q: "What is Alex's full name?",
+    cites: ["Alexander Stadlmair"],
+    lead: ["Stadlmair"],
+    topic: ["Alexander Stadlmair", "Alex"],
+  },
+  {
+    // "LATEST" MEANS THE PAST. There are 58 meetings called "Week planning" in
+    // this base and FIFTY of them are 2027 recurring shells with nothing in
+    // them; eight have happened and two of those carry a transcript. The most
+    // recent one that really happened is 31 August 2026, and its own words are
+    // the key below — Keno Group, Padelbase, the flu clinic's 48-hour SLA.
+    //
+    // A CITATION OF A 2027 SHELL IS A FAIL, not a near miss: the shell has the
+    // same title as the real meeting and is a near-perfect semantic match for
+    // this question, so nothing in the ranking can separate them. `lead` is what
+    // makes the difference legible — a passage from the real meeting says what
+    // was planned, and a shell says only that a meeting exists.
+    q: "What was the latest week planning about?",
+    conversation: true,
+    cites: ["Week planning"],
+    lead: ["Keno", "Padel", "Paddle", "Horse", "Flu Clinic", "flu clinic", "48-hour", "warehouse"],
+    topic: ["Week planning"],
+  },
+
   // ── QUESTIONS THAT CROSS SOURCES ─────────────────────────────────────────
   { q: "What is the plan for importing HOGO's existing data?", cites: ["HOGO", "Hogo", "Import"],
     lead: ["import", "data", "HOGO", "Hogo", "file", "structure"],

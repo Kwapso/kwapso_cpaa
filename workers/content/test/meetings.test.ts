@@ -593,6 +593,17 @@ describe("the sweep brings in everything, not only the repeating entries", () =>
     expect(meetingTitles()).toHaveLength(0)
   })
 
+  // THE THIRD DOOR GOOGLE'S TEXT COMES THROUGH. The sweep lanes were mended and
+  // then the transcript column was mended, and a calendar entry named after a
+  // person was still arriving as "Ãlaap / Alexander" — sitting in the meeting
+  // list looking like a typo somebody made. Found by censusing every TEXT column
+  // in the team database rather than by remembering another door.
+  it("mends Google's mis-spelling of a name in the entry's own title", async () => {
+    googleCalendar.events = [entry({ id: "E6", summary: "Ãlaap / Alexander" })]
+    await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    expect(meetingTitles()).toEqual(["Alaap / Alexander"])
+  })
+
   it("an entry with no title gets words rather than a blank, and sweeping twice writes once (R17)", async () => {
     googleCalendar.events = [entry({ id: "E5", summary: "" })]
     await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})

@@ -45,6 +45,7 @@ import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activ
 import { InAppLink } from "@/components/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
+import { clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -969,11 +970,11 @@ export function RecordScreen({
   // condensed stand-in takes over.
   const titleBlock =
     identityChips === undefined && subtitleLine === null ? (
-      <span ref={titleRef} className="min-w-0 break-words">{title}</span>
+      <span ref={titleRef} className="min-w-0 break-words">{clampRecordHeading(title)}</span>
     ) : (
       <span ref={titleRef} className="flex min-w-0 flex-col gap-[var(--space-1h)]">
         {identityChips}
-        <span className="min-w-0 break-words">{title}</span>
+        <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
         {subtitleLine}
       </span>
     )

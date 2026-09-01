@@ -35,6 +35,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import { makeApi, makeRpc, timedFetch } from "./lib/api.mjs"
+import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
 
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 const REPO = fileURLToPath(new URL("..", import.meta.url))
@@ -70,10 +71,10 @@ const section = (title) => console.log(`\n— ${title}`)
 /** A normal app request (session cookie), exactly as the browser makes it. */
 const api = makeApi(BASE)
 
-const TEST_LOGIN_KEY = process.env.TEST_LOGIN_KEY ?? ""
+const TEST_LOGIN_KEY = testLoginKey()
 if (!TEST_LOGIN_KEY)
   stop(
-    "no TEST_LOGIN_KEY in the environment",
+    NO_KEY_MESSAGE,
     "the smoke signs two accounts in through the staging-only admin test-login door (export TEST_LOGIN_KEY first)"
   )
 

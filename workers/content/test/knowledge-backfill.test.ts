@@ -214,20 +214,55 @@ describe.skipIf(!present)("the backfill, over the agency's own history", () => {
     // more of them the day apps, stories and sprints started carrying summaries,
     // and an expectation naming three tables would have gone on passing while
     // silently describing a smaller app. Each kind names its own table.
-    const mirrorable = INGEST_KINDS.reduce((n: number, k: { table: string }) => {
+    // AND WHAT ONE SOURCE IS, asked of the kind rather than assumed. Almost every
+    // kind mirrors a ROW; `dropdown` mirrors a LIST, so its sources are the
+    // distinct values of the column it declares in `oneSourcePer`. Assuming
+    // one-per-row would have counted every dropdown VALUE and expected sixty
+    // sources that should never exist — a red build asking for the corpus to be
+    // made worse.
+    const mirrorable = INGEST_KINDS.reduce(
+      (n: number, k: { table: string; oneSourcePer?: string; fromCoreDatabase?: boolean }) => {
+      // AND NOT EVERY KIND'S ROWS ARE IN THIS DATABASE. `person` mirrors the
+      // team's MEMBERS, and membership is global — `team_members` and `users`
+      // live in the core database, so the team's own `users` rows (which in
+      // production is a table that does not exist, and in this single-database
+      // fixture is a different set of people) are not what it filed. Counted
+      // separately below, off what it actually wrote, so the exclusion cannot
+      // hide a kind that filed nothing.
+      if (k.fromCoreDatabase) return n
       const t = k.table
+      const what = k.oneSourcePer ? `COUNT(DISTINCT ${k.oneSourcePer})` : "COUNT(*)"
       const live =
         t === "help"
-          ? "SELECT COUNT(*) AS n FROM help"
-          : `SELECT COUNT(*) AS n FROM ${t} WHERE deactivated_at IS NULL`
+          ? `SELECT ${what} AS n FROM help`
+          : `SELECT ${what} AS n FROM ${t} WHERE deactivated_at IS NULL`
       try {
         return n + one(live).n
       } catch {
         // the fixture does not ship this table — nothing to mirror from it
         return n
       }
-    }, 0)
-    expect(stats.sources).toBe(mirrorable)
+      },
+      0
+    )
+    // THE CORE-DATABASE KINDS, counted off what they wrote — and asserted to be
+    // more than nothing, so "excluded from the sum" can never quietly become
+    // "filed nothing at all". One source per live member of THIS team, which is
+    // the join the kind itself makes.
+    const coreTables = INGEST_KINDS.filter(
+      (k: { fromCoreDatabase?: boolean }) => k.fromCoreDatabase
+    ).map((k: { table: string }) => `'${k.table}'`)
+    const fromCore = coreTables.length
+      ? one(
+          `SELECT COUNT(*) AS n FROM knowledge_sources WHERE origin_table IN (${coreTables.join(", ")})`
+        ).n
+      : 0
+    if (coreTables.length)
+      expect(
+        fromCore,
+        "a kind reading the core database filed nothing — excluded from the sum is not the same as absent"
+      ).toBeGreaterThan(0)
+    expect(stats.sources).toBe(mirrorable + fromCore)
     const archived = one("SELECT COUNT(*) AS n FROM help WHERE archived_at IS NOT NULL").n
     if (archived > 0)
       expect(

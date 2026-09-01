@@ -49,6 +49,7 @@ import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import { KNOWLEDGE_KINDS } from "../src/lib/knowledge"
+import { SOURCE_CHIPS } from "@shared/knowledge-chips"
 import { stripComments } from "@shared/rules/source-scan"
 import { PORTAL_VISIBLE_READS } from "@shared/rules/registry"
 import type { KnowledgeAnswer } from "@shared/types"
@@ -112,8 +113,10 @@ async function sweepUntilCaughtUp(max = 40): Promise<number> {
   throw new Error(`the sweep never caught up in ${max} ticks`)
 }
 
-async function ask(question: string, accountId?: string): Promise<KnowledgeAnswer> {
-  const query = `?q=${encodeURIComponent(question)}${accountId ? `&accountId=${accountId}` : ""}&limit=12`
+async function ask(question: string, accountId?: string, sources?: string[]): Promise<KnowledgeAnswer> {
+  const query = `?q=${encodeURIComponent(question)}${accountId ? `&accountId=${accountId}` : ""}${
+    sources?.length ? `&sources=${encodeURIComponent(sources.join(","))}` : ""
+  }&limit=12`
   const res = await call(IDS.staffUser, "GET /api/content/knowledge/ask", undefined, query)
   expect(res.status).toBe(200)
   return (await res.json()) as KnowledgeAnswer
@@ -249,6 +252,73 @@ describe("every row that carries a client id becomes material, in that client's 
       expect(
         (KNOWLEDGE_KINDS as readonly string[]).includes(kind.kind),
         `the sweep writes "${kind.kind}" but KNOWLEDGE_KINDS does not name it — every source of it will list as a note`
+      ).toBe(true)
+  })
+
+  // WHAT A KIND DECLARES ABOUT ITSELF HAS TO BE TRUE OF ITS OWN READER.
+  //
+  // Three declarations landed with R47 and every one of them is a fact something
+  // ELSE then reasons from — `fromCoreDatabase` is why the backfill's expected
+  // count excludes a kind, `oneSourcePer` is why it counts DISTINCT instead of
+  // rows, `modules` is what R47's census credits a kind with. A declaration that
+  // drifts from its reader does not break anything visibly; it makes another
+  // check quietly measure the wrong thing, which is the failure mode this whole
+  // file exists for. So each is read back against the reader's own source.
+  it("a kind's own declarations still describe its own reader", () => {
+    const sweep = stripComments(readFileSync(INGEST_FILE, "utf8"))
+    const starts = [...sweep.matchAll(/\n {4}kind: "([a-z_]+)",\n/g)]
+    const tableEnd = sweep.indexOf("\n]", starts[starts.length - 1]?.index ?? 0)
+    const slice = (name: string) => {
+      const at = starts.findIndex((m) => m[1] === name)
+      const from = starts[at]?.index as number
+      const to = (starts[at + 1]?.index as number) ?? (tableEnd === -1 ? sweep.length : tableEnd)
+      return sweep.slice(from, to)
+    }
+    expect(starts.length, "the kind scan found nothing — it has gone blind").toBe(INGEST_KINDS.length)
+    for (const k of INGEST_KINDS) {
+      const src = slice(k.kind)
+      // BOTH WAYS. A kind claiming the core database must really reach it, and a
+      // kind that reaches it must say so — the second half is the one that
+      // matters, because an undeclared core reader makes the backfill count a
+      // team table that has nothing to do with what it filed.
+      expect(
+        Boolean(k.fromCoreDatabase),
+        `the "${k.kind}" kind ${k.fromCoreDatabase ? "claims fromCoreDatabase but never names env.DB" : "reads env.DB but does not declare fromCoreDatabase"}`
+      ).toBe(src.includes("env.DB"))
+      // A kind that says one source is per-column must really group by it.
+      if (k.oneSourcePer)
+        expect(
+          src.includes(`GROUP BY ${k.oneSourcePer}`),
+          `the "${k.kind}" kind declares one source per "${k.oneSourcePer}" but its reader does not GROUP BY it`
+        ).toBe(true)
+    }
+  })
+
+  // THE CHIPS AND THE KINDS CANNOT DRIFT APART. `shared/knowledge-chips.ts` groups
+  // the kinds into the six doors a person ticks, and it holds STRINGS rather than
+  // an import of KNOWLEDGE_KINDS, because `shared/` may not depend on a worker.
+  // So this is what holds the two together — and it fails BOTH ways, because both
+  // are real: a kind in no chip is material the screen can never reach, and a
+  // kind in two chips is two switches that disagree about the same passages.
+  it("every kind the sweep writes sits in exactly one source chip", () => {
+    const seen = new Map<string, string[]>()
+    for (const chip of SOURCE_CHIPS)
+      for (const kind of chip.kinds) seen.set(kind, [...(seen.get(kind) ?? []), chip.key])
+    for (const kind of KNOWLEDGE_KINDS) {
+      const chips = seen.get(kind) ?? []
+      expect(
+        chips.length,
+        chips.length === 0
+          ? `the kind "${kind}" is in no source chip — nothing a person can tick reaches it`
+          : `the kind "${kind}" is in ${chips.length} chips (${chips.join(", ")}) — two switches, same passages`
+      ).toBe(1)
+    }
+    // …and nothing invented: a chip naming a kind the sweep does not write is a
+    // switch over an empty set, which reads to a person as "we have none of that".
+    for (const [kind, chips] of seen)
+      expect(
+        (KNOWLEDGE_KINDS as readonly string[]).includes(kind),
+        `chip "${chips[0]}" names "${kind}", which is not a kind this base writes`
       ).toBe(true)
   })
 
@@ -393,6 +463,53 @@ describe("the two questions he actually asked", () => {
     // MORE THAN ONE KIND OF RECORD. The old base could only ever cite the account
     // card, because it was the only thing about a client that carried its name.
     expect(new Set(answer.citations.map((c) => c.kind)).size).toBeGreaterThan(1)
+  })
+
+  // ── THE SOURCE CHIPS NARROW THE DOOR, NOT THE SCREEN ──────────────────────
+  //
+  // A chip that ticks and unticks is trivial; a chip whose scope reaches the
+  // RETRIEVAL DOOR is the feature. So this asks the same question twice and
+  // compares the ANSWERS, rather than asserting that a parameter was accepted.
+  //
+  // It narrows in both places R26 names — the vector index is told which kinds to
+  // look at, and the passage read, where the database decides, carries the same
+  // clause. A test that only proved one of them would pass with the other
+  // deleted, and the deleted one is the fence.
+  it("naming a chip narrows what comes back, and naming none is unchanged", async () => {
+    const all = await ask("What do we do for Bergman S.A.?")
+    expect(all.found).toBe(true)
+    const kindsAll = new Set(all.citations.map((c) => c.kind))
+    expect(kindsAll.size, "the unnarrowed answer draws on more than one kind").toBeGreaterThan(1)
+
+    // ONE DOOR: the app's own records. Everything that comes back must be a kind
+    // that chip covers — the narrowing is real, not decorative.
+    const recordKinds = new Set(
+      SOURCE_CHIPS.find((c) => c.key === "records")?.kinds ?? []
+    )
+    const narrowed = await ask("What do we do for Bergman S.A.?", undefined, ["records"])
+    for (const c of narrowed.citations)
+      expect(
+        recordKinds.has(c.kind),
+        `"${c.title}" is a ${c.kind}, which the "records" chip does not cover`
+      ).toBe(true)
+
+    // AND A DOOR WITH NOTHING BEHIND IT ANSWERS NOTHING, rather than quietly
+    // widening back to everything. This is the assertion that fails if the
+    // narrowing is dropped anywhere on the path.
+    const mailOnly = await ask("What do we do for Bergman S.A.?", undefined, ["mail"])
+    expect(
+      mailOnly.citations.every((c) => c.kind === "email"),
+      `narrowing to mail returned ${mailOnly.citations.map((c) => c.kind).join(", ")}`
+    ).toBe(true)
+  })
+
+  it("an invented chip key is ignored, and reads as no narrowing at all", async () => {
+    // R20 at the boundary: the door checks each value against the declared set
+    // where it sits, so a key nobody declared contributes nothing — and "nothing
+    // named" is every door, never none. The alternative reading would let a typo
+    // silently turn the knowledge base off.
+    const answer = await ask("What do we do for Bergman S.A.?", undefined, ["not-a-chip"])
+    expect(answer.found, "a typo must not switch the knowledge base off").toBe(true)
   })
 
   it("'how does Bergman approve a supplier invoice?' finds the map, not the business card", async () => {
@@ -768,7 +885,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // came out of the Team Assembly?" while the 92-chunk transcript was not. The
   // bump is not cosmetic: those rows sit behind this lane's cursor and only a
   // rewind re-decides them.
-  meeting: { version: 4, digest: "2429e9f9e1353766" },
+  // v5: the mojibake mend reached `meetings.transcript_text` and the PASSAGES
+  // built from it were left behind — 39 meetings, 1,281 chunks, all sitting
+  // behind this lane's cursor with `content_hash` nulled and nothing that would
+  // ever read them again. Same reason as v3, and the same lesson: on a
+  // forward-only lane, nulling the hash on a row the cursor has passed does
+  // NOTHING. Only a bump walks it back.
+  meeting: { version: 5, digest: "73fb4b8e98d1f6c4" },
   todo: { version: 1, digest: "e00d2b0c6bb86edb" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
@@ -776,7 +899,29 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // slice at the table's own closing bracket changed the MEASUREMENT, not the
   // reader — the task builder is byte for byte what it was — so nothing needs
   // re-indexing and the version must not move.
-  task: { version: 1, digest: "be0ca1175f2e2618" },
+  // RE-PINNED AGAIN 1 Sep 2026, AT THE SAME VERSION, for the SECOND time and the
+  // same reason as the first. `task` was the last kind in the table, so its slice
+  // ran to the table's closing bracket; three kinds now follow it, so the slice
+  // ends where `person` begins. The measurement moved and the reader did not —
+  // the task builder is byte for byte what it was — so nothing needs re-indexing
+  // and the version must not move. That this keeps happening to whichever kind is
+  // declared last is worth knowing before reaching for a bump.
+  task: { version: 1, digest: "b837d2e036f69056" },
+  // R47's three (1 Sep 2026). Every one starts at v1 because no row of them has
+  // ever been indexed — there is nothing behind a cursor to leave saying the old
+  // words.
+  // v2: a client login is not a colleague — R21 makes one an ordinary team
+  // member holding an ordinary role, so `team_members` alone cannot tell them
+  // apart and three client contacts on staging were filed as colleagues within
+  // minutes of v1 landing. The live portal grant is the fact that separates
+  // them, and the bump is what walks the cursor back over the rows already
+  // written.
+  // v3: the SENTENCE, not the fact — "a client contact for Test client" rather
+  // than "a person at a client of ours FOR Test client, client". Only visible on
+  // a live row, which is where it was found, minutes after v2 shipped.
+  person: { version: 3, digest: "243b2b0621259f0d" },
+  dropdown: { version: 1, digest: "ce030ed2555c6595" },
+  portal_login: { version: 1, digest: "d759a60ff2f459f0" },
 }
 
 /** Everything in the sweep that is NOT inside a kind: the shared helpers each
@@ -797,7 +942,18 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // WHETHER a source is indexed, never a word of what any kind says, so again no
 // textVersion moves — and a bump here would be actively wrong: it would re-index
 // every row of every kind to fix nothing.
-const SHARED_DIGEST = "ab9427cec860b31b"
+// 1 Sep 2026: `IngestKind.read` gained a fifth argument (the global core
+// database, for the `person` kind — membership is global and `staff_profiles`
+// carries no name), `IngestKind` gained `modules` (R47), `oneSourcePer` (what
+// one source of a kind IS, where it is not one row) and `fromCoreDatabase` (its
+// rows are not in the team's database at all), and `nameSpellings` landed beside
+// the other helpers. None of the three changes a WORD any existing
+// kind says: the ten readers that were here before pass the new argument nowhere
+// and call the new helper never, and every one of their per-kind digests above
+// is unchanged except `task`, whose slice merely moved (see its note). So no
+// textVersion moves, and a bump here would re-index the whole base to fix
+// nothing.
+const SHARED_DIGEST = "60d395561678771d"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

@@ -72,6 +72,7 @@ const ready = {
     pinnedTeamId: null,
     language: null,
     scale: null,
+    spine: null,
   },
   teamId: "team_1",
   accounts: [{ id: "acc_1", name: "Confia" }],

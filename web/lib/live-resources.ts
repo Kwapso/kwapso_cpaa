@@ -546,6 +546,20 @@ export function runningTimersKey(teamId: string): string {
  * the story's Time tab for ever, because that key reached no listener at all —
  * and a row that reads as running is a row the screen refuses to let you edit. */
 export const TIME_SLICE_PREFIX = "time-of:"
+
+/** THE RELATIONSHIP MAP'S FAMILY — `record:map:<table>:<id>`, one key per record
+ * whose neighbourhood somebody has opened.
+ *
+ * A FAMILY DROP AND NOT A KEYED ONE, because the ping cannot name the keys: a
+ * ticket that gains an app changes the picture of the APP, of the ACCOUNT above
+ * it and of every sibling drawn beside it, and none of those ids is in the event.
+ * The family is small by construction — a person opens one or two maps in a
+ * session — so dropping it whole costs one re-read of a picture that is on
+ * screen, which is exactly the trade `TIME_SLICE_PREFIX` already makes. */
+export const RECORD_MAP_PREFIX = "record:map:"
+export function recordMapKey(table: string, id: string): string {
+  return `${RECORD_MAP_PREFIX}${table}:${id}`
+}
 export function recordTimeKey(targetTable: string, targetId: string): string {
   return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}`
 }
@@ -848,7 +862,13 @@ export const TEAM_RESOURCES: Record<
      * is enough to name a key derived from THAT row; it is not enough when the
      * slice is keyed by a DIFFERENT record (the story a work log sits against).
      * Everything under the prefix is dropped and re-read. */
-    slicePrefix?: string
+    /** A FAMILY OF KEYS THIS PING CANNOT NAME — dropped by prefix rather than by
+     * key. One prefix, or several: a row can go stale in more than one family,
+     * and a resource that could name only one had to choose which staleness to
+     * fix. The relationship map is what made that a real choice — a ticket
+     * changing its app changes the ticket's OWN caches and the neighbourhood
+     * picture of every record it sits beside, and those are two families. */
+    slicePrefix?: string | string[]
     /** refresh the active-team context (e.g. the section member count). */
     refreshCtx?: boolean
   }
@@ -918,6 +938,9 @@ export const TEAM_RESOURCES: Record<
     // deactivated company must reach the client pickers too, and a coarse
     // invalidate is honest for a 24-row list.
     deps: (t, id) => [accountKey(id), `activity:record:accounts:${id}`, companiesKey(t)],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   account_links: {
     key: (t) => accountsKey(t),
@@ -933,6 +956,9 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
     deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   // The knowledge base — row-level live. Adding a source, correcting one or
   // taking one away patches just that row in the cached list; the SWEEP's ping
@@ -991,7 +1017,7 @@ export const TEAM_RESOURCES: Record<
     // …and every per-account slice of the ticket list — a contact's Tickets tab
     // is one of those, and a slice nobody drops is a tab that goes stale the
     // moment somebody else raises a ticket.
-    slicePrefix: "tickets-account-of:",
+    slicePrefix: ["tickets-account-of:", RECORD_MAP_PREFIX],
   },
   // PROCESS MAPS — row-level live. A step edited on somebody else's screen
   // patches just that map in the cached list; the deps carry the parts of the
@@ -1021,6 +1047,9 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => wavesApi.one(id).then((r) => r.wave as unknown as Record<string, unknown>),
     fetchList: (t) => listFetch.waves(t),
     deps: (_t, id) => [waveOneKey(id), `activity:record:waves:${id}`],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   processes: {
     key: (t) => processesKey(t),
@@ -1046,7 +1075,7 @@ export const TEAM_RESOURCES: Record<
     // was current a moment ago is now one of these. The ping names the map, not
     // the version, so the honest answer is to drop the family and let whatever is
     // on screen re-read (cache-first: a slice nobody is looking at costs nothing).
-    slicePrefix: PROCESS_VERSION_SLICES,
+    slicePrefix: [PROCESS_VERSION_SLICES, RECORD_MAP_PREFIX],
   },
   // A comment carries the PROCESS id — a conversation is only ever read on its
   // own map, so that is the one row a listener can act on. It refreshes the
@@ -1093,6 +1122,9 @@ export const TEAM_RESOURCES: Record<
       insightsKey(t),
       ...recordCountDeps("stories"),
     ],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   // A sprint has a list of its own, and its rows carry counts of the stories
   // inside it — so a sprint ping patches the sprint row and leaves the backlog
@@ -1104,6 +1136,9 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.sprints(t),
     // …and the Sprints badge on whichever client or app record is open (R15).
     deps: (_t, id) => [`activity:record:sprints:${id}`, ...recordCountDeps("sprints")],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   // TIME — row-level live, and the one resource whose ping most often lands on
   // the person who caused it: the header timer is on every screen, so starting
@@ -1151,7 +1186,7 @@ export const TEAM_RESOURCES: Record<
     // re-read. This also closes a gap that predates the done pile: the account
     // slice reached no listener at all, so a client completing a to-do in their
     // portal left that client's To-dos tab showing yesterday.
-    slicePrefix: TODO_SLICE_PREFIX,
+    slicePrefix: [TODO_SLICE_PREFIX, RECORD_MAP_PREFIX],
   },
   // TASKS — our own admin, agency-side only. The row-level patch lands on the
   // OPEN list; the OTHER FIVE views are dropped instead, because a task that has
@@ -1169,6 +1204,9 @@ export const TEAM_RESOURCES: Record<
       `activity:record:tasks:${id}`,
       insightsKey(t),
     ],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
   // cursor in a sidecar, so the same registry keeps it live (R15's own words).
@@ -1212,7 +1250,7 @@ export const TEAM_RESOURCES: Record<
     // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and
     // both kinds start with the module's own name. It cannot reach the list key
     // itself, which is `meetings:<teamId>` — a colon where this has a hyphen.
-    slicePrefix: "meetings-",
+    slicePrefix: ["meetings-", RECORD_MAP_PREFIX],
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.
@@ -1270,6 +1308,9 @@ export const TEAM_RESOURCES: Record<
     // The shelf itself, and the badge above it. Both are named exactly, because
     // the ping said which app.
     deps: (_t, appId) => [deliverablesKey(appId), ...recordCountDeps("deliverables")],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
   account_rates: {
     key: (t) => accountsKey(t),
@@ -1309,6 +1350,9 @@ export const TEAM_RESOURCES: Record<
       `activity:record:apps:${id}`,
       ...recordCountDeps("apps"),
     ],
+    // …and the relationship map's picture of anything standing beside this
+    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
+    slicePrefix: RECORD_MAP_PREFIX,
   },
 }
 

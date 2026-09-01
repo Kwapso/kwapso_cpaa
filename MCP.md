@@ -150,6 +150,16 @@ Today it covers:
     tools below are unchanged and stay the shortest path to "give me this
     collection".
   - identity and rights, `whoami`, `my_permissions`, `get_team`
+  - **what has changed, and who changed it** — `read_activity`, the cross-module
+    history feed. It is the one door whose answer is assembled by SUBTRACTING
+    the caller's denied modules (R18), so a team-scope read is the history for
+    THAT caller and not for the team: the count moves with the role. It arrived
+    on this surface on 1 Sep 2026 under R47, which asks that every module a
+    person can see is one the assistant can answer about — and the reason this
+    door had held out until then, written down at the time, was that the merged
+    stream was "a separate decision for the owner, not a parity default". The
+    owner made it. `scope` is team, record, user, role or invite; the record
+    scope takes the record's own `table` and `id`.
   - people and access, `list_members`, `list_roles`, `list_invites`,
     `list_portal_access`
   - customers, `list_accounts`, `get_account`
@@ -227,7 +237,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **270 doors, 216 with a tool, 54 with a written reason**, the
+  red build. Today: **272 doors, 217 with a tool, 55 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -248,7 +258,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 216, **192 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 217, **193 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.

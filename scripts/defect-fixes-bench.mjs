@@ -119,10 +119,10 @@
 // saying only one of them.
 import "./lib/shared-alias.mjs"
 
-import { execSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
@@ -272,10 +272,7 @@ if (DRY) {
 // model (gpt-oss speaks native tool-call turns; no fence is applied on this
 // path — see that function's own comment).
 function workersAiModel(name) {
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-  const token =
-    process.env.CLOUDFLARE_API_TOKEN ||
-    execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+  const { account, token } = cloudflareCredentials()
   return {
     async complete(openAiMessages) {
       const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${name}`, {

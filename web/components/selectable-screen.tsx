@@ -40,6 +40,7 @@ import { useT } from "@shared/web/language"
 import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
 import { useConfirm } from "@shared/web/use-confirm"
+import { CollectionHeading } from "@/components/collection-heading"
 
 /** WHAT A DROPDOWN VALUE MAY BE ORDERED BY. "Value" reorders the words INSIDE
  * one group (the group itself stays put, alphabetical); "Group" reorders the
@@ -321,6 +322,7 @@ export function SelectableScreen({
   teamId,
   onImport,
   onOpen,
+  standalone = true,
 }: {
   teamId: string
   /** Host-provided soft-nav to the import wizard (pre-targeted to dropdown values). */
@@ -329,6 +331,13 @@ export function SelectableScreen({
    * The host owns the URL shape, exactly as it does for the import wizard above —
    * this screen knows a value has a record and not where the record lives. */
   onOpen?: (id: string) => void
+  /** Whether this is a whole page (`/t/<teamId>/dropdowns`, still resolves for
+   * anything unlinked that points at it — module-content.tsx) or one tab of the
+   * Settings screen (settings-screen.tsx, "Choices"). A page names and counts
+   * itself through the registry's own `CollectionHeading` (R16 ii); a tab
+   * already has its own name on the strip above it, so a second, page-sized
+   * heading inside the panel would be the count and the title said twice. */
+  standalone?: boolean
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
@@ -472,32 +481,16 @@ export function SelectableScreen({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
-            is the kit's own named "Page title" step (56/500), see
-            collection-heading.tsx's own note for the full ruling. */}
-        <Headline as="h1" size="display-m">
-          {t("Choices")}
-          {/* HOW MANY, BESIDE THE HEADING — because a count is a RESULT and a
-              heading is where this app says how big a collection is. It used
-              to sit at the head of the filter bar, on the same band as the
-              search box and the status Select, which are CAUSES. Three units,
-              one band, two different questions, and that is N4's own worked
-              example of the "twisted" fault: the eye reads left to right
-              expecting one idea and gets an answer followed by two controls
-              that produce it. Nothing about the number changed — this is a
-              bounded collection read whole, so it is an honest count of the
-              rows in hand rather than a page length. */}
-          {values.length > 0 && (
-            <span className="text-muted-foreground ml-2 text-base font-normal tabular-nums">
-              {filtered.length === values.length
-                ? values.length
-                : t("{shown} of {total}", {
-                    shown: filtered.length,
-                    total: values.length,
-                  })}
-            </span>
-          )}
-        </Headline>
+        {/* THE REGISTRY'S OWN HEADING, standalone only (R16 ii) — the "Choices"
+            page names and counts itself here; the "Choices" TAB on Settings
+            already carries that name on the strip above this panel, so a
+            second, page-sized title inside it would say the name and the
+            count twice (R16). Embedded, only the description line stays. */}
+        {standalone ? (
+          <CollectionHeading sectionKey="dropdowns" total={values.length} />
+        ) : (
+          <Headline as="h2" size="h4">{t("Choices")}</Headline>
+        )}
         <p className="text-muted-foreground mt-1 text-sm">
           {t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
         </p>

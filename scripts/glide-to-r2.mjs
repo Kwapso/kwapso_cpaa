@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Move the rescued Glide files off Google's storage and onto OUR R2, permanently.
 //
-//   export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cloudflare-token-kwapso -w)
+//   export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cf-token-kwapso -w)
 //   export CLOUDFLARE_ACCOUNT_ID=b5bb3d84a59c029ea5e0fe164dab1cf7
 //   node scripts/glide-to-r2.mjs staging
 //   node scripts/glide-to-r2.mjs production
@@ -101,7 +101,7 @@ if (ACCOUNT !== KWAPSO_ACCOUNT_ID || !TOKEN) {
     `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${ACCOUNT ?? "unset"}` +
       `${TOKEN ? "" : " and CLOUDFLARE_API_TOKEN is unset"},\n` +
       `and this script only ever writes to ${KWAPSO_ACCOUNT_ID}.\n\n` +
-      `  export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cloudflare-token-kwapso -w)\n` +
+      `  export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cf-token-kwapso -w)\n` +
       `  export CLOUDFLARE_ACCOUNT_ID=${KWAPSO_ACCOUNT_ID}`
   )
   process.exit(2)

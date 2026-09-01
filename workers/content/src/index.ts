@@ -150,6 +150,7 @@ import { getRecordCounts } from "./routes/record-counts"
 import {
   getKnowledge,
   getKnowledgeAsk,
+  getKnowledgeMap,
   getKnowledgeSync,
   postCreateKnowledge,
   postKnowledgeSync,
@@ -423,6 +424,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/record-counts": { handler: getRecordCounts, kind: "read" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
+  "GET /api/content/knowledge/map": { handler: getKnowledgeMap, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
   "POST /api/content/knowledge": { handler: postCreateKnowledge, kind: "mutation" },
   // A file becomes a source: stored whole, read where we can, and honest about

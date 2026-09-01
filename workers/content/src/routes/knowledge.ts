@@ -19,6 +19,9 @@ import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { consumeAiUnit, logUsage, refundAiUnits, type UsageSource } from "@shared/workers/credits"
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { resolveOrdering } from "@shared/workers/sorting"
+import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
+import { neighbourhood, readableTables } from "../lib/record-map"
+import { kindsForChips, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
@@ -174,6 +177,44 @@ export async function payToWrite(
  *
  * `accountId` is how a screen says WHOSE record the question was asked from; the
  * compartment is derived from it (or from the question), never picked by hand. */
+/** GET /api/content/knowledge/map — ONE RECORD'S NEIGHBOURHOOD, for the
+ * relationship map.
+ *
+ * `table` and `id` say where the reader is standing; the answer is what sits one
+ * step away, the lines between, and an exact count of the neighbours (R16) which
+ * is NOT the length of a capped list.
+ *
+ * THE FENCE IS THE POINT OF THIS DOOR, and it is R18's clause applied to a
+ * shape R18 never had to think about. The activity feed subtracts the caller's
+ * denied modules from a list of ROWS. A map's unit is an EDGE, which is a fact
+ * about TWO records — and an edge can disclose something neither endpoint
+ * states. So both ends are checked, and an edge whose far end the caller may not
+ * read is absent rather than greyed or counted: a count of things you may not
+ * see is itself the fact being withheld.
+ *
+ * AGENCY ONLY. `refusePortalCaller`, deliberately and permanently for now — the
+ * portal has its own account fence with its own suite, and an edge rule proved
+ * here is not inherited there. lib/record-map.ts carries the whole argument.
+ *
+ * Gated on `knowledge:read` because this is the knowledge section's own screen;
+ * everything it can actually SHOW is then decided by the per-module subtraction,
+ * so the gate opens the picture and the sheet decides what is in it. */
+export async function getKnowledgeMap(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "knowledge", "read")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  const table = queryText(url.searchParams.get("table"), "Table", TEXT_LIMITS.short)
+  const id = queryText(url.searchParams.get("id"), "Record", TEXT_LIMITS.short)
+  if (!table || !id) return fail(400, "invalid_input", "Say which record to open the map on.")
+  // hasOwnProperty, not bare bracket access — `?table=__proto__` resolves an
+  // INHERITED member and would otherwise pass a truthiness check as a live
+  // table. The same hardening `getActivityFeed` carries, for the same reason.
+  if (!Object.prototype.hasOwnProperty.call(ACTIVITY_GATE_MAP, table))
+    return fail(400, "invalid_input", "That is not a kind of record this map draws.")
+  const readable = await readableTables(cfg, guard)
+  return json(await neighbourhood(cfg, guard, { table, id, readable }))
+}
+
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, actor } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
@@ -192,10 +233,21 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // Checked where it sits (R20): the door reads exactly one spelling of yes, so
   // there is no truthiness anywhere on this path.
   const write = queryText(url.searchParams.get("compose"), "Compose") === "1"
+  // WHICH DOORS THIS CONVERSATION IS USING — the source chips, as a comma list of
+  // chip keys. Every value is checked against the declared set at the boundary
+  // (R20): an allow-list `.includes` is the checking position, so an invented key
+  // contributes nothing rather than reaching a WHERE clause. Absent or empty
+  // means every kind, which is what a caller who has never touched the chips
+  // sends — see `kindsForChips` for why that reading is the only safe one.
+  const chips = (queryText(url.searchParams.get("sources"), "Sources") ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => SOURCE_CHIP_KEYS.includes(k))
   return json(
     await retrieve(env, cfg, guard, {
       question,
       accountId: queryText(url.searchParams.get("accountId"), "Account") ?? null,
+      kinds: kindsForChips(chips),
       limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
       // The writer is only ever REACHED once there is something to write about —
       // `retrieve` calls it after `found` is settled — and it gates and meters

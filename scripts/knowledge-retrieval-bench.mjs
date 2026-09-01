@@ -13,7 +13,7 @@
 // the int8 rounding.
 //
 // Steps (each cached to disk, so a re-run costs nothing):
-//   export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cloudflare-token-kwapso -w)
+//   export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cf-token-kwapso -w)
 //   mkdir -p .kb-bench/books && cd .kb-bench/books
 //   for id in 2701 1342 84 1228 132 98 1497; do
 //     curl -sLO "https://www.gutenberg.org/cache/epub/$id/pg$id.txt"; done
@@ -32,7 +32,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { execSync } from "node:child_process"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const BOOKS = process.env.KB_BOOKS || join(HERE, "..", ".kb-bench", "books")
@@ -42,10 +42,7 @@ if (!existsSync(CACHE)) mkdirSync(CACHE, { recursive: true })
 const REPO = process.env.KB_REPO || join(HERE, "..")
 const TEXT_LIB = join(REPO, "workers", "content", "src", "lib", "knowledge-text.ts")
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const EMBED_MODEL = process.env.KB_EMBED_MODEL || "@cf/baai/bge-m3"
 const CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 const RERANK_MODEL = "@cf/baai/bge-reranker-base"

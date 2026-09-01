@@ -181,16 +181,21 @@ describe("the shell's own chrome stays on screen", () => {
     const src = read("components/app-shell.tsx")
     const rail = src.indexOf("<Rail")
     expect(rail, "app-shell must render the kit's Rail").toBeGreaterThan(-1)
-    // 1500 → 7000 (31 Aug 2026): the collapsed-state member row grew a real
-    // `<ProfileMenu trigger=… tooltip=…>` composition (the avatar itself is
-    // now the menu's trigger, replacing a separate dots button — see the
-    // note in app-shell.tsx) BEFORE the expanded state's own
-    // `<ProfileMenu … compact>` this assertion is really checking for, which
-    // pushed the real distance from `<Rail` to ~5,974 chars. The window only
-    // needs to be generous, not exact.
+    // NO `compact` PROP ANY MORE (client feedback, 1 Sep 2026: "kill the three
+    // buttons on the avatar in the navbar. clicking on the whole avatar pill
+    // should open the menu"). The standalone dots trigger `compact` used to
+    // draw is gone in BOTH rail states — the avatar (collapsed) and the
+    // avatar+name pill (expanded) are each `ProfileMenu`'s own `trigger` now,
+    // so this checks for that composition instead of a prop that no longer
+    // exists. Generous window, not exact: it only needs to still be AFTER the
+    // rail, in the same column.
     const after = src.slice(rail, rail + 7000)
     expect(after, "the account menu must be composed after the rail, in the same column").toContain("<ProfileMenu")
-    expect(after, "…compact, so it is not a second avatar beside Rail's own member chip").toMatch(/<ProfileMenu\s+active=\{active\}\s+compact/)
+    expect(
+      after,
+      "…as the avatar's own trigger, so it is not a second control beside Rail's own member chip"
+    ).toMatch(/<ProfileMenu\s+active=\{active\}\s+tooltip=\{railMember\.name\}\s+trigger=\{/)
+    expect(after, "…and no dead `compact` prop survives the redesign").not.toMatch(/<ProfileMenu[^>]*\bcompact\b/)
   })
 
   it("the theme control is in the profile menu, not the rail", () => {

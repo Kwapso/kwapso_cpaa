@@ -187,8 +187,14 @@ const OURS = "staff@kwapso.app"
 const THEIRS = "nadia@bergman.example"
 
 /** WHAT WAS SAID. One sentence nothing else in the fixture says, so an answer
- * built from it can only have come from the transcript. */
+ * built from it can only have come from the transcript.
+ *
+ * IT OPENS WITH THE ATTENDEE LINE, mangled exactly as Google writes it. A Meet
+ * transcript is Google-composed text and carries the display name Google itself
+ * mis-decodes; without this the fixture was cleaner than any real transcript in
+ * the base and could not have caught the gap it now covers. */
 const WHAT_WAS_SAID =
+  "Attendees\r\nÃlaap Kanchawala, Marta Reyes\r\n" +
   "Marta confirmed the dispatch desk will stop using the shared spreadsheet on the first Monday of April, " +
   "and asked us to keep the old supplier codes visible for one more quarter."
 
@@ -308,10 +314,11 @@ async function transcriptOnScreen(id: string): Promise<{
 const meetingLogs = () =>
   db()
     .prepare(
-      `SELECT user_id, user_name, kind, seconds, billable, account_id, note, started_at, ended_at
+      `SELECT id, user_id, user_name, kind, seconds, billable, account_id, note, started_at, ended_at
          FROM work_logs WHERE target_table = 'meetings' ORDER BY user_name`
     )
     .all() as {
+    id: string
     user_id: string
     user_name: string
     kind: string
@@ -497,6 +504,81 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
     expect(again.logsWritten).toBe(0)
     expect(meetingLogs(), "nobody's week grew a second time").toHaveLength(1)
     expect(published, "a repeat is silent (R17)").toEqual([])
+  })
+
+  // ── THE REPAIR THAT WOULD HAVE BILLED FOR WORK NOBODY DID ─────────────────
+  //
+  // Everything above proves the second press is silent, and every one of those
+  // proofs runs through the SAME gate: `transcript_captured_at IS NULL`. So they
+  // all say one thing — "the door refuses twice" — and none of them says what
+  // happens when that column is deliberately cleared.
+  //
+  // On 2026-08-31 it had to be. Seven meetings had been matched to the wrong
+  // document by route 2, and the only way to let the corrected hunt run again is
+  // to un-claim them. Those seven carried 21 work logs and 18.25 billable hours
+  // — correct hours, taken from each meeting's own duration and nothing to do
+  // with the transcript. Re-running the capture would have written them a second
+  // time and put 18.25 hours nobody worked on a client's account, with no error
+  // anywhere: the transcript would have been right, the answer would have been
+  // right, and the invoice would have been wrong.
+  //
+  // The claim guards the TRANSCRIPT. It was never guarding the HOURS, and the
+  // difference is invisible until the day you need the first without the second.
+  // ── THE DOOR THE FIRST MEND MISSED ────────────────────────────────────────
+  //
+  // `knowledge-google.ts` mends Google's mis-spelling of the owner's name on the
+  // four Google sweep lanes. A Meet transcript does not come through any of them
+  // — it arrives here, through `captureTranscript`, and lands in
+  // `meetings.transcript_text`, which the `meeting` kind then rebuilds its
+  // knowledge body from on every sweep.
+  //
+  // So repairing the knowledge row directly does nothing: on 2026-08-31 one was
+  // repaired at 15:05 and re-mangled at 15:15 from a transcript captured after
+  // the Google-lane mend had already shipped. Mending the COLUMN is what holds,
+  // and this is the test that says the two doors are not the same door.
+  it("mends the name Google mangled in the transcript itself, not just the sweep lanes", async () => {
+    const id = await sweepCalendar()
+    await readTranscript(id)
+
+    const stored = (await transcriptOnScreen(id)).text ?? ""
+    expect(stored, "the attendee line Google wrote").toContain("Alaap Kanchawala")
+    expect(stored, "and nothing mangled is left in the words themselves").not.toContain("Ã")
+    // Narrow, not a rewrite: everything else the transcript says is untouched.
+    expect(stored).toContain("first Monday of April")
+  })
+
+  it("a re-hunt after the transcript is cleared does not bill anybody twice", async () => {
+    const id = await sweepCalendar()
+    await readTranscript(id)
+    const before = meetingLogs()
+    expect(before, "one person in the room, one log").toHaveLength(1)
+
+    // THE REPAIR, exactly as `clear-mismatched-transcripts.mjs` performs it:
+    // the transcript columns are emptied and NOTHING ELSE is touched. The work
+    // logs are deliberately left where they are — they were never wrong.
+    db()
+      .prepare(
+        `UPDATE meetings SET transcript_file_id = NULL, transcript_captured_at = NULL,
+            transcript_text = NULL, transcript_note = NULL, transcript_url = NULL,
+            transcript_found_by = NULL WHERE id = ?`
+      )
+      .run(id)
+
+    // The hunt runs again for real and finds the document again — this is the
+    // repair working, and it is the point: the meeting SHOULD get its transcript.
+    const again = await readTranscript(id)
+    expect(again.captured, "the cleared meeting is hunted again").toBe(true)
+    expect(again.fileId).toBe("ATT_DOC")
+    expect((await transcriptOnScreen(id)).text, "and the words come back").toContain(
+      "first Monday of April"
+    )
+
+    // …and the week does not move. Both halves matter and they fail differently:
+    // the count catches a duplicate row, and `logsWritten` catches the door
+    // TELLING somebody it logged time it did not log.
+    expect(meetingLogs(), "the same hour is not billed a second time").toHaveLength(1)
+    expect(meetingLogs()[0].id, "and it is the original row, not a replacement").toBe(before[0].id)
+    expect(again.logsWritten, "an honest zero, not the size of the room").toBe(0)
   })
 })
 

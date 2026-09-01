@@ -2,6 +2,9 @@
 // boundary: raw HTML is escaped, only http/https/mailto links survive, and — the
 // bug security_sentry caught — a crafted URL can't break out of the href attribute.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
 import { describe, expect, it } from "vitest"
 
 import { toHtml } from "@shared/web/markdown-html"
@@ -79,5 +82,89 @@ describe("AgentMarkdown toHtml — XSS-safe", () => {
     expect(html).toContain("<table>")
     expect(html).not.toContain("<img")
     expect(html).not.toMatch(/<[^>]*\son\w+\s*=/i)
+  })
+
+  // A cell has no other way to hold two lines — GFM has no newline in a pipe
+  // row — so a model writes `<br>`. Escaped, that reached the owner as the
+  // literal text "<br>", twelve times in one answer, which is what made a
+  // correct answer read as broken.
+  it("turns <br> in a cell into a real line break", () => {
+    const html = toHtml("| who | points |\n|---|---|\n| Ana | first<br>second |")
+    expect(html).toContain("first<br />second")
+    expect(html).not.toContain("&lt;br&gt;")
+  })
+
+  it("accepts the spellings a model actually writes", () => {
+    expect(toHtml("| a |\n|---|\n| x<br/>y |")).toContain("x<br />y")
+    expect(toHtml("| a |\n|---|\n| x<br />y |")).toContain("x<br />y")
+    expect(toHtml("| a |\n|---|\n| x<BR>y |")).toContain("x<br />y")
+  })
+
+  // THE REVERSAL IS ONE TAG AND IT TAKES NOTHING. If this ever goes red, the
+  // allowance has been widened and the escape boundary is no longer a boundary.
+  it("brings back no other tag, and no br carrying anything", () => {
+    const withAttr = toHtml("| a |\n|---|\n| x<br onload=alert(1)>y |")
+    expect(withAttr).not.toMatch(/<br[^/>]*\son\w+/i)
+    expect(withAttr).toContain("&lt;br")
+    for (const tag of ["<script", "<img", "<a href=\"javascript:", "<iframe", "<style"]) {
+      const html = toHtml(`| a |\n|---|\n| ${tag}>bad</> |`)
+      expect(html).not.toContain(tag)
+    }
+  })
+})
+
+// ── A TABLE STAYS INSIDE ITS BUBBLE ─────────────────────────────────────────
+//
+// The owner screenshotted the assistant panel on 1 Sep 2026 with a table pushing
+// the whole conversation sideways and its right-hand columns cut off. Measured
+// live on staging at 375px, in the browser, before touching anything: the
+// wrapper around the table was 504px wide with a scrollWidth of 504 — so
+// `overflow-x-auto` had NOTHING to scroll, because the box had grown to its own
+// content — and the bubble around it was 540px inside a column of 241.
+//
+// THE CAUSE IS A PAIR, WHICH IS WHY THIS TEST IS A PAIR. The table carries a
+// 28rem floor so it does not crush into one word per cell (added 31 Aug 2026
+// after exactly that, and correct). Every ancestor up to the chat bubble is
+// SHRINK-TO-FIT, and `min-w-0` lets a box shrink without stopping it being sized
+// by its contents — so the floor travelled straight up and widened the bubble.
+// `contain: inline-size` is the one word that stops it: the wrapper's width
+// stops depending on what is inside it, the bubble sizes to the prose beside the
+// table, and the scroll finally engages. Measured after: wrapper 205 with
+// scrollWidth 504, bubble 241 in its 273 column, document scrollWidth back to
+// the viewport's own 375.
+//
+// A FLOOR WITHOUT CONTAINMENT IS THE BUG, so neither half may be removed alone.
+// Read off the disk because layout is not something jsdom can be asked about —
+// this locks the two classes that have to travel together, and the browser
+// measurement above is what says they are the right two.
+describe("a markdown table scrolls inside the bubble instead of widening it", () => {
+  const src = readFileSync(join(__dirname, "..", "components", "agent-markdown.tsx"), "utf8")
+  const wrapper = /<div className="([^"]*overflow-x-auto[^"]*)">\s*\n\s*<table/.exec(src)
+
+  it("the table's own wrapper is the one this scan found", () => {
+    expect(wrapper, "the table wrapper did not parse — this check has gone blind").toBeTruthy()
+  })
+
+  it("the wrapper's width does not depend on the table inside it", () => {
+    expect(
+      wrapper?.[1],
+      "without contain-inline-size the table's floor widens every ancestor up to the bubble"
+    ).toContain("contain-inline-size")
+  })
+
+  it("and it still fills the room it is given, with a floor of its own", () => {
+    // `w-full` so a contained box is not zero-width; the floor so a message that
+    // is NOTHING BUT a table does not collapse to the bubble's padding (measured
+    // at 36px without it).
+    expect(wrapper?.[1]).toContain("w-full")
+    expect(wrapper?.[1], "a contained, table-only bubble collapses without a floor").toMatch(
+      /min-w-\[\d+rem\]/
+    )
+  })
+
+  it("the table keeps the floor that stops it crushing", () => {
+    expect(src, "the 28rem floor is the other half of the pair").toMatch(
+      /<table className="[^"]*min-w-\[28rem\]/
+    )
   })
 })

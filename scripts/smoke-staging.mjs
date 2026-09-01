@@ -6,6 +6,7 @@
 // factory; later runs prove idempotency (and don't litter team databases).
 
 import { makeApi, makeRpc, timedFetch } from "./lib/api.mjs"
+import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
 
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 // Resend's test inbox: real send path, always "delivered", never bounces —
@@ -36,9 +37,9 @@ const api = makeApi(BASE)
 // gated by its OWN TEST_LOGIN_KEY secret, fails closed, and refused outright on
 // production). Login codes are NEVER echoed by the real send door in any
 // environment, so the smoke needs TEST_LOGIN_KEY in its environment.
-const TEST_LOGIN_KEY = process.env.TEST_LOGIN_KEY ?? ""
+const TEST_LOGIN_KEY = testLoginKey()
 if (!TEST_LOGIN_KEY) {
-  console.log("FAIL no TEST_LOGIN_KEY in the environment — cannot sign in (export TEST_LOGIN_KEY before running the smoke)")
+  console.log(NO_KEY_MESSAGE)
   process.exit(1)
 }
 const start = await api("/api/auth/admin/test-login", {

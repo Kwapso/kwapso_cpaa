@@ -3255,4 +3255,79 @@ export const SEED: Catalogue = {
     es: "No se pudo añadir la nota. Inténtalo de nuevo.",
     ca: "No s'ha pogut afegir la nota. Torna-ho a provar.",
   },
+
+  /* ── THE SOURCE CHIPS (1 Sep 2026) ───────────────────────────────────────
+   *
+   * Hand-written here rather than left to the generator, for the reason this
+   * file exists: two of the four are words a machine would translate and must
+   * not. "Google Drive" is a PRODUCT and its translation is itself — the bare
+   * word "Drive" is already in the generated catalogue as a disk drive
+   * ("Laufwerk", "Unidad"), which is exactly the collision the chip label
+   * avoids by naming the service. "App records" is the app's own rows, not
+   * "records" in the sense of a recording. And nothing was spent to put them
+   * here: a string with a seed entry is never sent to the model at all. */
+  "Google Drive": { de: "Google Drive", es: "Google Drive", ca: "Google Drive" },
+  "App records": { de: "App-Einträge", es: "Registros de la app", ca: "Registres de l'app" },
+  "Knowledge articles": {
+    de: "Wissensartikel",
+    es: "Artículos de conocimiento",
+    ca: "Articles de coneixement",
+  },
+  /* ── THE RAIL'S TWO GROUPS (1 Sep 2026) ──────────────────────────────────
+   *
+   * The words above each half of the sidebar, and they are the OWNER'S two: he
+   * replaced "Every day" and "Now and then" with the adjectives on the day they
+   * shipped. Hand-written here because a one-word heading is where a generator
+   * is least reliable — it has no sentence to take the register from — and
+   * because German wants one word for each of these and would be given a phrase.
+   *
+   * `Gelegentlich` is carried over unchanged from "Now and then": it was already
+   * the right German for this half, and the English moving does not move it. */
+  Frequent: { de: "Häufig", es: "Frecuente", ca: "Freqüent" },
+  Occasional: { de: "Gelegentlich", es: "Ocasional", ca: "Ocasional" },
+
+  /* ── THE RELATIONSHIP MAP (1 Sep 2026) ───────────────────────────────────
+   *
+   * Hand-written for the same reason the chips were: nothing is spent on a
+   * string that already has a seed entry, and two of these are sentences a
+   * generator would render stiffly. "Connections" is the tab; the rest are the
+   * controls and the two things the map says about itself — that it is showing
+   * the closest few, and that there is nothing linked yet. Both of those are
+   * honesty rather than decoration: a map that draws forty of three hundred and
+   * says nothing has answered a different question. */
+  Connections: { de: "Verbindungen", es: "Conexiones", ca: "Connexions" },
+  "{count} connected": {
+    de: "{count} verbunden",
+    es: "{count} conectados",
+    ca: "{count} connectats",
+  },
+  "Showing the closest few — there are more.": {
+    de: "Es werden nur die nächsten gezeigt — es gibt mehr.",
+    es: "Se muestran solo los más cercanos: hay más.",
+    ca: "Només es mostren els més propers: n'hi ha més.",
+  },
+  "Nothing is linked to this yet.": {
+    de: "Damit ist noch nichts verknüpft.",
+    es: "Todavía no hay nada vinculado a esto.",
+    ca: "Encara no hi ha res vinculat a això.",
+  },
+  "Zoom in": { de: "Vergrößern", es: "Acercar", ca: "Apropar" },
+  "Zoom out": { de: "Verkleinern", es: "Alejar", ca: "Allunyar" },
+  "Fit the whole map": {
+    de: "Ganze Karte anzeigen",
+    es: "Ver el mapa entero",
+    ca: "Veure el mapa sencer",
+  },
+  /* Read aloud, never drawn — the picture's own name. */
+  "A map of what this record is connected to": {
+    de: "Eine Karte davon, womit dieser Eintrag verbunden ist",
+    es: "Un mapa de con qué está conectado este registro",
+    ca: "Un mapa d'amb què està connectat aquest registre",
+  },
+  /* The group's accessible name — read aloud, never drawn. */
+  "Which sources the assistant reads": {
+    de: "Welche Quellen der Assistent liest",
+    es: "Qué fuentes lee el asistente",
+    ca: "Quines fonts llegeix l'assistent",
+  },
 }

@@ -130,7 +130,24 @@ export type IngestKind = {
   table: string
   /** plain words for the activity trail and the failure message */
   label: string
-  read: (cfg: D1Rest, guard: MemberGuard, after: Cursor | null, limit: number) => Promise<IngestRow[]>
+  read: (
+    cfg: D1Rest,
+    guard: MemberGuard,
+    after: Cursor | null,
+    limit: number,
+    /** THE GLOBAL CORE DATABASE, for the one kind whose material is not in the
+     * team's own. Every other kind mirrors a team table and never looks at it.
+     *
+     * Membership is GLOBAL — `team_members` and `users` live in core (see
+     * lib/members.ts's own header) — and `staff_profiles` in the team database
+     * carries a `user_id` and NO NAME AT ALL. So "who is Alex?" was a question
+     * no team table could answer, which is why it is the one kind that takes
+     * this. Passed rather than closed over so `INGEST_KINDS` stays a plain
+     * array every test and script can read without building an environment;
+     * the Google kinds close over theirs instead, for the different reason
+     * their own file gives. */
+    env: Env
+  ) => Promise<IngestRow[]>
   /** MIRRORS A WINDOW, NOT A TABLE. The three kinds above walk a table that has
    * a first row and a last one, so a cursor that reaches the end has finished.
    * A Google kind reads what one API call HANDS BACK — the fifty most recently
@@ -167,6 +184,51 @@ export type IngestKind = {
    * never for the whole table), and anything whose text really did not change is
    * hash-skipped before a single chunk is written. */
   rollup?: boolean
+  /** ITS ROWS ARE NOT IN THE TEAM'S DATABASE.
+   *
+   * True of exactly one kind, `person`, and it is a fact about the base rather
+   * than a flag for a test: MEMBERSHIP IS GLOBAL. `team_members` and `users`
+   * live in the core database (lib/members.ts's own header says so), while
+   * `staff_profiles` — the team's half of the same person — carries a `user_id`
+   * and no name at all. So this kind reaches `env.DB` for the names and the
+   * team database for the profile, and it is the only one that does.
+   *
+   * It is declared because everything that reasons about the sweep otherwise
+   * assumes `table` names a team table it can count: the backfill suite's
+   * expected-source count would read the TEAM's own `users` rows, which in
+   * production is a table that does not exist and in a single-database fixture
+   * is a different set of people. Rot-checked — a kind claiming this must
+   * really name `env.DB` in its own reader, and one that names `env.DB` must
+   * claim it. */
+  fromCoreDatabase?: boolean
+  /** WHAT ONE SOURCE OF THIS KIND IS, when it is not one row of `table`.
+   *
+   * Almost every kind mirrors a row: one ticket, one source. `dropdown` mirrors
+   * a LIST — "what ticket types do we use" is answered by the list and not by
+   * any one of its rows — so its sources are the DISTINCT values of one column
+   * (`type`), and its `originRowId` is that value.
+   *
+   * It is declared rather than inferred because something has to be able to
+   * check the invariant this file's whole design rests on: one source per thing
+   * mirrored, no duplicates, safe to re-run. The backfill suite derives its
+   * expected count from the kinds themselves rather than from a list written in
+   * the test, and a kind that quietly stopped being one-per-row would otherwise
+   * turn that derivation into a number nobody could explain. */
+  oneSourcePer?: string
+  /** THE PERMISSION MODULES THIS KIND'S TEXT PUTS IN THE CORPUS (R47), when its
+   * own `table` is not the whole answer. Default: the module `table` maps to.
+   *
+   * Only `person` needs it today, and it needs it because it is a JOIN across
+   * the fence between the two databases: the row is `users` (the `team_members`
+   * module) and the text also carries the staff profile and certificates
+   * (`staff_profiles`). One source, two modules — and a census that read the
+   * table alone would report the second as missing from the corpus while its
+   * words were sitting in it.
+   *
+   * Rot-checked by the coverage suite: every module named here must be a real
+   * TEAM_MODULE, and the kind's own read must really mention the table behind
+   * it, so this can never become a way to CLAIM coverage a reader does not have. */
+  modules?: string[]
   /** WHICH TEXT BUILDER WROTE THE ROWS ALREADY IN THE INDEX.
    *
    * The hash answers "has this ROW changed?", which is a different question from
@@ -1036,7 +1098,21 @@ export const INGEST_KINDS: IngestKind[] = [
     // v4 SINCE 28 AUG 2026: the same for a meeting that HAS happened and still
     // has nothing written on it. Bumped for the same reason — the bump is what
     // sends the sweep back over rows already filed under the old rule.
-    textVersion: 4,
+    //
+    // v5 SINCE 31 AUG 2026: the mojibake mend reached `transcript_text`, and 39
+    // meetings' PASSAGES did not reach it. This lane is not `windowed` and is not
+    // a rollup — it walks a cursor forward and never looks behind itself — so
+    // nulling `content_hash` on a row the cursor has already passed changes
+    // nothing at all. 1,281 passages were left quoting a name the record itself
+    // no longer spells that way, permanently, and the count LOOKED like it was
+    // draining because the rows AHEAD of the cursor really were.
+    //
+    // A bump is the only thing that walks this lane back, which is what v3 and
+    // v4 above were both for. It is also cheap: the rewind re-READS every
+    // meeting and re-EMBEDS only the ones whose text actually changed, because
+    // the hash decides — so this costs one pass of reads and 39 rows of
+    // embedding, not 4,296.
+    textVersion: 5,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -1346,7 +1422,411 @@ export const INGEST_KINDS: IngestKind[] = [
       }))
     },
   },
+  {
+    // WHO WE ARE — one source per colleague, and the kind that answers the
+    // question that started this refit.
+    //
+    // The owner asked the assistant for "Alex's full name" and it could not
+    // answer. Not a retrieval failure: NOTHING in the base said who his own
+    // colleagues are. `staff_profiles` (the team database) carries a `user_id`
+    // and no name column at all; the names live in `users` in the GLOBAL core
+    // database, joined through `team_members`. So this is the one kind that
+    // reads across the two databases — the same join lib/stakeholders.ts
+    // already makes for a ticket's watchers, and tenant-isolated the same way
+    // (JOIN team_members, WHERE team_id).
+    //
+    // IT SPELLS THE NAME EVERY WAY A PERSON WOULD TYPE IT, on purpose. The
+    // lexical arm of the search matches letters, so "Alex" only finds
+    // "Alexander Stadlmair" if the words "Alex" and "Stadlmair" are both in the
+    // text. A colleague is the one record type people refer to by a shortening
+    // nobody ever wrote down, which is exactly the case a vector search is
+    // worst at and a word match is best at.
+    //
+    // AGENCY MATERIAL, never a client's: no account id, so it is filed in the
+    // agency compartment, and `ownerUserId` is null because a colleague is the
+    // team's to know rather than one person's own sight of something.
+    kind: "person",
+    table: "users",
+    // Membership is global — see `fromCoreDatabase`.
+    fromCoreDatabase: true,
+    // The row is a member (`team_members`); the TEXT also carries the staff
+    // profile and the certificates, so this one source covers both modules.
+    modules: ["team_members", "staff_profiles"],
+    label: "colleagues",
+    // v3: the SENTENCE, not the fact. v2 got the distinction right and read
+    // badly — "a person at a client of ours for Test client, client" — because
+    // `buildSummary` renders `<title>, a <noun> for <account>, <status>` and the
+    // noun has to survive having "for Bergman" put after it. Only visible on a
+    // live row, which is where it was found.
+    // v2: A CLIENT LOGIN IS NOT A COLLEAGUE. Found on staging within minutes of
+    // v1 landing: three client contacts were filed as "a colleague of ours",
+    // because R21 makes a client login an ordinary team member holding an
+    // ordinary role and nothing in `team_members` tells the two apart. The live
+    // portal grant does. The bump is what walks the cursor back over the eight
+    // rows already written — nulling nothing would have left them saying it.
+    textVersion: 3,
+    read: async (cfg, guard, cursor, limit, env) => {
+      // THE CORE HALF, over the native binding rather than the REST door: this
+      // is the global database, which every worker reaches as `env.DB`.
+      // R14 hard cap: LIMIT is `limit`, INGEST_SOURCES_PER_TICK.
+      const keyset = cursor ? " AND (COALESCE(tm.updated_at, tm.created_at) > ?1 OR (COALESCE(tm.updated_at, tm.created_at) = ?1 AND tm.user_id > ?2))" : ""
+      const { results } = await env.DB.prepare(
+        `SELECT tm.user_id AS id, tm.role_id, tm.created_at, tm.deactivated_at,
+                COALESCE(tm.updated_at, tm.created_at) AS sort_at,
+                u.email, u.first_name, u.last_name
+           FROM team_members tm
+           JOIN users u ON u.id = tm.user_id
+          WHERE tm.team_id = ?3${keyset}
+          ORDER BY sort_at, tm.user_id LIMIT ${limit}`
+      )
+        .bind(cursor?.at ?? "", cursor?.id ?? "", guard.teamId)
+        .all<{
+          id: string
+          role_id: string
+          created_at: string
+          deactivated_at: string | null
+          sort_at: string
+          email: string
+          first_name: string | null
+          last_name: string | null
+        }>()
+      const members = results ?? []
+      if (members.length === 0) return []
+
+      // THE TEAM HALF — the role's NAME, the profile and the certificates, all
+      // three keyed by ids this slice already holds. One statement each rather
+      // than one per person: the slice is `limit` rows, so a per-person read
+      // would be the N+1 this file avoids everywhere else.
+      const ids = members.map((m) => sqlString(m.id)).join(", ")
+      const roleIds = [...new Set(members.map((m) => sqlString(m.role_id)))].join(", ")
+      const [roles, profiles, certificates, portal] = await Promise.all([
+        // R14 hard cap: bounded by the slice's own distinct role ids.
+        d1Query<{ id: string; title: string }>(
+          cfg,
+          guard.databaseId,
+          `SELECT id, title FROM member_roles WHERE id IN (${roleIds}) LIMIT ${limit}`
+        ),
+        // R14 hard cap: at most one live profile per member (partial unique index).
+        d1Query<{
+          user_id: string
+          headline: string | null
+          personality_type: string | null
+          strengths: string | null
+          weaknesses: string | null
+          role_models: string | null
+          about: string | null
+        }>(
+          cfg,
+          guard.databaseId,
+          `SELECT user_id, headline, personality_type, strengths, weaknesses, role_models, about
+             FROM staff_profiles
+            WHERE user_id IN (${ids}) AND deactivated_at IS NULL LIMIT ${limit}`
+        ),
+        // R14 hard cap: ROLLUP_ROWS, the same ceiling every child list here takes.
+        d1Query<{ user_id: string; title: string; issuer: string | null; issued_on: string | null }>(
+          cfg,
+          guard.databaseId,
+          `SELECT user_id, title, issuer, issued_on FROM staff_certificates
+            WHERE user_id IN (${ids}) AND deactivated_at IS NULL
+            ORDER BY user_id, issued_on DESC LIMIT ${ROLLUP_ROWS}`
+        ),
+        // NOT EVERYONE ON THE TEAM IS ONE OF US, and the fact that says so is
+        // structural rather than a word. R21: "a client login is an ordinary
+        // team member holding an ordinary role" — so a contact who can open the
+        // portal appears in `team_members` exactly as a colleague does, and the
+        // first version of this kind filed three of them on staging as "a
+        // colleague of ours". The role's TITLE happened to read "Client" there
+        // and would not on the next team; the LIVE PORTAL GRANT is the fact.
+        // R14 hard cap: at most one live grant per person (partial unique index).
+        d1Query<{ user_id: string; account_name: string | null }>(
+          cfg,
+          guard.databaseId,
+          `SELECT pu.user_id, a.name AS account_name
+             FROM portal_users pu LEFT JOIN accounts a ON a.id = pu.account_id
+            WHERE pu.user_id IN (${ids}) AND pu.deactivated_at IS NULL LIMIT ${limit}`
+        ),
+      ])
+      const roleName = new Map(roles.map((r) => [r.id, r.title]))
+      const profileOf = new Map(profiles.map((p) => [p.user_id, p]))
+      const certsOf = new Map<string, typeof certificates>()
+      for (const c of certificates) certsOf.set(c.user_id, [...(certsOf.get(c.user_id) ?? []), c])
+      const clientOf = new Map(portal.map((r) => [r.user_id, r.account_name]))
+
+      return members.map((m) => {
+        const full = [m.first_name, m.last_name].filter(Boolean).join(" ").trim()
+        const name = full || m.email
+        const role = roleName.get(m.role_id) ?? null
+        const p = profileOf.get(m.id)
+        const certs = certsOf.get(m.id) ?? []
+        // A CLIENT LOGIN, OR ONE OF US. `has`, not a truthy account name: a
+        // grant whose account row has gone leaves the name null and the person
+        // is still a client.
+        const isClient = clientOf.has(m.id)
+        const client = clientOf.get(m.id) ?? null
+        // "a client contact for Bergman", not "a person at a client of ours FOR
+        // Bergman" — `buildSummary` renders `<title>, a <noun> for <account>`,
+        // so the noun has to read as a noun with a "for" after it. Seen on live
+        // staging the moment v2 landed, which is the only place a sentence built
+        // in three pieces can be read as one.
+        const noun = isClient ? "client contact" : "colleague of ours"
+        return {
+          originRowId: m.id,
+          sortAt: m.sort_at,
+          title: name,
+          summary: buildSummary({
+            noun,
+            title: name,
+            accountName: isClient ? client : null,
+            // THE ROLE IS DROPPED FOR A CLIENT CONTACT. It is the role they hold
+            // on OUR permission sheet — "client" — which says nothing a reader
+            // does not already know from the noun, and reads as a second, vaguer
+            // answer to the question the sentence just answered.
+            status: isClient ? null : role ? role.toLowerCase() : null,
+            notes: [m.email ? `${m.email}.` : null, p?.headline ? `${p.headline}.` : null],
+            detail: plainText(p?.about ?? ""),
+          }),
+          body: [
+            isClient
+              ? `${name} is a person at ${client ?? "a client of ours"} with a login to the client portal, not a colleague of ours${
+                  role ? `; their role here is ${role}` : ""
+                }. Their email address is ${m.email}.`
+              : `${name} works here${role ? `, as ${role}` : ""}. Their email address is ${m.email}.`,
+            // EVERY SPELLING, ONE LINE. See this kind's header: a colleague is
+            // the record type people name by a shortening nobody wrote down.
+            nameSpellings(m.first_name, m.last_name, m.email).length > 1
+              ? `They are also called ${nameSpellings(m.first_name, m.last_name, m.email).join(", ")}.`
+              : "",
+            p?.headline ?? "",
+            p?.personality_type ? `Personality type: ${p.personality_type}.` : "",
+            p?.strengths ? `Strengths: ${p.strengths}` : "",
+            p?.weaknesses ? `Working on: ${p.weaknesses}` : "",
+            p?.role_models ? `Looks up to: ${p.role_models}` : "",
+            p?.about ?? "",
+            certs.length
+              ? `Certificates held:\n${certs
+                  .map(
+                    (c) =>
+                      `- ${c.title}${c.issuer ? ` from ${c.issuer}` : ""}${c.issued_on ? `, ${c.issued_on}` : ""}`
+                  )
+                  .join("\n")}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          accountId: null,
+          appId: null,
+          recordDate: m.created_at,
+          retired: m.deactivated_at !== null,
+          ownerUserId: null,
+          sourceUrl: null,
+        }
+      })
+    },
+  },
+  {
+    // THE TEAM'S OWN VOCABULARY — one source per LIST, never one per value.
+    //
+    // "What ticket types do we use?" is a real question and the answer is a
+    // list, so the list is the record. One source per VALUE would file several
+    // hundred sources whose whole text is two words, which is precisely the
+    // dilution the corpus is being cleaned of: a retrieval slot spent on the
+    // word "Bug" is a slot not spent on the ticket that describes one.
+    //
+    // A ROLLUP KIND (see `rollup` above): a value added to a list does not move
+    // the list, so the cursor is dropped at the end of the table and every
+    // vocabulary is rebuilt on a rolling cycle.
+    kind: "dropdown",
+    table: "selectable_data",
+    label: "dropdown lists",
+    textVersion: 1,
+    rollup: true,
+    // One source per LIST, so the thing mirrored is the distinct `type`.
+    oneSourcePer: "type",
+    read: async (cfg, guard, cursor, limit) => {
+      // ONE ROW PER TYPE, so the keyset walks TYPES and the id is the type
+      // itself — there is no other stable identity for a list that has no row
+      // of its own. The sort value is the newest change anywhere in the list,
+      // which is what makes a re-walk pick up an edited value.
+      const keyset = cursor
+        ? ` HAVING sort_at > ${sqlString(cursor.at)} OR (sort_at = ${sqlString(cursor.at)} AND type > ${sqlString(cursor.id)})`
+        : ""
+      const rows = await d1Query<{
+        type: string
+        sort_at: string
+        live: number
+        value_list: string | null
+        default_value: string | null
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and the number of
+        // TYPES is bounded by the vocabulary itself (a couple of dozen).
+        `SELECT type,
+                MAX(COALESCE(updated_at, created_at)) AS sort_at,
+                SUM(CASE WHEN deactivated_at IS NULL THEN 1 ELSE 0 END) AS live,
+                GROUP_CONCAT(CASE WHEN deactivated_at IS NULL THEN value END, ', ') AS value_list,
+                MAX(CASE WHEN is_default = 1 AND deactivated_at IS NULL THEN value END) AS default_value
+           FROM selectable_data
+          GROUP BY type${keyset}
+          ORDER BY sort_at, type LIMIT ${limit}`
+      )
+      return rows.map((r) => ({
+        originRowId: r.type,
+        sortAt: r.sort_at,
+        title: r.type,
+        summary: buildSummary({
+          noun: "list of choices this team keeps",
+          title: r.type,
+          notes: [`${r.live} in use.`, r.default_value ? `${r.default_value} is the default.` : null],
+          detail: r.value_list ?? "",
+        }),
+        body: [
+          `${r.type} is one of the lists this team keeps its own words in: when somebody fills in a form and picks a ${r.type.toLowerCase()}, these are the choices they are offered.`,
+          r.value_list ? `The choices in use are: ${r.value_list}.` : "There are no choices in this list yet.",
+          r.default_value ? `${r.default_value} is picked for them unless they change it.` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        accountId: null,
+        appId: null,
+        recordDate: r.sort_at,
+        // A LIST IS RETIRED WHEN NOTHING IN IT IS LIVE. The values are
+        // deactivated one at a time and the list itself has no row to switch
+        // off, so "nobody may pick any of these any more" is the only honest
+        // reading of an empty one.
+        retired: Number(r.live) === 0,
+        ownerUserId: null,
+        sourceUrl: null,
+      }))
+    },
+  },
+  {
+    // WHO AT A CLIENT CAN SIGN IN — one source per grant, filed in that
+    // client's own compartment, because "who at Bergman has a login?" is a
+    // question about Bergman.
+    //
+    // The row is the GRANT and not the person: a contact is already its own
+    // kind, and this says something different about them — that they can open
+    // the portal, and which of the client's apps they are restricted to if any.
+    kind: "portal_login",
+    table: "portal_users",
+    label: "portal logins",
+    textVersion: 1,
+    read: async (cfg, guard, cursor, limit) => {
+      const keyset = after(cursor, "COALESCE(pu.updated_at, pu.created_at)", "pu.id")
+      const rows = await d1Query<{
+        id: string
+        account_id: string
+        user_id: string
+        app_restriction: string | null
+        account_name: string | null
+        app_name: string | null
+        deactivated_at: string | null
+        created_at: string
+        creator_name: string | null
+        sort_at: string
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
+        `SELECT pu.id, pu.account_id, pu.user_id, pu.app_restriction, pu.deactivated_at,
+                pu.created_at, pu.creator_name,
+                a.name AS account_name, ap.name AS app_name,
+                COALESCE(pu.updated_at, pu.created_at) AS sort_at
+           FROM portal_users pu
+           LEFT JOIN accounts a ON a.id = pu.account_id
+           LEFT JOIN apps ap ON ap.id = pu.app_restriction
+          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
+          ORDER BY sort_at, pu.id LIMIT ${limit}`,
+        keyset.params
+      )
+      return rows.map((r) => {
+        // THE PERSON'S NAME IS NOT HERE, and that is not an omission this kind
+        // can fix: `portal_users.user_id` points at the GLOBAL users table, and
+        // a client contact is not a member of this team, so the tenant-isolated
+        // join `person` uses (JOIN team_members WHERE team_id) would return
+        // nothing for them by construction. The contact kind is where a client's
+        // people are named; this source says what the GRANT is, and names the
+        // company, which is the half a person asks this question about.
+        const who = r.account_name ?? "a client"
+        return {
+          originRowId: r.id,
+          sortAt: r.sort_at,
+          title: `Portal login at ${who}`,
+          summary: buildSummary({
+            noun: "portal login",
+            title: `Portal login at ${who}`,
+            accountName: r.account_name,
+            status: r.deactivated_at ? "switched off" : "active",
+            notes: [r.app_name ? `Restricted to ${r.app_name}.` : null],
+          }),
+          body: [
+            `Somebody at ${who} can sign in to the client portal${
+              r.deactivated_at ? ", but the login has been switched off" : ""
+            }.`,
+            r.app_name
+              ? `They only see ${r.app_name}; the rest of ${who}'s apps are not theirs to open.`
+              : `They see everything ${who} is allowed to see, across all of their apps.`,
+            r.creator_name ? `${r.creator_name} granted it${r.created_at ? ` on ${r.created_at.slice(0, 10)}` : ""}.` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          accountId: r.account_id,
+          appId: r.app_restriction,
+          recordDate: r.created_at,
+          retired: r.deactivated_at !== null,
+          ownerUserId: null,
+          sourceUrl: null,
+        }
+      })
+    },
+  },
 ]
+
+/** EVERY WAY A COLLEAGUE'S NAME GETS TYPED, beside the one it is stored as.
+ *
+ * The owner asked for "Alex's full name" and got nothing, and the reason is
+ * mechanical rather than clever: the lexical arm of the search matches LETTERS,
+ * so a question containing "Alex" reaches a passage containing "Alexander" only
+ * if the shorter form is written somewhere in it. Nobody ever writes it down —
+ * a person's row holds the name on their passport, and the office calls them
+ * something else.
+ *
+ * DERIVED, NOT A NICKNAME TABLE, which would be a second source of truth about
+ * people and wrong within a month. Three shapes, and all three are the same
+ * string a person already has: the first name alone, the local part of their
+ * own email address (which is what they chose to be called by a machine), and
+ * the short form the email gives when it differs from the first name — Alexander
+ * Stadlmair at alex@ yields "Alex". The stored full name is NOT repeated here;
+ * the sentence above this one already carries it.
+ *
+ * A shortening that is not in the email and is not the first name is not
+ * guessable and is deliberately not guessed: a wrong alias would put one
+ * colleague's passage in front of a question about another, which is worse than
+ * the miss it would have fixed. */
+export function nameSpellings(
+  firstName: string | null,
+  lastName: string | null,
+  email: string
+): string[] {
+  const first = (firstName ?? "").trim()
+  const last = (lastName ?? "").trim()
+  const local = email.split("@")[0] ?? ""
+  const out: string[] = []
+  const add = (value: string) => {
+    const clean = value.trim()
+    if (!clean || clean.length < 2) return
+    if (out.some((v) => v.toLowerCase() === clean.toLowerCase())) return
+    out.push(clean)
+  }
+  if (first) add(first)
+  // The email's local part, as a NAME rather than as an address: `alex.stadlmair`
+  // and `alex_s` are how somebody is addressed by a machine and are also how a
+  // colleague types their name into a search box in a hurry.
+  for (const piece of local.split(/[._-]+/)) add(piece.charAt(0).toUpperCase() + piece.slice(1))
+  if (first && last) add(`${first.charAt(0)}. ${last}`)
+  return out
+}
 
 /** The first sentence of a ticket's description, for a ticket that has no title
  * of its own. Bounded so a wall of pasted text can't become a title.
@@ -1415,7 +1895,7 @@ async function sweepKind(
     [stateKey]
   )
   const cursor = parseCursor(state[0]?.cursor ?? null, kind.textVersion)
-  let rows = await kind.read(cfg, guard, cursor, limit)
+  let rows = await kind.read(cfg, guard, cursor, limit, env)
   let indexed = 0
   let last: Cursor | null = cursor
 
@@ -1436,7 +1916,7 @@ async function sweepKind(
   // per tick. Bounded, once — not a loop.
   if (kind.windowed && rows.length === 0 && cursor) {
     last = null
-    rows = await kind.read(cfg, guard, null, limit)
+    rows = await kind.read(cfg, guard, null, limit, env)
   }
 
   for (const row of rows) {

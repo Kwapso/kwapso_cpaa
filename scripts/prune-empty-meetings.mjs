@@ -42,7 +42,7 @@
 // Production needs BOTH extra flags and is refused otherwise. This is one team's
 // imported customer material; the approval that covers staging does not cover it.
 
-import { execSync } from "node:child_process"
+import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const APPLY = process.argv.includes("--apply")
 /** Clear the vectors for rows this script already retired, and nothing else.
@@ -68,10 +68,7 @@ if (PRODUCTION && !CONFIRMED) {
  * the placeholders is the worst thing available here. */
 const MAX_CHUNKS_IN_SET = 3
 
-const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "b5bb3d84a59c029ea5e0fe164dab1cf7"
-const TOKEN =
-  process.env.CLOUDFLARE_API_TOKEN ||
-  execSync("security find-generic-password -s cloudflare-token-kwapso -w").toString().trim()
+const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = PRODUCTION
   ? process.env.KB_CORE_PROD || "e55a2c0f-346a-4056-b01c-7869a8b253dc"
   : process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7"

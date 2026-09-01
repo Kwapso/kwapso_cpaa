@@ -37,6 +37,10 @@ const holder = vi.hoisted(() => ({
   /** What one Drive file's text comes back as, when a test needs to CHANGE it
    * between sweeps. Empty by default, so every other test sees the fixture. */
   driveText: new Map<string, string>(),
+  /** MAIL_1's subject, when a test needs it to be one of Google's own calendar
+   * notices. Null by default, so every other test sees the fixture's own
+   * subject and every count in this file stays what it was. */
+  mailSubject: null as string | null,
   /** Extra chat messages one test wants and the others must not see. Empty by
    * default, so every count in this file stays what it was. */
   chat: [] as Record<string, unknown>[],
@@ -106,7 +110,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         threadId: "TH_1",
         from: "Luis Vera <luis@bergman.example>",
         to: "me@kwapso.app",
-        subject: "Re: the dispatch screen",
+        subject: holder.mailSubject ?? "Re: the dispatch screen — Ãlaap Kanchawala",
         snippet: "a snippet",
         date: "Tue, 4 Aug 2026 10:04:00 +0000",
             url: "https://mail.example/MAIL_1",
@@ -118,11 +122,11 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       threadId: "TH_1",
       from: "Luis Vera <luis@bergman.example>",
       to: "me@kwapso.app",
-      subject: "Re: the dispatch screen",
+      subject: holder.mailSubject ?? "Re: the dispatch screen — Ãlaap Kanchawala",
       snippet: "a snippet",
       date: "Tue, 4 Aug 2026 10:04:00 +0000",
       url: "https://mail.example/MAIL_1",
-      text: "We agreed on the fourth of August to park the reporting work.",
+      text: "We agreed on the fourth of August to park the reporting work. Ãlaap Kanchawala was in the room.",
     }),
     calendarList: async () => ({
       truncated: false,
@@ -180,7 +184,12 @@ import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
-import { GOOGLE_SOURCE_KINDS, googleStateKeys } from "../src/lib/knowledge-google"
+import {
+  driveFileIdOf,
+  eventNamedBy,
+  GOOGLE_SOURCE_KINDS,
+  googleStateKeys,
+} from "../src/lib/knowledge-google"
 
 const db = () => holder.db as DatabaseSync
 
@@ -286,6 +295,7 @@ beforeEach(() => {
   holder.unlisted.clear()
   holder.binned.clear()
   holder.events = []
+  holder.mailSubject = null
   holder.chat = []
   holder.driveText.clear()
   db().exec(
@@ -415,6 +425,40 @@ describe("what actually gets read", () => {
     const mail = byTitle("Re: the dispatch screen") as SourceRow
     expect(mail.body).toContain("park the reporting work")
     expect(mail.body, "the hundred-character snippet is not what answers a question").not.toBe("a snippet")
+  })
+
+  // ── THE NAME GOOGLE ITSELF SPELLS WRONG ───────────────────────────────────
+  //
+  // Google's profile carries the owner's display name mis-decoded, and writes
+  // that spelling into everything it composes — an invitation's subject, a
+  // transcript's attendee list, a chat roster. 311 rows on staging, 2026-08-31.
+  //
+  // A DATABASE REPAIR CANNOT HOLD IT, which is why the mend is here and not in a
+  // script. These kinds are `windowed`: the sweep re-reads what Google currently
+  // holds every fifteen minutes and the upsert sets `title = excluded.title`
+  // unconditionally, so a row repaired at noon is mangled again by quarter past.
+  // Correcting the name on the Google account fixes what Google composes from
+  // now on and cannot reach a subject line already sent — 268 of those 311 are
+  // frozen text that every sweep faithfully re-reads.
+  it("mends the display name Google itself mangled, in the title AND the body", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Re: the dispatch screen") as SourceRow
+
+    // The TITLE is the mail's own subject, and the BODY arrives later, through
+    // hydration — two different exits from `slice`, and the mend has to sit on
+    // both. Asserting only one would pass with the other still broken.
+    expect(mail.title, "the subject line").toContain("Alaap Kanchawala")
+    expect(mail.body, "and the body, which arrives through hydration").toContain("Alaap Kanchawala")
+    expect(`${mail.title} ${mail.body}`, "and nothing mangled is left").not.toContain("Ã")
+
+    // …and the mend is NARROW. It repairs known strings with a named source of
+    // truth and leaves every other word exactly as Google sent it — an em dash
+    // it never learned to mend must survive untouched, or "mend" has quietly
+    // become "rewrite".
+    expect(mail.title, "the rest of the subject is Google's, verbatim").toContain(
+      "Re: the dispatch screen —"
+    )
+    expect(mail.body).toContain("park the reporting work")
   })
 
   it("a Chat CONVERSATION is one source, attributed line by line, with a link back", async () => {
@@ -1143,5 +1187,107 @@ describe("a Google source carries the date it is from", () => {
     ]
     await sweep()
     expect(dateOf("google_calendar", `${IDS.staffUser}:NO_WHEN`)).toBeNull()
+  })
+})
+
+// ── ONE EVENT, ONE RECORD — THE CROSS-DOOR FOLD ────────────────────────────
+//
+// A single meeting arrives here as up to five sources: the meeting row this app
+// owns, the notes document Gemini leaves in Drive, Google's "Invitation:" mail,
+// an "Accepted:" mail per guest, and the calendar entry. Five titles, one
+// subject — and an answer built from six passages has told the reader one thing
+// five times, spending four slots a different real source did not get. Measured
+// on the owner's own staging base, 1 Sep 2026: 118 of 3,775 live sources, 3.1%
+// of the corpus.
+//
+// THE APP'S OWN RECORD IS CANONICAL. Both rules say only that, and each carries
+// a SECOND AGREEMENT which is the same sentence twice: fold only where the
+// original is really there. A transcript's Drive copy folds only if the meeting
+// holds the words; a calendar notice folds only if the base holds the event. An
+// invitation to something nothing else knows about is the ONLY record of it —
+// forty of them on staging — and it stays. Both halves are tested here, because
+// a rule that folds too much deletes material and a rule that folds too little
+// does nothing.
+describe("a second door onto something we already hold is folded", () => {
+  const FILE = `${IDS.staffUser}:FILE_1`
+  const MAIL = `${IDS.staffUser}:MAIL_1`
+
+  /** A meeting row, planted as the ORACLE the fold reads — never as a fixture the
+   * sweep produces. `words` is the second agreement in both directions. */
+  const meeting = (id: string, title: string, opts: { fileId?: string; words?: boolean } = {}) =>
+    db().exec(
+      `INSERT INTO meetings (id, title, starts_at, created_at${opts.fileId ? ", transcript_file_id" : ""}${
+        opts.words ? ", transcript_text" : ""
+      })
+       VALUES ('${id}', '${title}', '2026-08-01T09:00:00.000Z', '2026-08-01T09:00:00.000Z'${
+         opts.fileId ? `, '${opts.fileId}'` : ""
+       }${opts.words ? `, 'What was actually said in the room.'` : ""})`
+    )
+
+  it("a Drive file that IS a meeting's transcript is not filed a second time", async () => {
+    meeting("M_FOLD", "Bergman dispatch rollout", { fileId: "FILE_1", words: true })
+    await sweep()
+    expect(live(FILE), "the meeting holds these words already").toBe(false)
+  })
+
+  it("…but not while the meeting's own row is empty — that would lose both copies", async () => {
+    // The id matches; the words are not there. Folding here would leave the base
+    // with neither the transcript nor the document, which is worse than the
+    // duplication this rule exists to remove.
+    meeting("M_EMPTY", "Bergman dispatch rollout", { fileId: "FILE_1" })
+    await sweep()
+    expect(live(FILE), "the app's own record has nothing in it — keep the copy").toBe(true)
+  })
+
+  it("a calendar notice for an event we already hold is folded", async () => {
+    meeting("M_HELD", "Week recap")
+    holder.mailSubject = "Invitation: Week recap @ Thu Aug 6, 2026 1pm - 1:30pm (IST)"
+    await sweep()
+    expect(live(MAIL), "the base already holds the event this announces").toBe(false)
+  })
+
+  it("…but an invitation to something nothing else holds is the only record of it", async () => {
+    holder.mailSubject = "Invitation: A meeting nobody filed @ Thu Aug 6, 2026 1pm - 1:30pm (IST)"
+    await sweep()
+    expect(live(MAIL), "retiring this would lose the event, not deduplicate it").toBe(true)
+  })
+
+  it("a Notes: mail is never a notice — it carries the minutes", async () => {
+    meeting("M_NOTES", "Week recap")
+    holder.mailSubject = "Notes: “Week recap” Aug 6, 2026"
+    await sweep()
+    expect(live(MAIL), "the retrieval bench cites one of these as a correct answer").toBe(true)
+  })
+
+  it("and an ordinary mail that merely says the word is left alone", async () => {
+    meeting("M_WORD", "Week recap")
+    holder.mailSubject = "Re: your invitation: Week recap"
+    await sweep()
+    expect(live(MAIL), "a prefix is a notice; a substring is a person writing to us").toBe(true)
+  })
+})
+
+describe("what the fold reads out of a title", () => {
+  it("names the event a notice is about, whatever the prefix", () => {
+    expect(eventNamedBy("Invitation: Week recap @ Thu Aug 6, 2026 1pm")).toBe("Week recap")
+    expect(eventNamedBy("Accepted: FluClinic: Aug sprint 3.5 @ Thu Aug 13, 2026")).toBe(
+      "FluClinic: Aug sprint 3.5"
+    )
+    expect(eventNamedBy("Updated invitation: HOGO: Data imports @ Wed")).toBe("HOGO: Data imports")
+    // No " @ " tail at all — the whole remainder is the name.
+    expect(eventNamedBy("Canceled: Week recap")).toBe("Week recap")
+  })
+
+  it("and refuses everything that is not one", () => {
+    expect(eventNamedBy("Notes: “Week recap” Aug 6, 2026")).toBeNull()
+    expect(eventNamedBy("Re: your invitation: Week recap")).toBeNull()
+    expect(eventNamedBy("Invitation: ")).toBeNull()
+    expect(eventNamedBy("")).toBeNull()
+  })
+
+  it("reads the Drive file id out of one person's sight of it", () => {
+    expect(driveFileIdOf("01KZTW:1X6Gy9dur2Qk")).toBe("1X6Gy9dur2Qk")
+    expect(driveFileIdOf("no-colon-here")).toBeNull()
+    expect(driveFileIdOf("01KZTW:")).toBeNull()
   })
 })

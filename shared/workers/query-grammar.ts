@@ -162,6 +162,32 @@ export type QueryModule = {
    * their own `where` is asking about it deliberately and gets exactly what they
    * asked for. */
   putAway?: { field: string; reason: string }
+  /** ROWS THAT HAVE NOT HAPPENED YET — the OTHER half of "what does this
+   * collection mean", and the one that made "latest" a wrong answer.
+   *
+   * THE FAULT, 1 Sep 2026. The owner asked the assistant what the latest week
+   * planning was about and was told about a meeting in AUGUST 2027. There are
+   * fifty-eight meetings called "Week planning" in his base: EIGHT have
+   * happened, and fifty are recurring calendar shells stretching into 2027 with
+   * no agenda, no notes and no transcript. Sorted newest-first — which is what
+   * "latest" means to anything that sorts — the answer is a placeholder for a
+   * meeting nobody has held, and it carries the same title as the real one, so
+   * no ranking on earth separates them. Nothing was broken: the sort was
+   * correct, the row was real, and the answer was useless.
+   *
+   * SO A MODULE MAY SAY WHEN IT MEANS THE PAST. `field` names the date that
+   * decides, and rows dated after now are off the everyday list — exactly as
+   * `putAway`'s rows are, by exactly the same mechanism, with exactly the same
+   * escape: a caller whose own `where` names that field is asking about it
+   * deliberately ("what is coming up next week?") and gets precisely what they
+   * asked for. The reply says which of the two it did.
+   *
+   * DECLARED, NEVER ASSUMED, and only one module carries it today: `meetings`,
+   * whose own summary is already in the past tense — "when we met a client, and
+   * what was agreed". A to-do's due date and a sprint's end date are FUTURE
+   * facts about live work; hiding those rows would be a bug, which is why this
+   * is a per-module decision and not a rule about date columns. */
+  notYet?: { field: string; reason: string }
   /** A SECOND RIGHT THAT NARROWS WHICH ROWS THIS MODULE MEANS.
    *
    * Some modules are governed by TWO switches, not one: the module's own right
@@ -455,6 +481,14 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The meetings list — when we met a client, and what was agreed.",
     labelColumn: "title",
     defaultSort: "startsAt",
+    // "THE LATEST MEETING" IS ONE THAT HAPPENED. See `notYet` — fifty of this
+    // base's fifty-eight "Week planning" rows are empty 2027 calendar shells,
+    // and newest-first put one of them in front of the owner as an answer.
+    notYet: {
+      field: "startsAt",
+      reason:
+        "a meeting that has not happened has nothing to say about itself — most future rows here are recurring calendar shells with no agenda, no notes and no transcript, and sorted newest-first they answer every 'what was the latest…' question with a placeholder. Filter on `startsAt` yourself (gte today) to ask about what is coming up",
+    },
     putAway: {
       field: "deactivatedAt",
       reason:

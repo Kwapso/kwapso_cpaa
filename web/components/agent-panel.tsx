@@ -24,6 +24,9 @@ import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { PopoverContent } from "@shared/ui/components/popover/popover"
 import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
+import { Toggle } from "@shared/ui/components/toggle/toggle"
+
+import { SOURCE_CHIPS } from "@shared/knowledge-chips"
 import { CollectionRegister } from "@shared/ui/components/collection-frame/collection-frame"
 import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 import { Title } from "@shared/ui/components/title/title"
@@ -36,9 +39,68 @@ import { AgentUsageDialog } from "@/components/agent-usage-dialog"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
 import { usePermissions } from "@/lib/perms"
 import { personInitials } from "@/lib/identity"
-import { useLanguage } from "@shared/web/language"
+import { useLanguage, useT } from "@shared/web/language"
 import { formatRelative } from "@shared/web/format"
 import type { SessionUser } from "@shared/types"
+
+/** THE CHIP LABELS. Here rather than in `shared/knowledge-chips.ts` because a
+ * sentence a person reads is the front door's to say and to translate (R28/R33):
+ * a string in `shared/` that no front door said would be an orphan in the
+ * catalogue. The KEYS are shared; the words are ours.
+ *
+ * "App records" and "Knowledge articles" are two words each on purpose — the
+ * other four name a service a person already has a word for, and these two do
+ * not: "Records" alone reads as a database table, and "Articles" alone reads as
+ * something we published. */
+function SourceChips({
+  sources,
+  onToggle,
+  disabled,
+}: {
+  sources: string[]
+  onToggle: (key: string) => void
+  disabled?: boolean
+}) {
+  const t = useT()
+  // THE SERVICE'S OWN NAME, not the bare word. "Drive" alone is already in this
+  // app's catalogue as a disk drive ("Laufwerk", "Unidad"), and "Mail" and
+  // "Chat" are common nouns a translator will faithfully translate — so a chip
+  // reading "Drive" would have said "Laufwerk" to a German reader and meant
+  // Google Drive. `Gmail` and `Google Chat` are already in the catalogue,
+  // correctly untranslated; `Google Drive` joins them for the same reason.
+  const LABEL: Record<string, string> = {
+    meetings: t("Meetings"),
+    mail: t("Gmail"),
+    drive: t("Google Drive"),
+    chat: t("Google Chat"),
+    records: t("App records"),
+    articles: t("Knowledge articles"),
+  }
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1.5 px-1"
+      role="group"
+      aria-label={t("Which sources the assistant reads")}
+    >
+      {SOURCE_CHIPS.map((chip) => {
+        const on = sources.includes(chip.key)
+        return (
+          <Toggle
+            key={chip.key}
+            size="sm"
+            variant="outline"
+            pressed={on}
+            disabled={disabled}
+            onPressedChange={() => onToggle(chip.key)}
+            aria-label={LABEL[chip.key] ?? chip.key}
+          >
+            {LABEL[chip.key] ?? chip.key}
+          </Toggle>
+        )
+      })}
+    </div>
+  )
+}
 
 export function AgentPanel({
   teamId,
@@ -455,6 +517,27 @@ export function AgentPanel({
               conversation entirely. Clears the moment the next question is
               asked. */}
           {chat.failure && <AssistantLimitNotice failure={chat.failure} />}
+
+          {/* WHICH DOORS THIS CONVERSATION READS FROM — all on, untick to
+              narrow. Control when somebody wants it, and a diagnostic when an
+              answer smells wrong: re-ask with one chip on and see which door
+              lied.
+
+              UNDER THE HEADER, NOT UNDER THE INPUT, and the owner asked for
+              "above the input". Two reasons, and the first is this file's own
+              precedent: the limit notice was moved out from under the composer
+              on 27 Aug 2026 because the composer belongs to `AgentChat`, so
+              "above the composer" and "at the bottom of the panel" are the
+              same place — and a row of controls stranded below the input reads
+              as an afterthought rather than as the scope the conversation is
+              running under. The second is that this IS the conversation's
+              scope, not the message's: it is held for the whole thread, so it
+              belongs where the thread's other facts are.
+
+              THE LAST CHIP ON STAYS ON — see `toggleSource`: an empty list
+              reads as "every door" everywhere behind this, so unticking the
+              last one would silently WIDEN the search. */}
+          <SourceChips sources={chat.sources} onToggle={chat.toggleSource} disabled={chat.busy} />
 
           {/* ITEM 4, REVERSED (owner: "right of the send" on 31 Aug, then "move
               the attach button to the left of the send button" on 1 Sep), THEN

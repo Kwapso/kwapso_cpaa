@@ -22,6 +22,7 @@
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { mendMojibake } from "@shared/workers/mojibake"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { accessTokenFor } from "./google"
 import { type CalendarEvent } from "./google-api"
@@ -822,7 +823,15 @@ export async function captureTranscript(
   // can read a candidate before calling it a transcript (google-transcript.ts),
   // so reaching this line means there are words; and a meeting whose transcript
   // could not be read stays unclaimed and is tried again next time.
-  const words = capToRow(found.text)
+  // MENDED ON THE WAY IN, for the same reason the Google sweep mends (R-note in
+  // shared/workers/mojibake.ts): a Meet transcript is Google-composed text and
+  // carries the display name Google itself mis-decodes, right there in the
+  // attendee line. It has to happen HERE rather than in the knowledge row,
+  // because the `meeting` kind rebuilds its body from this column on every
+  // sweep — a knowledge row repaired directly was re-mangled twelve minutes
+  // later, from a transcript captured after the Google-lane mend shipped. The
+  // four Google lanes were not the only door Google's text comes through.
+  const words = capToRow(mendMojibake(found.text))
 
   // THE CLAIM, AND IT IS THE WHOLE OF THE IDEMPOTENCE. Everything below happens
   // exactly once because this statement moves exactly one row exactly once. It
@@ -858,22 +867,49 @@ export async function captureTranscript(
   // The duration is the meeting's own: an hour on the meeting is an hour off the
   // day, and inventing a finer figure out of a transcript's timestamps would be
   // inventing a fact. A meeting with no end runs the default hour.
+  //
+  // AND ONE PER PERSON PER MEETING, EVER — the predicate rides the INSERT (R17).
+  //
+  // This used to lean entirely on the claim above: `transcript_captured_at IS
+  // NULL` moves one row once, so the loop below ran once, so nobody was billed
+  // twice. That is true exactly as long as NOTHING EVER CLEARS THAT COLUMN — and
+  // on 2026-08-31 clearing it became the necessary repair, because seven
+  // meetings had been matched to the wrong document and the only way to let the
+  // corrected hunt run again is to un-claim them. The claim guards the
+  // TRANSCRIPT; it was never guarding the HOURS, and the difference is invisible
+  // until the day somebody needs the first without the second.
+  //
+  // Left alone, that repair would have added 18.25 billable hours across 21 work
+  // logs that nobody worked, silently, to a client's account. So the guard now
+  // sits where the risk is: a person already logged against this meeting is not
+  // logged again, whatever else has been reset. `logsWritten` counts what the
+  // database actually accepted rather than how many people were in the room —
+  // a re-capture honestly reports zero.
   const staff = await ourStaffAmong(env, guard.teamId, event.attendees.map((a) => a.email))
   const endsAt = meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString()
   const seconds = Math.max(0, Math.round((Date.parse(endsAt) - Date.parse(meeting.startsAt)) / 1000))
-  for (const person of staff)
-    await d1ExecScript(
+  let logsWritten = 0
+  for (const person of staff) {
+    const wrote = await d1Query<{ id: string }>(
       cfg,
       guard.databaseId,
       `INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, user_name, kind, note,
          started_at, ended_at, seconds, billable, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlString(id)}, ${sqlString(person.userId)}, ${sqlString(person.name)}, ${sqlString(MEETING_LOG_KIND)}, ${sqlString(`In "${meeting.title}"`)}, ${sqlString(meeting.startsAt)}, ${sqlString(endsAt)}, ${seconds}, 1, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+SELECT ${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlString(id)}, ${sqlString(person.userId)}, ${sqlString(person.name)}, ${sqlString(MEETING_LOG_KIND)}, ${sqlString(`In "${meeting.title}"`)}, ${sqlString(meeting.startsAt)}, ${sqlString(endsAt)}, ${seconds}, 1, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)}
+ WHERE NOT EXISTS (
+   SELECT 1 FROM work_logs
+    WHERE target_table = 'meetings' AND target_id = ${sqlString(id)}
+      AND user_id = ${sqlString(person.userId)} AND kind = ${sqlString(MEETING_LOG_KIND)}
+ )
+RETURNING id`
     )
+    if (wrote[0]) logsWritten++
+  }
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting transcript read",
-    description: `${actor.name} read the transcript of "${meeting.title}", and ${staff.length} ${
-      staff.length === 1 ? "person's time was" : "people's time was"
+    description: `${actor.name} read the transcript of "${meeting.title}", and ${logsWritten} ${
+      logsWritten === 1 ? "person's time was" : "people's time was"
     } logged`,
     relatedTable: "meetings",
     relatedRowId: id,
@@ -883,7 +919,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
     fileId: found.fileId,
     fileName: found.name,
     foundBy: found.foundBy,
-    logsWritten: staff.length,
+    logsWritten,
     // The one note worth carrying up: a transcript longer than a row may hold
     // was CUT, and the person is told so rather than left to discover that the
     // assistant only knows the first half of the conversation.
@@ -969,9 +1005,18 @@ const SERIES_HORIZON_DAYS = 28
 
 /** WHAT TO CALL AN ENTRY THAT NEVER GOT A NAME. Said once because the insert and
  * the refresh both need it and a row whose title changed on its second sync
- * would look like somebody had renamed it. */
+ * would look like somebody had renamed it.
+ *
+ * AND SAID ONCE IS ALSO WHY THE MEND BELONGS HERE. A calendar entry somebody
+ * named after a person carries Google's own mis-decoding of that person's name
+ * in its title — "Ãlaap / Alexander" sits in the meeting list looking like a
+ * typo somebody made. It is re-read from Google on every calendar sweep, so
+ * repairing the row is a treadmill for the same reason the sweep lanes were:
+ * this is the third door Google's text comes through, and a census of every
+ * TEXT column in the team database is what found it, after two rounds of
+ * fixing the doors I happened to remember. */
 function titleOf(event: CalendarEvent): string {
-  return event.summary || "A meeting with no title"
+  return mendMojibake(event.summary) || "A meeting with no title"
 }
 
 /** HOW FAR BACK THE LIVE WINDOW RE-READS, ON EVERY CALL.

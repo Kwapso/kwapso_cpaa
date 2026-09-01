@@ -429,7 +429,72 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "component-coverage",
     status: "enforced",
   },
+  {
+    id: "R47",
+    dimension: "ai",
+    law: "EVERY MODULE A PERSON CAN SEE, THE ASSISTANT CAN ANSWER ABOUT — AND WHAT IS NOT IN THE CORPUS SAYS WHY. Two clauses over one census, derived from the permission matrix itself (`TEAM_MODULES`, every module that offers a `read` right). FIRST: each of them resolves to at least one way the assistant can answer — a KNOWLEDGE KIND that mirrors it (`INGEST_KINDS`, its module read off the kind's own `table` through `ACTIVITY_GATE_MAP`/`QUERY_MODULES`, or off the `modules` a kind declares when its text carries more than its table), or a GATED READ TOOL on the agent's own catalogue (the tool's door found in that worker's own switchboard, its module read off the handler's own `requireRight`/`gated` pair), or a reasoned `ASSISTANT_BLIND_MODULES` line. SECOND, and this is the clause with the teeth: a module reachable ONLY by tool declares IN WRITING why its material is not in the searchable corpus — a `CORPUS_EXEMPT` line, rot-checked, so a module that gains a kind must lose its excuse and the list can only shrink. Nothing hand-listed: the modules come from the matrix, the kinds from the sweep, the tools from the catalogue, and each tool's gate from the source of the door it forwards to.",
+    why: "The owner's own sentence, 1 Sep 2026: anything he can see in the app, the knowledge base should be able to see. He proved it was false the way he proves everything — he asked. \"What is Alex's full name?\" was unanswerable, and not because retrieval failed: NOTHING anywhere in the base said who his own colleagues are. `staff_profiles` carries a `user_id` and no name at all, and the names live in the global core database, so no team table could have answered it. TWO CLAUSES BECAUSE ONE WAS MEASURED AND FOUND TOOTHLESS. The first draft asked only whether a module was reachable at all, and the census came back 21 of 22 green — every module already had a list tool, which is exactly why the failure was invisible: a tool answers when you know to call it, and a person asking a vague question reaches the corpus. So the law separates the two and makes the corpus gap a written decision rather than an accident. THE MONEY IS THE CASE THAT SETTLES THE SHAPE: internal rates and the margin are reachable by tool (`list_internal_rates`, `read_margin`, on the R24-fenced doors), and they must NEVER be in the corpus, because the corpus has exactly one gate — `knowledge:read` — and no way to subtract a caller's denied modules. A law that only asked 'is it reachable' would have called that a pass and said nothing; a law that demanded a kind for every module would have demanded the breach. Written down, it is the true sentence: reachable, but only by the people who could already see it.",
+    checkId: "assistant-coverage",
+    status: "enforced",
+  },
 ]
+
+/** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
+ * no gated read tool, and a reason why that is right rather than an oversight.
+ *
+ * One line long, and it should stay that way: a module a person can see and the
+ * assistant cannot reach is the exact failure this law exists to make visible.
+ * Rot-checked — a module here that gains a kind or a tool turns the build red,
+ * so the list can only shrink. */
+export const ASSISTANT_BLIND_MODULES: Record<string, string> = {
+  agent:
+    "THE MODULE IS THE SWITCH, and both of its rights are about the assistant rather than about anything the assistant could read: `read` is 'see your own threads with it' and `create` is 'say something to it' (shared/team-modules.ts). There is no third act and no record type behind it — a thread is the conversation the assistant is standing in, not material about the agency. Filing past conversations as a corpus would be worse than useless: the assistant would retrieve its own earlier answers as evidence for new ones, which is how a wrong answer becomes a cited fact. DELETE THIS LINE if the agent ever grows a record somebody could ask a question ABOUT.",
+}
+
+/** R47's second clause — MODULES REACHABLE BY TOOL AND DELIBERATELY NOT IN THE
+ * SEARCHABLE CORPUS, each with the reason in words a person can check.
+ *
+ * READ THE TWO CATEGORIES APART. Everything here IS reachable: the assistant can
+ * answer about all of it, through a gated tool, with the module's own permission
+ * checked at the door exactly as it is for a person on the screen. What these
+ * lines say is that the material is not ALSO copied into the knowledge base's
+ * searchable pile — which is a different question, and for one entry below it is
+ * a hard rule rather than a judgement.
+ *
+ * WHY THE DISTINCTION IS REAL AND NOT PEDANTRY. The corpus has exactly ONE gate,
+ * `knowledge:read`, and no way to subtract a caller's denied modules the way the
+ * activity feed does (R18). So putting a module's words in the corpus grants
+ * them to everybody who may ask the knowledge base a question. For most of the
+ * lines below the reason is simply that there are no WORDS to file — a rate, a
+ * filename, a switch. For `commercials` it is R24, and it is absolute.
+ *
+ * Rot-checked: a module here that gains a knowledge kind must lose its line, so
+ * this list can only shrink. */
+export const CORPUS_EXEMPT: Record<string, string> = {
+  // ── THE ONE THAT IS A RULE AND NOT A JUDGEMENT ────────────────────────────
+  commercials:
+    "WHAT OUR OWN HOUR COSTS, AND THE MARGIN. Reachable — `list_internal_rates`, `read_margin` and `list_role_rates` answer it, on the doors R24 already fences, so anybody whose role may see money on the screen can ask the assistant for the same number and anybody whose role may not is refused the same way. It is kept OUT of the searchable pile because the pile has one gate and cannot fence per module: a passage in it is readable by everyone who may ask the knowledge base a question, and this is the one number SCOPE says a client must never see under any setting. So the honest sentence is not 'the assistant cannot see the money' — it can — but 'only the people who could already see it can get it out of the assistant'. The client's OWN rate card (what they are charged) is a separate table for the same reason and is reachable the same way.",
+
+  // ── NOTHING TO FILE: A SWITCH, A SHEET, OR A NUMBER ───────────────────────
+  all_tasks:
+    "NOT A RECORD TYPE. Read the row as a sentence: 'this role may see everyone's tasks'. It is a switch over a SIGHT, and the tasks themselves are already in the corpus as the `task` kind — so there is nothing here to file that is not filed, and a source saying 'this role can see everyone's tasks' would be a permission fact wearing a passage's clothes.",
+  member_roles:
+    "A PERMISSION SHEET, AND IT MUST NEVER BE STALE. What each role may do is answered live by `get_role_permissions` and by `query_records` on `roles`, straight off the matrix. A corpus copy would be a second account of who can do what, written once and then wrong the next time somebody ticks a box — and of everything in this app, the permission matrix is the document where a confident, out-of-date answer does the most harm.",
+  knowledge:
+    "IT IS THE CORPUS. The knowledge base's own sources are what the pile is made of; filing the index inside the thing it indexes would put every source's metadata into competition with its content, so a question about a client could be answered by a passage describing a document about that client rather than by the document. `list_knowledge_sources` returns a source's own words when given its id, which is the honest way to ask what the base holds.",
+
+  // ── THE MATERIAL IS A FILE, AND THE ROW IS A LABEL ON IT ──────────────────
+  deliverables:
+    "WHAT WE HANDED OVER — a title, a kind, a date and a LINK. There is no body column on the row at all (team-schema.ts), so the words are in the document at the other end of the URL and the corpus would be filing a filename. That is R40's own distinction said again: a filename in a pile is not a document anybody can read. A REAL CANDIDATE, not a permanent no: the day the source readers (R42) are pointed at the handover shelf the way they are at the knowledge base's own uploads, this becomes a kind and this line goes.",
+  brand_assets:
+    "THE BRAND LIBRARY IS PICTURES AND FONTS. The row carries a name, a category, a one-line shelving `description` ('the primary logo, dark background') and a link to bytes. The material is the file; the description is where it sits. Same shape as `deliverables` above, and the same condition for deleting this line.",
+
+  // ── THE WORDS ARE ALREADY IN THE CORPUS, ATTACHED TO SOMETHING ELSE ───────
+  delivery:
+    "WHY WE MEET — about ten labels with a department each. Every one of them is ALREADY in the corpus, written into the meeting it explains: the meeting kind's own sentence reads '… is a meeting of ours about <purpose>'. A source per purpose would file the label twice, once attached to the conversation it describes and once alone, and the lone copy is the one with nothing in it to answer a question with.",
+  google:
+    "A CONNECTION IS A CREDENTIAL AND A SHELF, not material — whose Google account is joined up, and which folders and spaces they named. What it BRINGS is already four kinds (`document`, `email`, `event`, `message`), each carrying the personal fence that says whose sight it arrived through. Filing the connection itself would put one person's own account in a pile everybody with `knowledge:read` can search, which is the opposite of the fence those four kinds exist to keep.",
+}
 
 /** R44 — the ceiling. Per translated language, the number of extracted strings
  * (`shared/i18n-strings.json`) with no non-empty entry in `overlay(CATALOGUE,
@@ -485,13 +550,20 @@ export const RULES_REGISTRY: Rule[] = [
  * RAISED 39 -> 60 (all three), same night, same reason. The toolbar-everywhere
  * sweep and the kit's real empty-collection design (title + explanation +
  * "Add the first"/"Import a list") added 21 more English strings the same
- * two translate scripts still can't reach from this environment. Lower all
+ * two translate scripts still can't reach from this environment.
+ *
+ * RAISED 60 -> 114 (all three), same night, merging Alaap's own parallel
+ * push — the rail's collapsible groups, the relationship map, the source
+ * chips, the assistant's compare/panel width work — with this session's own
+ * batch, on top of the ship-night debt above. Same two blocked credential
+ * paths, still unreachable from this environment; the same 54 new strings
+ * moved for all three languages, none of them ahead of the others. Lower all
  * three back to 0 the next time either script runs with real credentials —
  * it is a few minutes of spend, not a decision to leave open. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 60,
-  es: 60,
-  ca: 60,
+  de: 114,
+  es: 114,
+  ca: 114,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -630,6 +702,21 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["property"],
     via: ["translatedFacets"],
     why: "the same, for filter facets: each label sits beside the `field` and `value` the door parses, which are names of data and are never translated. `translatedFacets(key, t, rows)` is the one read.",
+  },
+  "web/components/apps-screen.tsx": {
+    kinds: ["property"],
+    via: ["t(o.label)"],
+    why: "APP_SORTS is the same shape as COLLECTION_SORTS one file over — a BOUNDED collection's own sort vocabulary, module-level so it sits beside the `value` each label belongs to, translated on the way to `<SortControl>` (`APP_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at declaration, where `t` is not a hook this constant could call.",
+  },
+  "web/components/deliverables-panel.tsx": {
+    kinds: ["property"],
+    via: ["t(o.label)"],
+    why: "DELIVERABLE_SORTS, the same reasoning as APP_SORTS above — the deliverables shelf's own two-option sort vocabulary, translated where it is read (`DELIVERABLE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the module-level constant.",
+  },
+  "web/components/selectable-screen.tsx": {
+    kinds: ["property"],
+    via: ["t(o.label)"],
+    why: "VALUE_SORTS, the same reasoning again — Choices' own Value/Group sort vocabulary, translated where `<SortControl>` reads it (`VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the module-level constant.",
   },
   "web/components/tasks-screen.tsx": {
     kinds: ["field-label", "property"],
@@ -2058,8 +2145,6 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
     "MISMATCH. This app's real profile screen (`web/components/screens/profile-screen.tsx`) shows a summary plus an `ActivityFeed` and edits through a separate popup dialog; the composition is an inline full-page required/optional form with its own commit bar — a different editing model, not a missing prop.",
   "screens/session-expired.tsx":
     "GAP, a real unscoped finding — not a permanent exemption. Nothing today persists a signed-out user's identity or a return destination: a 401 clears the session cache and redirects to a bare `/login` with no context (`web/lib/use-active-team.ts`), and there is no redirect-back mechanism anywhere in the login flow to restore to. Worth a scoped brief (identity storage + a redirect-back contract the whole login flow honours) when auth UX gets dedicated attention — real, unstarted plumbing on the one path where a half-built screen locks somebody out of their own account.",
-  "screens/settings.tsx":
-    "MISMATCH. The kit assumes one Settings screen with six tabs; this app deliberately scattered the same settings across three destinations (a personal profile page, per-team tabs at `/t/<teamId>`, and one flat app-settings page) as a dated, named product decision (`web/components/screens/settings-screen.tsx`'s own comment: 'Your profile' moved off Settings on 17 Aug 2026).",
   "screens/sign-in-portal.tsx":
     "OWNER'S CALL. Everything but one line fits cleanly (the two-step email/code flow, resend countdown, 'Wrong address?' back). The one line: `PortalLoginRoute` states a client portal never shows a social sign-in row, and this app's portal shows Google on purpose per SCOPE ch.06 ('signing in with Google never creates access; the invite does'). RECOMMENDATION: keep the app's Google row — SCOPE ch.06's reasoning is a real, already-shipped security stance, not an oversight, and the kit's law reads as a generic default rather than a considered exception for an invite-gated portal; if this still bothers the owner, the in-rule fix is a documented exception upstream in the kit's own law (the shape RADIUS_EXCEPTION already uses), not silently dropping a working feature.",
   "screens/sign-in.tsx":

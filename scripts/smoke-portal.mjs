@@ -55,6 +55,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import { makeApi, timedFetch } from "./lib/api.mjs"
+import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
 
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 // The REAL hostname, not the workers.dev alias: the Google sign-in door
@@ -134,10 +135,10 @@ const post = (call) => (path, body, cookie) =>
 const agencyPost = post(agency)
 const portalPost = post(portal)
 
-const TEST_LOGIN_KEY = process.env.TEST_LOGIN_KEY ?? ""
+const TEST_LOGIN_KEY = testLoginKey()
 if (!TEST_LOGIN_KEY)
   stop(
-    "no TEST_LOGIN_KEY in the environment",
+    NO_KEY_MESSAGE,
     "the smoke signs two accounts in through the staging-only admin test-login door (export TEST_LOGIN_KEY first)"
   )
 

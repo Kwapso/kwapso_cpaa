@@ -197,6 +197,19 @@ export const KNOWLEDGE_KINDS = [
   "email",
   "event",
   "message",
+  // R47's three, added 1 Sep 2026 — the modules a person could see and the
+  // assistant could only reach through a tool.
+  //
+  // `person` is the one that earned the law: the owner asked for a colleague's
+  // full name and nothing in the base said who his own people are. It is also
+  // the only kind whose row is not in the team's database — membership is
+  // global, and `staff_profiles` carries no name at all.
+  "person",
+  // The team's own vocabulary, one source per LIST and never one per value: the
+  // answer to "what ticket types do we use" is a list, so the list is the record.
+  "dropdown",
+  // Who at a client can open the portal, filed in that client's own compartment.
+  "portal_login",
 ] as const
 export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number]
 
@@ -255,6 +268,30 @@ const LEXICAL_WEIGHT = 0.1
  * It is safe above parity ONLY because the token had to be rare to get here
  * (EXACT_TERM_MAX_CHUNKS): "2026" never reaches this line. */
 const EXACT_WEIGHT = 2
+
+/** THE NAME ARM'S VOTE, and why it is EXACT_WEIGHT's twin rather than a number
+ * of its own. A colleague's name is the same class of thing as a reference
+ * code: something a person types EXACTLY, that an embedding is indifferent to.
+ * "What is Alex's full name?" embeds almost entirely to "full name", which no
+ * passage in the base says, so the vector arm cleared nothing and the question
+ * was REFUSED — with the answer sitting one row away in a source titled
+ * "Alexander Stadlmair". Measured on the bench before and after: 20/20 → 22/22
+ * with the owner's two failed questions added, and no ordinary question moved.
+ *
+ * If a reason ever arises to move the two apart, move this one — the exact-token
+ * weight has an arithmetic derivation above it (see EXACT_WEIGHT) and this does
+ * not. */
+const NAME_WEIGHT = EXACT_WEIGHT
+
+/** THE SHORTEST THING THAT MAY BE SOMEBODY'S NAME. Two letters is "of", "an",
+ * "we"; three is the floor at which a prefix means a person rather than a
+ * coincidence, and it is what makes "Ana" work without "an" matching everybody. */
+const NAME_MIN_CHARS = 3
+
+/** How many colleagues this arm will consider. The people of ONE agency, so a
+ * cap rather than a page (R14) — and stated here rather than at the statement
+ * because a team that outgrows it wants a decision, not a silent truncation. */
+const PEOPLE_HARD_CAP = 200
 
 /** Chunks the fused list hands on to be READ out of the database.
  *
@@ -1973,6 +2010,91 @@ export function hasExactTerm(question: string): boolean {
   return questionTerms(question, MAX_QUESTION_TERMS).some((t) => /\d/.test(t))
 }
 
+/** DOES THIS QUESTION NAME ONE OF US? — the NAME ARM (R47's other half).
+ *
+ * THE FAULT, and it is a different one from anything the other two arms are for.
+ * The owner asked staging "what is Alex's full name?" and was refused. The
+ * answer was in the base: a source titled "Alexander Stadlmair" whose text says
+ * he is also called Alex. Neither arm could reach it, for two different reasons
+ * that happen to coincide on exactly this shape of question:
+ *
+ *   • THE VECTOR ARM. "What is X's full name?" embeds to something dominated by
+ *     "full name", and no passage in an agency's material says "full name". The
+ *     nearest neighbour was below the floor, correctly — the question is not
+ *     ABOUT anything, it is a lookup.
+ *   • THE WORD ARM. It runs beside the vector arm only for an EXACT token (a
+ *     digit-bearing reference), and "alex" has no digit in it. With the vector
+ *     arm empty the word arm may only overrule on a rare exact token, which by
+ *     construction this question has none of. So it was silent by design, and
+ *     the design was right for every other question.
+ *
+ * WHAT MAKES A NAME ANSWERABLE AND NOT A GENERAL BOOST. The base knows who its
+ * own people are — that is what R47's `person` kind is — so this arm does not
+ * guess whether a word is a name. It ASKS: it reads the team's own people (a
+ * bounded read, fenced exactly as every other read here is) and fires only when
+ * one of the question's terms is a word of somebody's name, or the beginning of
+ * one. "alex" begins "alexander"; "full", "name", "leave" and "policy" begin
+ * nobody. That is the whole gate, and it is why this cannot repeat the failure
+ * the word arm's own header describes: a question about parental leave matches
+ * no person, so this arm returns nothing and the refusal stands.
+ *
+ * A PREFIX, NOT A SUBSTRING, and not a nickname table. A shortening is almost
+ * always the front of the name (Alex, Chris, Ana, Chila), and a substring match
+ * would put "art" inside "Stuart" and "ana" inside "Johanna" — a wrong person is
+ * worse than a miss here, because the answer would look perfectly well-sourced.
+ * `nameSpellings` in the sweep writes the same shortenings INTO the material for
+ * the word arm to find; this reaches them by the other road, which is why "Alex"
+ * works even on a person whose email says nothing useful. */
+async function nameArm(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  terms: string[],
+  compartments: string[],
+  /** The chips, if the caller narrowed. A colleague is one of the app's own
+   * records, so a conversation that unticked "App records" has said it does not
+   * want them — and an arm that ignored that would be the one door a chip could
+   * not close. */
+  kinds: string[] | null
+): Promise<CandidateRow[]> {
+  if (kinds && !kinds.includes("person")) return []
+  const wanted = terms.filter((t) => t.length >= NAME_MIN_CHARS)
+  if (!wanted.length) return []
+  const owner = ownerClause(guard)
+  const where = [`kind = 'person'`, "deactivated_at IS NULL", owner.sql]
+  const params: string[] = [...owner.params]
+  if (compartments.length) {
+    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
+    params.push(...compartments)
+  }
+  const people = await d1Query<{ id: string; title: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: PEOPLE_HARD_CAP, one row per colleague.
+    `SELECT id, title FROM knowledge_sources WHERE ${where.join(" AND ")} LIMIT ${PEOPLE_HARD_CAP}`,
+    params
+  )
+  const named = people.filter((p) =>
+    p.title
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .some((word) => word.length >= NAME_MIN_CHARS && wanted.some((t) => word.startsWith(t)))
+  )
+  if (!named.length) return []
+  const rows = await d1Query<{ chunk_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: bounded by the people matched, which is bounded above, and a
+    // person's own source is one or two chunks.
+    `SELECT id AS chunk_id FROM knowledge_chunks
+      WHERE source_id IN (${named.map((p) => sqlString(p.id)).join(", ")})
+      ORDER BY source_id, seq LIMIT ${LEXICAL_TOP_K}`
+  )
+  // `lex` and `exact` are what `fuse` reads off a candidate; this arm's rows are
+  // ranked by nothing but the order they came back in, because a person either
+  // is the person asked about or is not.
+  return rows.map((r) => ({ chunk_id: r.chunk_id, lex: 1, exact: 1 }))
+}
+
 /** THE LEXICAL ARM. One keyed read over the inverted index, fenced by the reader
  * and narrowed by the compartment.
  *
@@ -2116,9 +2238,20 @@ type ScoredRow = {
  *
  * A rejection without its evidence gets re-tried by the next person who has the
  * same good idea. This is the evidence. */
-function fuse(vector: { id: string }[], lexical: CandidateRow[]): { id: string; score: number }[] {
+function fuse(
+  vector: { id: string }[],
+  lexical: CandidateRow[],
+  /** THE PEOPLE THE QUESTION NAMED, if it named any — see `nameArm`. A third
+   * list rather than more rows in `lexical`, because it earns a different vote
+   * and because a list that is empty on every question that names nobody cannot
+   * disturb a single measured number. */
+  named: CandidateRow[] = []
+): { id: string; score: number }[] {
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
+  named.forEach((row, rank) =>
+    fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + NAME_WEIGHT / (RRF_K + rank + 1))
+  )
   lexical.forEach((row, rank) =>
     fused.set(
       row.chunk_id,
@@ -2151,6 +2284,18 @@ export async function retrieve(
   input: {
     question: string
     accountId?: string | null
+    /** WHICH DOORS THIS CONVERSATION IS USING — the source chips, already
+     * resolved from chip keys to kinds by `kindsForChips`. Null means every
+     * kind, which is what a caller who has never touched the chips sends.
+     *
+     * IT NARROWS IN BOTH PLACES, and that is R26's shape rather than a belt and
+     * braces: the vector index is told to look only at those kinds (a label it
+     * already carries), and the passage read — the one place THE DATABASE
+     * DECIDES — carries the same clause. Narrowing only the index would let the
+     * word arm and the name arm return a kind the caller unticked; narrowing
+     * only the read would spend the index's whole budget on kinds it is going to
+     * throw away. */
+    kinds?: string[] | null
     limit?: number
     /** WRITE THE ANSWER OUT. Absent means the caller wants the evidence only, which
      * is what every caller wanted until the Knowledge tab started answering in
@@ -2178,6 +2323,7 @@ export async function retrieve(
       ? await searchVectors(env, guard, asked, {
           level: "chunk",
           ...compartmentFilter(route.compartments),
+          ...(input.kinds?.length ? { kind: { $in: input.kinds } } : {}),
         })
       : []
   // NOT EVERY NEAREST NEIGHBOUR IS EVIDENCE. There is always a closest thing;
@@ -2235,8 +2381,14 @@ export async function retrieve(
     role !== "beside" || hasExactTerm(question)
       ? await lexicalArm(cfg, guard, terms, exactTerms(question), route.compartments, role)
       : []
+  // THE NAME ARM RUNS ON EVERY QUESTION, and it is its own gate: it returns
+  // nothing unless one of the question's terms begins a colleague's name. So it
+  // costs one bounded read on a question about parental leave and speaks only on
+  // a question about a person — which is also why it may speak when the vector
+  // arm found nothing, the case that refused the owner outright.
+  const named = await nameArm(cfg, guard, terms, route.compartments, input.kinds ?? null)
 
-  const fused = fuse(vector, lexical)
+  const fused = fuse(vector, lexical, named)
 
   if (!fused.length)
     return knowledgeAnswer({
@@ -2258,6 +2410,14 @@ export async function retrieve(
   // The chunk's copy is a denormalisation for the word-match's single-table read,
   // never the authority (see readerClause).
   const reader = readerClause(guard, "s.")
+  // THE CHIPS, AS SQL — built ONCE and used at every read that can hand a
+  // passage back. There are three (the pool read, the router's fallback and the
+  // neighbour widening), and the fallback's own comment already says the rule:
+  // "a second way in may not be a wider one". Building the clause here rather
+  // than at each read is what makes a fourth way in honest by construction.
+  const chipClause = input.kinds?.length
+    ? ` AND s.kind IN (${input.kinds.map((k) => sqlString(k)).join(", ")})`
+    : ""
   const rows = await d1Query<ScoredRow>(
     cfg,
     guard.databaseId,
@@ -2269,7 +2429,7 @@ export async function retrieve(
             s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
-        AND s.deactivated_at IS NULL AND ${reader.sql}
+        AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}
       LIMIT ${RANKING_POOL}`,
     reader.params
   )
@@ -2323,7 +2483,7 @@ export async function retrieve(
               s.origin_table, s.origin_row_id, s.record_date
          FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
         WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
-          AND s.deactivated_at IS NULL AND ${reader.sql}
+          AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}
         ORDER BY c.seq LIMIT ${RANKING_POOL}`,
       reader.params
     )
@@ -2681,6 +2841,12 @@ async function widenNeighbours(
     guard.databaseId,
     // R14 hard cap: at most the shortfall itself, and the WHERE names a bounded
     // set of (source, seq) pairs built from the passages already chosen.
+    //
+    // NO CHIP CLAUSE HERE, and that is not an omission: a neighbour is another
+    // chunk of a passage that ALREADY survived the narrowed read, so it is the
+    // same source and therefore the same kind by construction. Adding the clause
+    // would be a filter that can never remove a row, which reads to the next
+    // person as though it could.
     `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
             s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
@@ -2777,6 +2943,11 @@ const RECORD_PATH: Record<string, string> = {
   meetings: "meetings",
   accounts: "accounts",
   tasks: "tasks",
+  // A COLLEAGUE OPENS AS THEIR MEMBER PAGE — `/t/<team>/members/<userId>`, which
+  // is where their profile and certificates are drawn (the `StaffPanel` under
+  // the member detail). The origin row id IS the user id, so the link resolves
+  // without a second lookup.
+  users: "members",
 }
 
 /** RECORDS THAT LIVE INSIDE ANOTHER RECORD'S PAGE.
@@ -2791,7 +2962,14 @@ const RECORD_PATH: Record<string, string> = {
  * a citation reading "Roland Golger at HOGO" with nothing to click was the one
  * shape of answer that could not be checked. Measured in the test run: four
  * citations out of six on a question about HOGO's people had no way back. */
-const LIVES_ON_ITS_ACCOUNT = new Set(["account_links", "todos"])
+const LIVES_ON_ITS_ACCOUNT = new Set([
+  "account_links",
+  "todos",
+  // A PORTAL LOGIN is a row on its account's Portal access tab — it has no page
+  // of its own, and the account page is where a person goes to look at one
+  // anyway. Its compartment is always that client's, so the hop always resolves.
+  "portal_users",
+])
 
 export function recordPath(
   originTable: string | null,

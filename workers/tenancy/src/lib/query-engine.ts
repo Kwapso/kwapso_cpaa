@@ -81,6 +81,10 @@ export type ParsedQuery = {
   /** true when the module's put-away rows were hidden, as its own list door
    * hides them — false when the caller asked about that field themselves. */
   everyday: boolean
+  /** true when rows dated after now were left out — see `notYet` in the
+   * grammar. False when the caller filtered on that date themselves, and false
+   * on every module that does not declare one. */
+  happened: boolean
   groupBy: QueryField[]
   select: QueryField[]
   /** "How many?" and nothing else — the total, with no rows at all.
@@ -267,8 +271,21 @@ export function parseQuery(
     if (!field) bad("This module's everyday list names a field it does not have.")
     where.push({ fields: [field as QueryField], op: "isNull", values: [] })
   }
+  // AND WHAT HAS NOT HAPPENED YET. The same mechanism, the same escape, a
+  // different question — see `notYet` in the grammar for the meeting in 2027
+  // that earned it. The bound is `<= now` rather than `< now` so a meeting
+  // starting this instant is still one that is happening.
+  const asksAboutWhen =
+    !!mod.notYet && where.some((c) => c.fields.some((f) => f.name === mod.notYet!.field))
+  const happened = !!mod.notYet && !asksAboutWhen
+  if (happened) {
+    const field = queryField(mod, mod.notYet!.field)
+    if (!field) bad("This module's everyday list names a date field it does not have.")
+    where.push({ fields: [field as QueryField], op: "lte", values: [new Date().toISOString()] })
+  }
   return {
     everyday,
+    happened,
     where,
     groupBy,
     select,
@@ -480,6 +497,10 @@ export type QueryAnswer = {
    * them out. Reported, never assumed: a caller must be able to tell "there are
    * none" from "there are none on the list". */
   everyday: boolean
+  /** true when rows that have not happened yet were left out. Reported for the
+   * same reason as `everyday`, and it matters more here: a caller who cannot
+   * tell will read a bounded answer as the whole table. */
+  happened: boolean
   groups: QueryGroup[] | null
   groupsTruncated: boolean
   /** the filter values that named nothing — empty when everything resolved */
@@ -557,6 +578,7 @@ export async function runQuery(
       groups,
       groupsTruncated: truncated,
       everyday: q.everyday,
+      happened: q.happened,
       unmatched: await unmatchedPromise,
       unlinked: await unlinkedPromise,
       sort: "",
@@ -574,6 +596,7 @@ export async function runQuery(
       groups: null,
       groupsTruncated: false,
       everyday: q.everyday,
+      happened: q.happened,
       unmatched: await unmatchedPromise,
       unlinked: await unlinkedPromise,
       sort: "",
@@ -615,6 +638,7 @@ export async function runQuery(
     groups: null,
     groupsTruncated: false,
     everyday: q.everyday,
+    happened: q.happened,
     unmatched: await unmatchedPromise,
     unlinked: await unlinkedPromise,
     sort: ordering.name,

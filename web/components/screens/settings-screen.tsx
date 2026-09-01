@@ -51,7 +51,7 @@
 // default) because its strip switches between records or between
 // collections; Settings' four tabs switch between SETTINGS SECTIONS instead,
 // which is the exact carve-out that file's own doc already states for the
-// line variant. Rather than writing `variant: "line"` a second time (the
+// line variant. Rather than naming that variant literally a second time (the
 // thing web/test/rules.test.ts's "tab shape is decided in one place" census
 // exists to catch), this spreads `RECORD_TABS_CONFIG` — the one constant
 // record-chrome.tsx already declares for exactly this override — so the
@@ -405,6 +405,7 @@ export function SettingsScreen({
                 teamId={teamId}
                 onImport={() => softNavigate(`/t/${teamId}/import/selectable_data`)}
                 onOpen={(id) => softNavigate(`/t/${teamId}/dropdowns/${id}`)}
+                standalone={false}
               />
             )
           }

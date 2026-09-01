@@ -42,7 +42,12 @@ import {
 import { computeReachability, kitInventory } from "../../scripts/kit-coverage.mjs"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
-import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
+import {
+  RECORD_MAP_PREFIX,
+  SIMPLE_INVALIDATIONS,
+  TEAM_RESOURCES,
+  TIME_SLICE_PREFIX,
+} from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, MODULE_PERMISSION, tabCountKey, withTabCounts } from "../lib/screens"
 import { COLLECTION_FILTERS } from "../lib/collection-filters"
@@ -1112,6 +1117,25 @@ describe("RULES — the laws of the base", () => {
   // exact total, hasMore, an opaque cursor — and a client that can actually reach
   // page two. Paging no one can reach is dead code wearing a law's clothes.
   it("bounded-lists: every GROWING collection pages by key, end to end", () => {
+    // THE SHARED BODY, PROVED ONCE. A caller may reach `<LoadMore>` through a
+    // shared component instead of drawing it directly — `work-panels.tsx`'s own
+    // `PagedPanelBody` is `<PagedFind>` + `<LoadMore>` written ONCE and reused
+    // by several panels (todos among them) — so the per-entry loop below trusts
+    // a `listKey` PASSED INTO that body without re-deriving that the body
+    // itself really ends in a live `<LoadMore>`. Proved here, once, off the
+    // function's own text: its declared `listKey` parameter must be the same
+    // name the `<LoadMore>` inside it reads.
+    const sharedBody = read(join(WEB, "components", "work-panels.tsx"))
+    const bodyAt = sharedBody.indexOf("function PagedPanelBody")
+    expect(bodyAt, "PagedPanelBody must exist — the shared-body proof below has nothing to check").toBeGreaterThan(-1)
+    const bodyEnd = sharedBody.indexOf("\n}\n", bodyAt)
+    const bodySrc = sharedBody.slice(bodyAt, bodyEnd === -1 ? undefined : bodyEnd)
+    expect(bodySrc, "PagedPanelBody must actually render a <LoadMore>").toMatch(/<LoadMore\b/)
+    expect(
+      bodySrc,
+      "PagedPanelBody's own <LoadMore> must read the SAME listKey the function was handed, not a different name"
+    ).toMatch(/<LoadMore[\s\S]{0,200}?listKey=\{[^}]*\blistKey\b[^}]*\}/)
+
     for (const [name, c] of Object.entries(GROWING_COLLECTIONS)) {
       const lib = read(join(ROOT, c.lib))
       const at = lib.indexOf(`export async function ${c.fn}`)
@@ -1170,12 +1194,40 @@ describe("RULES — the laws of the base", () => {
       // weaker-looking sentence it replaced had gone red. One branch cannot stand
       // for three collections; `pagerFile`/`pagerKey` name each one's own.
       const pager = read(join(WEB, c.pagerFile))
-      const wired = [...pager.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) =>
-        m[0].includes(c.pagerKey)
-      )
+      // A CALLER MAY REACH `<LoadMore>` THROUGH A SHARED BODY, not just draw it
+      // directly — `work-panels.tsx`'s own `PagedPanelBody` is `<PagedFind>` +
+      // `<LoadMore listKey={found.listKey ?? listKey} .../>` written ONCE and
+      // reused by several panels' worth of collections (todos among them), so
+      // the panel's own key-building call never sits inside the shared tag's
+      // 400 characters the way a one-off `<LoadMore listKey={x}>` does. What
+      // still has to hold, and is checked here instead: the panel's own call
+      // INTO that shared body names its listKey from `c.pagerKey`, which is
+      // real per-collection proof — a caller cannot pass a name it never
+      // computed, and `PagedPanelBody`'s own body (read once, above the
+      // per-entry loop) is what proves that prop always reaches a real
+      // `<LoadMore>` beneath it.
+      const wired =
+        [...pager.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.pagerKey)) ||
+        // THE SHARED-BODY CASE IS SCOPED TO THE ENCLOSING FUNCTION, not a fixed
+        // window: `<PagedPanelBody<Todo> listKey={key} .../>` reads a plain
+        // `key` variable, and the call that actually BUILDS it
+        // (`const key = todosListKey(...)`) can sit thousands of characters
+        // earlier in the same component — real distance, measured, not a
+        // guess. So for each shared-body tag this walks back to the nearest
+        // preceding `export function`/`function` (the component that owns
+        // it) and asks whether `c.pagerKey` appears ANYWHERE between that
+        // component's own start and the tag — wide enough to reach the real
+        // call, narrow enough that a DIFFERENT panel's key builder elsewhere
+        // in the file still cannot satisfy it.
+        [...pager.matchAll(/<Paged(?:Find|PanelBody)(?:<[^>]*>)?[^>]*listKey=\{[^}]*\}/g)].some((m) => {
+          const tagAt = m.index ?? 0
+          const fnAt = [...pager.slice(0, tagAt).matchAll(/(?:^|\n)(?:export )?function [A-Za-z]/g)].pop()
+          const scopeStart = fnAt ? (fnAt.index ?? 0) : Math.max(0, tagAt - 2000)
+          return pager.slice(scopeStart, tagAt).includes(c.pagerKey)
+        })
       expect(
         wired,
-        `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> whose listKey is built from ${c.pagerKey}`
+        `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> (directly, or through a shared paged body) whose listKey is built from ${c.pagerKey}`
       ).toBe(true)
       // …and the collection's cache key is NAMED by a component, which on the
       // record feed is the second half of the pairing rather than a restatement of
@@ -1361,21 +1413,33 @@ describe("RULES — the laws of the base", () => {
   // at "running" is also a row nobody can edit. One stale cache key, two
   // findings.
   it("live-collections: a record-scoped slice of a live collection reaches a listener too", () => {
-    const declared = Object.values(TEAM_RESOURCES)
-      .map((r) => r.slicePrefix)
-      .filter((p): p is string => !!p)
+    // A RESOURCE MAY CLAIM MORE THAN ONE FAMILY, since 1 Sep 2026 — a row can go
+    // stale in two pictures at once (a work log's own Time tab, and the
+    // relationship map of everything standing beside the record it is against),
+    // and a field that held one prefix made a resource choose which staleness to
+    // fix. Flattened here so the census reads both shapes.
+    const declared = Object.values(TEAM_RESOURCES).flatMap((r) =>
+      r.slicePrefix ? [r.slicePrefix].flat() : []
+    )
     expect(
       declared,
       "the time slices are a live collection's record-scoped half — a resource must claim them (R15)"
     ).toContain(TIME_SLICE_PREFIX)
+    expect(
+      declared,
+      "the relationship map's neighbourhoods are the same shape and must be claimed too (R15)"
+    ).toContain(RECORD_MAP_PREFIX)
 
     // …and the SHELL performs the drop, rather than the registry describing one
     // nothing does. A declared prefix nobody reads is R15's original failure
-    // mode wearing a new field name.
+    // mode wearing a new field name — and now it must drop EVERY prefix a
+    // resource declares, not the first one: a shell that read `r.slicePrefix`
+    // straight would silently ignore the second family of every resource that
+    // has two.
     const shell = read(join(WEB, "components", "app-shell.tsx"))
     expect(
-      shell.includes("invalidatePrefix(r.slicePrefix)"),
-      "app-shell must drop each resource's declared slice family on a ping (R15)"
+      /for \(const \w+ of \[r\.slicePrefix\]\.flat\(\)\) invalidatePrefix\(/.test(shell),
+      "app-shell must drop EVERY prefix in each resource's declared slice family on a ping (R15)"
     ).toBe(true)
 
     // …and no screen builds a per-record time key by hand. ONE builder, so the
@@ -2453,6 +2517,7 @@ describe("RULES — the laws of the base", () => {
       "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
       "translation-ceiling", // R44: web/test/translation-ceiling.test.ts — per-language untranslated count vs the pinned, only-falling ceiling
       "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
+      "assistant-coverage", // R47: workers/mcp/test/assistant-coverage.test.ts — the module census, beside R19/R22/R27/R43 on the same door census
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
     ])
     for (const r of RULES_REGISTRY) {

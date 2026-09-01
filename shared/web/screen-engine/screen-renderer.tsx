@@ -70,6 +70,7 @@ import {
 import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 import { List } from "@shared/web/list-compat"
 import { RecordDetail } from "@shared/ui/components/record-detail/record-detail"
+import { clampRecordHeading } from "../record-heading"
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 
 /* ------------------------- host-injected contracts ------------------------- */
@@ -831,7 +832,9 @@ function renderDetail(
 
   return (
     <RecordDetail
-      title={title}
+      /* Clamped to two lines, the same decision the bespoke details make —
+         shared/web/record-heading.tsx carries the reasoning. */
+      title={clampRecordHeading(title)}
       meta={subtitle}
       mark={mark}
       actions={actions}

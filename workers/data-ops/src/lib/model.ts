@@ -287,7 +287,37 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  * `reasoning_content`, and emits no tool call — it spends the budget thinking. It
  * reads exactly like "glm cannot use our tools" and it is not. Give it room
  * before you judge it. */
-export const DEFAULT_AGENT_MODEL = "@cf/openai/gpt-oss-120b"
+/** ── AND ON 1 SEP 2026 THE DEPLOYMENT WENT TO kimi-k2.6, MEASURED TWICE ─────
+ *
+ * `wrangler.jsonc` pins `@cf/moonshotai/kimi-k2.6` in BOTH environments, AND SO
+ * DOES THIS CONSTANT — change both or neither, which is `no-quiet-downgrade`'s
+ * own sentence and it is right. I first left this at gpt-oss-120b reasoning that
+ * the fallback should be "the incumbent, for an environment that has not
+ * chosen", and the check refused it: nothing in production reads this, so the
+ * only reader is a FRESH environment, and handing that one a different assistant
+ * from the one anybody has measured is exactly the quiet downgrade the law is
+ * named for. The measured engine is the default.
+ *
+ * WHAT WAS MEASURED, on the owner's own staging, real prompt, real catalogue,
+ * 22 real questions, and the switch made LAST so every other change in the
+ * knowledge-base refit was measured on a constant engine first:
+ *
+ *     gpt-oss-120b   19/22, 19/22   (the incumbent, two runs)
+ *     kimi-k2.6      21/22, 21/22   (measured before the refit)
+ *     kimi-k2.6      21/22, 22/22   (re-measured 1 Sep, after the refit)
+ *
+ * Four runs, never below 21, and it reaches for the knowledge base more often.
+ * The rule set before running was that it had to beat 21/22 TWICE or the switch
+ * would not be made — a model that does not beat the incumbent twice is not a
+ * win, and going last is what made the comparison clean.
+ *
+ * AND WHAT IT COSTS, off the METER rather than a price sheet: 16,593 neurons for
+ * both runs, about $0.18 — against the bench's own per-token estimate of $1.92
+ * PER RUN, which was computed at Claude's prices because kimi has no line in
+ * that table. Cloudflare bills neurons; a per-token table cannot predict them
+ * (deepseek-v4-pro metered 24× its price sheet). The bench no longer prints a
+ * figure it cannot stand behind. */
+export const DEFAULT_AGENT_MODEL = "@cf/moonshotai/kimi-k2.6"
 
 class WorkersAiModel implements Model {
   readonly canActWithTools = true

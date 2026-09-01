@@ -359,8 +359,11 @@ export function AppShell({
   const [groupPrefsReady, setGroupPrefsReady] = React.useState(false)
   React.useEffect(() => {
     try {
-      const raw = localStorage.getItem("ss-rail-closed-groups")
-      setClosedGroups(raw ? (JSON.parse(raw) as string[]) : [])
+      const raw = JSON.parse(localStorage.getItem("ss-rail-closed-groups") ?? "[]") as unknown
+      // Read defensively: this is a value from the reader's own browser, and a
+      // half-written or hand-edited one must leave the rail whole rather than
+      // throwing under the shell.
+      setClosedGroups(Array.isArray(raw) ? raw.filter((g): g is string => typeof g === "string") : [])
     } catch {
       setClosedGroups([])
     } finally {
@@ -549,7 +552,7 @@ export function AppShell({
       // nothing when the team-wide list isn't loaded, and "the person is looking
       // at one story's Time tab having never opened the Time page" is precisely
       // the case that stayed stale (see recordTimeKey in lib/live-resources).
-      if (r.slicePrefix) invalidatePrefix(r.slicePrefix)
+      if (r.slicePrefix) for (const p of [r.slicePrefix].flat()) invalidatePrefix(p)
       // R16: an add/remove moves the collection's exact total by one — bump the
       // primed sidecar so badges stay honest between full refetches.
       if (event.op === "add" || event.op === "remove") {
@@ -587,7 +590,7 @@ export function AppShell({
         // A record-scoped slice has no list fetcher to reconcile against — it is
         // the door answering a narrower question — so catching up on one is a
         // drop and a re-read.
-        if (r.slicePrefix) invalidatePrefix(r.slicePrefix)
+        if (r.slicePrefix) for (const p of [r.slicePrefix].flat()) invalidatePrefix(p)
       }
       invalidate(`activity:team:${teamId}`)
       invalidate(`my-perms:${teamId}`)
