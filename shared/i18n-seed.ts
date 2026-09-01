@@ -3259,6 +3259,15 @@ export const SEED: Catalogue = {
     es: "Artículos de conocimiento",
     ca: "Articles de coneixement",
   },
+  /* ── THE RAIL'S TWO GROUPS (1 Sep 2026) ──────────────────────────────────
+   *
+   * The words above each half of the sidebar. Hand-written because they are
+   * short adjectival phrases a generator renders stiffly, and because they must
+   * keep the register the rest of the rail is in: what somebody opens most days,
+   * and what they open when they need it. */
+  "Every day": { de: "Täglich", es: "A diario", ca: "Cada dia" },
+  "Now and then": { de: "Gelegentlich", es: "De vez en cuando", ca: "De tant en tant" },
+
   /* ── THE RELATIONSHIP MAP (1 Sep 2026) ───────────────────────────────────
    *
    * Hand-written for the same reason the chips were: nothing is spent on a

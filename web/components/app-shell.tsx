@@ -16,9 +16,16 @@ import { Breadcrumbs } from "@shared/ui/components/breadcrumbs/breadcrumbs"
 // twice, which is the kit's own default weight spelled out by hand and its
 // role written by hand beside it. The kit part draws the same hairline
 // through Radix and gets the role from the primitive.
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@shared/ui/components/collapsible/collapsible"
 import { Separator } from "@shared/ui/components/separator/separator"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal } from "@shared/ui/foundations/icons"
+import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, Route, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Timer, MoreHorizontal,
+  ChevronDown,
+} from "@shared/ui/foundations/icons"
 // `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
 import { SeaWaves } from "@shared/ui/foundations/icons"
@@ -134,9 +141,49 @@ export function AppShell({
   // menu that stays open over the screen it just opened is a menu you have to
   // dismiss twice.
   const [moreOpen, setMoreOpen] = React.useState(false)
+  // WHICH RAIL GROUPS ARE OPEN — the kit's own spec, adopted at last.
+  //
+  // NOBODY REMOVED THIS. The owner asked why the collapsible sidebar groups had
+  // been taken away and the true answer is that they were never built: the rail
+  // has drawn two groups separated by a `Separator` since the day grouping
+  // landed (`git log -S NavGroup` names one commit, which INTRODUCED it), and no
+  // heading or chevron ever shipped. What Aurora specified — `shared/ui/
+  // compositions/templates/rail.tsx`, ch.26.02, "Grouped sections with a collapse
+  // chevron per group", and "Group collapse (chevron, left) is separate and
+  // persists per user" — is what this now is.
+  //
+  // TWO DIFFERENT CONTROLS, and the chapter says so itself. This one collapses a
+  // GROUP inside the rail. `toggleCollapsed` below collapses the WHOLE RAIL to
+  // icons, is remembered separately, and is untouched — the owner likes it and
+  // said so ("don't break that").
+  //
+  // OPEN IS THE DEFAULT and only a CLOSED group is stored, so a person who has
+  // never touched a chevron carries nothing, and a group added tomorrow arrives
+  // open rather than mysteriously shut for everybody who has ever collapsed one.
+  const [shutGroups, setShutGroups] = React.useState<string[]>([])
   React.useEffect(() => {
     setCollapsed(localStorage.getItem("ss-sidebar-collapsed") === "1")
+    try {
+      const raw = JSON.parse(localStorage.getItem("ss-rail-groups-shut") ?? "[]") as unknown
+      // Read defensively: this is a value from the reader's own browser, and a
+      // half-written or hand-edited one must leave the rail whole rather than
+      // throwing under the shell.
+      if (Array.isArray(raw)) setShutGroups(raw.filter((g): g is string => typeof g === "string"))
+    } catch {
+      /* a rail with every group open is the honest fallback */
+    }
   }, [])
+  function toggleGroup(id: string) {
+    setShutGroups((shut) => {
+      const next = shut.includes(id) ? shut.filter((g) => g !== id) : [...shut, id]
+      try {
+        localStorage.setItem("ss-rail-groups-shut", JSON.stringify(next))
+      } catch {
+        /* a browser refusing storage still gets the toggle, just not the memory */
+      }
+      return next
+    })
+  }
   function toggleCollapsed() {
     setCollapsed((c) => {
       const next = !c
@@ -357,6 +404,21 @@ export function AppShell({
   // for the reason the ORIGINAL comment here named: without an explicit
   // height a flex child stretches to the tallest column and the profile row
   // drifts to the bottom of the document instead of the window.
+  /** THE WORD ABOVE EACH GROUP. Sentence case here and drawn small-caps by the
+   * class, which is the kit's own arrangement — a string shouted in the source
+   * is a string a translator has to un-shout.
+   *
+   * CHECKED AGAINST THE CATALOGUE BEFORE BEING CHOSEN, the way the source chips
+   * were: neither of these already means something else in this app, where
+   * "Daily" and "Occasional" would have been the obvious pair and "Daily" is the
+   * kind of bare adjective that collides. These name what `NavGroup` in
+   * pages.ts already says each half IS — what somebody opens most days, and what
+   * they open when they need it. */
+  const NAV_GROUP_TITLE: Record<NavGroup, string> = {
+    daily: t("Every day"),
+    occasional: t("Now and then"),
+  }
+
   const railContent = (
     <div
       data-rail-collapsed={collapsed ? "" : undefined}
@@ -370,14 +432,49 @@ export function AppShell({
         />
       </div>
       <nav className="flex flex-col gap-1">
-        {navGroups.map((group, i) => (
-          <React.Fragment key={group[0].slug}>
-            {/* The divider between the daily half and the occasional one. It
-                sits BETWEEN groups, never above the first or below the last. */}
-            {i > 0 && <Separator className="my-2" />}
-            {group.map(navButton)}
-          </React.Fragment>
-        ))}
+        {navGroups.map((group, i) => {
+          const id = group[0].group
+          const open = !shutGroups.includes(id)
+          // COLLAPSED TO ICONS, THERE IS NO HEADING TO PUT A CHEVRON ON. The
+          // rail is 3rem wide and a small-caps word does not fit in it, so the
+          // groups degrade to exactly the divider they have always been — and
+          // every entry stays reachable, which is the part that must not break.
+          if (collapsed)
+            return (
+              <React.Fragment key={id}>
+                {i > 0 && <Separator className="my-2" />}
+                {group.map(navButton)}
+              </React.Fragment>
+            )
+          return (
+            <Collapsible key={id} open={open} onOpenChange={() => toggleGroup(id)}>
+              {/* THE HEADING IS THE TRIGGER, not a label with a button beside
+                  it: the whole row is the target, which is what makes it usable
+                  with a thumb and what a screen reader announces once rather
+                  than twice. Radix puts `aria-expanded` and `data-state` on it,
+                  so the state is announced and the rotation below can read it
+                  without this file tracking a second copy of the same fact. */}
+              <CollapsibleTrigger className="text-ink-tertiary hover:text-foreground flex w-full items-center gap-1.5 px-2 py-1 text-micro uppercase">
+                {/* THE CHEVRON IS ON THE LEFT — ch.26.02's own word, and it is
+                    the side a disclosure's marker belongs on when the row it
+                    opens is a list rather than a value.
+                    `motion-disclosure-marker` is the KIT'S rotation, not one
+                    written here: it reads the `data-state` Radix already puts on
+                    the trigger, turns on the kit's own duration and easing, and
+                    is covered by whatever the kit decides about reduced motion.
+                    A hand-rolled `transition-transform` was the first draft and
+                    the motion law refused it, correctly — a second definition of
+                    how this app moves is how two things end up moving
+                    differently. */}
+                <ChevronDown className="motion-disclosure-marker size-3 shrink-0" aria-hidden />
+                {NAV_GROUP_TITLE[id]}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-1 pt-1">
+                {group.map(navButton)}
+              </CollapsibleContent>
+            </Collapsible>
+          )
+        })}
       </nav>
       <div
         className={`mt-auto flex min-w-0 flex-wrap items-center gap-2 pt-3 ${collapsed ? "flex-col" : "justify-between"}`}
