@@ -943,6 +943,91 @@ describe("THE QUESTION THIS LANE WAS OPENED BY, in two calls", () => {
   })
 })
 
+// ── "THE LATEST MEETING" IS ONE THAT HAPPENED ────────────────────────────
+//
+// The owner asked the assistant on 1 Sep 2026 what the latest week planning was
+// about, and was told about a meeting in AUGUST 2027. His base holds fifty-eight
+// meetings called "Week planning": eight have happened and FIFTY are recurring
+// calendar shells stretching into 2027 with no agenda, no notes and no
+// transcript. Sorted newest-first — which is what "latest" means to anything
+// that sorts — the answer is a placeholder for a meeting nobody has held, and it
+// carries the same title as the real one, so no ranking separates them.
+//
+// Nothing was broken. The sort was correct and the row was real. What was wrong
+// is what "the meetings" MEANS on a module whose own summary is in the past
+// tense, and the fix is the mechanism `putAway` already established: the module
+// declares it (`notYet` in the grammar), the everyday list applies it, the reply
+// says which of the two it did, and a caller who names that field in their own
+// `where` is asking about the future deliberately and gets it.
+describe("notYet: the everyday meetings list stops at today", () => {
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        VALUES ('${IDS.adminRole}_meetings_nq', '${IDS.adminRole}', 'meetings', 1, 1, 1, 1);
+      -- THE REAL ONE, last week.
+      INSERT INTO meetings (id, title, starts_at, created_at)
+        VALUES ('M_PAST', 'Week planning', '2026-08-31T07:00:00.000Z', '2026-08-31T07:00:00.000Z');
+      -- THE SHELLS, exactly the shape staging holds fifty of.
+      INSERT INTO meetings (id, title, starts_at, created_at)
+        VALUES ('M_SHELL_1', 'Week planning', '2027-08-16T07:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      INSERT INTO meetings (id, title, starts_at, created_at)
+        VALUES ('M_SHELL_2', 'Week planning', '2027-08-09T07:00:00.000Z', '2026-01-01T00:00:00.000Z');
+    `)
+  })
+
+  it("the owner's own question answers with the meeting that happened", async () => {
+    const { status, body } = await ask(
+      q({
+        module: "meetings",
+        where: [{ field: "title", op: "contains", value: "Week planning" }],
+        sort: "startsAt",
+        dir: "desc",
+      })
+    )
+    expect(status).toBe(200)
+    const rows = body.records as { id: string }[]
+    expect(rows[0]?.id, "the newest meeting that has HAPPENED, not the 2027 shell").toBe("M_PAST")
+    expect(body.total, "and the shells are not in the count either").toBe(1)
+    // SAID, NEVER SILENT: a caller who cannot tell reads a bounded answer as the
+    // whole table.
+    expect(body.when).toBe("happened")
+  })
+
+  it("a caller who asks about the future gets it, and is told the bound was lifted", async () => {
+    const { body } = await ask(
+      q({
+        module: "meetings",
+        where: [
+          { field: "title", op: "contains", value: "Week planning" },
+          { field: "startsAt", op: "gte", value: "2026-01-01" },
+        ],
+        sort: "startsAt",
+        dir: "desc",
+      })
+    )
+    expect(body.total, "all three, because the caller named the date themselves").toBe(3)
+    expect((body.records as { id: string }[])[0].id).toBe("M_SHELL_1")
+    expect(body.when).toBe("as asked")
+  })
+
+  it("a module that declares no bound carries no `when` at all", async () => {
+    const { body } = await ask(q({ module: "tickets" }))
+    expect(body.when, "only a module with a notYet declaration answers this question").toBeUndefined()
+  })
+
+  it("describe_module marks the field that lifts it", async () => {
+    const res = await worker.fetch(
+      new Request("https://tenancy/api/tenancy/query/describe?module=meetings", {
+        headers: { Cookie: "session=x" },
+      }),
+      makeEnv(() => holder.db as DatabaseSync, IDS.staffUser)
+    )
+    const body = (await res.json()) as { fields: { name: string; hidesRowsUnlessAsked?: boolean }[] }
+    const startsAt = body.fields.find((f) => f.name === "startsAt")
+    expect(startsAt?.hidesRowsUnlessAsked, "the caller has to be able to find the escape").toBe(true)
+  })
+})
+
 // ── R1's staleCheck — "the latest meeting for this client" CAN be honestly
 // the wrong row, because linking a meeting to a client is a person's own doing
 // and nothing links it automatically. Reproduces the shape measured on staging

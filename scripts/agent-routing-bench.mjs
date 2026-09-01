@@ -111,11 +111,11 @@ const QUESTIONS = [
   { q: "What came out of the Team Assembly?", want: "knowledge" },
   { q: "Remind me what we decided about issuing vouchers to a pharmacy.", want: "knowledge" },
   // ── what only a live read can answer ───────────────────────────────────
-  { q: "How many open tickets are there right now?", want: "live" },
+  { q: "How many open tickets are there right now?", want: "live", counts: true },
   { q: "List everyone on the team and the role each one holds.", want: "live" },
   { q: "Which tickets have nobody assigned to them?", want: "live" },
   { q: "What roles exist on this team?", want: "live" },
-  { q: "How many accounts do we have?", want: "live" },
+  { q: "How many accounts do we have?", want: "live", counts: true },
   { q: "Show me every ticket raised this week, newest first.", want: "live" },
   // ── about a record: the owner's complaint ──────────────────────────────
   { q: "What's going on with the HOGO account?", want: "knowledge" },
@@ -148,6 +148,20 @@ const judge = (want, tools) => {
 /* ------------------------------ the run ---------------------------------- */
 
 const system = systemFor(null)
+/** A tool call's arguments, however the model spelled them. Workers AI hands
+ * back a JSON STRING; some families hand back an object already. Neither is a
+ * reason to throw — an unreadable argument list reads as "said nothing". */
+function parseArgs(raw) {
+  if (!raw) return {}
+  if (typeof raw === "object") return raw
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === "object" ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
 const tools = toolSpecs()
 
 /** THE MODEL THE DEPLOYMENT ACTUALLY RUNS — read off wrangler.jsonc, never off
@@ -235,7 +249,14 @@ function workersAiModel(name) {
         toolCalls: (msg.tool_calls ?? []).map((c, i) => ({
           id: String(i),
           name: c.function?.name ?? c.name,
-          input: {},
+          // THE ARGUMENTS, NOT AN EMPTY OBJECT. They were dropped here, which
+          // meant the bench could see that a counting question reached a live
+          // read and NOT whether it asked for a count — so "how many open
+          // tickets" scored a pass for fetching fifty rows and counting them by
+          // hand. Parsed defensively: a model that hands back malformed JSON in
+          // an argument string is a fact about that model, not a reason to lose
+          // the whole run.
+          input: parseArgs(c.function?.arguments),
         })),
         // Priced per token, no prompt cache on this path — mapped onto the same
         // shape so the spend line below needs no special case.
@@ -263,7 +284,18 @@ for (const item of QUESTIONS) {
   )
   for (const k of Object.keys(spend)) spend[k] += reply.usage?.[k] ?? 0
   const called = reply.toolCalls.map((t) => t.name)
-  rows.push({ ...item, called, pass: judge(item.want, called) })
+  // DID IT ASK FOR A COUNT, OR FOR A PAGE TO COUNT BY HAND? Reported beside the
+  // score and deliberately NOT part of it: this bench's number is compared run
+  // to run and model to model, and a judge that changed mid-comparison would
+  // make every earlier figure a different measurement wearing the same name. A
+  // question marked `counts` wants `countOnly: true` — the reply then carries
+  // the number and no rows at all, which on a 1,820-ticket table is the
+  // difference between one integer and thousands of tokens read to ignore.
+  const countedProperly =
+    item.counts === true
+      ? reply.toolCalls.some((t) => t.name !== ASK && t.input?.countOnly === true)
+      : null
+  rows.push({ ...item, called, countedProperly, pass: judge(item.want, called) })
   if (VERBOSE && reply.text) console.log(`   ${item.q}\n   → ${reply.text.slice(0, 200)}\n`)
 }
 
@@ -285,6 +317,12 @@ console.log(`live questions going to a live read first    ${score(by("live"))}`)
 console.log(`overall                                      ${score(rows)}`)
 console.log(`${ASK} called anywhere in the turn           ${rows.filter((r) => r.called.includes(ASK)).length}/${rows.length}`)
 console.log(`tool calls per question                      ${(rows.reduce((n, r) => n + r.called.length, 0) / rows.length).toFixed(2)}`)
+// BESIDE THE SCORE, NEVER INSIDE IT — see `countedProperly`.
+const counting = rows.filter((r) => r.countedProperly !== null)
+if (counting.length)
+  console.log(
+    `counting questions asking for a COUNT           ${counting.filter((r) => r.countedProperly).length}/${counting.length}   (a page counted by hand is a right answer read expensively)`
+  )
 
 // THE SPEND LINE SITS HERE, ABOVE ANY EXIT. It was written below one once and
 // two paid runs reported no cost at all — a cost print that never runs is the

@@ -214,6 +214,12 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
       ...(mod.putAway?.field === f.name
         ? { hidesRowsUnlessAsked: true, note: mod.putAway.reason }
         : {}),
+      // THE SAME SENTENCE FOR THE OTHER BOUND. A caller who is never told that
+      // rows after today were left out reads a bounded answer as the whole
+      // table — and this is the field they filter on to lift it.
+      ...(mod.notYet?.field === f.name
+        ? { hidesRowsUnlessAsked: true, note: mod.notYet.reason }
+        : {}),
       ...(f.note ? { note: f.note } : {}),
     })),
   })
@@ -317,6 +323,13 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
     // own screens and its own list door mean by the word — and saying so is what
     // lets a caller tell "there are none" from "there are none on the list".
     ...(mod.putAway ? { view: answer.everyday ? "live" : "as asked" } : {}),
+    // AND WHETHER WHAT HAS NOT HAPPENED YET WAS LEFT OUT. Its own key rather
+    // than a second meaning for `view`, because they are two independent
+    // decisions and a caller has to be able to read either one alone: `when` is
+    // `happened` when rows dated after now were excluded, and `as asked` when
+    // the caller filtered on that date themselves. See `notYet` in the grammar
+    // for the meeting in 2027 this exists to stop being anybody's "latest".
+    ...(mod.notYet ? { when: answer.happened ? "happened" : "as asked" } : {}),
     ...(answer.sort ? { sort: answer.sort, dir: answer.dir } : {}),
   })
 }

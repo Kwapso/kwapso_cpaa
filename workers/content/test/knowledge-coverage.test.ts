@@ -832,7 +832,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // R47's three (1 Sep 2026). Every one starts at v1 because no row of them has
   // ever been indexed — there is nothing behind a cursor to leave saying the old
   // words.
-  person: { version: 1, digest: "0b321d45293b3e41" },
+  // v2: a client login is not a colleague — R21 makes one an ordinary team
+  // member holding an ordinary role, so `team_members` alone cannot tell them
+  // apart and three client contacts on staging were filed as colleagues within
+  // minutes of v1 landing. The live portal grant is the fact that separates
+  // them, and the bump is what walks the cursor back over the rows already
+  // written.
+  person: { version: 2, digest: "2688cce1dde6136e" },
   dropdown: { version: 1, digest: "ce030ed2555c6595" },
   portal_login: { version: 1, digest: "d759a60ff2f459f0" },
 }

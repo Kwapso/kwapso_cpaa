@@ -1453,7 +1453,13 @@ export const INGEST_KINDS: IngestKind[] = [
     // profile and the certificates, so this one source covers both modules.
     modules: ["team_members", "staff_profiles"],
     label: "colleagues",
-    textVersion: 1,
+    // v2: A CLIENT LOGIN IS NOT A COLLEAGUE. Found on staging within minutes of
+    // v1 landing: three client contacts were filed as "a colleague of ours",
+    // because R21 makes a client login an ordinary team member holding an
+    // ordinary role and nothing in `team_members` tells the two apart. The live
+    // portal grant does. The bump is what walks the cursor back over the eight
+    // rows already written — nulling nothing would have left them saying it.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit, env) => {
       // THE CORE HALF, over the native binding rather than the REST door: this
       // is the global database, which every worker reaches as `env.DB`.
@@ -1488,7 +1494,7 @@ export const INGEST_KINDS: IngestKind[] = [
       // would be the N+1 this file avoids everywhere else.
       const ids = members.map((m) => sqlString(m.id)).join(", ")
       const roleIds = [...new Set(members.map((m) => sqlString(m.role_id)))].join(", ")
-      const [roles, profiles, certificates] = await Promise.all([
+      const [roles, profiles, certificates, portal] = await Promise.all([
         // R14 hard cap: bounded by the slice's own distinct role ids.
         d1Query<{ id: string; title: string }>(
           cfg,
@@ -1519,11 +1525,27 @@ export const INGEST_KINDS: IngestKind[] = [
             WHERE user_id IN (${ids}) AND deactivated_at IS NULL
             ORDER BY user_id, issued_on DESC LIMIT ${ROLLUP_ROWS}`
         ),
+        // NOT EVERYONE ON THE TEAM IS ONE OF US, and the fact that says so is
+        // structural rather than a word. R21: "a client login is an ordinary
+        // team member holding an ordinary role" — so a contact who can open the
+        // portal appears in `team_members` exactly as a colleague does, and the
+        // first version of this kind filed three of them on staging as "a
+        // colleague of ours". The role's TITLE happened to read "Client" there
+        // and would not on the next team; the LIVE PORTAL GRANT is the fact.
+        // R14 hard cap: at most one live grant per person (partial unique index).
+        d1Query<{ user_id: string; account_name: string | null }>(
+          cfg,
+          guard.databaseId,
+          `SELECT pu.user_id, a.name AS account_name
+             FROM portal_users pu LEFT JOIN accounts a ON a.id = pu.account_id
+            WHERE pu.user_id IN (${ids}) AND pu.deactivated_at IS NULL LIMIT ${limit}`
+        ),
       ])
       const roleName = new Map(roles.map((r) => [r.id, r.title]))
       const profileOf = new Map(profiles.map((p) => [p.user_id, p]))
       const certsOf = new Map<string, typeof certificates>()
       for (const c of certificates) certsOf.set(c.user_id, [...(certsOf.get(c.user_id) ?? []), c])
+      const clientOf = new Map(portal.map((r) => [r.user_id, r.account_name]))
 
       return members.map((m) => {
         const full = [m.first_name, m.last_name].filter(Boolean).join(" ").trim()
@@ -1531,19 +1553,30 @@ export const INGEST_KINDS: IngestKind[] = [
         const role = roleName.get(m.role_id) ?? null
         const p = profileOf.get(m.id)
         const certs = certsOf.get(m.id) ?? []
+        // A CLIENT LOGIN, OR ONE OF US. `has`, not a truthy account name: a
+        // grant whose account row has gone leaves the name null and the person
+        // is still a client.
+        const isClient = clientOf.has(m.id)
+        const client = clientOf.get(m.id) ?? null
+        const noun = isClient ? "person at a client of ours" : "colleague of ours"
         return {
           originRowId: m.id,
           sortAt: m.sort_at,
           title: name,
           summary: buildSummary({
-            noun: "colleague of ours",
+            noun,
             title: name,
+            accountName: isClient ? client : null,
             status: role ? role.toLowerCase() : null,
             notes: [m.email ? `${m.email}.` : null, p?.headline ? `${p.headline}.` : null],
             detail: plainText(p?.about ?? ""),
           }),
           body: [
-            `${name} works here${role ? `, as ${role}` : ""}. Their email address is ${m.email}.`,
+            isClient
+              ? `${name} is a person at ${client ?? "a client of ours"} with a login to the client portal, not a colleague of ours${
+                  role ? `; their role here is ${role}` : ""
+                }. Their email address is ${m.email}.`
+              : `${name} works here${role ? `, as ${role}` : ""}. Their email address is ${m.email}.`,
             // EVERY SPELLING, ONE LINE. See this kind's header: a colleague is
             // the record type people name by a shortening nobody wrote down.
             nameSpellings(m.first_name, m.last_name, m.email).length > 1
