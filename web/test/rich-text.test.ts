@@ -232,6 +232,14 @@ const NOT_USER_TYPED: Record<string, string> = {
   // the rename to `s` is what made this line go red, and the shadow is worth
   // not putting back.
   "dataOps.importSampleHref(s.tableKey)": "an app-built URL from a catalogue key",
+  // THE RELATIONSHIP MAP'S own in-app destination. `hrefFor` builds
+  // `/t/<teamId>/<segment>/<id>` from a FIXED segment table in
+  // relationship-map.tsx and the record's own id, both of which come off this
+  // app's own door — no part of it is typed by anybody, and there is no scheme
+  // to sanitise because there is no scheme. Named distinctly rather than `href`
+  // on purpose: this pin must not silently cover the next component that calls
+  // its user-supplied URL `href`.
+  inAppRecordHref: "an app-built /t/<team>/<segment>/<id> path from a fixed segment table",
   // Uploads: the server writes these as `/media/<key>` (auth/profile.ts,
   // tenancy/teams.ts) — no caller ever supplies the string. `photo`/`logo` are the
   // object/data URL of the file the user just picked in THIS session.

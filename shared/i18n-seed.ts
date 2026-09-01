@@ -3259,6 +3259,44 @@ export const SEED: Catalogue = {
     es: "Artículos de conocimiento",
     ca: "Articles de coneixement",
   },
+  /* ── THE RELATIONSHIP MAP (1 Sep 2026) ───────────────────────────────────
+   *
+   * Hand-written for the same reason the chips were: nothing is spent on a
+   * string that already has a seed entry, and two of these are sentences a
+   * generator would render stiffly. "Connections" is the tab; the rest are the
+   * controls and the two things the map says about itself — that it is showing
+   * the closest few, and that there is nothing linked yet. Both of those are
+   * honesty rather than decoration: a map that draws forty of three hundred and
+   * says nothing has answered a different question. */
+  Connections: { de: "Verbindungen", es: "Conexiones", ca: "Connexions" },
+  "{count} connected": {
+    de: "{count} verbunden",
+    es: "{count} conectados",
+    ca: "{count} connectats",
+  },
+  "Showing the closest few — there are more.": {
+    de: "Es werden nur die nächsten gezeigt — es gibt mehr.",
+    es: "Se muestran solo los más cercanos: hay más.",
+    ca: "Només es mostren els més propers: n'hi ha més.",
+  },
+  "Nothing is linked to this yet.": {
+    de: "Damit ist noch nichts verknüpft.",
+    es: "Todavía no hay nada vinculado a esto.",
+    ca: "Encara no hi ha res vinculat a això.",
+  },
+  "Zoom in": { de: "Vergrößern", es: "Acercar", ca: "Apropar" },
+  "Zoom out": { de: "Verkleinern", es: "Alejar", ca: "Allunyar" },
+  "Fit the whole map": {
+    de: "Ganze Karte anzeigen",
+    es: "Ver el mapa entero",
+    ca: "Veure el mapa sencer",
+  },
+  /* Read aloud, never drawn — the picture's own name. */
+  "A map of what this record is connected to": {
+    de: "Eine Karte davon, womit dieser Eintrag verbunden ist",
+    es: "Un mapa de con qué está conectado este registro",
+    ca: "Un mapa d'amb què està connectat aquest registre",
+  },
   /* The group's accessible name — read aloud, never drawn. */
   "Which sources the assistant reads": {
     de: "Welche Quellen der Assistent liest",

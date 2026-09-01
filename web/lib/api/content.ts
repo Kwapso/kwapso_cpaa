@@ -603,6 +603,19 @@ export const content = {
       cursor?: string | null
     } = {}
   ) => api<PagedResponse<{ sources: KnowledgeSource[] }>>(`/api/content/knowledge${listQuery(find)}`),
+  /** ONE RECORD'S NEIGHBOURHOOD, for the relationship map — the focus, what sits
+   * one step away, the lines between them, and the EXACT number of neighbours
+   * (which is not the length of a capped list). The door applies the caller's
+   * per-module fence to BOTH ends of every edge, so an edge missing here is an
+   * edge this person may not know about; see workers/content/src/lib/record-map.ts. */
+  recordMap: (table: string, id: string) =>
+    api<{
+      focus: { table: string; id: string; label: string } | null
+      nodes: { table: string; id: string; label: string }[]
+      links: { from: string; to: string; relation: string }[]
+      total: number
+      capped: boolean
+    }>(`/api/content/knowledge/map?table=${enc(table)}&id=${enc(id)}`),
   knowledgeOne: (id: string) =>
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null

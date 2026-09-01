@@ -112,6 +112,11 @@ export function kitIcon(name: string): React.ReactNode {
 export const TAB_ICONS: Record<string, IconName> = {
   overview: "info",
   activity: "history",
+  // WHAT THIS RECORD IS CONNECTED TO — the relationship map's tab. Beside
+  // `overview` and `activity` rather than with the record kinds below, because
+  // like those two it is a VIEW of the record you are already standing on and
+  // not a collection of something else.
+  map: "network",
   // the record kinds, matching CONCEPT_ICON in web/lib/pages.ts word for word
   apps: "app-window",
   companies: "building-2",

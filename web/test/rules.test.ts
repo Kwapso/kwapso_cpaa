@@ -42,7 +42,12 @@ import {
 import { computeReachability, kitInventory } from "../../scripts/kit-coverage.mjs"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
-import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
+import {
+  RECORD_MAP_PREFIX,
+  SIMPLE_INVALIDATIONS,
+  TEAM_RESOURCES,
+  TIME_SLICE_PREFIX,
+} from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, MODULE_PERMISSION, tabCountKey, withTabCounts } from "../lib/screens"
 import { COLLECTION_FILTERS } from "../lib/collection-filters"
@@ -1353,21 +1358,33 @@ describe("RULES — the laws of the base", () => {
   // at "running" is also a row nobody can edit. One stale cache key, two
   // findings.
   it("live-collections: a record-scoped slice of a live collection reaches a listener too", () => {
-    const declared = Object.values(TEAM_RESOURCES)
-      .map((r) => r.slicePrefix)
-      .filter((p): p is string => !!p)
+    // A RESOURCE MAY CLAIM MORE THAN ONE FAMILY, since 1 Sep 2026 — a row can go
+    // stale in two pictures at once (a work log's own Time tab, and the
+    // relationship map of everything standing beside the record it is against),
+    // and a field that held one prefix made a resource choose which staleness to
+    // fix. Flattened here so the census reads both shapes.
+    const declared = Object.values(TEAM_RESOURCES).flatMap((r) =>
+      r.slicePrefix ? [r.slicePrefix].flat() : []
+    )
     expect(
       declared,
       "the time slices are a live collection's record-scoped half — a resource must claim them (R15)"
     ).toContain(TIME_SLICE_PREFIX)
+    expect(
+      declared,
+      "the relationship map's neighbourhoods are the same shape and must be claimed too (R15)"
+    ).toContain(RECORD_MAP_PREFIX)
 
     // …and the SHELL performs the drop, rather than the registry describing one
     // nothing does. A declared prefix nobody reads is R15's original failure
-    // mode wearing a new field name.
+    // mode wearing a new field name — and now it must drop EVERY prefix a
+    // resource declares, not the first one: a shell that read `r.slicePrefix`
+    // straight would silently ignore the second family of every resource that
+    // has two.
     const shell = read(join(WEB, "components", "app-shell.tsx"))
     expect(
-      shell.includes("invalidatePrefix(r.slicePrefix)"),
-      "app-shell must drop each resource's declared slice family on a ping (R15)"
+      /for \(const \w+ of \[r\.slicePrefix\]\.flat\(\)\) invalidatePrefix\(/.test(shell),
+      "app-shell must drop EVERY prefix in each resource's declared slice family on a ping (R15)"
     ).toBe(true)
 
     // …and no screen builds a per-record time key by hand. ONE builder, so the

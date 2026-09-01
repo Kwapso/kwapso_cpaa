@@ -23,6 +23,8 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+
+import { RelationshipMap } from "@/components/relationship-map"
 import { useRemembered } from "@shared/web/remembered"
 import { Paperclip, Pencil, Power } from "@shared/ui/foundations/icons"
 
@@ -35,7 +37,7 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
+import { appsKey, knowledgeKey, listFetch, recordMapKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
@@ -75,6 +77,17 @@ export function KnowledgeDetailScreen({
   // The generic record feed (R5) + the exact server total its tab badges (R8 for
   // the place, R16 for the number — never the loaded page's length).
   const activity = useRecordActivity("knowledge_sources", sourceId)
+  // WHAT THIS RECORD IS CONNECTED TO — the map's own read, asked only for a
+  // MIRRORED source, because a note somebody typed has no record behind it and
+  // therefore no neighbourhood. Cache-first like every other read on this screen
+  // (CACHING.md), keyed by the record rather than by the source, so opening the
+  // same account from two of its sources is one fetch.
+  const mapKey = item?.originTable && item?.originRowId
+    ? recordMapKey(item.originTable, item.originRowId)
+    : null
+  const mapQ = useCached(mapKey, () =>
+    content.recordMap(item?.originTable as string, item?.originRowId as string)
+  )
   // The accounts a source may be filed under. Bounded by the same paged door the
   // accounts screen reads; the picker offers page one, which is every account in
   // any team that is not already past a screenful.
@@ -235,6 +248,22 @@ export function KnowledgeDetailScreen({
     tabs: [
       { value: "source", label: t("Source"), icon: "file-text", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
+      // THE MAP TAB EXISTS ONLY WHERE THERE IS A RECORD TO MAP. A note somebody
+      // typed into the knowledge base has no row behind it, so it has no
+      // neighbourhood — and a tab that is always empty for a whole kind of
+      // source is a tab that teaches people it is never worth pressing.
+      ...(mapKey
+        ? [
+            {
+              value: "map",
+              label: t("Connections"),
+              icon: "network",
+              // R16: the door's exact count, through the one seam.
+              badge: formatCount(mapQ.data?.total ?? 0),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       {
         value: "activity",
         label: t("Activity"),
@@ -281,6 +310,19 @@ export function KnowledgeDetailScreen({
             return <OverviewList items={overviewItems} />
           if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
+          if (panel.value === "map")
+            return mapQ.data ? (
+              <RelationshipMap
+                teamId={teamId}
+                focus={mapQ.data.focus}
+                nodes={mapQ.data.nodes}
+                links={mapQ.data.links}
+                total={mapQ.data.total}
+                capped={mapQ.data.capped}
+              />
+            ) : (
+              <Skeleton variant="list" lines={4} />
+            )
           return (
             <div className="flex flex-col gap-6">
               {/* WHERE THESE WORDS CAME FROM — ONE BLOCK, not three.
