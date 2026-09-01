@@ -48,6 +48,16 @@ export function formatDayMonth(iso: string | null | undefined, lang: Language): 
     : d.toLocaleDateString(lang, { month: "short", day: "numeric" })
 }
 
+/** "Jun 2026" — a calendar month, for an AXIS whose columns are months rather
+ * than days: the waves timeline's periods (`components/gantt`'s own `periods`
+ * prop, which the component cannot format itself — ruling 07, the caller's own
+ * locale). Takes the first of the month it names; the day is never read. */
+export function formatMonth(iso: string | null | undefined, lang: Language): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(lang, { year: "numeric", month: "short" })
+}
+
 /** "14:05" — the clock time alone, for a row whose DAY is already said.
  *
  * Its own formatter for the same reason `formatDayMonth` is: an agenda groups

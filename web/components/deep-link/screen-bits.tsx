@@ -281,18 +281,18 @@ export function AddButton({
  * collection's bare toolbar and the kit panel's own toolbar read as the same
  * control in two places.
  *
- * FOUR NAMED SLOTS, NOT A HARDCODED FOUR-UP ROW. Each is independently
- * optional (a caller with no facets passes no `filters`, exactly as one with
- * no search passes no `search`), and the ORDER is this component's, not the
- * call site's — the same discipline the kit's own contract keeps. A `view`
- * control (list/grid/calendar), where a screen genuinely offers more than one
- * — is a fifth slot to add the same way, between `sort` and `actions`, the
- * day a bounded screen actually needs one; nothing here is sized to today's
- * four. */
+ * FIVE NAMED SLOTS, NOT A HARDCODED ROW. Each is independently optional (a
+ * caller with no facets passes no `filters`, exactly as one with no search
+ * passes no `search`), and the ORDER is this component's, not the call
+ * site's — the same discipline the kit's own contract keeps. `view` was
+ * added 2026-09-01, first reached by Apps' Tiles/List switch (apps-screen.tsx)
+ * — CH27.13's own order (search, filters, view switcher, actions) is why it
+ * sits between `sort` and `actions` rather than anywhere else. */
 export function ToolbarRow({
   search,
   filters,
   sort,
+  view,
   actions,
   className,
 }: {
@@ -309,6 +309,12 @@ export function ToolbarRow({
    * `actions` — a `SortControl`, typically. Omitted wherever a screen has
    * nothing to sort by. */
   sort?: React.ReactNode
+  /** THE VIEW SWITCH — a `ViewSwitch` pill (`shared/ui/components/
+   * collection-frame/view-switch.tsx`), after `sort` and before the
+   * pinned-right `actions`. Omitted wherever a screen offers only one body
+   * (`ViewSwitch` itself already renders nothing for fewer than two views,
+   * so a caller can pass it unconditionally once it has more than one). */
+  view?: React.ReactNode
   /** THE ROW'S OWN ACTION BUTTONS (New/Import/Export…), pinned to the far
    * right — the same `ml-auto` `PagedFind`'s own toolbar uses for its
    * `actions` slot, so a bounded collection's bare toolbar and a paged one's
@@ -316,12 +322,13 @@ export function ToolbarRow({
   actions?: React.ReactNode
   className?: string
 }) {
-  if (!search && !filters && !sort && !actions) return null
+  if (!search && !filters && !sort && !view && !actions) return null
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {search}
       {filters && <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>}
       {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
+      {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
       {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )

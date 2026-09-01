@@ -22,35 +22,59 @@
 // STAGE, and both land in Inactive on purpose: from the reader's side "put away"
 // is one idea, and a tile that says "archived" under the heading "Archived" is
 // the app agreeing with itself.
+//
+// A SECOND VIEW, LIST, ADDED 2026-09-01 — Tiles STAYS THE DEFAULT (CHECKLIST
+// 8.1, above, is a ruling about which body an app opens on, not a ban on a
+// second one). An agency two years in has tens of apps under one stage
+// heading, and "which of my clients' systems are in Development" is a
+// question a sorted list answers better than a wall of squares. `apps` is
+// BOUNDED (R14) — every row narrowed/sorted for Tiles (`shown`, below) is
+// already in hand, so List is a pure re-rendering of the same array through
+// `appsListRecipe` ("apps.list", web/lib/screens.ts) via `ScreenRenderer`,
+// never a second fetch or a second narrowing pass. `ViewSwitch`
+// (shared/ui/components/collection-frame/view-switch.tsx) puts `views[0]`
+// first as its own first-run default and its own doc recommends the TABLE
+// go there — but the kit's doc also says plainly it cannot check which entry
+// IS the table, "that route's vocabulary". Apps' vocabulary is CHECKLIST
+// 8.1: Tiles is the deliberate default, not a stand-in for a missing table,
+// so `views` stays `[Tiles, List]` in that order — don't "fix" it to match
+// the kit's generic recommendation.
 
 import * as React from "react"
 
 import { Input } from "@shared/ui/components/input/input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
+import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
 import { Search } from "@shared/ui/foundations/icons"
-import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
+import {
+  ScreenRenderer,
+  type ScreenActionContext,
+  type ScreenIntent,
+} from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
-import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { CollectionEmptyState, CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
 import { AppTiles } from "@/components/app-tiles"
+import { RecordMark } from "@shared/web/record-mark"
 import { useAccountNames } from "@/lib/account-names"
 import { tenancy } from "@/lib/api"
 import { accountsKey, appsKey, listFetch, impactKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
-import { APP_STAGES, NO_STAGE, appStageIsActive, appStageOrder } from "@shared/app-stages"
+import { APP_STAGES, NO_STAGE, appStageIsActive, appStageMark, appStageOrder } from "@shared/app-stages"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
+import { withDataDrivenCollection } from "@/lib/screens"
 import { useT } from "@shared/web/language"
 
 /** Record an app through the door and re-read what changed. Shared with the maps
@@ -217,13 +241,16 @@ export function AppsScreen({
     by: "name",
     dir: "asc",
   })
-  // The engine recipe and its rights are still the contract this screen is
-  // handed; the tiles below draw the rows themselves, and the row ACTIONS stay
-  // the engine's so a permission change reaches them without a second edit.
-  void recipe
-  void rights
-  void onAction
-  void onIntent
+  // WHICH BODY — Tiles or List, remembered per screen exactly like `tab`/
+  // `query`/`facetValues`/`sort` above (the kit's `ViewSwitch` doc calls this
+  // choice "remembered, per person" and leaves the STORE to the app; this is
+  // the app's one seam for that, already scoped to one browser's own tab).
+  // TILES FIRST, ALWAYS — CHECKLIST 8.1 (top of file) is a product ruling
+  // that this collection opens on a wall of tiles, not the kit's own
+  // generic "put the table first" recommendation (view-switch.tsx says
+  // plainly it cannot check which entry IS the table — "that route's
+  // vocabulary"). Don't reorder `views` below to match the kit's default.
+  const [view, setView] = useRemembered<"tiles" | "list">("view", "tiles")
 
   if (appsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the apps.")}</p>
   if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -270,6 +297,48 @@ export function AppsScreen({
   // has no business in the counts above. groupByStage still decides which
   // heading each tile lands under; this decides the order INSIDE one.
   const shown = [...preSort].sort((a, b) => compareApps(a, b, sort.by, accountNames, sort.dir))
+
+  // THE LIST VIEW'S ROWS — the SAME `shown` array Tiles renders below, shaped
+  // once for `appsListRecipe` ("apps.list", web/lib/screens.ts). No second
+  // fetch and no second narrowing pass: search, the facets and the sort above
+  // already produced `shown`, and this is only ever a rendering of it.
+  const listRows: Record<string, unknown>[] = shown.map((app) => {
+    const client = app.accountId ? (accountNames.get(app.accountId) ?? t("A client")) : t("Ours")
+    const stage = app.stage ? t(app.stage) : null
+    return {
+      id: app.id,
+      // THE RECORD'S OWN FACE (R35) — the same picture-or-stage-mark
+      // `AppMark` draws on the tile (app-tiles.tsx), built with `RecordMark`
+      // directly rather than through that wrapper: `list-compat.tsx`'s
+      // `leadingMarkFor` unwraps a `mark` field into the kit List's own
+      // circular Avatar ONLY when the element's type is `RecordMark` itself
+      // — every other list shaper in this file's own package (members,
+      // roles, meetings…) makes the same call for the same reason. Through
+      // `AppMark` this would still render, just doubly boxed.
+      mark: <RecordMark picture={app.logoUrl} mark={appStageMark(app.stage)} name={app.name} size="row" />,
+      name: app.active ? app.name : `${app.name} (archived)`,
+      detail: [client, stage].filter(Boolean).join(" · ") || "—",
+    }
+  })
+  // `withDataDrivenCollection` tunes the recipe's chrome to real data, then
+  // its OWN search/filter/sort/count are switched off deliberately: the
+  // ToolbarRow above is the one control surface for both views, and leaving
+  // the engine's copies on would be a second, disconnected search box (and,
+  // per R16, a second count — "Showing X of Y" beside the tab badge that
+  // already carries the exact one).
+  const listRecipeBase = withDataDrivenCollection(recipe, listRows)
+  const listRecipe: ScreenRecipe = listRecipeBase.collection
+    ? {
+        ...listRecipeBase,
+        collection: {
+          ...listRecipeBase.collection,
+          searchable: false,
+          userFilter: false,
+          sortable: false,
+          showCount: false,
+        },
+      }
+    : listRecipeBase
 
   const activeBadge = formatCount(active.length)
   const inactiveBadge = formatCount(inactive.length)
@@ -374,6 +443,22 @@ export function AppsScreen({
               />
             )
           }
+          view={
+            appsQ.data.length > 0 && (
+              <ViewSwitch
+                // TILES FIRST — CHECKLIST 8.1's own ruling, not the kit's
+                // generic table-first default (see the state declaration
+                // above and the file's header comment).
+                views={[
+                  { value: "tiles", label: t("Tiles") },
+                  { value: "list", label: t("List") },
+                ]}
+                value={view}
+                onValueChange={(next) => setView(next as "tiles" | "list")}
+                label={t("View")}
+              />
+            )
+          }
           actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
         />
         {shown.length === 0 ? (
@@ -392,6 +477,24 @@ export function AppsScreen({
               onCreate={canCreate ? () => setAddOpen(true) : undefined}
             />
           )
+        ) : view === "list" ? (
+          // THE LIST BODY — the engine's own renderer, fed the identical
+          // `shown` rows the tiles below draw, through the recipe already
+          // handed to this screen (`recipe`, "apps.list"). `action={null}`
+          // overrides the ambient create action `SectionWithCreate` publishes
+          // above (`CollectionCreateActionProvider`) so the panel's own
+          // toolbar draws no second + button — this screen's own AddButton,
+          // in the ToolbarRow above, is the one mango for the act.
+          <CollectionCreateActionProvider action={null}>
+            <ScreenRenderer
+              recipe={listRecipe}
+              data={{ rows: listRows }}
+              rights={rights}
+              onAction={onAction}
+              onIntent={onIntent}
+              useKitPanel
+            />
+          </CollectionCreateActionProvider>
         ) : (
           <div className="flex flex-col gap-12">
             {groupByStage(shown).map((group) => (

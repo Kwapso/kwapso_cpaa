@@ -568,11 +568,16 @@ export const CORPUS_EXEMPT: Record<string, string> = {
  *
  * LOWERED 115 -> 114 (all three), same night — the overnight audit removed a
  * dead three-dot profile-menu button ("Account menu"), which had a real,
- * already-translated string. A genuine improvement, not a stale pin. */
+ * already-translated string. A genuine improvement, not a stale pin.
+ *
+ * RAISED 114 -> 124 (all three), same night — the Opus-decided per-collection
+ * view work: Apps' Tiles/List switch and Waves' List/Timeline switch, each
+ * with their own new copy (view labels, empty states, the Gantt period
+ * stepper). Ten strings, same two blocked credential paths. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 114,
-  es: 114,
-  ca: 114,
+  de: 124,
+  es: 124,
+  ca: 124,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -584,8 +589,6 @@ export const TRANSLATION_CEILING: Record<string, number> = {
  * own directory name (`components/<name>` or `foundations/<name>`), the same
  * id `computeReachability` produces. */
 export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
-  "components/gantt":
-    "sprints render as a flat list plus one burndown bar (web/components/sprints-screen.tsx); nothing shows parallel per-app or per-owner lanes across periods for gantt's lane-per-record shape to draw.",
   "components/heatmap":
     "no screen aggregates \"which record did how much work each period\" as a grid — work-log views are single-series (one record's weeks, or one week's people, web/components/work-logs-panel.tsx), never a record×period matrix.",
   "components/pulse-band":
@@ -618,7 +621,7 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
   "components/notifications":
     "the app relies on the kit's own `sonner` toasts for the moment and `activity-feed` for the history — no bell icon or notification-center composition exists anywhere for this to replace.",
   "components/kanban":
-    "zero drag-and-drop infrastructure (no dnd-kit or equivalent) exists anywhere in the app; sprints and stories deliberately track state by date rather than by status column (web/components/sprints-screen.tsx's own comment).",
+    "zero drag-and-drop infrastructure (no dnd-kit or equivalent) exists anywhere in the app. Sprints deliberately track state by date rather than by status column (web/components/sprints-screen.tsx's own comment) — but that reasoning is sprints' alone: stories carry a real `status` (STORY_STATUSES, four values, workers/content/src/lib/stories.ts) plus a drag-`rank`, and are simply rendered as one flat, rank-ordered list (work-panels.tsx's `Row`s) rather than grouped into status columns anywhere. Corrected 2026-09-01 — the original line claimed stories track state by date too, which `stories.status` and `stories.rank` both contradict.",
   "components/spreadsheet":
     "rate cards and time logs (web/components/internal-rate-card.tsx, time-panel.tsx) are list-based with edits through a separate dialog, exactly the \"hours, invoices\" content the kit's own header names — but adopting it means re-architecting a working dialog-based edit flow into inline cell-editing, not a swap.",
   "components/matrix":

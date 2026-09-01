@@ -40,11 +40,13 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Pencil, Power, RotateCcw } from "@shared/ui/foundations/icons"
+import { Gantt, GanttPeriodStepper, type GanttBar, type GanttLane } from "@shared/ui/components/gantt/gantt"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import {
   EMPTY_WAVE_QUERY,
   type WaveOrder,
+  type WaveView,
   WaveFinder,
   selectWaves,
   waveQueryIsActive,
@@ -56,10 +58,11 @@ import { WaveFormDialog } from "@/components/wave-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { waves as wavesApi, wavesKey } from "@/lib/api/waves"
 import { companiesKey, totalKey } from "@/lib/live-resources"
+import { softNavigate } from "@/lib/nav"
 import { usePermissions } from "@/lib/perms"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
-import { formatDate } from "@shared/web/format"
+import { formatDate, formatMonth } from "@shared/web/format"
 import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
@@ -75,6 +78,133 @@ export function waveDates(
 ): string {
   if (wave.startsOn && wave.endsOn) return `${formatDate(wave.startsOn, lang)} → ${formatDate(wave.endsOn, lang)}`
   return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No sprints planned yet")
+}
+
+/** SIX PERIODS IS THE KIT'S OWN CEILING (gantt.tsx, CH27.26: "Six periods,
+ * then it steps"), and the periods here are MONTHS rather than weeks — the
+ * Opus analysis's own call, 1 Sep 2026: six weeks shows almost nothing over a
+ * two-year book of packages, six months shows a client's buying rhythm, which
+ * is the question this view exists to answer. */
+const TIMELINE_MONTHS = 6
+
+function monthIndex(iso: string): number {
+  const d = new Date(iso)
+  return d.getFullYear() * 12 + d.getMonth()
+}
+
+/** The first of a month, from the same zero-based index `monthIndex` reads —
+ * a plain ISO date, so `formatMonth` reads it exactly as it reads any other
+ * stored date. */
+function monthIso(index: number): string {
+  const year = Math.floor(index / 12)
+  const month = ((index % 12) + 12) % 12
+  return `${year}-${String(month + 1).padStart(2, "0")}-01`
+}
+
+export type WaveTimeline = {
+  periods: string[]
+  lanes: GanttLane[]
+  /** Older or newer waves sit outside this window — `GanttPeriodStepper` is
+   * the only way to reach them, never a scrollbar (CH27.26 forbids one by
+   * name: "A timeline never becomes a horizontal scroller inside the panel"). */
+  hasEarlier: boolean
+  hasLater: boolean
+}
+
+/**
+ * THE ALREADY-LOADED WAVES (bounded, no pager — see the file header),
+ * RESHAPED INTO THE SHAPE `components/gantt` ACTUALLY TAKES.
+ *
+ * PERIODS ARE MONTHS. `offset` counts months back from the most recent window
+ * the data reaches (0 = the latest six months something in `rows` touches),
+ * because a rolling book of packages is read for its RECENT rhythm first and
+ * the stepper is how a reader goes further back — never the other way, which
+ * would bury this quarter's waves behind however far the team's history runs.
+ *
+ * LANES ARE ONE PER ACCOUNT — CH27.26: "Lanes are apps, accounts or members".
+ * `Gantt` itself does not sort or de-overlap a lane's own bars (gantt.tsx's
+ * `GanttLane` doc: "They may not overlap … this file does not stack them and
+ * does not sort"), so two waves of the same client that overlap in time are
+ * packed into two SEPARATE lanes here, greedily, by start month — the same
+ * "minimum rooms" shape a calendar uses, and the kit's own rule for it
+ * ("two overlapping sprints mean two lanes").
+ *
+ * A WAVE WITH NO SPRINTS YET HAS NO DATES (`waveDates`'s own header) and
+ * cannot sit on an axis of time, so it is left out here rather than drawn at
+ * month zero — it is still on the List view, which is where it belongs.
+ */
+export function waveTimelineWindow(
+  rows: Wave[],
+  offset: number,
+  t: (s: string) => string,
+  lang: Language
+): WaveTimeline {
+  const dated = rows.filter((w) => w.startsOn && w.endsOn) as Array<
+    Wave & { startsOn: string; endsOn: string }
+  >
+  if (dated.length === 0) return { periods: [], lanes: [], hasEarlier: false, hasLater: false }
+
+  const dataStart = Math.min(...dated.map((w) => monthIndex(w.startsOn)))
+  const dataEnd = Math.max(...dated.map((w) => monthIndex(w.endsOn)))
+  const totalMonths = dataEnd - dataStart + 1
+  const span = Math.min(TIMELINE_MONTHS, totalMonths)
+  const maxOffset = Math.max(0, totalMonths - TIMELINE_MONTHS)
+  const clampedOffset = Math.min(Math.max(0, offset), maxOffset)
+
+  const windowEnd = dataEnd - clampedOffset
+  const windowStart = windowEnd - span + 1
+
+  const periods: string[] = []
+  for (let i = windowStart; i <= windowEnd; i++) periods.push(formatMonth(monthIso(i), lang))
+
+  const byAccount = new Map<string, Array<Wave & { startsOn: string; endsOn: string }>>()
+  for (const w of dated) {
+    const list = byAccount.get(w.accountId)
+    if (list) list.push(w)
+    else byAccount.set(w.accountId, [w])
+  }
+
+  const lanes: GanttLane[] = []
+  for (const waves of byAccount.values()) {
+    const sorted = [...waves].sort((a, b) => monthIndex(a.startsOn) - monthIndex(b.startsOn))
+    // GREEDY LANE PACKING. `laneEnds[i]` is the last occupied month-index of
+    // lane `i`; a wave joins the first lane whose last wave ends strictly
+    // before it starts, or opens a new lane. Not necessarily the fewest
+    // possible lanes — always non-overlapping ones, which is the rule.
+    const laneEnds: number[] = []
+    const laneBars: GanttBar[][] = []
+    for (const w of sorted) {
+      const s = monthIndex(w.startsOn)
+      const e = monthIndex(w.endsOn)
+      let lane = laneEnds.findIndex((end) => s > end)
+      if (lane === -1) {
+        lane = laneEnds.length
+        laneEnds.push(e)
+        laneBars.push([])
+      } else {
+        laneEnds[lane] = e
+      }
+      // CLIP TO THE WINDOW HERE, ONCE. `Gantt`'s own `renderBar` clamps a
+      // negative `start` to column 0 but keeps the UNCLAMPED `span`, so a
+      // wave that began before the window would be drawn wider than the
+      // months it still occupies inside it — clipping both ends before they
+      // ever reach the component is the honest fix, not a workaround for a
+      // bug: the component is telling the truth about a bar that starts at
+      // column 0, and the caller is the one deciding a bar starts there.
+      const relStart = s - windowStart
+      const relEnd = e - windowStart
+      if (relEnd < 0 || relStart >= periods.length) continue
+      const clippedStart = Math.max(0, relStart)
+      const clippedSpan = Math.min(periods.length, relEnd + 1) - clippedStart
+      laneBars[lane].push({ id: w.id, label: w.name, start: clippedStart, span: clippedSpan })
+    }
+    laneBars.forEach((bars, i) => {
+      if (bars.length === 0) return
+      lanes.push({ id: `${sorted[0].accountId}:${i}`, label: sorted[0].accountName ?? t("No client"), bars })
+    })
+  }
+
+  return { periods, lanes, hasEarlier: clampedOffset < maxOffset, hasLater: clampedOffset > 0 }
 }
 
 /** Page one of the team's waves, priming the exact server total the heading
@@ -160,6 +290,16 @@ export function WaveCollection({
       dir: was.dir === "asc" || was.dir === "desc" ? was.dir : EMPTY_WAVE_QUERY.dir,
     }
   })
+  // LIST OR TIMELINE — remembered the same way the search/filter/sort question
+  // is, one slot per screen rather than folded into it: the view is "how she
+  // wants to look", the query is "what she is looking for", and R16 already
+  // has its one count above, so this slot adds a body, never a second badge.
+  const [view, setView] = useRemembered<WaveView>("view", "list")
+  // WHICH SIX-MONTH WINDOW THE TIMELINE SHOWS. Ephemeral, unlike `view` and
+  // `query`: it is a scroll position over a window that only exists while the
+  // Timeline is on screen, not "where she was" in the sense nav-memory.ts
+  // means it, so a plain `useState` is the honest weight for it.
+  const [timelineOffset, setTimelineOffset] = React.useState(0)
   const [addOpen, setAddOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Wave | null>(null)
   const [switchingOff, setSwitchingOff] = React.useState<Wave | null>(null)
@@ -186,6 +326,33 @@ export function WaveCollection({
   const rows = selectWaves(all, query)
   const clients = (clientsQ.data ?? []).filter((a) => a.active)
   const asking = waveQueryIsActive(query)
+
+  // THE TIMELINE READS THE SAME NARROWED ROWS the List does — a search or a
+  // filter narrows both bodies alike, so switching views mid-search never
+  // silently widens what she was asking. Built only when it is actually on
+  // screen: it is arithmetic over an in-memory array, not a fetch, but there
+  // is no reason to pack every wave into lanes on a render where nobody reads
+  // the result.
+  const timeline = view === "timeline" ? waveTimelineWindow(rows, timelineOffset, t, lang) : null
+  // THE STEPPER ONLY WHEN THERE IS SOMEWHERE ELSE TO GO — CH27.26's cap is a
+  // ceiling to step past, not a permanent fixture on a book that already fits
+  // inside six months. `GanttPeriodStepper` would draw nothing here anyway
+  // (its own state 7/10), but the `undefined` keeps the toolbar row from
+  // reserving space for a control with nothing to move.
+  const timelineStepper =
+    timeline && (timeline.hasEarlier || timeline.hasLater) ? (
+      <GanttPeriodStepper
+        onPrevious={timeline.hasEarlier ? () => setTimelineOffset((o) => o + TIMELINE_MONTHS) : undefined}
+        onNext={timeline.hasLater ? () => setTimelineOffset((o) => Math.max(0, o - TIMELINE_MONTHS)) : undefined}
+        windowLabel={
+          timeline.periods.length > 0
+            ? `${timeline.periods[0]} – ${timeline.periods[timeline.periods.length - 1]}`
+            : undefined
+        }
+        previousLabel={t("Earlier")}
+        nextLabel={t("Later")}
+      />
+    ) : undefined
 
   return (
     <div className="flex flex-col gap-6">
@@ -215,6 +382,15 @@ export function WaveCollection({
               clients={clients}
               showClientFilter={!accountId}
               resultCount={rows.length}
+              view={view}
+              onViewChange={(v) => {
+                setView(v)
+                // A fresh view starts at the most recent window — carrying
+                // the old offset forward would land on a period the reader
+                // never chose from this collection.
+                setTimelineOffset(0)
+              }}
+              period={timelineStepper}
               actions={
                 canCreate && clients.length > 0 && (
                   <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
@@ -231,7 +407,26 @@ export function WaveCollection({
             />
           )
         )}
-        {rows.length === 0 ? (
+        {view === "timeline" && timeline ? (
+          // ONE LANE PER ACCOUNT, one bar per wave, months across the top —
+          // waveTimelineWindow's own header says why lanes are accounts and
+          // periods are months rather than weeks. `Gantt` draws its own
+          // empty register when `lanes` is empty (no dated wave in the
+          // window matches what she is asking), so there is no second empty
+          // sentence to keep in step with the List one above.
+          <Gantt
+            periods={timeline.periods}
+            lanes={timeline.lanes}
+            onBarSelect={(bar) => bar.id && softNavigate(`${basePath}/${bar.id}`)}
+            label={t("Waves timeline")}
+            emptyLabel={t("Nothing here")}
+            emptyBody={
+              asking
+                ? t("No waves match that in this window.")
+                : t("No waves have both a start and an end in this window yet.")
+            }
+          />
+        ) : rows.length === 0 ? (
           <p className="text-muted-foreground py-4 text-sm">
             {asking
               ? t("No waves match that.")

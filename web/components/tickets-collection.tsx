@@ -67,9 +67,13 @@
 // ticket is a conversation, not an importable record; `internal-money.ts`'s
 // neighbour AGENTIC-IMPORT.md says the same about what earns a target). A
 // "view selector" beyond the tab strip and the Archived filter is not drawn
-// either: the kit's own `ViewSwitch` (`shared/ui/components/collection-frame/
-// view-switch.tsx`) is unused everywhere in this app, including Accounts, so
-// adding one here would be inventing a control rather than reusing one.
+// either. The kit's own `ViewSwitch` (`shared/ui/components/collection-frame/
+// view-switch.tsx`) is genuinely reached elsewhere now (Apps' Tiles/List,
+// Waves' List/Timeline, 1 Sep 2026) — the reason it stays off THIS screen is
+// that a ticket has no second real way to look at the same rows, not that
+// the control is unproven. A Board grouped by `status` was analysed and
+// flagged as real future work (per-status paged reads, an R16 arbitration
+// question), not a "no view exists yet" gap.
 //
 // Every narrowing is still the DOOR's (R14 + R16). Filtering the loaded page
 // would answer "the questions among the newest fifty" while the badge above

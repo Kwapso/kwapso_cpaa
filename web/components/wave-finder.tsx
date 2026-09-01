@@ -26,11 +26,17 @@ import * as React from "react"
 
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
+import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
+
+/** LIST, or the Gantt-drawn TIMELINE (waves-screen.tsx's `waveTimelineWindow`).
+ * List is the first-run default — D7-5's "table-first" rule, spelled for a
+ * collection whose default body is a plain list rather than a table. */
+export type WaveView = "list" | "timeline"
 
 /** What a wave can be ordered by. The words are the SCREEN's, not the column's. */
 export type WaveOrder = "name" | "runs" | "sprints" | "client" | "newest"
@@ -112,6 +118,9 @@ export function WaveFinder({
   /** Omit the client filter where the list is already one client's. */
   showClientFilter = true,
   resultCount,
+  view,
+  onViewChange,
+  period,
   actions,
 }: {
   query: WaveQuery
@@ -119,6 +128,19 @@ export function WaveFinder({
   clients: Account[]
   showClientFilter?: boolean
   resultCount?: number
+  /** LIST/TIMELINE — CH19's third toolbar zone ("search, then filters, then
+   * view switcher, then actions pinned right", CH27.13), the kit's own
+   * `ViewSwitch`. Waves offers exactly two and no more, so it is always drawn
+   * here rather than made conditional — `ViewSwitch` itself renders nothing
+   * for fewer than two (view-switch.tsx's own state 7). */
+  view?: WaveView
+  onViewChange?: (view: WaveView) => void
+  /** CH27.26's `‹ 6 months ›` — override 28 puts the stepper "between the
+   * search field and the view switch". `GanttPeriodStepper` renders nothing
+   * with no handlers and no label (its own state 7/10), so an idle List view
+   * or a Timeline whose data fits inside six months passes nothing here and
+   * this slot draws empty air rather than a control with nowhere to go. */
+  period?: React.ReactNode
   /** THE ROW'S OWN ACTION BUTTONS ("Sell a wave"…), pinned to the far right of
    * THIS toolbar's first line — the same `ml-auto` slot `<PagedFind>`'s own
    * `actions` draws, so a bare collection's toolbar and a paged one's read as
@@ -210,6 +232,18 @@ export function WaveFinder({
         onDirectionChange={(dir) => onChange({ ...query, dir })}
         label={t("Sort by")}
       />
+      {period}
+      {view && onViewChange ? (
+        <ViewSwitch
+          views={[
+            { value: "list", label: t("List") },
+            { value: "timeline", label: t("Timeline") },
+          ]}
+          value={view}
+          onValueChange={(v) => onViewChange(v as WaveView)}
+          label={t("View")}
+        />
+      ) : null}
       {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )

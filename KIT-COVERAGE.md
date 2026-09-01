@@ -31,7 +31,7 @@ preparation, never edited by hand.
 ## Charts and graphs
 
 - [x] `chart`
-- [ ] `gantt`
+- [x] `gantt`
 - [ ] `heatmap`
 - [ ] `pulse-band`
 - [ ] `donut`
@@ -50,7 +50,7 @@ preparation, never edited by hand.
 - [x] `clamp`
 - [x] `typography`
 - [x] `title`
-- [ ] `article-body`
+- [x] `article-body`
 
 ## Space and motion
 
@@ -132,8 +132,8 @@ preparation, never edited by hand.
 - [x] `sort-control`
 - [x] `table`
 - [x] `use-virtual-rows`
-- [ ] `visibility`
-- [ ] `data-preview-table`
+- [x] `visibility`
+- [x] `data-preview-table`
 - [x] `description-list`
 
 ## Data display
@@ -163,8 +163,8 @@ preparation, never edited by hand.
 
 ## Forms and data
 
-- [ ] `form`
-- [ ] `import-wizard`
+- [x] `form`
+- [x] `import-wizard`
 - [x] `permission-matrix`
 
 ## Collection views
@@ -230,7 +230,7 @@ preparation, never edited by hand.
 - [ ] `screens/portal-impact`
 - [ ] `screens/profile`
 - [ ] `screens/session-expired`
-- [ ] `screens/settings`
+- [x] `screens/settings`
 - [ ] `screens/sign-in`
 - [ ] `screens/sign-in-portal`
 - [x] `screens/sign-in-system`
@@ -254,7 +254,7 @@ preparation, never edited by hand.
 - [ ] `templates/search-results`
 - [x] `templates/sign-in`
 - [ ] `templates/stat-strip`
-- [x] `templates/stepper-hero`
+- [ ] `templates/stepper-hero`
 
 ## Foundations
 
@@ -264,5 +264,5 @@ preparation, never edited by hand.
 
 ---
 
-**Components 79/115 · Foundations 3/3 · Compositions 8/47**
-**Components + foundations combined (the owner's "118"): 82/118**
+**Components 85/115 · Foundations 3/3 · Compositions 8/47**
+**Components + foundations combined (the owner's "118"): 88/118**
