@@ -1453,13 +1453,18 @@ export const INGEST_KINDS: IngestKind[] = [
     // profile and the certificates, so this one source covers both modules.
     modules: ["team_members", "staff_profiles"],
     label: "colleagues",
+    // v3: the SENTENCE, not the fact. v2 got the distinction right and read
+    // badly — "a person at a client of ours for Test client, client" — because
+    // `buildSummary` renders `<title>, a <noun> for <account>, <status>` and the
+    // noun has to survive having "for Bergman" put after it. Only visible on a
+    // live row, which is where it was found.
     // v2: A CLIENT LOGIN IS NOT A COLLEAGUE. Found on staging within minutes of
     // v1 landing: three client contacts were filed as "a colleague of ours",
     // because R21 makes a client login an ordinary team member holding an
     // ordinary role and nothing in `team_members` tells the two apart. The live
     // portal grant does. The bump is what walks the cursor back over the eight
     // rows already written — nulling nothing would have left them saying it.
-    textVersion: 2,
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit, env) => {
       // THE CORE HALF, over the native binding rather than the REST door: this
       // is the global database, which every worker reaches as `env.DB`.
@@ -1558,7 +1563,12 @@ export const INGEST_KINDS: IngestKind[] = [
         // is still a client.
         const isClient = clientOf.has(m.id)
         const client = clientOf.get(m.id) ?? null
-        const noun = isClient ? "person at a client of ours" : "colleague of ours"
+        // "a client contact for Bergman", not "a person at a client of ours FOR
+        // Bergman" — `buildSummary` renders `<title>, a <noun> for <account>`,
+        // so the noun has to read as a noun with a "for" after it. Seen on live
+        // staging the moment v2 landed, which is the only place a sentence built
+        // in three pieces can be read as one.
+        const noun = isClient ? "client contact" : "colleague of ours"
         return {
           originRowId: m.id,
           sortAt: m.sort_at,
@@ -1567,7 +1577,11 @@ export const INGEST_KINDS: IngestKind[] = [
             noun,
             title: name,
             accountName: isClient ? client : null,
-            status: role ? role.toLowerCase() : null,
+            // THE ROLE IS DROPPED FOR A CLIENT CONTACT. It is the role they hold
+            // on OUR permission sheet — "client" — which says nothing a reader
+            // does not already know from the noun, and reads as a second, vaguer
+            // answer to the question the sentence just answered.
+            status: isClient ? null : role ? role.toLowerCase() : null,
             notes: [m.email ? `${m.email}.` : null, p?.headline ? `${p.headline}.` : null],
             detail: plainText(p?.about ?? ""),
           }),

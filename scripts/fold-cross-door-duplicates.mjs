@@ -231,9 +231,30 @@ for (const team of teams) {
   const liveMeetingTitles = new Set(
     live.filter((s) => s.kind === "meeting" && (s.body_bytes ?? 0) > 0).map((s) => s.title)
   )
-  const heldEventTitles = new Set(
-    live.filter((s) => s.kind === "event" || s.kind === "meeting").map((s) => s.title)
-  )
+  // THE SAME ORACLE THE SHIPPED RULE READS, and they must not differ by a word.
+  //
+  // Caught by measuring: this script first asked only its own LIVE sources of
+  // kind event/meeting, while `readFoldTargets` in the sweep asks the `meetings`
+  // TABLE plus live event sources. Those disagree exactly where a meeting row
+  // exists but its knowledge source was retired — the 232 empty future shells
+  // meeting v3 retired — so the script would have quoted the owner a number the
+  // deployed rule does not produce. A dry run that describes something other than
+  // what happens is worse than no dry run.
+  //
+  // THE RULE'S READING IS THE ONE KEPT: the app's own record is canonical, and a
+  // meeting ROW is that record whether or not its searchable copy survived. The
+  // transcript half's own second agreement (the meeting must hold WORDS) is what
+  // stops that being a licence to lose material.
+  const heldEventTitles = new Set([
+    ...transcripts.map((m) => m.title),
+    ...(
+      await sql(
+        team.database_id,
+        `SELECT title FROM meetings WHERE deactivated_at IS NULL LIMIT 20000`
+      )
+    ).map((m) => m.title),
+    ...live.filter((s) => s.kind === "event").map((s) => s.title),
+  ])
   /** A SECOND, WIDER ORACLE — REPORTED, NEVER APPLIED.
    *
    * Gemini leaves a notes document titled `<event title> - <date> IST - Notes by

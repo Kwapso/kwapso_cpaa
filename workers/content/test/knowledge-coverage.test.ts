@@ -916,7 +916,10 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // minutes of v1 landing. The live portal grant is the fact that separates
   // them, and the bump is what walks the cursor back over the rows already
   // written.
-  person: { version: 2, digest: "2688cce1dde6136e" },
+  // v3: the SENTENCE, not the fact — "a client contact for Test client" rather
+  // than "a person at a client of ours FOR Test client, client". Only visible on
+  // a live row, which is where it was found, minutes after v2 shipped.
+  person: { version: 3, digest: "243b2b0621259f0d" },
   dropdown: { version: 1, digest: "ce030ed2555c6595" },
   portal_login: { version: 1, digest: "d759a60ff2f459f0" },
 }
