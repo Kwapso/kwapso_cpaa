@@ -2445,6 +2445,7 @@ describe("RULES — the laws of the base", () => {
       "agent-mcp-tool-parity", // R43: workers/mcp/test/agent-mcp-tool-parity.test.ts — the tool-NAME-SET half, beside R19/R22's door census
       "translation-ceiling", // R44: web/test/translation-ceiling.test.ts — per-language untranslated count vs the pinned, only-falling ceiling
       "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
+      "assistant-coverage", // R47: workers/mcp/test/assistant-coverage.test.ts — the module census, beside R19/R22/R27/R43 on the same door census
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
     ])
     for (const r of RULES_REGISTRY) {

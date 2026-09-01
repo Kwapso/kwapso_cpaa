@@ -236,6 +236,12 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   email: "From an email",
   event: "From a calendar entry",
   message: "From a chat message",
+  // R47's three (1 Sep 2026). `person` reads "About a colleague" rather than
+  // "From a colleague": the source is ABOUT them and was not written by them,
+  // and every other line in this map is the second sentence.
+  person: "About a colleague",
+  dropdown: "From a dropdown list",
+  portal_login: "From a portal login",
 }
 
 /** Where a source is filed, as a person reads it: an account compartment shows

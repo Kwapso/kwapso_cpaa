@@ -11,7 +11,7 @@ logging in for. Nothing else in the product matters if this is wrong.
 
 ## 0 · The rules you cannot break
 
-- `CLAUDE.md` holds the Laws of the Base, R1–R46. They are **machine-checked**:
+- `CLAUDE.md` holds the Laws of the Base, R1–R47. They are **machine-checked**:
   `npm run check` must exit 0, and a law without its check cannot ship
   (`registry-integrity`).
 - **Capture the real exit code.** `npm run check | tail` reports the *pipe's*

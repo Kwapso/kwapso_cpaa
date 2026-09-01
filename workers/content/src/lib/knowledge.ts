@@ -197,6 +197,19 @@ export const KNOWLEDGE_KINDS = [
   "email",
   "event",
   "message",
+  // R47's three, added 1 Sep 2026 — the modules a person could see and the
+  // assistant could only reach through a tool.
+  //
+  // `person` is the one that earned the law: the owner asked for a colleague's
+  // full name and nothing in the base said who his own people are. It is also
+  // the only kind whose row is not in the team's database — membership is
+  // global, and `staff_profiles` carries no name at all.
+  "person",
+  // The team's own vocabulary, one source per LIST and never one per value: the
+  // answer to "what ticket types do we use" is a list, so the list is the record.
+  "dropdown",
+  // Who at a client can open the portal, filed in that client's own compartment.
+  "portal_login",
 ] as const
 export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number]
 
@@ -2777,6 +2790,11 @@ const RECORD_PATH: Record<string, string> = {
   meetings: "meetings",
   accounts: "accounts",
   tasks: "tasks",
+  // A COLLEAGUE OPENS AS THEIR MEMBER PAGE — `/t/<team>/members/<userId>`, which
+  // is where their profile and certificates are drawn (the `StaffPanel` under
+  // the member detail). The origin row id IS the user id, so the link resolves
+  // without a second lookup.
+  users: "members",
 }
 
 /** RECORDS THAT LIVE INSIDE ANOTHER RECORD'S PAGE.
@@ -2791,7 +2809,14 @@ const RECORD_PATH: Record<string, string> = {
  * a citation reading "Roland Golger at HOGO" with nothing to click was the one
  * shape of answer that could not be checked. Measured in the test run: four
  * citations out of six on a question about HOGO's people had no way back. */
-const LIVES_ON_ITS_ACCOUNT = new Set(["account_links", "todos"])
+const LIVES_ON_ITS_ACCOUNT = new Set([
+  "account_links",
+  "todos",
+  // A PORTAL LOGIN is a row on its account's Portal access tab — it has no page
+  // of its own, and the account page is where a person goes to look at one
+  // anyway. Its compartment is always that client's, so the hop always resolves.
+  "portal_users",
+])
 
 export function recordPath(
   originTable: string | null,

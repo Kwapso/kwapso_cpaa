@@ -315,6 +315,42 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one member" : "List members") },
   },
   {
+    // WHAT CHANGED, AND WHO CHANGED IT — the one cross-module read in the app,
+    // and until now the one thing a person could see that no machine surface
+    // could. It is a TOOL and deliberately not a knowledge kind (R47): the feed
+    // carries every module's before/after, INCLUDING what our own hour costs and
+    // the margin computed from it, and the knowledge base has exactly one gate
+    // (`knowledge:read`) with no way to subtract a caller's denied modules. Only
+    // this door can do that — it builds the allowed table list from the caller's
+    // own per-module rights (R18) — so the assistant reads the feed HERE or not
+    // at all. Answering from a corpus instead would have collapsed R18's
+    // per-module fence and breached R24 in the same row.
+    name: "read_activity",
+    summary:
+      "What has CHANGED, and who changed it — edits, deactivations and reactivations across the whole team, newest first. A creation is not here: a record's own audit line says who made it, so this feed is the history AFTER that. `scope` says what you are asking about and is one of team, record, user, role or invite; it defaults to team, the whole feed narrowed to the modules your role may read. For one record's own history use scope record with `table` (the table the record lives in — help, stories, accounts, meetings, and so on) and `id`. For what one colleague changed use scope user with their user id in `id`; scope role takes a role id and scope invite takes an invite id. Any scope but team with no `id` answers with nothing rather than with everybody's. The reply carries `activity` — each row an `id`, a `type`, a plain-English `description` of the change, the `actorName` who made it and `createdAt` — plus an exact `total` over the same question (`totalCapped` true means the count stopped at its ceiling), `hasMore`, and an opaque `nextCursor` to hand straight back as `cursor` for the next page. YOU ONLY EVER SEE WHAT YOUR OWN ROLE MAY READ: the team feed subtracts every module you are denied, so a number here is the number for YOU and not for the team, and the door refuses a client login outright.",
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/activity",
+    schema: obj({ scope: S, id: S, table: S, cursor: S }),
+    // R19: every parameter the door parses is exposed above and forwarded here —
+    // scope, id, table and cursor, which is all four of them.
+    buildQuery: (i) => {
+      const parts: string[] = []
+      for (const key of ["scope", "id", "table", "cursor"])
+        if (str(i, key)) parts.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return parts.length ? `?${parts.join("&")}` : ""
+    },
+    agent: {
+      write: false,
+      summarize: (i, names) =>
+        str(i, "scope") === "record"
+          ? `Read what changed on ${names?.[str(i, "id")] ?? (str(i, "id") || "a record")}`
+          : str(i, "id")
+            ? `Read what ${names?.[str(i, "id")] ?? str(i, "id")} changed`
+            : "Read what has changed",
+    },
+  },
+  {
     name: "list_roles",
     summary: "List the team's roles. Pass `id` (a role id) to fetch just that one role.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/roles",

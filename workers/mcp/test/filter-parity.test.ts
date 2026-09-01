@@ -105,8 +105,6 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the client portal's own standing-move, for the same reason as its context read: only a client login has anywhere to move to, and this surface refuses client logins outright.",
   "GET /api/tenancy/invites/audit":
     "the forensic trail behind ONE invite (who sent it, when it was opened, when it was revoked). The invite's own state — email, role, status, id — is already machine-readable through list_invites; this is the strip a person reads on the invite's detail when something looks wrong.",
-  "GET /api/tenancy/activity":
-    "the cross-module history feed, and the one door whose answer is assembled by SUBTRACTING the caller's denied modules (R18). Everything it reports is readable through the module's own tools, with that module's own gate; putting the merged stream on the machine surface is a separate decision for the owner, not a parity default.",
   // THE TWO BADGE DOORS — one per worker, because the counting functions live
   // with the modules that own them. They exist to save a SCREEN round trips: a
   // record's tabs are badged when the record opens instead of when a tab is
