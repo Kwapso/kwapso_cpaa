@@ -259,6 +259,77 @@ function rowId(item: GoogleItem): string {
  * could be swept as the wrong person. Bound once, at the only place that has the
  * right to build them.
  */
+
+/** GOOGLE'S OWN CALENDAR-NOTICE OPENINGS. A PREFIX and never a substring: a mail
+ * that OPENS "Invitation: " is Google announcing an event, and a mail whose
+ * subject merely contains the word is a person writing to us. */
+const NOTICE_PREFIXES = [
+  "Invitation: ",
+  "Accepted: ",
+  "Declined: ",
+  "Tentative: ",
+  "Canceled: ",
+  "Cancelled: ",
+  "Updated invitation: ",
+  "Updated invitation with note: ",
+]
+
+/** The event a calendar notice is ABOUT — its own title, with Google's prefix
+ * and its " @ <when>" tail removed. Null when the title is not a notice, so "is
+ * this a notice" and "what is it about" are one decision in one place. */
+export function eventNamedBy(title: string): string | null {
+  const prefix = NOTICE_PREFIXES.find((p) => title.startsWith(p))
+  if (!prefix) return null
+  const rest = title.slice(prefix.length)
+  const at = rest.indexOf(" @ ")
+  const named = (at === -1 ? rest : rest.slice(0, at)).trim()
+  return named.length ? named : null
+}
+
+/** The Drive file a document row is one person's sight of — the tail of
+ * `<userId>:<driveFileId>`, which is what `rowId` builds. */
+export function driveFileIdOf(originRowId: string): string | null {
+  const at = originRowId.indexOf(":")
+  if (at === -1) return null
+  const id = originRowId.slice(at + 1).trim()
+  return id.length ? id : null
+}
+
+/** WHAT THE APP ALREADY HOLDS, for the fold below — read ONCE per sweep. */
+type FoldTargets = { transcripts: Set<string>; events: Set<string> }
+async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTargets> {
+  const [meetings, events] = await Promise.all([
+    // R14 hard cap: one team's meetings, stated at the statement.
+    d1Query<{ title: string; transcript_file_id: string | null; words: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT title, transcript_file_id, LENGTH(COALESCE(transcript_text, '')) AS words
+         FROM meetings WHERE deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
+    ),
+    // R14 hard cap: the calendar entries this base already mirrors.
+    d1Query<{ title: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT title FROM knowledge_sources
+        WHERE kind = 'event' AND deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
+    ),
+  ])
+  return {
+    // A TRANSCRIPT ONLY COUNTS WHEN THE MEETING REALLY HOLDS THE WORDS. Folding
+    // the Drive copy while the app's own row is empty would leave the base with
+    // neither, which is the one outcome worse than the duplication.
+    transcripts: new Set(
+      meetings.filter((m) => m.transcript_file_id && m.words > 0).map((m) => m.transcript_file_id as string)
+    ),
+    events: new Set([...meetings.map((m) => m.title), ...events.map((e) => e.title)]),
+  }
+}
+
+/** How many rows either half of the fold oracle will read. One agency's meetings
+ * and calendar entries, so a cap is the honest shape (R14) — and a base that
+ * outgrows it wants a decision rather than a silent truncation. */
+const FOLD_ORACLE_CAP = 20000
+
 export function googleIngestKinds(
   env: Env,
   cfg: D1Rest,
@@ -298,6 +369,58 @@ export function googleIngestKinds(
     body: mendMojibake(r.body),
   })
 
+  /* ── FOLD_TO_THE_APP_S_OWN_RECORD ─────────────────────────────────────────
+   *
+   * ONE EVENT, ONE RECORD. A single meeting arrives here as up to five sources:
+   * the meeting row this app owns, the notes document Gemini leaves in Drive,
+   * Google's "Invitation:" mail, an "Accepted:" mail per guest, and the calendar
+   * entry. Five titles, one subject — and an answer built from six passages has
+   * then told the reader one thing five times, spending four slots a different
+   * real source did not get. Measured on staging 1 Sep 2026: 118 of 3,775 live
+   * sources, 3.1% of the corpus.
+   *
+   * THE APP'S OWN RECORD IS CANONICAL, and the two rules say only that:
+   *   · a Drive file that IS some meeting's transcript is the same words at a
+   *     second address — an ID join on `transcript_file_id`, not a title guess;
+   *   · a Google calendar notice for an event the base ALREADY HOLDS is an
+   *     announcement of a record rather than a record.
+   *
+   * THE SECOND AGREEMENT IS WHAT MAKES EACH SAFE, and it is the same sentence
+   * both times: fold only where the original is really there. A transcript
+   * counts only if the meeting holds words; a notice folds only if we hold the
+   * event. An invitation to something the base does not otherwise know about is
+   * the ONLY record of it — measured, 40 of them on staging — and it stays.
+   *
+   * "Notes:" MAIL IS NOT A NOTICE AND IS NEVER FOLDED. It carries the meeting's
+   * actual minutes, and the retrieval bench cites one as a correct answer.
+   *
+   * RETIRED, NOT SKIPPED. The source is written and DEACTIVATED, which is the
+   * difference between "the assistant stops quoting it" and "the assistant
+   * quotes it forever because the sweep never visits it again" — and it means a
+   * row whose condition stops being true (the meeting's transcript is cleared)
+   * is REVIVED by the engine on the next tick, with no repair door to remember.
+   *
+   * The oracle is read ONCE per sweep and shared by both lanes; a tick that
+   * cannot read it folds nothing, which is the safe direction. */
+  let oracle: Promise<FoldTargets> | null = null
+  const foldTargets = (): Promise<FoldTargets> =>
+    (oracle ??= readFoldTargets(cfg, guard).catch(() => ({
+      transcripts: new Set<string>(),
+      events: new Set<string>(),
+    })))
+
+  const folded = (service: GoogleService, r: IngestRow, targets: FoldTargets): IngestRow => {
+    if (service === "drive") {
+      const fileId = driveFileIdOf(r.originRowId)
+      return fileId && targets.transcripts.has(fileId) ? { ...r, retired: true } : r
+    }
+    if (service === "gmail") {
+      const named = eventNamedBy(r.title)
+      return named && targets.events.has(named) ? { ...r, retired: true } : r
+    }
+    return r
+  }
+
   /** List cheaply, walk to the cursor, and only THEN pay for the bodies. A Drive
    * listing is one call for fifty files and their text is fifty more, so
    * hydrating before the slice would pay for forty-nine files this tick is not
@@ -316,7 +439,12 @@ export function googleIngestKinds(
     // "Google no longer has this" from "the cursor has already passed it".
     if (seen) seen.set(service, new Set(items.map((i) => i.externalId)))
     const wanted = afterCursor(inCursorOrder(toRows(items)), cursor).slice(0, limit)
-    if (!hydrate || wanted.length === 0) return wanted.map(mended)
+    // THE FOLD RIDES THE SAME EXIT `mended` DOES, and for the same reason: a
+    // fifth lane added tomorrow is covered because it goes through `slice`, not
+    // because somebody remembered.
+    const targets = await foldTargets()
+    const fold = (r: IngestRow) => folded(service, mended(r), targets)
+    if (!hydrate || wanted.length === 0) return wanted.map(fold)
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
@@ -327,7 +455,7 @@ export function googleIngestKinds(
       wanted.map((r) => byId.get(r.originRowId)).filter((i): i is GoogleItem => Boolean(i))
     )
     const textById = new Map(full.map((i) => [rowId(i), i.text]))
-    return wanted.map((r) => mended({ ...r, body: textById.get(r.originRowId) || r.body }))
+    return wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body }))
   }
 
   return [
