@@ -30,6 +30,7 @@ import type {
   TeamMember,
 } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
+import type { HelpAccountFacet } from "@/lib/api/content"
 import {
   RecordActionsMenu,
   RecordChipLink,
@@ -258,9 +259,14 @@ export function HelpDetailScreen({
       // away and refetched (the ~1s rebuild, measured; round-two speed review).
       if (r && "tickets" in r) {
         mergePage(`help:${teamId}`, "id", r.tickets as unknown as Record<string, unknown>[])
-        const extras = r as { byType?: Record<string, number>; byStatus?: Record<string, number> }
+        const extras = r as {
+          byType?: Record<string, number>
+          byStatus?: Record<string, number>
+          byAccount?: HelpAccountFacet[]
+        }
         if (extras.byType) primeCache(`help-by-type:${teamId}`, extras.byType)
         if (extras.byStatus) primeCache(`help-by-status:${teamId}`, extras.byStatus)
+        if (extras.byAccount) primeCache(`help-by-account:${teamId}`, extras.byAccount)
       } else invalidate(`help:${teamId}`)
       invalidate(recordActivityKey("help", helpId))
       toast.success(done)
@@ -318,12 +324,13 @@ export function HelpDetailScreen({
     moduleId?: string
     raisedByContactId?: string
   }) {
-    const { tickets, byType, byStatus } = await content.updateHelp({ id: helpId, ...input })
+    const { tickets, byType, byStatus, byAccount } = await content.updateHelp({ id: helpId, ...input })
     // Merge, don't replace: priming the whole key with this first page threw
     // away rows scrolled in past it (same seam-fix as the collection's edit).
     mergePage(`help:${teamId}`, "id", tickets as unknown as Record<string, unknown>[])
     if (byType) primeCache(`help-by-type:${teamId}`, byType)
     if (byStatus) primeCache(`help-by-status:${teamId}`, byStatus)
+    if (byAccount) primeCache(`help-by-account:${teamId}`, byAccount)
     invalidate(recordActivityKey("help", helpId))
     toast.success(t("Ticket updated."))
   }

@@ -96,6 +96,26 @@ export function HoursByChart({ rows, label }: { rows: { label: string; hours: nu
   )
 }
 
+/** TICKETS BY CLIENT — one bar per account, open tickets, biggest first.
+ *
+ * The exact shape of HoursByChart, because it is the same question ("who has
+ * the most") asked of a different collection: a comparison needs a scale, so
+ * the axis stays on, and there is no natural sequence for a list of clients so
+ * biggest-first (the door's own `ORDER BY open_n DESC`) is the ordering that
+ * carries the information — never re-sorted here. */
+export function TicketsByAccountChart({ rows, label }: { rows: { label: string; count: number }[]; label: string }) {
+  return (
+    <Chart
+      data={rows}
+      type="bar"
+      xKey="label"
+      series={[{ key: "count", label, color: "var(--chart-3)" }]}
+      legend={false}
+      height={`${BAND_HEIGHT}px`}
+    />
+  )
+}
+
 /** HOW FULL THE RUNNING SPRINTS ARE — done stacked under still-open.
  *
  * Done FIRST so it stacks at the bottom: a bar fills from the floor as the work

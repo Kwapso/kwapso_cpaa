@@ -486,6 +486,13 @@ export const CONCEPT_ICON = {
   // otherwise pick two icons for one idea. A funnel, because that is what triage
   // does to a queue.
   triage: "list-filter",
+  // DASHBOARD — a collection's own summary view, charts rather than rows
+  // (Tickets' own tab strip, following Triage's precedent above: a line here
+  // rather than an icon chosen at the tab, so a second collection that grows
+  // a Dashboard tab reaches for this instead of picking a second icon for one
+  // idea). Distinct from `overview`'s "layout-dashboard" — that one is a
+  // RECORD's own summary tab; this is a chart.
+  dashboard: "layout-dashboard",
   import: "upload",
   activity: "history",
   // The agency's own housekeeping: the material we make our own work with, why

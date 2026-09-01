@@ -107,7 +107,7 @@ import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { AddButton, CollectionCard, EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
-import { TicketStagesCard } from "@/components/pulse"
+import { TicketStagesCard, TicketsByAccountCard } from "@/components/pulse"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { tenancy } from "@/lib/api/tenancy"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
@@ -145,6 +145,12 @@ const READY: HelpFacet = "status:ready"
 const CLOSED: HelpFacet = "status:resolved"
 const TRIAGE: HelpFacet = "triage"
 const ALL: HelpFacet = "all"
+/** THE ONE OTHER NON-NARROWING TAB, following Triage's own precedent (the
+ * file header, "THE REDESIGN, 2026-08-31"): a different screen wearing the
+ * same strip, not a filter of the list. `helpFacetFilter` already returns `{}`
+ * for any value it doesn't recognise, so this needs no change there — only
+ * the render switch below and the `narrowed` check needed to know about it. */
+const DASHBOARD: HelpFacet = "dashboard"
 
 export function TicketsCollection({
   teamId,
@@ -209,8 +215,10 @@ export function TicketsCollection({
   // own `facets` below exactly the way a search or a sort already is, so they
   // land in that find's own cache key rather than a resting one here.
   const allQ = useCached<HelpTicket[]>(helpKey(teamId, "all"), () => listFetch.help(teamId))
-  // …and ONE more for whichever sub-tab is open.
-  const narrowed = facet !== ALL && facet !== TRIAGE
+  // …and ONE more for whichever sub-tab is open. DASHBOARD is excluded for the
+  // same reason TRIAGE is: neither narrows the list, both swap in a different
+  // screen, so neither should open a facet read of its own.
+  const narrowed = facet !== ALL && facet !== TRIAGE && facet !== DASHBOARD
   const facetQ = useCached<HelpTicket[]>(
     narrowed ? helpFacetKey(teamId, "all", facet) : null,
     () => listFetch.helpFacet(teamId, "all", facet)
@@ -266,6 +274,13 @@ export function TicketsCollection({
       })),
       { value: CLOSED, label: t("Closed"), icon: "", badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
+      // THE OTHER NON-NARROWING TAB (2026-09-01, beside Triage below): the
+      // Opus-analysis dashboard — which client is generating the most work,
+      // and where the tickets are sitting. No badge, for the same reason
+      // Triage carries none — it is not a count of a narrower slice of THIS
+      // list, so a number here would be R16's exact violation (a collection's
+      // count shown more than once).
+      { value: DASHBOARD, label: t("Dashboard"), icon: CONCEPT_ICON.dashboard, badge: "", badgeVariant: "" as const },
       // The one tab on this strip whose idea has a concept icon of its own. The
       // four KIND tabs beside it carry the team's own type MARKS on every other
       // surface (a ticket's header band, its detail) and cannot carry one here:
@@ -324,6 +339,19 @@ export function TicketsCollection({
                 // segment; MODULE_PERMISSION is where it becomes `help` again.
                 onOpen={(id) => onIntent({ kind: "open", module: "tickets", id })}
               />
+            </CollectionCard>
+          ) : facet === DASHBOARD ? (
+            /* THE DASHBOARD (2026-09-01) — two charts and no numbers (R16: a
+               tab strip badge and a stat tile would both be counting the same
+               collection twice). Tickets by client is the door's own
+               `byAccount` facet, never drawn before tonight; Where the
+               tickets are sitting is `TicketStagesCard`, MOVED here from
+               below the list (see the note there) rather than duplicated. */
+            <CollectionCard attached>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <TicketsByAccountCard teamId={teamId} />
+                <TicketStagesCard teamId={teamId} />
+              </div>
             </CollectionCard>
           ) : scopedQ.error ? (
             <CollectionCard attached>
@@ -455,30 +483,26 @@ export function TicketsCollection({
           )}
         </div>
 
-        {/* THE TWO PANELS THAT ARE NOT THE LIST, and they are UNDER it now.
-            WHOSE WEEK IT IS was written above the list because "it is the
-            sentence a person needs before they look, and a page they have to go
-            and open is a page nobody opens" (BUILD-1 §6) — the first half of
-            which is still true and the second half is what put it here rather
-            than on a screen of its own. WHERE THE WORK IS SITTING went above for
-            the same reason: the strip badges Ready, each kind and Closed and
-            says nothing about the four stages in between.
+        {/* THE ONE PANEL THAT IS NOT THE LIST, and it is UNDER it now. WHOSE
+            WEEK IT IS was written above the list because "it is the sentence a
+            person needs before they look, and a page they have to go and open
+            is a page nobody opens" (BUILD-1 §6). The person came for the list,
+            so the list comes first and this is a scroll away, which the owner
+            explicitly asked people to be happy to do. Nothing is hidden,
+            nothing is conditional on who is reading.
 
-            What neither argument answered is N2. Between the heading and the
-            first ticket a reader was crossing FIVE blocks — a duty band about ONE
-            person, a stage chart about the whole pipeline, one tab strip, a
-            search bar and an action row — before reaching the thing the page is
-            named after. That is the "too much in one glance" complaint arriving
-            as a stack. The person came for the list, so the list comes first and
-            these two are a scroll away, which the owner explicitly asked people
-            to be happy to do. Nothing is hidden, nothing is conditional on who is
-            reading, and the Triage QUEUE is still its own tab because that is a
-            screen's worth. */}
-        {facet !== TRIAGE && (
-          <>
-            <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
-            <TicketStagesCard teamId={teamId} />
-          </>
+            WHERE THE WORK IS SITTING used to render here too (N2's original
+            complaint: a reader crossed FIVE blocks — a duty band, a stage
+            chart, the tab strip, the search bar and an action row — before
+            reaching the list itself). It moved to the Dashboard tab
+            (2026-09-01, alongside the new Tickets-by-client chart): a chart
+            about the whole pipeline is a screen's worth of its own, the same
+            argument that already gave Triage's queue a tab rather than a
+            panel here, so it is absent on Dashboard's own tab (a screen does
+            not repeat its own reason for being one) and on Triage's, same as
+            before. */}
+        {facet !== TRIAGE && facet !== DASHBOARD && (
+          <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
         )}
       </div>
     </CountedAbove>
@@ -534,6 +558,7 @@ function TriageQueue({
       mergePage(helpKey(teamId, "all"), "id", r.tickets as unknown as Record<string, unknown>[])
       if (r.byType) primeCache(`help-by-type:${teamId}`, r.byType)
       if (r.byStatus) primeCache(`help-by-status:${teamId}`, r.byStatus)
+      if (r.byAccount) primeCache(`help-by-account:${teamId}`, r.byAccount)
       toast.success(t("Marked as read."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
@@ -555,7 +580,7 @@ function TriageQueue({
     raisedByContactId?: string
   }) {
     if (!editing) return
-    const { tickets, byType, byStatus } = await contentApi.updateHelp({ id: editing.id, ...input })
+    const { tickets, byType, byStatus, byAccount } = await contentApi.updateHelp({ id: editing.id, ...input })
     invalidate(triageKey(teamId))
     // The door's response IS the fresh first page — this used to be thrown
     // away and the same ~1s five-read rebuild fetched again one frame later.
@@ -566,6 +591,7 @@ function TriageQueue({
     // (round-two realtime review).
     if (byType) primeCache(`help-by-type:${teamId}`, byType)
     if (byStatus) primeCache(`help-by-status:${teamId}`, byStatus)
+    if (byAccount) primeCache(`help-by-account:${teamId}`, byAccount)
     toast.success(t("Ticket updated."))
   }
 

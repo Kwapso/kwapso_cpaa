@@ -128,6 +128,10 @@ export const listFetch = {
       // every ticket page, so the strip costs nothing extra to draw.
       primeCache(`help-by-type:${teamId}`, r.byType)
       primeCache(`help-by-status:${teamId}`, r.byStatus)
+      // The third facet — which client is generating the most work — rides the
+      // same read. The door has answered it since 2026-08-28; this is the first
+      // screen that reads it (workers/content/src/lib/help.ts's own note on it).
+      primeCache(`help-by-account:${teamId}`, r.byAccount)
       return r.tickets
     }),
   // PUT AWAY, AND FINDABLE — archive shipped as a door with no button, and
@@ -145,7 +149,7 @@ export const listFetch = {
    * pages and filtering a loaded page would answer "the questions among the
    * newest fifty" under a badge counting all of them (R14 + R16).
    *
-   * `byType` / `byStatus` are primed from EVERY ticket read, including this one:
+   * `byType` / `byStatus` / `byAccount` are primed from EVERY ticket read, including this one:
    * they are counted over the list ignoring the kind and stage facets, so the
    * strip's badges stay right whichever sub-tab is open. */
   helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
@@ -161,6 +165,7 @@ export const listFetch = {
         primeCache(cursorKey(helpFacetKey(teamId, scope, facet)), r.nextCursor)
         primeCache(`help-by-type:${teamId}`, r.byType)
         primeCache(`help-by-status:${teamId}`, r.byStatus)
+        primeCache(`help-by-account:${teamId}`, r.byAccount)
         return r.tickets
       })
   },

@@ -49,11 +49,12 @@ import { ChartNoAxesColumn } from "@shared/ui/foundations/icons"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"
+import type { HelpAccountFacet } from "@/lib/api/content"
 import { insightsKey } from "@/lib/live-resources"
 import type { TeamPulse } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
-import { useCached } from "@shared/web/store"
+import { useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 
 /** How tall a chart on a BAND is. Deliberately short: two of these plus the
@@ -111,6 +112,12 @@ export const HoursByChart = dynamic(() => chartModule().then((m) => m.HoursByCha
 /** The weekly series, for a screen drawing it over ONE record rather than the
  * whole team. Same picture, same lazy boundary, rows the caller has shaped. */
 export const RecordWeeksChart = dynamic(() => chartModule().then((m) => m.WeeksChart), {
+  ssr: false,
+  loading: chartLoading,
+})
+/** The Tickets Dashboard tab's own picture — which client is generating the
+ * most work, by open ticket count. Same lazy boundary as the others. */
+export const TicketsByAccountChart = dynamic(() => chartModule().then((m) => m.TicketsByAccountChart), {
   ssr: false,
   loading: chartLoading,
 })
@@ -207,6 +214,49 @@ export function TicketStagesCard({ teamId }: { teamId: string }) {
         />
       ) : (
         <StageChart rows={rows} label={t("Tickets")} />
+      )}
+    </BandCard>
+  )
+}
+
+/** WHICH CLIENT IS GENERATING THE MOST WORK — the Tickets Dashboard tab's own
+ * picture (2026-09-01). One bar per account, open tickets, biggest first —
+ * the same shape as HoursByChart, because it answers the same kind of
+ * question about a different collection.
+ *
+ * Reads a DIFFERENT cache key than the two visuals above: `byAccount` rides
+ * the TICKET LIST door (`workers/content/src/lib/help.ts`), not the `insights`
+ * aggregate `usePulse` reads, so this primes straight off `help-by-account`
+ * (the same key every ticket read primes in `web/lib/live-resources.ts`)
+ * rather than sharing `usePulse`'s one request.
+ *
+ * The agency's OWN tickets carry no account (`AND h.account_id IS NOT NULL`
+ * in the door's SQL — DATA-MODEL.md § help + help_threads says why), so these
+ * bars can never sum to the ticket total. Said on the card itself, in the
+ * open, because a dashboard is the one place a wrong-looking number goes
+ * unchecked — nobody scans a chart the way they scan a list. */
+export function TicketsByAccountCard({ teamId }: { teamId: string }) {
+  const t = useT()
+  const byAccount = useCachedValue<HelpAccountFacet[]>(`help-by-account:${teamId}`)
+  if (!byAccount) return null
+
+  const rows = byAccount.map((a) => ({ label: a.accountName ?? t("Unnamed client"), count: a.open }))
+  return (
+    <BandCard title={t("Tickets by client")}>
+      {rows.length === 0 ? (
+        <NothingYet
+          what={t("No tickets are tied to a client yet.")}
+          how={t("Raise a ticket against a client and it shows up here.")}
+        />
+      ) : (
+        <>
+          <TicketsByAccountChart rows={rows} label={t("Open tickets")} />
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t(
+              "The agency's own tickets aren't tied to a client, so they're left out here — these bars won't add up to the total above."
+            )}
+          </p>
+        </>
       )}
     </BandCard>
   )

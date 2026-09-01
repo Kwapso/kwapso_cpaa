@@ -573,11 +573,16 @@ export const CORPUS_EXEMPT: Record<string, string> = {
  * RAISED 114 -> 124 (all three), same night — the Opus-decided per-collection
  * view work: Apps' Tiles/List switch and Waves' List/Timeline switch, each
  * with their own new copy (view labels, empty states, the Gantt period
- * stepper). Ten strings, same two blocked credential paths. */
+ * stepper). Ten strings, same two blocked credential paths.
+ *
+ * RAISED 124 -> 130 (all three), same night — the Opus-decided Tickets
+ * Dashboard tab (the tickets-by-client chart, its own honesty caption about
+ * internal tickets, and the tab's own label). Six strings, same two blocked
+ * credential paths. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 124,
-  es: 124,
-  ca: 124,
+  de: 130,
+  es: 130,
+  ca: 130,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
