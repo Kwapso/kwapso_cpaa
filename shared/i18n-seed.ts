@@ -1393,7 +1393,6 @@ export const SEED: Catalogue = {
   "Choose a person": { de: "Person wählen", es: "Elige una persona", ca: "Tria una persona"},
   "Clear": { de: "Zurücksetzen", es: "Borrar", ca: "Esborrar"},
   "Collapse": { de: "Einklappen", es: "Contraer", ca: "Redueix"},
-  "Collapse sidebar": { de: "Seitenleiste einklappen", es: "Contraer la barra lateral", ca: "Redueix la barra lateral"},
   "Contact moved.": { de: "Kontakt verschoben.", es: "Contacto movido.", ca: "Contacte mogut."},
   "Continue": { de: "Weiter", es: "Continuar", ca: "Continuar"},
   "Correct this source": { de: "Diese Quelle korrigieren", es: "Corregir esta fuente", ca: "Corregeix aquesta font"},
@@ -1500,7 +1499,6 @@ export const SEED: Catalogue = {
   "Every entry here is the same kind of work.": { de: "Jeder Eintrag hier ist dieselbe Art von Arbeit.", es: "Cada entrada aquí es el mismo tipo de trabajo.", ca: "Cada entrada d'aquí és el mateix tipus de feina."},
   "Every ticket a client raises shows here while it is being worked on.": { de: "Jedes Ticket, das ein Kunde stellt, wird hier angezeigt, während es bearbeitet wird.", es: "Cada ticket que un cliente plantea aparece aquí mientras se está trabajando en él.", ca: "Tot ticket que presenta un client es mostra aquí mentre s'hi està treballant."},
   "Expand": { de: "Ausklappen", es: "Expandir", ca: "Expandir"},
-  "Expand sidebar": { de: "Seitenleiste ausklappen", es: "Expandir la barra lateral", ca: "Expandir la barra lateral"},
   "Filed.": { de: "Abgelegt.", es: "Registrado.", ca: "Registrat."},
   "Fix what was written down. The change is kept in the record's history, with your name on it.": { de: "Korrigieren Sie, was festgehalten wurde. Die Änderung bleibt im Verlauf des Datensatzes stehen, mit Ihrem Namen daran.", es: "Corrige lo que se anotó. El cambio queda en el historial del registro, con tu nombre.", ca: "Corregeix el que es va anotar. El canvi queda a l'historial del registre, amb el teu nom."},
   "For work already finished. Say when it started and when it stopped, we work out the rest.": { de: "Für Arbeit, die bereits erledigt ist. Sagen Sie, wann sie begann und wann sie endete, den Rest rechnen wir aus.", es: "Para trabajo ya terminado. Di cuándo empezó y cuándo terminó, del resto nos encargamos.", ca: "Per a feina ja acabada. Digues quan va començar i quan va acabar, la resta la calculem nosaltres."},
@@ -3241,4 +3239,20 @@ export const SEED: Catalogue = {
     ca: "La importació no ha acabat",
   },
   "Back to the plan": { de: "Zurück zum Plan", es: "Volver al plan", ca: "Torna al pla" },
+
+  /* THE RAIL'S TWO NEW SECTION HEADINGS (client feedback, 31 Aug 2026 —
+   * lib/pages.ts, NAV_GROUP_LABELS). "Accounts" already had a seed entry;
+   * these two are the rest of the three named sections. */
+  "My work": { de: "Meine Arbeit", es: "Mi trabajo", ca: "La meva feina" },
+  "Build": { de: "Aufbau", es: "Construcción", ca: "Construcció" },
+
+  /* THE RECORD FOOTER'S ADD-A-NOTE FIELD (ch27.8), record-chrome.tsx /
+   * use-record-activity.ts. */
+  "Add a note": { de: "Notiz hinzufügen", es: "Añadir una nota", ca: "Afegir una nota" },
+  "Note added.": { de: "Notiz hinzugefügt.", es: "Nota añadida.", ca: "Nota afegida." },
+  "Couldn't add the note. Try again.": {
+    de: "Notiz konnte nicht hinzugefügt werden. Bitte versuche es erneut.",
+    es: "No se pudo añadir la nota. Inténtalo de nuevo.",
+    ca: "No s'ha pogut afegir la nota. Torna-ho a provar.",
+  },
 }

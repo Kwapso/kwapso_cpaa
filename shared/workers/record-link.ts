@@ -97,7 +97,7 @@ const DESTINATIONS: Record<RecordKind, Record<Audience, Destination | null>> = {
     },
     portal: {
       // …and none in the portal either. To-dos sit on the portal home, above
-      // their own requests ("Waiting on you"), which is where this lands them.
+      // their own requests ("Awaiting your input"), which is where this lands them.
       label: "Open your portal",
       path: () => "/home",
     },

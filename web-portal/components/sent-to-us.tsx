@@ -12,7 +12,7 @@
 // from the only screen that had ever shown it. The last time they saw the
 // contract they had just sent us was the moment before they sent it.
 //
-// It renders NOTHING when the pile is empty, exactly as "We're waiting on you"
+// It renders NOTHING when the pile is empty, exactly as "Awaiting your input"
 // above it does, and for the same reason: most people will land here with
 // nothing in it, and a card congratulating them on that is a card they learn to
 // scroll past.
@@ -31,10 +31,10 @@ import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
 import { CollectionHeading } from "@/components/collection-heading"
 import { usePortalTodos } from "@/lib/todos"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export function SentToUs() {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { todos, total, hasMore, loadingMore, loadMore } = usePortalTodos("done")
   const rows = todos ?? []
   if (rows.length === 0) return null
@@ -51,7 +51,7 @@ export function SentToUs() {
           // the origin of the string. A URL it refuses prints as plain text.
           const fileLink = safeHref(todo.fileUrl)
           return (
-            <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border p-4">
+            <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
               <div className="min-w-0">
                 <p className="font-medium">{todo.title}</p>
                 <p className="text-muted-foreground text-sm">
@@ -59,7 +59,7 @@ export function SentToUs() {
                       date — see the same note in web/components/work-panels.tsx.
                       `completedAt` is set on every row this view can return: it
                       is what puts the row in this view. */}
-                  {todo.completedAt ? t("Sent {date}", { date: formatDate(todo.completedAt) }) : null}
+                  {todo.completedAt ? t("Sent {date}", { date: formatDate(todo.completedAt, lang) }) : null}
                   {todo.ref ? ` · ${todo.ref}` : ""}
                 </p>
               </div>

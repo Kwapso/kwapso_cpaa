@@ -96,7 +96,7 @@ build itself checks against):
 | Composition | Verdict | Why |
 |---|---|---|
 | `overlays/access-denied.tsx` | `[!]` | No real call site for a dialog-over-the-blurred-page: neither door has "one denied module, real page still open behind it." |
-| `overlays/assistant.tsx` | `[!]` | Kit's assistant is non-modal by design; this app's `AgentPanel` is deliberately modal because it live-drives the screen underneath. |
+| `overlays/assistant.tsx` | `[!]` | Kit's own composition is a right-hand `Sheet` despite chapter 19's corner-bubble ruling; its flat `CopilotMessage` model can't carry this app's streamed chunks, tool-step rows, R23 citations, or staged attachments. |
 | `overlays/bulk-edit.tsx` | `[?]` | The selection primitive is real and unblocked; recommend not adopting yet — no collection performs a bulk write today. |
 | `overlays/delete-confirmation.tsx` | `[!]` | `recordNumber` required, no numbered-record vocabulary here; whole premise is irreversible delete, this app only deactivates. |
 | `overlays/export.tsx` | `[!]` | `columns` not optional; this app's export is a one-click filtered `<a href>`, no scope/column picker exists. |
@@ -134,7 +134,7 @@ build itself checks against):
 | `templates/main-screen.tsx` | `[=]` | `ScreenShell` + `CollectionFrame(tone="bare")`, already reached independently; the one open question was decided not pursued. |
 | `templates/multi-step-form.tsx` | `[ ]` | Permanent — no wizard-style form exists anywhere; confirmed by the kit's own runtime warning. |
 | `templates/portal-home.tsx` | `[=]` | `web-portal/components/home-screen.tsx` already implements the identical spec natively. |
-| `templates/rail.tsx` | `[?]` | Parked per the owner's own review; recommend adopting — the render-probe already proved the team switcher fits its slots. |
+| `templates/rail.tsx` | `[x]` | Adopted 2026-08-31 — `AppShell` renders it directly; the team switcher composes above it (no Rail slot fits a workspace switcher). |
 | `templates/record-chrome.tsx` | `[x]` | Adopted — confirmed by direct import; the record-detail host seam every record screen composes through. |
 | `templates/record-route.tsx` | `[=]` | `ScreenShell` + `RecordChrome` + `StepperHero`, already assembled under other names. |
 | `templates/screen-shell.tsx` | `[x]` | Adopted and landed — `AppShell` now composes this directly, verified navigating (R37 object-identity check). |
@@ -243,6 +243,17 @@ superseded reasoning is removed rather than kept beside the new one — "a
 record of why something was rejected is only useful while it is true."
 
 ## [x] Adopted
+
+**`shared/ui/compositions/templates/rail.tsx`, for real, 2026-08-31.** Moved
+here from `[?] Needs a human call` — see that section (now 2, not 3) for the
+full account of what changed and the two findings it surfaced (the
+`onSelect`-only wiring Rail's own missing `preventDefault` requires, and the
+member chip's missing photo slot). `web/components/app-shell.tsx` now builds
+`RailGroup[]`/`RailMember` from `lib/pages.ts` and the signed-in user and
+renders `Rail` directly, `spine="paper"` to match `ScreenShell` below it. The
+`COMPOSITION_EXEMPT["templates/rail.tsx"]` line in `shared/rules/registry.ts`
+is deleted with this change (R45's own ratchet: an exemption for a
+composition now directly reached is stale).
 
 **`shared/ui/compositions/templates/stepper-hero.tsx`, read-only, for the
 ticket status track** (`web/components/help-status-stepper.tsx`).
@@ -525,19 +536,36 @@ step — flagged, not attempted this pass.
 
 ### `overlays/assistant.tsx`
 
-**Reasoning corrected, verdict unchanged.** The first pass's phrasing
-implied the kit's version was the modal one; re-reading, it's the reverse —
-the composition's own ruling 31 makes it **non-modal by default** ("never
-traps focus… you can type in a table while it's open"), and this app's
-`AgentPanel` is the one that is modal (a real `Sheet`) on purpose, because it
-also live-drives the screen underneath it through a "screen trace" mechanism
-the kit has no concept of. Letting someone type in the same table the agent
-is actively manipulating is a real correctness question (whose edit wins),
-not a styling preference — this is a product decision about concurrent
-agent/user control of one screen, not a prop the kit exposes either way. A
-peer's render probe confirms the kit's half is real, not just documented:
-`Assistant open` renders `role="dialog"` but never `aria-modal="true"` — it
-genuinely does not trap focus.
+**Reasoning corrected again, verdict unchanged.** The previous entry claimed
+this app's `AgentPanel` was "deliberately modal … because it live-drives the
+screen underneath" — stale, and backwards. `AgentPanel`
+(`web/components/agent-panel.tsx`) moved off `Sheet` entirely to a
+`Popover`-anchored bubble (item 2, 31 Aug 2026: "more like a bubble coming
+out of its button, instead of a slide-in"), and its own header comment
+records that it was **already** `modal={false}` on the prior `Sheet`
+primitive — non-modal is not new here, only the primitive changed. The real
+reason is the opposite of the old claim: the screen-trace mechanism
+(`agent-host.tsx`'s `go()` / `runAction()` driving the live screen) needs the
+underlying screen to stay interactive while the assistant is open, which
+non-modal serves, not modal — "you can type in a table while the assistant
+is open" is this surface's law regardless of primitive.
+
+Checked again on the same pass, the kit's `overlays/assistant.tsx` /
+`CopilotOverlay` still doesn't fit, for two reasons that have nothing to do
+with modality:
+
+1. The composition's own file header names it "CONTRADICTION 1" — chapter
+   19's ruling calls for a corner-anchored floating card, but what got
+   built, on purpose ("because it is the delivery contract"), is a
+   right-hand `Sheet` (`copilot-overlay.tsx` lines ~43-68). Adopting it would
+   trade one slide-in drawer for another, not for a bubble — the one thing
+   this app's own change was asked to fix and the kit's composition still
+   isn't.
+2. `CopilotOverlay`'s message model is a flat `CopilotMessage` list with no
+   concept of this app's streamed text deltas, live tool-step rows, R23
+   citations, or staged file attachments — adopting it would mean dropping
+   that whole state machine (`web/lib/use-agent-chat.tsx`), not swapping a
+   shell.
 
 ### `overlays/export.tsx`
 
@@ -588,31 +616,39 @@ navigate straight to the full record, with no peek pattern anywhere.
 Adopting this means changing established navigation behavior across the
 engine, not adding a missing piece.
 
-## [?] Needs a human call (3)
+## [?] Needs a human call (2)
 
 **`templates/sign-in.tsx`** — landed. The other lane shipped
 `sign-in-system` (the agency login now renders the kit's `LoginRoute`
 through `web/components/auth-card.tsx`) after this file's first pass flagged
 the asset-import blocker as stale. See UI-GAPS.md rows 2 and 23.
 
-**`templates/rail.tsx`** remains parked, not scheduled, per the owner's own
-review of staging live. The bigger question it used to be entangled with —
-"should `AppShell` itself be rebuilt on `ScreenShell`" — is now SETTLED
-(see `[x]` above: it has landed), which actually sharpens what's left of
-this one: `AppShell`'s rail COLUMN is the kit's own now, and only its
-CONTENTS (the nav buttons, drawn by this app's own `navButton` function)
-are still hand-rolled rather than the kit's `Rail` composition. **One
-stated reason for parking it was
-wrong, corrected by a peer's render probe**: `mark`, `wordmark` and
-`tagline` are all `React.ReactNode` slots at the rail's head and each takes
-an arbitrary node — rendered live with a real button in each slot — so the
-team switcher (a multi-tenant requirement this app's sidebar carries) has a
-home in `Rail` after all. The mobile half of the original reason still
-holds: `ScreenShell` drops the rail entirely below `md` by design and draws
-no hamburger anywhere, so the mobile top-bar and bottom-tab-bar stay bespoke
-regardless of whether `Rail` is adopted. The verdict (parked, not scheduled,
-a deliberate future attempt) is unchanged — only the stated reason for half
-of it was.
+**`templates/rail.tsx`** — LANDED 2026-08-31, moved out of this section (see
+`[x] Adopted` above). The client compared the live app's navbar against the
+kit's own reviewed `Rail` and said, verbatim, "the navbar is completely
+different" — `AppShell`'s rail COLUMN was the kit's `ScreenShell` since the
+earlier pass, but the nav CONTENTS were still this app's own `navButton`
+function reading the same `--spine-*` tokens by hand, which is exactly what
+read as a paraphrase rather than the real thing on a side-by-side. `web/components/app-shell.tsx`
+now builds `railGroups`/`railMember` from the nav registry (`lib/pages.ts`)
+and the signed-in user and renders the kit's `Rail` directly. The render probe
+recorded here — `mark`/`wordmark`/`tagline` all take an arbitrary node — turned
+out to be the wrong home for the team switcher after all: those three are the
+BRAND head (and this app's `brand.name` genuinely is "kwapso", so Rail's own
+default Logotype/Isotype is this app's real identity, not a placeholder), not
+a workspace-switcher slot, and there is no other prop for one. The switcher is
+composed ABOVE `Rail` instead — a real app-side addition beside the kit part,
+not forced into a slot that doesn't fit (the report this landed under says so
+explicitly). Two further findings, both worth keeping on record: (1) Rail's
+`<a>` element never calls `preventDefault`, so a real in-app `href` on a
+`RailItem` would hard-reload this static-export shell — every item is wired
+with `onSelect` only, rendering Rail's `<button>` branch instead, same as the
+hand-rolled row always was; (2) the member chip's `MemberChip` draws
+`AvatarFallback` only, with no photo slot, so the user's real `imageUrl` (which
+`ProfileMenu`'s own avatar already shows) has nowhere to go in Rail — a
+genuine kit gap, not silently worked around. The mobile top-bar/bottom-tab-bar
+stay bespoke as always: `ScreenShell` drops the rail entirely below `md` and
+draws no hamburger anywhere.
 
 **`overlays/bulk-edit.tsx`** — CORRECTED from `[ ]` to `[?]`. The first pass
 said this "requires a row-selection mechanism... nothing in

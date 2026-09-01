@@ -6,10 +6,11 @@
 import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
 import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } from "@shared/web/format"
-import { personName } from "@/lib/identity"
+import { nameInitials, personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
+import type { Language } from "@shared/i18n"
 import type {
   Account,
   ActivityItem,
@@ -33,12 +34,21 @@ export const INVITE_STATUS: Record<Invite["status"], string> = {
   expired: "Expired",
 }
 
-/** Activity items → the engine's activity-block row shape. */
+/** Activity items → the engine's activity-block row shape.
+ *
+ * `initials` rides here too — the SAME `nameInitials` helper `use-record-
+ * activity.ts` uses for the bespoke `RecordScreen` path — because this is the
+ * OTHER activity feed in the app: the recipe engine's own `{ kind: "activity"
+ * }` block (screen-renderer.tsx) draws Team, Team member and Invite through
+ * this shaper, not through `useRecordActivity`, so the initials fix that
+ * landed there never reached these three screens. Same row shape, same
+ * missing field, a second place to get it right. */
 export function shapeActivity(items: ActivityItem[]): Record<string, unknown>[] {
   return items.map((a) => ({
     id: a.id,
     description: a.description,
     actor: a.actorName ?? undefined,
+    initials: nameInitials(a.actorName),
     timestamp: formatActivityWhen(a.createdAt),
   }))
 }
@@ -49,21 +59,22 @@ export function shapeTeamDetail(opts: {
   logoUrl: string | null
   meta: TeamMeta
   activity: ActivityItem[]
+  lang: Language
 }): ScreenData {
   return {
     record: {
       id: opts.teamId,
       name: opts.name,
       image: opts.logoUrl ?? "",
-      created: formatDateTime(opts.meta.createdAt),
+      created: formatDateTime(opts.meta.createdAt, opts.lang),
       createdBy: opts.meta.creatorName || opts.meta.creatorEmail || "",
-      updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt) : "—",
+      updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt, opts.lang) : "—",
     },
     sets: { activity: shapeActivity(opts.activity) },
   }
 }
 
-export function shapeMembersList(members: TeamMember[]): ScreenData {
+export function shapeMembersList(members: TeamMember[], lang: Language): ScreenData {
   return {
     rows: members.map((m) => ({
       id: m.userId,
@@ -72,7 +83,7 @@ export function shapeMembersList(members: TeamMember[]): ScreenData {
       // stakeholders — and not on the list of the team itself.
       mark: <RecordMark picture={m.imageUrl} name={personName(m)} shape="round" />,
       name: personName(m),
-      detail: `${m.roleTitle} · joined ${formatDate(m.joinedAt)}`,
+      detail: `${m.roleTitle} · joined ${formatDate(m.joinedAt, lang)}`,
       // Facet column (read by the filter engine, not the renderer).
       role: m.roleTitle,
     })),
@@ -228,7 +239,7 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   sprint: "From a sprint",
   story: "From a story",
   meeting: "From a meeting",
-  todo: "From a to-do",
+  todo: "From an input",
   task: "From a task",
   // The four that arrive through somebody's own Google connection — named for
   // the thing rather than the service, the same way the kinds themselves are.
@@ -279,7 +290,7 @@ export function shapeKnowledgeList(
 /** One meeting, as a row: when it was, who it was with and why. The date leads
  * because a calendar is scanned by date — the title is what you read once you have
  * found the day. */
-export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
+export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenData {
   return {
     rows: meetings.map((m) => ({
       id: m.id,
@@ -292,7 +303,7 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       name: m.active ? m.title : `${m.title} (cancelled)`,
       // K1: when, and who with. The purpose is a column on the "all" view, which
       // is where a person compares meetings on it (K2).
-      detail: [formatDate(m.startsAt), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
+      detail: [formatDate(m.startsAt, lang), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
       // TABLE COLUMNS, not facets. `client` and `state` are two of the six the
       // "All" view draws, and the meetings list's filters are the DOOR's now
       // (web/lib/collection-filters.ts) — so these are read by the table and by
@@ -395,14 +406,14 @@ export function shapeAccountsList(
   }
 }
 
-export function shapeMemberDetail(member: TeamMember, activity: ActivityItem[]): ScreenData {
+export function shapeMemberDetail(member: TeamMember, activity: ActivityItem[], lang: Language): ScreenData {
   return {
     record: {
       id: member.userId,
       name: personName(member),
       email: member.email,
       role: member.roleTitle,
-      joined: formatDate(member.joinedAt),
+      joined: formatDate(member.joinedAt, lang),
       image: member.imageUrl ?? "",
     },
     sets: { activity: shapeActivity(activity) },
@@ -412,7 +423,8 @@ export function shapeMemberDetail(member: TeamMember, activity: ActivityItem[]):
 export function shapeInviteDetail(
   invite: Invite,
   audit: InviteAudit | null,
-  activity: ActivityItem[]
+  activity: ActivityItem[],
+  lang: Language
 ): ScreenData {
   return {
     record: {
@@ -421,9 +433,9 @@ export function shapeInviteDetail(
       role: invite.roleTitle,
       status: INVITE_STATUS[invite.status],
       invitedBy: audit?.inviterName || audit?.inviterEmail || "—",
-      invited: formatDate(invite.createdAt),
-      expires: formatDate(invite.expiresAt),
-      accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt) : "—",
+      invited: formatDate(invite.createdAt, lang),
+      expires: formatDate(invite.expiresAt, lang),
+      accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity) },
   }
@@ -467,7 +479,7 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
   }
 }
 
-export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): ScreenData {
+export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[], lang: Language): ScreenData {
   return {
     record: {
       id: asset.id,
@@ -478,9 +490,9 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): S
       // A COLOUR IS THE ASSET, not a file of it (0043). The two are exclusive by
       // construction: the migration cleared `file_url` on every row it converted.
       file: asset.colorHex || asset.fileUrl || "No file yet",
-      created: formatDateTime(asset.createdAt),
+      created: formatDateTime(asset.createdAt, lang),
       createdBy: asset.creatorName || "—",
-      updated: asset.updatedAt ? formatDateTime(asset.updatedAt) : "—",
+      updated: asset.updatedAt ? formatDateTime(asset.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity) },
   }
@@ -499,7 +511,7 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
   }
 }
 
-export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityItem[]): ScreenData {
+export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityItem[], lang: Language): ScreenData {
   return {
     record: {
       id: purpose.id,
@@ -507,9 +519,9 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
       detail: purpose.department || "No department",
       department: purpose.department || "—",
       description: purpose.description || "—",
-      created: formatDateTime(purpose.createdAt),
+      created: formatDateTime(purpose.createdAt, lang),
       createdBy: purpose.creatorName || "—",
-      updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt) : "—",
+      updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity) },
   }

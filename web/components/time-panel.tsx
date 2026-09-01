@@ -29,9 +29,11 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Trash2 } from "@shared/ui/foundations/icons"
 
 import { LoadMore } from "@/components/load-more"
+import { PagedFind } from "@/components/paged-find"
 import { clockFrom } from "@/components/timer-bar"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
 import { ApiFailure, content as contentApi } from "@/lib/api"
+import type { LogQuery } from "@/lib/api/content"
 import {
   TIME_SLICE_PREFIX,
   listFetch,
@@ -40,11 +42,15 @@ import {
   totalKey,
   workLogsKey,
 } from "@/lib/live-resources"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { translatedFacets } from "@/lib/collection-filters"
+import { useAssignableMembers } from "@/lib/members"
 import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
+import { AddButton } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /** THE META LINE OF A ROW OF TIME: who, and when. Two facts, and it used to be
  * five.
@@ -153,7 +159,7 @@ function RunawayPrompts({
       {runaways.map((timer) => (
         <div
           key={timer.id}
-          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm"
+          className="bg-destructive/5 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] px-3 py-2 text-sm"
         >
           <span>
             <AlarmClockOff className="mr-1.5 inline size-3.5" />
@@ -205,6 +211,10 @@ export function TimePanel({
   // R16: the exact server totals, primed by the same fetch that loaded page one —
   // never the loaded page's length, which on a paged list is just "50" for ever.
   const totalSeconds = useCachedValue<number>(totalKey("work-seconds", teamId))
+  // WHO MAY HAVE LOGGED IT — the team's own staff, for the "Who logged it"
+  // facet below. Never a client login: `useAssignableMembers` already drops
+  // one, which agrees with the door refusing a client login outright (R21).
+  const members = useAssignableMembers(teamId)
   const [addOpen, setAddOpen] = React.useState(false)
   // THE ROW BEING CORRECTED. Held rather than routed through the URL because a
   // correction is a thing you do to a line you are looking at — Back should
@@ -259,85 +269,142 @@ export function TimePanel({
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-2">
-        {/* THE HOURS. Not the collection's count (the heading above says that) —
-            the number anybody reading a timesheet actually came for. */}
-        <p className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm">
-          <Clock className="size-3.5" />
-          {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
-        </p>
-        {canCreate && (
-          <AddButton label={t("Log time")} onClick={() => setAddOpen(true)} />
-        )}
-      </div>
+      {/* THE HOURS, above the toolbar rather than inside it: it is a second,
+          different number from whatever the search box below is narrowing —
+          the collection's own count (the heading above says that) is a third —
+          and none of the three should read as an answer to the others. */}
+      <p className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm">
+        <Clock className="size-3.5" />
+        {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
+      </p>
 
       <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
 
-      {logs.length === 0 ? (
-        <EmptyLine concept="time">{t("No time logged yet.")}</EmptyLine>
-      ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
-          {logs.map((l) => (
-            <li key={l.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{l.targetLabel ?? "—"}</p>
-                <p className="text-muted-foreground flex items-center gap-2 truncate text-xs">
-                  {line(l)}
-                  {/* THE STATES, at the END of the meta line, never inside it —
-                      a badge is how the eye reads "this row is unusual" without
-                      reading the row (N4). Only the exceptions are drawn: nearly
-                      all time is billable and most of it has no kind said, and a
-                      badge on every row is a badge that says nothing. */}
-                  {!l.billable && (
-                    <Badge variant="secondary" className="shrink-0">
-                      {t("not billable")}
-                    </Badge>
-                  )}
-                  {l.kind && (
-                    <Badge variant="secondary" className="shrink-0">
-                      {l.kind}
-                    </Badge>
-                  )}
-                </p>
-              </div>
-              <span className="shrink-0 text-sm tabular-nums">
-                {l.endedAt ? clockFrom(l.seconds) : t("running")}
-              </span>
-              {/* FIX A LINE. Only on time that has FINISHED: a running timer is
-                  corrected by stopping it, and a start time you can edit while
-                  the clock is still counting is two people writing the same
-                  number.
-
-                  ICON ONLY, in the trailing slot. The word "Edit" beside a
-                  pencil on every row of a 2,940-row timesheet is the same word
-                  2,940 times; the pencil is the mapping this app uses everywhere
-                  (UI-CONVENTIONS §4) and the label rides on `aria-label` for
-                  anybody who needs it read out. */}
-              {canEdit && l.endedAt && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditing(l)}
-                  className="shrink-0"
-                  aria-label={t("Edit")}
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* R14: 2,940 rows arrived from two years of the previous system, and every
-          piece of work produces several more. */}
-      <LoadMore
+      {/* SEARCH, FILTER, SORT AND "LOG TIME" — the same real pattern every
+          other growing, paged main-screen collection draws through (tickets,
+          the backlog, accounts): the DOOR answers all three, never the loaded
+          page (R14 — 2,940 rows arrived from two years of the previous system
+          and every piece of work produces several more; SEARCH.md layer 2). */}
+      <PagedFind<WorkLog>
         listKey={workLogsKey(teamId)}
-        label={t("Load more time")}
-        fetchPage={(c: string) =>
-          contentApi.workLogs({ cursor: c }).then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
-        }
-      />
+        placeholder={t("Search time…")}
+        matches={{
+          none: t("No time matches"),
+          one: t("1 entry matches"),
+          many: t("{count} entries match"),
+        }}
+        sorts={translatedSorts("workLogs", t)}
+        defaultSort={COLLECTION_SORTS.workLogs.defaultSort}
+        facets={translatedFacets("workLogs", t, {
+          userId: members.map((m) => ({ value: m.id, label: m.name })),
+        })}
+        actions={() => (canCreate ? <AddButton label={t("Log time")} onClick={() => setAddOpen(true)} /> : null)}
+        fetchPage={(query, cursor) => {
+          // THE WHOLE QUESTION, read back off the door's own filter names —
+          // `q` (the search box), `userId` and `targetTable` (the two facets
+          // above) and `sort`/`dir` (the order control) — nothing here invents
+          // a name the door does not know (SEARCH.md layer 2).
+          const filter: LogQuery = {
+            q: query.q,
+            userId: query.userId,
+            targetTable: query.targetTable,
+            period: query.period,
+            sort: query.sort,
+            dir: query.dir,
+          }
+          return contentApi
+            .workLogs({ filter, cursor })
+            .then((r) => ({ rows: r.logs, nextCursor: r.nextCursor, total: r.total }))
+        }}
+      >
+        {(found) => {
+          const rows = found.active ? found.rows : logs
+          if (rows === null || rows === undefined) return <Skeleton variant="list" lines={3} />
+          return (
+            <>
+              {rows.length === 0 ? (
+                // No `work_logs` import target — time is logged live, off a
+                // running timer or a manual correction, never from a
+                // spreadsheet. "Nothing matched" is a different, and
+                // deliberately untrue, sentence over a resting empty list — it
+                // follows what was actually asked, the same as every other
+                // find bar in the app.
+                <CollectionEmptyState
+                  title={
+                    found.active
+                      ? t("Nothing matched. Try fewer words, or clear the filters.")
+                      : t("No time logged yet.")
+                  }
+                  onCreate={!found.active && canCreate ? () => setAddOpen(true) : undefined}
+                />
+              ) : (
+                <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+                  {rows.map((l) => (
+                    <li key={l.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{l.targetLabel ?? "—"}</p>
+                        <p className="text-muted-foreground flex items-center gap-2 truncate text-xs">
+                          {line(l)}
+                          {/* THE STATES, at the END of the meta line, never
+                              inside it — a badge is how the eye reads "this
+                              row is unusual" without reading the row (N4).
+                              Only the exceptions are drawn: nearly all time is
+                              billable and most of it has no kind said, and a
+                              badge on every row is a badge that says
+                              nothing. */}
+                          {!l.billable && (
+                            <Badge variant="secondary" className="shrink-0">
+                              {t("not billable")}
+                            </Badge>
+                          )}
+                          {l.kind && (
+                            <Badge variant="secondary" className="shrink-0">
+                              {l.kind}
+                            </Badge>
+                          )}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm tabular-nums">
+                        {l.endedAt ? clockFrom(l.seconds) : t("running")}
+                      </span>
+                      {/* FIX A LINE. Only on time that has FINISHED: a running
+                          timer is corrected by stopping it, and a start time
+                          you can edit while the clock is still counting is two
+                          people writing the same number.
+
+                          ICON ONLY, in the trailing slot. The word "Edit"
+                          beside a pencil on every row of a 2,940-row timesheet
+                          is the same word 2,940 times; the pencil is the
+                          mapping this app uses everywhere (UI-CONVENTIONS §4)
+                          and the label rides on `aria-label` for anybody who
+                          needs it read out. */}
+                      {canEdit && l.endedAt && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditing(l)}
+                          className="shrink-0"
+                          aria-label={t("Edit")}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* R14: 2,940 rows arrived from two years of the previous system,
+                  and every piece of work produces several more. */}
+              <LoadMore
+                listKey={found.listKey ?? workLogsKey(teamId)}
+                label={t("Load more time")}
+                fetchPage={found.fetchPage}
+              />
+            </>
+          )
+        }}
+      </PagedFind>
 
       <TimeFormDialog
         open={addOpen}

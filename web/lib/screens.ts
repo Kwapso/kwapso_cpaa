@@ -109,6 +109,10 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // ON the same screens, never a screen of its own — handing out a login is a
   // bigger decision than editing a phone number).
   accounts: "accounts",
+  // Contacts — a real sidebar page now (client, 31 Aug 2026), gated on the SAME
+  // `contacts` module the account-scoped tab it replaced already checked. The
+  // segment IS the module, like Accounts.
+  contacts: "contacts",
   // Process maps: the segment IS the module. `commercials` is a second gate ON
   // these screens as well (the rate card on an account), because what a client is
   // charged is a bigger decision than how long a step takes.
@@ -431,6 +435,42 @@ const accountsListRecipe: ScreenRecipe = {
   // moved, which is what a manager reported as "filter by type, the count
   // doesn't change". A filter a person can pick has to be one the server applies.
   collection: listCollection("No accounts yet.", "Search accounts…", [], { paged: true, icon: "accounts" }),
+}
+
+/** Contacts — every PERSON linked into the customer spine, across every
+ * account, in one list (client, 31 Aug 2026: "contacts as a real sidebar page,
+ * also remove the tab from inside accounts"). SAME table as Accounts (a person
+ * is an `accountType: "individual"` row — SCOPE ch.03), SAME door
+ * (`GET /accounts`, narrowed to `type=individual`), SAME `contacts:read` gate
+ * the account-scoped Contacts tab already checked — this is a second address
+ * for rows the app already knew how to fetch and show, not a new capability.
+ *
+ * PAGED (R14), like Accounts: the address book grows with every new client. Its
+ * own recipe key (`contacts.list`) rather than reusing `accounts.list` so its
+ * cache, its scroll memory and its rows-per-page facets can never be confused
+ * with the companies list sitting one page over — `binding.module` stays
+ * "contacts", its own identity, even though opening a row still lands on
+ * `/accounts/<id>` (the deep-link host's `onIntent` maps the two — see
+ * deep-link-screen.tsx): a person is one row of the SAME table a company is,
+ * so there is one door and one detail screen for both, never a second
+ * `/contacts/<id>` address for a record that already has one.
+ *
+ * Grouped by company on screen (`components/contacts-by-company.tsx`,
+ * UI-GAPS #24), promoted from the tab it used to live on rather than rebuilt —
+ * the same component, drawing the same row, at the same right. */
+const contactsListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "contacts" },
+  gate: { module: "contacts", right: "read" },
+  fields: [field("name", "Contact"), field("detail", "Details")],
+  leading: "mark",
+  actions: [],
+  // NO FACETS HERE, for the reason Accounts has none: the list PAGES, and a
+  // facet in the frame would narrow the loaded page under a badge counting
+  // everybody. The door's own filters (collection-filters.ts) still apply.
+  collection: listCollection("No contacts yet.", "Search contacts…", [], { paged: true, icon: "contacts" }),
 }
 
 /* -------------------------------- knowledge ------------------------------- */
@@ -774,6 +814,11 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   // nested under it are collections with their own actions, which no engine
   // block draws (see account-detail.tsx).
   "accounts.list": accountsListRecipe,
+  // Contacts — the segment IS the module (like Accounts and Knowledge): a real
+  // sidebar page now, promoted from the account-scoped tab it used to be
+  // (client, 31 Aug 2026). No DETAIL recipe: a contact's own screen is the
+  // account detail's, reached at `/accounts/<id>` (see the note on the recipe).
+  "contacts.list": contactsListRecipe,
   // Knowledge DETAIL has no recipe — its panel is the source's own text plus the
   // controls that take it away from the assistant or give it back, which no
   // engine block draws (see knowledge-detail.tsx).

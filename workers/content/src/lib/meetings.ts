@@ -45,7 +45,7 @@ import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/
 import { optionalMoment, optionalText, requireMoment, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Meeting, MeetingAttachment, MeetingGuest, MeetingPersonLink } from "@shared/types"
 
-import { nextRef, REF_KINDS } from "./refs"
+import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 
 type MeetingRow = {
   id: string
@@ -548,9 +548,10 @@ export async function createMeeting(
   await requireReferences(cfg, guard, v)
   const id = ulid()
   const now = new Date().toISOString()
-  // Null for an internal meeting: a reference is built out of a client's short
-  // code, and a number nobody can quote is worse than none (lib/refs.ts).
-  const ref = await nextRef(cfg, guard, v.accountId, REF_KINDS.meeting)
+  // Null for an internal meeting: TEAM-wide now (shared/workers/refs.ts), but
+  // still gated on there being a client to quote it — a number nobody can
+  // quote is worse than none.
+  const ref = v.accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.meeting) : null
   await d1ExecScript(
     cfg,
     guard.databaseId,

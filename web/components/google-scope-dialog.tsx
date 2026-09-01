@@ -263,8 +263,8 @@ export function GoogleScopeDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, mode: m.value }))}
               disabled={busy}
-              className={`flex flex-col gap-1 rounded-[var(--radius)] border p-3 text-left ${
-                values.mode === m.value ? "border-primary bg-muted" : ""
+              className={`flex flex-col gap-1 rounded-[var(--radius)] bg-surface-panel p-3 text-left ${
+                values.mode === m.value ? "border border-primary bg-muted" : ""
               }`}
             >
               <span className="text-sm font-medium">{t(m.title)}</span>
@@ -301,7 +301,7 @@ export function GoogleScopeDialog({
           </Field>
 
           {options !== null && (
-            <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] border">
+            <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] bg-surface-panel">
               {options.filter((o) => !alreadyNamed.some((s) => s.externalId === o.externalId)).length === 0 ? (
                 <p className="text-muted-foreground p-3 text-sm">
                   {t("Nothing else to add from your Google account.")}
@@ -377,7 +377,7 @@ export function GoogleScopeDialog({
             {GOOGLE_EVENT_TYPES.map((kind) => (
               <Choice
                 key={kind}
-                className="rounded-[var(--radius)] border p-3"
+                className="rounded-[var(--radius)] bg-surface-panel p-3"
                 label={t(EVENT_KINDS[kind].title)}
                 description={t(EVENT_KINDS[kind].description)}
               >
@@ -404,7 +404,7 @@ export function GoogleScopeDialog({
        * free. */}
       <Field config={forgetField} shape="group" className={fieldSpacing}>
         <Choice
-          className="rounded-[var(--radius)] border p-3"
+          className="rounded-[var(--radius)] bg-surface-panel p-3"
           label={t("Let go of what was already read")}
           description={
             service === "gmail"

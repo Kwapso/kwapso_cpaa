@@ -11,6 +11,7 @@
 
 import * as React from "react"
 
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -25,8 +26,9 @@ import { useActiveTeam } from "@/lib/use-active-team"
 import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
+import { dateFromYMD, ymdFromDate } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export type TodoFormValues = { accountId: string; title: string; detail: string; dueOn: string }
 
@@ -56,7 +58,7 @@ export function TodoFormDialog({
   draftKey?: string
   onSubmit: (values: TodoFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -141,11 +143,12 @@ export function TodoFormDialog({
         />
       </Field>
       <Field config={dueField} htmlFor="todo-due" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="todo-due"
-          type="date"
-          value={values.dueOn}
-          onChange={(e) => setValues((s) => ({ ...s, dueOn: e.target.value }))}
+          mode="date"
+          locale={lang}
+          value={dateFromYMD(values.dueOn)}
+          onValueChange={(d) => setValues((s) => ({ ...s, dueOn: ymdFromDate(d) }))}
           disabled={busy}
         />
       </Field>

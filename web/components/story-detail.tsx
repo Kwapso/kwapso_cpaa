@@ -16,10 +16,11 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Check, ClipboardCheck, Pencil } from "@shared/ui/foundations/icons"
 
@@ -27,8 +28,8 @@ import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-d
 import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
 import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
+import { storyStatusDotTone } from "@shared/status-tones"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
-import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { StoryAttachmentsPanel } from "@/components/story-attachments"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
@@ -37,23 +38,23 @@ import { TranslateAction, useHumanTranslation } from "@/components/translate-hum
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
+  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { storiesKey, storyAttachmentsKey } from "@/lib/live-resources"
-import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Story } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 
 export function StoryDetailScreen({
@@ -66,7 +67,7 @@ export function StoryDetailScreen({
   /** the stories list in the URL form we arrived through */
   basePath: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // The backlog is PAGED, so a story reached by a deep link may sit past page
   // one — it is fetched by id and kept in its own cache key, exactly as the
   // knowledge base does for a source past its first page.
@@ -95,6 +96,10 @@ export function StoryDetailScreen({
   // one that governs editing the story — a person who may log time but not
   // rewrite the work was being offered neither.
   const canLogTime = can("work", "create")
+  // Precomputed with the outer `t`: `renderPanel` below names its own tab-item
+  // parameter `t`, which would otherwise shadow the translation function right
+  // where the Activity tab's note field needs it.
+  const notePlaceholder = t("Add a note")
 
   // The open tab is remembered per record for as long as this document
   // lives (web/lib/nav-memory.ts) — leaving to another section and coming
@@ -211,7 +216,7 @@ export function StoryDetailScreen({
     // due, so this is the SPRINT's end date — the story's own date field went on
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story
     // with no sprint has no deadline to show, which is the honest answer.
-    { label: t("Deadline"), value: formatDate(story.sprintEndsOn) || "—" },
+    { label: t("Deadline"), value: formatDate(story.sprintEndsOn, lang) || "—" },
     // The three fields somebody TYPED — the detail, what was done, and what the
     // client will be told — read through `of`, so the reader who pressed
     // Translate sees them in their own language and nobody else's row changed.
@@ -234,7 +239,7 @@ export function StoryDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
@@ -285,18 +290,46 @@ export function StoryDetailScreen({
   return (
     <RecordScreen
       mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `story`), client ruling 2026-08-31.
+      eyebrow={t("Story")}
       // D4: the type word and the reference, above the title.
       recordNumber={story.ref || undefined}
       collectionLabel={story.storyType || t("Story")}
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
+      // scheme is not only for tickets … map colors"). `storyStatusDotTone`
+      // (shared/status-tones.ts) reuses the same four-value enum the header's
+      // own stage stepper used to draw before the 2026-08-31 "nothing after
+      // chips" ruling removed it (see `actions`'s own note below) — this chip
+      // is now the only place that fact reads.
+      //
+      // THE THIRD PILL, "the most relevant container parent" (client ruling,
+      // 2026-08-31). The glossary's own words settle which of the three
+      // cross-links below is that one: "story: … it lives in a SPRINT" — the
+      // sprint is the story's literal container, so it is the chip; the app and
+      // the ticket had no chip of their own and are gone from the header
+      // entirely (see this file's own note further down).
+      chips={
+        <>
+          <Badge variant="status" dot={storyStatusDotTone(story.status)}>
+            {STORY_STATUS_LABEL[story.status]}
+          </Badge>
+          {story.sprintId && story.sprintName ? (
+            <RecordChipLink href={`${host.base}/sprints/${story.sprintId}`}>
+              {story.sprintName}
+            </RecordChipLink>
+          ) : null}
+        </>
+      }
       title={translation.of(story.title)}
-      // D5: where it is, who has it, when it is due. Three facts, no more.
-      status={[
-        STORY_STATUS_LABEL[story.status],
-        story.assigneeName ?? undefined,
-        formatDate(story.sprintEndsOn) || undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      // CLIENT RULING, 2026-08-31, VERBATIM: "what is this 3rd component in
+      // the title under the chips? kill everywhere. chips is the last
+      // component of headers!" Overrides the D5 trim above, which had kept
+      // assignee/deadline here — both are already rows in the Overview tab
+      // (`overviewItems`: "Who's doing it", "Deadline"), so nothing is lost.
+      // `status` maps to `RecordChrome`'s `meta`, which the kit draws right
+      // under the chips row (`data-record-region="header"`) — exactly the
+      // region the ruling forbids.
       actions={
         <>
           {/* START, AND STOP. It used to be a permanent "Start timer" that could
@@ -342,52 +375,32 @@ export function StoryDetailScreen({
           <RecordActionsMenu actions={overflow} />
         </>
       }
-      /* THE LIFECYCLE AS A FACT (CHECKLIST 6.7). It used to be four buttons, and
-         pressing "in progress" started a timer — the tester asked for that
-         inversion and this is it: a timer start moves the story, and the track
-         reports where it got to. */
-      headerExtra={
-        <>
-          <StoryStatusStepper status={story.status} />
-          {/* THE CROSS-LINKS UP THE TREE, the app the work is on, the sprint it
-              was sold inside, and the request it answers. The owner's answer on
-              which path a person takes was "all three should get her there", and
-              this is the other end of all three. */}
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {story.ref && <span>{story.ref}</span>}
-            {story.appId && (
-              <Button
-                variant="link"
-                type="button"
-                onClick={() => softNavigate(`${host.base}/apps/${story.appId}`)}
-                className="hover:text-foreground"
-              >
-                {options.appNames.get(story.appId) ?? t("Its app")}
-              </Button>
-            )}
-            {story.sprintId && story.sprintName && (
-              <Button
-                variant="link"
-                type="button"
-                onClick={() => softNavigate(`${host.base}/sprints/${story.sprintId}`)}
-                className="hover:text-foreground"
-              >
-                {t("In")} {story.sprintName}
-              </Button>
-            )}
-            {story.ticketId && (
-              <Button
-                variant="link"
-                type="button"
-                onClick={() => softNavigate(`${host.base}/tickets/${story.ticketId}`)}
-                className="hover:text-foreground"
-              >
-                {t("Answers")} {story.ticketRef ?? t("a ticket")}
-              </Button>
-            )}
-          </p>
-        </>
-      }
+      // THE STAGE STEPPER AND THE APP/TICKET CROSS-LINKS ARE GONE — CLIENT
+      // RULING, 2026-08-31, VERBATIM: "what is this 3rd component in the
+      // title under the chips? kill everywhere. chips is the last component
+      // of headers!" `headerExtra` maps to `RecordChrome`'s `hero` prop,
+      // which the kit draws in its own `data-record-region="hero"` block —
+      // directly under the header block that carries the chips, still above
+      // the tab strip, so on the rendered page it reads as more content
+      // under the pills exactly as the ruling describes. The stepper stops
+      // being a text duplicate the moment it's a stepper, and the ruling
+      // says so anyway: "it doesn't matter whether the information is a
+      // duplicate or not." The app/ticket links are not shown anywhere else
+      // on this screen (confirmed against `overviewItems`, which has no App
+      // or Ticket row) — dropped from the header per this explicit ruling,
+      // not carried anywhere else; a reader can still reach the app from the
+      // Sprint the story links to, and the ticket from Tickets.
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: story.createdByName,
+        createdAt: story.createdAt,
+        editedByName: story.editedByName,
+        updatedAt: story.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("work", "create") ? activity.addNote : undefined}
+      notePlaceholder={notePlaceholder}
     >
 
       <TabsView
@@ -408,7 +421,13 @@ export function StoryDetailScreen({
               />
             )
           if (t.value === "activity")
-            return <ActivityPanel activity={activity} />
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("work", "create") ? activity.addNote : undefined}
+                notePlaceholder={notePlaceholder}
+              />
+            )
           // `work:edit`, which is what BOTH attachment doors gate on — not the
           // read right the ticket's panel takes, and not `canLogTime`. A button
           // drawn on a wider right is a button whose every press is a 403.
@@ -425,16 +444,6 @@ export function StoryDetailScreen({
               <OverviewList items={overviewItems} />
             </>
           )
-        }}
-      />
-
-      {/* D7 / CHECKLIST 11.3, the audit line, grey, at the foot of the record. */}
-      <RecordFooter
-        audit={{
-          createdByName: story.createdByName,
-          createdAt: story.createdAt,
-          editedByName: story.editedByName,
-          updatedAt: story.updatedAt,
         }}
       />
 

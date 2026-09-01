@@ -25,6 +25,7 @@ import { accountScopeClause, appScopeClause, requireAccountInScope, type Account
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
+import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 import { APP_MODULE_CAP, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -208,6 +209,7 @@ export async function listApps(
   const [rows, counted] = await Promise.all([
     d1Query<{
       id: string
+      ref: string | null
       account_id: string | null
       name: string
       url: string | null
@@ -232,7 +234,7 @@ export async function listApps(
       // laziness: the apps set is bounded and read whole, the detail screen reads
       // the record out of the same cache the list filled, and a second door for
       // four columns would be a round trip that buys a page nothing.
-      `SELECT id, account_id, name, url, stage, logo_url, tool_cost_cents_per_month,
+      `SELECT id, ref, account_id, name, url, stage, logo_url, tool_cost_cents_per_month,
               about, client_context, solution, key_actors, deactivated_at,
               created_at, creator_name, updated_at, editor_name
          FROM apps${sql} ORDER BY (deactivated_at IS NULL) DESC, name ASC LIMIT ${LIST_HARD_CAP}`,
@@ -295,6 +297,10 @@ export async function listApps(
       const canSeeCost = admin || staffedIds.has(r.id)
       return {
         id: r.id,
+        // THE NUMBER A PERSON READS OFF THE HEADER'S BLACK CHIP (record-chrome.tsx).
+        // Rides for everyone, same as the name and the logo above it — it is not
+        // an internal figure the way the cost below it is.
+        ref: r.ref,
         accountId: r.account_id,
         name: r.name,
         url: canOpen ? r.url : null,
@@ -642,8 +648,14 @@ export async function createApp(
 ): Promise<string> {
   if (input.accountId) requireAccountInScope(scope, input.accountId)
   const id = ulid()
+  // TEAM-wide, unconditionally (shared/workers/refs.ts) — unlike a ticket's or
+  // a meeting's, an app's reference never carried "the number a client
+  // quotes" meaning, so it is not gated on `accountId`: the agency's own
+  // systems get one exactly like a client's does.
+  const ref = await nextTeamRef(cfg, guard, TEAM_REF_KINDS.app)
   await insertRow(cfg, guard, "apps", {
     id,
+    ref,
     account_id: input.accountId ?? null,
     name: input.name,
     url: input.url ?? null,
@@ -1020,7 +1032,7 @@ export async function updateAppModule(
   if (!changed[0]) throw new GuardError(404, "not_found", "That module doesn't exist.")
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
-    { label: "Emoji", from: before.mark, to: mark },
+    { label: "Mark", from: before.mark, to: mark },
     { label: "German name", from: before.nameDe, to: nameDe },
     { label: "Description", from: before.description, to: description, hideValues: true },
     { label: "Benefit", from: before.benefit, to: benefit, hideValues: true },

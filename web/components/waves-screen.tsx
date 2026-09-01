@@ -50,7 +50,7 @@ import {
   waveQueryIsActive,
   type WaveQuery,
 } from "@/components/wave-finder"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { InAppLink } from "@/components/in-app-link"
 import { WaveFormDialog } from "@/components/wave-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -62,14 +62,19 @@ import type { Wave } from "@shared/waves"
 import { formatDate } from "@shared/web/format"
 import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import type { Language } from "@shared/i18n"
 
 /** WHEN A PACKAGE RUNS, from the two dates the door derived — or the sentence
  * that says nobody has planned it yet, which is an ordinary state and not a gap:
  * "Alex sells the wave, sprints get planned afterwards." */
-export function waveDates(wave: { startsOn: string | null; endsOn: string | null }, t: (s: string) => string): string {
-  if (wave.startsOn && wave.endsOn) return `${formatDate(wave.startsOn)} → ${formatDate(wave.endsOn)}`
-  return formatDate(wave.startsOn) || formatDate(wave.endsOn) || t("No sprints planned yet")
+export function waveDates(
+  wave: { startsOn: string | null; endsOn: string | null },
+  t: (s: string) => string,
+  lang: Language
+): string {
+  if (wave.startsOn && wave.endsOn) return `${formatDate(wave.startsOn, lang)} → ${formatDate(wave.endsOn, lang)}`
+  return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No sprints planned yet")
 }
 
 /** Page one of the team's waves, priming the exact server total the heading
@@ -102,7 +107,7 @@ export function WaveCollection({
    * filter is not offered because it has already been answered */
   accountId?: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { can } = usePermissions(teamId)
   // A wave is a package of SPRINTS, so it is the work engine's module — the same
   // right that lets somebody start a sprint. The doors gate; this only decides
@@ -191,25 +196,41 @@ export function WaveCollection({
           the same figure saying two different things. */}
       {accountId ? null : <CollectionHeading sectionKey="waves" total={total} />}
 
-      <SectionWithCreate
-        show={canCreate && clients.length > 0}
-        label={t("Sell a wave")}
-        icon="plus"
-        onCreate={() => setAddOpen(true)}
-        aboveCard={
-          /* Only once there is something to look through. A search box over an
-             empty collection is a control that cannot do anything. */
-          all.length > 0 ? (
+      {/* THE CANONICAL SHAPE — title, then ONE card holding the toolbar and
+          the rows, with "Sell a wave" at the FAR RIGHT of the toolbar's own
+          first line rather than a row of its own above it (client ruling,
+          2026-08-31: an action button never gets a separate row from the
+          toolbar it belongs to). This screen has no tab strip (single-view,
+          like Roles and Processes), so the toolbar is the first thing inside
+          the card. */}
+      <CollectionCard>
+        {all.length > 0 ? (
+          // Only once there is something to look through — a search box over
+          // an empty collection is a control that cannot do anything, so the
+          // button falls back to a bare `<ToolbarRow>` below instead.
+          <div className="mb-4">
             <WaveFinder
               query={query}
               onChange={setQuery}
               clients={clients}
               showClientFilter={!accountId}
               resultCount={rows.length}
+              actions={
+                canCreate && clients.length > 0 && (
+                  <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
+                )
+              }
             />
-          ) : undefined
-        }
-      >
+          </div>
+        ) : (
+          canCreate &&
+          clients.length > 0 && (
+            <ToolbarRow
+              className="mb-4"
+              actions={<AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />}
+            />
+          )
+        )}
         {rows.length === 0 ? (
           <p className="text-muted-foreground py-4 text-sm">
             {asking
@@ -219,7 +240,7 @@ export function WaveCollection({
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((w) => (
-              <li key={w.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
+              <li key={w.id} className="bg-surface-panel flex flex-wrap items-center gap-3 rounded-[var(--radius)] p-3">
                 {/* R35 — a record never appears without its face. A wave has no
                     picture of its own, so this is its initial. */}
                 <RecordMark name={w.name} />
@@ -230,7 +251,7 @@ export function WaveCollection({
                   <p className="text-muted-foreground truncate text-xs">
                     {[
                       w.accountName,
-                      waveDates(w, t),
+                      waveDates(w, t, lang),
                       w.sprintCount === 1 ? t("1 sprint") : `${w.sprintCount} ${t("sprints")}`,
                     ]
                       .filter(Boolean)
@@ -238,10 +259,12 @@ export function WaveCollection({
                   </p>
                 </div>
                 {w.active ? null : <Badge variant="secondary">{t("Switched off")}</Badge>}
+                {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
+                    "edit, only the pencil icon") — no more `sm:not-sr-only`
+                    reveal. */}
                 {canEdit ? (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(w)} className="gap-1">
-                    <Pencil className="size-3.5" aria-hidden />
-                    <span className="sr-only sm:not-sr-only">{t("Edit")}</span>
+                  <Button variant="ghost" size="icon" onClick={() => setEditing(w)} aria-label={t("Edit")}>
+                    <Pencil className="size-3.5" />
                   </Button>
                 ) : null}
                 {canEdit && w.active ? (
@@ -275,7 +298,7 @@ export function WaveCollection({
             ))}
           </ul>
         )}
-      </SectionWithCreate>
+      </CollectionCard>
 
       <WaveFormDialog
         open={addOpen}

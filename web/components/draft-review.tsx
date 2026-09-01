@@ -323,7 +323,7 @@ function Group({ title, count, children }: { title: string; count: number; child
         <h4 className="text-sm font-medium">{title}</h4>
         <Badge variant="secondary">{count}</Badge>
       </div>
-      <ul className="divide-border divide-y rounded-[var(--radius)] border">{children}</ul>
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">{children}</ul>
     </div>
   )
 }

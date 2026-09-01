@@ -83,6 +83,22 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   accounts: [
     { field: "archived", label: "Archived", options: YES_NO },
   ],
+  // TICKETS' OWN "Archived" — the exact Accounts/Processes shape, one door
+  // parameter later. The client's 2026-08-31 ruling ("there can never be 2 rows
+  // of tabs … just never") retired the tickets screen's OUTER strip (All
+  // tickets / Archived), which used to be a second folder tab stacked on the
+  // kind/stage strip beneath it. Archived was always a VIEW orthogonal to kind
+  // and stage — an archived ticket can be any type, at any stage — so it moves
+  // here rather than into the remaining tab row, the same way Accounts' own
+  // archive toggle sits beside its Companies/All tab rather than inside it. The
+  // one difference from Accounts' `archived` is the WORD the door already
+  // matches: `workers/content/src/routes/help.ts` calls it `view`
+  // (`"live" | "archived"`), never `archived`, so the field says what the door
+  // actually reads rather than copying a sibling screen's spelling.
+  help: [{ field: "view", label: "Archived", options: [
+    { value: "live", label: "No" },
+    { value: "archived", label: "Yes" },
+  ] }],
   knowledge: [
     // WHAT A SOURCE IS. A closed vocabulary — the door allow-lists it against
     // KNOWLEDGE_KINDS — so every kind is offered whether or not one happens to
@@ -144,6 +160,37 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     { field: "assigneeId", label: "Who has it" },
     { field: "sprintId", label: "Sprint" },
     { field: "appId", label: "App" },
+  ],
+  workLogs: [
+    // WHO LOGGED IT — a facet over rows, filled in from the team's own staff
+    // (useAssignableMembers already excludes a client login: R21 refuses one at
+    // this door outright, so a client never belongs in this list).
+    { field: "userId", label: "Who logged it" },
+    // WHAT KIND OF WORK — the door's own allow-list (WORK_LOG_TARGETS,
+    // workers/content/src/lib/work-logs.ts), in the glossary's own words for
+    // each (Story, Ticket, Task, Meeting) rather than the table name.
+    {
+      field: "targetTable",
+      label: "Kind of work",
+      options: [
+        { value: "stories", label: "Story" },
+        { value: "help", label: "Ticket" },
+        { value: "tasks", label: "Task" },
+        { value: "meetings", label: "Meeting" },
+      ],
+    },
+    // WHEN — a closed window rather than a free-form date range: nothing on
+    // either front door draws a date-range picker, and three rolling windows are
+    // the actual question a timesheet gets asked ("what have I logged lately?").
+    {
+      field: "period",
+      label: "When",
+      options: [
+        { value: "7d", label: "Last 7 days" },
+        { value: "30d", label: "Last 30 days" },
+        { value: "90d", label: "Last 90 days" },
+      ],
+    },
   ],
 }
 

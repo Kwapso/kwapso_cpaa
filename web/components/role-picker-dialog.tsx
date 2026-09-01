@@ -107,7 +107,7 @@ export function RolePickerDialog({
             <Label
               key={r.id}
               htmlFor={`role-${r.id}`}
-              className="hover:bg-muted/50 flex items-start gap-2 rounded-[var(--radius)] border p-3 motion-hover"
+              className="hover:bg-muted/50 flex items-start gap-2 rounded-[var(--radius)] bg-surface-panel p-3 motion-hover"
             >
               <RadioGroupItem
                 id={`role-${r.id}`}

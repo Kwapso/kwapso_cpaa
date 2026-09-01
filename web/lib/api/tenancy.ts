@@ -372,6 +372,19 @@ export const tenancy = {
       }`
     ),
 
+  /** Add a note to one record's history — the write half of `recordActivity`
+   * above, same (table, id) shape and the same gate map. Gated server-side by
+   * that module's CREATE right, and always refused for a portal caller
+   * (ch27.8: internal notes never reach the client portal). Answers `{ ok }`
+   * rather than the new row: the record's activity feed refreshes through the
+   * SAME live-sync ping every other edit on it already publishes, so there is
+   * nothing here for a caller to prime a cache with. */
+  addNote: (table: string, id: string, note: string) =>
+    api<{ ok: true }>("/api/tenancy/activity/note", {
+      method: "POST",
+      body: JSON.stringify({ table, id, note }),
+    }),
+
   /** The active team's Overview metadata (created by/when, last updated). */
   teamMeta: () => api<TeamMeta>("/api/tenancy/team-meta"),
 

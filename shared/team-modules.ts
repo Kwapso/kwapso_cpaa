@@ -157,7 +157,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // contact completes theirs and uploads a file against it from the portal
   // (SCOPE ch.06, one of the six things a contact can do), so an owner grants
   // `todos: read + edit` to their Client role and grants nothing else.
-  todos: "To-dos",
+  todos: "Inputs",
   // MEETINGS. A record of a conversation — when it was, why we met, what was on
   // the agenda and what was decided. AGENCY material: the notes are ours, taken
   // for us, and often about the client rather than for them, so every door on it

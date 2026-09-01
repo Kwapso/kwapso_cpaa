@@ -43,6 +43,12 @@ export type SessionUser = {
    * between devices, and because the viewport is locked against pinch-zoom this
    * is the only way anybody can make the app bigger (UI-RULEBOOK S4, S5). */
   scale: string | null
+  /** WHICH SPINE THE SIDEBAR IS PAINTED IN — ink, paper or mango
+   * (shared/spine.ts). Null means never chosen, which reads as paper — kept
+   * distinct from a deliberate choice of paper for the same reason `scale`
+   * is. It sits on the session rather than in one browser's storage so it
+   * follows the person between devices, exactly as `scale` does. */
+  spine: string | null
 }
 
 /** One team as the tenancy worker lists them for the signed-in person. */
@@ -1095,6 +1101,12 @@ export type AppMoneyBack = {
 /** An App: the built system, the thing with its own address (SCOPE ch.02). */
 export type AppRow = {
   id: string
+  /** THE NUMBER A PERSON READS OFF THE HEADER'S BLACK CHIP — "A3", team-wide,
+   * minted the moment the app is created (shared/workers/refs.ts). New as of
+   * the 2026-08-31 ruling: an app never carried one before. Null on every app
+   * that existed before that migration landed — there is nothing to mint one
+   * FROM after the fact. */
+  ref: string | null
   /** whose system it is; null is the agency's own */
   accountId: string | null
   name: string

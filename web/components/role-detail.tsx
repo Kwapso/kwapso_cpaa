@@ -30,7 +30,7 @@ import {
   PermissionMatrix,
   type PermissionRight,
 } from "@shared/ui/components/permission-matrix/permission-matrix"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
 import { Badge } from "@shared/ui/components/badge/badge"
@@ -40,7 +40,7 @@ import { RoleFormDialog } from "@/components/role-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chrome"
+import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
 import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
@@ -203,7 +203,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "permissions", label: t("Access rights"), icon: "shield-check", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
@@ -223,28 +223,58 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       // same square every other record's picture or glyph sits in
       // (shared/web/record-mark.tsx).
       leading={<RecordMark name={role.title} size="band" />}
-      // D4 + N4: the eyebrow says WHAT THIS IS, and one thing about its state.
-      // It used to read `Role · Locked · Inactive` — a type plus two states on
-      // one band, which is three units before the title has been read. The two
-      // states are mutually exclusive in practice (a locked role is a seeded
-      // one and a seeded one is never switched off), so the eyebrow carries
-      // whichever applies and never both.
-      collectionLabel={t("Role")}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `role`), client ruling 2026-08-31.
+      eyebrow={t("Role")}
+      // D4 + N4: the chip row says one thing about the role's state, never
+      // the type word again — client correction, 2026-08-31, verbatim: "now
+      // it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to also
+      // carry `collectionLabel={t("Role")}`, repeating the eyebrow above as a
+      // second chip — the same systemic mistake, found here too. It used to
+      // read `Role · Role · Locked · Inactive`, which is worse than the
+      // `Role · Locked · Inactive` this comment already flagged as three
+      // units before the title. The two states are mutually exclusive in
+      // practice (a locked role is a seeded one and a seeded one is never
+      // switched off), so the row carries whichever applies and never both.
       chips={
-        role.active ? (role.isDefault ? <Badge>{t("Locked")}</Badge> : null) : <Badge>{t("Inactive")}</Badge>
+        role.active ? (
+          role.isDefault ? (
+            <Badge>{t("Locked")}</Badge>
+          ) : null
+        ) : (
+          <Badge variant="status" dot="archived">
+            {t("Inactive")}
+          </Badge>
+        )
       }
       title={role.title}
-      status={
-        role.description || `${role.memberCount} member${role.memberCount === 1 ? "" : "s"}`
-      }
+      // THE DESCRIPTION/MEMBER-COUNT LINE IS GONE — CLIENT RULING,
+      // 2026-08-31, VERBATIM: "what is this 3rd component in the title under
+      // the chips? kill everywhere. chips is the last component of
+      // headers!" `status` mapped to `RecordChrome`'s `meta`, drawn directly
+      // under the chips row (`data-record-region="header"`). Not lost: both
+      // facts are already rows in the Overview tab (`overviewItems`:
+      // "Description", "Members with this role").
       actions={
+        // ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon").
         canSave ? (
-          <Button variant="secondary" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1">
+          <Button variant="secondary" size="icon" onClick={() => setEditingOpen(true)} aria-label={t("Edit details")}>
             <Pencil className="size-3.5" />
-            {t("Edit details")}
           </Button>
         ) : undefined
       }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: role.createdByName,
+        createdAt: role.createdAt,
+        editedByName: role.editedByName,
+        updatedAt: role.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("member_roles", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}
@@ -255,11 +285,17 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
           if (panel.value === "activity")
-            return <ActivityPanel activity={activity} />
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("member_roles", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           // Permissions — the main tab.
           return !role.active ? (
             // Deactivated: permissions frozen (holders keep access); offer reactivate.
-            <div className="border-border/60 flex flex-col gap-4 rounded-[var(--radius)] border p-6">
+            <div className="bg-surface-panel flex flex-col gap-4 rounded-[var(--radius)] p-6">
               <p className="text-muted-foreground text-sm">
                 {t("This role is deactivated. Members who have it keep their access, but you can't give it to anyone new until you activate it again.")}
               </p>
@@ -368,14 +404,6 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    <RecordFooter
-        audit={{
-          createdByName: role.createdByName,
-          createdAt: role.createdAt,
-          editedByName: role.editedByName,
-          updatedAt: role.updatedAt,
-        }}
-      />
     </RecordScreen>
   )
 }

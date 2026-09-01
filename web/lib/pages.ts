@@ -11,26 +11,103 @@ export type NavItem = {
   title: string
   icon: "home" | "settings" | "kwapso"
   need?: { module: string; right: "read" }
-  /** Which half of the rail it sits in — see NavGroup below. */
-  group: NavGroup
+  /** Which section of the rail it sits under — see NavGroup below. `"none"` is
+   * a destination the rail draws with NO heading above it at all (not an empty
+   * one — Rail's own group heading is a clickable disclosure control, so an
+   * item that wants no section cannot be a group with a blank label). It is a
+   * REQUIRED, explicit choice for the same reason the two-bucket version was:
+   * a destination nobody decided about should not default into a section by
+   * accident. */
+  group: NavGroup | "none"
+  /** Whether this destination renders in the rail (and the mobile bottom bar /
+   * "everything else" sheet) at all. Defaults to true. Settings and Kwapso are
+   * the two exceptions (client feedback, 31 Aug 2026): both pages are
+   * unchanged and still reachable, just not FROM the rail — `ProfileMenu` is
+   * the one door to both now, so the app's own admin material sits with the
+   * account menu instead of taking a row (or a whole section) beside the
+   * team's own work. */
+  inRail?: boolean
 }
 
-/** THE RAIL HAS TWO HALVES, with a divider between them (the owner's ruling, and
- * he rejected both alternatives put to him: "keep it under nine" would have hidden
- * real destinations behind a More, and "show everything flat" is the fourteen-item
- * wall this replaces).
+/** THE RAIL IS THREE NAMED SECTIONS, PLUS ONE DESTINATION OUTSIDE ALL OF THEM
+ * (client feedback, 31 Aug 2026 — superseding the two-bucket "daily/occasional"
+ * split below the divider that shipped 13 Aug 2026). The client's own words,
+ * verbatim: "My work: today, tasks, meetings / build: Apps, sprints, stories /
+ * accounts: accounts, contacts / kwapso, welcome have no section."
  *
- *   • "daily"      — what somebody opens most days: the work in hand, what clients
- *                    have asked for, who they are, and our own admin.
- *   • "occasional" — what somebody opens when they need it: the blocks work was
- *                    sold in, the systems it runs on, the maps, and the material.
+ *   • "my-work"  — the work a person actually does most days: the team's own
+ *                  admin, what clients have asked for, and when they're meeting.
+ *   • "build"    — the systems being built and the blocks that work was sold
+ *                  inside: apps, sprints, the backlog, the packages they sit in.
+ *   • "accounts" — who the team works with.
  *
- * The grouping is a fact about a destination, so it lives beside the destination
- * rather than in the shell — the shell just draws whatever the registry says. */
-export type NavGroup = "daily" | "occasional"
+ * Home carries `group: "none"` instead of one of the three — see `NavItem.group`.
+ * The grouping is still a fact about a destination, living beside the
+ * destination rather than in the shell.
+ *
+ * "TODAY" AND "WELCOME," RECONCILED AGAINST THE REAL DATA. The client's two
+ * words map to the app's ONE landing screen ("Home" — `web/components/screens/
+ * home-screen.tsx`, no separate "Today" or "Welcome" page exists anywhere in
+ * the codebase; `shared/i18n-strings.json` carries no "Welcome" string at all).
+ * "Welcome" is read as Home here: it is the rail's one remaining standalone
+ * entry, the same anchor the client's own screenshot showed it as. "Today" is
+ * therefore NOT a second, duplicated Home entry inside My work — the rail's
+ * own dedupe (`web/test/nav.test.ts`, "a destination appears twice on the
+ * rail") treats showing one destination under two labels as the bug it would
+ * be for a person clicking around. FLAGGED, not guessed past: if "Today" was
+ * meant to be Home MOVING into My work rather than Home being called "Welcome"
+ * and staying put, that's a one-line change once confirmed.
+ *
+ * KWAPSO GOT A FOURTH NAMED SECTION AND LOST IT AGAIN, THE SAME DAY. The
+ * client asked for one ("create a new section called kwapso, pages inside
+ * (under): team, branding. put this section the last one") and, later on 31
+ * Aug 2026, reversed it in as many words: "remove the whole kwapso section
+ * from the sidebar and move with your profile and settings." So the section,
+ * its heading and its three rows (Details · Team · Branding) are gone from
+ * the rail — not folded into one of the three sections above, because the
+ * client's own instruction names where they go instead, and it isn't a rail
+ * section. See `ProfileMenu` (web/components/profile-menu.tsx) for where the
+ * three destinations live now: one "Kwapso" entry landing on `/kwapso`'s own
+ * default tab, the same shape Settings already has in this menu —
+ * `KwapsoScreen`'s own tab strip (Details · The team · Brand library) is how
+ * Team and Branding stay reachable without a second and third menu row each.
+ *
+ * CONTACTS HAD NO FIRST-CLASS PAGE, until the client answered the question
+ * this note used to flag: "contacts as a real sidebar page, also remove the
+ * tab from inside accounts" (31 Aug 2026). It is a rail destination now — its
+ * own `contacts` module (`MODULE_PERMISSION`), its own recipe
+ * (`contacts.list`, screens.ts), the SAME `contacts:read` right the
+ * account-scoped tab it replaces already checked. See the `contacts` entry
+ * below for the whole of it.
+ *
+ * THE UNNAMED SIDEBAR PAGES (Knowledge base, Tickets, Work logs, Waves) were
+ * not in the client's list. They keep the closest reading of their old half:
+ * the three daily ones join My work, and Waves — the shelf a sprint sits
+ * inside — joins Build beside Apps and Sprints. */
+export type NavGroup = "my-work" | "build" | "accounts"
+
+/** Render order for the rail's three named sections — a second, independent
+ * fact from which section a destination is IN (`NavGroup`), so reordering the
+ * sections themselves is a one-line change here rather than a reshuffle of
+ * every entry's `group`. */
+export const NAV_GROUP_ORDER: readonly NavGroup[] = ["my-work", "build", "accounts"]
+
+/** The heading each section draws — the application's word, per `RailGroup.heading`. */
+export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
+  "my-work": "My work",
+  build: "Build",
+  accounts: "Accounts",
+}
 
 export const NAV: NavItem[] = [
-  { slug: "home", path: "/home", title: "Home", icon: "home", group: "daily" },
+  // STANDALONE — no section heading above it (see NavGroup). The client's
+  // "Welcome"; see the note on NavGroup for why this is Home and not a second,
+  // duplicated entry.
+  // OFF THE RAIL (client, 31 Aug 2026): "rename home to welcome. remove home
+  // from navbar, make that when we click the icon kwapso on top of sidebar it
+  // takes us there." Not deleted — the route and screen stand, reached from
+  // the brand mark instead of a rail row, same pattern `settings` uses below.
+  { slug: "home", path: "/home", title: "Welcome", icon: "home", group: "none", inRail: false },
   // THE AGENCY ITSELF, as a destination (CHECKLIST 10.1, 17 Aug 2026). Who we
   // are: the material we make our own work with, the people who make it, and the
   // details that go on a contract. "As a business owner you use this all the
@@ -38,15 +115,27 @@ export const NAV: NavItem[] = [
   // Settings — Settings is where you change how the app behaves, and none of
   // this is a setting.
   //
-  // A NAV ENTRY RATHER THAN A TEAM SECTION, deliberately. It is gated by no
-  // module of its own: every person in the team may look up the company's phone
-  // number. What is INSIDE it is gated panel by panel — the brand library on
-  // `brand_assets:read`, the people on `team_members:read`, and editing the
-  // legal details on `teams:edit` — so a role sees exactly the parts it holds
-  // and the page never becomes a permission of its own that somebody has to
-  // remember to grant.
-  { slug: "kwapso", path: "/kwapso", title: "Kwapso", icon: "kwapso", group: "occasional" },
-  { slug: "settings", path: "/settings", title: "Settings", icon: "settings", group: "occasional" },
+  // OFF THE RAIL, THE SAME DAY IT WENT ON (client, 31 Aug 2026). It was a NAV
+  // entry rather than a team section from the start — gated by no module of
+  // its own, since every person in the team may look up the company's phone
+  // number, with everything INSIDE it gated panel by panel instead (the brand
+  // library on `brand_assets:read`, the people on `team_members:read`, editing
+  // the legal details on `teams:edit`) — and it briefly grew into its own
+  // three-row rail SECTION (Details · Team · Branding, one per tab on
+  // `KwapsoScreen`) before the client reversed that in the same breath as
+  // Settings: "remove the whole kwapso section from the sidebar and move with
+  // your profile and settings." So this is one entry again, landing on the
+  // page's own default tab — `ProfileMenu` (web/components/profile-menu.tsx)
+  // is the door now, exactly the shape `settings` below already has, and the
+  // page's own tab strip (Details · The team · Brand library) is how the
+  // other two stay reachable without a second and third row in this menu.
+  { slug: "kwapso", path: "/kwapso", title: "Details", icon: "kwapso", group: "none", inRail: false },
+  // OFF THE RAIL (client, 31 Aug 2026: "remove settings from navbar, this is
+  // only accessible through clicking profile"). The page and the route are
+  // unchanged — `ProfileMenu` (web/components/profile-menu.tsx) is the one door
+  // to it now. `group` is unused while `inRail` is false; kept a real value
+  // rather than a cast so the field is never accidentally read as "unset".
+  { slug: "settings", path: "/settings", title: "Settings", icon: "settings", group: "none", inRail: false },
 ]
 
 /** How many slots the phone's bottom bar has. Five is what a thumb can hit
@@ -99,6 +188,7 @@ export type TeamSection = {
     // record, because the question is always about one client (R24 · SCOPE).
     | "internal-rates"
     | "accounts"
+    | "contacts"
     | "tickets"
     | "knowledge"
     | "processes"
@@ -116,8 +206,8 @@ export type TeamSection = {
     | "stories"
     | "tasks"
     // MEETINGS — a section of its own, which is what the owner asked for. It sits
-    // in `daily` beside Stories and Tasks: a calendar is something somebody opens
-    // before their first call, not an inventory they consult twice a year.
+    // in `my-work` beside Tasks: a calendar is something somebody opens before
+    // their first call, not an inventory they consult twice a year.
     | "meetings"
     // The agency's own housekeeping. The brand library is a sidebar page rather
     // than an admin tab: it is somebody's actual work, not a setting. Meeting
@@ -143,9 +233,10 @@ export type TeamSection = {
    * the same rows the screen shows and can never be forgotten (LAW R8). Absent on
    * metadata/non-collection tabs (Overview) and non-tab destinations (Import). */
   countCacheKey?: string
-  /** Which half of the sidebar rail this destination sits in. Required on every
-   * `placement: "sidebar"` section and meaningless on the others — a tab is not
-   * in the rail at all, and a contextual page is reached from a button. */
+  /** Which of the rail's three named sections this destination sits in.
+   * Required on every `placement: "sidebar"` section and meaningless on the
+   * others — a tab is not in the rail at all, and a contextual page is reached
+   * from a button. */
   group?: NavGroup
 }
 
@@ -155,9 +246,18 @@ export const TEAM_SECTIONS: TeamSection[] = [
   { key: "members", title: "Members", module: "team_members", segment: "members", placement: "tab", countCacheKey: "members" },
   { key: "roles", title: "Member roles", module: "member_roles", segment: "roles", placement: "tab", countCacheKey: "member_roles" },
   { key: "invites", title: "Invites", module: "team_members", segment: "invites", placement: "tab", countCacheKey: "invites" },
-  // Dropdown values ("selectable data") — managed on the team page, a tab beside
-  // the other admin sections. Gated by the selectable_data module.
-  { key: "dropdowns", title: "Dropdown values", module: "selectable_data", segment: "dropdowns", placement: "tab", countCacheKey: "selectable" },
+  // Choices ("selectable data", formerly "Dropdown values") — the team's own
+  // vocabulary. It lived as a tab beside the other admin sections until
+  // Settings grew real tabs of its own (2026-09-01): it is now the "Choices"
+  // tab on Settings, and `placement: "contextual"` (not "tab") is what takes
+  // it OFF the team area's own strip — the same treatment Import already
+  // gets, and for the same reason: this section is reached from a specific
+  // destination rather than switched to from every other team page. The
+  // segment/module/route stay exactly as they were (`/t/<teamId>/dropdowns`
+  // still resolves — a value's own detail address does not move under it),
+  // so nothing that already links here breaks; Settings' Choices tab is
+  // simply the one place that link is offered now.
+  { key: "dropdowns", title: "Choices", module: "selectable_data", segment: "dropdowns", placement: "contextual", countCacheKey: "selectable" },
   // Internal rates — gated on `commercials`, so a role without that read right
   // never sees the tab at all. The segment says `internal-rates` in full rather
   // than `rates`: an ambiguous URL is how somebody eventually wires the wrong
@@ -171,90 +271,105 @@ export const TEAM_SECTIONS: TeamSection[] = [
   //
   // ══ THE SIDEBAR ORDER IS THIS LIST'S ORDER ═══════════════════════════════
   // The shell composes Home, then these in the order they appear here, then
-  // Settings — and THEN partitions by `group`, drawing the divider between the
-  // two halves. So a page's place on the rail is two facts and no third: where
-  // its line sits in this list, and which group it declares. Moving a page is
-  // moving its line.
+  // Kwapso — and THEN partitions by `group`, drawing a heading over each named
+  // run (Home and Kwapso carry `group: "none"` and draw no heading at all: see
+  // `NavGroup` in this file). So a page's place on the rail is two facts and no
+  // third: where its line sits in this list, and which group it declares.
+  // Moving a page is moving its line.
   //
-  // The owner's sequence, fixed 13 Aug 2026:
-  //   daily       Home · Accounts · Knowledge base · Tickets · Stories · Tasks
-  //   occasional  Meetings · Apps · Sprints · Brand library · Settings
+  // THREE NAMED SECTIONS, client feedback 31 Aug 2026 — superseding the
+  // daily/occasional split fixed 13 Aug 2026 below (kept for the record; the
+  // sections it named no longer exist as headings, only as ordering history):
+  //   [was] daily       Home · Accounts · Knowledge base · Tickets · Stories · Tasks
+  //   [was] occasional  Meetings · Apps · Sprints · Brand library · Settings
   //
-  // Two pages changed halves with it. KNOWLEDGE BASE moved up into the daily
-  // set — it stopped being a library somebody consults and became the thing the
-  // team asks first, which is a different habit and belongs above the fold.
-  // MEETINGS moved down out of it: the meetings list is read when there is a meeting,
-  // not every morning.
+  // The new sequence, this list's real order:
+  //   My work   Tasks · Meetings · Knowledge base · Tickets · Work logs
+  //   Build     Apps · Sprints · Stories · Waves
+  //   Accounts  Accounts · Contacts
+  //   (none)    Home, Kwapso — see NAV in this file
+  //
+  // ACCOUNTS MOVED OUT OF THE DAILY SET into a named section of its own — the
+  // client's own word for the group is the same as the page's, which reads as
+  // one idea rather than two the way "occasional → Accounts" did. MEETINGS
+  // moved the other way, UP into My work: the client's explicit list ("My
+  // work: today, tasks, meetings") puts it beside Tasks, not beside Apps and
+  // Sprints. STORIES moved out of the old daily run to sit with the rest of
+  // the work engine in Build (the client's explicit order there is "Apps,
+  // sprints, stories" — this list's order IS that order, so the line moved
+  // rather than the client's sequence being re-derived some other way).
   //
   // FOUR PAGES LEFT THE RAIL on 17 Aug 2026 and only one of them lost anything.
   // Marketing and Learning were purged outright (the owner's ruling), Delivery
   // method's programmes were folded onto the sprint type, and PROCESS MAPS
   // stopped being a destination because a map is read inside the app it belongs
   // to — its screens and its records are all still here, reached from the app.
+  { key: "accounts", title: "Accounts", module: "accounts", segment: "accounts", placement: "sidebar", countCacheKey: "accounts", group: "accounts" },
+  // CONTACTS — every person linked into the customer spine, across every
+  // account, promoted to a real sidebar page (client, 31 Aug 2026: "contacts as
+  // a real sidebar page, also remove the tab from inside accounts" — see the
+  // note this entry replaces, below the old two-bucket history a few lines
+  // down). It was a tab on ONE account's own record (`account-detail.tsx`,
+  // `contacts:read`) until now; that tab is gone, and an account's Overview
+  // carries the same add/link/remove controls for ITS OWN people instead (see
+  // account-detail.tsx's own note on why).
   //
-  // Accounts — the companies and people the team works with (the customer spine,
-  // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
-  // setting. Its count is an exact server total (R16) keyed off the same
-  // `accounts:<teamId>` cache the list reads, so the badge and the rows agree.
-  { key: "accounts", title: "Accounts", module: "accounts", segment: "accounts", placement: "sidebar", countCacheKey: "accounts", group: "daily" },
+  // SAME module, SAME right, SAME door as before (`accounts`, narrowed to
+  // `type=individual`) — this is a second address for rows the app already
+  // fetched, not a new capability. Its count key is the SAME exact server total
+  // the old Companies/Contacts/All strip badged (`accounts-individual`),
+  // primed by the one `listFetch.accounts` read either page already makes.
+  { key: "contacts", title: "Contacts", module: "contacts", segment: "contacts", placement: "sidebar", countCacheKey: "accounts-individual", group: "accounts" },
+  // THE WORK ENGINE'S OWN ADMIN, first in My work per the client's explicit
+  // list ("My work: today, tasks, meetings" — Home/"today" is `NAV`'s
+  // standalone entry, not repeated here; see the note on `NavGroup`).
+  { key: "tasks", title: "Tasks", module: "work", segment: "tasks", placement: "sidebar", countCacheKey: "tasks", group: "my-work" },
+  // MEETINGS — the client's own list puts it beside Tasks, not beside Apps and
+  // Sprints: a calendar is something somebody opens before their first call,
+  // which is a My-work habit and not the occasional one it used to sit with.
+  { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "my-work" },
   // The knowledge base — what the assistant is allowed to read, and the one
   // screen where a person can see it, add to it, correct it and take something
   // out. Gated by its own module, so a role without it never sees the
-  // destination at all.
-  { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge", group: "daily" },
+  // destination at all. Not named in the client's list — kept in My work, the
+  // closest reading of the daily half it used to sit in.
+  { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge", group: "my-work" },
   // Tickets is the one place in this table where the URL segment is NOT the
   // permission module. The section, the page and the address bar say `tickets`,
   // because that is the word for the thing (glossary, SCOPE ch.02). The right the
   // server enforces is still `help`: it is the string sitting in every role's
   // permission sheet, in every team database, and renaming it would be a data
   // migration that could only ever take somebody's access away. `MODULE_PERMISSION`
-  // in lib/screens.ts is the one seam that translates between the two.
-  { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help", group: "daily" },
-  // ── THE WORK ENGINE, AS FOUR DESTINATIONS ────────────────────────────────
-  // Apps → Sprints → Stories, plus our own admin beside them. Each is a section
-  // AND a tab on the record above it, because the owner's comprehension answer
-  // on where a person starts looking was "it should not matter — all three
-  // should get her there". One path is a dead end in somebody's head; three are
-  // a product.
-  //
-  // Stories is the page that used to be called Work. The sprints moved out to a
-  // section of their own, so what is left on it is the backlog — and the word
-  // for that in the glossary is Story. The URL segment moved with the title
-  // rather than being kept for old links: nothing outside this app has ever
-  // linked to /work, and a segment that disagrees with its heading is a cost
-  // paid for ever (Tickets pays it because a permission STRING in every team's
-  // database is behind it — there is no such string here, the module is `work`
-  // either way).
-  //
-  // Stories and Tasks are daily. Sprints and apps are not: a sprint is a
-  // contract and an app is an inventory, and neither is opened before lunch.
-  { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "daily" },
-  { key: "tasks", title: "Tasks", module: "work", segment: "tasks", placement: "sidebar", countCacheKey: "tasks", group: "daily" },
-  // TIME — the fourth daily destination, and the one that had none.
-  //
-  // A work log is the row every figure in this app is eventually built on, and
-  // there was nowhere to go and look at one: the whole list lived in a panel at
-  // the FOOT of the Stories page, under the backlog, and a story's own Time tab
-  // showed the handful logged against that story. Both are the right place for
-  // what they do — a start button belongs beside the work, and a story's hours
-  // belong on the story — and neither is a place a person goes to find "the time
-  // I logged". A tester with 115 entries reported she could not find any of it.
+  // in lib/screens.ts is the one seam that translates between the two. Not named
+  // in the client's list — kept in My work for the same reason as Knowledge base.
+  { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help", group: "my-work" },
+  // TIME — a work log is the row every figure in this app is eventually built
+  // on, and there was nowhere to go and look at one until 24 Aug 2026: the whole
+  // list lived in a panel at the FOOT of the Stories page, under the backlog,
+  // and a story's own Time tab showed the handful logged against that story.
+  // Both are the right place for what they do — a start button belongs beside
+  // the work, and a story's hours belong on the story — and neither is a place
+  // a person goes to find "the time I logged". A tester with 115 entries
+  // reported she could not find any of it.
   //
   // "WORK LOGS", not "Time" (CHECKLIST 2.6). It was headed Time on the argument
   // that the glossary defines a work log as "one row of time" — but the glossary
   // TERM is `Work log`, and the story record's own tab had already moved to that
   // word, so the rail was the last screen calling one thing two names (Law R6).
   // The URL segment is deliberately left alone: `/time` is a link people have
-  // already sent each other, and a slug is not a word anybody reads.
-  // The count is the exact number of ROWS (R16), keyed off the same cache the
-  // list reads; the hours are a second, different number the screen says itself.
-  { key: "time", title: "Work logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "daily" },
-  // ── and below the divider ────────────────────────────────────────────────
-  { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "occasional" },
-  // Apps gate on `processes`, not `work`: an app is the thing a process
-  // hangs off, and the module that owns the App → Process → Step chain is the
-  // one whose right a person needs to see any of it.
-  { key: "apps", title: "Apps", module: "processes", segment: "apps", placement: "sidebar", countCacheKey: "apps", group: "occasional" },
+  // already sent each other, and a slug is not a word anybody reads. Not named
+  // in the client's list — kept in My work, the closest reading of daily.
+  { key: "time", title: "Work logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
+  // ── BUILD: the work engine's other three destinations, in the client's own
+  // explicit order ("build: Apps, sprints, stories") ──────────────────────────
+  // Apps → Sprints → Stories, plus our own admin above. Each is a section AND a
+  // tab on the record above it, because the owner's comprehension answer on
+  // where a person starts looking was "it should not matter — all three should
+  // get her there". One path is a dead end in somebody's head; three are a
+  // product. Apps gates on `processes`, not `work`: an app is the thing a
+  // process hangs off, and the module that owns the App → Process → Step chain
+  // is the one whose right a person needs to see any of it.
+  { key: "apps", title: "Apps", module: "processes", segment: "apps", placement: "sidebar", countCacheKey: "apps", group: "build" },
   // PROCESSES — App → Process → Step, and the value drilled through them.
   // CONTEXTUAL since 17 Aug 2026: the owner's ruling is that a process lives under
   // the APP it belongs to, and it is reached from that app's own screen. Nothing
@@ -267,11 +382,25 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // server total of the PROCESSES, keyed off the same `processes:<teamId>` cache
   // the list reads.
   { key: "processes", title: "Processes", module: "processes", segment: "processes", placement: "contextual", countCacheKey: "processes" },
+  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "build" },
+  // STORIES — the page that used to be called Work. The sprints moved out to a
+  // section of their own, so what is left on it is the backlog — and the word
+  // for that in the glossary is Story. The URL segment moved with the title
+  // rather than being kept for old links: nothing outside this app has ever
+  // linked to /work, and a segment that disagrees with its heading is a cost
+  // paid for ever (Tickets pays it because a permission STRING in every team's
+  // database is behind it — there is no such string here, the module is `work`
+  // either way). LAST in Build, per the client's explicit order ("Apps,
+  // sprints, stories") — moved out of the old daily/My-work run it shared with
+  // Tasks, since the client's own grouping puts it with the rest of the work
+  // engine rather than with the team's day-to-day admin.
+  { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "build" },
   // WAVES — what a client BOUGHT: a package of sprints. Its own destination
   // beside Sprints rather than a tab on one, because the question it answers is
   // "what did they buy?" and a sprint answers "what are we doing this fortnight?".
-  { key: "waves", title: "Waves", module: "work", segment: "waves", placement: "sidebar", countCacheKey: "waves", group: "occasional" },
-  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "occasional" },
+  // Not named in the client's Build list — kept beside Apps and Sprints, the
+  // closest reading of the occasional half it used to sit in.
+  { key: "waves", title: "Waves", module: "work", segment: "waves", placement: "sidebar", countCacheKey: "waves", group: "build" },
   // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
   // right so a role without it never sees the destination at all. Its count is
   // an exact server total (R16) keyed off the same cache the list reads, so the

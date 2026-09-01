@@ -1421,12 +1421,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_work_logs",
     summary:
-      "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, and `meetingTime`, 'exclude' drops the time spent in meetings, 'only' keeps nothing else, and leaving it off counts all of it. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, it is billable time, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+      "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, `meetingTime` ('exclude' drops the time spent in meetings, 'only' keeps nothing else, leaving it off counts all of it), `q` (matches who logged it and what it was against — the same search the Time screen's toolbar asks), and `period` ('7d', '30d' or '90d', a rolling window on when it was logged; leave it off for all time). `sort` ('started', the default, newest first; 'duration', longest first; 'person', alphabetically by who logged it) and `dir` ('asc' or 'desc') choose the order; leave `sort` off to keep the door's own default. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, it is billable time, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
-    schema: obj({ scope: S, targetTable: S, targetId: S, userId: S, meetingTime: S, cursor: S }),
+    schema: obj({
+      scope: S, targetTable: S, targetId: S, userId: S, meetingTime: S, q: S, period: S, sort: S, dir: S, cursor: S,
+    }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["scope", "targetTable", "targetId", "userId", "meetingTime", "cursor"])
+      for (const k of ["scope", "targetTable", "targetId", "userId", "meetingTime", "q", "period", "sort", "dir", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

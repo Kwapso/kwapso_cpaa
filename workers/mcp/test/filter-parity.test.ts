@@ -107,6 +107,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the forensic trail behind ONE invite (who sent it, when it was opened, when it was revoked). The invite's own state — email, role, status, id — is already machine-readable through list_invites; this is the strip a person reads on the invite's detail when something looks wrong.",
   "GET /api/tenancy/activity":
     "the cross-module history feed, and the one door whose answer is assembled by SUBTRACTING the caller's denied modules (R18). Everything it reports is readable through the module's own tools, with that module's own gate; putting the merged stream on the machine surface is a separate decision for the owner, not a parity default.",
+  "POST /api/tenancy/activity/note":
+    "the write half of the read above: a free-text note hung off one record's history, gated per the BODY's own `table` field rather than a fixed module (openTeam's own doc explains why). Wired tonight to give the kit's existing add-a-note field (CH27.8) a real door behind it for the first time — a person typing a note in the app's own footer, not a capability the assistant has been asked to exercise on someone's behalf yet. A generic 'leave a note on any record' tool is a real future option, but it is a scope call for the owner (same reasoning as the read side above), not something to default into the moment the door exists.",
   // THE TWO BADGE DOORS — one per worker, because the counting functions live
   // with the modules that own them. They exist to save a SCREEN round trips: a
   // record's tabs are badged when the record opens instead of when a tab is

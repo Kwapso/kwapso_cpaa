@@ -90,7 +90,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
           zero or merely incomplete: a partial figure that does not say what it
           left out reads as the whole answer, which is the same bug quieter. */}
       {unpriced.length > 0 && (
-        <div className="border-border/60 bg-muted/40 flex flex-col gap-4 rounded-[var(--radius)] border p-4">
+        <div className="bg-muted/40 flex flex-col gap-4 rounded-[var(--radius)] p-4">
           <p className="text-sm font-medium">
             {view.moneyCentsPerMonth === 0
               ? t("There is no money figure yet, and here is what it is waiting on.")
@@ -138,7 +138,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
 
       {/* WHERE IT COMES FROM, process by process — the same drill-down every
           other savings screen offers, with the role and its price added. */}
-      <ul className="divide-border divide-y rounded-[var(--radius)] border">
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {view.lines.map((line) => (
           <li
             key={line.processId}

@@ -176,7 +176,7 @@ import {
 } from "../dropdown-menu/dropdown-menu";
 import { Separator } from "../separator/separator";
 import { Spinner } from "../spinner/spinner";
-import { Tabs, TabsList, TabsTrigger } from "../tabs/tabs";
+import { Tabs, TabsCount, TabsList, TabsTrigger } from "../tabs/tabs";
 import { Title } from "../title/title";
 import { MoreHorizontal } from "../../foundations/icons";
 
@@ -549,8 +549,10 @@ export interface CollectionFrameTab {
   /** What the tab says. A node, so a count or an icon can ride along. */
   label: React.ReactNode;
   /**
-   * A count after the label. Drawn as CH14's quiet number — micro, tabular,
-   * tertiary ink — and NEVER as a `Badge` (override 45). Zero renders nothing.
+   * A count after the label, drawn by `TabsCount` — CH14's quiet number
+   * (micro, tabular, tertiary ink, never a `Badge`, override 45) when this
+   * frame's tabs are `folder`, or R-4a's asymmetric line count if a caller
+   * passes `tabsVariant="line"`. Zero renders nothing either way.
    */
   count?: number;
   /** Dead tab: a fill and an ink, never an opacity. */
@@ -1015,25 +1017,17 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
                     {/* OVERRIDE 45 (2026-08-23) — A TAB'S COUNT IS QUIET,
                         NEVER A BADGE. CH14, the folder chapter's own closing
                         law, verbatim: "counts are quiet, never badges." This
-                        strip shipped a `Badge` on every folder tab, which is
-                        a filled chip inside a tab shape — two boxes deep, and
-                        the one thing the chapter rules out by name.
-                        `tabs.tsx` already stated the replacement in
-                        `TabsTrigger`'s own doc — "a call site writes the
-                        number in `text-micro tabular-nums text-ink-tertiary`
-                        next to the label rather than reaching for `Badge`" —
-                        so nothing here is invented; the contract was written
-                        and this file was the one place not keeping it.
-                        `Badge`'s zero law survives the move: a count of zero
-                        or less renders nothing, never "0" (SHELL.md). */}
-                    {tab.count === undefined || tab.count <= 0 ? null : (
-                      <span
-                        data-slot="collection-frame-tab-count"
-                        className="text-micro tabular-nums text-ink-tertiary"
-                      >
-                        {tab.count}
-                      </span>
-                    )}
+                        strip used to shipped a `Badge` on every folder tab,
+                        which is a filled chip inside a tab shape — two boxes
+                        deep, and the one thing the chapter rules out by name.
+                        The quiet number this override fixed it to is now
+                        `TabsCount` itself (GAPS-RULINGS.md R-4a), so this
+                        frame's own hand-rolled span cannot drift from the
+                        contract a second time the way it drifted the first —
+                        `TabsCount` resolves the right shape for whichever
+                        `tabsVariant` this frame is passed, `folder`'s quiet
+                        number by default. */}
+                    <TabsCount count={tab.count} />
                   </TabsTrigger>
                 ))}
               </TabsList>

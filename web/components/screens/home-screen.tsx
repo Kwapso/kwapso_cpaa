@@ -28,6 +28,7 @@ import {
 import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
 import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/foundations/icons"
+import { Headline } from "@shared/ui/components/typography/typography"
 
 import { PulseBand } from "@/components/pulse"
 import { letterMark } from "@/lib/identity"
@@ -72,7 +73,10 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
           <AvatarFallback className="text-xl">{letterMark(ctx.team?.name)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-medium">{ctx.team?.name}</h1>
+          {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
+              is the kit's own named "Page title" step (56/500), see
+              collection-heading.tsx's own note for the full ruling. */}
+          <Headline as="h1" size="display-m" className="truncate">{ctx.team?.name}</Headline>
           <div className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
             {ctx.role && <Badge variant="secondary">{ctx.role.title}</Badge>}
             <span>
@@ -89,7 +93,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
 
       <List
         surface="none"
-        className="motion-panel-in rounded-[var(--radius)] border"
+        className="motion-panel-in rounded-[var(--radius)] bg-surface-panel"
         onItemClick={(item) => softNavigate(item.id)}
         items={[...LINKS, ...ADMIN].map((l) => {
           const Icon = l.icon

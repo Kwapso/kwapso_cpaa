@@ -54,7 +54,8 @@ import { formatRelative } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
 import { helpAttachmentsKey } from "@/lib/live-resources"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { useConfirm } from "@shared/web/use-confirm"
 
 /** WILL WE PUT THIS IN AN `href`? (The seam that answers it is `safeHref`; this
  * says which of ITS answers this screen also accepts.)
@@ -93,7 +94,7 @@ export function HelpAttachmentsPanel({
    * anybody else's. The owner ruled "never" on that, 27 Aug 2026. */
   canEdit: boolean
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = helpAttachmentsKey(ticketId)
   const listQ = useCached<HelpAttachment[]>(key, () =>
     contentApi.helpAttachments(ticketId).then((r) => {
@@ -106,19 +107,29 @@ export function HelpAttachmentsPanel({
   const [addingLink, setAddingLink] = React.useState(false)
   const [link, setLink] = React.useState({ label: "", url: "" })
   const [busy, setBusy] = React.useState(false)
+  // Taking a file off is the one destructive act in this list — one confirm
+  // dialog (shared/web/use-confirm.tsx); adding stays confirm-free.
+  const { ask: askRemove, dialog: removeDialog } = useConfirm()
 
   function keep(r: { attachments: HelpAttachment[]; total: number }) {
     primeCache(key, r.attachments)
     primeCache(`total:${key}`, r.total)
   }
 
-  async function run(what: () => Promise<{ attachments: HelpAttachment[]; total: number }>, done: string) {
+  /** Returns whether it worked, so a confirm dialog can stay open beside the
+   * message rather than closing as if it had happened. */
+  async function run(
+    what: () => Promise<{ attachments: HelpAttachment[]; total: number }>,
+    done: string
+  ): Promise<boolean> {
     setBusy(true)
     try {
       keep(await what())
       toast.success(done)
+      return true
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
+      return false
     } finally {
       setBusy(false)
     }
@@ -209,7 +220,7 @@ export function HelpAttachmentsPanel({
               {/* Wraps below `sm` so the filename keeps its width — the story
                 * panel's note carries the whole reason. */}
               <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
-                {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t)]
+                {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t, lang)]
                   .filter(Boolean)
                   .join(" · ")}
               </span>
@@ -218,7 +229,14 @@ export function HelpAttachmentsPanel({
                   variant="ghost"
                   size="sm"
                   disabled={busy}
-                  onClick={() => void run(() => contentApi.removeHelpAttachment(ticketId, a.id), "Taken off.")}
+                  onClick={() =>
+                    askRemove({
+                      title: t("Take {label} off this ticket?", { label: a.label }),
+                      body: t("There's no way to bring it back from here — attach it again if you need it."),
+                      action: t("Take it off"),
+                      run: () => run(() => contentApi.removeHelpAttachment(ticketId, a.id), t("Taken off.")),
+                    })
+                  }
                   className="text-destructive hover:text-destructive shrink-0 gap-1"
                   aria-label={t("Take it off")}
                 >
@@ -293,6 +311,8 @@ export function HelpAttachmentsPanel({
           )}
         </div>
       )}
+
+      {removeDialog}
     </div>
   )
 }

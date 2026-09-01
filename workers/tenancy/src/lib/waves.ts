@@ -49,6 +49,7 @@ import { accountScopeClause, type AccountScope } from "@shared/workers/account-s
 import { d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
 import { GuardError, type MemberGuard } from "./permissions"
 
@@ -115,6 +116,7 @@ function duplicateOr(e: unknown, name: string): unknown {
 
 type WaveRow = {
   id: string
+  ref: string | null
   account_id: string
   account_name: string | null
   name: string
@@ -129,7 +131,7 @@ type WaveRow = {
   editor_name: string | null
 }
 
-const WAVE_COLUMNS = `w.id, w.account_id, a.name AS account_name, w.name, w.goal,
+const WAVE_COLUMNS = `w.id, w.ref, w.account_id, a.name AS account_name, w.name, w.goal,
             w.starts_on, w.ends_on, w.deactivated_at,
             w.created_at, w.creator_name, w.updated_at, w.editor_name,
             (SELECT COUNT(*) FROM sprints s
@@ -138,6 +140,10 @@ const WAVE_COLUMNS = `w.id, w.account_id, a.name AS account_name, w.name, w.goal
 function toWave(r: WaveRow): Wave {
   return {
     id: r.id,
+    // THE NUMBER A PERSON READS OFF THE HEADER'S BLACK CHIP — "W1", team-wide,
+    // new as of the 2026-08-31 ruling (shared/workers/refs.ts). Null on every
+    // wave sold before that migration landed.
+    ref: r.ref,
     accountId: r.account_id,
     accountName: r.account_name,
     name: r.name,
@@ -362,6 +368,10 @@ export async function createWave(
   assertAccountInScope(scope, input.accountId)
   const id = ulid()
   const now = new Date().toISOString()
+  // TEAM-wide (shared/workers/refs.ts) — a wave always names an account
+  // (mandatory on this input), so there is no gating question here the way
+  // there is for a ticket or a meeting.
+  const ref = await nextTeamRef(cfg, guard, TEAM_REF_KINDS.wave)
   // THE UNIQUENESS RIDES THE WRITE (CONCURRENCY.md): a partial unique index over
   // the live rows means a duplicate name is refused by the database rather than
   // by a count-then-insert that two clicks can both pass.
@@ -369,8 +379,8 @@ export async function createWave(
     await d1Query(
       cfg,
       guard.databaseId,
-      `INSERT INTO waves (id, account_id, name, goal, ${AUDIT_CREATE})
-       VALUES (${sqlString(id)}, ${sqlString(input.accountId)}, ${sqlString(input.name)},
+      `INSERT INTO waves (id, ref, account_id, name, goal, ${AUDIT_CREATE})
+       VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(input.accountId)}, ${sqlString(input.name)},
                ${sqlString(input.goal)}, ${auditCreateValues(actor, now)})`
     )
   } catch (e) {

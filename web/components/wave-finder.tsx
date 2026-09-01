@@ -112,12 +112,22 @@ export function WaveFinder({
   /** Omit the client filter where the list is already one client's. */
   showClientFilter = true,
   resultCount,
+  actions,
 }: {
   query: WaveQuery
   onChange: (next: WaveQuery) => void
   clients: Account[]
   showClientFilter?: boolean
   resultCount?: number
+  /** THE ROW'S OWN ACTION BUTTONS ("Sell a wave"…), pinned to the far right of
+   * THIS toolbar's first line — the same `ml-auto` slot `<PagedFind>`'s own
+   * `actions` draws, so a bare collection's toolbar and a paged one's read as
+   * the same control in two places. Waves is the one bounded, single-view
+   * collection whose search/sort/filter is a component of its own rather than
+   * the frame's, so the button lives HERE, beside search and sort, instead of
+   * in a row of its own above this one (client ruling, 2026-08-31: an action
+   * button never gets a separate row from the toolbar it belongs to). */
+  actions?: React.ReactNode
 }) {
   const t = useT()
 
@@ -178,6 +188,7 @@ export function WaveFinder({
           onDirectionChange={(dir) => onChange({ ...query, dir })}
           label={t("Sort by")}
         />
+        {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
       <FilterBar
         facets={facets}

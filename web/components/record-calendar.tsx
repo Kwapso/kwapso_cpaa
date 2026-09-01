@@ -50,8 +50,8 @@ import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } f
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"
-import { useT } from "@shared/web/language"
-import type { Vars } from "@shared/i18n"
+import { useLanguage } from "@shared/web/language"
+import type { Language, Vars } from "@shared/i18n"
 
 /* ------------------------------- what it takes ---------------------------- */
 
@@ -114,11 +114,11 @@ function startOfMonth(d: Date): Date {
  * itself parses a bare `"2026-08-07"` as UTC midnight, which renders as 6 August
  * for everybody west of Greenwich. So the key is read as LOCAL parts first, and
  * a key that is not three numbers renders nothing rather than throwing. */
-function formatDayKey(key: string | null): string {
+function formatDayKey(key: string | null, lang: Language): string {
   if (!key) return ""
   const [y, m, d] = key.split("-").map(Number)
   if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return ""
-  return formatDate(new Date(y, m - 1, d).toISOString())
+  return formatDate(new Date(y, m - 1, d).toISOString(), lang)
 }
 
 /** The 42 squares a month grid draws: the Monday on or before the 1st, then six
@@ -247,7 +247,7 @@ export function RecordCalendar({
    * month — R14's failure mode, not this file's to reintroduce. */
   onMonthChange?: (month: string) => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isPhone = useIsPhone()
   // WHAT A PHONE OPENS ON. `null` means "nobody has chosen", so the answer keeps
   // following the device — rotate a phone into landscape and the grid arrives.
@@ -306,7 +306,7 @@ export function RecordCalendar({
   // the grid buckets them, handed to the kit's `Agenda` rather than drawn here.
   const agendaKitDays: AgendaDay[] = agendaDayKeys.map((day) => ({
     key: day,
-    label: `${formatDayKey(day)}${day === today ? ` · ${t("Today")}` : ""}`,
+    label: `${formatDayKey(day, lang)}${day === today ? ` · ${t("Today")}` : ""}`,
     items: (byDay.get(day) ?? []).map((e) => ({
       id: e.id,
       title: (
@@ -420,7 +420,7 @@ export function RecordCalendar({
       <Dialog open={openDay !== null} onOpenChange={(next) => !next && setOpenDay(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{formatDayKey(openDay)}</DialogTitle>
+            <DialogTitle>{formatDayKey(openDay, lang)}</DialogTitle>
           </DialogHeader>
           <DayRows
             entries={dayEntries}

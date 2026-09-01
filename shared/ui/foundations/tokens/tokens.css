@@ -1375,6 +1375,10 @@
   --spine-chip-fill:   var(--spine-paper-chip);
   --spine-mark-fill:   var(--surface-inverse);
   --spine-mark-ink:    var(--ink-on-inverse);
+  /* GAPS-RULINGS.md R-4d — the rail's own section-divider hairline. The paper
+     spine sits on soft paper like everything else that reads `--hair`, so it
+     takes that token unchanged. */
+  --spine-hair:        var(--hair);
 }
 
 [data-spine="ink"] {
@@ -1388,6 +1392,11 @@
   --spine-chip-fill:   var(--kw-unlit-raised);
   --spine-mark-fill:   var(--kw-off-beige);
   --spine-mark-ink:    var(--kw-charcoal);
+  /* R-4d. The ink spine's fill is charcoal, so its hairline needs the INVERSE
+     hairline (an off-beige alpha) to read at all — `--hair` itself would
+     resolve to a charcoal-based alpha here and nearly vanish on its own
+     ground. */
+  --spine-hair:        var(--hair-inverse);
 }
 
 /* A VALUE ON A GROUND THAT DOES NOT MOVE BETWEEN PALETTES MUST NOT MOVE
@@ -1429,6 +1438,14 @@
   --spine-chip-fill:   var(--kw-off-beige);
   --spine-mark-fill:   var(--kw-charcoal);
   --spine-mark-ink:    var(--kw-off-beige);
+  /* R-4d, and the SAME rule `--spine-active-hover` states two names up: mango
+     is #FED069 in both palettes, so anything drawn on it must be too. `--hair`
+     flips with the palette (charcoal-based in light, off-beige-based in dark)
+     and the off-beige half would read close to invisible on a ground this
+     light. Pinned to the light `--border`'s own value, literally — a fixed
+     charcoal alpha, no new hex, palette-independent like the nine names
+     around it. */
+  --spine-hair:        rgba(26, 25, 24, .08);
 }
 
 

@@ -245,10 +245,12 @@ describe("the meetings list itself", () => {
   })
 
   it("a meeting with a client gets the reference that client quotes; ours gets none", async () => {
+    // 2026-08-31: team-wide, no account-code prefix — the account's own code
+    // no longer matters, so this is set (or not) without changing the result.
     db().exec(`UPDATE accounts SET code = 'BERG' WHERE id = '${IDS.victimAccount}';`)
     const theirs = await arrange({ title: "Review", accountId: IDS.victimAccount })
     const ours = await arrange({ title: "Our own planning" })
-    expect(theirs.ref).toBe("BERG-M0001")
+    expect(theirs.ref).toBe("M0001")
     expect(ours.ref, "a number nobody can quote is worse than none").toBeNull()
   })
 

@@ -22,6 +22,7 @@ import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 // screen that is already drawn.
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, auth, tenancy } from "@/lib/api"
@@ -178,7 +179,12 @@ export default function OnboardingPage() {
         </div>
         <div className="motion-panel-in w-full max-w-sm text-center">
           <BrandMark className="mb-1" />
-          <h1 className="mt-2 text-2xl font-medium">{t("You're in the right place")}</h1>
+          {/* display-m — CLIENT CORRECTION, 2026-08-31: main-screen titles must
+              be the kit's own named "Page title" step (56/500), not h2 (32) —
+              see collection-heading.tsx's own note for the full ruling. This
+              standalone screen has no collection or record under it, but it is
+              still the page's own name, in the same role. */}
+          <Headline as="h1" size="display-m" className="mt-2">{t("You're in the right place")}</Headline>
           {/* The worker's own sentence, not a second copy written here. */}
           <p className="text-muted-foreground mt-2 text-sm">{wrongDoor}</p>
           <p className="text-muted-foreground mt-4 text-sm">
@@ -199,9 +205,10 @@ export default function OnboardingPage() {
       <div className="motion-panel-in w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           <BrandMark className="mb-1" />
-          <h1 className="text-2xl font-medium">
+          {/* display-m — see this file's other Headline for the ruling. */}
+          <Headline as="h1" size="display-m">
             {teamless ? t("You're not in a team") : t("Set up your profile")}
-          </h1>
+          </Headline>
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
               ? t("An admin can invite you back — ask them to send a new invite to this email address.")

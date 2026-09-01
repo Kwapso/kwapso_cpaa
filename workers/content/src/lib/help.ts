@@ -37,10 +37,10 @@ import {
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
-// The reference number moved out to its own file the moment a second noun needed
-// one (a story, a task, a to-do, a sprint). One counter, one race guard, one
-// spelling of the format — see lib/refs.ts.
-import { nextRef, REF_KINDS } from "./refs"
+// The reference number lives in shared/workers/refs.ts — a ticket is TEAM-wide
+// now (no account-code prefix), and app/wave mint from the same seam over in
+// tenancy, so it moved out of this worker entirely (2026-08-31 ruling).
+import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -980,7 +980,12 @@ export async function createTicket(
   // resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a ticket that exists for a moment with no number is a ticket
   // somebody screenshots with no number.
-  const ref = await nextRef(cfg, guard, accountId, REF_KINDS.ticket)
+  //
+  // GATED ON `accountId`, not on the team-wide counter: the reference is TEAM
+  // wide now (no account-code prefix, shared/workers/refs.ts), but "the number
+  // a client quotes" still needs a client. The agency's own question, with no
+  // account, gets no reference — same answer as before, for the same reason.
+  const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.ticket) : null
   const rank = await topRank(cfg, guard)
   // WHO IS RAISING IT decides whether the wording is still the account's. A
   // ticket a STAFF member types is locked the instant it exists: the first staff

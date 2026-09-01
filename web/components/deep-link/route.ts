@@ -63,7 +63,7 @@ export type Route = {
  * with the History API (no reload); only pre-auth routes (/login, /onboarding) are left
  * out, so leaving the app is a real navigation. */
 export const TOP_LEVEL_MODULES = [
-  "accounts", "tickets", "processes",
+  "accounts", "contacts", "tickets", "processes",
   // The knowledge base was MISSING from this list while being a sidebar page, so
   // every tap on it left the History API and did a full reload — which throws
   // away the warm in-memory cache the whole caching model is built on. The four

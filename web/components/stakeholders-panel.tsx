@@ -28,8 +28,10 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { Input } from "@shared/ui/components/input/input"
+import { ChevronRight, Search } from "@shared/ui/foundations/icons"
 
+import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
 import { useT } from "@shared/web/language"
@@ -79,7 +81,7 @@ function Group({ title, people, empty, mainLabel }: { title: string; people: Sid
       {people.length === 0 ? (
         <p className="text-muted-foreground text-sm">{empty}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (
             <PersonRow key={p.id} p={p} mainLabel={mainLabel} />
           ))}
@@ -108,6 +110,7 @@ export function StakeholdersPanel({
   host: { base: string }
 }) {
   const t = useT()
+  const [query, setQuery] = React.useState("")
   // A CONTACT IS AN ACCOUNTS ROW (there is no contacts table), so their record
   // is at the accounts address — which is where the account screen sends an
   // individual too, so both routes reach the same screen.
@@ -126,20 +129,56 @@ export function StakeholdersPanel({
     href: `${host.base}/accounts/${p.contactId}`,
   }))
 
+  // ONE SEARCH, OVER BOTH GROUPS — "who is on this, on either side" is one
+  // question a person types once, not two boxes for two lists that sit right
+  // beside each other. Bounded (a system has a handful of people on each
+  // side), so this narrows the arrays already in hand.
+  const needle = query.trim().toLowerCase()
+  const matches = (p: Side) => needle === "" || p.name.toLowerCase().includes(needle)
+  const shownOurs = ours.filter(matches)
+  const shownTheirs = theirs.filter(matches)
+
   return (
     <div className="flex flex-col gap-6">
+      {ours.length + theirs.length > 1 && (
+        <ToolbarRow
+          search={
+            <div className="relative w-full sm:w-56">
+              <Search
+                className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                aria-hidden
+              />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search people on this…")}
+                className="h-9 pl-8"
+                aria-label={t("Search people on this")}
+              />
+            </div>
+          }
+        />
+      )}
       <Group
         title={t("Ours")}
-        people={ours}
-        empty={t("Nobody from our side is on this yet.")}
+        people={shownOurs}
+        empty={
+          query.trim()
+            ? t("Nobody on our side matches that.")
+            : t("Nobody from our side is on this yet.")
+        }
         // "Team lead" is the word the app already uses for this person on the
         // form that sets them — not "main", which is the client side's word.
         mainLabel={t("Team lead")}
       />
       <Group
         title={t("Theirs")}
-        people={theirs}
-        empty={t("Nobody from the client's side is on this yet.")}
+        people={shownTheirs}
+        empty={
+          query.trim()
+            ? t("Nobody on the client's side matches that.")
+            : t("Nobody from the client's side is on this yet.")
+        }
         mainLabel={t("Main")}
       />
     </div>

@@ -61,7 +61,8 @@ import { safeHref } from "@shared/web/rich-text"
 import { formatRelative } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { useConfirm } from "@shared/web/use-confirm"
 
 /** WILL WE PUT THIS IN AN `href`? The seam that answers it is `safeHref`; this
  * says which of ITS answers this screen also accepts, exactly as the ticket panel
@@ -92,7 +93,7 @@ export function StoryAttachmentsPanel({
    * refuses is the failure this parameter is named after. */
   canEdit: boolean
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = storyAttachmentsKey(storyId)
   const listQ = useCached<StoryAttachment[]>(key, () =>
     contentApi.storyAttachments(storyId).then((r) => {
@@ -115,19 +116,30 @@ export function StoryAttachmentsPanel({
    * once at a time. Set before `.click()`, read in the change handler, cleared
    * on the way out of both paths including the cancel. */
   const replacingRef = React.useRef<string | null>(null)
+  // Taking a file off is the one destructive act in this list — one confirm
+  // dialog (shared/web/use-confirm.tsx); rename, replace and add all stay
+  // confirm-free since nothing about them takes anything away.
+  const { ask: askRemove, dialog: removeDialog } = useConfirm()
 
   function keep(r: { attachments: StoryAttachment[]; total: number }) {
     primeCache(key, r.attachments)
     primeCache(`total:${key}`, r.total)
   }
 
-  async function run(what: () => Promise<{ attachments: StoryAttachment[]; total: number }>, done: string) {
+  /** Returns whether it worked, so a confirm dialog can stay open beside the
+   * message rather than closing as if it had happened. */
+  async function run(
+    what: () => Promise<{ attachments: StoryAttachment[]; total: number }>,
+    done: string
+  ): Promise<boolean> {
     setBusy(true)
     try {
       keep(await what())
       toast.success(done)
+      return true
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
+      return false
     } finally {
       setBusy(false)
     }
@@ -325,7 +337,7 @@ export function StoryAttachmentsPanel({
                     * Below `sm` the size, the person and the date take a line of
                     * their own and the name gets the width it needs. */}
                   <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
-                    {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t)]
+                    {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t, lang)]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
@@ -345,7 +357,14 @@ export function StoryAttachmentsPanel({
                         variant="ghost"
                         size="sm"
                         disabled={busy}
-                        onClick={() => void run(() => contentApi.removeStoryAttachment(storyId, a.id), "Taken off.")}
+                        onClick={() =>
+                          askRemove({
+                            title: t("Take {label} off this story?", { label: a.label }),
+                            body: t("There's no way to bring it back from here — attach it again if you need it."),
+                            action: t("Take it off"),
+                            run: () => run(() => contentApi.removeStoryAttachment(storyId, a.id), t("Taken off.")),
+                          })
+                        }
                         className="text-destructive hover:text-destructive shrink-0 gap-1"
                         aria-label={t("Take it off")}
                       >
@@ -422,6 +441,8 @@ export function StoryAttachmentsPanel({
           )}
         </div>
       )}
+
+      {removeDialog}
     </div>
   )
 }

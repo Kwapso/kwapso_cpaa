@@ -208,7 +208,7 @@ export function MailReplyDialog({
           asked for — "I can just click inside of the kwapso app and it takes me
           to my Gmail". */}
       {gmailLink && (
-        <p className="border-border/60 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm">
+        <p className="bg-surface-panel flex flex-wrap items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">{t("It is waiting in your Gmail drafts. Nothing is sent.")}</span>
           <a
             href={gmailLink}

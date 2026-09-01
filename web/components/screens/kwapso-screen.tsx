@@ -27,6 +27,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { ChevronRight, Palette, Pencil } from "@shared/ui/foundations/icons"
+import { Headline } from "@shared/ui/components/typography/typography"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"
 import { OverviewList } from "@/components/overview-list"
@@ -44,13 +45,33 @@ import { useCached, useCachedValue } from "@shared/web/store"
 import { totalKey } from "@/lib/live-resources"
 import { useT } from "@shared/web/language"
 
-export function KwapsoScreen({ active }: { active: ActiveTeam }) {
+export function KwapsoScreen({
+  active,
+  initialTab,
+}: {
+  active: ActiveTeam
+  /** From the URL's `?tab=` (deep-link-screen.tsx) — set by any link that
+   * points at `/kwapso?tab=team` or `/kwapso?tab=brand` directly, rather than
+   * the plain `/kwapso` link `ProfileMenu` draws today (its own one entry
+   * always lands on the default tab; the three separate rail rows that used
+   * to set this — Details · Team · Branding — are gone with the section, see
+   * `NavGroup` in lib/pages.ts). An explicit link always wins over whatever
+   * tab a previous visit remembered (see the `revive` below): landing on
+   * Details after following a `?tab=team` link would look like it did
+   * nothing. */
+  initialTab?: string
+}) {
   const t = useT()
   const team = active.ctx?.team ?? null
   const teamId = team?.id ?? null
   const { can } = usePermissions(teamId)
-  // Remembered with the screen — see web/lib/nav-memory.ts.
-  const [tab, setTab] = useRemembered("tab", "details")
+  // Remembered with the screen — see web/lib/nav-memory.ts. `revive` forces
+  // `initialTab` over whatever was remembered when the URL named one (an
+  // explicit link always wins); with no `?tab=` it behaves exactly as before,
+  // handing the remembered value straight back.
+  const [tab, setTab] = useRemembered("tab", initialTab ?? "details", (remembered) =>
+    initialTab ? initialTab : typeof remembered === "string" ? remembered : undefined
+  )
   const [editOpen, setEditOpen] = React.useState(false)
 
   if (!team || !teamId) return <Skeleton variant="list" lines={4} />
@@ -68,16 +89,19 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
     <div className="flex w-full flex-col gap-6">
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-medium">{team.name}</h1>
+          {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
+              is the kit's own named "Page title" step (56/500), see
+              collection-heading.tsx's own note for the full ruling. */}
+          <Headline as="h1" size="display-m">{team.name}</Headline>
           <p className="text-muted-foreground mt-1 text-sm">
             {t("Who we are: our material, our team, and the details that go on a contract.")}
           </p>
         </div>
+        {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
         {can("teams", "edit") && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)} className="gap-1">
+            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           </div>
         )}

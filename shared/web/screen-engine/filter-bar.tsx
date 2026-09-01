@@ -80,6 +80,44 @@ import { facetOptions } from "./collection"
 import { type FacetOption, type FilterFacet } from "./config"
 import { formatRange, parseRange } from "./range"
 
+/** BUG FIX, 2026-08-31 — client: pill hover must move the pill's own FILL,
+ * never just its text. The kit's `FilterBar` (vendored, `shared/ui/
+ * components/filter-bar/filter-bar.tsx`, CLAUDE.md R39, do not hand-edit)
+ * draws two chip-shaped buttons whose hover is text-only: the dashed
+ * "+ filter" slot (`CHIP_ADD`: `text-ink-tertiary enabled:hover:text-
+ * foreground`, no background rule at all) and "Clear filters" (reuses
+ * `filterChipVariants({state:"default"})`'s `bg-[var(--surface-raised)]`
+ * plus that same text-only hover). The removable chip's own label button
+ * already gets this right (`CHIP_LABEL_INTERACTIVE`: `enabled:hover:bg-
+ * accent`) — these two just never picked up the same treatment.
+ *
+ * App-side override, not a kit edit — the exact `[&_[data-slot=X]]:` pattern
+ * `web/components/auth-card.tsx` documents: reached from outside via the
+ * kit's own stable `data-slot="filter-bar-add"` / `"filter-bar-clear"`
+ * hooks, on this adapter's own wrapping `<div>`, so a design-sync re-pull
+ * never has to notice this exists. A fill, never a border: the app's hover
+ * law is a fill swap, and neither button's resting border (the add slot's
+ * dashed one) is touched.
+ *
+ * TWO DIFFERENT TOKENS, NOT ONE — measured, not assumed. `--accent`
+ * (`CHIP_LABEL_INTERACTIVE`'s own neutral hover, a `rgba(…, .05)` wash) is
+ * right for the "+ filter" slot: its resting fill is `bg-transparent`, so
+ * the wash tints the OPAQUE surface behind it (the page) and reads as a real
+ * highlight. "Clear filters" is not transparent at rest — it reuses
+ * `filterChipVariants({state:"default"})`'s OPAQUE `bg-[var(--surface-
+ * raised)]` (`--card`) — so `bg-accent` would REPLACE that opaque fill with
+ * the 5% wash rather than tint it, composite against whatever sits behind
+ * the chip instead, and (measured against the dark palette's page tone) come
+ * out DARKER than resting, i.e. the chip dimming on hover rather than
+ * lighting up. `--btn-secondary-hover` is `Button`'s own OPAQUE hover token
+ * for THE SAME resting fill (`--btn-secondary-fill` is also `--card`) — the
+ * exact pairing this chip's own base state already borrows, so its hover
+ * state borrows the matching one rather than reaching for the wash. Filed
+ * upstream as a kit gap either way. */
+const FILTER_BAR_HOVER_FILL =
+  "[&_[data-slot=filter-bar-add]]:hover:bg-accent " +
+  "[&_[data-slot=filter-bar-clear]]:hover:bg-[var(--btn-secondary-hover)]"
+
 /** What a `control:"range"` facet's chip says. Symbols rather than words, so a
  * bound reads the same in every language and never has to be a sentence. */
 function rangeSaid(value: string): string {
@@ -227,7 +265,7 @@ function FilterBar<T>({
   }
 
   return (
-    <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
+    <div className={cn("flex w-full min-w-0 flex-col gap-2", FILTER_BAR_HOVER_FILL, className)}>
       <Popover open={open} onOpenChange={setOpen} modal={modal}>
         <PopoverAnchor asChild>
           <KitFilterBar

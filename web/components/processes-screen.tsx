@@ -194,6 +194,7 @@ export function ProcessesScreen({
                 icon="plus"
                 secondary={{ show: canCreate, label: t("Record an app"), onClick: () => setAppOpen(true) }}
                 onCreate={() => setAddOpen(true)}
+                useKitPanel
               >
                 <ScreenRenderer
                   recipe={listRecipe}
@@ -201,6 +202,7 @@ export function ProcessesScreen({
                   rights={rights}
                   onAction={onAction}
                   onIntent={onIntent}
+                  useKitPanel
                 />
               </SectionWithCreate>
 

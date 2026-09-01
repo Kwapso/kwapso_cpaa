@@ -23,8 +23,6 @@ import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { PRIORITY_LABEL, departmentAsks, priorityScore } from "@shared/departments"
 import type { Task, TaskViewName } from "@shared/types"
 
-import { nextRef, REF_KINDS } from "./refs"
-
 type TaskRow = {
   id: string
   ref: string | null
@@ -308,16 +306,17 @@ export async function createTask(
 
   const id = ulid()
   const now = new Date().toISOString()
-  // Usually null: our own admin belongs to no client, and a reference is built
-  // out of an account's short code. A number nobody can quote is worse than none.
-  const ref = await nextRef(cfg, guard, accountId, REF_KINDS.task)
+  // NO REFERENCE. A task never carried one that reached a screen (the old
+  // "K####" was minted and shown nowhere), and the 2026-08-31 ruling makes
+  // that explicit: a task is the agency's own internal admin, same category
+  // as a process, a role or a dropdown value, none of which mints one either.
   await d1ExecScript(
     cfg,
     guard.databaseId,
     `INSERT INTO tasks (id, ref, account_id, app_id, title, detail, assignee_id, assignee_name, due_on,
   important, urgent, department, file_url, file_name,
   status, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(input.title)}, ${sqlString(input.detail ?? null)}, ${sqlString(input.assigneeId ?? null)}, ${sqlString(input.assigneeId ? requireText(input.assigneeName, "Assignee", TEXT_LIMITS.short) : null)}, ${sqlString(input.dueOn ?? null)}, ${input.important ? 1 : 0}, ${input.urgent ? 1 : 0}, ${sqlString(input.department ?? null)}, ${sqlString(input.fileUrl ?? null)}, ${sqlString(input.fileName ?? null)}, 'open', ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(null)}, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(input.title)}, ${sqlString(input.detail ?? null)}, ${sqlString(input.assigneeId ?? null)}, ${sqlString(input.assigneeId ? requireText(input.assigneeName, "Assignee", TEXT_LIMITS.short) : null)}, ${sqlString(input.dueOn ?? null)}, ${input.important ? 1 : 0}, ${input.urgent ? 1 : 0}, ${sqlString(input.department ?? null)}, ${sqlString(input.fileUrl ?? null)}, ${sqlString(input.fileName ?? null)}, 'open', ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Task created",

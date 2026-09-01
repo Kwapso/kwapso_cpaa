@@ -32,7 +32,7 @@ import * as React from "react"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 
 import { formatDate } from "@shared/web/format"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { useCached, useCachedValue, primeCache } from "@shared/web/store"
@@ -79,7 +79,7 @@ function byApp(rows: ClientDeliverable[]): { app: string | null; rows: ClientDel
 }
 
 export function DeliverablesScreen() {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { data, loading } = useCached<ClientDeliverable[]>(cacheKeys.deliverables, () =>
     handover.deliverables().then((r) => {
       // R16: the badge is the DOOR's exact count, parked in its own key beside
@@ -108,7 +108,9 @@ export function DeliverablesScreen() {
       <section>
         <CollectionHeading label={t("What we handed over")} total={total} />
         {rows.length === 0 ? (
-          <div className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
+          // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
+          // impact-screen.tsx's own note on this box for the full reasoning.
+          <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
             <p>{t("Nothing here yet.")}</p>
             <p className="mt-1 text-sm">
               {t("When we hand something over and share it with you, it turns up here.")}
@@ -127,7 +129,7 @@ export function DeliverablesScreen() {
                     return (
                       <li
                         key={d.id}
-                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-4"
+                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] bg-surface-panel p-4"
                       >
                         {/* An eighteenth hand-rolled answer to "what to draw
                             when there is no picture" — the square, the radius,
@@ -165,7 +167,7 @@ export function DeliverablesScreen() {
                             <p className="font-medium">{d.title}</p>
                           )}
                           <p className="text-muted-foreground text-sm">
-                            {formatDate(d.datedOn) || formatDate(d.sharedOn)}
+                            {formatDate(d.datedOn, lang) || formatDate(d.sharedOn, lang)}
                           </p>
                           {/* Said once, plainly, and only where it is true. A
                               person who cannot open something needs to know what

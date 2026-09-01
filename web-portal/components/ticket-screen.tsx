@@ -98,7 +98,7 @@ import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
 import { TicketAttachments } from "@/components/ticket-attachments"
 import type { PortalReady } from "@/components/portal-shell"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 
 /** WHICH SIDE A MESSAGE SITS ON — and why it is this way round.
@@ -130,7 +130,7 @@ export function sideFor(authorId: string | null, meId: string): "mine" | "theirs
 }
 
 export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId: string }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // The list is usually already warm (they tapped a row to get here), so read the
   // ticket out of it; fall back to the by-id door on a cold deep link from email.
   const { tickets } = useTickets()
@@ -161,7 +161,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       // Your own side says only the time: the side IS the attribution, which is
       // the whole point of having one.
       author: side === OWN_SIDE ? undefined : (m.authorName ?? brand.name),
-      time: formatRelative(m.createdAt, t),
+      time: formatRelative(m.createdAt, t, lang),
       // A reply is typed, so its line breaks are the person's. The kit's bubble
       // wraps and breaks a long word; preserving a paragraph is the call site's.
       body: <span className="whitespace-pre-wrap">{m.body}</span>,
@@ -237,7 +237,10 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         ) : (
           // Outside the fence a real id and a made-up one are the same sentence —
           // the door answers null either way, and so do we.
-          <p className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
+          //
+          // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
+          // impact-screen.tsx's own note on this box for the full reasoning.
+          <p className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
             {t("We can't find that ticket.")}
           </p>
         )}

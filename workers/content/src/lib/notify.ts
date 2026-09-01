@@ -367,7 +367,7 @@ async function resolutionInboxes(
     }))
 }
 
-/** EMAIL ONE: we need something from you.
+/** EMAIL ONE: we need your input.
  *
  * A to-do is the only thing in the product where the next move is the client's
  * and they have no way to know it without being told. The mail carries the
@@ -401,7 +401,7 @@ export async function notifyTodoRaised(
     // `portal_users`, so there is no staff address in this list and no per-person
     // audience question to ask. The portal has no to-do detail screen and one is
     // not invented here: the item sits on the portal home, above their own
-    // requests ("Waiting on you"), which is where this lands them.
+    // requests ("Awaiting your input"), which is where this lands them.
     const link = recordLink(env, "portal", {
       kind: "todo",
       teamId: guard.teamId,
@@ -411,8 +411,8 @@ export async function notifyTodoRaised(
     // staff member is doing the work — and an email is a surface that leaves the
     // building, which is exactly where that promise is easiest to drop.
     await sendToMany("to-do notice", people, (p) =>
-      send(env, p.email, `${brand.name}: we need something from you`, {
-        heading: "One thing from you",
+      send(env, p.email, `${brand.name}: we need your input`, {
+        heading: "We need your input",
         intro: `${todo.title}${todo.due_on ? `, by ${todo.due_on.slice(0, 10)}` : ""}.`,
         ctaLabel: link?.label,
         ctaUrl: link?.url,

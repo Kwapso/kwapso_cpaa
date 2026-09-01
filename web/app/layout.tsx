@@ -2,6 +2,7 @@ import { AmbientBackground } from "@shared/ui/components/ambient-background/ambi
 import { Toaster } from "@shared/ui/components/sonner/sonner"
 import { ThemeProvider } from "@shared/web/theme-provider"
 import { MarkRuntime } from "@shared/web/mark-runtime"
+import { TopLoadingBar } from "@shared/web/top-loading-bar"
 import { appMetadata, appViewport } from "@shared/web/pwa"
 import { AgentHost } from "@/components/agent-host"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -50,7 +51,60 @@ export default function RootLayout({
        *
        * The client portal has always done this (web-portal/app/layout.tsx). This
        * is the agency door catching up, one class, same token. */}
-      <body className="bg-background min-h-[100svh] antialiased">
+      {/* THE QUIET CHIP IS THE WRONG BEIGE — client, 2026-08-31, pointing at
+       * a Contact's "Contact"/"Can sign in" pills and the assistant panel's
+       * quota pill, both screenshotted: "there's a color that you keep
+       * getting wrong on the pills. use this color #F7F2EB (the main token
+       * for beige)." #F7F2EB is already `--surface-panel` in this palette
+       * (tokens.css) — not a new value, the client is naming which of the
+       * app's own tokens the pill belongs on. `Badge`'s own default fill
+       * (`variant="secondary"`, `shared/ui/components/badge/badge.tsx`) is
+       * `bg-surface-quiet` — the kit's documented "quiet chip" tone
+       * (`shared/ui/docs/TOKENS.md` §2), a full step darker than
+       * `--surface-panel` in light (#E2DDD4 vs #F7F2EB) and a different tone
+       * again in dark. Every unqualified `<Badge>` and every explicit
+       * `variant="secondary"` in both front doors inherits it — sixty-plus
+       * call sites, not one wrong prop, which is why patching call sites
+       * would never have stopped the client "keeps getting" this. `Badge` is
+       * vendored and pinned (R39; a hand-edit fails `web/test/
+       * vendored-kit.test.ts`), so the repoint lives here instead, on the ONE
+       * element every screen in this app renders inside: a Badge always
+       * carries the kit's own `data-slot="badge"`, and only the quiet
+       * variant carries the literal `bg-surface-quiet` utility class (no
+       * other variant does), so the selector below repoints exactly that
+       * pairing and touches no coloured, destructive, warning, inverse or
+       * status-dot badge. `web-portal/app/layout.tsx` carries the identical
+       * line for the client portal's own plain badges (e.g. "Main contact").
+       * Left as an app-side override rather than a kit edit: the upstream
+       * design-mothership doc still calls `--surface-quiet` the deliberate
+       * "quiet chip" tone, so this is the client's own live correction to
+       * that ruling, not a bug fix, and belongs upstream too (flagged
+       * separately) so a future kit pull does not need to relearn it.
+       *
+       * THE HAIRLINE, ADDED THE SAME DAY AND THEN TAKEN BACK OUT, 2026-08-31.
+       * `--surface-panel` (#F7F2EB) sits one faint step off `--background`
+       * (#FFFEF9) — 8-14 points a side in RGB — which reads as low contrast
+       * the moment a plain pill sits directly on the page ground rather than
+       * on a card. The first fix reached for `Card`'s own documented
+       * `hairline` case (an inset 1px `--border`) and drew it around every
+       * repointed pill. The client rejected that outright on the next
+       * review, verbatim: "pills no border!" — an inset hairline is still a
+       * STROKE the moment it outlines a pill's whole edge, which is exactly
+       * what a pill is never allowed to carry (BUILD-A-SCREEN.md §6.1;
+       * separation is a fill or a shading shadow, never an outline). So the
+       * hairline is gone from this app-wide rule again: every ordinary pill
+       * app-wide (list badges, table badges, the assistant's quota pill,
+       * Contact's "Contact"/"Can sign in" pills) reads fine at plain
+       * #F7F2EB against its own card or list-row ground with no edge at all
+       * — the client only ever re-flagged the ONE place that still read as
+       * beige-on-beige after this rule landed, the record header's identity
+       * row, because THAT band is transparent and shows the ambient field
+       * through rather than sitting on a card (`web/components/
+       * record-chrome.tsx`'s `IDENTITY_ROW`, C4). That row now solves its
+       * own contrast with a different FILL instead of a border — see its own
+       * comment for the token and the reasoning; this rule is untouched for
+       * every other Badge in the app. */}
+      <body className="bg-background min-h-[100svh] antialiased [&_[data-slot=badge].bg-surface-quiet]:bg-surface-panel">
         {/* The mark's stylesheet and its animator, FIRST in the body: the
          * animator has to be published before the parser reaches the loader
          * further down, so the mark is already turning when the bundle is still
@@ -74,6 +128,14 @@ export default function RootLayout({
           <AmbientBackground variant="brand" anchor="fixed" />
           <ErrorReporter />
           <VersionWatch />
+          {/* THE TOP-OF-PAGE LOADING BAR (client feedback, 31 Aug 2026, with a
+           * screenshot). Mounted once, here, beside the routed screens rather
+           * than inside any one of them — it reads the same global "is a
+           * useCached read still waiting" signal every screen's own skeleton
+           * already comes from (shared/web/top-loading-bar.tsx), so it never
+           * needs its own per-screen wiring and can never disagree with the
+           * skeleton it draws beside. */}
+          <TopLoadingBar />
           {/* CONTAINMENT (ERROR-HANDLING.md C1). A thrown RENDER error is not caught
            * by the window.onerror reporter above — that fires for events, not React's
            * render phase — so without this the tree blanks. The boundary wraps the

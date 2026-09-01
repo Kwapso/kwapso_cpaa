@@ -1,33 +1,51 @@
 {
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "kwapso",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace=web"],
-      "port": 3000
-    },
-    {
-      "name": "kwapso-portal",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:portal"],
-      "port": 3001
-    },
-    {
-      "_": "The agency app on :3000 with every door and /media/* pointed at deployed STAGING, for looking at a branch against real rows before it is merged. See the DEV_API_ORIGIN note in web/next.config.ts. Reads only — a write is refused by the far door's CSRF check.",
-      "name": "kwapso-vs-staging",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace=web"],
-      "port": 3000,
-      "env": { "DEV_API_ORIGIN": "https://kwapso-staging.kwapso.workers.dev" }
-    },
-    {
-      "_": "The CLIENT PORTAL on :3001 with every door and /media/* pointed at deployed STAGING. Same flag, same reasoning as the entry above — see the DEV_API_ORIGIN note in web-portal/next.config.ts. Reads only.",
-      "name": "kwapso-portal-vs-staging",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:portal"],
-      "port": 3001,
-      "env": { "DEV_API_ORIGIN": "https://kwapso-portal-staging.kwapso.workers.dev" }
-    }
-  ]
+    "version": "0.0.1",
+    "configurations": [
+        {
+            "name": "kwapso",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev",
+                "--workspace=web"
+            ],
+            "port": 3000
+        },
+        {
+            "name": "kwapso-portal",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev:portal"
+            ],
+            "port": 3001
+        },
+        {
+            "_": "The agency app on :3000 with every door and /media/* pointed at deployed STAGING, for looking at a branch against real rows before it is merged. See the DEV_API_ORIGIN note in web/next.config.ts. Reads only \u2014 a write is refused by the far door's CSRF check.",
+            "name": "kwapso-vs-staging",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev",
+                "--workspace=web"
+            ],
+            "port": 3000,
+            "env": {
+                "DEV_API_ORIGIN": "https://kwapso-staging.kwapso.workers.dev"
+            }
+        },
+        {
+            "_": "The CLIENT PORTAL on :3001 with every door and /media/* pointed at deployed STAGING. Same flag, same reasoning as the entry above \u2014 see the DEV_API_ORIGIN note in web-portal/next.config.ts. Reads only.",
+            "name": "kwapso-portal-vs-staging",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev:portal"
+            ],
+            "port": 3001,
+            "env": {
+                "DEV_API_ORIGIN": "https://kwapso-portal-staging.kwapso.workers.dev"
+            }
+        }
+    ]
 }

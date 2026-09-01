@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sectionFor } from "@/components/deep-link/route"
-import { BOTTOM_NAV_SLOTS, NAV, TEAM_SECTIONS, bottomNavItems, overflowNavItems } from "@/lib/pages"
+import { BOTTOM_NAV_SLOTS, NAV, NAV_GROUP_ORDER, TEAM_SECTIONS, bottomNavItems, overflowNavItems } from "@/lib/pages"
 import { MODULE_PERMISSION } from "@/lib/screens"
 import { TEAM_MODULES } from "@shared/team-modules"
 import { stripComments } from "@shared/rules/source-scan"
@@ -85,83 +85,100 @@ describe("the phone can actually reach the overflow", () => {
   })
 
   it("what it opens lists EVERY section, not only the leftovers", () => {
-    // navGroups is the whole rail. Listing only `overflowNav` here would mean
-    // "where is Tickets?" has a different answer on a phone than on a laptop.
+    // railBlocks is the whole rail (the standalone anchors plus every named
+    // section). Listing only `overflowNav` here would mean "where is Tickets?"
+    // has a different answer on a phone than on a laptop.
     const sheet = shell.slice(shell.indexOf("<Sheet open={moreOpen}"))
-    expect(sheet).toContain("navGroups.map(")
+    expect(sheet).toContain("railBlocks.map(")
   })
 })
 
-// THE RAIL'S ORDER IS THE OWNER'S, AND IT IS NOT A COMMENT.
+// THE RAIL'S ORDER IS THE CLIENT'S, AND IT IS NOT A COMMENT.
 //
 // It was written down in a comment in pages.ts and nowhere else, which means any
 // change — a new page appended, a group flipped, a line moved while editing
-// something nearby — would have reordered his sidebar with a green build.
+// something nearby — would have reordered the sidebar with a green build.
 //
-// This composes the rail the way app-shell.tsx does (Home first, the sidebar
-// sections in registry order, Settings last, then partitioned by group with the
-// divider between the halves) and asserts the sequence he fixed. It reads the
-// registry rather than the shell's JSX, so it stays true if the shell is
-// rewritten — but the composition is duplicated here, and that is the one thing
-// to keep honest: if app-shell's `inOrder` changes shape, change it here too.
-describe("the sidebar sequence the owner fixed", () => {
+// This composes the rail the way app-shell.tsx does (Home standalone first,
+// then the team's sidebar sections AND any grouped NAV entry — none today,
+// Kwapso included: it went through a rail section of its own and back out
+// again the same day, see the note on NavGroup in pages.ts — partitioned into
+// the three named groups in registry order) and asserts the sequence the
+// client's 31 Aug 2026 feedback fixed. It reads the registry rather than the
+// shell's JSX, so it stays true if the shell is rewritten — but the
+// composition is duplicated here, and that is the one thing to keep honest:
+// if app-shell's derivation changes shape, change it here too.
+describe("the sidebar sequence the client fixed", () => {
   const composeLikeTheShell = () => {
-    const universal = NAV.filter((i) => !i.need)
+    const universal = NAV.filter((i) => !i.need && i.inRail !== false)
     const sidebar = TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => ({
       slug: s.key,
-      group: s.group ?? ("occasional" as const),
+      group: s.group ?? ("my-work" as const),
     }))
-    const inOrder = [
-      ...universal.filter((i) => i.slug === "home"),
+    const grouped = [
       ...sidebar,
-      ...universal.filter((i) => i.slug !== "home"),
+      ...universal.filter((i) => i.group !== "none").map((i) => ({ slug: i.slug, group: i.group as string })),
     ]
-    return (["daily", "occasional"] as const).map((g) => inOrder.filter((i) => i.group === g).map((i) => i.slug))
+    const home = universal.filter((i) => i.slug === "home").map((i) => i.slug)
+    const named = NAV_GROUP_ORDER.map((g) => grouped.filter((i) => i.group === g).map((i) => i.slug))
+    return { home, named }
   }
 
-  // SEVEN since Time joined them. It is the fourth work-engine destination and
-  // it sits with the other two dailies — a timesheet is opened on the days you
-  // fill it in, which is most of them. It had no place on the rail at all
-  // before: the whole list of logged time was a panel at the foot of the Stories
-  // page, which is how a tester with 115 entries came to report that she could
-  // not find any of it.
-  it("puts the seven daily destinations above the divider, in his order", () => {
-    expect(composeLikeTheShell()[0]).toEqual([
-      "home",
-      "accounts",
-      "knowledge",
-      "tickets",
-      "stories",
-      "tasks",
-      "time",
-    ])
+  it("puts My work first among the named sections, in the client's order", () => {
+    // Tasks and Meetings are the client's own explicit pair ("My work: today,
+    // tasks, meetings" — "today" is Home, standalone, not repeated here — see
+    // the note on NavGroup in pages.ts). Knowledge base, Tickets and Work logs
+    // were not named; they keep the closest reading of the daily half they used
+    // to sit in, after the two the client did name.
+    expect(composeLikeTheShell().named[0]).toEqual(["tasks", "meetings", "knowledge", "tickets", "time"])
   })
 
-  it("puts the occasional ones below it, in his order", () => {
-    // FIVE, and the fifth changed on 17 Aug 2026. Marketing and Learning were
-    // purged, the Delivery method page went with its programmes folded onto the
-    // sprint type, and Process maps became contextual — a map is read inside the
-    // app it belongs to. Then BRAND LIBRARY became contextual too and KWAPSO
-    // took its place: the library is one of the three things the Kwapso page is
-    // for, and a rail that lists both the section and the page it lives on reads
-    // as two ideas. None of the five lost a screen; three lost a module and two
-    // lost only their line on the rail.
-    // SIX since 24 Aug 2026: WAVES joined, between Apps and Sprints, because it
-    // is the shelf ABOVE a sprint — what a client bought, which the sprints
-    // inside it deliver. A rail that put it after Sprints would read as a
-    // narrower thing than the sprints it contains.
-    expect(composeLikeTheShell()[1]).toEqual([
-      "meetings",
-      "apps",
-      "waves",
-      "sprints",
-      "kwapso",
-      "settings",
-    ])
+  it("puts Build second, in the client's own explicit order", () => {
+    // "build: Apps, sprints, stories" — that is this list's real order now, not
+    // a derived one. Waves was not named; it keeps the closest reading of the
+    // occasional half it used to sit in, appended after the three the client did
+    // name.
+    expect(composeLikeTheShell().named[1]).toEqual(["apps", "sprints", "stories", "waves"])
+  })
+
+  it("puts Accounts third, both pages the client named", () => {
+    // "accounts: accounts, contacts" — Contacts had no first-class page to
+    // point a rail entry at when this suite first named the gap (it was a tab
+    // on the account record, gated by its own `contacts` right); the client
+    // later answered the flag explicitly ("contacts as a real sidebar page,
+    // also remove the tab from inside accounts", 31 Aug 2026), so both of the
+    // client's own words now name a real page.
+    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "contacts"])
+  })
+
+  it("has exactly three named sections — Kwapso is not a fourth", () => {
+    // Kwapso WAS a fourth named section, last, for part of one day (client,
+    // 31 Aug 2026: "create a new section called kwapso, pages inside (under):
+    // team, branding. put this section the last one") — then, later the same
+    // day, it wasn't: "remove the whole kwapso section from the sidebar and
+    // move with your profile and settings." So `named` has three entries, not
+    // four, and none of them is named "kwapso" — see ProfileMenu for where
+    // the destination actually lives now.
+    const { named } = composeLikeTheShell()
+    expect(named).toHaveLength(3)
+    expect(named.flat()).not.toContain("kwapso")
+  })
+
+  it("has no standalone entry at all — Home left the rail entirely", () => {
+    // "kwapso, welcome have no section" was true for a few hours on 31 Aug
+    // 2026, with Home standalone in the meantime — then the client asked for
+    // Home to leave the rail altogether ("remove home from navbar, make that
+    // when we click the icon kwapso on top of sidebar it takes us there"), so
+    // `home` in NAV now carries `inRail: false` like Settings and Kwapso, and
+    // the brand mark is its only door (NavBrandHeader, app-shell.tsx). This
+    // composition reads the same `inRail` field the shell does, so an empty
+    // array here is the correct answer, not a regression.
+    expect(composeLikeTheShell().home).toEqual([])
   })
 
   it("lists every sidebar page exactly once, so nothing was lost in the reorder", () => {
-    const rail = composeLikeTheShell().flat()
+    const { home, named } = composeLikeTheShell()
+    const rail = [...home, ...named.flat()]
     const sidebarKeys = TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => s.key)
     for (const key of sidebarKeys)
       expect(rail, `the "${key}" section is in the registry but not on the rail`).toContain(key)

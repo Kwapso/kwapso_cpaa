@@ -17,29 +17,48 @@
 // or write an account, which is what keeps the record's tabs (R2/R8) and its
 // counts (R16) in one place.
 
+import * as React from "react"
+
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Ban, KeyRound, Link2, Power, UserMinus } from "@shared/ui/foundations/icons"
+import { Input } from "@shared/ui/components/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/components/select/select"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
+import { Ban, KeyRound, Link2, Power, Search, UserMinus } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
 import { formatDate } from "@shared/web/format"
-import { useT } from "@shared/web/language"
-import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
+import { useLanguage, useT } from "@shared/web/language"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import type { Confirm, PanelActions } from "@shared/web/use-confirm"
 
-/** A destructive action waiting for a yes. One dialog in the host serves all of
- * them — they differ only in their words and what they run. `run` answers
- * whether it worked, so a refusal leaves the dialog open beside the message
- * rather than closing as if it had happened. */
-export type Confirm = { title: string; body: string; action: string; run: () => Promise<boolean> }
-
-/** The two verbs a panel borrows from the host: put a question in front of the
- * person, and do a thing (telling them plainly if it was refused). */
-export type PanelActions = {
-  busy: boolean
-  ask: (c: Confirm) => void
-  act: (what: () => Promise<unknown>, done: string, fallback: string) => Promise<boolean>
+/** Both lists here are bounded (a contact's own account, or one account's
+ * logins) and handed down already read whole — the same shape
+ * `selectable-screen.tsx`'s own toolbar filters, so the search + status
+ * filter run in the browser rather than asking a door for something it
+ * already gave us. "All" is the default for both: the row already showed
+ * inactive rows faded rather than hidden, and the filter only has to narrow
+ * that further, never less than what was on screen before it existed. */
+type ActiveFilter = "all" | "active" | "inactive"
+function matchesActive(filter: ActiveFilter, active: boolean): boolean {
+  return filter === "all" || (filter === "active" ? active : !active)
 }
+
+/** The shared confirm shape (shared/web/use-confirm.tsx) and the two verbs a
+ * panel borrows from the host that owns it: put a question in front of the
+ * person, and do a thing (telling them plainly if it was refused).
+ * Re-exported because account-detail.tsx, contact-detail.tsx and
+ * account-rate-card.tsx all reached this file for them before the shared hook
+ * existed — one shape, one owner, now living beside the dialog itself. */
+export type { Confirm, PanelActions }
 
 /** A row in one of these lists: bordered, and visibly faded when it is switched
  * off. Every list here shows inactive rows rather than hiding them — nothing in
@@ -96,28 +115,102 @@ export function ContactsPanel({
   onOpen: (accountId: string) => void
 }) {
   const t = useT()
+  const [query, setQuery] = React.useState("")
+  const [status, setStatus] = React.useState<ActiveFilter>("all")
+  const [sort, setSort] = React.useState<{ by: "name" | "relationship"; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
+
+  const q = query.trim().toLowerCase()
+  const filtered = links.filter(
+    (l) =>
+      matchesActive(status, l.active) &&
+      (q === "" ||
+        l.personName.toLowerCase().includes(q) ||
+        (l.relationship ?? "").toLowerCase().includes(q))
+  )
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const sorted = [...filtered].sort((a, b) =>
+    sort.by === "name"
+      ? a.personName.localeCompare(b.personName) * dirMul
+      : (a.relationship ?? "").localeCompare(b.relationship ?? "") * dirMul
+  )
+
   return (
     <div className="flex flex-col gap-4">
-      {(canCreate || canCreatePerson) && (
-        <div className="flex flex-wrap justify-end gap-2">
-          {/* Distinct glyphs on purpose: two icon-only buttons that both showed a
-              plus would be one button drawn twice. Create keeps the Plus
-              (UI-CONVENTIONS §4); linking gets the link. */}
-          {canCreate && (
-            <AddButton
-              label={t("Add contact")}
-              onClick={onAdd}
-              icon={<Link2 className="size-4" />}
-            />
-          )}
-          {canCreatePerson && <AddButton label={t("New contact")} onClick={onNew} />}
-        </div>
-      )}
+      <ToolbarRow
+        search={
+          links.length > 0 && (
+            <>
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search contacts…")}
+                  className="h-9 pl-8"
+                  aria-label={t("Search contacts")}
+                />
+              </div>
+              <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
+                <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All")}</SelectItem>
+                  <SelectItem value="active">{t("Contacts now")}</SelectItem>
+                  <SelectItem value="inactive">{t("Not a contact now")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <SortControl
+                options={[
+                  { value: "name", label: t("Name") },
+                  { value: "relationship", label: t("Relationship") },
+                ]}
+                value={sort.by}
+                onValueChange={(by) => setSort({ by: by as typeof sort.by, dir: "asc" })}
+                direction={sort.dir}
+                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+                label={t("Sort by")}
+              />
+            </>
+          )
+        }
+        actions={
+          (canCreate || canCreatePerson) && (
+            <>
+              {/* Distinct glyphs on purpose: two icon-only buttons that both showed a
+                  plus would be one button drawn twice. Create keeps the Plus
+                  (UI-CONVENTIONS §4); linking gets the link. */}
+              {canCreate && (
+                <AddButton
+                  label={t("Add contact")}
+                  onClick={onAdd}
+                  icon={<Link2 className="size-4" />}
+                />
+              )}
+              {canCreatePerson && <AddButton label={t("New contact")} onClick={onNew} />}
+            </>
+          )
+        }
+      />
       {links.length === 0 ? (
-        <EmptyLine concept="contacts">{t("No contacts yet.")}</EmptyLine>
+        // No import wiring: the `accounts` import target bulk-creates people,
+        // but never the LINK that makes one a contact HERE — a straight
+        // import would still need this same "Add contact" step afterwards.
+        <CollectionEmptyState
+          title={t("No contacts yet.")}
+          onCreate={canCreatePerson ? onNew : undefined}
+        />
+      ) : sorted.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
-          {links.map((l) => (
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+          {sorted.map((l) => (
             <Row key={l.id} active={l.active}>
               {/* The kit's `link` variant: no box, inherited ink, underline on
                   hover. The overrides are layout only — the name flexes and
@@ -210,24 +303,87 @@ export function PortalAccessPanel({
   actions: PanelActions
   onGrant: () => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
+  const [query, setQuery] = React.useState("")
+  const [status, setStatus] = React.useState<ActiveFilter>("all")
+  const [sort, setSort] = React.useState<{ by: "grantedAt"; dir: "asc" | "desc" }>({
+    by: "grantedAt",
+    dir: "desc",
+  })
+
+  const q = query.trim().toLowerCase()
+  const filtered = portalUsers.filter(
+    (p) =>
+      matchesActive(status, p.active) &&
+      (q === "" ||
+        (p.email ?? "").toLowerCase().includes(q) ||
+        (p.grantedByName ?? "").toLowerCase().includes(q))
+  )
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const sorted = [...filtered].sort(
+    (a, b) => ((a.grantedAt ?? "") < (b.grantedAt ?? "") ? -1 : 1) * dirMul
+  )
+
   return (
     <div className="flex flex-col gap-4">
-      {canGrant && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onGrant} className="gap-1">
-            <KeyRound className="size-4" />
-            {t("Give access")}
-          </Button>
-        </div>
-      )}
+      <ToolbarRow
+        search={
+          portalUsers.length > 0 && (
+            <>
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search logins…")}
+                  className="h-9 pl-8"
+                  aria-label={t("Search logins")}
+                />
+              </div>
+              <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
+                <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All")}</SelectItem>
+                  <SelectItem value="active">{t("Can sign in")}</SelectItem>
+                  <SelectItem value="inactive">{t("Access taken away")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <SortControl
+                options={[{ value: "grantedAt", label: t("Given") }]}
+                value={sort.by}
+                onValueChange={() => undefined}
+                direction={sort.dir}
+                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+                label={t("Sort by")}
+              />
+            </>
+          )
+        }
+        actions={
+          canGrant && (
+            <Button size="sm" onClick={onGrant} className="gap-1">
+              <KeyRound className="size-4" />
+              {t("Give access")}
+            </Button>
+          )
+        }
+      />
       {portalUsers.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
-        </p>
+        <CollectionEmptyState
+          title={t("Nobody here can sign in yet.")}
+          description={t("Give access to someone and they'll see this account's own work.")}
+          onCreate={canGrant ? onGrant : undefined}
+        />
+      ) : sorted.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
-          {portalUsers.map((p) => (
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+          {sorted.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">
                 {p.email ?? t("Someone with a login")}
@@ -235,7 +391,7 @@ export function PortalAccessPanel({
               <span className="text-muted-foreground text-xs">
                 {p.active ? t("Can sign in") : t("Access taken away")}
                 {p.grantedByName ? ` · by ${p.grantedByName}` : ""}
-                {p.grantedAt ? ` · ${formatDate(p.grantedAt)}` : ""}
+                {p.grantedAt ? ` · ${formatDate(p.grantedAt, lang)}` : ""}
               </span>
               {canRevoke &&
                 (p.active ? (

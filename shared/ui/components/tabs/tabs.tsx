@@ -179,6 +179,11 @@ const LIST_SKIN: Record<TabsVariant, string> = {
 };
 
 const TRIGGER_BASE = [
+  // Named so `TabsCount` can key its shape off THIS element's own
+  // `data-state`, the same attribute the indicator measures off. A count is a
+  // child of the trigger, not a sibling, so `group-data-*` — not `peer-*` —
+  // is the mechanism; see `TabsCount` below and GAPS-RULINGS.md R-4a.
+  "group/tab",
   // The kit's reset line on every bare control. NOT `[font:inherit]`: Tailwind
   // emits that arbitrary property AFTER the named utilities in the bundle, so
   // the shorthand was silently overriding each skin's own step — `line`'s
@@ -676,10 +681,14 @@ export interface TabsTriggerProps
  * one child, and the kit draws no folder tab that is anything but a button.
  * `line` is untouched and still renders `children` alone.
  *
- * A count rides along as a child, not as an API: ch14 rules that "counts are
- * quiet, never badges", so a call site writes the number in
- * `text-micro tabular-nums text-ink-tertiary` next to the label rather than
- * reaching for `Badge`.
+ * A count rides along as a child, not as an API: `TabsCount` (below) is the
+ * shaped number, so a call site never hand-rolls the count's markup and the
+ * two variants cannot drift apart from each other again. `folder`'s count is
+ * ch14's own closing law, unchanged — "counts are quiet, never badges",
+ * micro/tabular/tertiary, no shape, active or not. `line`'s count is
+ * GAPS-RULINGS.md R-4a's ruling: quiet tertiary text at rest, and on the
+ * ACTIVE tab only, a small circular mango fill with primary-ink text — see
+ * `TabsCount` for the shape itself.
  *
  * TEN STATES
  *  1. default        — `line`: tertiary ink over the strip's own rule.
@@ -774,6 +783,91 @@ const TabsTrigger = React.forwardRef<
 });
 
 TabsTrigger.displayName = "TabsTrigger";
+
+/* ============================================================================
+   TabsCount
+
+   THE 2026-08-31/09-01 CLIENT RULING — recorded in full at GAPS-RULINGS.md
+   R-4a. Read that entry before touching either branch below: `folder`'s is
+   ch14's pre-existing law, restated so it cannot drift a second time (it
+   already had, once, in `CollectionFrame` — override 45); `line`'s is a NEW
+   decision that changes what CH27's "underline strip with a quiet count"
+   meant in practice, and it is not a taste call to soften back to symmetric.
+   ========================================================================= */
+
+const TABS_COUNT_SKIN: Record<TabsVariant, string> = {
+  /* ch14's own law, untouched by tonight's ruling: "counts are quiet, never
+     badges." Micro, tabular, tertiary ink, no shape — active or not, because
+     a folder tab already says "selected" with its own fill and rise; the
+     count has nothing left to add. */
+  folder: "text-micro tabular-nums text-ink-tertiary",
+  /* R-4a. At rest: bare `text-badge` (12 — "badge, count and status text",
+     KWAPSO-SPEC ch07/ch26) in tertiary ink, no shape at all — never a pill,
+     never a stroke, matching the inactive half of the ruling exactly.
+     On the tab THIS count lives in going active — read off `group/tab`'s own
+     `data-state`, the same attribute the strip's indicator measures off, so
+     no JS branch is needed here — the number gains a small fully circular
+     mango fill (`rounded-pill`, the kit's own name for the geometry, not a
+     literal `rounded-full`) at `1.125rem` (18px, the client's stated
+     "~16-18px" ceiling) with primary-ink (`--primary-foreground`, already
+     charcoal) text. The type size does not change between the two states — "colour is
+     the only difference" is ch14's phrase for the tab itself, and it is kept
+     here for the count too, so a count never reflows the label beside it
+     when its own tab is selected. */
+  line: cn(
+    "text-badge tabular-nums leading-none text-ink-tertiary",
+    "group-data-[state=active]/tab:inline-flex group-data-[state=active]/tab:size-[1.125rem]",
+    "group-data-[state=active]/tab:items-center group-data-[state=active]/tab:justify-center",
+    "group-data-[state=active]/tab:rounded-pill group-data-[state=active]/tab:bg-primary",
+    "group-data-[state=active]/tab:text-primary-foreground",
+  ),
+};
+
+export interface TabsCountProps extends React.ComponentPropsWithoutRef<"span"> {
+  /**
+   * Zero or a negative count renders nothing — `Badge`'s own zero law
+   * (SHELL.md: "counts render empty when zero"), applied here without
+   * reaching for `Badge`: on `line`, active, this IS shaped like a badge, but
+   * it is drawn by this file so the shape can turn off again on the other
+   * three states without a second component existing to turn off.
+   */
+  count: number | undefined;
+}
+
+/**
+ * The live number beside a tab's label. A child of `TabsTrigger`, not a prop
+ * on it — `<TabsTrigger value="x">Label <TabsCount count={n} /></TabsTrigger>`
+ * — so the trigger's own API stays the one Radix already ships and a call
+ * site keeps full control over what else rides beside the label (an icon, a
+ * `Tooltip`).
+ *
+ * TEN STATES — as `TabsTrigger`'s own block; this adds only the shape
+ * `TABS_COUNT_SKIN` describes, keyed off the SAME `data-state` the strip's
+ * indicator reads, so the two can never disagree about which tab is active.
+ *
+ * RTL — safe. The pill is a fixed square (`size-*`), and the text inside it
+ * is centred both axes; nothing here is positioned by side.
+ */
+const TabsCount = React.forwardRef<HTMLSpanElement, TabsCountProps>(
+  ({ count, className, ...props }, ref) => {
+    const resolved = React.useContext(TabsVariantContext);
+
+    if (count === undefined || count <= 0) return null;
+
+    return (
+      <span
+        ref={ref}
+        data-slot="tabs-count"
+        className={cn(TABS_COUNT_SKIN[resolved], className)}
+        {...props}
+      >
+        {count}
+      </span>
+    );
+  },
+);
+
+TabsCount.displayName = "TabsCount";
 
 /* ============================================================================
    TabsContent
@@ -950,4 +1044,4 @@ const TabsView = React.forwardRef<
 
 TabsView.displayName = "TabsView";
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, TabsView };
+export { Tabs, TabsList, TabsTrigger, TabsContent, TabsCount, TabsView };

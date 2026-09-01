@@ -25,23 +25,29 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Pencil, Plus, Power, RotateCcw, UserMinus } from "@shared/ui/foundations/icons"
+import { Pencil, Power, RotateCcw, Search, UserMinus } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { OverviewList } from "@/components/overview-list"
 import { RecordPicker } from "@/components/record-picker"
 import { WaveFormDialog } from "@/components/wave-form-dialog"
 import { waveDates } from "@/components/waves-screen"
 import {
   RecordActionsMenu,
-  RecordFooter,
+  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { ApiFailure } from "@/lib/api"
@@ -59,7 +65,7 @@ import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
 import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 
 export function WaveDetailScreen({
@@ -72,7 +78,7 @@ export function WaveDetailScreen({
   /** the waves list in the URL form we arrived through */
   basePath: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // ITS OWN READ, not a row out of the list. The record needs three things the
   // list row does not carry — the sprints, the clashes, and the goal — and its
   // dates move when a SPRINT moves, which is a change the list row alone could
@@ -103,6 +109,16 @@ export function WaveDetailScreen({
   const [planOpen, setPlanOpen] = React.useState(false)
   const [editOpen, setEditOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  // THE SPRINTS LIST ITSELF, narrowed here — bounded (a wave holds a handful of
+  // sprints, never a growing page of them) and already read whole above, so
+  // this is the same in-browser search/sort the other nested panels use. The
+  // ATTACH PICKER (`RecordPicker`, below) is untouched: it searches the pool of
+  // sprints NOT yet in this wave, a different question over a different list.
+  const [sprintQuery, setSprintQuery] = React.useState("")
+  const [sprintSort, setSprintSort] = React.useState<{ by: "name" | "startsOn"; dir: "asc" | "desc" }>({
+    by: "startsOn",
+    dir: "asc",
+  })
 
   /** Every write re-reads the record it changed, plus the list behind it and the
    * record's own history. Cheap (bounded, one round trip each) and it keeps this
@@ -169,6 +185,16 @@ export function WaveDetailScreen({
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   const { wave, sprints, overlaps } = waveQ.data
 
+  const sprintNeedle = sprintQuery.trim().toLowerCase()
+  const sprintDirMul = sprintSort.dir === "desc" ? -1 : 1
+  const shownSprints = sprints
+    .filter((s) => sprintNeedle === "" || s.name.toLowerCase().includes(sprintNeedle))
+    .sort((a, b) =>
+      sprintSort.by === "startsOn"
+        ? ((a.startsOn ?? "") < (b.startsOn ?? "") ? -1 : 1) * sprintDirMul
+        : a.name.localeCompare(b.name) * sprintDirMul
+    )
+
   // The sprints this client has that are not already in this package. A sprint
   // already filed under ANOTHER wave is deliberately still offered: picking it
   // MOVES it, which is a real thing to want and the one act that changes two
@@ -187,7 +213,7 @@ export function WaveDetailScreen({
     },
     // DERIVED FROM THE SPRINTS, said as one line so it reads the way somebody
     // would say it. Never typed — see the header.
-    { label: t("Runs"), value: waveDates(wave, t) },
+    { label: t("Runs"), value: waveDates(wave, t, lang) },
     {
       label: t("Sprints inside it"),
       value:
@@ -201,7 +227,7 @@ export function WaveDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
@@ -244,26 +270,69 @@ export function WaveDetailScreen({
   return (
     <RecordScreen
       leading={<RecordMark name={wave.name} />}
-      collectionLabel={t("Wave")}
-      title={wave.name}
-      status={[wave.accountName ?? undefined, waveDates(wave, t), wave.active ? undefined : t("Switched off")]
-        .filter(Boolean)
-        .join(" · ")}
-      actions={canEdit ? <RecordActionsMenu actions={overflow} /> : undefined}
-      headerExtra={
-        wave.accountId && wave.accountName ? (
-          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Button
-              variant="link"
-              type="button"
-              onClick={() => softNavigate(`${basePath}/${waveId}/accounts/${wave.accountId}`)}
-              className="hover:text-foreground"
-            >
-              {t("For")} {wave.accountName}
-            </Button>
-          </p>
-        ) : undefined
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `wave`), client ruling 2026-08-31.
+      eyebrow={t("Wave")}
+      // D4: THE NUMBER A PERSON QUOTES, in the black chip below the title. A
+      // wave gained one the same day this rule split off the account-code
+      // prefix (shared/workers/refs.ts) — `Wave.ref` didn't exist before that.
+      recordNumber={wave.ref || undefined}
+      // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
+      // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to repeat
+      // `t("Wave")` a second time as a chip, directly under the eyebrow that
+      // already says it.
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
+      // scheme is not only for tickets … map colors"). A wave's only two
+      // states are running and switched off (same shape as an account's),
+      // so this is the one unambiguous colour, exactly the account/process
+      // pattern: `archived` while switched off, wordless while running.
+      //
+      // THE THIRD PILL, "the most relevant container parent" (client ruling,
+      // 2026-08-31). The glossary's own words settle it: "wave: a package of
+      // sprints sold to ONE ACCOUNT" — the account it was sold to.
+      chips={
+        <>
+          {!wave.active && (
+            <Badge variant="status" dot="archived">
+              {t("Switched off")}
+            </Badge>
+          )}
+          {wave.accountId && wave.accountName ? (
+            <RecordChipLink href={`${basePath}/${waveId}/accounts/${wave.accountId}`}>
+              {wave.accountName}
+            </RecordChipLink>
+          ) : null}
+        </>
       }
+      title={wave.name}
+      // THE DATE RANGE MOVES TO `subtitle` — CLIENT RULING, 2026-08-31,
+      // VERBATIM: "what is this 3rd component in the title under the chips?
+      // kill everywhere. chips is the last component of headers!" It used to
+      // be this screen's `status` prop, which maps to `RecordChrome`'s
+      // `meta` and is drawn directly under the chips row
+      // (`data-record-region="header"`) — exactly what the ruling forbids.
+      // `subtitle` sits ABOVE the chips (record-chrome.tsx's own doc comment:
+      // "directly under the title, above chips/status" — the same slot the
+      // client named for a meeting's date/time), and this screen doesn't use
+      // it for anything else, so the dates move up rather than dropping out
+      // of the header. Duplicated in the Overview tab's own "Runs" row, the
+      // same way meeting-detail.tsx's subtitle duplicates its own "When" row
+      // — the client's own ruling on that screen says the duplication
+      // doesn't matter when the fact belongs in this exact position.
+      subtitle={waveDates(wave, t, lang)}
+      actions={canEdit ? <RecordActionsMenu actions={overflow} /> : undefined}
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: wave.createdByName,
+        createdAt: wave.createdAt,
+        editedByName: wave.editedByName,
+        updatedAt: wave.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("work", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       {/* TWO SPRINTS THAT CROSS — a warning band under the header, where this
           book already says a warning band goes. It is not a refusal and it never
@@ -300,40 +369,82 @@ export function WaveDetailScreen({
                     already exists. A screen offering only the second makes
                     somebody leave, create a sprint somewhere else, and come
                     back to find it. */}
-                {canCreate ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-fit gap-1"
-                    disabled={busy}
-                    onClick={() => setPlanOpen(true)}
-                  >
-                    <Plus className="size-3.5" aria-hidden />
-                    {t("Plan a sprint")}
-                  </Button>
-                ) : null}
-
-                {canEdit && addable.length > 0 ? (
-                  <RecordPicker
-                    id="wave-add-sprint"
-                    value=""
-                    onChange={(sprintId) => void moveSprint(sprintId, waveId)}
-                    options={addable.map((s) => ({ value: s.id, label: s.name, picture: null }))}
-                    placeholder={t("Put a sprint in this wave")}
-                    searchPlaceholder={t("Search sprints…")}
-                    emptyText={t("No sprint matched.")}
-                    disabled={busy}
+                {/* TWO ACTIONS, ONE TOOLBAR ROW, pinned right — "Plan a sprint"
+                    (ICON-ONLY, client ruling 2026-08-31) beside "Put a sprint
+                    in this wave" (a search-to-attach control, the same kind of
+                    second act `ContactsPanel`'s "Add contact" is). */}
+                {sprints.length > 0 || canCreate || (canEdit && addable.length > 0) ? (
+                  <ToolbarRow
+                    // THE LIST'S OWN SEARCH + SORT — over the sprints ALREADY in
+                    // this wave, never the attach picker's pool. Shown once
+                    // there is more than one row to narrow; a wave with one
+                    // sprint has nothing for either control to do.
+                    search={
+                      sprints.length > 1 && (
+                        <>
+                          <div className="relative w-full sm:w-56">
+                            <Search
+                              className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                              aria-hidden
+                            />
+                            <Input
+                              value={sprintQuery}
+                              onChange={(e) => setSprintQuery(e.target.value)}
+                              placeholder={t("Search sprints in this wave…")}
+                              className="h-9 pl-8"
+                              aria-label={t("Search sprints in this wave")}
+                            />
+                          </div>
+                          <SortControl
+                            options={[
+                              { value: "startsOn", label: t("Starts") },
+                              { value: "name", label: t("Name") },
+                            ]}
+                            value={sprintSort.by}
+                            onValueChange={(by) => setSprintSort({ by: by as typeof sprintSort.by, dir: "asc" })}
+                            direction={sprintSort.dir}
+                            onDirectionChange={(dir) => setSprintSort((s) => ({ ...s, dir }))}
+                            label={t("Sort by")}
+                          />
+                        </>
+                      )
+                    }
+                    actions={
+                      <>
+                        {canCreate && (
+                          <AddButton label={t("Plan a sprint")} onClick={() => setPlanOpen(true)} disabled={busy} />
+                        )}
+                        {canEdit && addable.length > 0 && (
+                          <RecordPicker
+                            id="wave-add-sprint"
+                            value=""
+                            onChange={(sprintId) => void moveSprint(sprintId, waveId)}
+                            options={addable.map((s) => ({ value: s.id, label: s.name, picture: null }))}
+                            placeholder={t("Put a sprint in this wave")}
+                            searchPlaceholder={t("Search sprints…")}
+                            emptyText={t("No sprint matched.")}
+                            disabled={busy}
+                          />
+                        )}
+                      </>
+                    }
                   />
                 ) : null}
 
                 {sprints.length === 0 ? (
-                  <p className="text-muted-foreground py-4 text-sm">
-                    {t("No sprints in this wave yet. The wave is sold first; the sprints inside it are planned afterwards.")}
-                  </p>
+                  // No `sprints` import target at all — a wave's sprints are
+                  // planned or moved in, never bulk-loaded.
+                  <CollectionEmptyState
+                    title={t("No sprints in this wave yet.")}
+                    description={t("The wave is sold first; the sprints inside it are planned afterwards.")}
+                    onCreate={canCreate ? () => setPlanOpen(true) : undefined}
+                  />
+                ) : shownSprints.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
-                    {sprints.map((s) => (
-                      <li key={s.id} className="bg-card flex items-center gap-3 rounded-[var(--radius)] border p-3">
+                    {shownSprints.map((s) => (
+                      <li key={s.id} className="bg-surface-panel flex items-center gap-3 rounded-[var(--radius)] p-3">
                         {/* R35 — a record row carries its face. */}
                         <RecordMark name={s.name} />
                         <div className="min-w-0 flex-1">
@@ -345,7 +456,7 @@ export function WaveDetailScreen({
                             {s.name}
                           </button>
                           <p className="text-muted-foreground truncate text-xs">
-                            {waveDates(s, t)}
+                            {waveDates(s, t, lang)}
                           </p>
                         </div>
                         {canEdit ? (
@@ -366,7 +477,14 @@ export function WaveDetailScreen({
                 )}
               </div>
             )
-          if (panel.value === "activity") return <ActivityPanel activity={activity} />
+          if (panel.value === "activity")
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("work", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           return <OverviewList items={overviewItems} />
         }}
       />
@@ -408,15 +526,6 @@ export function WaveDetailScreen({
           invalidate(sprintsKey(teamId))
           if (wave.accountId) invalidate(sliceKey("sprints-account", wave.accountId))
           toast.success(t("Sprint planned, and it is in this wave."))
-        }}
-      />
-
-      <RecordFooter
-        audit={{
-          createdByName: wave.createdByName,
-          createdAt: wave.createdAt,
-          editedByName: wave.editedByName,
-          updatedAt: wave.updatedAt,
         }}
       />
 

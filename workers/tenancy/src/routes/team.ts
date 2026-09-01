@@ -4,7 +4,7 @@
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { logActivity } from "@shared/workers/activity"
+import { logActivity, writeActivity } from "@shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
 import { getMyPermissions } from "../lib/roles"
 import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "@shared/rules/registry"
@@ -22,7 +22,7 @@ import {
 import { MAX_TEAMS_PER_USER, numberVar } from "@shared/workers/limits"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
-import { gatedBody } from "@shared/workers/route"
+import { gatedBody, openTeam } from "@shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
 
@@ -382,6 +382,65 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     id = idx.invite_row_id
   }
   return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor, await accountScope(cfg, guard))))
+}
+
+/** POST /api/tenancy/activity/note — add a note to one record's history: the
+ * generic (table, id) WRITE half of the "record" scope above, behind the SAME
+ * gate map. CH27.8's add-a-note field on the kit's ink footer had no door
+ * behind it at all until now (BASE-IMPROVEMENTS.md said so; the kit accepted
+ * `onAddNote` and drew nothing because no caller ever passed it).
+ *
+ * OPENS WITH `openTeam`, not `gated`/`gatedBody`: which module gates this
+ * write depends on the BODY (the `table` the note is about), so the right
+ * can't be named before the body is read — the same shape the importer uses
+ * to gate `create` on a body-named target module (openTeam's own doc). It
+ * gates for real, explicitly, two lines down.
+ *
+ * `create`, not `edit`: a note is a NEW item hung off an existing record, not
+ * a change to the record's own fields — the same right `processes/comments`
+ * already gates its own free-text append on.
+ *
+ * REFUSES EVERY PORTAL CALLER, for every table, unconditionally — ch27.8:
+ * "the portal never shows internal notes" is a blanket rule, not a per-table
+ * fence, so this calls `refusePortalCaller` rather than `portalActivityClause`
+ * (the read side's per-table fence). The portal's own gateway never names this
+ * door anyway (it forwards a NAMED allow-list and this isn't on it); the
+ * refusal here is belt-and-braces for the one origin that could still reach
+ * it — the agency's own — the same defence `getTeamMetaFeed` above uses.
+ *
+ * The write goes through `writeActivity` (shared/workers/activity.ts), not
+ * `logActivity`: writing the row IS the point of this request, so a failure
+ * must come back as a real error, never be swallowed. */
+export async function postActivityNote(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await openTeam<Body>(request, env)
+  await refusePortalCaller(cfg, guard)
+  const table = requireText(body.table, "Table", TEXT_LIMITS.short)
+  // hasOwnProperty, not bare bracket access — the same defence the record
+  // scope above takes for the identical reason: `table: "__proto__"` would
+  // otherwise resolve an INHERITED member, read as a real module, and 500 the
+  // permission check instead of a clean 400.
+  const module = Object.prototype.hasOwnProperty.call(ACTIVITY_GATE_MAP, table)
+    ? ACTIVITY_GATE_MAP[table]
+    : undefined
+  if (!module) return fail(400, "invalid_input", "Unknown record type.")
+  await requireRight(cfg, guard, module, "create")
+  const id = requireText(body.id, "Record", TEXT_LIMITS.short)
+  // TEXT_LIMITS.long — "descriptions, article bodies, replies": a note is
+  // exactly that shape, not a label.
+  const note = requireText(body.note, "Note", TEXT_LIMITS.long)
+  await writeActivity(cfg, guard.databaseId, actor, {
+    type: "Note added",
+    description: `${actor.name} added a note: "${note}"`,
+    relatedTable: table,
+    relatedRowId: id,
+  })
+  // The SAME resource name every real edit on this table already publishes
+  // (accounts, help, sprints, …) — so the record's own TEAM_RESOURCES entry in
+  // web/lib/live-resources.ts, which already lists `activity:record:<table>:
+  // <id>` among its deps for every module this feature is wired to, refreshes
+  // the feed with no new listener code (R15).
+  await publishChange(env, guard.teamId, table, id)
+  return json({ ok: true })
 }
 
 /** The active team's Overview metadata (any member of the AGENCY may read it —

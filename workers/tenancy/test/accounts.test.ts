@@ -764,27 +764,41 @@ describe("the reference code", () => {
   const codeOf = (id: string) =>
     (db().prepare("SELECT code FROM accounts WHERE id = ?").get(id) as { code: string | null }).code
 
-  it("is the first four letters of the name, uppercased", async () => {
+  // 2026-08-31 ruling: CONSONANTS, not letters. "Padelbase" -> PDLB is the
+  // client's own example.
+  it("is the first four consonants of the name, uppercased", async () => {
     const id = await createAccount(cfg, guard, staff, actor, {
       accountType: "entity",
-      name: "Bergman S.A.",
+      name: "Padelbase",
     })
-    expect(codeOf(id)).toBe("BERG")
+    expect(codeOf(id)).toBe("PDLB")
   })
 
-  it("a second company with the same four letters gets a numeric suffix", async () => {
+  it("a second company with the same four consonants gets a numeric suffix", async () => {
+    // Bergman, Bergmann and Bergmark all reduce to the same four consonants
+    // (B, R, G, M) once the vowels are stripped, exactly the way the old
+    // by-letters scheme collided on their first four letters.
     const first = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Bergman S.A." })
     const second = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Bergmann GmbH" })
     const third = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Bergmark Oy" })
-    expect(codeOf(first)).toBe("BERG")
-    expect(codeOf(second)).toBe("BERG2")
-    expect(codeOf(third)).toBe("BERG3")
+    expect(codeOf(first)).toBe("BRGM")
+    expect(codeOf(second)).toBe("BRGM2")
+    expect(codeOf(third)).toBe("BRGM3")
+  })
+
+  it("fewer than four consonants pads with the name's own vowels, in order", async () => {
+    // "Iowa" has exactly one consonant (W) — the fallback fills the rest from
+    // the vowels I, O, A in the order they appear, "use what there is".
+    const id = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Iowa" })
+    expect(codeOf(id)).toBe("WIOA")
   })
 
   it("punctuation and accents are not part of it", async () => {
     const id = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Ñ&Co Ltd" })
-    // The tilde is stripped to its base letter, the ampersand is not a letter.
-    expect(codeOf(id)).toBe("NCOL")
+    // The tilde is stripped to its base letter, the ampersand is not a letter,
+    // and the O is a vowel — stripped from the four consonants (N, C, L, T)
+    // the same as any other vowel.
+    expect(codeOf(id)).toBe("NCLT")
   })
 
   it("a name with nothing usable in it mints nothing — the row still lands", async () => {

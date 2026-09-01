@@ -154,16 +154,43 @@ describe("the shell's own chrome stays on screen", () => {
       .toMatch(/overflow-y-auto/)
   })
 
-  it("the bottom row is still the thing being held down there", () => {
-    // If this ever stops being mt-auto the two tests above are guarding nothing.
-    // Anchored on the class list, not the bare word — the comment above the
-    // <aside> discusses mt-auto in prose, and matched first.
+  // THE NAV CONTENTS ARE THE KIT'S `Rail` NOW (R45) — the hand-rolled
+  // `navButton`/`toggleCollapsed` pair this used to anchor on is gone with it,
+  // by design: Rail draws its own rows and its own collapse control. What has
+  // to survive the swap is the PROPERTY, not the old mechanism — the nav
+  // region scrolls in its own wrapper so a long list can never push the team
+  // switcher or the account menu off the bottom of the window.
+  it("the nav region is a bounded, independently-scrolling wrapper around Rail", () => {
     const src = read("components/app-shell.tsx")
-    const bottom = src.indexOf("mt-auto flex")
-    expect(bottom, "the profile/theme/collapse row must still be bottom-anchored").toBeGreaterThan(-1)
-    const row = src.slice(bottom, bottom + 700)
-    expect(row).toContain("<ProfileMenu")
-    expect(row).toContain("toggleCollapsed")
+    // Substring, not the exact class list (31 Aug 2026): the wrapper also picked
+    // up `overflow-x-clip` (a real bug fix — Rail's own row bleed made this
+    // wrapper's un-set overflow-x compute to `auto`, letting the rail drag
+    // sideways) — checking the vertical-scroll classes are PRESENT, not that
+    // nothing else ever joins them, so the next legitimate addition here
+    // doesn't retrigger this same false failure.
+    const wrapper = src.indexOf('className="min-h-0 flex-1 overflow-y-auto')
+    expect(wrapper, "Rail must sit inside a sized, scrollable wrapper — its own min-h-full needs one to fill").toBeGreaterThan(-1)
+    expect(src.slice(wrapper, wrapper + 200), "the wrapper must actually hold <Rail").toContain("<Rail")
+  })
+
+  it("the account menu sits below the rail, still reachable at the bottom of the column", () => {
+    // Rail's own member chip is ONE action (real name, `onSelect` only — see
+    // the note in app-shell.tsx); the actual account menu (profile, settings,
+    // appearance, sign out) has no Rail slot, so it stays a real,
+    // separately-composed control rather than being dropped.
+    const src = read("components/app-shell.tsx")
+    const rail = src.indexOf("<Rail")
+    expect(rail, "app-shell must render the kit's Rail").toBeGreaterThan(-1)
+    // 1500 → 7000 (31 Aug 2026): the collapsed-state member row grew a real
+    // `<ProfileMenu trigger=… tooltip=…>` composition (the avatar itself is
+    // now the menu's trigger, replacing a separate dots button — see the
+    // note in app-shell.tsx) BEFORE the expanded state's own
+    // `<ProfileMenu … compact>` this assertion is really checking for, which
+    // pushed the real distance from `<Rail` to ~5,974 chars. The window only
+    // needs to be generous, not exact.
+    const after = src.slice(rail, rail + 7000)
+    expect(after, "the account menu must be composed after the rail, in the same column").toContain("<ProfileMenu")
+    expect(after, "…compact, so it is not a second avatar beside Rail's own member chip").toMatch(/<ProfileMenu\s+active=\{active\}\s+compact/)
   })
 
   it("the theme control is in the profile menu, not the rail", () => {
@@ -176,8 +203,25 @@ describe("the shell's own chrome stays on screen", () => {
     // had simply been deleted, and a theme control nobody can reach is worse
     // than a wide one.
     const shell = read("components/app-shell.tsx")
-    const bottom = shell.indexOf("mt-auto flex")
-    expect(shell.slice(bottom, bottom + 700), "the rail must not draw it").not.toContain("<ModeToggle")
+    expect(shell, "the shell must not draw it inline").not.toContain("<ModeToggle")
     expect(read("components/profile-menu.tsx"), "…and the menu must").toContain("<ModeToggle")
+  })
+
+  it("Rail never gets a real in-app href (its own <a> never calls preventDefault)", () => {
+    // A kit-side finding, not a hypothetical: `templates/rail.tsx`'s row
+    // renders a real <a onClick={...}> with no preventDefault, firing
+    // onSelect ALONGSIDE the browser's own navigation rather than instead of
+    // it. Wiring `RailItem.href` to an in-app path would hard-reload this
+    // static-export shell on every click (EDGE-CASES.md's trap, R37). Every
+    // row and the member chip must go through `onSelect` only.
+    const src = read("components/app-shell.tsx")
+    const groups = src.indexOf("const railGroups")
+    const member = src.indexOf("const railMember")
+    expect(groups, "railGroups must be built in app-shell.tsx").toBeGreaterThan(-1)
+    expect(member, "railMember must be built in app-shell.tsx").toBeGreaterThan(-1)
+    const groupsBlock = src.slice(groups, member)
+    const memberBlock = src.slice(member, member + 700)
+    expect(groupsBlock, "a RailItem must never carry href").not.toContain("href:")
+    expect(memberBlock, "the member chip must never carry href").not.toContain("href:")
   })
 })

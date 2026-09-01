@@ -197,7 +197,6 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { Badge } from "../badge/badge";
 import { Card, CardContent } from "../card/card";
 import { Input } from "../input/input";
 import { Title } from "../title/title";
@@ -208,6 +207,7 @@ import {
 import {
   Tabs,
   TabsContent,
+  TabsCount,
   TabsList,
   TabsTrigger,
 } from "../tabs/tabs";
@@ -225,7 +225,8 @@ export interface RecordDetailTab {
   value: string;
   /** What the tab says. */
   label: React.ReactNode;
-  /** A live count beside the label. Zero renders nothing — `Badge`'s law. */
+  /** A live count beside the label, drawn by `TabsCount`. Zero renders
+   *  nothing — `Badge`'s zero law, without reaching for `Badge` itself. */
   count?: number;
   /** This tab's panel. Absent, `children` is shown for every tab. */
   content?: React.ReactNode;
@@ -693,8 +694,14 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
           {visibleTabs.map((item) => (
             <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
               {item.label}
-              {/* Zero renders nothing — `Badge`'s law, not re-derived here. */}
-              <Badge count={item.count} />
+              {/* `line`'s asymmetric count — quiet text at rest, a small
+                  mango circle with primary-ink text on the active tab only —
+                  is `TabsCount`'s own shape (GAPS-RULINGS.md R-4a). Not a
+                  `Badge`: a record's sections stay CH27's underline strip,
+                  and this was the exact place a bare `Badge` had drifted from
+                  that strip's own "quiet count" law before tonight's
+                  ruling gave the active state somewhere to go instead. */}
+              <TabsCount count={item.count} />
             </TabsTrigger>
           ))}
         </TabsList>

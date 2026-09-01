@@ -16,6 +16,8 @@
 // renders nothing at all — never a "0" that reads as an empty collection while
 // the rows are still on their way.
 
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { formatCount } from "@shared/web/format-count"
 
 export function CollectionHeading({
@@ -31,10 +33,19 @@ export function CollectionHeading({
   const count = formatCount(total)
   return (
     <div className="mb-4 flex items-baseline justify-between gap-2">
-      <h2 className="text-lg font-medium">
+      {/* display-m — CLIENT CORRECTION, 2026-08-31, verbatim: "title on main
+          screens still way too small! it's currently smaller than in detail
+          screens. makes no sense." This used to sit at h3 (24, matching
+          SHAPE_HEADING_SIZE.calm — itself a step short because the vendored
+          `Title` primitive has no rung above h2/32 at all), then at a bare
+          `text-lg` (18) before that. The reference kit names this step
+          outright — display-m / 56 / 500 is "Page title" — and a portal main
+          screen's title is exactly that role, the same as the agency app's own
+          CollectionHeading. */}
+      <Headline as="h2" size="display-m" className="flex items-center gap-2">
         {label}
-        {count ? <span className="text-muted-foreground ml-2 font-normal">{count}</span> : null}
-      </h2>
+        {count ? <Badge variant="secondary">{count}</Badge> : null}
+      </Headline>
       {action}
     </div>
   )

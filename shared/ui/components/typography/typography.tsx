@@ -95,8 +95,8 @@ const headlineVariants = cva([], {
      * enforce — it is written here so the next reader knows.
      */
     serif: {
-      true: "font-[var(--font-serif)] tracking-[var(--tracking-serif)]",
-      false: "font-[var(--font-sans)]",
+      true: "font-[family-name:var(--font-serif)] tracking-[var(--tracking-serif)]",
+      false: "font-[family-name:var(--font-sans)]",
     },
   },
   defaultVariants: { size: "h2", weight: "medium", tone: "default", serif: false },

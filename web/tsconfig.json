@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -13,23 +17,29 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
-      "@/*": ["./*"],
-      "@shared/*": ["../shared/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@shared/*": [
+        "../shared/*"
+      ]
     }
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     "../shared/**/*.ts",
+    "../shared/**/*.tsx",
     // shared/web/ is the BROWSER half of shared/ — the seams both front doors
     // render (FormShell, formatCount, the cache store, the draft hook). It is
     // .tsx as well as .ts, and it is excluded from every worker's tsconfig,
     // which has no DOM.
-    "../shared/**/*.tsx",
-    ".next/types/**/*.ts"
     // THE KIT'S COMPOSITIONS ARE IN THIS PROGRAM, and until 2026-08-28 they
     // were excluded. The exclusion's reason — "a .png import is a string
     // [under vite]; under Next it is a StaticImageData" — stopped being true
@@ -50,6 +60,24 @@
     // use can now turn the build red on a sync. That is the trade being made
     // on purpose — a kit screen that does not compile under Next is something
     // to learn at the sync, not on the day somebody first imports it.
+    ".next-avatar-verify/types/**/*.ts",
+    ".next-borderfix-verify/types/**/*.ts",
+    ".next-breadcrumbs-verify/types/**/*.ts",
+    ".next-empty-collection-verify/types/**/*.ts",
+    ".next-hoverfill-verify/types/**/*.ts",
+    ".next-list-mark-verify/types/**/*.ts",
+    ".next-member-row-verify/types/**/*.ts",
+    ".next-nested-toolbars-verify/types/**/*.ts",
+    ".next-rail-fixes-verify/types/**/*.ts",
+    ".next-rail-regression-verify/types/**/*.ts",
+    ".next-rail-toggle-verify/types/**/*.ts",
+    ".next-tabs-underline-verify/types/**/*.ts",
+    ".next-toolbar-shape-verify/types/**/*.ts",
+    ".next-verify-toolbars/types/**/*.ts",
+    ".next-verify/types/**/*.ts",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-filters-sort-verify/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

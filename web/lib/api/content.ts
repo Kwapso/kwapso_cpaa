@@ -140,16 +140,27 @@ export type LogQuery = {
   targetTable?: string
   targetId?: string
   userId?: string
+  /** the Time screen's search box, answered by the door (R14) */
+  q?: string
+  /** a rolling window on `startedAt` — "7d", "30d" or "90d"; leave off for all time */
+  period?: string
+  /** a name out of the door's own WORK_LOG_SORTS, with `dir` flipping it */
+  sort?: string
+  dir?: string
 }
 
 function logQuery(filter: LogQuery | undefined, cursor: string | null | undefined): string {
-  const q = new URLSearchParams()
-  if (filter?.scope) q.set("scope", filter.scope)
-  if (filter?.targetTable) q.set("targetTable", filter.targetTable)
-  if (filter?.targetId) q.set("targetId", filter.targetId)
-  if (filter?.userId) q.set("userId", filter.userId)
-  if (cursor) q.set("cursor", cursor)
-  const s = q.toString()
+  const params = new URLSearchParams()
+  if (filter?.scope) params.set("scope", filter.scope)
+  if (filter?.targetTable) params.set("targetTable", filter.targetTable)
+  if (filter?.targetId) params.set("targetId", filter.targetId)
+  if (filter?.userId) params.set("userId", filter.userId)
+  if (filter?.q) params.set("q", filter.q)
+  if (filter?.period) params.set("period", filter.period)
+  if (filter?.sort) params.set("sort", filter.sort)
+  if (filter?.dir) params.set("dir", filter.dir)
+  if (cursor) params.set("cursor", cursor)
+  const s = params.toString()
   return s ? `?${s}` : ""
 }
 
@@ -455,7 +466,17 @@ export const content = {
    * be carrying the file a client sent. `total` counts the view that was asked
    * for; the other two numbers ride along so a tab badge is never derived from
    * the rows in front of it (R16). */
-  todos: (opts: { accountId?: string; view?: TodoViewName; cursor?: string } = {}) =>
+  todos: (
+    opts: {
+      accountId?: string
+      view?: TodoViewName
+      /** the nested panel's own search box, answered by the DOOR — the done
+       * pile pages and grows forever, so a browser could only ever search the
+       * page it had loaded. `total` counts this same question. */
+      q?: string
+      cursor?: string
+    } = {}
+  ) =>
     api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
       `/api/content/todos${listQuery({ ...opts })}`
     ),

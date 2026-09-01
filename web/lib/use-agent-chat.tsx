@@ -24,8 +24,17 @@ export type AgentChatItem =
    * maps this onto them, because the ruled shape is two names and the evidence
    * is a knowledge source with a kind, a record path and the passage's words.
    * Mapping in the panel keeps the kind's WORD on the side that can translate
-   * it. */
-  | (AgentChatMessage & { evidence?: TurnEvidence })
+   * it.
+   *
+   * `createdAt` — the eyebrow the panel draws above each bubble (the owner,
+   * 31 Aug 2026: timestamps, "like an eyebrow on top of the bubble", matching
+   * `TicketThread`'s own author/time row). A saved turn carries the server's
+   * own `AgentMessage.createdAt`; a turn born in THIS session (optimistic send,
+   * or the assistant bubble a stream is about to fill) has no server row yet,
+   * so it is stamped with the moment it appeared here — close enough for an
+   * "eyebrow", and corrected to the server's own value the next time this
+   * thread is loaded from storage. */
+  | (AgentChatMessage & { evidence?: TurnEvidence; createdAt?: string })
   | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed" }
 import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -105,7 +114,13 @@ const toChatItems = (messages: AgentMessage[]): AgentChatItem[] => {
       // Spent: the next question's answer stands on its own retrieval, which is
       // the same sentence the model is told (CITE_RULE).
       pending = undefined
-      return { id: m.id, role: m.role, content: <AgentMarkdown text={m.content ?? ""} />, evidence }
+      return {
+        id: m.id,
+        role: m.role,
+        content: <AgentMarkdown text={m.content ?? ""} />,
+        evidence,
+        createdAt: m.createdAt,
+      }
     })
 }
 
@@ -270,7 +285,10 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
       setItems((prev) =>
         prev.some((it) => it.id === assistantId)
           ? prev.map((it) => (it.id === assistantId ? { ...it, content } : it))
-          : [...prev, { id: assistantId, role: "assistant" as const, content }]
+          : [
+              ...prev,
+              { id: assistantId, role: "assistant" as const, content, createdAt: new Date().toISOString() },
+            ]
       )
 
     await run((ev) => {
@@ -459,10 +477,11 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     const shown = files ? `${text}\n(Attached: ${files.map((f) => f.name).join(", ")})` : text
     // Optimistic: the user's message appears instantly, and an empty assistant row
     // carries the animated 3-dot indicator (showTyping) until reply text streams.
+    const now = new Date().toISOString()
     setItems((prev) => [
       ...prev,
-      { id: newId(), role: "user", content: shown },
-      { id: assistantId, role: "assistant", content: "" },
+      { id: newId(), role: "user", content: shown, createdAt: now },
+      { id: assistantId, role: "assistant", content: "", createdAt: now },
     ])
     setBusy(true)
     setPending(null)
@@ -501,7 +520,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
         : calls.map(
             (c): AgentChatItem => ({ id: newId(), role: "tool", actionLabel: c.summary, status: "failed" })
           )),
-      { id: assistantId, role: "assistant", content: "" },
+      { id: assistantId, role: "assistant", content: "", createdAt: new Date().toISOString() },
     ])
     try {
       await consume(
@@ -556,8 +575,29 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // bubble still has no text — so it fills the gap before the first event, every
   // step_end→step_start gap, and the wait for the first reply delta, then vanishes
   // the moment reply text streams (or a confirm/final drops the empty bubble).
+  //
+  // THIS WAS COMPUTED AND NEVER DRAWN. `showTyping` fed `AgentChat`'s
+  // `streaming` prop, which does exactly one thing with it — a blinking caret
+  // AFTER the last assistant turn's own content — and there was no assistant
+  // turn to put it after: the panel's placeholder bubble carries `content: ""`,
+  // so the caret rendered alone in an otherwise-empty box. That is what the
+  // library actually has a state for (`thinking` — "three breathing dots as
+  // their own turn"), and it was never wired up. `showTyping` now feeds
+  // `thinking` instead (agent-panel.tsx), and the placeholder bubble is kept
+  // OUT of the rendered turn list while it carries no text — see the filter
+  // there — so the dots are the only thing standing in for "nothing arrived
+  // yet", and the caret is free to mean what it always meant: a turn IS being
+  // written into, and it only turns on once real text has (`streamingReply`).
   const lastAssistant = [...items].reverse().find((it): it is AgentChatMessage => it.role === "assistant")
   const showTyping = busy && !pending && !lastAssistant?.content
+  // The blinking caret's own condition — the mirror of `showTyping` above.
+  // Kept separate rather than reusing `busy` directly: while `pending` (a
+  // paused confirm) there is no live text turn to blink a caret onto, and
+  // while a tool step is running mid-turn the trailing item in the RAW list
+  // can be that step's row rather than the reply bubble — `lastAssistant`
+  // already skips role:"tool" rows, so this only goes true once the actual
+  // reply bubble is the one holding text.
+  const streamingReply = busy && !pending && !!lastAssistant?.content
 
   // The proposed actions as RunSteps (pending until the user decides).
   const confirmSteps: RunStep[] = pending ? confirmStepsFrom(pending.calls) : []
@@ -598,6 +638,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     pending,
     failure,
     showTyping,
+    streamingReply,
     confirmSteps,
     quotaLabel,
     usageSummary,

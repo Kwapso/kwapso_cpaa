@@ -47,7 +47,7 @@ export const GLOSSARY = {
   // a task is our own admin. Keeping those four apart in the words is what keeps
   // them apart on the screens.
   story: { term: "Story", def: "One piece of work we do. It carries who's doing it and by when, and lives in a sprint." },
-  todo: { term: "To-do", def: "Something we're waiting on a client for. It sits in their portal with a due date." },
+  todo: { term: "Input", def: "Something we need from a client. It sits in their portal with a due date." },
   task: { term: "Task", def: "Our own internal admin, something for us, not for an account's delivery." },
   sprint: { term: "Sprint", def: "A block of delivery work sold to one account, with a start, an end and a price." },
   // The one nav section whose noun the glossary did not define — found by the
@@ -60,7 +60,10 @@ export const GLOSSARY = {
   engagementType: { term: "Engagement type", def: "A label on time saying how it was sold: blueprint, sprint, support or hourly." },
   recordReference: { term: "Reference number", def: "The short number on a ticket, story or sprint. BERG-T0412, so anyone can say which one they mean." },
   stakeholder: { term: "Stakeholder", def: "Someone kept in the loop on a ticket, the person who raised it, your admins, and anyone mentioned." },
-  dropdownValues: { term: "Dropdown values", def: "The options behind your team's dropdowns, like Ticket types and Sprint types." },
+  // RENAMED FROM "Dropdown values" TO "Choices" (2026-09-01), the day the
+  // screen itself moved into Settings as its own tab — the key stays (nothing
+  // reads the object key as a word), only the term a person reads changes.
+  dropdownValues: { term: "Choices", def: "The options behind your team's dropdowns, like Ticket types and Sprint types." },
   importCsv: { term: "Import", def: "Bring rows in from a spreadsheet (CSV) instead of typing them one by one." },
   exportCsv: { term: "Export", def: "Download what you can see as a spreadsheet (CSV) file." },
   sampleFile: { term: "Sample file", def: "A downloadable example that shows what a good import file looks like." },

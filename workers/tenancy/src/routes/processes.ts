@@ -22,7 +22,7 @@
 // is the assumption two leaks in this codebase were built on.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { imageFieldLimit, optionalMark, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -334,7 +334,11 @@ export async function postCreateAppModule(request: Request, env: Env): Promise<R
   const id = await createAppModule(cfg, guard, scope, actor, {
     appId: requireText(body.appId, "App", TEXT_LIMITS.short),
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
-    mark: optionalText(body.mark, "Emoji", TEXT_LIMITS.short),
+    // R20: "Mark", not "Emoji" — the field's own UI label dropped the word on
+    // 2026-08-31 (internal-record-dialog.tsx's moduleFields), and optionalMark
+    // is what actually enforces "no emoji" now, the same guard selectable.ts
+    // and client-org.ts's tool "Icon" carry.
+    mark: optionalMark(body.mark, "Mark", TEXT_LIMITS.short),
     nameDe: optionalText(body.nameDe, "German name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     benefit: optionalText(body.benefit, "Benefit", TEXT_LIMITS.long),
@@ -351,7 +355,11 @@ export async function postUpdateAppModule(request: Request, env: Env): Promise<R
   const id = requireText(body.id, "Module", TEXT_LIMITS.short)
   await updateAppModule(cfg, guard, scope, actor, id, {
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
-    mark: optionalText(body.mark, "Emoji", TEXT_LIMITS.short),
+    // R20: "Mark", not "Emoji" — the field's own UI label dropped the word on
+    // 2026-08-31 (internal-record-dialog.tsx's moduleFields), and optionalMark
+    // is what actually enforces "no emoji" now, the same guard selectable.ts
+    // and client-org.ts's tool "Icon" carry.
+    mark: optionalMark(body.mark, "Mark", TEXT_LIMITS.short),
     nameDe: optionalText(body.nameDe, "German name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     benefit: optionalText(body.benefit, "Benefit", TEXT_LIMITS.long),

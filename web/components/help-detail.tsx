@@ -13,7 +13,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
 
@@ -32,9 +32,10 @@ import type {
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
+  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { MARK_GROUP, markMap, typeMark } from "@/lib/type-marks"
@@ -49,8 +50,8 @@ import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpAttachmentsPanel } from "@/components/help-attachments"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
-import { HelpStatusStepper } from "@/components/help-status-stepper"
 import { HELP_STATUS } from "@/components/deep-link/shape"
+import { helpStatusDotTone } from "@shared/status-tones"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
@@ -62,9 +63,10 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { helpAttachmentsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
+import { useConfirm } from "@shared/web/use-confirm"
 
 /** The one map every ticket screen reads. Imported rather than retyped here: this
  * file used to keep its own copy, and a copy is how the list and the record end
@@ -84,7 +86,7 @@ export function HelpDetailScreen({
    * /t/<team>/tickets) — a cross-link off this record stays in that shape. */
   basePath: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
 
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
     content.help().then((r) => r.tickets)
@@ -190,6 +192,10 @@ export function HelpDetailScreen({
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
+  // Archive is the one destructive act on this screen — one confirm dialog
+  // (shared/web/use-confirm.tsx) rather than a hand-rolled one. Restoring stays
+  // confirm-free, as the button beside it already says.
+  const { busy: archiveBusy, ask: askArchive, run: runArchive, dialog: archiveDialog } = useConfirm()
   // R16: the Files and links tab badges the door's exact COUNT(*). `null` there
   // is the third answer beside a number and an absence — the role may not read
   // the module (R18) — and it renders as nothing, exactly as a zero does.
@@ -358,14 +364,33 @@ export function HelpDetailScreen({
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped and no screen ever called it, so a ticket could be archived by the
    * assistant and then be unreachable by a person. Nothing is deleted: the
-   * conversation and the history survive exactly as they were. */
-  async function setArchived(archived: boolean) {
+   * conversation and the history survive exactly as they were. Putting it away
+   * asks first (it is the red half); taking it back out does not. */
+  function archiveTicket() {
+    askArchive({
+      title: t("Archive this ticket?"),
+      body: t("It stops showing in the everyday lists. The conversation and its history stay exactly as they are, and you can take it back out any time."),
+      action: t("Archive"),
+      run: () =>
+        runArchive(
+          async () => {
+            const { tickets } = await content.archiveHelp(helpId, true)
+            primeCache(`help:${teamId}`, tickets)
+            invalidate(recordActivityKey("help", helpId))
+          },
+          t("Put away."),
+          t("Couldn't archive the ticket.")
+        ),
+    })
+  }
+
+  async function restoreTicket() {
     setStatusBusy(true)
     try {
-      const { tickets } = await content.archiveHelp(helpId, archived)
+      const { tickets } = await content.archiveHelp(helpId, false)
       primeCache(`help:${teamId}`, tickets)
       invalidate(recordActivityKey("help", helpId))
-      toast.success(archived ? t("Put away.") : t("Taken back out."))
+      toast.success(t("Taken back out."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
     } finally {
@@ -437,7 +462,7 @@ export function HelpDetailScreen({
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
     author: r.authorName || "Member",
-    time: formatRelative(r.createdAt, t),
+    time: formatRelative(r.createdAt, t, lang),
     // The reply as the reader asked for it: what was typed, or the translation
     // they pressed for. Never both, and never a stored rewrite of somebody's
     // words — `of` is a lookup, not a save.
@@ -464,12 +489,12 @@ export function HelpDetailScreen({
     // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
     // stop pushing the ticket's own facts below the fold. The status is on the
     // header band's own line.
-    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt, t) : "" },
+    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt, t, lang) : "" },
   ]
 
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       {
         value: "conversation",
@@ -584,15 +609,15 @@ export function HelpDetailScreen({
                 label: t("Take it back out"),
                 icon: <ArchiveRestore className="size-3.5" />,
                 disabled: statusBusy,
-                onSelect: () => void setArchived(false),
+                onSelect: () => void restoreTicket(),
               }
             : {
                 key: "archive",
                 label: t("Archive"),
                 icon: <Archive className="size-3.5" />,
-                disabled: statusBusy,
+                disabled: statusBusy || archiveBusy,
                 destructive: true,
-                onSelect: () => void setArchived(true),
+                onSelect: archiveTicket,
               },
         ]
       : []),
@@ -649,29 +674,105 @@ export function HelpDetailScreen({
       // The glyph the team set beside this ticket type on the Dropdown values
       // screen, in the square the header band keeps for it (G3).
       mark={typeMark(selectableQ.data, MARK_GROUP.ticket, ticket.helpType)}
-      // D4: the type word and THE NUMBER THE CLIENT QUOTES, above the title. The
-      // reference had existed on this record since the work engine landed and
-      // appeared on no screen — the one thing a person needs when a client rings
-      // up saying "about BERG-T0412".
-      // OVERRIDE 73: the ID in the black chip, the collection beside it, both
-      // BELOW the title. This is the record the client was looking at.
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `ticket`), client ruling 2026-08-31.
+      eyebrow={t("Ticket")}
+      // D4: THE NUMBER THE CLIENT QUOTES, above the title. The reference had
+      // existed on this record since the work engine landed and appeared on no
+      // screen — the one thing a person needs when a client rings up saying
+      // "about BERG-T0412".
+      // OVERRIDE 73: the ID in the black chip, BELOW the title. This is the
+      // record the client was looking at.
       recordNumber={ticket.ref || undefined}
-      collectionLabel={ticket.helpType || t("Ticket")}
-      chips={ticket.archivedAt ? <Badge>{t("Archived")}</Badge> : null}
+      // NO `collectionLabel` HERE — client re-ruling, 2026-08-31, reading this
+      // exact screenshot back: "why the pill 'issue' as the first one? … the
+      // first one is black and is the id, the second is always the status
+      // (color-coded), the third is the parent item (the app)." This used to
+      // pass `ticket.helpType` ("Issue") as `collectionLabel`, which
+      // `RecordScreen` always renders in PILL TWO — ahead of `chips`, no
+      // matter what `chips` starts with. So the status dot below was really
+      // pill three the whole time, and on any ticket with no `ref` yet
+      // (`recordNumber` renders nothing) the type chip slid all the way to
+      // pill one — exactly the bug in the client's screenshot. app-detail.tsx
+      // hit the same wall for the same reason and answered it the same way:
+      // leave `collectionLabel` unset and put every pill in `chips`, in the
+      // order the client actually wants them.
+      //
+      // The type isn't lost by dropping it here — it's the glyph in the
+      // header square above (`mark`, from the same `Ticket type` vocabulary)
+      // and it's which kind-tab the ticket lives under back on the Tickets
+      // screen (`type:${v}` in tickets-collection.tsx). This row said it a
+      // second time, in the one position that pushed the status pill out of
+      // its ruled spot.
+      //
+      // THE FIRST PILL IN `chips`, WITH A COLOUR (client ruling, 2026-08-31:
+      // "the status scheme is not only for tickets, identify everywhere … and
+      // map colors"). The seven-stage → dot mapping this screen deferred is
+      // now `shared/status-tones.ts`'s `helpStatusDotTone` — reused by nothing
+      // else, because the portal draws this same status in its OWN words for
+      // a client reader (ticket-row.tsx's `STATUS_WORDS`) rather than the
+      // agency's internal stage names.
+      //
+      // THE SECOND PILL IN `chips`, "the most relevant container parent"
+      // (client ruling, 2026-08-31) — a ticket's own example, verbatim:
+      // "second the app f.e. 'Padelbase'. When I click here should take me to
+      // padelbase app."
+      chips={
+        <>
+          <Badge variant="status" dot={helpStatusDotTone(ticket.status)}>
+            {STATUS_LABEL[ticket.status]}
+          </Badge>
+          {ticket.appId && ticket.appName && (
+            <RecordChipLink href={`${host.base}/apps/${ticket.appId}`}>
+              {ticket.appName}
+            </RecordChipLink>
+          )}
+          {ticket.archivedAt ? (
+            <Badge variant="status" dot="archived">
+              {t("Archived")}
+            </Badge>
+          ) : null}
+        </>
+      }
       // The description is rich text now, and a TITLE is one line: the words,
       // without the markup they were typed with. The body renders formatted in
       // the conversation below, which is where a person reads it. Translated
       // FIRST, then flattened — a title has to say what the reader just chose.
       title={richTextPlain(translation.of(ticket.description))}
-      // D5: one line, three facts at most.
-      status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
-        .filter(Boolean)
-        .join(" · ")}
+      // CLIENT RULING, 2026-08-31, VERBATIM: "what is this 3rd component in
+      // the title under the chips? kill everywhere. chips is the last
+      // component of headers!" Overrides the D5 trim above, which had kept
+      // `raisedByContactName` here reasoning it wasn't shown anywhere else —
+      // that reasoning no longer matters (the client's ruling drops the
+      // information regardless of duplication), and in any case "Raised by"
+      // is already a row in the Overview tab (this screen's own
+      // `overviewItems`), so nothing is lost. `RecordChrome`'s `meta` slot
+      // (record-chrome.tsx's `status` prop, confirmed via the kit's own
+      // `data-record-region="header"` block) renders directly under the
+      // chips row, which is exactly the region the ruling forbids — so
+      // `status` is dropped rather than fed, on every record screen, not
+      // only here.
+      //
+      // `headerExtra`'s stepper is dropped for the same reason: it maps to
+      // `RecordChrome`'s `hero` prop, which the kit draws in its own
+      // `data-record-region="hero"` block — the region directly under the
+      // header block that carries the chips, still above the tab strip. On
+      // the rendered page that reads as more content under the pills, which
+      // is the ruling's own complaint, so it goes too rather than being read
+      // as a technicality the ruling didn't quite reach.
       actions={actions}
-      /* A STATUS IS A FACT, NOT A BUTTON. The track still says how far along the
-         request is, because that is what a track is for — it simply is not
-         something anybody can press (CHECKLIST 5.2). */
-      headerExtra={<HelpStatusStepper status={ticket.status} />}
+      // D7 / CHECKLIST 11.3: who made it and who last touched it, now the
+      // kit's own ink footer's Record column rather than five rows in the
+      // middle of Overview.
+      audit={{
+        createdByName: ticket.raiserName,
+        createdAt: ticket.createdAt,
+        editedByName: ticket.editorName,
+        updatedAt: ticket.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("help", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}
@@ -682,7 +783,13 @@ export function HelpDetailScreen({
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
           if (panel.value === "activity")
-            return <ActivityPanel activity={activity} />
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("help", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
           // answer many tickets and one ticket may need many stories, so this is
           // a collection with its own create action — and the button is the
@@ -782,17 +889,6 @@ export function HelpDetailScreen({
         }}
       />
 
-      {/* D7 / CHECKLIST 11.3: who made it and who last touched it, grey, at the
-          foot of the record rather than five rows in the middle of Overview. */}
-      <RecordFooter
-        audit={{
-          createdByName: ticket.raiserName,
-          createdAt: ticket.createdAt,
-          editedByName: ticket.editorName,
-          updatedAt: ticket.updatedAt,
-        }}
-      />
-
       {/* NEW WORK ON THIS REQUEST. The ticket rides in as `fixedTicket`: the
           request behind the work is a fact about where you are standing, not a
           question, so it is shown rather than offered and cannot be mistyped.
@@ -860,6 +956,8 @@ export function HelpDetailScreen({
         helpId={helpId}
         canAttach={canEdit}
       />
+
+      {archiveDialog}
     </RecordScreen>
   )
 }

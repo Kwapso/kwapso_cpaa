@@ -52,7 +52,7 @@ import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
-import type { HelpScope, TaskView } from "@/lib/live-resources"
+import type { TaskView } from "@/lib/live-resources"
 import { registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import { RememberedScreen } from "@shared/web/remembered"
@@ -61,11 +61,11 @@ import { useScreenData } from "@/lib/use-screen-data"
 import { useScreenActions } from "@/lib/use-screen-actions"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { TEAM_SECTIONS, type Crumb } from "@/lib/pages"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export function DeepLinkScreen() {
   const active = useActiveTeam()
-  const t = useT()
+  const { t, lang } = useLanguage()
   const router = useRouter()
 
   /* -------------------------------- where am I ------------------------------- */
@@ -88,11 +88,6 @@ export function DeepLinkScreen() {
 
   /* --------------------------------- the data -------------------------------- */
 
-  // Which ticket set the Tickets screen shows. It is a SERVER scope (R14: the list
-  // is paged, so the door filters by raiser — not a client filter over a page),
-  // so it must be declared ABOVE the reads that key off it.
-  const [helpScope, setHelpScope] = React.useState<HelpScope>("all")
-
   // Which pile of our own admin the Tasks screen shows. A SERVER view for the
   // same reason (the list is capped, so "the done ones" is a question for the
   // door, not a sieve over the rows already loaded), so it is declared here too.
@@ -104,12 +99,12 @@ export function DeepLinkScreen() {
     overridesQ,
     accountsQ,
     knowledgeQ,
+    companiesQ,
     membersQ,
     rolesQ,
     invitesQ,
     metaQ,
     helpQ,
-    helpArchivedQ,
     brandQ,
     purposesQ,
     storiesQ,
@@ -134,7 +129,6 @@ export function DeepLinkScreen() {
     enabled,
     module,
     recordId,
-    helpScope,
     taskView,
     // The records this one was opened INSIDE. Their lists back the breadcrumb's
     // labels, so a nested address that does not ask for them shows the word
@@ -306,10 +300,19 @@ export function DeepLinkScreen() {
   /* -------------------------- engine intent + action ------------------------- */
 
   function onIntent(intent: ScreenIntent) {
-    if (intent.kind === "open")
+    if (intent.kind === "open") {
+      // A CONTACT OPENS AT ITS ACCOUNT ADDRESS. A contact is one row of the SAME
+      // `accounts` table a company is (SCOPE ch.03), read through the SAME door
+      // and drawn by the SAME screen (account-detail.tsx hands an individual
+      // straight to contact-detail.tsx) — so the Contacts list's own recipe
+      // binds to "contacts" for ITS identity (its cache, its scroll memory), and
+      // this is the one place that identity is translated back to the record's
+      // real address. Never a second `/contacts/<id>` URL for a record that
+      // already has one.
+      const openModule = intent.module === "contacts" ? "accounts" : intent.module
       // Open a record in the SAME URL form we're in (clean top-level or /t-scoped).
-      go(topLevel ? `/${intent.module}/${intent.id}` : `/t/${teamId}/${intent.module}/${intent.id}`)
-    else if (intent.kind === "close") {
+      go(topLevel ? `/${openModule}/${intent.id}` : `/t/${teamId}/${openModule}/${intent.id}`)
+    } else if (intent.kind === "close") {
       if (query.panel || query.confirm) closePanel()
       else router.back()
     }
@@ -397,8 +400,16 @@ export function DeepLinkScreen() {
             with tabs, and it is a rail destination like any other. */}
         <RememberedScreen memory={screenMemory}>
         {module === "home" && <HomeScreen active={active} />}
-        {module === "kwapso" && <KwapsoScreen active={active} />}
-        {module === "settings" && <SettingsScreen active={active} />}
+        {/* `?tab=` is the rail's own link into the record's OTHER two tabs
+            (the new Kwapso section, client feedback 31 Aug 2026 — see NAV in
+            lib/pages.ts) — KwapsoScreen reads it as the tab's INITIAL value,
+            so an explicit link always wins over whatever was remembered from
+            a previous visit. */}
+        {module === "kwapso" && <KwapsoScreen active={active} initialTab={query.tab} />}
+        {/* `?tab=` is the same rail-link mechanism the Kwapso screen's own
+            `initialTab` already uses (see above) — e.g. `ManageDropdownsLink`
+            opens `/settings?tab=choices` straight onto the Choices tab. */}
+        {module === "settings" && <SettingsScreen active={active} initialTab={query.tab} />}
         {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
         </RememberedScreen>
@@ -432,6 +443,10 @@ export function DeepLinkScreen() {
     internal_rates: totals.internal_rates,
     help: totals.help,
     accounts: totals.accounts,
+    // Contacts' own sidebar badge — the SAME exact total the old
+    // Companies/Contacts/All strip badged, primed by the one `listFetch.accounts`
+    // read either page already makes (see the `contacts` entry in lib/pages.ts).
+    "accounts-individual": totals.accountsIndividual,
     knowledge: totals.knowledge,
     stories: totals.stories,
     sprints: totals.sprints,
@@ -442,49 +457,81 @@ export function DeepLinkScreen() {
     purposes: totals.purposes,
   })
 
-  const crumbs = buildCrumbs({
-    levels: route.levels,
-    t,
-    topLevel,
-    module,
-    recordId,
-    teamName,
-    teamPath,
-    sectionPath,
-    records: crumbRecords,
-    resolved: resolvedNames,
-  })
-
-  // OVERRIDE 73 (2026-08-26). The client, on the live `Tickets · Padelbase · 4182`
-  // page, verbatim: "detail pages do not need this bar that you have on top where
-  // we have Padelbase and the number. these are chips, so the black chip is always
-  // the ID … of course, translate this to universal rules." The universal rule is
-  // this line: a RECORD screen carries no crumb trail, because the identity that
-  // trail was spelling now sits in the chips under the title (see RecordScreen).
-  // A collection keeps its crumbs — he ruled on detail pages and nothing else.
+  // OVERRIDE 73 (2026-08-26), REVISITED 2026-08-31, REVISITED AGAIN THE SAME
+  // DAY. The first revisit (below) was right that a record's own detail
+  // screen needs its trail back — override 73 struck the OLD bar for
+  // repeating the identity chips, not for existing at all. But the fix that
+  // restored it dropped the condition rather than correcting it, so the SAME
+  // trail now drew on a screen with no record open too: the client's next
+  // screenshot was the Sprints COLLECTION with a bar reading nothing but
+  // "Sprints" — above a screen whose own title already says "Sprints" and a
+  // sidebar that already shows the section. His words: "kill breadcrumbs in
+  // main screens!" — the SHELL.md line this whole override answers to is "a
+  // main screen is in the navbar; a detail screen has breadcrumbs."
   //
-  // The row itself stays: it also carries the running timer on desktop, and a
-  // timer is not a breadcrumb.
-  const showCrumbs = recordId === null
+  // So the trail is built ONLY when there is somewhere for it to lead BACK
+  // FROM: a record is actually open (`recordId`), or the screen sits nested
+  // inside an ancestor record that a plain nav item cannot reach on its own
+  // (`trail.length > 1` — a client's own Sprints list, say). A flat
+  // collection at the top of its section has nothing above it and nothing
+  // beside it that a crumb would say better than the title already does.
+  const showCrumbs = Boolean(recordId) || trail.length > 1
+  const crumbs = showCrumbs
+    ? buildCrumbs({
+        levels: route.levels,
+        t,
+        topLevel,
+        module,
+        recordId,
+        teamName,
+        teamPath,
+        sectionPath,
+        records: crumbRecords,
+        resolved: resolvedNames,
+      })
+    : []
+  //
+  // THIS RULING IS ADDITIVE, NOT A REVERSAL: a trail whose only job is the
+  // path BACK to the parent collection ("Tickets" → this record) names no
+  // ID and no collection chip's own text — `buildCrumbs` puts the record's
+  // own name/reference on the last crumb (a fact the identity chips don't
+  // carry in that form) and the section name on the link before it, both
+  // read off this app's own routing data (`sectionTitle` → `TEAM_SECTIONS`
+  // in web/lib/pages.ts), never invented here. So a record screen — flat or
+  // nested — gets the one crumb trail, at the top, above the title; a
+  // collection screen gets one only when it is nested inside a record
+  // (`/accounts/CONFIA/stories`, "Confia › Stories"), never at its own
+  // top-level address (`/stories`, `/sprints`, `/accounts`…).
 
   return (
-    <AppShell active={active} breadcrumbs={showCrumbs ? crumbs : undefined} onNavigate={go} activePath={currentPath}>
+    <AppShell active={active} breadcrumbs={crumbs} onNavigate={go} activePath={currentPath}>
       {/* data-trace marks the screen the agent just drove; the ring is a short-lived
        * glance cue (auto-cleared) so the user sees WHERE a traced change landed. It
        * rings the content region — a just-opened dialog draws the eye on its own. */}
-      {/* ONE PAGE CONTAINER, ONE CAP (UI-RULEBOOK L1). This was `max-w-3xl`, 768px
-       * — and it was the ONLY width cap in the agency app, so it governed every
-       * module screen. On the 1283px laptop the feedback screenshots were taken
-       * at, that left a 138px gutter each side; on a 2560px display, over 700px.
-       * 1600px keeps a comfortable measure on a large display while the shell's
-       * own `px-4 sm:px-6 lg:px-8` gutters (S2, and exactly the brand site's own
-       * 40px `--margin--m`) do the work at every width below it.
+      {/* THE WIDTH CAP MOVED TO THE SHELL (R29, app-shell.tsx). This line used to
+       * carry `mx-auto` + `max-w-[1600px]` itself, which capped every MODULE
+       * screen but not the five account screens (home, kwapso, settings,
+       * profile, invitations) that return earlier in this component and never
+       * reach this div at all — they ran uncapped, invisibly, until a wide
+       * monitor showed Kwapso wider than Meetings. The cap now lives once on
+       * `AppShell`'s own content div, which every screen this component renders
+       * passes through either way, so this div keeps only the layout it still
+       * owns: a flex column with a gap between the section nav and the content
+       * below it.
        *
-       * `rounded-[var(--radius)] transition-shadow` went with it: it rounded and animated a
-       * container that has no surface of its own. */}
+       * `flex-1 min-h-0` — THE FOOTER-TO-THE-BOTTOM CHAIN, LINK 2 (see
+       * `app-shell.tsx`'s own note on its content div for link 1 and the
+       * client ruling it answers). This div is already `flex flex-col`, so
+       * these two classes are the whole of it: `flex-1` claims the height
+       * `AppShell`'s div just floored to the body pane's own height, and
+       * `min-h-0` clears the default `min-height: auto` a flex column item
+       * gets from its own content, which is what would otherwise refuse the
+       * growth on a short record. A list/collection screen through this same
+       * div just ends up a little taller than its own content — nothing
+       * downstream of one reads that height, so nothing changes for it. */}
       <div
         data-trace={traceHighlight ?? undefined}
-        className={`mx-auto flex w-full max-w-[1600px] flex-col gap-6 ${
+        className={`flex w-full flex-1 min-h-0 flex-col gap-6 ${
           traceHighlight ? "ring-primary/60 rounded-[var(--radius)] ring-2 ring-offset-2 ring-offset-background" : ""
         }`}
       >
@@ -513,8 +560,12 @@ export function DeepLinkScreen() {
               screen swaps a panel, and `motion-panel-in` (the tight 4px rise) is
               what a panel takes. Remounting on a query change would also throw
               away the panel's own state to play an animation, which is the wrong
-              trade in both directions. */}
-          <div key={`${module}:${recordId ?? ""}`} className="motion-page-in flex flex-col gap-6">
+              trade in both directions.
+
+              `flex-1 min-h-0` — LINK 3 of the same chain, for the same
+              reason as the div above it (this one wraps the routed screen
+              itself, one level closer to `RecordScreen`). */}
+          <div key={`${module}:${recordId ?? ""}`} className="motion-page-in flex flex-1 min-h-0 flex-col gap-6">
           {/* THE SCREEN'S OWN MEMORY, scoped to this address. Everything the
               routed content holds that a person would expect to find where they
               left it — the open tab, a collection's search and filters, the
@@ -526,17 +577,17 @@ export function DeepLinkScreen() {
           <RememberedScreen memory={screenMemory}>
           {renderModuleContent({
             noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
-            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, companiesQ, totals,
             brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
-            sectionPath, helpScope, setHelpScope, myUserId, query, helpArchivedQ,
+            sectionPath, myUserId, query,
             // The tickets screen's sub-tab strip is built from the team's own
             // ticket types (CHECKLIST 5.1) — the same list the ticket form's
             // picker reads, so the words agree wherever they appear.
             helpTypeOptions,
-            taskView, setTaskView, t,
+            taskView, setTaskView, t, lang,
           })}
           </RememberedScreen>
           </div>

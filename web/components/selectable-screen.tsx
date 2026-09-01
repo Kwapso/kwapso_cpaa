@@ -1,10 +1,13 @@
 "use client"
 
-// Dropdown values ("selectable data") manager — host-composed, a tab on the team
-// Settings area. Lists the team's values grouped by TYPE (with the standard search +
-// status filter), and lets admins add a value (via the shared form dialog — Law R4,
-// like every other create), rename one, or deactivate/reactivate one. Gated by the
-// selectable_data module; the server re-checks every write. Library primitives only.
+// Choices ("selectable data", formerly "Dropdown values") manager — host-composed,
+// the "Choices" tab on the app-level Settings screen (2026-09-01; it used to be a
+// tab on the team area's own strip — `/t/<teamId>/dropdowns` still resolves there,
+// unlinked, for anything that still points at it). Lists the team's values grouped
+// by TYPE (with the standard search + status filter), and lets admins add a value
+// (via the shared form dialog — Law R4, like every other create), rename one, or
+// deactivate/reactivate one. Gated by the selectable_data module; the server
+// re-checks every write. Library primitives only.
 
 import * as React from "react"
 import { useRemembered } from "@shared/web/remembered"
@@ -21,9 +24,12 @@ import {
   SelectValue,
 } from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff } from "@shared/ui/foundations/icons"
 
+import type { SortOption } from "@shared/web/screen-engine/config"
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { RecordActionsMenu } from "@/components/record-chrome"
@@ -31,8 +37,22 @@ import { SelectableFormDialog } from "@/components/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
+import { useConfirm } from "@shared/web/use-confirm"
+
+/** WHAT A DROPDOWN VALUE MAY BE ORDERED BY. "Value" reorders the words INSIDE
+ * one group (the group itself stays put, alphabetical); "Group" reorders the
+ * GROUPS themselves (Ticket type before Sprint type, or the other way round)
+ * and leaves what's inside each one exactly where it was. Two different
+ * questions, and this is the whole vocabulary — a value has no date, no
+ * count, nothing else this screen could sort by (SelectableValue carries a
+ * word, a type, a default flag and an active flag, and none of the other
+ * three reads as an ORDER). */
+const VALUE_SORTS: SortOption[] = [
+  { value: "value", label: "Value" },
+  { value: "group", label: "Group" },
+]
 
 /** Shared by every row, virtualized or not — one function so the two render
  * paths cannot draw a value two different ways. */
@@ -262,7 +282,7 @@ function GroupValues({ items, ctx }: { items: SelectableValue[]; ctx: RowContext
 
   if (!v.virtualized) {
     return (
-      <ul className="divide-border divide-y rounded-[var(--radius)] border">
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {items.map((item) => (
           <ValueRow key={item.id} v={item} ctx={ctx} />
         ))}
@@ -273,7 +293,7 @@ function GroupValues({ items, ctx }: { items: SelectableValue[]; ctx: RowContext
   return (
     <ul
       ref={v.scrollRef}
-      className="divide-border divide-y rounded-[var(--radius)] border max-h-[28rem] overflow-y-auto"
+      className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel max-h-[28rem] overflow-y-auto"
     >
       {/* THE SPACERS ARE `<li>`s, not `<div>`s wrapping one — a `<ul>`'s only
           valid direct children are `<li>`, and a reader's list-item count
@@ -336,6 +356,17 @@ export function SelectableScreen({
   // Remembered with the screen — see web/lib/nav-memory.ts.
   const [query, setQuery] = useRemembered("search", "")
   const [status, setStatus] = React.useState<"active" | "inactive" | "all">("active")
+  // Sort — "Value" (default, A→Z inside each group) or "Group" (reorders the
+  // group headings themselves). Not remembered with the screen: it is a view
+  // preference over a short list a person re-derives in one glance, the same
+  // weight `status` above already gets.
+  const [sort, setSort] = React.useState<{ by: string; dir: "asc" | "desc" }>({
+    by: "value",
+    dir: "asc",
+  })
+  // Deactivating a value is the red half — one confirm dialog
+  // (shared/web/use-confirm.tsx); reactivating stays confirm-free.
+  const { ask: askDeactivate, run: runActive, dialog: deactivateDialog } = useConfirm()
 
   const values = valuesQ.data ?? []
   // The add form's group datalist offers EVERY existing type (not just the filtered
@@ -348,9 +379,17 @@ export function SelectableScreen({
       (status === "all" || (status === "active" ? v.active : !v.active)) &&
       (q === "" || v.value.toLowerCase().includes(q) || v.type.toLowerCase().includes(q))
   )
-  const grouped = Array.from(new Set(filtered.map((v) => v.type)))
-    .sort()
-    .map((t) => ({ type: t, items: filtered.filter((v) => v.type === t) }))
+  // "Value" sorts what's INSIDE each group; "Group" sorts the group headings
+  // themselves and leaves each one's own order alone — two different
+  // questions, never mixed into one comparator.
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const sortedFiltered =
+    sort.by === "value"
+      ? [...filtered].sort((a, b) => a.value.localeCompare(b.value) * dirMul)
+      : filtered
+  const grouped = Array.from(new Set(sortedFiltered.map((v) => v.type)))
+    .sort((a, b) => a.localeCompare(b) * (sort.by === "group" ? dirMul : 1))
+    .map((t) => ({ type: t, items: sortedFiltered.filter((v) => v.type === t) }))
 
   // Create — the dialog calls this; it throws on failure so the dialog surfaces the
   // reason and stays open, and closes itself on success.
@@ -396,14 +435,27 @@ export function SelectableScreen({
   // Deactivate / reactivate one value. A deactivated value is switched off, not deleted:
   // it stays visible here (greyed, with an Activate button) so it's never a dead end,
   // and drops out of the form pickers. Same key the pickers read, so both refresh.
-  async function setActive(v: SelectableValue, next: boolean) {
-    try {
-      const { values: list } = await tenancy.setSelectableActive(v.id, next)
-      primeCache(`selectable:${teamId}`, list)
-      toast.success(next ? `Activated "${v.value}".` : `Deactivated "${v.value}".`)
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update that value."))
+  // Deactivating is the red half, so it asks first; reactivating does not.
+  function setActive(v: SelectableValue, next: boolean) {
+    if (!next) {
+      askDeactivate({
+        title: t('Deactivate "{value}"?', { value: v.value }),
+        body: t("It drops out of the pickers everywhere it's offered. Anything already using it keeps it, and you can turn it back on any time."),
+        action: t("Deactivate"),
+        run: () =>
+          runActive(
+            () => tenancy.setSelectableActive(v.id, false).then(({ values: list }) => primeCache(`selectable:${teamId}`, list)),
+            t('Deactivated "{value}".', { value: v.value }),
+            t("Couldn't update that value.")
+          ),
+      })
+      return
     }
+    void runActive(
+      () => tenancy.setSelectableActive(v.id, true).then(({ values: list }) => primeCache(`selectable:${teamId}`, list)),
+      t('Activated "{value}".', { value: v.value }),
+      t("Couldn't update that value.")
+    )
   }
 
   if (valuesQ.error)
@@ -419,56 +471,36 @@ export function SelectableScreen({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-medium">
-            {t("Dropdown values")}
-            {/* HOW MANY, BESIDE THE HEADING — because a count is a RESULT and a
-                heading is where this app says how big a collection is. It used
-                to sit at the head of the filter bar, on the same band as the
-                search box and the status Select, which are CAUSES. Three units,
-                one band, two different questions, and that is N4's own worked
-                example of the "twisted" fault: the eye reads left to right
-                expecting one idea and gets an answer followed by two controls
-                that produce it. Nothing about the number changed — this is a
-                bounded collection read whole, so it is an honest count of the
-                rows in hand rather than a page length. */}
-            {values.length > 0 && (
-              <span className="text-muted-foreground ml-2 text-base font-normal tabular-nums">
-                {filtered.length === values.length
-                  ? values.length
-                  : t("{shown} of {total}", {
-                      shown: filtered.length,
-                      total: values.length,
-                    })}
-              </span>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
-          </p>
-        </div>
-        {/* Actions — New value / Import / Export. flex-wrap so the buttons never
-         * clip on a phone (UI-CONVENTIONS action-row rule). New records go through
-         * the shared form dialog (Law R4), never an inline row. */}
-        <div className="flex flex-wrap justify-end gap-2">
+      <div>
+        {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
+            is the kit's own named "Page title" step (56/500), see
+            collection-heading.tsx's own note for the full ruling. */}
+        <Headline as="h1" size="display-m">
+          {t("Choices")}
+          {/* HOW MANY, BESIDE THE HEADING — because a count is a RESULT and a
+              heading is where this app says how big a collection is. It used
+              to sit at the head of the filter bar, on the same band as the
+              search box and the status Select, which are CAUSES. Three units,
+              one band, two different questions, and that is N4's own worked
+              example of the "twisted" fault: the eye reads left to right
+              expecting one idea and gets an answer followed by two controls
+              that produce it. Nothing about the number changed — this is a
+              bounded collection read whole, so it is an honest count of the
+              rows in hand rather than a page length. */}
           {values.length > 0 && (
-            <a
-              href="/api/tenancy/selectable/export"
-              className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
-            >
-              <Download className="size-4" aria-hidden /> {t("Export CSV")}
-            </a>
+            <span className="text-muted-foreground ml-2 text-base font-normal tabular-nums">
+              {filtered.length === values.length
+                ? values.length
+                : t("{shown} of {total}", {
+                    shown: filtered.length,
+                    total: values.length,
+                  })}
+            </span>
           )}
-          {canCreate && onImport && (
-            <Button variant="secondary" onClick={onImport} className="gap-1">
-              <Upload className="size-4" aria-hidden /> {t("Import CSV")}
-            </Button>
-          )}
-          {canCreate && (
-            <AddButton label={t("New value")} onClick={() => setAddOpen(true)} />
-          )}
-        </div>
+        </Headline>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
+        </p>
       </div>
 
       {canCreate && (
@@ -481,53 +513,97 @@ export function SelectableScreen({
         />
       )}
 
-      {/* Filter bar. Search + status, matching the other collections. Deactivated
-       * values are hidden under the Active default; switch to Inactive/All to see and
-       * reactivate them. flex-wrap so the controls never clip on a phone. */}
-      {values.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full sm:w-56">
-            <Search
-              className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-              aria-hidden
-            />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("Search values…")}
-              className="h-9 pl-8"
-              aria-label={t("Search dropdown values")}
-            />
-          </div>
-          <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-            <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">{t("Active")}</SelectItem>
-              <SelectItem value="inactive">{t("Inactive")}</SelectItem>
-              <SelectItem value="all">{t("All")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      {/* THE CANONICAL SHAPE — title, then ONE card holding the toolbar (search
+          + status filter, LEFT) and the rows, with New/Import/Export at the
+          FAR RIGHT of that SAME toolbar row (client ruling, 2026-08-31: an
+          action button never gets a row of its own, separate from the
+          search/filter it belongs beside). This screen has no tab strip
+          (single-view, like Roles and Processes), so the toolbar is the first
+          thing inside the card — drawn through `<ToolbarRow>` (screen-bits.tsx)
+          rather than the two hand-rolled rows this used to be, one of them
+          floating ABOVE the card with the actions and one below it with the
+          search — so the button cannot drift back onto its own row. */}
+      <CollectionCard>
+        {(values.length > 0 || canCreate) && (
+          <ToolbarRow
+            className="mb-4"
+            search={
+              values.length > 0 && (
+                <>
+                  <div className="relative w-full sm:w-56">
+                    <Search
+                      className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                      aria-hidden
+                    />
+                    <Input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={t("Search values…")}
+                      className="h-9 pl-8"
+                      aria-label={t("Search dropdown values")}
+                    />
+                  </div>
+                  <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+                    <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">{t("Active")}</SelectItem>
+                      <SelectItem value="inactive">{t("Inactive")}</SelectItem>
+                      <SelectItem value="all">{t("All")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <SortControl
+                    options={VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) }))}
+                    value={sort.by}
+                    onValueChange={(by) => setSort({ by, dir: "asc" })}
+                    direction={sort.dir}
+                    onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+                    label={t("Sort by")}
+                  />
+                </>
+              )
+            }
+            actions={
+              <>
+                {values.length > 0 && (
+                  <a
+                    href="/api/tenancy/selectable/export"
+                    className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
+                  >
+                    <Download className="size-4" aria-hidden /> {t("Export CSV")}
+                  </a>
+                )}
+                {canCreate && onImport && (
+                  <Button variant="secondary" onClick={onImport} className="gap-1">
+                    <Upload className="size-4" aria-hidden /> {t("Import CSV")}
+                  </Button>
+                )}
+                {canCreate && <AddButton label={t("New value")} onClick={() => setAddOpen(true)} />}
+              </>
+            }
+          />
+        )}
 
-      {grouped.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {values.length === 0
-            ? t("No values yet. Add your first above.")
-            : t("No values match your search or filter.")}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {grouped.map((g) => (
-            <div key={g.type} className="flex flex-col gap-2">
-              <h2 className="text-sm font-medium">{g.type}</h2>
-              <GroupValues items={g.items} ctx={rowCtx} />
-            </div>
-          ))}
-        </div>
-      )}
+        {grouped.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {values.length === 0
+              ? t("No values yet. Add your first above.")
+              : t("No values match your search or filter.")}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {grouped.map((g) => (
+              <div key={g.type} className="flex flex-col gap-2">
+                <h2 className="text-sm font-medium">{g.type}</h2>
+                <GroupValues items={g.items} ctx={rowCtx} />
+              </div>
+            ))}
+          </div>
+        )}
+      </CollectionCard>
+
+      {deactivateDialog}
     </div>
   )
 }

@@ -84,7 +84,7 @@ export type StepsPanelActions = {
   onAgainst: (versionId: string | null) => void
   onAddStep: () => void
   onEditStep: (step: ProcessStep | null) => void
-  onConfirm: (c: Confirm | null) => void
+  onConfirm: (c: Confirm) => void
 }
 
 /** WHAT THE READER MAY DO. Four answers the host already has — a panel that
@@ -232,7 +232,7 @@ export function StepsPanel({
           server refuses the write regardless — this is the sentence,
           not the lock. */}
       {!isCurrent && (
-        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] border p-3 text-xs">
+        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] p-3 text-xs">
           {t("This is how the work was described when")}{" "}
           {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
           {t("was cut")}
@@ -317,7 +317,7 @@ export function StepsPanel({
             : t("This version has no steps recorded.")}
         </p>
       ) : (
-        <div className="rounded-[var(--radius)] border">
+        <div className="rounded-[var(--radius)] bg-surface-panel">
           {/* ONE STEP, AS A TITLE AND A META LINE (K1), and it used to
               be eight things on one sweep: number, name, "no longer
               done", minutes each time, runs a month, hours a month,
@@ -493,7 +493,7 @@ export function StepsPanel({
           there is, and a comparison that showed only surviving steps
           would leave it out. */}
       {saving && saving.steps.length > 0 && (
-        <div className="rounded-[var(--radius)] border p-4">
+        <div className="rounded-[var(--radius)] bg-surface-panel p-4">
           <p className="text-muted-foreground text-sm">
             {t("Time given back, measured from")} {auditDate}
           </p>

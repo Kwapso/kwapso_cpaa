@@ -20,6 +20,7 @@
 
 import * as React from "react"
 
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -36,7 +37,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import type { WorkLog } from "@shared/types"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export type TimeFormValues = {
   targetTable: string
@@ -88,7 +89,7 @@ export function TimeFormDialog({
   initial?: WorkLog | null
   onSubmit: (values: TimeFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   const [values, setValues, clearDraft] = useFormDraft(
@@ -169,7 +170,7 @@ export function TimeFormDialog({
           // row from a story to a ticket, so a picker here would offer a change
           // the server would quietly drop; on a new entry opened from a record
           // because the record IS the answer.
-          <p id="time-target" className="text-muted-foreground border-border/60 rounded-[var(--radius)] border px-3 py-2 text-sm">
+          <p id="time-target" className="text-muted-foreground bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm">
             {fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")}
           </p>
         ) : (
@@ -191,20 +192,26 @@ export function TimeFormDialog({
         )}
       </Field>
       <Field config={startField} htmlFor="time-start" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="time-start"
-          type="datetime-local"
-          value={values.startedAt}
-          onChange={(e) => setValues((s) => ({ ...s, startedAt: e.target.value }))}
+          mode="datetime"
+          locale={lang}
+          value={values.startedAt ? new Date(values.startedAt) : null}
+          onValueChange={(d) =>
+            setValues((s) => ({ ...s, startedAt: d ? toLocalInput(d.toISOString()) : "" }))
+          }
           disabled={busy}
         />
       </Field>
       <Field config={endField} htmlFor="time-end" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="time-end"
-          type="datetime-local"
-          value={values.endedAt}
-          onChange={(e) => setValues((s) => ({ ...s, endedAt: e.target.value }))}
+          mode="datetime"
+          locale={lang}
+          value={values.endedAt ? new Date(values.endedAt) : null}
+          onValueChange={(d) =>
+            setValues((s) => ({ ...s, endedAt: d ? toLocalInput(d.toISOString()) : "" }))
+          }
           disabled={busy}
         />
       </Field>

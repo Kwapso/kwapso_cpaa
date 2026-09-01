@@ -15,6 +15,8 @@ export type UserRow = {
   language: string | null
   /** null until this person picks one; reads as comfortable (shared/scale.ts). */
   scale: string | null
+  /** null until this person picks one; reads as paper (shared/spine.ts). */
+  spine: string | null
   created_at: string
   updated_at: string
   deactivated_at: string | null
@@ -38,6 +40,7 @@ export function toSessionUser(row: UserRow & { team_pin?: string | null }): Sess
     pinnedTeamId: row.team_pin ?? null,
     language: row.language ?? null,
     scale: row.scale ?? null,
+    spine: row.spine ?? null,
   }
 }
 
@@ -76,11 +79,13 @@ export async function findOrCreateUserByEmail(
     image_url: null,
     onboarding_completed_at: null,
     current_team_id: null,
-    // Never chosen, both of them. Language reads as English and size reads as
-    // comfortable, and each stays distinguishable from somebody who actively
-    // picked that answer (0024_user_language.sql, 0026_user_scale.sql).
+    // Never chosen, all three. Language reads as English, size reads as
+    // comfortable, and the spine reads as paper, and each stays distinguishable
+    // from somebody who actively picked that answer (0024_user_language.sql,
+    // 0026_user_scale.sql, 0028_user_spine.sql).
     scale: null,
     language: null,
+    spine: null,
     created_at: now,
     updated_at: now,
     deactivated_at: null,

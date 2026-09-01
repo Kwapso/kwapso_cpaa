@@ -97,6 +97,16 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
       { value: "added", label: "Recently added", defaultDir: "desc" },
     ],
   },
+  // WORK_LOG_SORTS (workers/content/src/lib/work-logs.ts) is this door's own
+  // menu — three names, one per real question a timesheet gets asked.
+  workLogs: {
+    defaultSort: "started",
+    options: [
+      { value: "started", label: "Date", defaultDir: "desc" },
+      { value: "duration", label: "Length", defaultDir: "desc" },
+      { value: "person", label: "Who logged it", defaultDir: "asc" },
+    ],
+  },
 }
 
 /** One collection's options with their labels put through the reader's own

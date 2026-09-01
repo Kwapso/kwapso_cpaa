@@ -35,11 +35,17 @@ import { softNavigate } from "@/lib/nav"
 import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo, TodoViewName } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
-import { useT } from "@shared/web/language"
-import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
+import { useLanguage, useT } from "@shared/web/language"
+import type { Language } from "@shared/i18n"
+import { AddButton } from "@/components/deep-link/screen-bits"
+import { CollectionCreateActionProvider, CollectionEmptyState, CollectionFrame } from "@shared/web/screen-engine/collection-frame"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { formatCount } from "@shared/web/format-count"
+import { PagedFind, type FindPage, type FindQuery } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { HELP_STATUS } from "@/components/deep-link/shape"
+import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -92,7 +98,7 @@ function Row({
  * collection of two or more rows". Written once so seven panels cannot drift
  * into seven spellings of one list. */
 function RowList({ children }: { children: React.ReactNode }) {
-  return <ul className="divide-border divide-y rounded-[var(--radius)] border">{children}</ul>
+  return <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">{children}</ul>
 }
 
 /** The clickable name of a record, in the URL form the caller arrived through. */
@@ -171,17 +177,104 @@ export function sliceKey(kind: string, ownerId: string): string {
   return `${kind}-of:${ownerId}`
 }
 
+/** THE REAL TOOLBAR a PAGED nested panel wears: search always, sort where the
+ * door has one, filters where a real field backs them, the create button
+ * pinned right — then the RESTING list until somebody asks the door
+ * something, and the door's OWN answer once they do. Exactly the switch
+ * `tickets-collection.tsx` makes for its own paged sub-tab (`scopedQ` vs
+ * `found`), pulled out here because four of these panels are that switch and
+ * nothing else — the same reason `Row`/`RowList` above are one function
+ * rather than four near-identical copies.
+ *
+ * The panel's OWN cache key doubles as `<PagedFind>`'s `listKey`: there is one
+ * resting list per panel instance (never a second tab sharing it), so nothing
+ * is lost by handing over the same key both places, and it is what
+ * `tickets-collection.tsx` does too. */
+function PagedPanelBody<T>({
+  listKey,
+  placeholder,
+  matches,
+  sorts = [],
+  defaultSort = "",
+  facets = [],
+  fixed,
+  fetchPage,
+  restingData,
+  restingError,
+  errorText,
+  onNew,
+  newLabel,
+  emptyTitle,
+  loadMoreLabel,
+  renderRows,
+}: {
+  listKey: string
+  placeholder: string
+  matches: { none: string; one: string; many: string }
+  sorts?: SortOption[]
+  defaultSort?: string
+  facets?: FilterFacet[]
+  /** what the panel is ALREADY asking, above whatever the person types (e.g.
+   * `{ appId }`) — see `<PagedFind fixed>`'s own doc. */
+  fixed?: FindQuery
+  fetchPage: (query: FindQuery, cursor: string | null) => Promise<FindPage<T>>
+  /** the resting (unsearched) list this panel already held — `undefined`
+   * while its first read is still on its way. */
+  restingData: T[] | undefined
+  restingError: unknown
+  errorText: string
+  onNew?: () => void
+  newLabel: string
+  emptyTitle: string
+  loadMoreLabel: string
+  renderRows: (rows: T[]) => React.ReactNode
+}) {
+  if (restingError) return <p className="text-destructive text-sm">{errorText}</p>
+  if (restingData === undefined) return <Skeleton variant="list" lines={3} />
+  return (
+    <PagedFind<T>
+      listKey={listKey}
+      placeholder={placeholder}
+      matches={matches}
+      sorts={sorts}
+      defaultSort={defaultSort}
+      facets={facets}
+      fixed={fixed}
+      actions={() => (onNew ? <AddButton label={newLabel} onClick={onNew} /> : null)}
+      fetchPage={fetchPage}
+    >
+      {(found) => {
+        const rows = found.active ? found.rows : restingData
+        if (rows === null || rows === undefined) return <Skeleton variant="list" lines={3} />
+        if (rows.length === 0) {
+          return found.active ? (
+            <p className="text-muted-foreground text-sm">{found.emptyText}</p>
+          ) : (
+            <CollectionEmptyState title={emptyTitle} onCreate={onNew} />
+          )
+        }
+        return (
+          <>
+            {renderRows(rows)}
+            <LoadMore listKey={found.listKey ?? listKey} label={loadMoreLabel} fetchPage={found.fetchPage} />
+          </>
+        )
+      }}
+    </PagedFind>
+  )
+}
+
 /* ------------------------------- the stories ------------------------------ */
 
 /** One story, in one line: where it is, who has it, when it is due, and which
  * request it answers. The same sentence the backlog row says, because it is the
  * same record — a person reading it on a sprint should not have to re-learn it. */
-function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket"): string {
+function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket", lang: Language): string {
   return (
     [
       STORY_STATUS_LABEL[s.status],
       s.assigneeName ?? "unassigned",
-      s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
+      s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
       // THE OWNER IS NOT A FACT ABOUT THE ROW. This list hangs off a sprint, an
       // app or a ticket, and it used to name the sprint and the ticket on every
       // row of all three — so the sprint's own Stories tab said "Sprint 14" forty
@@ -226,7 +319,7 @@ export function StoriesPanel({
   onNew?: () => void
   emptyText: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = sliceKey(`stories-${ownerKind}`, ownerId)
   const q = useCached<Story[]>(key, () =>
     // `view: "all"` on purpose: this is the record of what was done, not a
@@ -238,51 +331,76 @@ export function StoriesPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the work.")}</p>
-  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
+  const renderRows = (rows: Story[]) => (
+    <RowList>
+      {rows.map((s) => (
+        <Row key={s.id} live={s.status !== "done"} mark={<RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? s.title} />}>
+          <div className="min-w-0 flex-1">
+            <OpenLink
+              label={s.ref ? `${s.ref} · ${s.title}` : s.title}
+              onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)}
+            />
+            <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind, lang)}</p>
+          </div>
+          {s.status === "done" && (
+            <Badge variant="secondary" className="text-badge">
+              {t("Done")}
+            </Badge>
+          )}
+        </Row>
+      ))}
+    </RowList>
+  )
 
   return (
-    <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("New story")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{emptyText}</p>
-      ) : (
-        <RowList>
-          {rows.map((s) => (
-            <Row key={s.id} live={s.status !== "done"} mark={<RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? s.title} />}>
-              <div className="min-w-0 flex-1">
-                <OpenLink
-                  label={s.ref ? `${s.ref} · ${s.title}` : s.title}
-                  onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)}
-                />
-                <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind)}</p>
-              </div>
-              {s.status === "done" && (
-                <Badge variant="secondary" className="text-badge">
-                  {t("Done")}
-                </Badge>
-              )}
-            </Row>
-          ))}
-        </RowList>
-      )}
-      {/* R14: the badge above counts ALL of this slice, so the list under it has
-          to be able to reach the rest of it. */}
-      <LoadMore
-        listKey={key}
-        label={t("Load more work")}
-        fetchPage={(c: string) =>
-          contentApi
-            .stories({ ...filter, view: "all", cursor: c })
-            .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor }))
-        }
-      />
-    </div>
+    <PagedPanelBody<Story>
+      listKey={key}
+      placeholder={t("Search stories…")}
+      matches={{
+        none: t("No stories match"),
+        one: t("1 story matches"),
+        many: t("{count} stories match"),
+      }}
+      sorts={translatedSorts("stories", t)}
+      defaultSort={COLLECTION_SORTS.stories.defaultSort}
+      // THE ONE REAL FACET this narrower view can offer without a second
+      // fetch: the four stages every story moves through, the same words
+      // `STORY_STATUS_LABEL` renders on the row. `assigneeId`/`sprintId` are
+      // door filters too (COLLECTION_FILTERS.stories), but both need an
+      // OPTIONS list — the team's members, the app's sprints — this panel is
+      // not handed, and a facet with nowhere to get its options from is the
+      // useless dropdown `translatedFacets` itself refuses to draw.
+      facets={[
+        {
+          field: "status",
+          label: t("Status"),
+          control: "select",
+          options: Object.entries(STORY_STATUS_LABEL).map(([value, label]) => ({ value, label: t(label) })),
+        },
+      ]}
+      // WHAT THIS PANEL IS ALREADY ASKING — the sprint/app/ticket it hangs off
+      // — forwarded to the door exactly as the resting read above does.
+      fixed={Object.fromEntries(Object.entries(filter).filter(([, v]) => v)) as FindQuery}
+      fetchPage={(query, cursor) =>
+        contentApi
+          .stories({ ...filter, view: "all", ...query, cursor: cursor ?? undefined })
+          .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor, total: r.total }))
+      }
+      restingData={q.data}
+      restingError={q.error}
+      errorText={t("Couldn't load the work.")}
+      onNew={onNew}
+      newLabel={t("New story")}
+      // No import wiring here (composition 27.21's second button): the
+      // real `stories` import target (workers/data-ops) writes UNSCOPED
+      // rows, and this collection is always narrowed to one sprint/app/
+      // ticket — a generic import cannot land its rows on this owner, so
+      // offering the button would point at an act that does not do what
+      // it says.
+      emptyTitle={emptyText}
+      loadMoreLabel={t("Load more work")}
+      renderRows={renderRows}
+    />
   )
 }
 
@@ -291,7 +409,7 @@ export function StoriesPanel({
 /** A sprint, in one line: what kind, whose, when, and how much of it is left.
  * The counts are the door's own exact counts over the stories inside it (R16),
  * never the length of anything loaded here. */
-export function sprintLine(s: Sprint): string {
+export function sprintLine(s: Sprint, lang: Language): string {
   const done = s.storyCount - s.openStoryCount
   return (
     [
@@ -302,8 +420,8 @@ export function sprintLine(s: Sprint): string {
       // reading "2026-02-23T00:00:00.000Z → 2026-03-20T00:00:00.000Z" is a
       // timestamp somebody has to decode, on a list built for a manager to scan.
       s.startsOn && s.endsOn
-        ? `${formatDate(s.startsOn)} → ${formatDate(s.endsOn)}`
-        : (formatDate(s.startsOn) || formatDate(s.endsOn) || null),
+        ? `${formatDate(s.startsOn, lang)} → ${formatDate(s.endsOn, lang)}`
+        : (formatDate(s.startsOn, lang) || formatDate(s.endsOn, lang) || null),
       s.storyCount > 0 ? `${done} of ${s.storyCount} done` : "no work in it yet",
     ]
       .filter(Boolean)
@@ -329,14 +447,14 @@ export function sprintLine(s: Sprint): string {
  * kind, and there the kind is the one word telling you what sort of block of
  * work you are looking at. Two lines, because there are two situations, not
  * because there are two opinions. */
-export function sprintLineInKindGroup(s: Sprint): string {
+export function sprintLineInKindGroup(s: Sprint, lang: Language): string {
   return (
     [
       s.accountName,
       s.appName,
       s.startsOn && s.endsOn
-        ? `${formatDate(s.startsOn)} → ${formatDate(s.endsOn)}`
-        : (formatDate(s.startsOn) || formatDate(s.endsOn) || null),
+        ? `${formatDate(s.startsOn, lang)} → ${formatDate(s.endsOn, lang)}`
+        : (formatDate(s.startsOn, lang) || formatDate(s.endsOn, lang) || null),
     ]
       .filter(Boolean)
       .join(" · ") || "—"
@@ -367,7 +485,7 @@ export function SprintsPanel({
   onNew?: () => void
   emptyText: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = sliceKey(`sprints-${ownerKind}`, ownerId)
   const q = useCached<Sprint[]>(key, () =>
     contentApi.sprints(filter).then((r) => {
@@ -378,38 +496,75 @@ export function SprintsPanel({
 
   if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
+
+  // BOUNDED (R14), like the top-level Sprints screen this mirrors: a sprint is
+  // a contract, so this whole collection is already in the browser and
+  // ordering/narrowing it here is honest and free — `CollectionFrame`, never
+  // `<PagedFind>`. A DERIVED field, because the door's own `completedAt`/
+  // `active` columns are two facts and the facet is one question: "is this
+  // block still live, or wrapped?" — the exact split `sprintState` groups the
+  // Overview by, one file along.
+  const rows = q.data.map((s) => ({ ...s, wrapped: s.completedAt || !s.active ? "yes" : "no" }))
 
   return (
-    <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Start a sprint")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{emptyText}</p>
-      ) : (
-        <RowList>
-          {rows.map((s) => (
-            <Row key={s.id} live={!s.completedAt} mark={<RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? s.name} />}>
-              <div className="min-w-0 flex-1">
-                <OpenLink
-                  label={s.ref ? `${s.ref} · ${s.name}` : s.name}
-                  onOpen={() => softNavigate(`${host.base}/sprints/${s.id}`)}
-                />
-                <p className="text-muted-foreground truncate text-xs">{sprintLine(s)}</p>
-              </div>
-              {s.completedAt && (
-                <Badge variant="secondary" className="text-badge">
-                  {t("Complete")}
-                </Badge>
-              )}
-            </Row>
-          ))}
-        </RowList>
-      )}
-    </div>
+    <CollectionCreateActionProvider action={onNew ? { label: t("Start a sprint"), onCreate: onNew } : null}>
+      <CollectionFrame
+        useKitPanel
+        config={{
+          ...defaultCollectionConfig,
+          searchPlaceholder: t("Search sprints…"),
+          emptyText: emptyText,
+          userFilter: true,
+          filterFacets: [
+            // WHICHEVER OF THE TWO ISN'T ALREADY FIXED by hanging here — an
+            // account's Sprints tab still spans several apps; an app's
+            // always has exactly one account, so that facet would offer a
+            // single, useless choice and is left off.
+            ...(ownerKind === "account"
+              ? [{ field: "appName", label: t("App"), control: "select" as const }]
+              : []),
+            { field: "sprintType", label: t("Kind"), control: "select" as const },
+            {
+              field: "wrapped",
+              label: t("Status"),
+              control: "select" as const,
+              options: [
+                { value: "no", label: t("Active") },
+                { value: "yes", label: t("Wrapped") },
+              ],
+            },
+          ],
+          sortable: true,
+          sortOptions: [
+            { value: "name", label: t("Name"), defaultDir: "asc" },
+            { value: "startsOn", label: t("Start date"), defaultDir: "desc" },
+            { value: "sprintType", label: t("Kind"), defaultDir: "asc" },
+          ],
+        }}
+        data={rows}
+        searchKeys={["name", "ref", "sprintType", "accountName", "appName"]}
+        renderItems={(page) => (
+          <RowList>
+            {page.map((s) => (
+              <Row key={s.id} live={!s.completedAt} mark={<RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? s.name} />}>
+                <div className="min-w-0 flex-1">
+                  <OpenLink
+                    label={s.ref ? `${s.ref} · ${s.name}` : s.name}
+                    onOpen={() => softNavigate(`${host.base}/sprints/${s.id}`)}
+                  />
+                  <p className="text-muted-foreground truncate text-xs">{sprintLine(s, lang)}</p>
+                </div>
+                {s.completedAt && (
+                  <Badge variant="secondary" className="text-badge">
+                    {t("Complete")}
+                  </Badge>
+                )}
+              </Row>
+            ))}
+          </RowList>
+        )}
+      />
+    </CollectionCreateActionProvider>
   )
 }
 
@@ -445,40 +600,65 @@ export function AppsPanel({
 
   if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the apps.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
 
+  // BOUNDED (R14) — an account has tens of systems, not thousands, so this is
+  // its whole inventory read whole. `CollectionFrame`, the same seam the top-
+  // level Apps screen would reach for if it were recipe-driven (it isn't —
+  // see apps-screen.tsx's own note — but its `appsListRecipe` facets, "Client
+  // / Stage / Archived", are exactly where these three come from).
   return (
-    <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Record an app")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <EmptyLine concept="apps">{t("Nothing built for")} {accountName} {t("yet.")}</EmptyLine>
-      ) : (
-        <RowList>
-          {rows.map((a) => (
-            <Row key={a.id} live={a.active} mark={null}>
-              {/* THE SAME RECORD, THE SAME SQUARE. These rows and the tiles on
-                  the apps screen list the identical AppRow, and only one of them
-                  drew the client's mark — so an app was a picture on one screen
-                  and a line of text on the next. */}
-              <AppMark app={a} size="row" />
-              <div className="min-w-0 flex-1">
-                <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
-                <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>
-              </div>
-              {!a.active && (
-                <Badge variant="secondary" className="text-muted-foreground text-badge">
-                  {t("Archived")}
-                </Badge>
-              )}
-            </Row>
-          ))}
-        </RowList>
-      )}
-    </div>
+    <CollectionCreateActionProvider action={onNew ? { label: t("Record an app"), onCreate: onNew } : null}>
+      <CollectionFrame
+        useKitPanel
+        config={{
+          ...defaultCollectionConfig,
+          searchPlaceholder: t("Search apps…"),
+          emptyText: t("Nothing built for {account} yet.", { account: accountName }),
+          userFilter: true,
+          filterFacets: [
+            { field: "stage", label: t("Stage"), control: "select" as const },
+            {
+              field: "active",
+              label: t("Status"),
+              control: "select" as const,
+              options: [
+                { value: "true", label: t("Active") },
+                { value: "false", label: t("Archived") },
+              ],
+            },
+          ],
+          sortable: true,
+          sortOptions: [
+            { value: "name", label: t("Name"), defaultDir: "asc" },
+            { value: "stage", label: t("Stage"), defaultDir: "asc" },
+          ],
+        }}
+        data={q.data}
+        searchKeys={["name", "stage", "url"]}
+        renderItems={(page) => (
+          <RowList>
+            {page.map((a) => (
+              <Row key={a.id} live={a.active} mark={null}>
+                {/* THE SAME RECORD, THE SAME SQUARE. These rows and the tiles on
+                    the apps screen list the identical AppRow, and only one of them
+                    drew the client's mark — so an app was a picture on one screen
+                    and a line of text on the next. */}
+                <AppMark app={a} size="row" />
+                <div className="min-w-0 flex-1">
+                  <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
+                  <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>
+                </div>
+                {!a.active && (
+                  <Badge variant="secondary" className="text-muted-foreground text-badge">
+                    {t("Archived")}
+                  </Badge>
+                )}
+              </Row>
+            ))}
+          </RowList>
+        )}
+      />
+    </CollectionCreateActionProvider>
   )
 }
 
@@ -509,55 +689,74 @@ export function ProcessesPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the processes.")}</p>
-  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
+  const renderRows = (rows: ProcessSummary[]) => (
+    <RowList>
+      {rows.map((p) => (
+        <Row key={p.id} live={p.active} mark={<RecordMark name={p.name} />}>
+          <div className="min-w-0 flex-1">
+            <OpenLink
+              label={p.name}
+              onOpen={() => softNavigate(`${host.base}/processes/${p.id}`)}
+            />
+            <p className="text-muted-foreground truncate text-xs">
+              {[
+                `${p.stepCount} step${p.stepCount === 1 ? "" : "s"}`,
+                p.versionCount > 1 ? `version ${p.versionCount}` : "baseline only",
+              ].join(" · ")}
+            </p>
+          </div>
+          <OpenChevron
+            label={p.name}
+            onOpen={() => softNavigate(`${host.base}/processes/${p.id}`)}
+          />
+        </Row>
+      ))}
+    </RowList>
+  )
 
   return (
-    <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Map a process")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t("No processes drawn inside this app yet.")}
-        </p>
-      ) : (
-        <RowList>
-          {rows.map((p) => (
-            <Row key={p.id} live={p.active} mark={<RecordMark name={p.name} />}>
-              <div className="min-w-0 flex-1">
-                <OpenLink
-                  label={p.name}
-                  onOpen={() => softNavigate(`${host.base}/processes/${p.id}`)}
-                />
-                <p className="text-muted-foreground truncate text-xs">
-                  {[
-                    `${p.stepCount} step${p.stepCount === 1 ? "" : "s"}`,
-                    p.versionCount > 1 ? `version ${p.versionCount}` : "baseline only",
-                  ].join(" · ")}
-                </p>
-              </div>
-              <OpenChevron
-                label={p.name}
-                onOpen={() => softNavigate(`${host.base}/processes/${p.id}`)}
-              />
-            </Row>
-          ))}
-        </RowList>
-      )}
-      <LoadMore
-        listKey={key}
-        label={t("Load more processes")}
-        fetchPage={(c: string) =>
-          tenancy
-            .processes({ appId, cursor: c })
-            .then((r) => ({ rows: r.processes, nextCursor: r.nextCursor }))
-        }
-      />
-    </div>
+    <PagedPanelBody<ProcessSummary>
+      listKey={key}
+      placeholder={t("Search processes…")}
+      matches={{
+        none: t("No processes match"),
+        one: t("1 process matches"),
+        many: t("{count} processes match"),
+      }}
+      // "App" comes off the top-level sort menu: every row here is already
+      // this one app's, so ordering by it would be furniture.
+      sorts={translatedSorts("processes", t).filter((o) => o.value !== "app")}
+      defaultSort={COLLECTION_SORTS.processes.defaultSort}
+      // ARCHIVED — the one real door filter left once `appId` is already
+      // fixed by hanging here (COLLECTION_FILTERS.processes).
+      facets={[
+        {
+          field: "archived",
+          label: t("Archived"),
+          control: "select",
+          options: [
+            { value: "no", label: t("No") },
+            { value: "yes", label: t("Yes") },
+          ],
+        },
+      ]}
+      fixed={{ appId }}
+      fetchPage={(query, cursor) =>
+        tenancy
+          .processes({ appId, ...query, cursor: cursor ?? undefined })
+          .then((r) => ({ rows: r.processes, nextCursor: r.nextCursor, total: r.total }))
+      }
+      restingData={q.data}
+      restingError={q.error}
+      errorText={t("Couldn't load the processes.")}
+      onNew={onNew}
+      newLabel={t("Map a process")}
+      // No `processes` import target — a map is drawn from inside the app
+      // it belongs to (CHECKLIST 8.12), never bulk-loaded.
+      emptyTitle={t("No processes drawn inside this app yet.")}
+      loadMoreLabel={t("Load more processes")}
+      renderRows={renderRows}
+    />
   )
 }
 
@@ -579,7 +778,7 @@ export function AppMeetingsPanel({
   /** present = the caller may arrange one from here, and this opens the form */
   onNew?: () => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = sliceKey("meetings-app", appId)
   const q = useCached<Meeting[]>(key, () =>
     contentApi.meetings({ appId }).then((r) => {
@@ -589,47 +788,63 @@ export function AppMeetingsPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
-  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
+  const renderRows = (rows: Meeting[]) => (
+    <RowList>
+      {rows.map((m) => (
+        <Row key={m.id} live={m.active} mark={<RecordMark name={m.accountName ?? m.title} />}>
+          <div className="min-w-0 flex-1">
+            <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
+            <p className="text-muted-foreground truncate text-xs">
+              {[formatDate(m.startsAt, lang), m.accountName].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          {/* A "Held" badge sat here, reading a status column that is
+              retired: the date on the line above already says whether the
+              meeting has happened, and a badge repeating it in a word
+              somebody had to remember to tick could contradict it. */}
+        </Row>
+      ))}
+    </RowList>
+  )
 
   return (
-    <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Arrange a meeting")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <EmptyLine concept="meetings">{t("No meetings about this app yet.")}</EmptyLine>
-      ) : (
-        <RowList>
-          {rows.map((m) => (
-            <Row key={m.id} live={m.active} mark={<RecordMark name={m.accountName ?? m.title} />}>
-              <div className="min-w-0 flex-1">
-                <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
-                <p className="text-muted-foreground truncate text-xs">
-                  {[formatDate(m.startsAt), m.accountName].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-              {/* A "Held" badge sat here, reading a status column that is
-                  retired: the date on the line above already says whether the
-                  meeting has happened, and a badge repeating it in a word
-                  somebody had to remember to tick could contradict it. */}
-            </Row>
-          ))}
-        </RowList>
-      )}
-      <LoadMore
-        listKey={key}
-        label={t("Load more meetings")}
-        fetchPage={(c: string) =>
-          contentApi
-            .meetings({ appId, cursor: c })
-            .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
-        }
-      />
-    </div>
+    <PagedPanelBody<Meeting>
+      listKey={key}
+      placeholder={t("Search meetings…")}
+      matches={{
+        none: t("No meetings match"),
+        one: t("1 meeting matches"),
+        many: t("{count} meetings match"),
+      }}
+      // "Client" comes off the top-level menu: an app belongs to one account
+      // always (the owner's ruling), so every meeting here is already that
+      // account's and ordering by it would be furniture.
+      sorts={translatedSorts("meetings", t).filter((o) => o.value !== "client")}
+      defaultSort={COLLECTION_SORTS.meetings.defaultSort}
+      // NO FACETS: `accountId` is fixed the same way the sort option above is
+      // furniture, and `purposeId` — the one real door filter left
+      // (COLLECTION_FILTERS.meetings) — needs an options list (the team's
+      // meeting purposes, id → name) this panel is not handed, so offering it
+      // would be the useless, optionless dropdown `translatedFacets` itself
+      // refuses to draw.
+      fixed={{ appId }}
+      fetchPage={(query, cursor) =>
+        contentApi
+          .meetings({ appId, ...query, cursor: cursor ?? undefined })
+          .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
+      }
+      restingData={q.data}
+      restingError={q.error}
+      errorText={t("Couldn't load the meetings.")}
+      onNew={onNew}
+      newLabel={t("Arrange a meeting")}
+      // The `meetings` import target is real, but it writes UNSCOPED rows —
+      // this list is always narrowed to one app, so a generic import
+      // cannot land on it (see StoriesPanel's own note above).
+      emptyTitle={t("No meetings about this app yet.")}
+      loadMoreLabel={t("Load more meetings")}
+      renderRows={renderRows}
+    />
   )
 }
 
@@ -641,6 +856,7 @@ export function AppMeetingsPanel({
 export function AppTicketsPanel({
   appId,
   marks,
+  helpTypeOptions,
   host,
   onNew,
 }: {
@@ -650,6 +866,10 @@ export function AppTicketsPanel({
    * the screens that mount it all hold the vocabulary already, so passing it
    * costs nothing and fetching it here would cost a round trip per panel. */
   marks?: Map<string, string>
+  /** the team's live `Ticket type` values (the same list `tickets-collection.tsx`
+   * builds its own strip from) — what the Kind facet below offers. Absent
+   * draws no such facet at all, rather than one with nothing in it. */
+  helpTypeOptions?: string[]
   host: PanelHost
   /** present = the caller may raise one from here, and this opens the form */
   onNew?: () => void
@@ -664,47 +884,88 @@ export function AppTicketsPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
-  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = q.data
   // Tickets live at their own top-level URL, so the link is built off the host
   // prefix rather than the section we are standing in.
+  const renderRows = (rows: HelpTicket[]) => (
+    <RowList>
+      {rows.map((ticket) => (
+        <Row key={ticket.id} live={!ticket.archivedAt} mark={<RecordMark mark={marks?.get(ticket.helpType ?? "") ?? null} name={ticket.helpType ?? "?"} />}>
+          <div className="min-w-0 flex-1">
+            <OpenLink
+              label={richTextPlain(ticket.description)}
+              onOpen={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
+            />
+            <p className="text-muted-foreground truncate text-xs">
+              {[ticket.ref, ticket.helpType, ticket.status].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+        </Row>
+      ))}
+    </RowList>
+  )
+
   return (
-    <div className="flex flex-col gap-4">
-      {onNew && (
-        <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Raise a ticket")} onClick={onNew} />
-        </div>
-      )}
-      {rows.length === 0 ? (
-        <EmptyLine concept="tickets">{t("Nothing has been raised about this app yet.")}</EmptyLine>
-      ) : (
-        <RowList>
-          {rows.map((ticket) => (
-            <Row key={ticket.id} live={!ticket.archivedAt} mark={<RecordMark mark={marks?.get(ticket.helpType ?? "") ?? null} name={ticket.helpType ?? "?"} />}>
-              <div className="min-w-0 flex-1">
-                <OpenLink
-                  label={richTextPlain(ticket.description)}
-                  onOpen={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
-                />
-                <p className="text-muted-foreground truncate text-xs">
-                  {[ticket.ref, ticket.helpType, ticket.status].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-            </Row>
-          ))}
-        </RowList>
-      )}
-      <LoadMore
-        listKey={key}
-        label={t("Load more tickets")}
-        fetchPage={(c: string) =>
-          contentApi
-            .help({ appId, cursor: c })
-            .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
-        }
-      />
-    </div>
+    <PagedPanelBody<HelpTicket>
+      listKey={key}
+      placeholder={t("Search tickets…")}
+      matches={{
+        none: t("No tickets match"),
+        one: t("1 ticket matches"),
+        many: t("{count} tickets match"),
+      }}
+      sorts={translatedSorts("help", t)}
+      defaultSort={COLLECTION_SORTS.help.defaultSort}
+      facets={[
+        // ARCHIVED — the same door parameter (`view`) Tickets' own toolbar
+        // offers (COLLECTION_FILTERS.help), and the reason `ticket.archivedAt`
+        // above is worth reading at all: the resting read defaults to the
+        // live pile, so an archived one only ever appears once this is asked.
+        {
+          field: "view",
+          label: t("Archived"),
+          control: "select",
+          options: [
+            { value: "live", label: t("No") },
+            { value: "archived", label: t("Yes") },
+          ],
+        },
+        // STAGE — closed vocabulary, the same words the row's own line prints.
+        {
+          field: "status",
+          label: t("Stage"),
+          control: "select",
+          options: Object.entries(HELP_STATUS).map(([value, label]) => ({ value, label: t(label) })),
+        },
+        // KIND — the team's own vocabulary, exactly as the top-level Tickets
+        // tab strip is built from it. A real door filter with nowhere to draw
+        // a strip in this narrower view, so it becomes a facet here instead.
+        ...(helpTypeOptions && helpTypeOptions.length > 0
+          ? [
+              {
+                field: "helpType",
+                label: t("Kind"),
+                control: "select" as const,
+                options: helpTypeOptions.map((v) => ({ value: v, label: v })),
+              },
+            ]
+          : []),
+      ]}
+      fixed={{ appId }}
+      fetchPage={(query, cursor) =>
+        contentApi
+          .help({ appId, ...query, cursor: cursor ?? undefined })
+          .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
+      }
+      restingData={q.data}
+      restingError={q.error}
+      errorText={t("Couldn't load the tickets.")}
+      onNew={onNew}
+      newLabel={t("Raise a ticket")}
+      // No `help`/tickets import target exists.
+      emptyTitle={t("Nothing has been raised about this app yet.")}
+      loadMoreLabel={t("Load more tickets")}
+      renderRows={renderRows}
+    />
   )
 }
 
@@ -769,7 +1030,7 @@ export function TodosPanel({
   canCancel: boolean
   onNew?: () => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [view, setView] = React.useState<TodoViewName>("open")
   const key = todosListKey(teamId, accountId, view)
   const openTotal = useCachedValue<number | null>(todoTotalKey(teamId, accountId, "open"))
@@ -829,170 +1090,187 @@ export function TodosPanel({
     />
   )
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {tabs}
-        {onNew && <AddButton label={t("Ask for something")} onClick={onNew} />}
-      </div>
-
-      {q.error ? (
-        <p className="text-destructive text-sm">{t("Couldn't load the to-dos.")}</p>
-      ) : q.data === undefined ? (
-        <Skeleton variant="list" lines={3} />
-      ) : q.data.length === 0 ? (
-        <EmptyLine concept="todos">
-          {view === "done"
-            ? t("Nothing has come back from a client yet.")
-            : t("Nothing outstanding with a client.")}
-        </EmptyLine>
-      ) : view === "done" ? (
-        // THE DONE PILE IS A RECORD, NOT A LIST OF ACTIONS — the open pile's
-        // row carries one (Withdraw), and Checklist's row has no slot for it
-        // (checked: mark/number/label/owner+when, nothing else). A finished
-        // to-do offers nothing to press, so the shape that had no action slot
-        // to miss fits it exactly, and its mark says "done" as a real
-        // checkmark where the open-pile row said nothing at all. `onToggle`
-        // omitted is the composition's own read-only register (its own doc
-        // header: "Absent, the whole list is read-only and no mark is
-        // interactive") — verified by rendering, not assumed: the checkbox
-        // comes back `disabled`, `aria-checked="true"`, `aria-readonly` on
-        // the list.
-        <Checklist
-          numbered={false}
-          showProgress={false}
-          label={t("Sent back by the client")}
-          items={q.data.map((todo) => {
-            const fileLink = safeHref(todo.fileUrl)
-            return {
-              id: todo.id,
-              done: true,
-              // Checklist's own label span has no truncation of its own —
-              // the kit draws a multi-line task description there, and a
-              // to-do's title mid-length is closer to a table row's single
-              // line. Truncated here rather than left to wrap: at 27 rows,
-              // five or six lines apiece (measured against real staging
-              // titles) turned the list into something nobody scans.
-              label: (
-                <span className="block truncate">
-                  {todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}
-                </span>
-              ),
-              owner: todo.accountName,
-              when: todo.completedAt ? t("done {date}", { date: formatDate(todo.completedAt) }) : null,
-              dateTime: todo.completedAt ?? undefined,
-              meta:
-                todo.completedByName || todo.fileName ? (
-                  <>
-                    {todo.completedByName}
-                    {todo.completedByName && todo.fileName ? " · " : null}
-                    {todo.fileName &&
-                      (fileLink ? (
-                        <a
-                          href={fileLink}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="text-primary underline-offset-2 hover:underline"
-                        >
-                          {todo.fileName}
-                        </a>
-                      ) : (
-                        todo.fileName
-                      ))}
-                  </>
-                ) : null,
-            }
-          })}
-        />
-      ) : (
-        <RowList>
-          {q.data.map((todo) => {
-            // WHAT THE CLIENT ACTUALLY SENT US, as a thing you can open.
-            //
-            // The filename used to be a third item in the ` · ` join below — a
-            // string in a paragraph — while `todo.fileUrl` sat on the row and
-            // was read by no component in either front door. So the agency asked
-            // a client for a document, the client uploaded it through the
-            // portal's "Send a file", the door wrote the bytes to the bucket and
-            // the row, and a member of staff was shown the word "invoice.pdf"
-            // that they could not click. The upload worked every time; nothing
-            // ever led back to it — and then the row itself stopped rendering,
-            // because attaching the file is what completes the to-do.
-            //
-            // Through `safeHref` like every other file on a screen, even though
-            // this path is one THIS app minted (/media/…): the seam decides, not
-            // the origin of the string. A URL it refuses prints as the plain
-            // text it always was — the same fallback `staff-panel.tsx` gives a
-            // certificate, whose shape this copies rather than inventing a third.
-            const fileLink = safeHref(todo.fileUrl)
-            const meta = [
-              todo.accountName,
-              todo.dueOn ? t("due {date}", { date: formatDate(todo.dueOn) }) : t("no date"),
-            ]
-            return (
-              <Row
-                key={todo.id}
-                live={!todo.completedAt && !todo.cancelled}
-                mark={<RecordMark name={todo.title} />}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {meta.filter(Boolean).join(" · ")}
-                    {todo.fileName && (
-                      <>
-                        {" · "}
-                        {fileLink ? (
-                          <a
-                            href={fileLink}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="text-primary underline-offset-2 hover:underline"
-                          >
-                            {todo.fileName}
-                          </a>
-                        ) : (
-                          todo.fileName
-                        )}
-                      </>
-                    )}
-                  </p>
-                </div>
-                {/* The row that has just been completed under the reader's
-                    eyes, patched in place by the live layer, before the tab
-                    it now belongs to has caught up. */}
-                {todo.completedAt && (
-                  <Badge variant="secondary" className="text-badge">
-                    {t("Done")}
-                  </Badge>
-                )}
-                {canCancel && !todo.completedAt && !todo.cancelled && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    aria-label={t("Withdraw this to-do")}
-                    onClick={() => void cancel(todo.id)}
-                  >
-                    <Ban className="size-3.5" />
-                  </Button>
-                )}
-              </Row>
-            )
-          })}
-        </RowList>
-      )}
-
-      {/* R14: page two. The key carries the view, so each pile walks its own
-          cursor under its own ordering. */}
-      <LoadMore
-        listKey={todosListKey(teamId, accountId, view)}
-        label={t("Load more to-dos")}
-        fetchPage={(c: string) =>
-          contentApi
-            .todos({ ...(accountId ? { accountId } : {}), view, cursor: c })
-            .then((r) => ({ rows: r.todos, nextCursor: r.nextCursor }))
+  // THE DONE PILE IS A RECORD, NOT A LIST OF ACTIONS — the open pile's
+  // row carries one (Withdraw), and Checklist's row has no slot for it
+  // (checked: mark/number/label/owner+when, nothing else). A finished
+  // to-do offers nothing to press, so the shape that had no action slot
+  // to miss fits it exactly, and its mark says "done" as a real
+  // checkmark where the open-pile row said nothing at all. `onToggle`
+  // omitted is the composition's own read-only register (its own doc
+  // header: "Absent, the whole list is read-only and no mark is
+  // interactive") — verified by rendering, not assumed: the checkbox
+  // comes back `disabled`, `aria-checked="true"`, `aria-readonly` on
+  // the list.
+  const renderDone = (rows: Todo[]) => (
+    <Checklist
+      numbered={false}
+      showProgress={false}
+      label={t("Sent back by the client")}
+      items={rows.map((todo) => {
+        const fileLink = safeHref(todo.fileUrl)
+        return {
+          id: todo.id,
+          done: true,
+          // Checklist's own label span has no truncation of its own —
+          // the kit draws a multi-line task description there, and a
+          // to-do's title mid-length is closer to a table row's single
+          // line. Truncated here rather than left to wrap: at 27 rows,
+          // five or six lines apiece (measured against real staging
+          // titles) turned the list into something nobody scans.
+          label: (
+            <span className="block truncate">
+              {todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}
+            </span>
+          ),
+          owner: todo.accountName,
+          when: todo.completedAt ? t("done {date}", { date: formatDate(todo.completedAt, lang) }) : null,
+          dateTime: todo.completedAt ?? undefined,
+          meta:
+            todo.completedByName || todo.fileName ? (
+              <>
+                {todo.completedByName}
+                {todo.completedByName && todo.fileName ? " · " : null}
+                {todo.fileName &&
+                  (fileLink ? (
+                    <a
+                      href={fileLink}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      {todo.fileName}
+                    </a>
+                  ) : (
+                    todo.fileName
+                  ))}
+              </>
+            ) : null,
         }
+      })}
+    />
+  )
+
+  const renderOpen = (rows: Todo[]) => (
+    <RowList>
+      {rows.map((todo) => {
+        // WHAT THE CLIENT ACTUALLY SENT US, as a thing you can open.
+        //
+        // The filename used to be a third item in the ` · ` join below — a
+        // string in a paragraph — while `todo.fileUrl` sat on the row and
+        // was read by no component in either front door. So the agency asked
+        // a client for a document, the client uploaded it through the
+        // portal's "Send a file", the door wrote the bytes to the bucket and
+        // the row, and a member of staff was shown the word "invoice.pdf"
+        // that they could not click. The upload worked every time; nothing
+        // ever led back to it — and then the row itself stopped rendering,
+        // because attaching the file is what completes the to-do.
+        //
+        // Through `safeHref` like every other file on a screen, even though
+        // this path is one THIS app minted (/media/…): the seam decides, not
+        // the origin of the string. A URL it refuses prints as the plain
+        // text it always was — the same fallback `staff-panel.tsx` gives a
+        // certificate, whose shape this copies rather than inventing a third.
+        const fileLink = safeHref(todo.fileUrl)
+        const meta = [
+          todo.accountName,
+          todo.dueOn ? t("due {date}", { date: formatDate(todo.dueOn, lang) }) : t("no date"),
+        ]
+        return (
+          <Row
+            key={todo.id}
+            live={!todo.completedAt && !todo.cancelled}
+            mark={<RecordMark name={todo.title} />}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
+              <p className="text-muted-foreground truncate text-xs">
+                {meta.filter(Boolean).join(" · ")}
+                {todo.fileName && (
+                  <>
+                    {" · "}
+                    {fileLink ? (
+                      <a
+                        href={fileLink}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        {todo.fileName}
+                      </a>
+                    ) : (
+                      todo.fileName
+                    )}
+                  </>
+                )}
+              </p>
+            </div>
+            {/* The row that has just been completed under the reader's
+                eyes, patched in place by the live layer, before the tab
+                it now belongs to has caught up. */}
+            {todo.completedAt && (
+              <Badge variant="secondary" className="text-badge">
+                {t("Done")}
+              </Badge>
+            )}
+            {canCancel && !todo.completedAt && !todo.cancelled && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label={t("Withdraw this input")}
+                onClick={() => void cancel(todo.id)}
+              >
+                <Ban className="size-3.5" />
+              </Button>
+            )}
+          </Row>
+        )
+      })}
+    </RowList>
+  )
+
+  return (
+    <div className="flex flex-col gap-2">
+      {tabs}
+      {/* THE PANEL'S REAL TOOLBAR — search only, answered by the DOOR (R14):
+          the done pile keeps every completed to-do for ever, so a browser
+          could only ever search the page it had loaded. No sort control and
+          no facet: `view` is already this strip's own tab, `accountId` is
+          already fixed wherever one is handed in, and the two piles are
+          deliberately two ORDERINGS (`TODO_SORTS`,
+          workers/content/src/lib/todos.ts) rather than one list a user
+          control could reorder — a search asked while looking at Open still
+          knows the Done pile's own match, from the very same read. */}
+      <PagedPanelBody<Todo>
+        listKey={key}
+        placeholder={t("Search inputs…")}
+        matches={{
+          none: t("No inputs match"),
+          one: t("1 input matches"),
+          many: t("{count} inputs match"),
+        }}
+        fixed={{ view, ...(accountId ? { accountId } : {}) }}
+        fetchPage={(query, cursor) =>
+          contentApi
+            .todos({ ...(accountId ? { accountId } : {}), view, ...query, cursor: cursor ?? undefined })
+            .then((r) => ({ rows: r.todos, nextCursor: r.nextCursor, total: r.total }))
+        }
+        restingData={q.data}
+        restingError={q.error}
+        errorText={t("Couldn't load the inputs.")}
+        onNew={view === "open" ? onNew : undefined}
+        newLabel={t("Ask for something")}
+        // No import target for to-dos — they are asked of a client one at a
+        // time. The "done" pile has nothing to ADD (it is what came BACK), so
+        // its empty state carries no button at all (`onNew` above is already
+        // `undefined` on that tab).
+        emptyTitle={
+          view === "done"
+            ? t("Nothing has come back from a client yet.")
+            : t("Nothing outstanding with a client.")
+        }
+        loadMoreLabel={t("Load more inputs")}
+        renderRows={view === "done" ? renderDone : renderOpen}
       />
     </div>
   )

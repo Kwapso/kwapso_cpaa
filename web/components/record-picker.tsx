@@ -64,6 +64,7 @@ import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/she
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { Check, ChevronsUpDown, X } from "@shared/ui/foundations/icons"
+import { cn } from "@shared/ui/lib/utils"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached } from "@shared/web/store"
@@ -196,12 +197,16 @@ export function RecordPicker({
       : (found.data ?? options ?? [])
     : (options ?? [])
   const chosen = !!value && value !== emptyOption?.value
+  // THE CHOSEN ROW ITSELF, not just its label — so the closed control can draw
+  // its face too (below), the same option object `label` is already pulled
+  // from. Absent while the value is a session-only id the door hasn't
+  // answered for yet (`picked`/`selectedLabel` cover the label in that gap;
+  // there is no picture to show until a real option row exists).
+  const chosenOption = chosen
+    ? (rows.find((o) => o.value === value) ?? options?.find((o) => o.value === value))
+    : undefined
   const label = chosen
-    ? (rows.find((o) => o.value === value)?.label ??
-      options?.find((o) => o.value === value)?.label ??
-      picked ??
-      selectedLabel ??
-      value)
+    ? (chosenOption?.label ?? picked ?? selectedLabel ?? value)
     : placeholder
 
   function choose(next: string) {
@@ -230,16 +235,26 @@ export function RecordPicker({
       <Check className={value === o.value ? "mt-0.5 opacity-100" : "mt-0.5 opacity-0"} />
       {/* THE RECORD'S OWN FACE, in the slot an icon would take (R35). Drawn only
           when the option carries one, so a list of roles or versions is exactly
-          as dense as it was. `size="row"` is the same box the collections use —
-          a picker row and a list row are the same record at the same size. */}
+          as dense as it was. `size="choice"` (24px) — CLIENT-REPORTED,
+          2026-09-01, on the "Team lead" field's open list: this used to be
+          `size="row"` (36px) on the reasoning that a picker row and a
+          collection row are the same record at the same size, but a picker's
+          list is a dense, scannable stack of candidates being compared against
+          each other — the same shape as the staff CHECKLIST `choice` was
+          already named for in `record-mark.tsx` — not a single row read on its
+          own the way a collection row is. NO SIZE CLASS HERE — a `size-6`/
+          `text-sm` className here was a hand-rolled size fighting the `size`
+          prop for the same box, exactly the drift `RecordMark`'s own header
+          warns a caller-supplied size class causes; that bug is fixed, this is
+          a size decision on top of it. */}
       {(o.picture || o.mark) && (
         <RecordMark
           picture={o.picture}
           mark={o.mark}
           name={o.label}
           shape={o.shape}
-          size="row"
-          className="mt-0.5 size-6 text-sm"
+          size="choice"
+          className="mt-0.5"
         />
       )}
       <span className="flex min-w-0 flex-col">
@@ -313,6 +328,34 @@ export function RecordPicker({
     </Command>
   )
 
+  // A PERSON IN THEIR OWN RIGHT gets their face on the closed control too, not
+  // only in the open list — a staff Owner/Assignee field or a Contact field,
+  // told apart from a client/app/thing by the same `shape: "round"` the option
+  // already carries (record-mark.tsx's own discriminator). Client-reported:
+  // "every time I have to select a person, add the avatar" — originally drawn
+  // on the RIGHT, beside the chevron, so the label stayed the thing read
+  // first. OVERRIDDEN 2026-08-31: the client's next ruling is a blanket one —
+  // "an avatar next to a name sits on the LEFT of it, never the right, never
+  // above or below" — which this control's own trigger disagreed with. Drawn
+  // before the label now, exactly where the kit's own `Avatar`-then-name
+  // pattern (team-switcher.tsx, the kit's `List`/`ActivityFeed`) already puts
+  // it everywhere else in the app.
+  const personMark = chosenOption?.shape === "round" && (
+    // No size className here either — see the option row's own `RecordMark`
+    // comment above: a `size-6` override was fighting the `size` prop for the
+    // same box. `size="choice"` (24px), for the same reason as the open list:
+    // the closed control and its own open rows are the same record at the
+    // same size, so the closed face follows the list's size down with it.
+    <RecordMark
+      picture={chosenOption.picture}
+      mark={chosenOption.mark}
+      name={chosenOption.label}
+      shape="round"
+      size="choice"
+      className="shrink-0"
+    />
+  )
+
   const trigger = (
     <Button
       id={id}
@@ -324,12 +367,33 @@ export function RecordPicker({
       disabled={disabled}
       // Square, not pill: this is a form control sitting in a column of inputs,
       // and the library's own Select trigger is the shape a person reads as one.
-      className="min-h-9 min-w-0 flex-1 justify-between rounded-[var(--radius)] px-3 font-normal"
+      //
+      // THE GREY OUTLINE, 2026-08-31 — client-reported on this exact dialog's
+      // screenshot: the two picker fields ("Whose system it is", "Stage") sat
+      // beside plain Input/Textarea fields as a solid filled swatch with no
+      // edge, while every other field around them drew the field hairline.
+      // `--btn-secondary-fill` already IS `--card` — same tone `input.tsx` and
+      // `textarea.tsx` fill with — so the two were never a colour mismatch;
+      // a BUTTON carries no border in any state (button.tsx's own law) and a
+      // FIELD does, drawn as this inset-shadow hairline (never a CSS
+      // `border`), which is the one thing missing here. Two strengths, same
+      // as `input.tsx`'s `disabled` split: `--hair-strong` at rest, the
+      // weaker `--hair` once the control is disabled — so a picker a form
+      // has locked reads as locked the same way a text field does. Focus
+      // needs nothing added: tokens.css §8 rings every control the same way
+      // already, button or field.
+      className={cn(
+        "min-h-9 min-w-0 flex-1 justify-between gap-2 rounded-[var(--radius)] px-3 font-normal",
+        disabled ? "shadow-[var(--hairline)]" : "shadow-[var(--hairline-strong)]"
+      )}
     >
-      <span className={chosen ? "truncate" : "text-muted-foreground truncate"} title={label}>
-        {label}
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        {personMark}
+        <span className={chosen ? "min-w-0 truncate" : "text-muted-foreground min-w-0 truncate"} title={label}>
+          {label}
+        </span>
       </span>
-      <ChevronsUpDown className="opacity-50" />
+      <ChevronsUpDown className="shrink-0 opacity-50" />
     </Button>
   )
 

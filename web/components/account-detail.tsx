@@ -1,7 +1,7 @@
 "use client"
 
 // Account detail — one COMPANY at /accounts/<id>, as a tabbed record (Law R2):
-// Overview / Contacts / its work / Rates / Knowledge / Activity.
+// Overview / its work / Rates / Knowledge / Activity.
 // Host-composed, because most of those tabs are collections with their own
 // actions — link a person, add an app, deactivate a rate — and no engine block draws
 // those. Those list bodies live next door in account-detail-panels.tsx; this file
@@ -19,18 +19,31 @@
 // — where it invited the question "who exactly is signing in?" and answered it
 // with a list.
 //
-// THE PEOPLE ARE THEIR OWN PERMISSION. The Contacts tab is behind `contacts:read`
-// — a developer opening a client sees the company and its apps, and not the
-// address book. The server withholds the rows too (routes/accounts.ts): a tab
-// that is not drawn is not a permission.
+// THE PEOPLE ARE THEIR OWN PERMISSION. This account's own contacts are behind
+// `contacts:read` — a developer opening a client sees the company and its
+// apps, and not the address book. The server withholds the rows too
+// (routes/accounts.ts): content that is not drawn is not a permission.
+//
+// NO CONTACTS TAB ANY MORE (client, 31 Aug 2026: "contacts as a real sidebar
+// page, also remove the tab from inside accounts"). The address book across
+// EVERY account now has its own destination (`/contacts`, grouped by company —
+// see web/lib/screens.ts's `contactsListRecipe` and the "contacts" branch in
+// collection-content.tsx). What survives HERE, on Overview, is the answer to
+// "who is a contact of THIS account" — the add/link/remove controls that used
+// to live on the tab, unchanged, because a company's own record is still where
+// somebody adds or removes ITS people, and reading them nested under this
+// company's own fields costs nothing new: the rows were already fetched for
+// this screen either way.
 //
 // THE HIERARCHY IS STATED ONCE, IN THE HEADER — which account this one sits
 // under, as a link one tap up the tree. It used to be stated twice, and the
 // second telling was a tab called "Under this account" listing the rows whose
 // parent pointer names this one. In this agency's data those rows are its
 // people, so the record carried two tabs answering the same question under two
-// names, which is the duplication the tester reported (7.2). The tab is gone and
-// Contacts is the survivor; the parent pointer itself is untouched.
+// names, which is the duplication the tester reported (7.2). That tab went and
+// Contacts was the survivor; now Contacts itself has moved off the tab strip
+// too, onto Overview and onto its own page — the parent pointer itself is
+// untouched throughout.
 //
 // Every count here is an exact server COUNT(*) through the ONE formatCount seam
 // (R16) — never the length of a list the door capped. Every destructive action is
@@ -41,20 +54,10 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@shared/ui/components/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
+import { useConfirm } from "@shared/web/use-confirm"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
@@ -67,11 +70,7 @@ import { moneyText } from "@shared/web/money"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
 import { AccountRateCard } from "@/components/account-rate-card"
 import { MarginPanel } from "@/components/margin-panel"
-import {
-  ContactsPanel,
-  type Confirm,
-  type PanelActions,
-} from "@/components/account-detail-panels"
+import { ContactsPanel, type PanelActions } from "@/components/account-detail-panels"
 import {
   ContactCreateDialog,
   ContactLinkDialog,
@@ -93,9 +92,9 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
@@ -257,11 +256,9 @@ export function AccountDetailScreen({
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
   const [newContactOpen, setNewContactOpen] = React.useState(false)
-  const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [appOpen, setAppOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
-  const [busy, setBusy] = React.useState(false)
 
   /** Re-read what this screen shows after our own write. (Everyone else's screen
    * catches up from the live ping — see the accounts entries in live-resources.) */
@@ -271,30 +268,15 @@ export function AccountDetailScreen({
     invalidate(accountsKey(teamId))
   }, [accountId, teamId])
 
-  /** Run a write, tell the person plainly if it was refused, and re-read. Returns
-   * false when it failed, so a confirm dialog can stay open. */
-  const run = React.useCallback(
-    async (what: () => Promise<unknown>, done: string, fallback: string) => {
-      setBusy(true)
-      try {
-        await what()
-        refresh()
-        toast.success(done)
-        return true
-      } catch (err) {
-        toast.error(err instanceof ApiFailure ? err.message : fallback)
-        return false
-      } finally {
-        setBusy(false)
-      }
-    },
-    [refresh]
-  )
+  // The one confirm dialog every red action on this record shares
+  // (shared/web/use-confirm.tsx) — `run` refreshes on success and toasts
+  // either way; `ask` opens the dialog with the words for this particular act.
+  const { busy, ask, run, dialog: confirmDialog } = useConfirm(refresh)
 
   /** What the three collection tabs borrow from this screen: ask first, then do
    * it. Bundled so a panel takes one prop rather than three, and so there is
    * exactly one confirm dialog on the record (at the bottom of this file). */
-  const actions: PanelActions = { busy, ask: setConfirm, act: run }
+  const actions: PanelActions = { busy, ask, act: run }
 
   // Saving the record. There is no MOVE half any more: the form stopped offering
   // a parent picker (18 Aug 2026 — account-form-dialog's header), so the only
@@ -422,7 +404,7 @@ export function AccountDetailScreen({
   if (detailQ.data === undefined)
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
 
-  const { account, parent, links, linksTotal } = detailQ.data
+  const { account, parent, links } = detailQ.data
 
   // A PERSON IS A DIFFERENT SCREEN. One table, one door, one read — and from here
   // two compositions, because a contact has no sprints, no rate card and no
@@ -467,31 +449,18 @@ export function AccountDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
-      // THE ADDRESS BOOK, behind its own right. A role without `contacts:read`
-      // does not see this tab — and the door sends it no rows either, so the tab
-      // is the consequence of the permission rather than the permission itself.
-      ...(canSeeContacts
-        ? [
-            {
-              value: "contacts",
-              label: t("Contacts"),
-              icon: CONCEPT_ICON.contacts,
-              badge: formatCount(linksTotal),
-              badgeVariant: "" as const,
-            },
-          ]
-        : []),
-      // NO "UNDER THIS ACCOUNT" TAB (7.2). It listed the account rows whose
-      // parent pointer names this one, which — in the way this agency actually
-      // uses the record — is the same list of people the Contacts tab above
-      // already shows, under a second name. Two tabs answering "who is inside
-      // this company" is the duplication the tester reported; the answer is the
-      // one with the right word on it. The PARENT POINTER is untouched: a company
-      // still sits under its holding company, the form still moves it, and the
-      // header still links up the tree.
+      // NO CONTACTS TAB (client, 31 Aug 2026). The address book, behind its own
+      // right, is now a section on Overview above — same `contacts:read` gate,
+      // same rows, so a role without it still sees neither. NO "UNDER THIS
+      // ACCOUNT" TAB either (7.2): it listed the account rows whose parent
+      // pointer names this one, which — in the way this agency actually uses
+      // the record — is the same list of people the Contacts section above
+      // already shows, under a second name. The PARENT POINTER is untouched: a
+      // company still sits under its holding company, the form still moves it,
+      // and the header still links up the tree.
       // The work hanging off this client, each behind its own read right.
       ...(canSeeApps
         ? [
@@ -566,7 +535,7 @@ export function AccountDetailScreen({
         ? [
             {
               value: "todos",
-              label: t("To-dos"),
+              label: t("Inputs"),
               icon: CONCEPT_ICON.todos,
               badge: formatCount(todosTotal),
               badgeVariant: "" as const,
@@ -629,7 +598,7 @@ export function AccountDetailScreen({
               disabled: busy,
               destructive: true,
               onSelect: () =>
-                setConfirm({
+                ask({
                   title: `Archive ${account.name}?`,
                   body: "It stops showing in the everyday lists. Everything on it, its people and its history, stays exactly where it is, and you can bring it back any time.",
                   action: "Archive",
@@ -665,37 +634,57 @@ export function AccountDetailScreen({
       // clicks away led with a glyph. No logo falls back to the company's
       // initial, never to an empty square (shared/web/record-mark.tsx).
       leading={<RecordMark picture={account.logoUrl} name={account.name} size="band" />}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `account`), client ruling 2026-08-31.
+      eyebrow={t("Account")}
       recordNumber={account.code || undefined}
       collectionLabel={t("Company")}
-      chips={account.active ? null : <Badge>{t("Archived")}</Badge>}
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31, reading
+      // their own screenshot of an account back: a status chip carries a dot).
+      // An account's only two states are live and archived (glossary: "An
+      // account has none [no status]: it is live, or it is archived"), so the
+      // one unambiguous colour here is the kit's own `archived` dot tone —
+      // nothing is invented for the live half, which stays wordless as it
+      // always has.
+      chips={
+        account.active ? null : (
+          <Badge variant="status" dot="archived">
+            {t("Archived")}
+          </Badge>
+        )
+      }
       title={account.name}
       actions={
         <>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
-            <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
+            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
         </>
       }
-      headerExtra={
-        <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          {parent ? (
-            <Button
-              variant="link"
-              type="button"
-              onClick={() => openAccount(parent.id)}
-              className="hover:text-foreground"
-            >
-              {t("Part of")} {parent.name}
-            </Button>
-          ) : (
-            <span>{t("Sits on its own")}</span>
-          )}
-        </p>
-      }
+      // THE "PART OF {ACCOUNT}" LINE IS GONE — CLIENT RULING, 2026-08-31,
+      // VERBATIM: "what is this 3rd component in the title under the chips?
+      // kill everywhere. chips is the last component of headers!" This lived
+      // in `headerExtra`, which maps to `RecordChrome`'s `hero` prop — the
+      // kit draws it in its own `data-record-region="hero"` block, directly
+      // under the header block that carries the chips and still above the
+      // tab strip, so on the rendered page it read as more content under the
+      // pills exactly as the ruling describes. Not lost: "Parent account" is
+      // already a row in the Overview tab (`overviewItems`).
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: account.createdByName,
+        createdAt: account.createdAt,
+        editedByName: account.editedByName,
+        updatedAt: account.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("accounts", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
 
       <TabsView
@@ -719,11 +708,38 @@ export function AccountDetailScreen({
                 <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-[var(--radius)] object-cover sm:h-40" />
                 <OverviewList items={overviewItems} />
                 {account.about && (
-                  <div className="rounded-[var(--radius)] border p-4">
+                  <div className="rounded-[var(--radius)] bg-surface-panel p-4">
                     <p className="text-muted-foreground mb-2 text-micro uppercase">
                       {t("About")}
                     </p>
                     <RichText html={account.about} />
+                  </div>
+                )}
+                {/* THE ADDRESS BOOK, ON OVERVIEW RATHER THAN ITS OWN TAB (client,
+                    31 Aug 2026: "contacts as a real sidebar page, also remove
+                    the tab from inside accounts"). Same right (`contacts:read`
+                    — a role without it sees neither this box nor the rows), same
+                    rows, same add/link/remove controls the tab used to carry:
+                    "who is a contact of THIS account" is still a question this
+                    record answers, it just no longer needs a tab of its own to
+                    do it. Every contact ACROSS every account has its own page
+                    now — see `/contacts` (web/lib/screens.ts). */}
+                {canSeeContacts && (
+                  <div className="rounded-[var(--radius)] bg-surface-panel p-4">
+                    <p className="text-muted-foreground mb-2 text-micro uppercase">
+                      {t("Contacts")}
+                    </p>
+                    <ContactsPanel
+                      accountName={account.name}
+                      links={links}
+                      canCreate={canLinkContacts}
+                      canCreatePerson={canCreateContacts}
+                      canArchive={canUnlinkContacts}
+                      actions={actions}
+                      onAdd={() => setLinkOpen(true)}
+                      onNew={() => setNewContactOpen(true)}
+                      onOpen={openAccount}
+                    />
                   </div>
                 )}
               </div>
@@ -735,8 +751,8 @@ export function AccountDetailScreen({
           // is never assembled here.
           // THE CLIENT'S OWN ORGANISATION. `links` is handed down rather than
           // re-fetched: the record screen already holds this company's contacts
-          // for the Contacts tab, and they are exactly the pool a role's holder
-          // comes from.
+          // for the Contacts section on Overview, and they are exactly the pool
+          // a role's holder comes from.
           if (tabItem.value === "organisation")
             return <ClientOrgPanel teamId={teamId} accountId={accountId} contacts={links} />
 
@@ -752,7 +768,7 @@ export function AccountDetailScreen({
                     a figure a client cannot account for is worse than no figure
                     at all. */}
                 {moneyBack && (
-                  <div className="rounded-[var(--radius)] border p-4">
+                  <div className="rounded-[var(--radius)] bg-surface-panel p-4">
                     <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
                     <p className="text-2xl font-medium tabular-nums">{moneyBack}</p>
                     <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
@@ -762,20 +778,11 @@ export function AccountDetailScreen({
             )
 
           if (tabItem.value === "activity")
-            return <ActivityPanel activity={activity} />
-
-          if (tabItem.value === "contacts")
             return (
-              <ContactsPanel
-                accountName={account.name}
-                links={links}
-                canCreate={canLinkContacts}
-                canCreatePerson={canCreateContacts}
-                canArchive={canUnlinkContacts}
-                actions={actions}
-                onAdd={() => setLinkOpen(true)}
-                onNew={() => setNewContactOpen(true)}
-                onOpen={openAccount}
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("accounts", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
               />
             )
 
@@ -876,7 +883,13 @@ export function AccountDetailScreen({
 
           // ACTIVITY is the last tab, and the fall-through. The login switch is
           // not here any more — only a person can hold one.
-          return <ActivityPanel activity={activity} />
+          return (
+            <ActivityPanel
+              activity={activity}
+              onAddNote={can("accounts", "create") ? activity.addNote : undefined}
+              notePlaceholder={t("Add a note")}
+            />
+          )
         }}
       />
 
@@ -1007,37 +1020,7 @@ export function AccountDetailScreen({
 
       {/* One confirm for every red action — nothing here deletes, so each one says
        * plainly what survives. */}
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !busy && !o && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{confirm?.body}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={busy}
-              onClick={(e) => {
-                e.preventDefault()
-                const c = confirm
-                if (!c) return
-                void c.run().then((ok) => ok && setConfirm(null))
-              }}
-            >
-              {busy ? <Spinner /> : null}
-              {busy ? t("Working…") : confirm?.action}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    <RecordFooter
-        audit={{
-          createdByName: account.createdByName,
-          createdAt: account.createdAt,
-          editedByName: account.editedByName,
-          updatedAt: account.updatedAt,
-        }}
-      />
+      {confirmDialog}
     </RecordScreen>
   )
 }

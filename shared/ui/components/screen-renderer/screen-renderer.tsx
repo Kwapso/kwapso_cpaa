@@ -93,7 +93,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../tabs/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent, TabsCount } from "../tabs/tabs";
 import { Badge } from "../badge/badge";
 import { Title } from "../title/title";
 import { Skeleton } from "../skeleton/skeleton";
@@ -172,7 +172,11 @@ export interface ScreenTab {
   value: string;
   /** What the tab says. A node, so a count can ride along. */
   label: React.ReactNode;
-  /** A live count beside the label. Zero renders nothing — `Badge`'s law. */
+  /**
+   * A live count beside the label, drawn by `TabsCount` — ch14's quiet
+   * number here, since `ScreenRenderer` always states `variant="folder"`
+   * (ruling E). Zero renders nothing.
+   */
   count?: number;
   /** The tab's own body. Absent, the screen's `body` is shown for every tab. */
   body?: ScreenBlock[];
@@ -919,9 +923,20 @@ const ScreenRenderer = React.forwardRef<HTMLDivElement, ScreenRendererProps>(
             </div>
           ) : null}
 
-          {/* ---- Tabs → toolbar → body → footer. ------------------------- */}
+          {/* ---- Tabs → toolbar → body → footer. -------------------------
+              CLIENT RULING E, 2026-08-22: "folder tabs are for main screens,
+              line tabs for detail screens." ScreenRenderer draws ch19
+              COLLECTION VIEWS ONLY — the toolbar contract quoted at the top
+              of this file (search, filters, actions, view switch) is the
+              main-screen contract, and this component has no record/detail
+              mode at all. So `folder` is stated here rather than left to
+              `Tabs`'s own generic default, which is `line` (right for the
+              majority of `Tabs` consumers, wrong for this one). Leaving it
+              unstated was the exact regression `CollectionFrame` already
+              closed for itself — see that file's `tabsVariant` default. */}
           {tabs && tabs.length > 0 ? (
             <Tabs
+              variant="folder"
               value={tab}
               defaultValue={defaultTab ?? tabs[0].value}
               onValueChange={onTabChange}
@@ -931,7 +946,13 @@ const ScreenRenderer = React.forwardRef<HTMLDivElement, ScreenRendererProps>(
                 {tabs.map((item) => (
                   <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
                     {item.label}
-                    <Badge count={item.count} />
+                    {/* FIX, matching the bug override 45 already fixed once
+                        in `CollectionFrame`: this strip is always
+                        `variant="folder"` (see the block above), and ch14's
+                        "counts are quiet, never badges" forbids the `Badge`
+                        chip that used to sit here. `TabsCount` draws the
+                        quiet number for the resolved variant on its own. */}
+                    <TabsCount count={item.count} />
                   </TabsTrigger>
                 ))}
               </TabsList>

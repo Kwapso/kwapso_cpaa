@@ -43,7 +43,7 @@ import { SelectableDetailScreen } from "@/components/selectable-detail"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { tenancy } from "@/lib/api"
-import type { HelpScope, TaskView } from "@/lib/live-resources"
+import type { TaskView } from "@/lib/live-resources"
 import {
   shapeBrandDetail,
   shapeInviteDetail,
@@ -52,6 +52,7 @@ import {
   shapeTeamDetail,
 } from "@/components/deep-link/shape"
 import type { ActivityItem } from "@shared/types"
+import type { Language } from "@shared/i18n"
 import type { useScreenData } from "@/lib/use-screen-data"
 import type { usePermissions } from "@/lib/perms"
 import type { useActiveTeam } from "@/lib/use-active-team"
@@ -72,7 +73,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
@@ -103,8 +104,6 @@ export type ModuleContentCtx = Pick<
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
   sectionPath: string
-  helpScope: HelpScope
-  setHelpScope: (v: HelpScope) => void
   myUserId: string | null
   query: ScreenQuery
   taskView: TaskView
@@ -114,12 +113,21 @@ export type ModuleContentCtx = Pick<
    * calls `useT()` once and hands the result down with everything else. Every
    * recipe on screen is translated by passing it to `resolveRecipe`. */
   t: (english: string) => string
+  /** The reader's language, as the raw code — `formatDate` and its siblings need
+   * this rather than `t`, for the reason `shared/web/format.ts` gives at its own
+   * required `lang` parameter. Rides beside `t` for the same reason `t` does:
+   * the host resolves it once (`useLanguage()`) and hands it down. */
+  lang: Language
 }
 
 /** The row is whichever record kind a segment holds; each shaper takes its own
  * type, so the three call sites erase it through this one alias rather than
  * three inline casts. */
-type InternalShaper = (row: { id: string }, activity: ActivityItem[]) => ReturnType<typeof shapeBrandDetail>
+type InternalShaper = (
+  row: { id: string },
+  activity: ActivityItem[],
+  lang: Language
+) => ReturnType<typeof shapeBrandDetail>
 
 /** The BODY of an agency-internal record detail, once: find the row in its
  * loaded collection, render it through the engine, and hang the paged history
@@ -150,7 +158,7 @@ function internalDetail(
   if (spec.query.data === undefined) return <Skeleton variant="list" lines={4} />
   const row = spec.query.data.find((r) => r.id === ctx.recordId) ?? null
   if (!row) return <p className="text-muted-foreground text-sm">{ctx.t("That record no longer exists.")}</p>
-  const data = spec.shape(row, ctx.internalActivity.rows)
+  const data = spec.shape(row, ctx.internalActivity.rows, ctx.lang)
   return (
     <div className="flex flex-col gap-6">
       <ScreenRenderer
@@ -174,6 +182,7 @@ function internalDetail(
 export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
   const {
     t,
+    lang,
     noAccess,
     enabled,
     perms,
@@ -262,6 +271,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         logoUrl: active.ctx?.team?.logoUrl ?? null,
         meta: metaQ.data,
         activity: activityQ.data ?? [],
+        lang,
       })
       return (
         <div className="flex flex-col gap-4">
@@ -312,7 +322,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       let recipe = withTabCounts(base, { activity: activityTotal })
       // You can't change your own role or remove yourself here.
       if (member.isYou) recipe = withoutActions(recipe, ["members.changeRole", "members.remove"])
-      const data = shapeMemberDetail(member, activityQ.data ?? [])
+      const data = shapeMemberDetail(member, activityQ.data ?? [], lang)
       return (
         <div className="flex flex-col gap-4">
           <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
@@ -336,7 +346,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       let recipe = withTabCounts(base, { activity: activityTotal })
       // Revoke only makes sense while the invite is still pending.
       if (invite.status !== "pending") recipe = withoutActions(recipe, ["invites.revoke"])
-      const data = shapeInviteDetail(invite, inviteAuditQ.data ?? null, activityQ.data ?? [])
+      const data = shapeInviteDetail(invite, inviteAuditQ.data ?? null, activityQ.data ?? [], lang)
       return (
         <div className="flex flex-col gap-4">
           <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
@@ -399,7 +409,13 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // tabs are prose somebody wrote and its header carries the button that
     // reaches outside this app.
     if (module === "meetings") {
-      return <MeetingDetailScreen teamId={teamId as string} meetingId={recordId} />
+      return (
+        <MeetingDetailScreen
+          teamId={teamId as string}
+          meetingId={recordId}
+          basePath={sectionPath}
+        />
+      )
     }
     // ONE TASK. A component since 18 Aug 2026, when it grew a Work logs tab —
     // see task-detail.tsx for why the engine handed it over. The tick still runs

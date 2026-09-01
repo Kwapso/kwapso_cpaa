@@ -24,6 +24,7 @@
 import * as React from "react"
 
 import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -42,8 +43,9 @@ import type { PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
+import { dateFromYMD, ymdFromDate } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export type TaskFormValues = {
   title: string
@@ -112,7 +114,7 @@ export function TaskFormDialog({
   initial?: TaskFormValues | null
   onSubmit: (values: TaskFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     initial ?? {
@@ -181,14 +183,18 @@ export function TaskFormDialog({
     value: string,
     placeholder: string,
     searchPlaceholder: string,
-    options: { id: string; label: string }[],
+    // `picture`/`shape` optional: department and app below pass neither, and
+    // the PERSON one passes both — a staff member's own face, the way any
+    // Owner/Assignee field does (record-picker.tsx's `shape: "round"`
+    // discriminator).
+    options: { id: string; label: string; picture?: string | null; shape?: "square" | "round" }[],
     set: (v: string) => void
   ) => (
     <RecordPicker
       id={id}
       value={value || NONE}
       onChange={(v) => set(v === NONE ? "" : v)}
-      options={options.map((o) => ({ value: o.id, label: o.label }))}
+      options={options.map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
       emptyOption={{ value: NONE, label: placeholder }}
       placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
@@ -235,7 +241,7 @@ export function TaskFormDialog({
           values.assigneeId,
           "Nobody yet",
           t("Search members…"),
-          members.map((m) => ({ id: m.id, label: m.name })),
+          members.map((m) => ({ id: m.id, label: m.name, picture: m.photo, shape: "round" as const })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}
       </Field>
@@ -296,11 +302,12 @@ export function TaskFormDialog({
         </Field>
       )}
       <Field config={dueField} htmlFor="task-due" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="task-due"
-          type="date"
-          value={values.dueOn}
-          onChange={(e) => setValues((s) => ({ ...s, dueOn: e.target.value }))}
+          mode="date"
+          locale={lang}
+          value={dateFromYMD(values.dueOn)}
+          onValueChange={(d) => setValues((s) => ({ ...s, dueOn: ymdFromDate(d) }))}
           disabled={busy}
         />
       </Field>

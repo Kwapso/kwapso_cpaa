@@ -112,7 +112,7 @@ export function AccountRateCard({
           {t("No rates set for")} {accountName} {t("yet, nothing is being charged by the hour.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rates.map((r) => (
             <li
               key={r.id}

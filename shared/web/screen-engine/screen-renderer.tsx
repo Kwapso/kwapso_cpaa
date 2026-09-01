@@ -260,7 +260,7 @@ function ScreenLayer({
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className={cn(
-            "bg-card fixed z-50 flex flex-col gap-4 overflow-y-auto border p-6 shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0",
+            "bg-card fixed z-50 flex flex-col gap-4 overflow-y-auto p-6 shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0",
             layerContent[presentation]
           )}
         >
@@ -431,6 +431,16 @@ function renderBlock(
 ): React.ReactNode {
   const record = data.record ?? {}
   switch (block.kind) {
+    // NO CARD HERE. Both reachable callers of this case — `renderDetail`'s
+    // `panel` and its per-tab `content` — land inside the kit's
+    // `RecordDetail`, which already wraps the whole panel in ONE `Card` at
+    // the DEFAULT variant (`bg-surface-panel`); that OUTER seam is the real
+    // fix, and it stands. A second `Card` here, added 2026-08-31 as the
+    // app-side twin of `web/components/overview-list.tsx`'s same-night
+    // change, put a white `variant="raised"` box INSIDE that panel — a
+    // container inside a container, which the client's screenshot rejected
+    // outright the same night. The fact list's `<dl>` renders straight onto
+    // the panel again, exactly as it did before that change.
     case "description":
       return (
         <DescriptionList
@@ -462,11 +472,13 @@ function renderBlock(
             id: string
             description: string
             actor?: string
+            initials?: string
             timestamp?: string
           }>).map((a) => ({
             id: a.id,
             description: a.description,
             actor: a.actor,
+            initials: a.initials,
             time: a.timestamp,
           }))}
         />

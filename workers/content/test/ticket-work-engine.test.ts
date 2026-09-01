@@ -57,10 +57,10 @@ const historyFor = (id: string) =>
 
 beforeEach(() => {
   holder.db = buildSpineDb()
-  // The victim's company carries a short code, which is what a reference number
-  // is built out of. The shared fixture doesn't set one (it isn't about
-  // references), so this suite gives it one rather than asserting against a
-  // fixture nobody else needs to reason about.
+  // The victim's company carries a short code. A ticket's own reference no
+  // longer needs one (2026-08-31: it is team-wide, no account-code prefix),
+  // but the shared fixture still leaves this null for anything else in the
+  // suite that reasons about it, so it is set here rather than assumed.
   db().exec(`UPDATE accounts SET code = 'BERG' WHERE id = '${IDS.victimAccount}';`)
 })
 
@@ -195,7 +195,11 @@ describe("the seven states", () => {
 })
 
 describe("the reference number the client quotes", () => {
-  it("is built from the account's own code and counts per account", async () => {
+  it("is TEAM-wide (no account-code prefix) and counts across accounts", async () => {
+    // 2026-08-31 ruling: the account-code prefix is gone, and so is the
+    // per-account scope it rode on. The counter is now one sequence per KIND,
+    // shared by every account in the team — so a second account's ticket
+    // continues the same run rather than starting its own at 1.
     const first = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", {
         description: "First for Bergman",
@@ -208,19 +212,22 @@ describe("the reference number the client quotes", () => {
         accountId: IDS.victimAccount,
       })
     ))[0]
-    expect(row(first).ref).toBe("BERG-T0001")
-    expect(row(second).ref).toBe("BERG-T0002")
+    expect(row(first).ref).toBe("T0001")
+    expect(row(second).ref).toBe("T0002")
   })
 
-  it("is null when there is nothing to build one out of", async () => {
-    // The agency's own question: no account, so no code, so no reference. A
-    // number nobody can quote would look like it meant something.
+  it("is null with no account, but no longer needs the account's own code", async () => {
+    // The agency's own question: no account, so nobody to quote it to. A
+    // number nobody can quote would look like it meant something. This half
+    // is unchanged by the 2026-08-31 ruling.
     const ours = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", { description: "Our own internal question" })
     ))[0]
     expect(row(ours).ref).toBeNull()
 
-    // A client with no short code yet — same answer, different reason.
+    // A client with NO short code at all still gets a reference now — the
+    // string no longer embeds the account's code, so there is nothing left
+    // for an absent one to block.
     db().exec(`UPDATE accounts SET code = NULL WHERE id = '${IDS.victimAccount}';`)
     const uncoded = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", {
@@ -228,7 +235,7 @@ describe("the reference number the client quotes", () => {
         accountId: IDS.victimAccount,
       })
     ))[0]
-    expect(row(uncoded).ref).toBeNull()
+    expect(row(uncoded).ref).toBe("T0001")
   })
 
   it("two tickets raised at the same instant never take the same number", async () => {
@@ -250,7 +257,7 @@ describe("the reference number the client quotes", () => {
     expect(new Set(refs.map((r) => r.ref)).size, "every reference must be its own").toBe(12)
     // …and they are a dense run, not twelve copies of the same gap.
     expect(refs.map((r) => r.ref)).toEqual(
-      Array.from({ length: 12 }, (_, i) => `BERG-T${String(i + 1).padStart(4, "0")}`)
+      Array.from({ length: 12 }, (_, i) => `T${String(i + 1).padStart(4, "0")}`)
     )
   })
 })

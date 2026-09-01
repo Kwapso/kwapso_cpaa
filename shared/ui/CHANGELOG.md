@@ -1,5 +1,95 @@
 # Changelog
 
+## v1.2.15 — 2026-09-01
+
+Five UI-level decisions the client confirmed against live `kwapso_system`
+screens the night of 2026-08-31, re-imported here rather than left as the
+app's own CSS overrides — see GAPS-RULINGS.md R-4 for the full record,
+including which of these are bug fixes against this kit's OWN pre-existing
+rules and which are genuinely new decisions made that night. Both kinds are
+covered below; neither is unauthorized drift.
+
+### Fixed — a folder tab's count was a `Badge` a second time, and a line tab's was a `Badge` a first time
+
+`screen-renderer.tsx` put a `<Badge count={…} />` inside every folder-variant
+tab, which is the exact defect override 45 had already fixed once elsewhere
+(`collection-frame.tsx`) — ch14's "counts are quiet, never badges" was never
+swept into this file. `record-detail.tsx`'s line-variant tabs had the same
+`Badge`, which CH27's own "underline strip with a quiet count" forbids too.
+Both now go through one new component, `TabsCount` (`components/tabs/tabs.tsx`),
+so the shape lives in one place instead of three.
+
+### Added — an active line-variant tab's count is a small mango circle, by ruling
+
+The client's new decision, on top of the fix above: `line`'s count stays quiet
+at rest, and on the ACTIVE tab only, becomes a small fully circular mango fill
+with primary-ink text (`TabsCount`, same file). `folder`'s count is unchanged
+by this — ch14's law was never in question, only whether the build kept it.
+
+### Verified — the rail's active-item pill is already a deliberate, named shape
+
+No code change. `compositions/templates/rail.tsx`'s collapsed active item
+already reads `rounded-pill` (999px) by the kit's own name, not an accidental
+clamp of radius and row height; its expanded active row is deliberately
+SQUARE, per an existing 2026-08-24 ruling (KWAPSO-SPEC.md row 55) that reversed
+an earlier pill build on the client's own screenshots. Checked and left alone.
+
+### Added — Badge's quiet fill gets a documented, non-border fallback for an ambient ground
+
+`badge.tsx`'s `secondary` fill is now `bg-[var(--badge-quiet-fill,
+var(--surface-quiet))]` rather than a bare token — every existing call site is
+pixel-identical — so a caller whose badge sits on `--muted` (measured at 1.175
+contrast in dark, worse than the already-exempted panel case in
+GAPS-CONTRAST.md) can rebind one custom property to a darker quiet tone. A
+fill shift only, never a border or a shadow, matching this kit's law
+throughout.
+
+### Added — a hairline divider between a rail's named sections
+
+`compositions/templates/rail.tsx` groups now separate with a thin inset-shadow
+hairline (never before the first group), reading a new spine-aware token,
+`--spine-hair` (`foundations/tokens/tokens.css` §7b) — one value per rail
+spine, following the same "the mango spine never flips with the palette" law
+`--spine-active-hover` already states in the same block.
+
+### Not changed — no floating rail collapse toggle exists in this kit
+
+Checked and confirmed there is nothing to fix or document: this kit's collapse
+control is an in-flow row at the foot of the rail's own column
+(`data-slot="rail-collapse"`), per KWAPSO-SPEC.md line 4316, not a floating
+control overlapping the rail's edge.
+
+## v1.2.14 — 2026-08-31
+
+### Added — `AgentChat onAttach`/`attachLabel`, and a per-turn `eyebrow`
+
+Two gaps a consuming app logged rather than worked around by hand-editing the
+vendored copy (Brimba's `agent-panel.tsx`, ITEM 4 and ITEM 7, 31 Aug – 1 Sep
+2026): the composer had no attach slot, and a turn had no field for anything
+drawn ABOVE the bubble, on the panel's own ground.
+
+`TicketThread` already carries both shapes, for the same composition
+(ch27.10 — "the assistant… [is] the same composition with a different header
+and a different participant list"): `onAttach`/`attachLabel` draw a real
+paperclip button inside the composer's own pill, left of the field; its
+author/authorMeta/time row draws outside the bubble, above it. `AgentChat`
+had neither, so a caller reaching for either had to lay a control outside
+the composer's own row by hand, or squeeze a timestamp inside the bubble's
+own padding via a negative margin escape hatch.
+
+Both are mirrored onto `AgentChat`, not re-invented: `onAttach`/`attachLabel`
+render the identical control `TicketThread` does (absent by default — a
+caller with nothing to attach gets the unchanged composer), and `eyebrow`
+takes the author/time row's visual register (tertiary ink, the micro step,
+tabular figures) as a single node per turn, since a two-party assistant
+conversation has no second author field to draw — the sighted counterpart to
+the `sr-only` role name already beside it, not a second one.
+
+Not carried over: `TicketThread`'s `hidden sm:inline-flex` on its attach
+button, which exists because that thread can fall back to a per-message
+attachment list on a narrow screen. `AgentChat` has no such fallback, so its
+attach control stays in the row at every width.
+
 ## v1.2.13 — 2026-08-31
 
 Three, from three lanes, batched so a consuming app syncs once. Two are the

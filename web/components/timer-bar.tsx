@@ -167,7 +167,7 @@ export function TimerBar({
                 {badgeName(timer)}
               </button>
             }
-            className={timer.runaway ? "border border-destructive/40 text-destructive" : undefined}
+            className={timer.runaway ? "shadow-[var(--hairline-error)] text-destructive" : undefined}
           />
         )
       })}
@@ -253,7 +253,6 @@ export function RecordTimerButton({
   return (
     <Button
       variant="secondary"
-      size="sm"
       className="gap-1"
       disabled={busy || disabled}
       onClick={() => void toggle()}

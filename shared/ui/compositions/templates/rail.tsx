@@ -1152,7 +1152,7 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             isCollapsed && "items-center gap-[var(--space-3)]",
           )}
         >
-          {groups.map((group) => {
+          {groups.map((group, groupIndex) => {
             const open = !closed.includes(group.id);
             return (
               <div
@@ -1161,6 +1161,23 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
                 className={cn(
                   "flex min-w-0 flex-col gap-[var(--space-2)]",
                   isCollapsed && "items-center",
+                  /* SECTION DIVIDER, GAPS-RULINGS.md R-4d. A hairline between
+                     ADJACENT groups only — never before the first, which
+                     already sits under the brand mark with nothing to
+                     separate it from. `--spine-hair` (tokens.css §7b) is the
+                     spine-aware read of `--hair`: the paper spine's own
+                     hairline, `--hair-inverse` on the ink spine's charcoal
+                     fill, and a fixed charcoal alpha on mango — the same
+                     "does not move with the palette" law `--spine-active-hover`
+                     already states two blocks up in that file. Drawn as an
+                     INSET box-shadow on the group's own top edge, never a
+                     `border` property — this file's law throughout, and the
+                     kit's ("No borders. Ever."). Collapsed groups carry no
+                     heading at all ("nothing to collapse further"), so they
+                     carry no divider either — the two disappear together. */
+                  !isCollapsed &&
+                    groupIndex > 0 &&
+                    "shadow-[inset_0_0.0625rem_0_var(--spine-hair)]",
                 )}
               >
                 {/* 26.02: "the group headers and chevrons disappear entirely

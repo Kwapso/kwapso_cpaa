@@ -16,11 +16,6 @@
 
 import * as React from "react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@shared/ui/components/avatar/avatar"
 import { Button } from "@shared/ui/components/button/button"
 import { List } from "@shared/web/list-compat"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
@@ -75,23 +70,20 @@ export function InvitationsPanel({ refresh }: { refresh: () => Promise<void> }) 
     return <p className="text-destructive text-sm">{t("Couldn't load your invites.")}</p>
   if (invites === undefined) return <Skeleton variant="list" lines={2} />
 
-  // Library List (flat surface + a border to match the design language). Rows
-  // aren't clickable — the trailing Accept button is the only action.
+  // Library List (flat surface + a fill to match the design language, per
+  // BUILD-A-SCREEN §6.1 — separation is a fill or an inset shadow, never a
+  // stroke). Rows aren't clickable — the trailing Accept button is the only
+  // action.
   return (
     <List
       surface="none"
-      className="rounded-[var(--radius)] border"
+      className="rounded-[var(--radius)] bg-surface-panel"
       empty={t("No invites waiting for you.")}
       items={invites.map((inv) => ({
         id: inv.id,
-        leading: (
-          <Avatar className="size-9">
-            {inv.teamLogoUrl && <AvatarImage src={inv.teamLogoUrl} alt={inv.teamName} />}
-            <AvatarFallback className="text-xs">
-              {letterMark(inv.teamName)}
-            </AvatarFallback>
-          </Avatar>
-        ),
+        image: inv.teamLogoUrl,
+        imageAlt: inv.teamName,
+        initials: letterMark(inv.teamName),
         title: inv.teamName,
         subtitle: "Invited to join this team.",
         trailing: (

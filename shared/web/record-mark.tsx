@@ -115,20 +115,97 @@ import * as React from "react"
 
 import { safeSrc } from "./rich-text"
 
-/** The three places a mark is ever drawn, and the size each one is: the leading
- * slot of a row, the square on a card in a tile grid, and the square in a
- * record's header band (UI-RULEBOOK G3). THREE, not "whatever the caller passes"
- * — a size handed in as a class name would put two Tailwind size rules on one
+/** The four places a mark is ever drawn, and the size each one is: the dense
+ * checkbox row of a checklist (and, since 2026-09-01, a `RecordPicker`'s own
+ * closed control and open list — see below), the leading slot of an ordinary
+ * row, the square on a card in a tile grid, and the square in a record's
+ * header band (UI-RULEBOOK G3). NAMED, not "whatever the caller passes" — a
+ * size handed in as a class name would put two Tailwind size rules on one
  * element and leave the winner to stylesheet order, and it is how a fourth,
- * fifth and sixth size arrive without anybody deciding on one. */
+ * fifth and sixth size arrive without anybody deciding on one. `choice` is the
+ * one exception to that count, and it is the rule proving itself rather than
+ * breaking it: added ONCE, here, on 2026-08-31, after `row` on a staff/
+ * stakeholder checklist (`app-form-dialog.tsx`) had already had its hand-rolled
+ * `size-6` className removed for fighting the `size` prop, and the client
+ * still called the result "too big". `row` (36px) was never the smallest thing
+ * this file could draw — the kit's OWN person mark
+ * (`shared/ui/components/avatar/avatar.tsx`) scales 24/32/48
+ * (`--avatar-sm/-md/-lg`), and this file's three sizes were decided without
+ * reference to it. `choice` reuses `--avatar-sm` itself rather than a bare
+ * `size-6`, so a dense checklist row draws the exact box the kit's own
+ * smallest avatar draws, at `text-micro` to match the kit's own initial at
+ * that size — a fourth NAMED, DECIDED size, which is the antidote the old
+ * comment was describing, not the failure it warned about.
+ *
+ * AND THE SAME COMPLAINT CAME BACK ONE DAY LATER, against a control this file
+ * never touches directly: `record-picker.tsx`'s own closed trigger and its
+ * open candidate list, both hand-picked `row` (36px) at the time on the
+ * reasoning that "a picker row and a list row are the same record at the same
+ * size" — true of a COLLECTION row read on its own, and the wrong analogy for
+ * a picker, whose whole job is a dense stack of candidates read AGAINST each
+ * other, the same shape `choice` was named for. Both call sites moved to
+ * `choice` on 2026-09-01; nothing in this file changed, because the drift was
+ * never in the box, only in which named size two OTHER callers reached for. */
 const BOX = {
+  choice: "size-[var(--avatar-sm)] text-micro",
   row: "size-9 text-lg",
   tile: "size-12 text-2xl",
   band: "size-14 text-3xl sm:size-[72px]",
 } as const
 
-export function RecordMark({
+/** The picture-or-fallback CONTENT alone — no box, no background, no shape,
+ * no `overflow-hidden`. `RecordMark` below is this wrapped in its own box;
+ * this bare version exists for exactly one caller,
+ * `shared/web/list-compat.tsx`, which feeds a record's mark into the
+ * vendored kit's `List` (`shared/ui/components/list/list.tsx`) — a slot that
+ * ALREADY draws its own circular `Avatar` around whatever it holds (its own
+ * doc comment invites "an icon or any node in the well instead of initials").
+ * A full `<RecordMark>` there nested a second, differently-shaped box inside
+ * the kit's own: two avatars, one DOM tree, doubled paint. This is the same
+ * safe-picture state machine `RecordMark` uses (see its header for why the
+ * ref check exists), with nothing around it, so it can sit AS the kit's own
+ * fallback content instead of bringing a competing box. */
+export function RecordMarkGlyph({
   picture: stored,
+  mark,
+  name,
+  cover = false,
+}: {
+  /** The stored path to the record's own picture, if it has one. */
+  picture?: string | null
+  /** The record type's glyph, when the type has one. */
+  mark?: string | null
+  /** The record's name — the last resort is its first letter. */
+  name?: string | null
+  /** Crop to fill (a face) vs show whole (a logo) — the same choice
+   * `RecordMark`'s `fit` resolves; passed in already-resolved because the
+   * caller here already built the `<RecordMark>` this replaces and knows it. */
+  cover?: boolean
+}) {
+  const [failed, setFailed] = React.useState<string | null>(null)
+  const picture = safeSrc(stored ?? undefined)
+  // The failure belongs to a SRC, not to the component. See `RecordMark`'s header.
+  const broken = failed !== null && failed === picture
+  const fallback = mark || name?.trim()?.[0]?.toUpperCase() || "·"
+  return picture && !broken ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      key={picture}
+      ref={(node) => {
+        if (node && node.complete && node.naturalWidth === 0) setFailed(picture)
+      }}
+      src={picture}
+      alt=""
+      className={`size-full ${cover ? "object-cover" : "object-contain"}`}
+      onError={() => setFailed(picture)}
+    />
+  ) : (
+    <>{fallback}</>
+  )
+}
+
+export function RecordMark({
+  picture,
   mark,
   name,
   shape = "square",
@@ -153,21 +230,17 @@ export function RecordMark({
    * explicitly for the case the default gets wrong — a FACE drawn in a SQUARE,
    * which is every individual client on the accounts list. */
   fit?: "cover" | "contain"
+  /** Defaults to `row`. `choice` (24px) is for a checklist's own checkbox row
+   * and for `record-picker.tsx`'s closed control + open candidate list — see
+   * the header on `BOX` above for why. `row` stays the size for an ordinary
+   * collection row read on its own, which a picker's stack of candidates is
+   * not. */
   size?: keyof typeof BOX
   className?: string
 }) {
-  const [failed, setFailed] = React.useState<string | null>(null)
-  const picture = safeSrc(stored ?? undefined)
-  // The failure belongs to a SRC, not to the component. See the header.
-  const broken = failed !== null && failed === picture
   const round = shape === "round"
   // The fit follows the box unless the caller separates them.
   const cover = (fit ?? (round ? "cover" : "contain")) === "cover"
-  // The mark first, then the initial, then a neutral placeholder glyph. Every
-  // branch puts SOMETHING in the box: a record with no type, no picture and no
-  // name is still a record, and an empty grey square reads as a screen that
-  // failed to finish loading.
-  const fallback = mark || name?.trim()?.[0]?.toUpperCase() || "·"
   return (
     <span
       aria-hidden
@@ -175,28 +248,7 @@ export function RecordMark({
         round ? "rounded-pill" : "rounded-[var(--radius)]"
       } ${BOX[size]} ${className}`}
     >
-      {picture && !broken ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          // `key` on the src gives the NEW picture a new element, so the ref
-          // below runs again for it — which is what it was always for and
-          // could never do while the failure was a bare boolean.
-          key={picture}
-          // A ref rather than `onLoad`, because the question is not "did it
-          // load" but "had it already finished before React got here". Runs
-          // once when the node attaches; a fetch still in flight answers
-          // `complete === false` and is left to `onError` as before.
-          ref={(node) => {
-            if (node && node.complete && node.naturalWidth === 0) setFailed(picture)
-          }}
-          src={picture}
-          alt=""
-          className={`size-full ${cover ? "object-cover" : "object-contain"}`}
-          onError={() => setFailed(picture)}
-        />
-      ) : (
-        fallback
-      )}
+      <RecordMarkGlyph picture={picture} mark={mark} name={name} cover={cover} />
     </span>
   )
 }

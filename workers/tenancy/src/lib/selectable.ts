@@ -149,9 +149,11 @@ export async function createSelectable(
   actor: Actor,
   type: string,
   value: string,
-  /** THE TYPE MARK (UI-RULEBOOK G2, CHECKLIST 11.8) — one glyph in the slot an
-   * icon would take, beside the word it marks. Optional, and null is a real
-   * answer: most groups are labels and want no pictograph. */
+  /** THE TYPE MARK (UI-CONVENTIONS §5) — a short word, initial or two-letter
+   * code in the slot an icon would take, beside the word it marks. Optional,
+   * and null is a real answer: most groups are labels and want no mark at all.
+   * Never a pictograph — the route validates that with `optionalMark`
+   * (shared/workers/validate.ts) before this function ever sees the value. */
   mark?: string | null
 ): Promise<string> {
   const t = type.trim()

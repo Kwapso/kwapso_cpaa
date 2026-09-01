@@ -18,19 +18,29 @@
 //     feed with no way to reach the other 93 rows: an exact count of what the
 //     screen refuses to show is worse than no count at all.
 
-import { tenancy } from "@/lib/api"
+import { ApiFailure, tenancy } from "@/lib/api"
+import { nameInitials } from "@/lib/identity"
 import { cursorKey } from "@/lib/live-resources"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { formatActivityWhen } from "@shared/web/format"
+import { useT } from "@shared/web/language"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { ActivityItem } from "@shared/types"
 
 /** One activity row, dressed for the library ActivityFeed. Every record detail
  * wrote this same four-line map out for itself — same fields, same date format —
- * which is four places to change the day a feed row grows a field. */
+ * which is four places to change the day a feed row grows a field.
+ *
+ * `initials` rides here rather than being recomputed at each of the two
+ * consumers (the record footer's Latest-activity column, the Activity tab's
+ * own feed) — the SAME generic-activity-path law (R5) that keeps this one
+ * fetch shared keeps its derived display fields shared too, so a mark that
+ * renders blank in one place can't happen while the other gets it right. */
 export type ActivityFeedRow = {
   id: string
   description: string
   actor: string | undefined
+  initials: string
   timestamp: string
 }
 
@@ -67,7 +77,24 @@ export function useRecordActivity(
   error: unknown
   listKey: string
   fetchPage: (cursor: string) => Promise<{ rows: ActivityItem[]; nextCursor: string | null }>
+  /**
+   * Add a note to this record — CH27.8's add-a-note field on the kit's ink
+   * footer (`RecordScreen`'s `onAddNote`), which draws only when a caller
+   * passes this at all. Synchronous, matching the kit's own `(value: string)
+   * => void` contract (it clears the field on Enter before any request could
+   * have returned); the request runs in the background and toasts on either
+   * end.
+   *
+   * NO explicit cache-priming here, on purpose: the door publishes the SAME
+   * resource+id every real edit on this record already does, and that
+   * resource's own `TEAM_RESOURCES` entry (web/lib/live-resources.ts) already
+   * lists this record's `activity:record:<table>:<id>` key among its deps —
+   * the live-sync ping every other note, reply or edit on this record already
+   * rides refreshes this one too, with no new listener code (R15).
+   */
+  addNote: (note: string) => void
 } {
+  const t = useT()
   const on = Boolean(table && id)
   const key = recordActivityKey(table ?? "", id ?? "")
   const query = useCached<ActivityItem[]>(on ? key : null, () =>
@@ -84,6 +111,7 @@ export function useRecordActivity(
       id: a.id,
       description: a.description,
       actor: a.actorName ?? undefined,
+      initials: nameInitials(a.actorName),
       timestamp: formatActivityWhen(a.createdAt),
     })),
     total: useCachedValue<number>(on ? `total:${key}` : null),
@@ -93,5 +121,13 @@ export function useRecordActivity(
       tenancy
         .recordActivity(table as string, id as string, cursor)
         .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor })),
+    addNote: (note: string) => {
+      if (!table || !id) return
+      tenancy.addNote(table, id, note).then(
+        () => toast.success(t("Note added.")),
+        (err: unknown) =>
+          toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add the note. Try again."))
+      )
+    },
   }
 }

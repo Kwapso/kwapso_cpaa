@@ -87,7 +87,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 function StaleShell() {
   const t = useT()
   return (
-    <div className="text-muted-foreground flex flex-col items-start gap-2 rounded-[var(--radius)] border p-4 text-sm">
+    <div className="text-muted-foreground bg-surface-panel flex flex-col items-start gap-2 rounded-[var(--radius)] p-4 text-sm">
       <p>{t("A new version of the app is ready.")}</p>
       <Button variant="secondary" size="sm" onClick={() => location.reload()}>
         {t("Reload")}
@@ -145,7 +145,7 @@ function Broken({
           honest sentence; only a diagnosable host also gets the raw error —
           which screen it was in, and what it actually said. */}
       {isDiagnosableHost() ? (
-        <p className="text-muted-foreground border-destructive/30 bg-destructive/5 mt-4 w-full break-words rounded-[var(--radius)] border p-4 font-mono text-xs">
+        <p className="text-muted-foreground bg-destructive/5 mt-4 w-full break-words rounded-[var(--radius)] p-4 font-mono text-xs">
           {label ? `${label}: ` : ""}
           {detail}
         </p>

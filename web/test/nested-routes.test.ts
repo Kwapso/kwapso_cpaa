@@ -340,3 +340,84 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
     expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Stories", "BERG-S0188"])
   })
 })
+
+// ── A MAIN SCREEN CARRIES NO TRAIL. ONLY A DETAIL SCREEN DOES ────────────────
+//
+// SHELL.md's own line: "a main screen is in the navbar; a detail screen has
+// breadcrumbs." Override 73 (2026-08-26) struck the OLD breadcrumb bar for
+// repeating the identity chips' own two facts, not for existing outright — so
+// when a record's own trail turned out to be genuinely missing, the fix that
+// restored it (earlier the same day as the one below, 31 Aug 2026) dropped the
+// gate entirely instead of correcting it. The SAME one-line trail then drew on
+// every flat COLLECTION screen too — Sprints, Accounts, Tasks, reachable
+// straight from the sidebar — a bar reading nothing but the section's own
+// name, above a screen whose title already says it and a sidebar that already
+// shows it. The client, on a screenshot of exactly that: "kill breadcrumbs in
+// main screens!"
+//
+// THE WIRING, NOT THE FUNCTION, again: `buildCrumbs` has always been capable
+// of returning a short, honest one-crumb trail for a bare collection (see
+// crumbs.ts's own topLevel branch) — that is a valid answer for a NESTED
+// collection ("Confia › Stories", above), and the wrong one for a screen with
+// nothing above it at all. The defect both times was in whether the CALLER
+// asks for a trail in the first place, not in what `buildCrumbs` hands back
+// when asked — so this reads the caller, the same way the nesting regression
+// above does.
+describe("a main screen carries no breadcrumb trail — only a detail screen does", () => {
+  const shell = stripComments(
+    readFileSync(join(WEB, "components", "deep-link-screen.tsx"), "utf8")
+  )
+
+  it("gates the trail on an open record or a nested ancestor, never on neither", () => {
+    expect(
+      /const showCrumbs\s*=\s*Boolean\(recordId\)\s*\|\|\s*trail\.length\s*>\s*1/.test(shell),
+      "deep-link-screen.tsx must compute `showCrumbs = Boolean(recordId) || " +
+        "trail.length > 1` — a record actually open, or a screen nested inside one " +
+        "an ordinary nav item cannot reach on its own. Recreating the old " +
+        "`recordId === null` check (even inverted to `!== null`) is not enough on " +
+        "its own: after the screen's early returns `recordId` is always a STRING " +
+        "(a flat collection's is `\"\"`, never `null`), so `!== null` alone would " +
+        "be true everywhere and reopen today's exact regression."
+    ).toBe(true)
+  })
+
+  it("only builds the trail behind that gate — never unconditionally", () => {
+    expect(
+      /const crumbs = showCrumbs\s*\n\s*\?\s*buildCrumbs\(/.test(shell),
+      "buildCrumbs is called unconditionally. A flat collection screen (no record " +
+        "open, no ancestor) will then get the same one-line trail a detail screen " +
+        "gets — the exact regression the client screenshotted on the Sprints page " +
+        "the same day the detail-screen trail was fixed."
+    ).toBe(true)
+  })
+
+  it("still shows the trail on a flat detail screen — the earlier fix, not regressed", () => {
+    // The regression this whole block guards is dropping crumbs where they are
+    // needed just as much as adding them where they are not — so the positive
+    // case (a record genuinely open, one level in, no ancestor) is asserted
+    // here too, in the units `buildCrumbs` already speaks in. Same assertion as
+    // the test just above; kept here as the paired negative case's neighbour.
+    expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Stories", "BERG-S0188"])
+  })
+
+  it("still shows the trail on a nested collection — the client's own nesting feature", () => {
+    // `/accounts/CONFIA/stories`: no record open at THIS level, but there is an
+    // ancestor a plain nav item cannot reach on its own — the gate must not
+    // blind itself to that case while fixing the flat one.
+    expect(crumbs("/accounts/CONFIA/stories").map((c) => c.label)).toEqual(["Confia", "Stories"])
+  })
+
+  it("shows nothing for a flat collection — the client's exact complaint", () => {
+    // `buildCrumbs` alone cannot express "show nothing" for this case — asked
+    // directly, with `recordId: ""` and a one-level trail, it still returns a
+    // single section crumb (crumbs.ts's own topLevel branch, exercised by the
+    // "flat address" test above with a record instead). The one place that
+    // decides whether a MAIN screen calls it at all is the gate this describe
+    // block reads off the shell; this pins the INPUT that must resolve to
+    // `showCrumbs === false` there.
+    const r = parseRoute("/sprints", "")
+    expect(r.recordId).toBe("")
+    expect(r.levels).toHaveLength(1)
+    expect(Boolean(r.recordId) || r.levels.length > 1).toBe(false)
+  })
+})

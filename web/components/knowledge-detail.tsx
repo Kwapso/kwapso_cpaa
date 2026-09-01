@@ -22,28 +22,29 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Paperclip, Pencil, Power } from "@shared/ui/foundations/icons"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
-import { RecordScreen, STICKY_TABS } from "@/components/record-chrome"
+import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
-import { ApiFailure, content, tenancy } from "@/lib/api"
+import { content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
+import { accountKey, appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
+import { useConfirm } from "@shared/web/use-confirm"
 
 export function KnowledgeDetailScreen({
   teamId,
@@ -52,7 +53,7 @@ export function KnowledgeDetailScreen({
   teamId: string
   sourceId: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const sourcesQ = useCached<KnowledgeSource[]>(knowledgeKey(teamId), () =>
     content.knowledge().then((r) => r.sources)
   )
@@ -75,13 +76,24 @@ export function KnowledgeDetailScreen({
   // The generic record feed (R5) + the exact server total its tab badges (R8 for
   // the place, R16 for the number — never the loaded page's length).
   const activity = useRecordActivity("knowledge_sources", sourceId)
-  // The accounts a source may be filed under. Bounded by the same paged door the
-  // accounts screen reads; the picker offers page one, which is every account in
-  // any team that is not already past a screenful.
+  // The accounts a source MAY BE filed under, for the edit dialog's picker
+  // suggestions only — page one is plenty there, since the field itself
+  // searches rather than trusting page one to hold everything.
   const accountsQ = useCached<Account[]>(`accounts:${teamId}`, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
-  const accountNames = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
+  // THE ONE ACCOUNT THIS SOURCE IS FILED UNDER, read by id — app-detail.tsx's
+  // own bug, here too, 2026-08-31: this used to come off the SAME paged
+  // accounts list above (`accountsQ.data`), and accounts PAGE (R14), so a
+  // source filed under an account outside page one read "A client" forever,
+  // not just before the page arrived. `item` isn't known yet on the branch
+  // where this hook still has to run before the loading guard below, so the
+  // id is read optionally.
+  const filedAccountId = item?.accountId ?? null
+  const filedAccountQ = useCached<Account | null>(
+    filedAccountId ? accountKey(filedAccountId) : null,
+    () => tenancy.accountRow(filedAccountId as string)
+  )
   // The apps a source may be LIMITED TO (12.3). `canOpen` is the door's own
   // answer to 8.11, so this list is the server's and not a second opinion.
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
@@ -95,7 +107,9 @@ export function KnowledgeDetailScreen({
   // back lands on the tab she was reading, and a miss lands on "source".
   const [tab, setTab] = useRemembered("tab", "source")
   const [editingOpen, setEditingOpen] = React.useState(false)
-  const [busyActive, setBusyActive] = React.useState(false)
+  // Stopping the assistant from reading this is the red half, so it asks first
+  // (shared/web/use-confirm.tsx); using it again is the confirm-free restore.
+  const { busy: busyActive, ask: askStop, run: runActive, dialog: stopDialog } = useConfirm()
 
   // READ THE MATERIAL IN YOUR OWN LANGUAGE, if you ask. A source is a document
   // somebody wrote — a contract, a transcript, a page of house rules — so it is
@@ -129,19 +143,26 @@ export function KnowledgeDetailScreen({
     toast.success(t("Source updated."))
   }
 
-  async function setActive(activeNext: boolean) {
-    setBusyActive(true)
-    try {
-      const { source } = await content.setKnowledgeActive(sourceId, activeNext)
-      patchLists(source)
-      toast.success(
-        activeNext ? t("The assistant can use this again.") : t("The assistant will no longer use this.")
-      )
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the source."))
-    } finally {
-      setBusyActive(false)
-    }
+  function stopUsing() {
+    askStop({
+      title: t("Stop using this source?"),
+      body: t("The assistant stops reading it right away. Nothing is deleted, and the sweep won't put it back — you can turn it on again here any time."),
+      action: t("Stop using this"),
+      run: () =>
+        runActive(
+          () => content.setKnowledgeActive(sourceId, false).then(({ source }) => patchLists(source)),
+          t("The assistant will no longer use this."),
+          t("Couldn't update the source.")
+        ),
+    })
+  }
+
+  async function useAgain() {
+    await runActive(
+      () => content.setKnowledgeActive(sourceId, true).then(({ source }) => patchLists(source)),
+      t("The assistant can use this again."),
+      t("Couldn't update the source.")
+    )
   }
 
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
@@ -177,7 +198,7 @@ export function KnowledgeDetailScreen({
   // one shows is different: one is kept in step with a record, the other was
   // read out of a document you can open.
   const textOwnedElsewhere = mirrored || item.fileUrl !== null
-  const filedUnder = item.accountId ? (accountNames.get(item.accountId) ?? "A client") : "The agency"
+  const filedUnder = item.accountId ? (filedAccountQ.data?.name ?? "A client") : "The agency"
   const overviewItems = [
     { label: t("Type"), value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
     { label: t("Filed under"), value: filedUnder },
@@ -215,7 +236,7 @@ export function KnowledgeDetailScreen({
           },
         ]
       : []),
-    { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
+    { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt, lang) : "—" },
     ...auditItems(
       {
         createdByName: item.creatorName,
@@ -224,14 +245,15 @@ export function KnowledgeDetailScreen({
         updatedAt: item.updatedAt,
         status: item.active ? t("In use") : t("Not in use"),
       },
-      t
+      t,
+      lang
     ),
   ]
 
   const link = safeHref(item.sourceUrl)
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "source", label: t("Source"), icon: "file-text", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
@@ -247,26 +269,40 @@ export function KnowledgeDetailScreen({
 
   return (
     <RecordScreen
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `source`), client ruling 2026-08-31.
+      eyebrow={t("Source")}
       collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}
       chips={
         <>
-          {!item.active && <Badge>{t("Not in use")}</Badge>}
+          {!item.active && (
+            <Badge variant="status" dot="archived">
+              {t("Not in use")}
+            </Badge>
+          )}
           {item.visibility === "private" && <Badge>{t("Private to you")}</Badge>}
           {item.visibility === "app" && <Badge>{item.visibleToAppName ?? t("Limited to one app")}</Badge>}
         </>
       }
       title={item.title}
-      status={filedUnder}
+      // `status` (which account/agency it's filed under) IS GONE — CLIENT
+      // RULING, 2026-08-31, VERBATIM: "what is this 3rd component in the
+      // title under the chips? kill everywhere. chips is the last component
+      // of headers!" `status` maps to `RecordChrome`'s `meta`, drawn
+      // directly under the chips row (`data-record-region="header"`). Not
+      // lost: "Filed under" is already a row in the Overview tab
+      // (`overviewItems`).
       actions={
+        // ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon").
         canEdit && (
           <Button
             variant="secondary"
-            size="sm"
+            size="icon"
             onClick={() => setEditingOpen(true)}
-            className="shrink-0 gap-1"
+            className="shrink-0"
+            aria-label={t("Edit")}
           >
             <Pencil className="size-3.5" />
-            {t("Edit")}
           </Button>
         )
       }
@@ -376,7 +412,7 @@ export function KnowledgeDetailScreen({
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => void setActive(false)}
+                      onClick={stopUsing}
                       disabled={busyActive}
                       className="text-destructive hover:text-destructive gap-1"
                     >
@@ -384,7 +420,7 @@ export function KnowledgeDetailScreen({
                       {t("Stop using this")}
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => void setActive(true)} disabled={busyActive} className="gap-1">
+                    <Button size="sm" onClick={() => void useAgain()} disabled={busyActive} className="gap-1">
                       {busyActive ? <Spinner /> : <Power className="size-3.5" />}
                       {t("Use this again")}
                     </Button>
@@ -429,6 +465,8 @@ export function KnowledgeDetailScreen({
         }}
         onSubmit={saveDetails}
       />
+
+      {stopDialog}
     </RecordScreen>
   )
 }

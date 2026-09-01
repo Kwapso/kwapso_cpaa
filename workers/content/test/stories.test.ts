@@ -160,9 +160,11 @@ describe("a story is what WE do", () => {
     ).tickets[0]
     const id = await addStory({ title: "Fix the refresh", ticketId: ticket.id })
     expect(storyRow(id).account_id).toBe(IDS.victimAccount)
-    // Its own sequence, not the ticket's: BERG-T0001 and BERG-S0001 are two
-    // different things and a client quotes both.
-    expect(storyRow(id).ref).toBe("BERG-S0001")
+    // Its own sequence, not the ticket's: T0001 and B0001 are two
+    // different things and a client quotes both. (2026-08-31: team-wide, no
+    // account-code prefix, and story's own letter is now `B` — its old `S`
+    // moved to sprint.)
+    expect(storyRow(id).ref).toBe("B0001")
   })
 
   it("refuses a made-up ticket rather than writing a story pointing at nothing", async () => {
@@ -325,7 +327,10 @@ describe("a sprint is the block of work sold", () => {
     })
     const sprint = db().prepare(`SELECT * FROM sprints LIMIT 1`).get() as Record<string, string | number>
     expect(sprint.sold_price_cents).toBe(450_000)
-    expect(sprint.ref).toBe("BERG-SPR0001")
+    // 2026-08-31: team-wide, no account-code prefix, and sprint's own letter
+    // is now `S` (its old three-letter `SPR` is gone — `S` moved here from
+    // story, which is now `B`).
+    expect(sprint.ref).toBe("S0001")
 
     const open = await addStory({ title: "In the sprint", sprintId: sprint.id as string })
     await addStory({ title: "Also in it", sprintId: sprint.id as string, changesNoStep: true })

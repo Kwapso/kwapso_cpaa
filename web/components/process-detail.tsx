@@ -55,20 +55,10 @@ import { InAppLink } from "@/components/in-app-link"
 import { AuditDateDialog, ConnectProcessDialog } from "@/components/process/process-dialogs"
 import { StepsPanel, stepSecondsPerMonth, versionLabel } from "@/components/process/steps-panel"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@shared/ui/components/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
+import { useConfirm, type Confirm } from "@shared/web/use-confirm"
 import { Comments } from "@shared/ui/components/comments/comments"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
 
@@ -91,9 +81,9 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { RecordMark } from "@shared/web/record-mark"
@@ -119,11 +109,10 @@ import { RichText } from "@shared/web/rich-text-view"
 
 
 
-/** A confirm this screen asks before a red action. Nothing here deletes, so each
- * one says plainly what survives. */
-/** A yes/no the screen is holding. Exported because the Steps panel raises two
- * of them and the host is the one that shows them — one shape, one owner. */
-export type Confirm = { title: string; body: string; action: string; run: () => Promise<boolean> }
+/** A yes/no the screen is holding — the shared shape (shared/web/use-confirm.tsx),
+ * re-exported because the Steps panel raises two of them and the host is the
+ * one that shows them — one shape, one owner. */
+export type { Confirm }
 
 export function ProcessDetailScreen({
   teamId,
@@ -223,8 +212,6 @@ export function ProcessDetailScreen({
   const [editingStep, setEditingStep] = React.useState<ProcessStep | null>(null)
   const [auditOpen, setAuditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
-  const [confirm, setConfirm] = React.useState<Confirm | null>(null)
-  const [busy, setBusy] = React.useState(false)
 
   /** Re-read what this screen shows after our own write. (Everyone else's screen
    * catches up from the live ping — see the processes entries in live-resources.) */
@@ -241,23 +228,12 @@ export function ProcessDetailScreen({
     invalidatePrefix(PROCESS_VERSION_SLICES)
   }, [processId, teamId])
 
-  const run = React.useCallback(
-    async (what: () => Promise<unknown>, done: string, fallback: string) => {
-      setBusy(true)
-      try {
-        await what()
-        refresh()
-        toast.success(done)
-        return true
-      } catch (err) {
-        toast.error(err instanceof ApiFailure ? err.message : fallback)
-        return false
-      } finally {
-        setBusy(false)
-      }
-    },
-    [refresh]
-  )
+  // The one confirm dialog every red action on this record shares
+  // (shared/web/use-confirm.tsx) — `run` refreshes on success and toasts
+  // either way; `ask` opens the dialog with the words for this particular act.
+  // The Steps panel raises its own two confirms through the same `ask` (passed
+  // down as `onConfirm`).
+  const { busy, ask, run, dialog: confirmDialog } = useConfirm(refresh)
 
   async function saveProcess(values: ProcessFormValues) {
     await tenancy.updateProcess({
@@ -394,7 +370,7 @@ export function ProcessDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
@@ -444,7 +420,7 @@ export function ProcessDetailScreen({
             icon: <GitBranch className="size-3.5" />,
             disabled: busy,
             onSelect: () =>
-              setConfirm({
+              ask({
                 title: t("Cut a new version?"),
                 body: "Today's steps are copied into a new version, and this one is kept exactly as it was agreed. Edits from now on describe the new way of working.",
                 action: "Cut version",
@@ -464,7 +440,7 @@ export function ProcessDetailScreen({
                 disabled: busy,
                 destructive: true,
                 onSelect: () =>
-                  setConfirm({
+                  ask({
                     title: `Archive ${process.name}?`,
                     body: "It stops showing in the everyday lists and drops out of the value figures. Every version, every step and the whole conversation stay exactly where they are, and you can bring it back any time.",
                     action: "Archive",
@@ -501,15 +477,33 @@ export function ProcessDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={process.name} size="band" />}
-      collectionLabel={t("Process")}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `process`), client ruling 2026-08-31.
+      eyebrow={t("Process")}
+      // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
+      // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to repeat
+      // `t("Process")` a second time as a chip, directly under the eyebrow
+      // that already says it.
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
+      // scheme is not only for tickets … map colors"). A process map's only
+      // two states are live and archived, the account/wave pattern exactly:
+      // `archived` while put away, wordless while live.
+      chips={
+        !process.active ? (
+          <Badge variant="status" dot="archived">
+            {t("Archived")}
+          </Badge>
+        ) : null
+      }
       title={process.name}
-      status={[
-        process.appName,
-        current ? `${t("version")} ${current.versionNo}` : undefined,
-        process.active ? undefined : t("Archived"),
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      // THE APP/VERSION LINE IS GONE — CLIENT RULING, 2026-08-31, VERBATIM:
+      // "what is this 3rd component in the title under the chips? kill
+      // everywhere. chips is the last component of headers!" `status`
+      // mapped to `RecordChrome`'s `meta`, drawn directly under the chips
+      // row (`data-record-region="header"`). Not lost: both facts are
+      // already rows in the Overview tab (`overviewItems`: "App", "Current
+      // version").
       actions={
         <>
           {canEdit && (
@@ -521,6 +515,14 @@ export function ProcessDetailScreen({
           <RecordActionsMenu actions={overflow} />
         </>
       }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column. The summary row carries the creation date and
+      // no names, so the footer says the one fact it has rather than four
+      // dashes.
+      audit={{ createdAt: process.createdAt }}
+      activity={activity}
+      onAddNote={can("processes", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
 
       <TabsView
@@ -542,7 +544,7 @@ export function ProcessDetailScreen({
                     it qualifies. `whitespace-pre-line` keeps the blank line the
                     caveat is written after. */}
                 {process.description && (
-                  <div className="bg-muted/40 rounded-[var(--radius)] border p-4">
+                  <div className="bg-muted/40 rounded-[var(--radius)] p-4">
                     <RichText html={process.description} />
                   </div>
                 )}
@@ -556,7 +558,7 @@ export function ProcessDetailScreen({
                     Moving it WARNS first (Aurora's ruling): it changes every
                     figure on every screen at once, including the one on the
                     client's own portal. */}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] bg-surface-panel p-4">
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Measured from")}</p>
                     <p className="text-sm font-medium">{auditDate}</p>
@@ -581,7 +583,7 @@ export function ProcessDetailScreen({
                     side. It is a signpost, and a signpost that altered the road
                     would be worse than none — so this panel shows and removes,
                     and never computes. */}
-                <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
+                <div className="flex flex-col gap-3 rounded-[var(--radius)] bg-surface-panel p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium">{t("Connected processes")}</p>
                     {canEdit && (
@@ -650,7 +652,7 @@ export function ProcessDetailScreen({
                   onAgainst: setAgainstId,
                   onAddStep: () => setStepOpen(true),
                   onEditStep: setEditingStep,
-                  onConfirm: setConfirm,
+                  onConfirm: ask,
                 }}
                 run={run}
                 refresh={refresh}
@@ -671,7 +673,7 @@ export function ProcessDetailScreen({
                     app does and what removes the last unit from the band. It is
                     a real <button>, so it is reachable by keyboard and announced
                     as a control, and the two states stay badges. H 7 → 4. */}
-                <div className="rounded-[var(--radius)] border">
+                <div className="rounded-[var(--radius)] bg-surface-panel">
                   {versions.map((v) => (
                     <button
                       key={v.id}
@@ -734,7 +736,13 @@ export function ProcessDetailScreen({
               />
             )
 
-          return <ActivityPanel activity={activity} />
+          return (
+            <ActivityPanel
+              activity={activity}
+              onAddNote={can("processes", "create") ? activity.addNote : undefined}
+              notePlaceholder={t("Add a note")}
+            />
+          )
         }}
       />
 
@@ -818,36 +826,7 @@ export function ProcessDetailScreen({
         }}
       />
 
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !busy && !o && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{confirm?.body}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={busy}
-              onClick={(e) => {
-                e.preventDefault()
-                const c = confirm
-                if (!c) return
-                void c.run().then((ok) => ok && setConfirm(null))
-              }}
-            >
-              {busy ? <Spinner /> : null}
-              {busy ? t("Working…") : confirm?.action}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    <RecordFooter
-        audit={{
-          // The summary row carries the creation date and no names, so the
-          // footer says the one fact it has rather than four dashes.
-          createdAt: process.createdAt,
-        }}
-      />
+      {confirmDialog}
     </RecordScreen>
   )
 }

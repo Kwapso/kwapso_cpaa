@@ -40,7 +40,7 @@ import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { ApiFailure, mcp } from "@/lib/api"
 import { formatActivityWhen, formatDate } from "@shared/web/format"
 import { useCached, primeCache } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
@@ -87,7 +87,7 @@ function copyInstructions(token: string, t: (english: string) => string) {
 }
 
 export function AccessTokensSection({ teamName }: { teamName: string | null }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const tokensQ = useCached<McpTokenSummary[]>("mcp-tokens", () =>
     mcp.tokens().then((r) => r.tokens)
   )
@@ -149,7 +149,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       ) : tokens.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No tokens yet.")}</p>
       ) : (
-        <div className="flex flex-col rounded-[var(--radius)] border">
+        <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
           {tokens.map((token) => (
             <div
               key={token.id}
@@ -184,8 +184,8 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 {token.revokedAt
                   ? ""
                   : hasExpired(token)
-                    ? ` · ${t("expired {date}", { date: formatDate(token.expiresAt) })}`
-                    : ` · ${t("works until {date}", { date: formatDate(token.expiresAt) })}`}
+                    ? ` · ${t("expired {date}", { date: formatDate(token.expiresAt, lang) })}`
+                    : ` · ${t("works until {date}", { date: formatDate(token.expiresAt, lang) })}`}
               </span>
               {!token.revokedAt && (
                 <div className="flex items-center gap-2">
@@ -243,7 +243,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 {teamName ?? t("this team")}. Treat it like a password. It works for{" "}
                 {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
               </DialogDescription>
-              <div className="bg-muted/60 flex items-center gap-2 rounded-[var(--radius)] border p-3">
+              <div className="bg-muted/60 flex items-center gap-2 rounded-[var(--radius)] p-3">
                 <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
                 <Button
                   variant="secondary"

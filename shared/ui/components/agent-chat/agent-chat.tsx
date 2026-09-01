@@ -93,7 +93,7 @@ import { Button } from "../button/button";
 import { Skeleton } from "../skeleton/skeleton";
 import { Textarea } from "../textarea/textarea";
 import { CollectionRegister } from "../collection-frame/collection-frame";
-import { CircleStop, Send, Sparkles } from "../../foundations/icons";
+import { CircleStop, Paperclip, Send, Sparkles } from "../../foundations/icons";
 
 const turnVariants = cva(
   [
@@ -227,6 +227,17 @@ export interface AgentChatMessage {
   actions?: React.ReactNode;
   /** This turn failed or was cut off. Poppy ink on the footnote, and words. */
   failed?: boolean;
+  /**
+   * A line above the bubble, on the PANEL's own ground — never inside the
+   * card. `TicketThread`'s author/time row (ch27.10) draws exactly this
+   * position for a thread with more than one possible speaker; a turn here
+   * has only two, already named for a screen reader by the `sr-only` role
+   * label below, so this slot is the sighted half of the same idea rather
+   * than a second author field — a timestamp most commonly, but any node.
+   * Rendered at the same register as that row (tertiary ink, the micro
+   * step, tabular figures for a time), aligned with the turn's own side.
+   */
+  eyebrow?: React.ReactNode;
 }
 
 export interface AgentChatProps
@@ -279,6 +290,15 @@ export interface AgentChatProps
   onValueChange?: (value: string) => void;
   /** Fires on send — the control, or Enter without a modifier. */
   onSend?: (value: string) => void;
+  /**
+   * Fires when the attach control is pressed. Absent, no attach control —
+   * `TicketThread`'s own contract for the same prop. The kit's chapter 20
+   * drawing carries no attach glyph in this composer, so the control is
+   * opt-in rather than always drawn: a caller with nothing to attach to
+   * (most of this component's own states — reading a conversation makes no
+   * file) gets exactly the composer it had before this prop existed.
+   */
+  onAttach?: () => void;
   /** The composer cannot be typed in. A fill and an ink, never an opacity. */
   disabled?: boolean;
   /** Ghost text. The kit's own English is "Ask about your work". */
@@ -303,6 +323,8 @@ export interface AgentChatProps
   sendLabel?: string;
   /** The stop control's accessible name. */
   stopLabel?: string;
+  /** The attach control's accessible name — it is an icon and has no words. */
+  attachLabel?: string;
   /** Accessible name for the composer field. */
   composerLabel?: string;
   /** The footnote on a turn that failed, where the caller gives none. */
@@ -571,6 +593,7 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
       defaultValue,
       onValueChange,
       onSend,
+      onAttach,
       disabled = false,
       placeholder = "Ask about your work",
       userLabel = "You",
@@ -580,6 +603,7 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
       thinkingLabel = "Thinking…",
       sendLabel = "Send",
       stopLabel = "Stop",
+      attachLabel = "Attach a file",
       composerLabel = "Message",
       failedLabel = "That answer did not finish.",
       loading = false,
@@ -766,6 +790,18 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                           paragraphs and no idea which is the machine. */}
                       <span className="sr-only">{mine ? userLabel : assistantLabel}</span>
 
+                      {/* `TicketThread`'s author/time row, at the turn's own
+                          position: on the PANEL's ground, above the card,
+                          never inside it. The column above is already
+                          `items-end`/`items-start`, so no extra alignment
+                          class is needed here the way the wrapping sources
+                          row below needs `justify-end`. */}
+                      {message.eyebrow !== undefined && message.eyebrow !== null ? (
+                        <span className="min-w-0 text-micro tabular-nums text-ink-tertiary">
+                          {message.eyebrow}
+                        </span>
+                      ) : null}
+
                       {/* RULING D7-2 — the turn's own sources, so a `Cite`
                           written into the prose reads its NUMBER from the
                           same array the pills below are drawn from. Scoped to
@@ -920,6 +956,32 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
               grown ? "ps-4 rounded-[var(--radius)]" : "ps-5 rounded-pill",
             )}
           >
+            {onAttach ? (
+              /* `TicketThread`'s own attach control, mirrored: a paperclip
+                 inside this pill, to the left of the field, real prop and
+                 real button rather than a caller reaching past this
+                 component to lay one beside it. Unlike that thread, nothing
+                 here hides it below a breakpoint — `TicketThread` can drop
+                 to a per-message attachment list on a narrow screen and this
+                 conversation has no such fallback, so the control stays in
+                 the row at every width. */
+              <button
+                type="button"
+                onClick={onAttach}
+                disabled={disabled}
+                aria-label={attachLabel}
+                className={cn(
+                  "inline-flex shrink-0 cursor-pointer appearance-none items-center justify-center",
+                  "size-[var(--control-height-dense)] rounded-pill border-0 bg-transparent",
+                  "text-ink-tertiary transition-colors duration-[var(--duration-colour)] ease-kwapso",
+                  "enabled:hover:bg-accent enabled:hover:text-foreground",
+                  "disabled:cursor-not-allowed disabled:bg-[var(--btn-disabled-fill)] disabled:text-[var(--btn-disabled-label)]",
+                )}
+              >
+                <Paperclip size={16} aria-hidden="true" />
+              </button>
+            ) : null}
+
             <Textarea
               aria-label={composerLabel}
               placeholder={placeholder}

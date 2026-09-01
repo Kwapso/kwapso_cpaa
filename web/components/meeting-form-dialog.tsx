@@ -15,6 +15,7 @@
 
 import * as React from "react"
 
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -28,9 +29,9 @@ import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
-import { toMoment } from "@shared/web/format"
+import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 /** A picker can't hold an empty value, so "nobody in particular" needs a
  * sentinel — the same one the knowledge form uses for the agency's own material. */
@@ -96,7 +97,7 @@ export function MeetingFormDialog({
   initial?: Partial<MeetingFormValues>
   draftKey?: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -182,20 +183,26 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={whenField} htmlFor="meeting-when" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="meeting-when"
-          type="datetime-local"
-          value={values.startsAt}
-          onChange={(e) => setValues((s) => ({ ...s, startsAt: e.target.value }))}
+          mode="datetime"
+          locale={lang}
+          value={values.startsAt ? new Date(values.startsAt) : null}
+          onValueChange={(d) =>
+            setValues((s) => ({ ...s, startsAt: d ? toLocalInput(d.toISOString()) : "" }))
+          }
           disabled={busy}
         />
       </Field>
       <Field config={untilField} htmlFor="meeting-until" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="meeting-until"
-          type="datetime-local"
-          value={values.endsAt}
-          onChange={(e) => setValues((s) => ({ ...s, endsAt: e.target.value }))}
+          mode="datetime"
+          locale={lang}
+          value={values.endsAt ? new Date(values.endsAt) : null}
+          onValueChange={(d) =>
+            setValues((s) => ({ ...s, endsAt: d ? toLocalInput(d.toISOString()) : "" }))
+          }
           disabled={busy}
         />
       </Field>

@@ -43,11 +43,91 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/components/select/select"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { Pencil, Power, Search } from "@shared/ui/foundations/icons"
 
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+
+/** THREE BOUNDED LISTS (see the file header), each read whole and narrowed here
+ * — the same toolbar shape `selectable-screen.tsx` draws for the team's own
+ * dropdown values. "All" is the default status so nothing already on screen
+ * disappears the moment the filter exists; a row that is switched off already
+ * says so with its own badge rather than by hiding. */
+type ActiveFilter = "all" | "active" | "inactive"
+function matchesActive(filter: ActiveFilter, active: boolean): boolean {
+  return filter === "all" || (filter === "active" ? active : !active)
+}
+
+/** A plain search + status toolbar, the search slot of a `<ToolbarRow>`. One
+ * function for the three lists below rather than three copies of the same
+ * three controls. */
+function ListToolbar({
+  query,
+  onQuery,
+  status,
+  onStatus,
+  placeholder,
+  sortOptions,
+  sort,
+  onSort,
+}: {
+  query: string
+  onQuery: (v: string) => void
+  status: ActiveFilter
+  onStatus: (v: ActiveFilter) => void
+  placeholder: string
+  sortOptions: { value: string; label: string }[]
+  sort: { by: string; dir: "asc" | "desc" }
+  onSort: (next: { by: string; dir: "asc" | "desc" }) => void
+}) {
+  const t = useT()
+  return (
+    <>
+      <div className="relative w-full sm:w-56">
+        <Search
+          className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+          aria-hidden
+        />
+        <Input
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={placeholder}
+          className="h-9 pl-8"
+          aria-label={placeholder}
+        />
+      </div>
+      <Select value={status} onValueChange={(v) => onStatus(v as ActiveFilter)}>
+        <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{t("All")}</SelectItem>
+          <SelectItem value="active">{t("Active")}</SelectItem>
+          <SelectItem value="inactive">{t("Switched off")}</SelectItem>
+        </SelectContent>
+      </Select>
+      <SortControl
+        options={sortOptions}
+        value={sort.by}
+        onValueChange={(by) => onSort({ by, dir: "asc" })}
+        direction={sort.dir}
+        onDirectionChange={(dir) => onSort({ ...sort, dir })}
+        label={t("Sort by")}
+      />
+    </>
+  )
+}
 import {
   InternalRecordDialog,
   clientDepartmentFields,
@@ -138,6 +218,58 @@ export function ClientOrgPanel({
   const [switchingOff, setSwitchingOff] =
     React.useState<{ kind: "department" | "role" | "tool"; id: string; name: string } | null>(null)
 
+  // ── THE THREE TOOLBARS — search, status, sort, one set of state per list.
+  const [deptQuery, setDeptQuery] = React.useState("")
+  const [deptStatus, setDeptStatus] = React.useState<ActiveFilter>("all")
+  const [deptSort, setDeptSort] = React.useState<{ by: string; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
+  const [roleQuery, setRoleQuery] = React.useState("")
+  const [roleStatus, setRoleStatus] = React.useState<ActiveFilter>("all")
+  const [roleSort, setRoleSort] = React.useState<{ by: string; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
+  const [toolQuery, setToolQuery] = React.useState("")
+  const [toolStatus, setToolStatus] = React.useState<ActiveFilter>("all")
+  const [toolSort, setToolSort] = React.useState<{ by: string; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
+
+  const shownDepartments = React.useMemo(() => {
+    const q = deptQuery.trim().toLowerCase()
+    const dirMul = deptSort.dir === "desc" ? -1 : 1
+    return departments
+      .filter((d) => matchesActive(deptStatus, d.active) && (q === "" || d.name.toLowerCase().includes(q)))
+      .sort((a, b) =>
+        deptSort.by === "roleCount" ? (a.roleCount - b.roleCount) * dirMul : a.name.localeCompare(b.name) * dirMul
+      )
+  }, [departments, deptQuery, deptStatus, deptSort])
+
+  const shownRoles = React.useMemo(() => {
+    const q = roleQuery.trim().toLowerCase()
+    const dirMul = roleSort.dir === "desc" ? -1 : 1
+    return roles
+      .filter((r) => matchesActive(roleStatus, r.active) && (q === "" || r.name.toLowerCase().includes(q)))
+      .sort((a, b) =>
+        roleSort.by === "cost"
+          ? ((a.centsPerHour ?? -1) - (b.centsPerHour ?? -1)) * dirMul
+          : a.name.localeCompare(b.name) * dirMul
+      )
+  }, [roles, roleQuery, roleStatus, roleSort])
+
+  const shownTools = React.useMemo(() => {
+    const q = toolQuery.trim().toLowerCase()
+    const dirMul = toolSort.dir === "desc" ? -1 : 1
+    return tools
+      .filter((x) => matchesActive(toolStatus, x.active) && (q === "" || x.name.toLowerCase().includes(q)))
+      .sort((a, b) =>
+        toolSort.by === "price" ? ((a.cents ?? -1) - (b.cents ?? -1)) * dirMul : a.name.localeCompare(b.name) * dirMul
+      )
+  }, [tools, toolQuery, toolStatus, toolSort])
+
   /** Every write re-reads the list it changed. Cheap (bounded, and one round
    * trip), and it keeps this panel out of the business of guessing what the
    * server did — which is the same reason the live layer patches rather than
@@ -216,20 +348,41 @@ export function ClientOrgPanel({
     <div className="flex flex-col gap-6">
       {/* ── departments ──────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between">
-          <h3 className="text-sm font-medium">{t("Departments")}</h3>
-          {canCreate ? (
-            <AddButton onClick={() => setAddingDept(true)} label={t("Add department")} />
-          ) : null}
-        </div>
+        <h3 className="text-sm font-medium">{t("Departments")}</h3>
+        <ToolbarRow
+          search={
+            departments.length > 0 && (
+              <ListToolbar
+                query={deptQuery}
+                onQuery={setDeptQuery}
+                status={deptStatus}
+                onStatus={setDeptStatus}
+                placeholder={t("Search departments…")}
+                sortOptions={[
+                  { value: "name", label: t("Name") },
+                  { value: "roleCount", label: t("Roles") },
+                ]}
+                sort={deptSort}
+                onSort={setDeptSort}
+              />
+            )
+          }
+          actions={canCreate && <AddButton onClick={() => setAddingDept(true)} label={t("Add department")} />}
+        />
         {departments.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-sm">
-            {t("No departments yet. Add the parts of their company, so a role can say where it sits.")}
-          </p>
+          // No import target — a department is a fact about the client's own
+          // org chart, added one at a time as it comes up.
+          <CollectionEmptyState
+            title={t("No departments yet.")}
+            description={t("Add the parts of their company, so a role can say where it sits.")}
+            onCreate={canCreate ? () => setAddingDept(true) : undefined}
+          />
+        ) : shownDepartments.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {departments.map((d) => (
-              <li key={d.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
+            {shownDepartments.map((d) => (
+              <li key={d.id} className="bg-surface-panel flex flex-wrap items-center gap-3 rounded-[var(--radius)] p-3">
                 <div className="min-w-0 flex-1 basis-[12rem]">
                   <p className="truncate text-sm font-medium">{d.name}</p>
                   <p className="text-muted-foreground text-xs">
@@ -237,10 +390,12 @@ export function ClientOrgPanel({
                   </p>
                 </div>
                 {d.active ? null : <Badge variant="secondary">{t("Switched off")}</Badge>}
+                {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
+                    "edit, only the pencil icon") — no more `sm:not-sr-only`
+                    reveal. */}
                 {canEdit ? (
-                  <Button variant="ghost" size="sm" onClick={() => setEditingDept(d)} className="gap-1">
-                    <Pencil className="size-3.5" aria-hidden />
-                    <span className="sr-only sm:not-sr-only">{t("Edit")}</span>
+                  <Button variant="ghost" size="icon" onClick={() => setEditingDept(d)} aria-label={t("Edit")}>
+                    <Pencil className="size-3.5" />
                   </Button>
                 ) : null}
                 {canSwitchOff && d.active ? (
@@ -262,18 +417,44 @@ export function ClientOrgPanel({
 
       {/* ── roles ────────────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium">{t("Roles")}</h3>
-          {canCreate ? <AddButton onClick={() => setAddingRole(true)} label={t("Add role")} /> : null}
-        </div>
+        <h3 className="text-sm font-medium">{t("Roles")}</h3>
+        <ToolbarRow
+          search={
+            roles.length > 0 && (
+              <ListToolbar
+                query={roleQuery}
+                onQuery={setRoleQuery}
+                status={roleStatus}
+                onStatus={setRoleStatus}
+                placeholder={t("Search roles…")}
+                sortOptions={[
+                  { value: "name", label: t("Name") },
+                  { value: "cost", label: t("Cost an hour") },
+                ]}
+                sort={roleSort}
+                onSort={setRoleSort}
+              />
+            )
+          }
+          actions={canCreate && <AddButton onClick={() => setAddingRole(true)} label={t("Add role")} />}
+        />
         {roles.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-sm">
-            {t("No roles yet. A role carries what an hour of it costs them, which is what turns a process map's minutes into money.")}
-          </p>
+          // No import target — a role's cost is set by hand, deliberately
+          // (the file's own header: overwriting it from a sheet is exactly
+          // what would break an older map's saving).
+          <CollectionEmptyState
+            title={t("No roles yet.")}
+            description={t(
+              "A role carries what an hour of it costs them, which is what turns a process map's minutes into money."
+            )}
+            onCreate={canCreate ? () => setAddingRole(true) : undefined}
+          />
+        ) : shownRoles.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {roles.map((r) => (
-              <li key={r.id} className="bg-card flex flex-col gap-2 rounded-[var(--radius)] border p-3">
+            {shownRoles.map((r) => (
+              <li key={r.id} className="bg-surface-panel flex flex-col gap-2 rounded-[var(--radius)] p-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1 basis-[12rem]">
                     <p className="truncate text-sm font-medium">{r.name}</p>
@@ -288,10 +469,12 @@ export function ClientOrgPanel({
                     </p>
                   </div>
                   {r.active ? null : <Badge variant="secondary">{t("Switched off")}</Badge>}
+                  {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
+                      "edit, only the pencil icon") — no more `sm:not-sr-only`
+                      reveal. */}
                   {canEdit ? (
-                    <Button variant="ghost" size="sm" onClick={() => setEditingRole(r)} className="gap-1">
-                      <Pencil className="size-3.5" aria-hidden />
-                      <span className="sr-only sm:not-sr-only">{t("Edit")}</span>
+                    <Button variant="ghost" size="icon" onClick={() => setEditingRole(r)} aria-label={t("Edit")}>
+                      <Pencil className="size-3.5" />
                     </Button>
                   ) : null}
                   {canSwitchOff && r.active ? (
@@ -376,18 +559,41 @@ export function ClientOrgPanel({
 
       {/* ── tools ────────────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between">
-          <h3 className="text-sm font-medium">{t("Tools")}</h3>
-          {canCreate ? <AddButton onClick={() => setAddingTool(true)} label={t("Add tool")} /> : null}
-        </div>
+        <h3 className="text-sm font-medium">{t("Tools")}</h3>
+        <ToolbarRow
+          search={
+            tools.length > 0 && (
+              <ListToolbar
+                query={toolQuery}
+                onQuery={setToolQuery}
+                status={toolStatus}
+                onStatus={setToolStatus}
+                placeholder={t("Search tools…")}
+                sortOptions={[
+                  { value: "name", label: t("Name") },
+                  { value: "price", label: t("Price") },
+                ]}
+                sort={toolSort}
+                onSort={setToolSort}
+              />
+            )
+          }
+          actions={canCreate && <AddButton onClick={() => setAddingTool(true)} label={t("Add tool")} />}
+        />
         {tools.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-sm">
-            {t("No tools yet. Add what they run on, so a step that replaces one can subtract what it costs.")}
-          </p>
+          // No import target — a tool's price is set from its own dated form
+          // (the file's own header explains why), never bulk-loaded.
+          <CollectionEmptyState
+            title={t("No tools yet.")}
+            description={t("Add what they run on, so a step that replaces one can subtract what it costs.")}
+            onCreate={canCreate ? () => setAddingTool(true) : undefined}
+          />
+        ) : shownTools.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {tools.map((x) => (
-              <li key={x.id} className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
+            {shownTools.map((x) => (
+              <li key={x.id} className="bg-surface-panel flex flex-wrap items-center gap-3 rounded-[var(--radius)] p-3">
                 <span aria-hidden className="w-6 shrink-0 text-center text-lg">
                   {x.mark || "·"}
                 </span>
@@ -405,10 +611,12 @@ export function ClientOrgPanel({
                     <span>{t("Price")}</span>
                   </Button>
                 ) : null}
+                {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
+                    "edit, only the pencil icon") — no more `sm:not-sr-only`
+                    reveal. */}
                 {canEdit ? (
-                  <Button variant="ghost" size="sm" onClick={() => setEditingTool(x)} className="gap-1">
-                    <Pencil className="size-3.5" aria-hidden />
-                    <span className="sr-only sm:not-sr-only">{t("Edit")}</span>
+                  <Button variant="ghost" size="icon" onClick={() => setEditingTool(x)} aria-label={t("Edit")}>
+                    <Pencil className="size-3.5" />
                   </Button>
                 ) : null}
                 {canSwitchOff && x.active ? (

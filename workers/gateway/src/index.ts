@@ -33,7 +33,7 @@ import { requestId, stampTrace } from "@shared/workers/trace"
  * while this loop had grown to fifteen modules. test/shell-routing.test.ts reads
  * both off disk and holds them together. */
 export const SHELL_MODULES = [
-  "accounts", "tickets", "knowledge", "processes",
+  "accounts", "contacts", "tickets", "knowledge", "processes",
   // THE WORK ENGINE'S FOUR. `work` became `stories` when the sprints moved
   // out to a page of their own — the segment follows the heading, because a
   // URL that disagrees with the title on the page is a cost paid for ever.

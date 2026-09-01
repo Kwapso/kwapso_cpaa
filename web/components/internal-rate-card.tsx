@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Pencil, Plus, Power } from "@shared/ui/foundations/icons"
+import { Headline } from "@shared/ui/components/typography/typography"
 
 import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
@@ -139,7 +140,10 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-medium">{t("Internal rates")}</h1>
+          {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
+              is the kit's own named "Page title" step (56/500), see
+              collection-heading.tsx's own note for the full ruling. */}
+          <Headline as="h1" size="display-m">{t("Internal rates")}</Headline>
           {/* The sentence that says who may read this, on the screen rather than
               in a doc. Somebody setting these numbers should know before they
               type them, not after. */}
@@ -159,7 +163,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -378,7 +382,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
           {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rates.map((r) => (
             <li
               key={r.id}

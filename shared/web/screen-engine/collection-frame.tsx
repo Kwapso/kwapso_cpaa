@@ -20,7 +20,7 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown } from "@shared/ui/foundations/icons"
+import { ArrowUpDown, Plus } from "@shared/ui/foundations/icons"
 
 import { facetOptions, selectRows } from "./collection"
 import { useRemembered } from "@shared/web/remembered"
@@ -43,6 +43,7 @@ import {
   PopoverTrigger,
 } from "@shared/ui/components/popover/popover"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
@@ -72,9 +73,45 @@ export type CollectionCreateAction = {
   /** The host's glyph, so the two buttons for one act cannot disagree. */
   icon?: React.ReactNode
   onCreate: () => void
+  /**
+   * THE COLLECTION'S OWN IMPORT ACT, published beside its create act — never
+   * invented here. A caller passes this only where a real CSV import target
+   * exists for this record type (`workers/data-ops/src/lib/targets.ts`) AND
+   * the reader holds the right to run it; most nested collections have
+   * neither and this stays `undefined`, which is the only way "Import a
+   * list" does not appear on a screen with nothing to import (composition
+   * 27.21's own doors-differ clause — the portal has no second action, and
+   * an agency collection with no import target is the same absence for a
+   * different reason). `SectionWithCreate`'s own `secondary` prop is this
+   * same act, already gated by `secondary.show` there — this is that act,
+   * carried one layer further down to where the empty body actually draws.
+   */
+  secondary?: { label: string; onClick: () => void }
 }
 
 const CreateActionContext = React.createContext<CollectionCreateAction | null>(null)
+
+/** THE PUBLISHED CREATE ACTION, DRAWN — a glyph and nothing else (UI-RULEBOOK
+ * B3 / CHECKLIST 11.7, client ruling 2026-08-31: "+ actions never have a
+ * word, they are only the + icon"). `label` becomes the button's accessible
+ * name and its tooltip, the same seam `screen-bits.tsx`'s own `AddButton`
+ * draws from — one function, so the toolbar button and the filtered-empty
+ * state's CTA cannot drift into two different shapes for one act. The
+ * GENUINELY-empty body no longer calls this — see `CollectionEmptyState`
+ * below, which carries composition 27.21's one carved-out exception: "the
+ * only place a labelled create button is allowed". */
+function createActionButton(action: CollectionCreateAction, className?: string) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="icon" onClick={action.onCreate} aria-label={action.label} className={className}>
+          {action.icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{action.label}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export function CollectionCreateActionProvider({
   action,
@@ -84,6 +121,83 @@ export function CollectionCreateActionProvider({
   children: React.ReactNode
 }) {
   return <CreateActionContext.Provider value={action}>{children}</CreateActionContext.Provider>
+}
+
+/** THE KIT'S OWN "NOTHING IN THIS COLLECTION YET" REGISTER, drawn to the exact
+ * composition (`shared/ui/compositions/states/empty-collection.tsx`, 27.21)
+ * this engine's own `useKitPanel` branch already approximated — this is that
+ * approximation, finished, and pulled out so a hand-rolled nested panel
+ * (work-panels.tsx and its dozen siblings) can draw the identical register
+ * instead of a fourth version of "a bare grey line".
+ *
+ * WHY IT WAS WRONG BEFORE (the client's own screenshot, 2026-09-01): a
+ * genuinely-empty collection drew ONE icon-only mango, no sentence, no way to
+ * import — the plainest reading of `createActionButton` above reused for a
+ * screen 27.21 explicitly carves an exception for. "The one mango" rule (B3)
+ * governs every OTHER button in the app; this is composition 27.21's own
+ * named exception to it: "Add the first takes the one mango — the only place
+ * a labelled create button is allowed, because there is no toolbar + to lean
+ * on and the screen exists to be filled."
+ *
+ * TWO BUTTONS, NEITHER INVENTED. `onCreate` absent (a reader with no create
+ * right) draws no button at all — TEN STATES #10 in the composition's own
+ * doc: "the control is then absent, never dimmed". `onImport` absent (no CSV
+ * target for this record, or the reader lacks the right) likewise draws
+ * nothing — never a button that would 404 or refuse. */
+export function CollectionEmptyState({
+  title,
+  description,
+  onCreate,
+  onImport,
+  className,
+}: {
+  /** The collection's own word for what's missing — `config.emptyText`,
+   * translated at the call site. */
+  title: string
+  /** 27.21: "One sentence naming the two routes". Defaults to the
+   * composition's own words, verbatim, for a caller with nothing more
+   * specific to say. */
+  description?: string
+  /** The one mango on this register — composition 27.21's own exception to
+   * B3. Absent draws no button (a reader with no create right). */
+  onCreate?: () => void
+  /** The paper action beside it — absent unless a real import target exists
+   * for this record AND the reader may run it. */
+  onImport?: () => void
+  className?: string
+}) {
+  const t = useT()
+  return (
+    <div
+      data-slot="collection-empty-body"
+      className={cn("flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]", className)}
+    >
+      <Headline as="h3" size="h3">
+        {title}
+      </Headline>
+      <Text as="p" size="sm" tone="secondary" measure>
+        {description ??
+          t(
+            "Records land here when someone adds one, or when a client raises a request from the portal. The first one takes a minute."
+          )}
+      </Text>
+      {(onCreate || onImport) && (
+        <div className="mt-2 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
+          {onCreate && (
+            <Button onClick={onCreate} className="gap-1">
+              <Plus className="size-4" />
+              {t("Add the first")}
+            </Button>
+          )}
+          {onImport && (
+            <Button variant="secondary" onClick={onImport}>
+              {t("Import a list")}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function CollectionFrame<T>({
@@ -418,12 +532,18 @@ function CollectionFrame<T>({
         onDirectionChange={setSortDir}
       />
     ) : null
-    const createButton = createAction ? (
-      <Button onClick={createAction.onCreate} className="gap-1">
-        {createAction.icon}
-        {createAction.label}
-      </Button>
-    ) : null
+    // GENUINELY EMPTY SUPPRESSES THE TOOLBAR'S OWN + BUTTON. Below, the
+    // GENUINELY-EMPTY branch draws `CollectionEmptyState`'s own "Add the
+    // first" — a labelled button carrying the identical `createAction`. The
+    // toolbar's icon-only + button pinned to the panel's `actions` slot
+    // (composition 27.1's toolbar contract: "search, then filters, then view
+    // switcher, then actions pinned right") would then sit right above it,
+    // two controls for the one act the client's B3 rule ("the one mango")
+    // exists to prevent. It stays for every OTHER state — loading, error,
+    // no-results (`narrowed`), and a populated collection — where the empty
+    // body is not the one being drawn.
+    const isEmptyState = state === "ready" && filtered.length === 0 && !narrowed
+    const createButton = createAction && !isEmptyState ? createActionButton(createAction) : null
 
     return (
       <KitCollectionFrame
@@ -478,34 +598,19 @@ function CollectionFrame<T>({
             }
           />
         ) : filtered.length === 0 ? (
-          // GENUINELY EMPTY — assembled from the kit's own primitives
-          // (Headline + Text + Button) to match `EmptyCollectionScreen`'s
-          // `emptyBody` register (states/empty-collection.tsx), the one
-          // piece of that composition this engine can adopt without also
-          // needing a figure strip or zero-badged tabs (concepts
-          // `CollectionConfig` doesn't have — see COMPOSITION-MISMATCHES.md).
-          // "Left-aligned, type only... no dashed placeholder rectangle" is
-          // the composition's own law, kept here rather than the dashed box
-          // this used to be.
-          <div
-            data-slot="collection-empty-body"
-            className="flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]"
-          >
-            <Headline as="h3" size="h3">
-              {copy?.emptyTitle ?? t(config.emptyText)}
-            </Headline>
-            {copy?.emptyDescription ? (
-              <Text as="p" size="sm" tone="secondary" measure>
-                {copy.emptyDescription}
-              </Text>
-            ) : null}
-            {createAction ? (
-              <Button onClick={createAction.onCreate} className="mt-2 gap-1">
-                {createAction.icon}
-                {createAction.label}
-              </Button>
-            ) : null}
-          </div>
+          // GENUINELY EMPTY — the finished register, `CollectionEmptyState`
+          // above, matching `EmptyCollectionScreen`'s `emptyBody`
+          // (states/empty-collection.tsx, 27.21) verbatim: a bold title, one
+          // explanatory sentence, and up to two buttons. The figure strip and
+          // zero-badged tabs are still not adopted — `CollectionConfig` has
+          // no "figures" concept, and inventing one is separate, unscoped
+          // work (COMPOSITION-MISMATCHES.md).
+          <CollectionEmptyState
+            title={copy?.emptyTitle ?? t(config.emptyText)}
+            description={copy?.emptyDescription}
+            onCreate={createAction?.onCreate}
+            onImport={createAction?.secondary?.onClick}
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {renderItems(visible)}
@@ -717,29 +822,39 @@ function CollectionFrame<T>({
         // reading of ch27.21's "no empty-box drawing, no mascot … type and one
         // button carry it". Dropping the icon is that law, not a shim I could
         // not find; a recipe's `emptyIcon` is simply unread from here now.
-        <ShapeStateBody
-          shape="collectionScreen"
-          state="empty"
-          filtered={narrowed}
-          copy={{ emptyTitle: t(config.emptyText), ...copy }}
-          action={
-            narrowed
-              ? Object.keys(facetValues).length > 0 && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
-                  >
-                    {t("Clear filters")}
-                  </Button>
-                )
-              : createAction && (
-                  <Button onClick={createAction.onCreate} className="gap-1">
-                    {createAction.icon}
-                    {createAction.label}
-                  </Button>
-                )
-          }
-        />
+        //
+        // GENUINELY EMPTY draws through `CollectionEmptyState` now (same
+        // register `useKitPanel` draws, see its own doc) rather than
+        // `ShapeStateBody` — a bold title, the two-routes sentence, and up to
+        // two buttons, never the icon-only mango this used to stop at.
+        // NO-RESULTS is unchanged: `ShapeStateBody` + "Clear filters", because
+        // a filtered-out list is a different fact and 27.22 draws it
+        // differently (no mango in the body at all).
+        narrowed ? (
+          <ShapeStateBody
+            shape="collectionScreen"
+            state="empty"
+            filtered
+            copy={{ emptyTitle: t(config.emptyText), ...copy }}
+            action={
+              Object.keys(facetValues).length > 0 && (
+                <Button
+                  variant="secondary"
+                  onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
+                >
+                  {t("Clear filters")}
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <CollectionEmptyState
+            title={copy?.emptyTitle ?? t(config.emptyText)}
+            description={copy?.emptyDescription}
+            onCreate={createAction?.onCreate}
+            onImport={createAction?.secondary?.onClick}
+          />
+        )
       ) : (
         renderItems(visible)
       )}

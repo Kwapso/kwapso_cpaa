@@ -39,7 +39,7 @@ import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Badge } from "@shared/ui/components/badge/badge"
@@ -52,12 +52,14 @@ import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { ActivityPanel } from "@/components/activity-panel"
 import { EmptyLine } from "@/components/deep-link/screen-bits"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
+import { useConfirm } from "@shared/web/use-confirm"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
+  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey } from "@/lib/live-resources"
@@ -74,10 +76,22 @@ import { useRecordCounts } from "@/lib/use-record-counts"
 // see the note in google-source-dialog.tsx for why "it came from Google" is not
 // a reason to skip it.
 import { richTextValue, safeHref, safeSrc } from "@shared/web/rich-text"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
-export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; meetingId: string }) {
-  const t = useT()
+export function MeetingDetailScreen({
+  teamId,
+  meetingId,
+  basePath,
+}: {
+  teamId: string
+  meetingId: string
+  /** the meetings collection in the URL form we arrived through — the same
+   * `sectionPath` every other cross-linking record's screen already takes
+   * (app-detail.tsx, sprint-detail.tsx, …), so `RecordChipLink` below can
+   * build a real href rather than a hand-rolled one. */
+  basePath: string
+}) {
+  const { t, lang } = useLanguage()
   const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // The list is a PAGE (R14), so the record may not be in it — a link straight to
   // a meeting the loaded prefix doesn't reach must still open. One read by id,
@@ -88,6 +102,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     () => content.meetingOne(meetingId)
   )
   const item = inPage ?? oneQ.data ?? null
+  const host = { base: `${basePath}/${meetingId}` }
 
   // The generic record feed (R5) + the exact server total its tab badges (R8 for
   // the place, R16 for the number — never the loaded page's length).
@@ -243,18 +258,20 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     }
   }
 
-  async function setActive(active: boolean) {
-    setBusy("active")
-    try {
-      const { meeting } = await content.setMeetingActive(meetingId, active)
-      patchLists(meeting)
-      toast.success(active ? t("Back in Meetings.") : t("Cancelled, the record and its notes are kept."))
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
-    } finally {
-      setBusy(null)
-    }
-  }
+  // THE CANCEL CONFIRM — client feedback, 2026-08-31, verbatim: "i was able to
+  // cancel a meeting without confirming." Every other destructive action in
+  // the app already asks first through this one shared dialog
+  // (shared/web/use-confirm.tsx); this screen's own "Cancel it" was a bare
+  // `setActive(false)` with no ask step at all, the one gap that ruling
+  // found. `refresh` invalidates rather than patches — the same shape
+  // app-detail.tsx's and account-detail.tsx's own archive/restore pairs use,
+  // so a fourth screen following this pattern reads the same way.
+  const refresh = React.useCallback(() => {
+    invalidate(meetingsKey(teamId))
+    invalidate(`meeting:one:${meetingId}`)
+    invalidate(recordActivityKey("meetings", meetingId))
+  }, [meetingId, teamId])
+  const { busy: confirmBusy, ask, run, dialog: confirmDialog } = useConfirm(refresh)
 
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
   // the rollout from help-detail (73414c58).
@@ -286,8 +303,8 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     { label: t("Who it is with"), value: item.accountName ?? "Nobody, it is ours" },
     { label: t("Which app"), value: item.appName ?? "—" },
     { label: t("Why we are meeting"), value: item.purposeName ?? "—" },
-    { label: t("When"), value: formatDateTime(item.startsAt) },
-    { label: t("Until"), value: item.endsAt ? formatDateTime(item.endsAt) : "—" },
+    { label: t("When"), value: formatDateTime(item.startsAt, lang) },
+    { label: t("Until"), value: item.endsAt ? formatDateTime(item.endsAt, lang) : "—" },
     { label: t("Where"), value: item.location ?? "—" },
     { label: t("Reference"), value: item.ref ?? "—" },
     {
@@ -301,7 +318,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "notes", label: t("Agenda & notes"), icon: "notebook-pen", badge: "", badgeVariant: "" as const },
       // ONLY WHEN THERE IS ONE. A meeting nobody put in a calendar has nothing
@@ -372,14 +389,44 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       : []),
     ...(canCancel
       ? [
-          {
-            key: "active",
-            label: item.active ? t("Cancel it") : t("Put it back"),
-            icon: <Power className="size-3.5" />,
-            disabled: busy !== null,
-            destructive: item.active,
-            onSelect: () => setActive(!item.active),
-          },
+          item.active
+            ? {
+                key: "active",
+                label: t("Cancel it"),
+                icon: <Power className="size-3.5" />,
+                disabled: busy !== null || confirmBusy,
+                destructive: true,
+                // ASK FIRST — see the "THE CANCEL CONFIRM" note above `useConfirm`.
+                // Honest, specific copy: it comes out of Meetings, nothing is lost.
+                onSelect: () =>
+                  ask({
+                    title: t("Cancel {title}?", { title: item.title }),
+                    body: t(
+                      "It comes out of Meetings. The record and its notes stay exactly where they are, and you can put it back any time."
+                    ),
+                    action: t("Cancel it"),
+                    run: () =>
+                      run(
+                        () => content.setMeetingActive(meetingId, false),
+                        t("Cancelled, the record and its notes are kept."),
+                        t("Couldn't cancel the meeting.")
+                      ),
+                  }),
+              }
+            : {
+                key: "active",
+                label: t("Put it back"),
+                icon: <Power className="size-3.5" />,
+                disabled: busy !== null || confirmBusy,
+                // A REVERSAL, NOT A DESTRUCTIVE ACT — no ask, same as
+                // app-detail.tsx's own restoreApp.
+                onSelect: () =>
+                  void run(
+                    () => content.setMeetingActive(meetingId, true),
+                    t("Back in Meetings."),
+                    t("Couldn't restore the meeting.")
+                  ),
+              },
         ]
       : []),
   ]
@@ -393,25 +440,87 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={item.title} size="band" />}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `meeting`), client ruling 2026-08-31.
+      eyebrow={t("Meeting")}
       recordNumber={item.ref || undefined}
-      collectionLabel={t("Meeting")}
+      // NO `collectionLabel` — client correction, 2026-08-31, verbatim: "now
+      // it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to repeat
+      // `t("Meeting")` a second time as a chip, directly under the eyebrow
+      // that already says it — the same word, twice, one screen. The eyebrow
+      // alone carries the type now; role/wave/process/task/contact-detail.tsx
+      // carried the identical mistake and lost the same line for the same
+      // reason.
+      // THE PARENT CHIPS, ORDER RULED BY THE CLIENT (2026-08-31, verbatim):
+      // "meeting parent is app, and customer in chips by this order. is app
+      // is empty then only customer." What it DOES have is up to two
+      // parents, and the app (when there is one) always leads: a meeting
+      // about one of our systems is that system's meeting first and the
+      // client's second, and a meeting with no app skips straight to the one
+      // chip it does have rather than rendering an empty slot for the other.
+      //
+      // CANCELLED IS NOW A CHIP, NOT A LINE UNDER THE CHIPS — client ruling,
+      // 2026-08-31, verbatim: "what is this 3rd component in the title under
+      // the chips? kill everywhere. chips is the last component of headers!"
+      // This used to be the screen's `status` prop (`RecordChrome`'s `meta`,
+      // drawn directly under the chips row) on the theory that "a meeting
+      // carries no status chip at all" — that theory was true while the only
+      // candidate fact was the app/account, already said as chips, but
+      // Cancelled is exactly the kind of state every other record spells as
+      // a coloured dot (`archived` while account/process/wave are put away,
+      // `Inactive` on a role), so it leads the row the same way.
+      chips={
+        <>
+          {!item.active && (
+            <Badge variant="status" dot="archived">
+              {t("Cancelled")}
+            </Badge>
+          )}
+          {item.appId && item.appName && (
+            <RecordChipLink href={`${host.base}/apps/${item.appId}`}>
+              {item.appName}
+            </RecordChipLink>
+          )}
+          {item.accountId && item.accountName && (
+            <RecordChipLink href={`${host.base}/accounts/${item.accountId}`}>
+              {item.accountName}
+            </RecordChipLink>
+          )}
+        </>
+      }
       title={item.title}
-      // The date leads, and it is also the answer to "has this happened?" — which
-      // is why there is no third word here any more.
-      status={[formatDateTime(item.startsAt), item.accountName ?? undefined, !item.active ? t("Cancelled") : undefined]
-        .filter(Boolean)
-        .join(" · ")}
+      // THE SUBTITLE — client ruling, 2026-08-31, verbatim: "some titles may
+      // have 'subtitles'. place it directly under the title and on top of
+      // the pills. f.e. in a meeting, the time." An earlier header-cleanup
+      // pass had folded this into `status` (below the chips) on the theory
+      // that it was redundant with the Overview tab's own "When" row — it
+      // isn't a duplicate of any CHIP, and the client wants exactly this fact
+      // in exactly this position, so it moves up into the new slot rather
+      // than staying where a trim pass had left it.
+      subtitle={formatDateTime(item.startsAt, lang)}
       actions={
         <>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
-            <Button onClick={() => setEditing(true)} className="gap-1">
+            <Button size="icon" onClick={() => setEditing(true)} aria-label={t("Edit")}>
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
         </>
       }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: item.creatorName,
+        createdAt: item.createdAt,
+        editedByName: item.editorName,
+        updatedAt: item.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("meetings", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}
@@ -426,7 +535,13 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
           if (panel.value === "activity")
-            return <ActivityPanel activity={activity} />
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("meetings", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           if (panel.value === "time")
             return (
               <WorkLogsPanel
@@ -559,7 +674,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                     <Skeleton variant="list" lines={3} />
                   ) : transcriptQ.data.text ? (
                     <>
-                      <div className="max-h-96 overflow-y-auto rounded-[var(--radius)] border p-3">
+                      <div className="max-h-96 overflow-y-auto rounded-[var(--radius)] bg-surface-panel p-3">
                         <p className="text-sm whitespace-pre-wrap">{transcriptQ.data.text}</p>
                       </div>
                       {/* NEVER SILENTLY TRIMMED. A transcript longer than one
@@ -602,14 +717,8 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         }}
         onSubmit={save}
       />
-    <RecordFooter
-        audit={{
-          createdByName: item.creatorName,
-          createdAt: item.createdAt,
-          editedByName: item.editorName,
-          updatedAt: item.updatedAt,
-        }}
-      />
+
+      {confirmDialog}
     </RecordScreen>
   )
 }
@@ -659,7 +768,7 @@ function CalendarPanel({
   links: MeetingPersonLink[] | null
   loadingLinks: boolean
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const linkFor = new Map((links ?? []).map((l) => [l.email, l]))
   // ROOMS ARE NOT STAKEHOLDERS. Google puts meeting rooms on the same attendee
   // list as people, and a room shown as a stakeholder is a stakeholder nobody
@@ -706,7 +815,7 @@ function CalendarPanel({
         {people.length === 0 ? (
           <EmptyLine concept="members">{t("Nobody else is on the invitation.")}</EmptyLine>
         ) : (
-          <div className="flex flex-col rounded-[var(--radius)] border">
+          <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
             {people.map((g) => {
               const known = linkFor.get(g.email)
               return (
@@ -760,7 +869,7 @@ function CalendarPanel({
       {meeting.googleAttachments.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-muted-foreground text-sm font-medium">{t("Attached to the entry")}</h2>
-          <div className="flex flex-col rounded-[var(--radius)] border">
+          <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
             {meeting.googleAttachments.map((a) => (
               <a
                 key={a.fileId || a.url || a.title}
@@ -821,7 +930,7 @@ function CalendarPanel({
           mirror somebody will one day trust over the thing it reflects. */}
       <p className="text-muted-foreground text-xs">
         {meeting.googleSyncedAt
-          ? `${t("Read from your calendar")} ${formatDateTime(meeting.googleSyncedAt)}`
+          ? `${t("Read from your calendar")} ${formatDateTime(meeting.googleSyncedAt, lang)}`
           : t("This hasn't been read from a calendar yet.")}
       </p>
     </div>

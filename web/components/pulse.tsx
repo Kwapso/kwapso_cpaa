@@ -42,6 +42,7 @@ import * as React from "react"
 
 import dynamic from "next/dynamic"
 
+import { Card } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { ChartNoAxesColumn } from "@shared/ui/foundations/icons"
@@ -53,7 +54,7 @@ import type { TeamPulse } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
 import { useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage, useT } from "@shared/web/language"
 
 /** How tall a chart on a BAND is. Deliberately short: two of these plus the
  * numbers above them is about a third of a laptop screen, which leaves the
@@ -135,7 +136,7 @@ export function hoursSpoken(seconds: number): string {
  * that says what would make a picture appear. */
 export function BandCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-[var(--radius)] border p-4">
+    <section className="min-w-0 rounded-[var(--radius)] bg-surface-panel p-4">
       <h3 className="text-muted-foreground mb-2 text-sm font-medium">{title}</h3>
       {children}
     </section>
@@ -147,17 +148,30 @@ export function BandCard({ title, children }: { title: string; children: React.R
  * reads as a broken screen rather than an empty one — and the glyph is there for
  * the same reason, so the box looks like a place something goes rather than like
  * a chart that failed to draw. `aria-hidden`, because the sentences beside it
- * carry the whole meaning (UI-CONVENTIONS §5). */
+ * carry the whole meaning (UI-CONVENTIONS §5).
+ *
+ * REGRESSION FIX, 2026-09-01: this drew `border border-dashed` — a stroke round
+ * a box nested inside `BandCard`'s own `bg-surface-panel` fill, i.e. a card
+ * inside a card with a visible outline on the inner one, at every call site
+ * (impact-panel.tsx, app-money-panel.tsx, work-logs-panel.tsx x3,
+ * margin-panel.tsx). BUILD-A-SCREEN.md §6.1 is absolute ("no CSS border,
+ * ever"; separation is a fill or an inset shadow) and the ONE place the kit
+ * itself draws a real `border` is `file-upload.tsx`'s drag-and-drop dropzone
+ * edge — documented there as deliberately NOT a pattern to extend. This is
+ * exactly Card's own "well" — chapter 13: "a well holds secondary detail
+ * inside a card… same radius, no edge, no shadow" — so it now IS one
+ * (`variant="well"`, `bg-accent`) instead of a hand-rolled dashed box. */
 export function NothingYet({ what, how }: { what: string; how: string }) {
   return (
-    <div
-      className="text-muted-foreground flex flex-col items-start justify-center gap-1 rounded-[var(--radius)] border border-dashed p-4 text-sm"
+    <Card
+      variant="well"
+      className="text-muted-foreground flex flex-col items-start justify-center gap-1 p-4 text-sm"
       style={{ minHeight: BAND_HEIGHT }}
     >
       <ChartNoAxesColumn aria-hidden className="mb-1 size-5 opacity-60" />
       <p>{what}</p>
       <p className="text-xs">{how}</p>
-    </div>
+    </Card>
   )
 }
 
@@ -201,13 +215,13 @@ export function TicketStagesCard({ teamId }: { teamId: string }) {
 /** HOURS LOGGED, WEEK BY WEEK. The eight buckets the door summed, oldest first,
  * labelled by the Monday that opens each one. */
 export function HoursByWeekCard({ teamId }: { teamId: string }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { data } = usePulse(teamId)
   const work = data?.work
   if (!work) return null
 
   const rows = work.weeks.map((w) => ({
-    label: formatDayMonth(w.weekStart),
+    label: formatDayMonth(w.weekStart, lang),
     hours: Math.round((w.seconds / 3600) * 10) / 10,
   }))
   return (

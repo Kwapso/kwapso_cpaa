@@ -20,16 +20,17 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Check, Paperclip, Pencil, Undo2 } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { OverviewList } from "@/components/overview-list"
-import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chrome"
+import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -47,7 +48,7 @@ import { RichText } from "@shared/web/rich-text-view"
 import { safeHref } from "@shared/web/rich-text"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export function TaskDetailScreen({
   teamId,
@@ -69,7 +70,7 @@ export function TaskDetailScreen({
   loading: boolean
   onToggleDone: () => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
   // The clock asks for the right its own door asks for (`work:create`).
@@ -114,7 +115,7 @@ export function TaskDetailScreen({
     // DEADLINE, the same word the tasks table, the sort control and the form
     // all use for this column (CHECKLIST 2.5). It read "Due" here, which is a
     // second word for one fact on the record whose table says the first.
-    { label: t("Deadline"), value: task.dueOn ? formatDate(task.dueOn) : "" },
+    { label: t("Deadline"), value: task.dueOn ? formatDate(task.dueOn, lang) : "" },
     // A React node, not a string: a rich-text body renders as the formatting
     // somebody typed rather than as its own tags.
     { label: t("Detail"), value: task.detail ? <RichText html={task.detail} /> : "" },
@@ -157,7 +158,7 @@ export function TaskDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // WORK LOGS, wherever time is tracked (CHECKLIST 6.8). Forty minutes on the
@@ -195,12 +196,39 @@ export function TaskDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={task.title} size="band" />}
-      recordNumber={task.ref || undefined}
-      collectionLabel={t("Task")}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `task`), client ruling 2026-08-31. No third, parent-container pill: a
+      // task is "our own internal admin, not for an account's delivery"
+      // (glossary), so it has none to point at.
+      eyebrow={t("Task")}
+      // NO `recordNumber` — the 2026-08-31 ruling puts a task in the same
+      // category as a process, a role or a dropdown value: agency-internal
+      // admin nobody quotes, so it mints no reference at all (`task.ref` is
+      // always null going forward; a handful of pre-ruling rows may still
+      // carry the old, never-shown "K####" and are not worth a black chip
+      // either).
+      // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
+      // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to repeat
+      // `t("Task")` a second time as a chip, directly under the eyebrow that
+      // already says it.
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
+      // scheme is not only for tickets … map colors"). A task's only two
+      // states are open and done — `archived` for "not done yet" (the
+      // "Not started" tier every other lifecycle in the app reads this way),
+      // `shipped` once ticked (closed, successfully).
+      chips={
+        <Badge variant="status" dot={done ? "shipped" : "archived"}>
+          {done ? t("Done") : t("Open")}
+        </Badge>
+      }
       title={task.title}
-      status={[done ? t("Done") : t("Open"), task.assigneeName || undefined]
-        .filter(Boolean)
-        .join(" · ")}
+      // THE ASSIGNEE LINE IS GONE — CLIENT RULING, 2026-08-31, VERBATIM:
+      // "what is this 3rd component in the title under the chips? kill
+      // everywhere. chips is the last component of headers!" `status`
+      // mapped to `RecordChrome`'s `meta`, drawn directly under the chips
+      // row (`data-record-region="header"`). Not lost: it's already a row
+      // in the Overview tab (`overviewItems`: "Who has it").
       actions={
         <>
           {/* THE TICK SAYS WHAT IT WILL DO NEXT. Same door, two directions — a
@@ -214,14 +242,17 @@ export function TaskDetailScreen({
               record of something that happened — the door refuses one, and the
               button stands down rather than opening a form that will be
               rejected. */}
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil
+              icon") — the same `size="icon"` + `aria-label` shape every other
+              standalone Edit control in this app already draws (RecordActionsMenu's
+              own trigger, work-logs-panel.tsx, time-panel.tsx). */}
           {canEdit && !done && (
-            <Button size="sm" variant="secondary" onClick={() => setEditing(true)} className="gap-1">
+            <Button variant="secondary" size="icon" onClick={() => setEditing(true)} aria-label={t("Edit")}>
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           )}
           {canEdit && (
-            <Button size="sm" variant="secondary" onClick={onToggleDone} className="gap-1">
+            <Button variant="secondary" onClick={onToggleDone} className="gap-1">
               {done ? <Undo2 className="size-3.5" /> : <Check className="size-3.5" />}
               {done ? t("Put it back") : t("Tick it off")}
             </Button>
@@ -236,6 +267,12 @@ export function TaskDetailScreen({
           />
         </>
       }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{ createdByName: task.createdByName, createdAt: task.createdAt }}
+      activity={activity}
+      onAddNote={can("work", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}
@@ -248,13 +285,20 @@ export function TaskDetailScreen({
               <WorkLogsPanel
                 targetTable="tasks"
                 targetId={taskId}
-                recordLabel={task.ref ? `${task.ref} · ${task.title}` : task.title}
+                recordLabel={task.title}
                 canEdit={canEdit}
                 canLog={canLogTime}
                 onActivityChanged={() => invalidate(`activity:record:tasks:${taskId}`)}
               />
             )
-          if (panel.value === "activity") return <ActivityPanel activity={activity} />
+          if (panel.value === "activity")
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("work", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           return <OverviewList items={overviewItems} />
         }}
       />
@@ -303,9 +347,6 @@ export function TaskDetailScreen({
           toast.success(t("Task updated."))
         }}
       />
-
-      {/* D7 / CHECKLIST 11.3 — who made it and when, grey, at the foot. */}
-      <RecordFooter audit={{ createdByName: task.createdByName, createdAt: task.createdAt }} />
     </RecordScreen>
   )
 }

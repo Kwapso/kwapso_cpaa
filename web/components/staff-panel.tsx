@@ -28,7 +28,7 @@ import { CertificateFormDialog, type CertificateValues } from "@/components/cert
 import { RecordActionsMenu } from "@/components/record-chrome"
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/staff-profile-dialog"
 import { OverviewList } from "@/components/overview-list"
-import { ApiFailure, content } from "@/lib/api"
+import { content } from "@/lib/api"
 import { staffCertificatesKey, staffProfilesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { RecordMark } from "@shared/web/record-mark"
@@ -37,8 +37,10 @@ import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { StaffCertificate, StaffProfile } from "@shared/types"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { useConfirm } from "@shared/web/use-confirm"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 export function StaffPanel({
   teamId,
@@ -49,7 +51,7 @@ export function StaffPanel({
   userId: string
   memberName: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { can } = usePermissions(teamId)
   const mayRead = can("staff_profiles", "read")
   const mayWrite = can("staff_profiles", "edit")
@@ -77,6 +79,10 @@ export function StaffPanel({
   const [profileOpen, setProfileOpen] = React.useState(false)
   const [certOpen, setCertOpen] = React.useState(false)
   const [editingCert, setEditingCert] = React.useState<StaffCertificate | null>(null)
+  // The one confirm dialog this panel's two red actions share
+  // (shared/web/use-confirm.tsx) — deactivating a profile and archiving a
+  // certificate. Their confirm-free restores don't go through it.
+  const { busy: archiveBusy, ask, run, dialog: archiveDialog } = useConfirm()
 
   if (!mayRead) return null
   if (profilesQ.data === undefined || certsQ.data === undefined) return <Skeleton variant="list" lines={3} />
@@ -109,25 +115,51 @@ export function StaffPanel({
    * live profile until somebody says otherwise — the door has answered this
    * since the module shipped and no screen called it, so the only way to switch
    * one off was to ask the assistant. Nothing is deleted: what was written stays
-   * written, and the panel reads it back the moment it comes on again. */
-  async function setProfileActive(profile: StaffProfile, active: boolean) {
-    try {
-      const { profiles } = await content.setStaffProfileActive(profile.id, active)
-      primeCache(staffProfilesKey(teamId), profiles)
-      toast.success(active ? t("Profile activated.") : t("Profile deactivated."))
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the profile."))
-    }
+   * written, and the panel reads it back the moment it comes on again.
+   * Deactivating is the red half, so it asks first (shared/web/use-confirm.tsx);
+   * activating is the confirm-free restore. */
+  function deactivateProfile(profile: StaffProfile) {
+    ask({
+      title: t("Deactivate this profile?"),
+      body: t("It stops showing as a live colleague. What was written stays written, and the panel reads it back the moment it comes on again."),
+      action: t("Deactivate"),
+      run: () =>
+        run(
+          () => content.setStaffProfileActive(profile.id, false).then(({ profiles }) => primeCache(staffProfilesKey(teamId), profiles)),
+          t("Profile deactivated."),
+          t("Couldn't update the profile.")
+        ),
+    })
   }
 
-  async function archiveCertificate(cert: StaffCertificate) {
-    try {
-      const { certificates: next } = await content.setStaffCertificateActive(cert.id, !cert.active)
-      primeCache(staffCertificatesKey(teamId), next)
-      toast.success(cert.active ? t("Archived.") : t("Restored."))
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the certificate."))
-    }
+  async function activateProfile(profile: StaffProfile) {
+    await run(
+      () => content.setStaffProfileActive(profile.id, true).then(({ profiles }) => primeCache(staffProfilesKey(teamId), profiles)),
+      t("Profile activated."),
+      t("Couldn't update the profile.")
+    )
+  }
+
+  function archiveCertificate(cert: StaffCertificate) {
+    ask({
+      title: t("Archive {title}?", { title: cert.title }),
+      body: t("It stops showing as a live certificate. Nothing is deleted, and you can restore it any time."),
+      action: t("Archive"),
+      run: () =>
+        run(
+          () => content.setStaffCertificateActive(cert.id, false).then(({ certificates: next }) => primeCache(staffCertificatesKey(teamId), next)),
+          t("Archived."),
+          t("Couldn't update the certificate.")
+        ),
+    })
+  }
+
+  async function restoreCertificate(cert: StaffCertificate) {
+    await run(
+      () => content.setStaffCertificateActive(cert.id, true).then(({ certificates: next }) => primeCache(staffCertificatesKey(teamId), next)),
+      t("Restored."),
+      t("Couldn't update the certificate.")
+    )
   }
 
   // Only the fields that were actually filled in. A profile half written is the
@@ -157,10 +189,17 @@ export function StaffPanel({
         </h2>
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="ml-auto flex flex-wrap gap-2">
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil
+              icon") — the label survives as the accessible name, whichever of
+              the two verbs applies. */}
           {mayWrite && (
-            <Button variant="secondary" size="sm" onClick={() => setProfileOpen(true)} className="gap-1">
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setProfileOpen(true)}
+              aria-label={profile?.active ? t("Edit profile") : t("Write a profile")}
+            >
               <Pencil className="size-3.5" />
-              {profile?.active ? t("Edit profile") : t("Write a profile")}
             </Button>
           )}
           {/* WHEN SOMEBODY LEAVES. Red because it takes the profile out of the
@@ -172,7 +211,8 @@ export function StaffPanel({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => void setProfileActive(profile, false)}
+                disabled={archiveBusy}
+                onClick={() => deactivateProfile(profile)}
                 className="text-destructive hover:text-destructive gap-1"
               >
                 <Power className="size-3.5" />
@@ -182,7 +222,7 @@ export function StaffPanel({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => void setProfileActive(profile, true)}
+                onClick={() => void activateProfile(profile)}
                 className="gap-1"
               >
                 <Power className="size-3.5" />
@@ -235,7 +275,19 @@ export function StaffPanel({
       <Card>
         <CardContent className="flex flex-col gap-4 p-4">
           {certificates.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("Nothing recorded for")} {memberName} {t("yet.")}</p>
+            // No `staff_certificates` import target — a certificate is filed
+            // one at a time, with the file it proves attached.
+            <CollectionEmptyState
+              title={t("Nothing recorded for {name} yet.", { name: memberName })}
+              onCreate={
+                mayAdd
+                  ? () => {
+                      setEditingCert(null)
+                      setCertOpen(true)
+                    }
+                  : undefined
+              }
+            />
           ) : (
             certificates.map((c) => {
               const link = safeHref(c.fileUrl)
@@ -264,8 +316,8 @@ export function StaffPanel({
                     <p className="text-muted-foreground text-xs">
                       {[
                         c.issuer,
-                        c.issuedOn ? `${t("granted")} ${formatDate(c.issuedOn)}` : null,
-                        c.expiresOn ? `${t("lapses")} ${formatDate(c.expiresOn)}` : null,
+                        c.issuedOn ? `${t("granted")} ${formatDate(c.issuedOn, lang)}` : null,
+                        c.expiresOn ? `${t("lapses")} ${formatDate(c.expiresOn, lang)}` : null,
                       ]
                         .filter(Boolean)
                         .join(" · ") || t("No details recorded")}
@@ -300,7 +352,10 @@ export function StaffPanel({
                               label: c.active ? t("Archive") : t("Restore"),
                               icon: <Power className="size-3.5" />,
                               destructive: c.active,
-                              onSelect: () => void archiveCertificate(c),
+                              disabled: archiveBusy,
+                              onSelect: c.active
+                                ? () => archiveCertificate(c)
+                                : () => void restoreCertificate(c),
                             },
                           ]
                         : []),
@@ -355,6 +410,8 @@ export function StaffPanel({
         }
         onSubmit={saveCertificate}
       />
+
+      {archiveDialog}
     </div>
   )
 }

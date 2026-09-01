@@ -22,21 +22,23 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { Plus } from "@shared/ui/foundations/icons"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
+import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { GoogleSyncButton } from "@/components/google-sync"
 import { CountedAbove } from "@/components/counted-tabs"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
@@ -54,7 +56,7 @@ import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 /* THE "EARLIER NOT LOADED" NOTICE IS GONE, and its absence is the fix.
  *
@@ -122,6 +124,78 @@ const ALL_COLUMN_HEADERS = ALL_COLUMNS.map((f) => {
   }
 })
 
+/** THE CALENDAR TAB'S OWN MONTH READ — its own component, and not a `const`
+ * inside `<PagedFind>`'s `children`, because `children` there is a plain
+ * render-prop CALLBACK rather than a component (paged-find.tsx's own header
+ * explains why it has to stay one), and a hook cannot live inside one: it would
+ * be attributed to `PagedFind`'s own fiber rather than this screen's, which
+ * happens to work only for as long as the same hooks fire in the same order
+ * every render — exactly the kind of accident this codebase does not ship. A
+ * real, capitalised component gives `useCached` a fiber of its own.
+ *
+ * THE MONTH ITSELF is its own read for the reason `meetingsMonthKey` explains at
+ * length: the meetings list pages newest-first, so the month on screen is very
+ * often not in the page in hand at all. `null` until the calendar reports (it
+ * does so on mount), so the first render asks for nothing rather than guessing.
+ *
+ * AND NOW NARROWED — `narrowing` is the meetings list's own search box +
+ * facets (`q`, `accountId`, `purposeId`), the exact same question `<PagedFind>`
+ * is already asking of the whole meetings list, forwarded onto this door call
+ * too. Before this the toolbar above the grid was real and visibly did
+ * nothing: typing a name narrowed the list and the table and left the grid
+ * drawing the whole month regardless, because this read had never been told
+ * what was typed. */
+function MeetingsMonthCalendar({
+  teamId,
+  narrowing,
+  emptyText,
+  onOpen,
+}: {
+  teamId: string
+  /** `{}` when nothing is being asked — the door then answers the whole month,
+   * exactly as before this existed. */
+  narrowing: Record<string, string>
+  /** "Nothing matched." while a search is on and it answers nothing at all,
+   * anywhere — the list/table views' own `found.emptyText`, so all three tabs
+   * say the identical sentence about a failed search. `undefined` the rest of
+   * the time, so the grid's own "nothing this month" keeps saying that. */
+  emptyText?: string
+  onOpen: (id: string) => void
+}) {
+  const { t, lang } = useLanguage()
+  const [calendarMonth, setCalendarMonth] = React.useState<string | null>(null)
+  const monthQ = useCached<Meeting[]>(
+    calendarMonth ? meetingsMonthKey(teamId, calendarMonth, narrowing) : null,
+    () => listFetch.meetingsMonth(teamId, calendarMonth as string, narrowing)
+  )
+  // THE CALENDAR'S OWN ROWS — the month (and question) the door answered for,
+  // shaped the same way the list is so a meeting reads identically in both.
+  const monthRows = monthQ.data ?? []
+  const monthShaped = shapeMeetingsList(monthRows, lang)
+  const startsAtById = new Map(monthRows.map((m) => [m.id, m.startsAt]))
+  const calendarEntries: CalendarEntry[] = (monthShaped.rows ?? []).map((r) => ({
+    id: String(r.id),
+    day: String(r.startsOn ?? ""),
+    title: String(r.name ?? ""),
+    accent: String(r.state ?? ""),
+    detail: [formatTime(startsAtById.get(String(r.id)), lang), String(r.client ?? "")]
+      .filter(Boolean)
+      .join(" · "),
+  }))
+  return (
+    <RecordCalendar
+      entries={calendarEntries}
+      onOpen={onOpen}
+      emptyText={
+        monthQ.data === undefined
+          ? t("Reading this month…")
+          : (emptyText ?? t("Nothing in Meetings this month."))
+      }
+      onMonthChange={setCalendarMonth}
+    />
+  )
+}
+
 export function MeetingsScreen({
   teamId,
   recipe,
@@ -148,7 +222,7 @@ export function MeetingsScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // The two pickers the form needs. Both are read only when the dialog can be
   // opened at all — a person who cannot create a meeting has no use for either.
@@ -194,22 +268,6 @@ export function MeetingsScreen({
   // reader and nothing
   // else; the four censuses went red on it within one run.
   const weekView = view === "week" ? ("week" as const) : undefined
-  // THE MONTH THE CALENDAR IS DRAWING, and its own read.
-  //
-  // The grid told nobody which month it was on, so it drew whatever the paged
-  // list happened to hold — and the meetings list pages newest-first, which on 19 Aug
-  // 2026 meant June-to-August 2027 while the month on screen was August 2026
-  // with 61 meetings in it. Grid and agenda both said "nothing in Meetings this
-  // month" over a badge reading 436. The week view had the identical fault, was
-  // fixed on its own, and this one reads the same page it was fixed away from.
-  //
-  // `null` until the calendar reports (it does so on mount), so the first render
-  // asks for nothing rather than guessing at a month.
-  const [calendarMonth, setCalendarMonth] = React.useState<string | null>(null)
-  const monthQ = useCached<Meeting[]>(
-    view === "calendar" && calendarMonth ? meetingsMonthKey(teamId, calendarMonth) : null,
-    () => listFetch.meetingsMonth(teamId, calendarMonth as string)
-  )
   const weekQ = useCached<Meeting[]>(weekView ? meetingsKey(teamId, weekView) : null, () =>
     listFetch.meetings(teamId, "week")
   )
@@ -265,42 +323,6 @@ export function MeetingsScreen({
           number twice. */}
       <CollectionHeading sectionKey="meetings" total={total} />
 
-      {/* `line`, not the folder shape, for the reason spelled out in
-          tickets-collection.tsx: the kit's folder tab is drawn to be attached
-          to the card below it, and the search box sits between this strip and
-          the list. */}
-      <TabsView
-        config={{
-          ...defaultTabsConfig,
-          variant: "line",
-          tabs: [
-            {
-              value: "week",
-              label: t("This week"),
-              icon: "calendar-clock",
-              badge: formatCount(weekTotal),
-              badgeVariant: "" as const,
-            },
-            {
-              value: "calendar",
-              label: t("Calendar"),
-              icon: "calendar",
-              badge: formatCount(total),
-              badgeVariant: "" as const,
-            },
-            {
-              value: "all",
-              label: t("All"),
-              icon: "list",
-              badge: formatCount(total),
-              badgeVariant: "" as const,
-            },
-          ],
-        }}
-        value={view}
-        onValueChange={(v) => setView(v as "week" | "calendar" | "all")}
-      />
-
       {/* R14's other half: the meetings list pages, and the meeting somebody digs for is
           the OLD one — so the search box is answered by the door, over the whole
           meetings list rather than the page in the browser. */}
@@ -345,6 +367,56 @@ export function MeetingsScreen({
             })
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
         }
+        // THE CANONICAL SHAPE (client ruling, 2026-08-31 — Accounts and Tickets
+        // both moved to this the same day, then all three corrected the same
+        // day once the action shared the tabs' row: "never align the button
+        // with the tabs — that button belongs in the right of the toolbar,
+        // part of the toolbar"): a FOLDER strip, not `line` — it sits directly
+        // above the toolbar's own card (`wrap` below) with zero gap, the same
+        // join Tickets draws, so it reads as attached rather than floating
+        // above a search box on the base background. `tabs` is a
+        // `FolderTabStrip`, which carries nothing but the tabs BY SHAPE now;
+        // "New meeting" moved to `actions`, at the right of the toolbar itself.
+        tabs={{
+          config: {
+            ...defaultTabsConfig,
+            variant: "folder",
+            tabs: [
+              {
+                value: "week",
+                label: t("This week"),
+                icon: "calendar-clock",
+                badge: formatCount(weekTotal),
+                badgeVariant: "" as const,
+              },
+              {
+                value: "calendar",
+                label: t("Calendar"),
+                icon: "calendar",
+                badge: formatCount(total),
+                badgeVariant: "" as const,
+              },
+              {
+                value: "all",
+                label: t("All"),
+                icon: "list",
+                badge: formatCount(total),
+                badgeVariant: "" as const,
+              },
+            ],
+          },
+          value: view,
+          onValueChange: (v) => setView(v as "week" | "calendar" | "all"),
+        }}
+        // "NEW MEETING", AT THE RIGHT OF THE TOOLBAR — PagedFind's own
+        // `actions` slot, exactly where Accounts' own New/Import/Export and
+        // Tickets' own "Raise ticket" now sit.
+        actions={() => (canCreate ? <AddButton label={t("New meeting")} onClick={() => setOpen(true)} /> : null)}
+        // THE ONE CARD — toolbar, then rows — the same join Accounts and
+        // Tickets draw (`collection-content.tsx`'s and `tickets-collection.tsx`'s
+        // own `wrap`): zero gap to the tab row above, which is this file's own
+        // `tabs` slot rather than a second `gap-*` here.
+        wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
       >
         {(found) => {
           // WHICH ROWS THIS TAB IS SHOWING. A find answers over the whole meetings list
@@ -358,26 +430,20 @@ export function MeetingsScreen({
           // row on screen now came back from the door answering the question
           // this tab asks, which is the same door the count came from (R16).
           const shown = rows
-          const data = shapeMeetingsList(shown)
-          // THE CALENDAR'S ROWS — the shaper's, so a meeting reads the same in
-          // the grid as it does in the list underneath (a cancelled one still
-          // says so). The one thing the shaper has no column for is the CLOCK
-          // TIME, which is the whole point of an agenda row, so it is looked up
-          // beside it rather than shaped a second way.
-          // THE CALENDAR'S OWN ROWS — the month the door answered for, shaped the
-          // same way the list is so a meeting reads identically in both.
-          const monthRows = monthQ.data ?? []
-          const monthShaped = shapeMeetingsList(monthRows)
-          const startsAtById = new Map(monthRows.map((m) => [m.id, m.startsAt]))
-          const calendarEntries: CalendarEntry[] = (monthShaped.rows ?? []).map((r) => ({
-            id: String(r.id),
-            day: String(r.startsOn ?? ""),
-            title: String(r.name ?? ""),
-            accent: String(r.state ?? ""),
-            detail: [formatTime(startsAtById.get(String(r.id))), String(r.client ?? "")]
-              .filter(Boolean)
-              .join(" · "),
-          }))
+          const data = shapeMeetingsList(shown, lang)
+          // THE CALENDAR'S OWN NARROWING — `found.query` is the exact question
+          // the search box + facets above are asking (paged-find.tsx's own
+          // `Found.query`), minus `sort`/`dir`: a calendar square does not
+          // order, the day it falls on does, so there is nothing for a sort to
+          // change there. Forwarded to the month-scoped door read inside
+          // `MeetingsMonthCalendar` below — see that component's own header for
+          // why the read has to live in a component of its own rather than
+          // here.
+          const monthNarrowing: Record<string, string> = {}
+          for (const [field, value] of Object.entries(found.query)) {
+            if (field === "sort" || field === "dir") continue
+            monthNarrowing[field] = value
+          }
           // ALL shows far more columns (9.1). The other two views stay the
           // two-line list a person scans, which is the rulebook's own rule about
           // a table being for scanning and a list for reading.
@@ -396,53 +462,66 @@ export function MeetingsScreen({
           )
           const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
           return (
-            <>
-              <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
-                {view === "calendar" ? (
-                  // NO `unloaded` SENTENCE ANY MORE. It said "earlier meetings
-                  // haven't been loaded yet, so this month may not be the whole
-                  // of it", which was true of a grid reading the paged prefix and
-                  // is now false: the month on screen IS the whole of it, asked
-                  // of the door. Leaving it would be an apology for a fault that
-                  // no longer exists, which teaches a person to distrust a
-                  // correct screen.
-                  <RecordCalendar
-                    entries={calendarEntries}
-                    onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
-                    emptyText={
-                      monthQ.data === undefined
-                        ? t("Reading this month…")
-                        : t("Nothing in Meetings this month.")
-                    }
-                    onMonthChange={setCalendarMonth}
-                  />
-                ) : view === "all" ? (
-                  // THE MEETINGS LIST PAGES, so its headers ask the DOOR — `found.order`
-                  // is the same handle the picker above the table holds, so the
-                  // two controls are one question and the answer spans the whole
-                  // meetings list instead of the fifty rows in the browser. The picker
-                  // stays because it names orders that are not columns ("Recently
-                  // added"); the headers cover the ones that are.
-                  <RecordTable
-                    columns={ALL_COLUMN_HEADERS}
-                    rows={data.rows ?? []}
-                    config={tableRecipe.collection as CollectionConfig}
-                    order={found.order}
-                    actions={visibleActions(tableRecipe, rights, onAction)}
-                    onRowClick={(row) =>
-                      onIntent({ kind: "open", module: "meetings", id: String(row.id) })
-                    }
-                  />
-                ) : (
-                  <ScreenRenderer
-                    recipe={listRecipe}
-                    data={data}
-                    rights={rights}
-                    onAction={onAction}
-                    onIntent={onIntent}
-                  />
-                )}
-              </SectionWithCreate>
+            // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
+            // `SectionWithCreate` does this identically) — the create button now
+            // lives in the toolbar above; the engine's zero-state still needs to
+            // name the next act.
+            <CollectionCreateActionProvider
+              action={canCreate ? { label: t("New meeting"), icon: <Plus className="size-4" />, onCreate: () => setOpen(true) } : null}
+            >
+              {view === "calendar" ? (
+                // NO `unloaded` SENTENCE ANY MORE. It said "earlier meetings
+                // haven't been loaded yet, so this month may not be the whole
+                // of it", which was true of a grid reading the paged prefix and
+                // is now false: the month on screen IS the whole of it, asked
+                // of the door. Leaving it would be an apology for a fault that
+                // no longer exists, which teaches a person to distrust a
+                // correct screen.
+                //
+                // NARROWED BY THE SAME SEARCH BOX, now — `monthNarrowing` is
+                // `found.query` forwarded straight through (see the note above).
+                // `found.active` decides whether "Nothing matched." (the exact
+                // sentence the list/table views already show for a failed
+                // search, `found.emptyText`) can override the grid's own
+                // "nothing this month" — a search with no hits anywhere is a
+                // different sentence from a month that is simply empty.
+                <MeetingsMonthCalendar
+                  teamId={teamId}
+                  narrowing={monthNarrowing}
+                  emptyText={found.active ? found.emptyText : undefined}
+                  onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
+                />
+              ) : view === "all" ? (
+                // THE MEETINGS LIST PAGES, so its headers ask the DOOR — `found.order`
+                // is the same handle the picker above the table holds, so the
+                // two controls are one question and the answer spans the whole
+                // meetings list instead of the fifty rows in the browser. The picker
+                // stays because it names orders that are not columns ("Recently
+                // added"); the headers cover the ones that are.
+                //
+                // No `useKitPanel`: `CollectionCard` above (drawn by `wrap`) is
+                // the ONE box now — Accounts and Tickets dropped it the same day
+                // for the same reason ("the broken combination", screen-bits.tsx's
+                // own doc on `CollectionCard`).
+                <RecordTable
+                  columns={ALL_COLUMN_HEADERS}
+                  rows={data.rows ?? []}
+                  config={tableRecipe.collection as CollectionConfig}
+                  order={found.order}
+                  actions={visibleActions(tableRecipe, rights, onAction)}
+                  onRowClick={(row) =>
+                    onIntent({ kind: "open", module: "meetings", id: String(row.id) })
+                  }
+                />
+              ) : (
+                <ScreenRenderer
+                  recipe={listRecipe}
+                  data={data}
+                  rights={rights}
+                  onAction={onAction}
+                  onIntent={onIntent}
+                />
+              )}
 
               {/* R14: the heading counts the WHOLE meetings list, so the list under it has to be
                   able to reach all of it — page one, then Load more.
@@ -457,7 +536,7 @@ export function MeetingsScreen({
                   label={t("Load more meetings")}
                 />
               )}
-            </>
+            </CollectionCreateActionProvider>
           )
         }}
       </PagedFind>
@@ -486,7 +565,7 @@ export function MeetingsScreen({
        * card there would be wrong. Here it is the foot of a list, so it gets a
        * card. */}
       {canCreate && (
-        <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
+        <div className="flex flex-col gap-3 rounded-[var(--radius)] bg-surface-panel p-4">
           <GoogleSyncButton
             teamId={teamId}
             scope="both"
@@ -509,7 +588,7 @@ export function MeetingsScreen({
             </p>
           )}
           {ahead.length > 0 && (
-            <div className="flex flex-col gap-2 border-t pt-3">
+            <div className="flex flex-col gap-2 shadow-[var(--hairline-over)] pt-3">
               {/* NOT RECORDS YET, AND SAID SO. The live window reaches four weeks
                   ahead; these are further out. The walk will reach them too,
                   which is why the sentence says "yet". */}
@@ -520,7 +599,7 @@ export function MeetingsScreen({
                 {ahead.map((a) => (
                   <li key={a.eventId} className="text-muted-foreground flex flex-wrap gap-2 text-sm">
                     <span className="min-w-0 truncate">{a.title}</span>
-                    <span className="tabular-nums">{formatDate(a.startsAt)}</span>
+                    <span className="tabular-nums">{formatDate(a.startsAt, lang)}</span>
                   </li>
                 ))}
               </ul>

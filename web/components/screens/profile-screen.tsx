@@ -18,11 +18,6 @@
 
 import * as React from "react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@shared/ui/components/avatar/avatar"
 import { Button } from "@shared/ui/components/button/button"
 import { List } from "@shared/web/list-compat"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
@@ -37,10 +32,10 @@ import { LanguageSection } from "@shared/web/language-section"
 import { personName, personInitials } from "@/lib/identity"
 import { useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 export function ProfileScreen({ active }: { active: ActiveTeam }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [editing, setEditing] = React.useState(false)
   const [changingEmail, setChangingEmail] = React.useState(false)
   const { user } = active
@@ -56,16 +51,13 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
         <section className="motion-panel-in flex flex-col gap-4">
           <List
             surface="none"
-            className="rounded-[var(--radius)] border"
+            className="rounded-[var(--radius)] bg-surface-panel"
             items={[
               {
                 id: "profile",
-                leading: (
-                  <Avatar className="size-9">
-                    {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={name} />}
-                    <AvatarFallback>{personInitials(user?.firstName, user?.lastName)}</AvatarFallback>
-                  </Avatar>
-                ),
+                image: user?.imageUrl,
+                imageAlt: name,
+                initials: personInitials(user?.firstName, user?.lastName),
                 title: name,
                 trailing: (
                   <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
@@ -112,7 +104,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
               items={accountActivityQ.data.map((a) => ({
                 id: a.id,
                 description: a.description,
-                time: formatDateTime(a.createdAt),
+                time: formatDateTime(a.createdAt, lang),
               }))}
             />
           )}

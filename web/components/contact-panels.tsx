@@ -13,19 +13,39 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Input } from "@shared/ui/components/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/components/select/select"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { ChevronRight, Search } from "@shared/ui/foundations/icons"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
 import { content as contentApi } from "@/lib/api"
+import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { formatDate } from "@shared/web/format"
 import { softNavigate } from "@/lib/nav"
 import { totalKey } from "@/lib/live-resources"
 import { sliceKey } from "@/components/work-panels"
-import { EmptyLine } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { primeCache, useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage, useT } from "@shared/web/language"
 import { richTextPlain } from "@shared/web/rich-text"
+
+/** Every list on this file is a bounded, already-loaded array — either the
+ * whole of it (Companies) or the door's own "page one, a summary" read
+ * (Tickets, Meetings — see each panel's own doc). Either way the narrowing
+ * below runs over rows already in the browser, the same shape
+ * `selectable-screen.tsx`'s own toolbar uses. */
+type ActiveFilter = "all" | "active" | "inactive"
+function matchesActive(filter: ActiveFilter, active: boolean): boolean {
+  return filter === "all" || (filter === "active" ? active : !active)
+}
 
 /** The two slice kinds these panels cache under. Named constants because the
  * live registry has to invalidate them by PREFIX when any ticket or meeting
@@ -86,16 +106,66 @@ export function CompaniesPanel({
   onOpen: (accountId: string) => void
 }) {
   const t = useT()
+  const [query, setQuery] = React.useState("")
+  const [status, setStatus] = React.useState<ActiveFilter>("all")
+
   if (companies.length === 0)
+    // No `onCreate` on purpose — this whole panel is read-only (see the file
+    // header): a link is made on the COMPANY's own Contacts tab, never here.
     return (
-      <p className="text-muted-foreground text-sm">
-        {t("They are not linked to a company. Add them as a contact from the company's own page.")}
-      </p>
+      <CollectionEmptyState
+        title={t("Not linked to a company.")}
+        description={t("Add them as a contact from the company's own page.")}
+      />
     )
+
+  const q = query.trim().toLowerCase()
+  const shown = companies.filter(
+    (c) =>
+      matchesActive(status, c.active) &&
+      (q === "" ||
+        c.personName.toLowerCase().includes(q) ||
+        (c.relationship ?? "").toLowerCase().includes(q))
+  )
+
   return (
     <div className="flex flex-col gap-3">
-      <ul className="divide-border divide-y rounded-[var(--radius)] border">
-        {companies.map((c) => (
+      {companies.length > 1 && (
+        <ToolbarRow
+          search={
+            <>
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search companies…")}
+                  className="h-9 pl-8"
+                  aria-label={t("Search companies")}
+                />
+              </div>
+              <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
+                <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All")}</SelectItem>
+                  <SelectItem value="active">{t("Contacts now")}</SelectItem>
+                  <SelectItem value="inactive">{t("No longer")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          }
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+      )}
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        {shown.map((c) => (
           <Row key={c.id} active={c.active} onClick={() => onOpen(c.accountId)}>
             <span className="min-w-0 flex-1 truncate text-sm">{c.personName}</span>
             {c.relationship && (
@@ -133,7 +203,9 @@ export function ContactTicketsPanel({
   accountId: string
   basePath: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
+  const [query, setQuery] = React.useState("")
+  const [status, setStatus] = React.useState("all")
   const q = useCached<HelpTicket[]>(sliceKey(TICKETS_OF_ACCOUNT, accountId), () =>
     contentApi.help({ accountId }).then((r) => {
       primeCache(totalKey("tickets-account", accountId), r.total)
@@ -143,24 +215,84 @@ export function ContactTicketsPanel({
   if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   if (q.data.length === 0)
-    return <EmptyLine concept="tickets">{t("No tickets raised for them yet.")}</EmptyLine>
+    return (
+      <CollectionEmptyState
+        title={t("No tickets raised for them yet.")}
+        description={t("Every ticket about them will show here once one is raised.")}
+      />
+    )
   // Tickets live at their own top-level URL; the account list's base is the
   // sibling form we arrived through, so the section swap keeps the same shape.
   const ticketsBase = basePath.replace(/\/accounts$/, "/tickets")
+  // THE STATUS OPTIONS ARE DERIVED FROM WHAT'S ON SCREEN, never a hard-coded
+  // enum — the same rule `FilterFacet.options` follows when a caller leaves
+  // them off (config.ts: "the distinct values are derived from the data").
+  // This tab is a page-one SUMMARY (the file header), so that data is exactly
+  // what a filter here can honestly promise to narrow.
+  const statuses = Array.from(new Set(q.data.map((tk) => tk.status))).sort()
+  const needle = query.trim().toLowerCase()
+  const shown = q.data.filter(
+    (tk) =>
+      (status === "all" || tk.status === status) &&
+      (needle === "" ||
+        richTextPlain(tk.description).toLowerCase().includes(needle) ||
+        (tk.helpType ?? "").toLowerCase().includes(needle))
+  )
   return (
-    <ul className="divide-border divide-y rounded-[var(--radius)] border">
-      {q.data.map((ticket) => (
-        <Row key={ticket.id} onClick={() => softNavigate(`${ticketsBase}/${ticket.id}`)}>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm">{richTextPlain(ticket.description)}</p>
-            <p className="text-muted-foreground truncate text-xs">
-              {[ticket.helpType, ticket.status, formatDate(ticket.createdAt)].filter(Boolean).join(" · ")}
-            </p>
-          </div>
-          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-        </Row>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      {(q.data.length > 1 || statuses.length > 1) && (
+        <ToolbarRow
+          search={
+            <>
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search tickets…")}
+                  className="h-9 pl-8"
+                  aria-label={t("Search tickets")}
+                />
+              </div>
+              {statuses.length > 1 && (
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("All")}</SelectItem>
+                    {statuses.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
+          }
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+      )}
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        {shown.map((ticket) => (
+          <Row key={ticket.id} onClick={() => softNavigate(`${ticketsBase}/${ticket.id}`)}>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm">{richTextPlain(ticket.description)}</p>
+              <p className="text-muted-foreground truncate text-xs">
+                {[ticket.helpType, ticket.status, formatDate(ticket.createdAt, lang)].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+          </Row>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -173,7 +305,9 @@ export function ContactMeetingsPanel({
   accountId: string
   basePath: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
+  const [query, setQuery] = React.useState("")
+  const [sort, setSort] = React.useState<{ dir: "asc" | "desc" }>({ dir: "desc" })
   const q = useCached<Meeting[]>(sliceKey(MEETINGS_OF_ACCOUNT, accountId), () =>
     contentApi.meetings({ accountId }).then((r) => {
       primeCache(totalKey("meetings-account", accountId), r.total)
@@ -183,24 +317,73 @@ export function ContactMeetingsPanel({
   if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   if (q.data.length === 0)
-    return <EmptyLine concept="meetings">{t("No meetings with them yet.")}</EmptyLine>
+    return (
+      <CollectionEmptyState
+        title={t("No meetings with them yet.")}
+        description={t("Every meeting they're in will show here once one is arranged.")}
+      />
+    )
   const meetingsBase = basePath.replace(/\/accounts$/, "/meetings")
+  const needle = query.trim().toLowerCase()
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const shown = q.data
+    .filter(
+      (m) =>
+        needle === "" ||
+        m.title.toLowerCase().includes(needle) ||
+        (m.location ?? "").toLowerCase().includes(needle)
+    )
+    .sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1) * dirMul)
   return (
-    <ul className="divide-border divide-y rounded-[var(--radius)] border">
-      {q.data.map((m) => (
-        <Row key={m.id} onClick={() => softNavigate(`${meetingsBase}/${m.id}`)}>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm">{m.title}</p>
-            <p className="text-muted-foreground truncate text-xs">
-              {/* The date is the first thing here and it is also the answer to
-                  "has it happened?", which is why the status word that used to
-                  sit third is gone rather than replaced. */}
-              {[formatDate(m.startsAt), m.location].filter(Boolean).join(" · ")}
-            </p>
-          </div>
-          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-        </Row>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      {q.data.length > 1 && (
+        <ToolbarRow
+          search={
+            <>
+              <div className="relative w-full sm:w-56">
+                <Search
+                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                  aria-hidden
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("Search meetings…")}
+                  className="h-9 pl-8"
+                  aria-label={t("Search meetings")}
+                />
+              </div>
+              <SortControl
+                options={[{ value: "startsAt", label: t("When") }]}
+                value="startsAt"
+                onValueChange={() => undefined}
+                direction={sort.dir}
+                onDirectionChange={(dir) => setSort({ dir })}
+                label={t("Sort by")}
+              />
+            </>
+          }
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+      )}
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        {shown.map((m) => (
+          <Row key={m.id} onClick={() => softNavigate(`${meetingsBase}/${m.id}`)}>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm">{m.title}</p>
+              <p className="text-muted-foreground truncate text-xs">
+                {/* The date is the first thing here and it is also the answer to
+                    "has it happened?", which is why the status word that used to
+                    sit third is gone rather than replaced. */}
+                {[formatDate(m.startsAt, lang), m.location].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+          </Row>
+        ))}
+      </ul>
+    </div>
   )
 }

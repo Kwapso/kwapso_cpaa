@@ -175,7 +175,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   if (!canImport)
     return (
       <p className="text-muted-foreground text-sm">
-        {t("There's nothing here you can import into yet. You can import once you're allowed to create Accounts, Roles or Dropdown values.")}
+        {t("There's nothing here you can import into yet. You can import once you're allowed to create Accounts, Roles or Choices.")}
       </p>
     )
 
@@ -311,7 +311,7 @@ function PlanColumns({ plan, targets }: { plan: NonNullable<ImportBatchView["pla
 
       {/* THE STEPS ARE A COLLECTION, so they get ONE container with divided
           rows inside it (N6). */}
-      <div className="divide-border divide-y rounded-[var(--radius)] border">
+      <div className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {plan.steps.map((step, i) => (
           <div key={step.fileId} className="flex flex-col gap-4 p-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -424,7 +424,7 @@ function PlanReview({ plan }: { plan: NonNullable<ImportBatchView["plan"]> }) {
       {/* Per STEP, because a bad file is one file — a single total would say
           "42 rows will be skipped" without saying which spreadsheet to fix. */}
       {plan.steps.some((s) => s.predictedRejects > 0) && (
-        <div className="divide-border divide-y rounded-[var(--radius)] border">
+        <div className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {plan.steps
             .filter((s) => s.predictedRejects > 0)
             .map((step) => (
@@ -476,7 +476,7 @@ function Report({ report }: { report: ImportBatchReport }) {
 
       {report.perTarget.length > 0 && (
         // ONE container round the collection, `divide-y` inside it (N6).
-        <div className="divide-border divide-y rounded-[var(--radius)] border">
+        <div className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {report.perTarget.map((row) => (
             <div key={row.target} className="flex items-center gap-2 p-3 text-sm">
               <span className="flex-1 font-medium">{row.targetName}</span>
@@ -508,7 +508,7 @@ function Report({ report }: { report: ImportBatchReport }) {
               <Download className="size-3.5" aria-hidden /> {t("Download to fix")}
             </Button>
           </div>
-          <div className="max-h-48 overflow-auto rounded-[var(--radius)] border">
+          <div className="max-h-48 overflow-auto rounded-[var(--radius)] bg-surface-panel">
             {report.rejections.slice(0, 50).map((r, i) => (
               <div key={i} className="flex gap-2 border-b p-2 text-xs last:border-0">
                 <span className="text-muted-foreground w-24 shrink-0 truncate">
@@ -538,7 +538,7 @@ function PastImports({ teamId }: { teamId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium">{t("Past imports")}</p>
-      <div className="divide-border divide-y rounded-[var(--radius)] border">
+      <div className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {batches.map((b) => (
           <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-xs">
             <span className="font-medium">{b.by}</span>

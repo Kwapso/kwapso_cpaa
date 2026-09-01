@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="ascii">
+<title>SHAPE_HEADING_SIZE &mdash; open decision</title>
+<style>
+  :root {
+    --background:      #FFFEF9;
+    --foreground:      #1A1918;
+    --card:            #FFFEF9;
+    --muted:           #FAF9F7;
+    --border:          rgba(26,25,24,.08);
+    --ink-secondary:   #4a4946;
+    --ink-tertiary:    #5f5d59;
+    --hair-strong:     rgba(26,25,24,.20);
+    --accent:          #8a5a2b;
+    --flag-bg:         #fff4e0;
+    --flag-border:     #d9a441;
+    --flag-ink:        #6b4a12;
+    --ok-bg:           #e9f3ea;
+    --ok-border:       #5a9a63;
+  }
+  [data-theme="dark"] {
+    --background:      #141310;
+    --foreground:      #FFFEF9;
+    --card:            #26241F;
+    --muted:           #2F2D28;
+    --border:          rgba(255,254,249,.12);
+    --ink-secondary:   #d5d1c9;
+    --ink-tertiary:    #bdb9b1;
+    --hair-strong:     rgba(255,254,249,.24);
+    --accent:          #d3ac74;
+    --flag-bg:         #2e2610;
+    --flag-border:     #8a6a2a;
+    --flag-ink:        #e9c887;
+    --ok-bg:           #16261a;
+    --ok-border:       #3f7a4a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 24px 120px;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-weight: 300;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 8px;
+  }
+  h1.page-title {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+  }
+  p.lede {
+    color: var(--ink-secondary);
+    font-size: 15px;
+    line-height: 1.5;
+    max-width: 74ch;
+    margin: 0 0 28px;
+  }
+  code {
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.92em;
+  }
+  button#toggle {
+    border: 1px solid var(--border);
+    background: var(--muted);
+    color: var(--foreground);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .flag {
+    background: var(--flag-bg);
+    border: 1px solid var(--flag-border);
+    color: var(--flag-ink);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    margin-bottom: 36px;
+  }
+  .flag b { font-weight: 600; }
+  section.block { margin-bottom: 56px; }
+  h2.block-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-tertiary);
+    margin: 0 0 4px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hair-strong);
+  }
+  p.block-note {
+    font-size: 13.5px;
+    color: var(--ink-secondary);
+    margin: 10px 0 20px;
+    max-width: 80ch;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .col {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--card);
+  }
+  .col-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .col-label .name { font-weight: 600; }
+  .col-label .px { color: var(--ink-tertiary); font-variant-numeric: tabular-nums; }
+  .tag {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid;
+  }
+  .tag.current { color: var(--ink-tertiary); border-color: var(--border); }
+  .tag.proposed { color: var(--flag-ink); border-color: var(--flag-border); background: var(--flag-bg); }
+
+  /* ---- mock screen header ---- */
+  .mock { padding: 26px 22px; }
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-tertiary);
+    margin: 0 0 6px;
+  }
+  .heading {
+    font-weight: 500;
+    margin: 0;
+    line-height: 1.1;
+  }
+  .meta {
+    font-size: 13px;
+    color: var(--ink-secondary);
+    margin: 8px 0 0;
+  }
+  .actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .btn {
+    font-size: 12.5px;
+    border: 1px solid var(--border);
+    background: var(--muted);
+    border-radius: 999px;
+    padding: 5px 12px;
+  }
+  .btn.primary { background: var(--accent); color: var(--background); border-color: var(--accent); }
+  .rule { border-bottom: 1px solid var(--hair-strong); margin-top: 18px; padding-bottom: 0; }
+  .body-hint {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--ink-tertiary);
+    font-style: italic;
+  }
+
+  table.cost {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+  table.cost th, table.cost td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.cost th {
+    color: var(--ink-tertiary);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .same { color: var(--ink-tertiary); }
+  .diff { color: var(--foreground); font-weight: 500; }
+
+  footer.settle {
+    margin-top: 60px;
+    border-top: 1px solid var(--hair-strong);
+    padding-top: 22px;
+    font-size: 13.5px;
+    color: var(--ink-secondary);
+    max-width: 90ch;
+  }
+  footer.settle h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-tertiary);
+    margin: 0 0 10px;
+  }
+  footer.settle ul { margin: 0; padding-left: 20px; }
+  footer.settle li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 class="page-title">SHAPE_HEADING_SIZE: what should a title's OWN size be?</h1>
+      <p class="lede">
+        The client's reference PDF names three roles: <code>display-m</code> (56px) =
+        &ldquo;Page title&rdquo;, <code>h1</code> (44px) = &ldquo;Record heading&rdquo;,
+        <code>h2</code> (32px) = &ldquo;Section title&rdquo;. Every screen built through
+        <code>MainScreen</code> / <code>RecordChrome</code> renders its title through
+        <code>SHAPE_HEADING_SIZE</code>, which only ever offers <code>h2</code> or
+        <code>h3</code> &mdash; there is no wired path to 44 or 56 at all, on either door.
+      </p>
+    </div>
+    <button id="toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme==='dark' ? 'light' : 'dark'; document.getElementById('toggle').textContent = document.documentElement.dataset.theme==='dark' ? 'Light mode' : 'Dark mode';">Dark mode</button>
+  </div>
+
+  <div class="flag">
+    <b>Structural catch, not just a number swap:</b> the component both templates
+    render through, <code>Title</code> (<code>shared/ui/components/title/title.tsx</code>),
+    is documented in its own file header as the kit's <b>&ldquo;Section header&rdquo;</b>
+    (chapter 13's Section-header specimen) and its size ladder is <b>only ever defined as
+    h2 / h3 / h4</b> &mdash; there is no h1 or display-m variant on this component to widen
+    into. The kit's OWN 44px &ldquo;page's own name&rdquo; step already exists, on a
+    different component (<code>Headline</code>, in
+    <code>shared/ui/components/typography/typography.tsx</code>), but nothing in
+    <code>MainScreen</code> or <code>RecordChrome</code> wires a page title to it. So the
+    open question is not &ldquo;which value does <code>SHAPE_HEADING_SIZE</code> return&rdquo;
+    &mdash; it's whether a page/record title should keep running through the
+    <b>section-header</b> primitive at all, capped at 32, or move to the
+    <b>page-name</b> primitive the kit already drew for this and left unplumbed.
+  </div>
+
+  <!-- ===================== SYSTEM APP / MainScreen ===================== -->
+  <section class="block">
+    <h2 class="block-title">System app &middot; MainScreen page title &middot; density &ldquo;comfortable&rdquo;</h2>
+    <p class="block-note">
+      <code>shared/ui/compositions/templates/main-screen.tsx:479-488</code>. Same eyebrow,
+      same meta line, same action buttons in every column &mdash; only the title's own size
+      changes.
+    </p>
+    <div class="row">
+      <div class="col">
+        <div class="col-label"><span class="name">Current</span><span class="tag current">SHAPE_HEADING_SIZE.comfortable = h2</span><span class="px">32px</span></div>
+        <div class="mock">
+          <p class="eyebrow">Active &middot; 214 records</p>
+          <h3 class="heading" style="font-size:32px; letter-spacing:-0.02em; line-height:1.18;">Renovation projects</h3>
+          <p class="meta">Everything the crew is billing against this quarter</p>
+          <div class="actions-row"><span class="btn">Filter</span><span class="btn">Export</span><span class="btn primary">New project</span></div>
+          <div class="rule"></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-label"><span class="name">Option A</span><span class="tag proposed">&rarr; h1</span><span class="px">44px</span></div>
+        <div class="mock">
+          <p class="eyebrow">Active &middot; 214 records</p>
+          <h3 class="heading" style="font-size:44px; letter-spacing:-0.025em; line-height:1.08;">Renovation projects</h3>
+          <p class="meta">Everything the crew is billing against this quarter</p>
+          <div class="actions-row"><span class="btn">Filter</span><span class="btn">Export</span><span class="btn primary">New project</span></div>
+          <div class="rule"></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-label"><span class="name">Option B</span><span class="tag proposed">&rarr; display-m</span><span class="px">56px</span></div>
+        <div class="mock">
+          <p class="eyebrow">Active &middot; 214 records</p>
+          <h3 class="heading" style="font-size:56px; letter-spacing:-0.025em; line-height:1.06;">Renovation projects</h3>
+          <p class="meta">Everything the crew is billing against this quarter</p>
+          <div class="actions-row"><span class="btn">Filter</span><span class="btn">Export</span><span class="btn primary">New project</span></div>
+          <div class="rule"></div>
+        </div>
+      </div>
+    </div>
+    <table class="cost">
+      <tr><th>Row</th><th>Current (h2/32)</th><th>Option A (h1/44)</th><th>Option B (display-m/56)</th></tr>
+      <tr><td>Reference PDF role</td><td class="diff">&ldquo;Section title&rdquo; &mdash; wrong role for a page title</td><td class="same">&ldquo;Record heading&rdquo;</td><td class="diff">&ldquo;Page title&rdquo; &mdash; exact match for MainScreen's role</td></tr>
+      <tr><td>Header band height</td><td class="same">baseline</td><td class="diff">+~16-18px</td><td class="diff">+~28-30px</td></tr>
+      <tr><td>Long titles (2 lines)</td><td class="same">wraps cleanly under eyebrow/meta</td><td class="diff">wraps, needs a check against narrow sidebars/rail-open layouts</td><td class="diff">wraps, more prone to crowding the eyebrow above it at &lt;480px</td></tr>
+      <tr><td>Component ladder</td><td class="same">native to <code>Title</code></td><td class="diff">not on <code>Title</code>'s ladder &mdash; needs a new variant, or swap to <code>Headline</code></td><td class="diff">not on <code>Title</code>'s ladder &mdash; needs a new variant, or swap to <code>Headline</code></td></tr>
+    </table>
+  </section>
+
+  <!-- ===================== SYSTEM APP / RecordChrome ===================== -->
+  <section class="block">
+    <h2 class="block-title">System app &middot; RecordChrome record heading &middot; density &ldquo;comfortable&rdquo;</h2>
+    <p class="block-note">
+      <code>shared/ui/compositions/templates/record-chrome.tsx:489</code> &rarr;
+      <code>RecordDetail</code> (<code>shared/ui/components/record-detail/record-detail.tsx:291,724-732</code>),
+      whose own <code>titleSize</code> prop is typed <code>&quot;h2&quot; | &quot;h3&quot; | &quot;h4&quot;</code>
+      &mdash; &ldquo;Title's own ladder &mdash; 32 / 24 / 20&rdquo;, verbatim from that file's comment.
+      Actions (Edit) sit in the title's own row per the client's own request &mdash;
+      that alignment holds at every size shown here.
+    </p>
+    <div class="row">
+      <div class="col">
+        <div class="col-label"><span class="name">Current</span><span class="tag current">h2</span><span class="px">32px</span></div>
+        <div class="mock">
+          <h3 class="heading" style="font-size:32px; letter-spacing:-0.02em; line-height:1.18;">Marchetti kitchen remodel</h3>
+          <p class="meta">Stage: In progress &middot; Updated 2 hours ago</p>
+          <div class="actions-row"><span class="btn">Edit</span><span class="btn">Archive</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-label"><span class="name">Option A</span><span class="tag proposed">&rarr; h1</span><span class="px">44px</span></div>
+        <div class="mock">
+          <h3 class="heading" style="font-size:44px; letter-spacing:-0.025em; line-height:1.08;">Marchetti kitchen remodel</h3>
+          <p class="meta">Stage: In progress &middot; Updated 2 hours ago</p>
+          <div class="actions-row"><span class="btn">Edit</span><span class="btn">Archive</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-label"><span class="name">Option B</span><span class="tag proposed">&rarr; display-m</span><span class="px">56px</span></div>
+        <div class="mock">
+          <h3 class="heading" style="font-size:56px; letter-spacing:-0.025em; line-height:1.06;">Marchetti kitchen remodel</h3>
+          <p class="meta">Stage: In progress &middot; Updated 2 hours ago</p>
+          <div class="actions-row"><span class="btn">Edit</span><span class="btn">Archive</span></div>
+        </div>
+      </div>
+    </div>
+    <table class="cost">
+      <tr><th>Row</th><th>Current (h2/32)</th><th>Option A (h1/44)</th><th>Option B (display-m/56)</th></tr>
+      <tr><td>Reference PDF role</td><td class="diff">&ldquo;Section title&rdquo; &mdash; wrong role for a record heading</td><td class="diff">&ldquo;Record heading&rdquo; &mdash; exact match</td><td class="same">&ldquo;Page title&rdquo; &mdash; one role too big for a record</td></tr>
+      <tr><td>Stage stepper below</td><td class="same">tight vertical rhythm</td><td class="diff">needs ~14px more gap above the stepper to avoid crowding</td><td class="diff">needs ~24px more gap; on narrow viewports the stepper may need to drop a row</td></tr>
+    </table>
+  </section>
+
+  <!-- ===================== CLIENT PORTAL ===================== -->
+  <section class="block">
+    <h2 class="block-title">Client portal &middot; page title &middot; density &ldquo;calm&rdquo;</h2>
+    <p class="block-note">
+      Same <code>MainScreen</code>/<code>RecordChrome</code> templates, portal's own
+      centered 60rem column (<code>SHAPE_SHELL.calm</code>). Currently pinned to h3 (24px)
+      &mdash; one step BELOW even the system app's capped 32px.
+    </p>
+    <div class="row">
+      <div class="col">
+        <div class="col-label"><span class="name">Current</span><span class="tag current">SHAPE_HEADING_SIZE.calm = h3</span><span class="px">24px</span></div>
+        <div class="mock" style="max-width:420px; margin:0 auto;">
+          <h3 class="heading" style="font-size:24px; letter-spacing:-0.014em; line-height:1.25;">Your open requests</h3>
+          <p class="meta">3 waiting on you, 1 waiting on us</p>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-label"><span class="name">Option A</span><span class="tag proposed">&rarr; h2</span><span class="px">32px</span></div>
+        <div class="mock" style="max-width:420px; margin:0 auto;">
+          <h3 class="heading" style="font-size:32px; letter-spacing:-0.02em; line-height:1.18;">Your open requests</h3>
+          <p class="meta">3 waiting on you, 1 waiting on us</p>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-label"><span class="name">Option B</span><span class="tag proposed">&rarr; h1</span><span class="px">44px</span></div>
+        <div class="mock" style="max-width:420px; margin:0 auto;">
+          <h3 class="heading" style="font-size:44px; letter-spacing:-0.025em; line-height:1.08;">Your open requests</h3>
+          <p class="meta">3 waiting on you, 1 waiting on us</p>
+        </div>
+      </div>
+    </div>
+    <table class="cost">
+      <tr><th>Row</th><th>Current (h3/24)</th><th>Option A (h2/32)</th><th>Option B (h1/44)</th></tr>
+      <tr><td>vs. system app's own title</td><td class="diff">smaller than the system app it mirrors &mdash; likely part of the client's complaint</td><td class="same">matches the system app's current (also-too-small) title</td><td class="diff">bigger than the system app's title unless the system app also moves to h1</td></tr>
+      <tr><td>60rem centered column</td><td class="same">baseline</td><td class="diff">comfortable, no wrap risk on typical titles</td><td class="diff">comfortable on desktop; check the narrowest calm breakpoint for 2-3 word titles</td></tr>
+    </table>
+  </section>
+
+  <footer class="settle">
+    <h3>What this page does not settle</h3>
+    <ul>
+      <li>Whether the fix is data-only (widen <code>SHAPE_HEADING_SIZE</code>'s
+        <code>Record&lt;ScreenDensity, ...&gt;</code> return type) or structural (retire
+        <code>Title</code> from the page/record-title role entirely and wire
+        <code>MainScreen</code>/<code>RecordChrome</code> to <code>Headline</code> instead,
+        leaving <code>Title</code> for actual in-page section headers, which is what its
+        own file header says it is).</li>
+      <li>Whether <code>comfortable</code> (system app) should land on h1 or display-m &mdash;
+        the reference calls display-m &ldquo;Page title&rdquo; and h1 &ldquo;Record
+        heading,&rdquo; which argues for MainScreen at display-m and RecordChrome at h1
+        rather than one shared step for both.</li>
+      <li>Whether <code>calm</code> (portal) should match <code>comfortable</code>'s new
+        step exactly, or keep one step below it the way it does today (h3 vs h2) &mdash;
+        the portal's narrower 60rem column has more headroom per line than the full-width
+        system app does.</li>
+      <li>This is vendored, hash-checked code (<code>shared/ui/</code>, Law R45/R46 in this
+        repo's <code>CLAUDE.md</code>, hash pinned in <code>shared/ui/VERSION.json</code> at
+        tag v1.2.13 of <code>Kwapso/kwapso-ui-ux</code>). Nothing here should be hand-patched
+        in this repo &mdash; the fix belongs upstream, and Alaap owns that swap per the
+        design-kit pipeline.</li>
+    </ul>
+  </footer>
+</div>
+</body>
+</html>

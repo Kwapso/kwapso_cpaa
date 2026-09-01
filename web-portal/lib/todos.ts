@@ -6,7 +6,7 @@
 //
 // TWO PAGED LISTS, NOT ONE LIST WITH A FILTER. That distinction is the whole
 // reason this file exists rather than a `.filter()` in a component, and it is
-// the shape "Waiting on you" shipped with: it fetched the to-do list and kept
+// the shape "Awaiting your input" shipped with: it fetched the to-do list and kept
 // the rows with no `completedAt`. That was honest while the door answered with
 // every row it had; the moment the door PAGES (R14) it is a filter over page
 // one, quietly answering "nothing" about everything past the cursor.

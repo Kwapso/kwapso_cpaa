@@ -20,6 +20,7 @@ import {
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
+import { resolveOrdering } from "@shared/workers/sorting"
 import {
   countWorkLogs,
   editWorkLog,
@@ -32,6 +33,7 @@ import {
   startTimer,
   stopTimer,
   summariseWorkLogs,
+  WORK_LOG_SORTS,
   type LogFilter,
 } from "../lib/work-logs"
 import { progressFlip, ticketBehind } from "../lib/ready-flip"
@@ -42,6 +44,7 @@ import type { Env } from "../env"
  * be asked different questions (R16) and the machine surface has one thing to
  * mirror (R19). */
 function logFilterFrom(url: URL): LogFilter {
+  const period = queryText(url.searchParams.get("period"), "When")
   return {
     scope: queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all",
     targetTable: queryText(url.searchParams.get("targetTable"), "Target"),
@@ -56,6 +59,12 @@ function logFilterFrom(url: URL): LogFilter {
         : queryText(url.searchParams.get("meetingTime"), "Meeting time") === "only"
           ? "only"
           : undefined,
+    // THE SEARCH BOX — who logged it, or what it was against (R14: the door
+    // answers, never the loaded page).
+    q: queryText(url.searchParams.get("q"), "Search"),
+    // A CLOSED WINDOW ON WHEN — three words the door knows, anything else means
+    // all time. Never a free-form pair of dates: see lib/work-logs's own note.
+    period: period === "7d" || period === "30d" || period === "90d" ? period : undefined,
   }
 }
 
@@ -65,21 +74,34 @@ async function logPage(
   cfg: Parameters<typeof listWorkLogs>[0],
   guard: Parameters<typeof listWorkLogs>[1],
   filter: LogFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering?: Parameters<typeof listWorkLogs>[4]
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
-    listWorkLogs(cfg, guard, filter, cursor),
+    listWorkLogs(cfg, guard, filter, cursor, ordering),
     countWorkLogs(cfg, guard, filter),
   ])
   return pagedJson("logs", { ...page, total: counts.total }, { totalSeconds: counts.totalSeconds })
 }
 
-/** GET /api/content/work-logs — time, newest first. */
+/** GET /api/content/work-logs — time, newest first (or by whatever `sort` asks). */
 export async function getWorkLogs(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
-  return logPage(cfg, guard, logFilterFrom(url), queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+  const ordering = resolveOrdering(
+    WORK_LOG_SORTS,
+    "started",
+    queryText(url.searchParams.get("sort"), "Sort"),
+    queryText(url.searchParams.get("dir"), "Direction")
+  )
+  return logPage(
+    cfg,
+    guard,
+    logFilterFrom(url),
+    queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+    ordering
+  )
 }
 
 /** GET /api/content/work-logs/summary — THE NUMBERS ON TOP OF A LIST OF TIME.
