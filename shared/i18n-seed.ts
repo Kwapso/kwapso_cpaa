@@ -3241,4 +3241,28 @@ export const SEED: Catalogue = {
     ca: "La importació no ha acabat",
   },
   "Back to the plan": { de: "Zurück zum Plan", es: "Volver al plan", ca: "Torna al pla" },
+
+  /* ── THE SOURCE CHIPS (1 Sep 2026) ───────────────────────────────────────
+   *
+   * Hand-written here rather than left to the generator, for the reason this
+   * file exists: two of the four are words a machine would translate and must
+   * not. "Google Drive" is a PRODUCT and its translation is itself — the bare
+   * word "Drive" is already in the generated catalogue as a disk drive
+   * ("Laufwerk", "Unidad"), which is exactly the collision the chip label
+   * avoids by naming the service. "App records" is the app's own rows, not
+   * "records" in the sense of a recording. And nothing was spent to put them
+   * here: a string with a seed entry is never sent to the model at all. */
+  "Google Drive": { de: "Google Drive", es: "Google Drive", ca: "Google Drive" },
+  "App records": { de: "App-Einträge", es: "Registros de la app", ca: "Registres de l'app" },
+  "Knowledge articles": {
+    de: "Wissensartikel",
+    es: "Artículos de conocimiento",
+    ca: "Articles de coneixement",
+  },
+  /* The group's accessible name — read aloud, never drawn. */
+  "Which sources the assistant reads": {
+    de: "Welche Quellen der Assistent liest",
+    es: "Qué fuentes lee el asistente",
+    ca: "Quines fonts llegeix l'assistent",
+  },
 }

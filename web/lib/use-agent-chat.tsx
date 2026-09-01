@@ -32,6 +32,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, ModelFailure, PendingCall } from "@shared/types"
 import { evidenceFromSaved, mergeEvidence, type TurnEvidence } from "@shared/agent-cites"
+import { SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
 import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { clearPendingQuestion, usePendingQuestion } from "@/lib/agent-open"
@@ -136,6 +137,25 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // CSV files staged for the NEXT message (the chat import): picked or dropped,
   // sent with the message, planned server-side, run via the normal confirm panel.
   const [attached, setAttached] = React.useState<{ name: string; csv: string }[]>([])
+  // WHICH DOORS THIS CONVERSATION READS FROM — the source chips.
+  //
+  // ALL ON is the state a person who has never touched them is in, and the wire
+  // carries the TICKED set rather than the unticked one, so "all on" and "never
+  // touched" are the same message. Held for the whole conversation rather than
+  // per message: a person narrows to find out where an answer came from, and a
+  // scope that reset after one question would answer the next one from
+  // everywhere again without saying so.
+  const [sources, setSources] = React.useState<string[]>(() => [...SOURCE_CHIP_KEYS])
+  const toggleSource = React.useCallback((key: string) => {
+    setSources((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+      // NEVER EMPTY. An empty list reads as "all of them" everywhere behind this
+      // (see `kindsForChips`), so unticking the last chip would silently WIDEN
+      // the search — the opposite of what the person just pressed. The last one
+      // on stays on, and the control simply does not move.
+      return next.length ? next : prev
+    })
+  }, [])
   const [busy, setBusy] = React.useState(false)
   const [quota, setQuota] = React.useState<AgentQuota | null>(null)
   // A paused turn awaiting the user's go-ahead — the proposed actions + the text.
@@ -469,7 +489,14 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     setFailure(null)
     setAttached([])
     try {
-      await consume((onEvent) => dataOps.agentChatStream({ message: text, threadId, files }, onEvent), assistantId)
+      // The ticked set rides every turn. Sent only when it is a real narrowing:
+      // all-on is the same request the panel made before the chips existed.
+      const narrowed = sources.length < SOURCE_CHIP_KEYS.length ? sources : undefined
+      await consume(
+        (onEvent) =>
+          dataOps.agentChatStream({ message: text, threadId, files, sources: narrowed }, onEvent),
+        assistantId
+      )
     } catch (err) {
       // The person sees the failure in the bubble; the error store must see it
       // too — a chat drop was the one user-facing crash that left no row
@@ -603,6 +630,8 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     usageSummary,
     addAttachments,
     removeAttachment,
+    sources,
+    toggleSource,
     send,
     resolve,
     newChat,

@@ -2049,8 +2049,14 @@ async function nameArm(
   cfg: D1Rest,
   guard: MemberGuard,
   terms: string[],
-  compartments: string[]
+  compartments: string[],
+  /** The chips, if the caller narrowed. A colleague is one of the app's own
+   * records, so a conversation that unticked "App records" has said it does not
+   * want them — and an arm that ignored that would be the one door a chip could
+   * not close. */
+  kinds: string[] | null
 ): Promise<CandidateRow[]> {
+  if (kinds && !kinds.includes("person")) return []
   const wanted = terms.filter((t) => t.length >= NAME_MIN_CHARS)
   if (!wanted.length) return []
   const owner = ownerClause(guard)
@@ -2278,6 +2284,18 @@ export async function retrieve(
   input: {
     question: string
     accountId?: string | null
+    /** WHICH DOORS THIS CONVERSATION IS USING — the source chips, already
+     * resolved from chip keys to kinds by `kindsForChips`. Null means every
+     * kind, which is what a caller who has never touched the chips sends.
+     *
+     * IT NARROWS IN BOTH PLACES, and that is R26's shape rather than a belt and
+     * braces: the vector index is told to look only at those kinds (a label it
+     * already carries), and the passage read — the one place THE DATABASE
+     * DECIDES — carries the same clause. Narrowing only the index would let the
+     * word arm and the name arm return a kind the caller unticked; narrowing
+     * only the read would spend the index's whole budget on kinds it is going to
+     * throw away. */
+    kinds?: string[] | null
     limit?: number
     /** WRITE THE ANSWER OUT. Absent means the caller wants the evidence only, which
      * is what every caller wanted until the Knowledge tab started answering in
@@ -2305,6 +2323,7 @@ export async function retrieve(
       ? await searchVectors(env, guard, asked, {
           level: "chunk",
           ...compartmentFilter(route.compartments),
+          ...(input.kinds?.length ? { kind: { $in: input.kinds } } : {}),
         })
       : []
   // NOT EVERY NEAREST NEIGHBOUR IS EVIDENCE. There is always a closest thing;
@@ -2367,7 +2386,7 @@ export async function retrieve(
   // costs one bounded read on a question about parental leave and speaks only on
   // a question about a person — which is also why it may speak when the vector
   // arm found nothing, the case that refused the owner outright.
-  const named = await nameArm(cfg, guard, terms, route.compartments)
+  const named = await nameArm(cfg, guard, terms, route.compartments, input.kinds ?? null)
 
   const fused = fuse(vector, lexical, named)
 
@@ -2391,6 +2410,14 @@ export async function retrieve(
   // The chunk's copy is a denormalisation for the word-match's single-table read,
   // never the authority (see readerClause).
   const reader = readerClause(guard, "s.")
+  // THE CHIPS, AS SQL — built ONCE and used at every read that can hand a
+  // passage back. There are three (the pool read, the router's fallback and the
+  // neighbour widening), and the fallback's own comment already says the rule:
+  // "a second way in may not be a wider one". Building the clause here rather
+  // than at each read is what makes a fourth way in honest by construction.
+  const chipClause = input.kinds?.length
+    ? ` AND s.kind IN (${input.kinds.map((k) => sqlString(k)).join(", ")})`
+    : ""
   const rows = await d1Query<ScoredRow>(
     cfg,
     guard.databaseId,
@@ -2402,7 +2429,7 @@ export async function retrieve(
             s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
-        AND s.deactivated_at IS NULL AND ${reader.sql}
+        AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}
       LIMIT ${RANKING_POOL}`,
     reader.params
   )
@@ -2456,7 +2483,7 @@ export async function retrieve(
               s.origin_table, s.origin_row_id, s.record_date
          FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
         WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
-          AND s.deactivated_at IS NULL AND ${reader.sql}
+          AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}
         ORDER BY c.seq LIMIT ${RANKING_POOL}`,
       reader.params
     )
@@ -2814,6 +2841,12 @@ async function widenNeighbours(
     guard.databaseId,
     // R14 hard cap: at most the shortfall itself, and the WHERE names a bounded
     // set of (source, seq) pairs built from the passages already chosen.
+    //
+    // NO CHIP CLAUSE HERE, and that is not an omission: a neighbour is another
+    // chunk of a passage that ALREADY survived the narrowed read, so it is the
+    // same source and therefore the same kind by construction. Adding the clause
+    // would be a filter that can never remove a row, which reads to the next
+    // person as though it could.
     `SELECT c.id, c.source_id, c.seq, c.text, s.title, s.kind, s.source_url, s.compartment,
             s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id

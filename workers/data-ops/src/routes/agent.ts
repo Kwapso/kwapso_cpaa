@@ -24,6 +24,7 @@ import { isLanguage, LANGUAGES } from "@shared/i18n"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { ModelError } from "@shared/workers/model-failure"
 import { fail, json } from "@shared/workers/http"
+import { SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { GuardError, adminGuard, requireRight, teamContext } from "@shared/workers/gating"
@@ -193,6 +194,7 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
     threadId?: unknown
     message?: unknown
     files?: unknown
+    sources?: unknown
   }
   const message = requireText(body.message, "Message", TEXT_LIMITS.message)
   const threadId = optionalText(body.threadId, "Thread", 64)
@@ -215,7 +217,22 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
   // The caller's own language rides on the session `teamContext` already
   // resolved, so the assistant answers in the language the person reads the
   // rest of the app in without a second lookup or a client-supplied claim.
-  const opts = { threadId, message, source: callerSurface(user), files, language: user.language }
+  // WHICH DOORS THIS CONVERSATION MAY READ FROM — the source chips.
+  //
+  // IT IS ENFORCED, NOT SUGGESTED, and that is the whole design. The MODEL
+  // decides when to call `ask_knowledge`; a chip that only appeared in the prompt
+  // would be a request the model could forget, and a person who unticked "Mail"
+  // and then read an answer out of their mail would be right to stop trusting the
+  // control. So it rides the turn and the executor puts it ON the call.
+  //
+  // Checked where it sits (R20): each value must be one of the declared chip
+  // keys, an allow-list `.includes` being the checking position. An empty or
+  // absent list means every door, which is what a caller who has never touched
+  // the chips sends — see `kindsForChips`.
+  const sources = Array.isArray(body.sources)
+    ? body.sources.filter((k): k is string => typeof k === "string" && SOURCE_CHIP_KEYS.includes(k))
+    : undefined
+  const opts = { threadId, message, source: callerSurface(user), files, sources, language: user.language }
   if (wantsStream(request))
     return streamRun(env, (emit) => runChat(env, request, cfg, guard, actor, opts, emit))
   return json(await runChat(env, request, cfg, guard, actor, opts))

@@ -19,6 +19,7 @@ import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { consumeAiUnit, logUsage, refundAiUnits, type UsageSource } from "@shared/workers/credits"
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { resolveOrdering } from "@shared/workers/sorting"
+import { kindsForChips, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
@@ -192,10 +193,21 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // Checked where it sits (R20): the door reads exactly one spelling of yes, so
   // there is no truthiness anywhere on this path.
   const write = queryText(url.searchParams.get("compose"), "Compose") === "1"
+  // WHICH DOORS THIS CONVERSATION IS USING — the source chips, as a comma list of
+  // chip keys. Every value is checked against the declared set at the boundary
+  // (R20): an allow-list `.includes` is the checking position, so an invented key
+  // contributes nothing rather than reaching a WHERE clause. Absent or empty
+  // means every kind, which is what a caller who has never touched the chips
+  // sends — see `kindsForChips` for why that reading is the only safe one.
+  const chips = (queryText(url.searchParams.get("sources"), "Sources") ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => SOURCE_CHIP_KEYS.includes(k))
   return json(
     await retrieve(env, cfg, guard, {
       question,
       accountId: queryText(url.searchParams.get("accountId"), "Account") ?? null,
+      kinds: kindsForChips(chips),
       limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
       // The writer is only ever REACHED once there is something to write about —
       // `retrieve` calls it after `found` is settled — and it gates and meters

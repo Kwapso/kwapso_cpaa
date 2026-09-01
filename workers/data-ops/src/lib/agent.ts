@@ -812,7 +812,36 @@ type StepCtx = {
   /** what this turn may still hand the model in tool-result text. Per-TURN, like
    * `repeats`, so it is made outside the loop and the step context carries it. */
   budget: ReturnType<typeof readBudget>
+  /** THE SOURCE CHIPS this conversation is using — see `injectSources`. */
+  sources?: string[]
   emit?: Emit
+}
+
+/** THE CHIPS, PUT ON THE CALL — the one place a person's choice of doors becomes
+ * a fact the model cannot talk its way past.
+ *
+ * The chips narrow WHICH DOORS one conversation reads from, and the model is
+ * what decides when to open the retrieval door at all. Two ways to join those
+ * up, and only one of them is a control: describe the chips in the prompt and
+ * hope, or put them on the call. A person who unticks "Mail" and then reads an
+ * answer out of their mail is right to stop trusting the control, and there is
+ * no recovering that — so the scope OVERWRITES whatever the model sent, rather
+ * than filling in a gap it left.
+ *
+ * ONE TOOL, deliberately: `ask_knowledge` is the only door the chips are ABOUT.
+ * A chip does not narrow `query_records` — that is a question about the app's
+ * live rows, with its own permission at its own door, and silently shrinking it
+ * would make a count wrong rather than a search narrower.
+ *
+ * Absent or empty means every door, so a conversation nobody has touched the
+ * chips on is byte for byte the call it was before this existed. */
+function injectSources(
+  name: string,
+  input: Record<string, unknown>,
+  sources: string[] | undefined
+): Record<string, unknown> {
+  if (name !== "ask_knowledge" || !sources?.length) return input
+  return { ...input, sources }
 }
 
 /** RUN ONE TOOL CALL — the single step seam, shared by the plan loop and confirmAndRun.
@@ -874,7 +903,7 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   }
   emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
   const result: ToolResult = t
-    ? await executeTool(ctx.env, ctx.request, t, tc.input)
+    ? await executeTool(ctx.env, ctx.request, t, injectSources(tc.name, tc.input, ctx.sources))
     : { ok: false, status: 404, data: null, error: `Unknown tool "${tc.name}".` }
   // A failed step carries the door's short reason (e.g. which permission was missing) —
   // shown on the red step row, live AND when the chat is reopened.
@@ -1014,6 +1043,11 @@ export async function runChat(
     message: string
     source: string
     files?: { name: string; csv: string }[]
+    /** THE SOURCE CHIPS this conversation is using — chip keys, already checked
+     * against the declared set at the door. Undefined or empty means every door.
+     * See `injectSources` for why it is forced onto the call rather than
+     * described to the model. */
+    sources?: string[]
     /** The caller's own language, off their session. Undefined reads as English. */
     language?: string | null
   },
@@ -1051,7 +1085,7 @@ export async function runChat(
     threadId,
     convo,
     quota,
-    { source: opts.source, summary: usageSummary(opts.message), tally },
+    { source: opts.source, summary: usageSummary(opts.message), tally, sources: opts.sources },
     {},
     emit
   )
@@ -1072,7 +1106,7 @@ async function runPlanLoop(
   threadId: string,
   convo: ChatMessage[],
   quota: AgentQuota,
-  opts: { source: string; summary: string; tally: UsageTally },
+  opts: { source: string; summary: string; tally: UsageTally; sources?: string[] },
   loopOpts: { prepaid?: boolean; fold?: boolean } = {},
   emit?: Emit
 ): Promise<ChatOutcome> {
@@ -1321,7 +1355,7 @@ async function runPlanLoop(
       emit && reply.toolCalls.some((tc) => hasNameableId(tc.input))
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
-    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, emit }
+    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, sources: opts.sources, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
       const { message, ok } = await runToolCall(stepCtx, tc)

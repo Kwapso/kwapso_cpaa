@@ -49,6 +49,7 @@ import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import { KNOWLEDGE_KINDS } from "../src/lib/knowledge"
+import { SOURCE_CHIPS } from "@shared/knowledge-chips"
 import { stripComments } from "@shared/rules/source-scan"
 import { PORTAL_VISIBLE_READS } from "@shared/rules/registry"
 import type { KnowledgeAnswer } from "@shared/types"
@@ -112,8 +113,10 @@ async function sweepUntilCaughtUp(max = 40): Promise<number> {
   throw new Error(`the sweep never caught up in ${max} ticks`)
 }
 
-async function ask(question: string, accountId?: string): Promise<KnowledgeAnswer> {
-  const query = `?q=${encodeURIComponent(question)}${accountId ? `&accountId=${accountId}` : ""}&limit=12`
+async function ask(question: string, accountId?: string, sources?: string[]): Promise<KnowledgeAnswer> {
+  const query = `?q=${encodeURIComponent(question)}${accountId ? `&accountId=${accountId}` : ""}${
+    sources?.length ? `&sources=${encodeURIComponent(sources.join(","))}` : ""
+  }&limit=12`
   const res = await call(IDS.staffUser, "GET /api/content/knowledge/ask", undefined, query)
   expect(res.status).toBe(200)
   return (await res.json()) as KnowledgeAnswer
@@ -291,6 +294,34 @@ describe("every row that carries a client id becomes material, in that client's 
     }
   })
 
+  // THE CHIPS AND THE KINDS CANNOT DRIFT APART. `shared/knowledge-chips.ts` groups
+  // the kinds into the six doors a person ticks, and it holds STRINGS rather than
+  // an import of KNOWLEDGE_KINDS, because `shared/` may not depend on a worker.
+  // So this is what holds the two together — and it fails BOTH ways, because both
+  // are real: a kind in no chip is material the screen can never reach, and a
+  // kind in two chips is two switches that disagree about the same passages.
+  it("every kind the sweep writes sits in exactly one source chip", () => {
+    const seen = new Map<string, string[]>()
+    for (const chip of SOURCE_CHIPS)
+      for (const kind of chip.kinds) seen.set(kind, [...(seen.get(kind) ?? []), chip.key])
+    for (const kind of KNOWLEDGE_KINDS) {
+      const chips = seen.get(kind) ?? []
+      expect(
+        chips.length,
+        chips.length === 0
+          ? `the kind "${kind}" is in no source chip — nothing a person can tick reaches it`
+          : `the kind "${kind}" is in ${chips.length} chips (${chips.join(", ")}) — two switches, same passages`
+      ).toBe(1)
+    }
+    // …and nothing invented: a chip naming a kind the sweep does not write is a
+    // switch over an empty set, which reads to a person as "we have none of that".
+    for (const [kind, chips] of seen)
+      expect(
+        (KNOWLEDGE_KINDS as readonly string[]).includes(kind),
+        `chip "${chips[0]}" names "${kind}", which is not a kind this base writes`
+      ).toBe(true)
+  })
+
   it("every kind has a word a person can read in the filter", () => {
     // The list's Kind facet is built from `KNOWLEDGE_KIND` in
     // web/components/deep-link/shape.tsx, and a kind missing from it falls
@@ -432,6 +463,53 @@ describe("the two questions he actually asked", () => {
     // MORE THAN ONE KIND OF RECORD. The old base could only ever cite the account
     // card, because it was the only thing about a client that carried its name.
     expect(new Set(answer.citations.map((c) => c.kind)).size).toBeGreaterThan(1)
+  })
+
+  // ── THE SOURCE CHIPS NARROW THE DOOR, NOT THE SCREEN ──────────────────────
+  //
+  // A chip that ticks and unticks is trivial; a chip whose scope reaches the
+  // RETRIEVAL DOOR is the feature. So this asks the same question twice and
+  // compares the ANSWERS, rather than asserting that a parameter was accepted.
+  //
+  // It narrows in both places R26 names — the vector index is told which kinds to
+  // look at, and the passage read, where the database decides, carries the same
+  // clause. A test that only proved one of them would pass with the other
+  // deleted, and the deleted one is the fence.
+  it("naming a chip narrows what comes back, and naming none is unchanged", async () => {
+    const all = await ask("What do we do for Bergman S.A.?")
+    expect(all.found).toBe(true)
+    const kindsAll = new Set(all.citations.map((c) => c.kind))
+    expect(kindsAll.size, "the unnarrowed answer draws on more than one kind").toBeGreaterThan(1)
+
+    // ONE DOOR: the app's own records. Everything that comes back must be a kind
+    // that chip covers — the narrowing is real, not decorative.
+    const recordKinds = new Set(
+      SOURCE_CHIPS.find((c) => c.key === "records")?.kinds ?? []
+    )
+    const narrowed = await ask("What do we do for Bergman S.A.?", undefined, ["records"])
+    for (const c of narrowed.citations)
+      expect(
+        recordKinds.has(c.kind),
+        `"${c.title}" is a ${c.kind}, which the "records" chip does not cover`
+      ).toBe(true)
+
+    // AND A DOOR WITH NOTHING BEHIND IT ANSWERS NOTHING, rather than quietly
+    // widening back to everything. This is the assertion that fails if the
+    // narrowing is dropped anywhere on the path.
+    const mailOnly = await ask("What do we do for Bergman S.A.?", undefined, ["mail"])
+    expect(
+      mailOnly.citations.every((c) => c.kind === "email"),
+      `narrowing to mail returned ${mailOnly.citations.map((c) => c.kind).join(", ")}`
+    ).toBe(true)
+  })
+
+  it("an invented chip key is ignored, and reads as no narrowing at all", async () => {
+    // R20 at the boundary: the door checks each value against the declared set
+    // where it sits, so a key nobody declared contributes nothing — and "nothing
+    // named" is every door, never none. The alternative reading would let a typo
+    // silently turn the knowledge base off.
+    const answer = await ask("What do we do for Bergman S.A.?", undefined, ["not-a-chip"])
+    expect(answer.found, "a typo must not switch the knowledge base off").toBe(true)
   })
 
   it("'how does Bergman approve a supplier invoice?' finds the map, not the business card", async () => {
