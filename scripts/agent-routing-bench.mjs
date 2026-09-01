@@ -341,12 +341,31 @@ const CF_RATES = {
   "@cf/ibm-granite/granite-4.0-h-micro": [0.017, 0.112],
   "@cf/meta/llama-4-scout-17b-16e-instruct": [0.27, 0.85],
 }
+// A COST LINE THAT IS WRONG IS WORSE THAN NONE, because it is quoted — this
+// file's own header says so about the run that reported a 12-cent bench as
+// $2.40. It then did the same thing in the other direction: with no rate on
+// file it printed "cost not computed" AND a dollar figure, computed at CLAUDE's
+// per-token prices, for a Cloudflare model. Two runs of kimi-k2.6 printed $1.92
+// each; the account's own meter says $0.18 for BOTH. So the fallback is gone.
+//
+// AND THE TOKEN COUNTS STAY, because they are the model's own numbers and they
+// are true whatever anything costs. What replaces the guess is the instruction
+// to go and read the meter, which is the only ground truth here: Cloudflare
+// bills NEURONS, a model's metered neurons can be many times its price sheet
+// (24× on deepseek-v4-pro, measured), and no per-token table can predict that.
 const rate = CF_RATES[runModel] ?? null
-if (!rate) console.log(`(no published rate on file for ${runModel} — cost not computed)`)
-const usd = rate
-  ? (spend.input * rate[0] + spend.output * rate[1]) / 1_000_000
-  : (spend.input * 3 + spend.cacheWrite * 3.75 + spend.cacheRead * 0.3 + spend.output * 15) / 1_000_000
 console.log()
 console.log(
-  `spent  $${usd.toFixed(3)}   in ${spend.input.toLocaleString()}  cache w ${spend.cacheWrite.toLocaleString()} r ${spend.cacheRead.toLocaleString()}  out ${spend.output.toLocaleString()}`
+  `tokens  in ${spend.input.toLocaleString()}  cache w ${spend.cacheWrite.toLocaleString()} r ${spend.cacheRead.toLocaleString()}  out ${spend.output.toLocaleString()}`
+)
+if (rate)
+  console.log(
+    `at the published rate: $${((spend.input * rate[0] + spend.output * rate[1]) / 1_000_000).toFixed(3)} — ` +
+      `an ESTIMATE. Cloudflare bills neurons, so read the meter for what it cost.`
+  )
+else console.log(`no published rate on file for ${runModel} — read the meter.`)
+console.log(
+  "THE METER, which is the only ground truth: the account's own GraphQL,\n" +
+    "  aiInferenceAdaptiveGroups { sum { totalNeurons } dimensions { modelId } }\n" +
+    "  filtered to the window this run covers."
 )
