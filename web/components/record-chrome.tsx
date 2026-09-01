@@ -38,6 +38,7 @@ import { RecordChrome } from "@shared/ui/compositions/templates/record-chrome"
 import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/states"
 
 import { RecordMark } from "@shared/web/record-mark"
+import { clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
@@ -316,7 +317,9 @@ export function RecordScreen({
       recordNumber={recordNumber}
       collectionLabel={collectionLabel}
       chips={chips}
-      title={title}
+      /* THE RECORD'S NAME, CLAMPED TO TWO LINES — see shared/web/record-heading.tsx
+         for the ticket that earned it and why the clamp is app-side. */
+      title={clampRecordHeading(title)}
       meta={status}
       actions={actions}
       hero={headerExtra}
