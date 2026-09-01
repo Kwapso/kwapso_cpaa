@@ -1010,18 +1010,31 @@ export function RecordScreen({
   // relationships, which read as too tight for the pills-to-title seam and
   // was never asked to change for the title-to-subtitle one. So the column
   // splits in two: the pills get their own wrapper with a real
-  // `mb-[var(--space-3)]` (12px, doubling the old gap) under them, and a
-  // NESTED column keeps title+subtitle at the original tight
-  // `gap-[var(--space-1h)]` — the subtitle prop's own doc comment ("directly
-  // under the title") was never re-ruled on, so that pairing stays as close
-  // as it always was.
+  // `mb-[var(--space-4)]` (16px) under them, and a NESTED column keeps
+  // title+subtitle at the original tight `gap-[var(--space-1h)]` — the
+  // subtitle prop's own doc comment ("directly under the title") was never
+  // re-ruled on, so that pairing stays as close as it always was.
+  //
+  // NOT `--space-3` (12px) — A FIRST PASS AT THIS FIX REACHED FOR IT AND
+  // LANDED ON THE WRONG SEAM. `IDENTITY_ROW` (above) already spends `gap-3`
+  // — literally `--space-3` — as the gap BETWEEN one pill and the next
+  // inside the row; tokens.css's own comment names that value "control gap",
+  // the space between two controls sitting on the same line. Reusing it here
+  // would make the space between the WHOLE pill row and the title read as
+  // identical to the space between one pill and its neighbour — the title
+  // would look like one more chip in the row rather than the next row down,
+  // which is the opposite of the hierarchy the client's screenshot asked
+  // for. `--space-4` is tokens.css's own next step up, named "form rows,
+  // list rows" — exactly this shape, one row (the pills) sitting above the
+  // next (the title) — so it reads as a real, unambiguous break rather than
+  // a same-size echo of the control gap one level down.
   const titleBlock =
     identityChips === undefined && subtitleLine === null ? (
       <span ref={titleRef} className="min-w-0 break-words">{clampRecordHeading(title)}</span>
     ) : (
       <span ref={titleRef} className="flex min-w-0 flex-col">
         {identityChips !== undefined ? (
-          <span className="mb-[var(--space-3)]">{identityChips}</span>
+          <span className="mb-[var(--space-4)]">{identityChips}</span>
         ) : null}
         <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">
           <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>

@@ -564,11 +564,15 @@ export const CORPUS_EXEMPT: Record<string, string> = {
  * RAISED 114 -> 115 (all three), same night — the assistant's source-chips row
  * gained a visible "Reading from" caption (client, 1 Sep 2026: the row read as
  * unlabelled black pills with no context). One string, same two blocked
- * credential paths. */
+ * credential paths.
+ *
+ * LOWERED 115 -> 114 (all three), same night — the overnight audit removed a
+ * dead three-dot profile-menu button ("Account menu"), which had a real,
+ * already-translated string. A genuine improvement, not a stale pin. */
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 115,
-  es: 115,
-  ca: 115,
+  de: 114,
+  es: 114,
+  ca: 114,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

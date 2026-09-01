@@ -28,7 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
-import { BadgeCheck, LogOut, MoreHorizontal, Palette, Settings, UserRound } from "@shared/ui/foundations/icons"
+import { BadgeCheck, LogOut, Palette, Settings, UserRound } from "@shared/ui/foundations/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
@@ -40,23 +40,16 @@ import { useT } from "@shared/web/language"
 
 export function ProfileMenu({
   active,
-  compact = false,
   trigger,
   tooltip,
 }: {
   active: ActiveTeam
-  /** An icon trigger rather than the avatar — for a spot where the real face
-   * is already shown elsewhere (the kit's `Rail` member chip, app-shell.tsx),
-   * so a second avatar beside it would read as two people rather than one
-   * menu. Same content either way; only the trigger changes. Ignored when
-   * `trigger` is supplied. */
-  compact?: boolean
   /** A caller-supplied trigger element, for a spot needing its OWN exact
-   * avatar treatment neither built-in trigger covers — the collapsed rail's
-   * branded, `--avatar-md` chip (app-shell.tsx): `compact`'s glyph carries no
-   * photo at all, and the default trigger above is a plain `size-8` avatar,
-   * not the rail's active-fill tinted one. The menu itself is identical
-   * either way; only the trigger swaps, same as `compact` already did. */
+   * avatar treatment the default trigger below doesn't cover — the rail's
+   * branded, `--avatar-md` chip, both collapsed and expanded (app-shell.tsx):
+   * the default trigger below is a plain `size-8` avatar, not the rail's
+   * active-fill tinted one. The menu itself is identical either way; only
+   * the trigger swaps. */
   trigger?: React.ReactNode
   /** Wraps `trigger` in the kit's own `Tooltip`, showing this label on
    * hover/focus — for an icon-only trigger with no visible name beside it,
@@ -68,17 +61,7 @@ export function ProfileMenu({
   const router = useRouter()
   const { user } = active
   const menuTrigger =
-    trigger ??
-    (compact ? (
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-8 rounded-pill"
-        aria-label={t("Account menu")}
-      >
-        <MoreHorizontal className="size-4" />
-      </Button>
-    ) : (
+    trigger ?? (
       <Button variant="ghost" size="icon" className="size-8 rounded-pill p-0">
         <Avatar className="size-8">
           {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={t("You")} />}
@@ -87,7 +70,7 @@ export function ProfileMenu({
           </AvatarFallback>
         </Avatar>
       </Button>
-    ))
+    )
   // THE NESTED-TRIGGER COMPOSITION, ONLY WHEN A TOOLTIP IS ASKED FOR. Radix's
   // `asChild` clones onto its single child, and that child may itself be
   // another `asChild` trigger — the standard "Tooltip wrapping a menu

@@ -384,13 +384,53 @@ export function PagedFind<T>({
           placeholder={placeholder}
           className="w-56"
         />
-        {/* THE ORDER, beside the search box because the two are asked with the
-            same gesture — you type, then you say what order. (The filters moved
-            to the row below when the kit's bar arrived: hers is a full-width
-            strip of chips, not a control that sits in a toolbar. All three are
-            still one question and still one cache key.) What it changes is what
-            the DOOR is asked, so the answer spans the whole collection rather
-            than the page in front of you. */}
+        {/* THE FACET CHIPS, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
+            ruling, 2026-09-01, the toolbar spec Aurora approved that night
+            against a real Tickets mockup: search, then the facet chips, then
+            "+ Filter", then sort, then create, pinned right). This used to be
+            a full-width sibling BELOW this row — the same two-row shape her
+            Apps screenshot caught — on the reasoning that the kit's own
+            `FilterBar` (`shared/ui/components/filter-bar/filter-bar.tsx`)
+            hard-codes `w-full` on its root and so "can never sit beside
+            `SearchInput`/`SortControl`". That reasoning did not survive
+            contact with the two OTHER places this exact bug was fixed in the
+            same pass (`screen-bits.tsx`'s `ToolbarRow` and this file's
+            sibling fix in `collection-frame.tsx`'s legacy header): a `w-full`
+            child only claims the WHOLE row when it is a DIRECT child of it.
+            Wrapped first in its own non-growing flex box — `min-w-0`, no
+            `w-full` of its OWN — the wrapper's width is resolved from its
+            CONTENT before the child's `100%` has anything to resolve
+            against (a percentage on an indeterminate box is treated as
+            `auto` for that computation, CSS Sizing §5.3), so the wrapper sizes
+            to the chip row's actual content width, and only THEN does the
+            `w-full` child fill exactly that box rather than the row. Same
+            technique, same reason, third call site — no adapter change and
+            no kit change (R39) needed, because the kit was never the thing
+            forcing the second row. */}
+        {showFilters && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <FilterBar
+              facets={facets}
+              values={values}
+              // Empty on purpose: every facet above carries its own options, so
+              // there is nothing for the bar to derive from the rows on screen.
+              data={[]}
+              onChange={(field, value) => {
+                const next = { ...values }
+                if (value === "") delete next[field]
+                else next[field] = value
+                setValues(next)
+              }}
+              onClearFacets={() => setValues({})}
+              resultCount={total}
+            />
+          </div>
+        )}
+        {/* THE ORDER, after search and the facet chips because the three are
+            asked with the same gesture — you type, you narrow, then you say
+            what order. What it changes is what the DOOR is asked, so the
+            answer spans the whole collection rather than the page in front
+            of you. */}
         {showSort && (
           <SortControl
             options={sorts}
@@ -415,62 +455,14 @@ export function PagedFind<T>({
           </span>
         )}
         {/* THE ROW'S OWN ACTIONS, PINNED RIGHT — `ml-auto` rather than a
-            `justify-between` on the row, so search/sort/the match count stay
-            grouped on the left and the actions land at the far edge whatever
-            else is showing (client ruling, 2026-08-31: rightmost, part of the
-            toolbar, never beside the tab strip). */}
+            `justify-between` on the row, so search/filters/sort/the match count
+            stay grouped on the left and the actions land at the far edge
+            whatever else is showing (client ruling, 2026-08-31: rightmost,
+            part of the toolbar, never beside the tab strip). */}
         {actions && (
           <div className="ml-auto flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
         )}
       </div>
-
-      {/* THE FILTERS, ON THEIR OWN ROW. The kit's bar is a full-width strip of
-          chips above whatever they are narrowing: what is on stays visible and
-          removable in one press at every width, and the facet controls live
-          behind its own "+ filter" slot. Putting it back inside the row above
-          would be the first step of theming it into the row it replaced.
-
-          TENSION, FLAGGED RATHER THAN OVERRIDDEN (2026-09-01). Aurora's
-          overnight toolbar spec — confirmed against a real Tickets mockup —
-          shows ONE row, always: search, then the real facet chips (Client,
-          Module), then "+ Filter", a separator, sort, an optional view
-          control, and create pinned to the row's far end. That is not this
-          shape: `<FilterBar>` (`shared/web/screen-engine/filter-bar.tsx`)
-          renders through the vendored kit's own `FilterBar`
-          (`shared/ui/components/filter-bar/filter-bar.tsx`), whose root is
-          hard-coded `w-full` — a flex item that consumes its whole row and so
-          can never sit beside `SearchInput`/`SortControl` above no matter how
-          this file arranges its own containers (measured, not assumed: a
-          `w-full` flex child forces the wrap the paragraph above this one
-          argues FOR). Overriding that width from here would need a
-          `className` passed through the adapter to the kit component, which
-          the adapter does not do today, and reaching past the adapter into
-          the vendored kit itself is the one thing R39 forbids outright. The
-          mockup's own "Client ▾ | Module ▾" reads as an always-visible
-          per-facet trigger, which is also a different interaction model from
-          this bar's "no chip until a facet is set, everything lives behind
-          one + Filter popover" — the shape the adapter's own header comment
-          says was a deliberate, recent convergence with the kit (not a
-          reskin). Reconciling the two is a kit-level or adapter-level
-          decision, not a `<PagedFind>` one, so it stays a flagged tension
-          rather than a hand-rolled row here. */}
-      {showFilters && (
-        <FilterBar
-          facets={facets}
-          values={values}
-          // Empty on purpose: every facet above carries its own options, so
-          // there is nothing for the bar to derive from the rows on screen.
-          data={[]}
-          onChange={(field, value) => {
-            const next = { ...values }
-            if (value === "") delete next[field]
-            else next[field] = value
-            setValues(next)
-          }}
-          onClearFacets={() => setValues({})}
-          resultCount={total}
-        />
-      )}
 
       {children({
         active,
