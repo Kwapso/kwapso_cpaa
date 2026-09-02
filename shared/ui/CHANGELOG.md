@@ -1,5 +1,82 @@
 # Changelog
 
+## v1.2.19 — 2026-09-02
+
+### Added — three more client rulings on the rail and on tabs: the member chip's fill, weight as a third nav signal, and hover-weight on tab labels
+
+Three follow-ups to v1.2.18, same review.
+
+**The rail's member chip is black in dark mode, and always black on mango.**
+Verbatim: the foot chip's fill should be black whenever the app is in dark
+mode (any spine) or whenever the spine is mango (either palette); light-paper
+and light-ink are unchanged. `MemberChip`'s `shell` read `--spine-chip-fill`,
+which also re-binds `--btn-secondary-fill` / `--pill-fill` for anything else a
+route renders inside the rail column (`screen-shell.tsx`'s `RAIL_COLUMN`), so
+repointing it would have blackened controls the client never saw. Two new
+tokens instead, read only by the chip: `--spine-member-fill` (paper and ink
+keep today's chip in light, both go to `--kw-charcoal` in dark; mango is
+`--kw-charcoal` unconditionally, needing no dark half — same law as the rest
+of tokens.css §7b) and `--spine-member-ink` (reuses `--spine-ink` on paper and
+ink, since that was already the right value against both the old fill and the
+new black one; mango gets its own `--kw-off-beige`, because on mango the
+chip's fill just became the same charcoal the name text already was, and the
+text has to invert rather than vanish against its own background). Two new
+helper variables, `--spine-paper-member-fill` / `--spine-ink-member-fill`,
+carry the light/dark split alongside the four existing ones in §4.
+
+### Changed — font-weight is now a third, explicit signal on the rail's nav rows
+
+Alongside fill and colour, an inactive row now hovers to `--font-weight-
+medium` — `ACTIVE_TREATMENT`'s own weight, the heaviest this face ships,
+`--font-weight-semibold`/`bold`/`extrabold` all alias to the same 500 — with
+NO `--spine-active-fill` wash added: "the pill is earned by being current, not
+by being pointed at." Resting weight (`--font-weight-light`, 300) is unchanged
+in value but is now named on `ROW_IDLE` instead of merely inherited from the
+body default, so it survives a rail rendered somewhere that default doesn't
+reach. `rail.tsx` only; the collapsible toggle shares `ROW_IDLE` and picks up
+the same hover for free.
+
+### Changed — an inactive tab's hover previews the active weight, in both variants
+
+`components/tabs/tabs.tsx`'s `TRIGGER_SKIN.line` and `.folder` each gain one
+line, `enabled:hover:font-[var(--font-weight-medium)]`, beside the existing
+`enabled:hover:text-foreground` — which is untouched, per the client's
+explicit instruction that colour does not move. A no-op on an already-active
+trigger (already at that weight, unconditionally), so neither needs a
+`data-[state=inactive]` guard.
+
+## v1.2.18 — 2026-09-02
+
+### Fixed — the rail's idle nav text was gray on every spine; the client wants full ink, always
+
+Live against all six spine × theme combinations, the client's verdict was
+verbatim: "nav text should ALWAYS be either pure black or pure white — never
+gray — depending on what it sits on." `rail.tsx`'s `ROW_IDLE` was reading
+`--spine-ink-quiet`, D5 = C's deliberate muted resting tier (26.01's ghost,
+darkening to full on hover) — correct for the hierarchy ruling it implements,
+but not what this client instruction asks for on this component. The idle
+label now reads `--spine-ink` outright, the same full-contrast token the row
+used to darken TO on hover (so the hover rule is gone, not redundant-but-kept):
+charcoal on mango and on paper-in-light, off-beige on ink and on
+paper-in-dark, at rest and unconditionally. The mango spine's own resting
+colour does not visibly change — D3/D5 already pin its quiet ink to
+`--ink-on-accent`, so `--spine-ink-quiet` and `--spine-ink` were already the
+same value there — which is why her mango findings read as already-correct
+once this was checked live. Scoped to the destination label alone:
+`--spine-ink-quiet` itself is untouched in `tokens.css`, so the group heading
+and the idle count badge — neither of them "nav text" — keep the quiet tier
+exactly as D5 = C drew it. The active row's own ink (`--spine-active-ink`)
+was not touched; it was never the complaint. Separately, the reported
+dark-mode-mango logo defect (the mark must always be the black cut on any
+mango ground, per `brand.tsx`'s own law) could not be reproduced against this
+repo's current `rail.tsx` → `brand.tsx` path — `markField` already resolves
+mango to `"brand"` in both palettes, `BrandArtwork` renders only the black
+`<img>` for that field with no dark-mode class applied to it, and a repo-wide
+search turned up no second render path and no CSS filter or recolour
+targeting `[data-slot="brand-cut"]`. Verified correct, live, in all six
+combinations at `verify/spine-colors/`; left alone rather than "fixed" with
+no defect to point at.
+
 ## v1.2.17 — 2026-09-02
 
 ### Changed — `SortControl`'s field and direction button fuse into one chip

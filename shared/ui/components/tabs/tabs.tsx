@@ -233,6 +233,13 @@ const TRIGGER_SKIN: Record<TabsVariant, string> = {
     // TAB-B3.
     "text-sm text-ink-secondary",
     "enabled:hover:text-foreground",
+    // WEIGHT AS A THIRD SIGNAL, CLIENT RULING 2026-09-02 — colour is
+    // untouched (the rule above is unchanged); hover on an inactive trigger
+    // ALSO previews the active weight, `--font-weight-medium`, the same token
+    // `TRIGGER_SELECTED.line` sets two blocks down. A no-op on an already-
+    // active trigger (it is already at that weight, unconditionally), so this
+    // needs no `data-[state=inactive]` guard.
+    "enabled:hover:font-[var(--font-weight-medium)]",
   ),
   folder: cn(
     // One height for every tab, active or not — ch14's rule, verbatim: "a tab
@@ -264,6 +271,13 @@ const TRIGGER_SKIN: Record<TabsVariant, string> = {
     // so the two can never race on equal specificity (PATTERN §4).
     "text-caption [color:var(--ink-secondary)]",
     "enabled:hover:text-foreground",
+    // WEIGHT AS A THIRD SIGNAL, CLIENT RULING 2026-09-02 — colour is
+    // untouched (the rule above is unchanged); hover on an inactive trigger
+    // ALSO previews the active weight, `--font-weight-medium`, the same token
+    // `TRIGGER_SELECTED.folder` sets a few lines down. A no-op on an already-
+    // active trigger (it is already at that weight, unconditionally), so this
+    // needs no `data-[state=inactive]` guard.
+    "enabled:hover:font-[var(--font-weight-medium)]",
     // Above the panel's own z-2 when active, behind it when not, so an
     // inactive tab is "clipped by the card edge" as ch14 puts it.
     "relative z-[1] data-[state=active]:z-[3]",

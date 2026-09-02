@@ -4,9 +4,9 @@
 // the kit's own Appearance panel draws Theme in (26.05, "a choice that
 // changes how the app looks is never a row of pills … one card per option: a
 // small picture of the thing itself, the option's name, one line of prose,
-// and a mango badge on the one that is set"). Scale, directly above this
-// section, is words instead of pictures because a root font size has no
-// picture worth drawing; a rail's fill does, and the kit already drew one.
+// and a mango badge on the one that is set"). Mode and Scale, on either side
+// of this section, are the same cards now too — `theme-section.tsx` and
+// `scale-section.tsx` copy this file's shape rather than reinventing it.
 //
 // THE CARDS ARE THE KIT'S OWN, not reinvented. `AppearanceOptionGroup` and
 // `SpinePicture` are `compositions/screens/settings.tsx`'s own sub-primitives

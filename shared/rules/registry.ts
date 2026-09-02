@@ -579,10 +579,18 @@ export const CORPUS_EXEMPT: Record<string, string> = {
  * Dashboard tab (the tickets-by-client chart, its own honesty caption about
  * internal tickets, and the tab's own label). Six strings, same two blocked
  * credential paths. */
+// RAISED 2026-09-02, 130 → 140: the new Theme and Scale picture-card
+// sections (shared/web/theme-section.tsx, shared/web/scale-section.tsx)
+// extracted 9 new English strings — the three THEMES/SCALES option
+// labels/descriptions this app had not drawn a card for before today. None
+// has a translation yet in any of the three languages (no environment here
+// carries the credential a real translation run needs — the same blocked
+// path every prior raise in this file cites: ANTHROPIC_API_KEY or a
+// Cloudflare Workers-AI token). Real work still owed, not debt hidden.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 130,
-  es: 130,
-  ca: 130,
+  de: 140,
+  es: 140,
+  ca: 140,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -689,11 +697,6 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["property"],
     via: ["t(config.emptyText)"],
     why: "The screen engine's collection defaults — `emptyText: \"Nothing here yet.\"` — are module-level DATA (the same shape as a field config: `t` is a hook and a default object is a constant), and the one place the sentence reaches a screen is CollectionFrame's empty state, which reads it through `t(config.emptyText)`. Declared English, translated on the way to the screen — the ruling R33's own law text makes for field configs, applied to the collection config the engine inherited when the old library moved app-side.",
-  },
-  "shared/scale.ts": {
-    kinds: ["property"],
-    via: ["t(step.label)"],
-    why: "The three size steps are ONE table read three ways — the column's allow-list, the door's fallback and the picker — so the label sits beside the value it belongs to rather than in a component. `shared/web/scale-section.tsx` renders `{t(step.label)}`, which is the same ruling `translateRecipe` makes: declare the English where the data lives, ask for the translation on the way to the screen. It only became visible to this check when the walk stopped being a folder list and became the front doors' import closure — the file is one directory outside `shared/web/`, which is exactly the staleness a folder list cannot avoid.",
   },
   "shared/brand.ts": {
     kinds: ["property"],

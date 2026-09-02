@@ -519,9 +519,56 @@ const ROW_COLLAPSED = cn(
  */
 const MARK_STEP = "[--brand-step:var(--icon-20)]";
 
-/** A quiet entry. 26.01's ghost: quiet ink, darkening to full on hover. */
-const ROW_IDLE =
-  "text-[var(--spine-ink-quiet)] hover:text-[var(--spine-ink)]";
+/* ----------------------------------------------------------------------------
+   AN IDLE ENTRY, AND D5 = C's COLOUR HALF IS OVERRULED ON THIS ROW, 2026-09-02.
+
+   Until today this was 26.01's ghost — `--spine-ink-quiet`, darkening to
+   `--spine-ink` on hover — which is what D5 = C asked for: "THE QUIET TIER IS
+   MADE BY WEIGHT AND SIZE, NOT BY COLOUR", with the colour distinction kept
+   wherever a ground already had one (ink and paper read `--fg2`-shaped quiet
+   ink; only mango had none). That reading is live on screen now, and the
+   client's verdict on all six spine × theme combinations she reviewed is
+   verbatim: "nav text should ALWAYS be either pure black or pure white — never
+   gray — depending on what it sits on."
+
+   THAT IS A NARROWER LAW THAN D5 = C, NOT A DIFFERENT ONE, and this row is
+   where the two collide. D5 = C is still right about WEIGHT AND SIZE carrying
+   the lit/quiet distinction — `ACTIVE_TREATMENT`'s `font-weight-medium` against
+   this row's body weight is untouched — and it is still right that the mango
+   spine has no second ink, which `--spine-ink-quiet` already resolves to
+   `--ink-on-accent` for and this change does not disturb. What the client is
+   removing is the ink AND paper spines' own quiet tier, which used to read
+   `--ink-on-inverse-secondary` (light ink spine, #d5d1c9) or `--muted-
+   foreground` (dark ink and paper, #bdb9b1 / #5f5d59 in light paper) — three
+   real greys an idle row was resting in. So THIS ROW takes `--spine-ink`
+   outright, the same full-contrast token the row already darkens TO on hover,
+   which makes the hover rule redundant and is why it is gone: charcoal on
+   mango and paper-in-light, off-beige on ink and paper-in-dark, unconditionally
+   and at rest.
+
+   NOT TOUCHED: the group heading (`text-[var(--spine-ink-quiet)]` two blocks
+   down, still `--text-micro` and still quiet — a heading is not a nav item and
+   the client's sentence was about "nav text") and the idle count badge, for
+   the same reason. `--spine-ink-quiet` ITSELF is unchanged in tokens.css, so
+   neither of those moved. Scoped to the one thing the client actually looked
+   at: the destination's own label.
+
+   ADDENDUM, SAME DAY — WEIGHT BECOMES A THIRD, EXPLICIT SIGNAL, NOT JUST THE
+   BODY'S DEFAULT. `ROW_SHAPE`'s own comment above still says "no weight here
+   … a row's resting weight is the body's", and the body's IS `--font-weight-
+   light` (300, the only weight below `--font-weight-medium` this face ships —
+   see tokens.css §5) — so nothing here contradicts that. What changed is that
+   it is now named instead of merely inherited, and a HOVER step is added:
+   the client wants three signals reading together (fill, colour, weight), not
+   two, and wants hover to preview the ACTIVE weight without previewing the
+   active FILL — "the pill is earned by being current, not by being pointed
+   at." So an inactive row hovers to `--font-weight-medium`, `ACTIVE_TREATMENT`'s
+   own weight two names below, with no `--spine-active-fill` wash added — this
+   class carries no `hover:bg-*` and never has. */
+const ROW_IDLE = cn(
+  "font-[var(--font-weight-light)] text-[var(--spine-ink)]",
+  "hover:font-[var(--font-weight-medium)]",
+);
 
 /** 27.7's blocked entry: still there, in disabled ink, and NOT filled. */
 const ROW_BLOCKED = "cursor-not-allowed text-[var(--spine-ink-disabled)]";
@@ -1276,11 +1323,13 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
           </button>
         ) : null}
 
-        {/* THE MEMBER CHIP — a container, in `--spine-chip-fill`: the paper
-            one rung off whichever spine it is standing on. On paper that is
-            the off-beige chip 27.1 and 27.26 draw at the foot; on ink and
-            mango it is the same relationship, one rung, and nothing here
-            picks a colour.
+        {/* THE MEMBER CHIP — a container, in `--spine-member-fill`: the paper
+            one rung off whichever spine it is standing on, EXCEPT where the
+            client's 2026-09-02 ruling forces it to black instead (dark mode,
+            any spine; mango, either palette) — see `MemberChip` for the token
+            and why it is not `--spine-chip-fill`. On light paper and light
+            ink that rung is still the off-beige / raised chip 27.1 and 27.26
+            draw at the foot; nothing here picks a colour.
 
             26.02: "no member list (that lives in Settings)". One chip. */}
         {member !== null && member !== undefined ? (
@@ -1373,7 +1422,7 @@ function MemberChip({
         as="span"
         size="sm"
         aria-hidden={abbreviated ? true : undefined}
-        className="min-w-0 flex-1 truncate font-[var(--font-weight-medium)] text-[var(--spine-ink)]"
+        className="min-w-0 flex-1 truncate font-[var(--font-weight-medium)] text-[var(--spine-member-ink)]"
       >
         {shown}
       </Text>
@@ -1381,9 +1430,21 @@ function MemberChip({
     </>
   );
 
+  /* THE CHIP'S OWN FILL, NOT `--spine-chip-fill` — CLIENT RULING, 2026-09-02.
+     Verbatim: the chip is BLACK whenever the app is in dark mode (any spine)
+     or whenever the spine is mango (either palette); light-paper and
+     light-ink are unchanged. `--spine-member-fill` is a dedicated token for
+     exactly that (tokens.css §4/§7b) rather than a repoint of `--spine-chip-
+     fill`, because that token also re-binds `--btn-secondary-fill` /
+     `--pill-fill` for anything else a route renders inside the rail column
+     (`screen-shell.tsx`'s `RAIL_COLUMN`) — blackening it would have changed a
+     button the client never saw. `--spine-member-ink` above moves WITH this
+     fill, not with `--spine-ink`: on mango the fill is now the same charcoal
+     the name text used to be, so the text inverts to off-beige rather than
+     vanishing against its own new background. */
   const shell = cn(
     "flex min-w-0 items-center gap-[var(--space-3)] text-start",
-    "rounded-pill border-0 bg-[var(--spine-chip-fill)]",
+    "rounded-pill border-0 bg-[var(--spine-member-fill)]",
     /* 4 around a 32 avatar in a 999 pill: the pill's radius (20) is the
        avatar's (16) plus its own padding, so the two circles are concentric.
        This was already the intent; with two lines of type the TEXT was taller

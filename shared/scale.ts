@@ -43,19 +43,22 @@
 // opts that property out of this control. That is why the reskin deleted 54
 // hand-set `text-[10px]`-family sizes rather than re-tuning them.
 
-/** One step: what it is called, and the root font size it sets on each front
- * door. `agencyPx` is `web/`; `portalPx` is `web-portal/`. */
+/** One step: the root font size it sets on each front door. `agencyPx` is
+ * `web/`; `portalPx` is `web-portal/`. Carries no `label` — `scale-section.tsx`
+ * is the one reader of a step's name and declares its own `t("Compact")`-
+ * style literal per option (the ordinary translation shape, `wrapped-strings`
+ * checks it directly), rather than this table holding an English word for a
+ * translator to find one directory outside the front doors' own walk. */
 export type ScaleStep = {
   value: string
-  label: string
   agencyPx: number
   portalPx: number
 }
 
 export const SCALE_STEPS: ScaleStep[] = [
-  { value: "compact", label: "Compact", agencyPx: 15, portalPx: 16 },
-  { value: "comfortable", label: "Comfortable", agencyPx: 16, portalPx: 17 },
-  { value: "large", label: "Large", agencyPx: 18, portalPx: 19 },
+  { value: "compact", agencyPx: 15, portalPx: 16 },
+  { value: "comfortable", agencyPx: 16, portalPx: 17 },
+  { value: "large", agencyPx: 18, portalPx: 19 },
 ]
 
 /** What a person has never chosen. Named rather than repeated, so the column's

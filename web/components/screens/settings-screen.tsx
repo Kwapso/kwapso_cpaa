@@ -80,7 +80,7 @@ import { usePermissions } from "@/lib/perms"
 import { auth } from "@/lib/api"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
 import type { ActiveTeam } from "@/lib/use-active-team"
-import { AppearanceSection } from "@shared/web/appearance-section"
+import { ThemeSection } from "@shared/web/theme-section"
 import { ScaleSection } from "@shared/web/scale-section"
 import { SpineSection } from "@shared/web/spine-section"
 import { useLanguage } from "@shared/web/language"
@@ -231,8 +231,12 @@ export function SettingsScreen({
 
                 {/* LIGHT / DARK / SYSTEM. The owner's own instruction: a
                     preference about how the app looks, in the one place a
-                    person goes to change how the app looks. */}
-                <AppearanceSection />
+                    person goes to change how the app looks. `ThemeSection`
+                    draws the same visual option cards Sidebar and Size do
+                    here; the profile menu keeps the plain `<ModeToggle />`
+                    segmented control, which is the right shape for a menu
+                    reached mid-task rather than a settings page. */}
+                <ThemeSection />
 
                 {/* THE SIDEBAR'S COLOUR — ink, paper or mango (client ruling
                     D3). Persisted the same way Scale is, on the person's own

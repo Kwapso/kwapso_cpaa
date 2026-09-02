@@ -569,11 +569,28 @@
      because in dark the ink spine is still a DARK ground and --invfg2 flips
      to a dark ink there. --spine-paper-chip is the paper one rung off the
      spine, which is what 27.1 itself draws (a var(--card) chip on a
-     var(--sheet) rail).                                                     */
+     var(--sheet) rail).
+
+     --spine-{paper,ink}-member-fill, ADDED 2026-09-02, ARE A FIFTH AND SIXTH
+     HALF, for the same reason the first four exist: the client's ruling on
+     the member chip's fill only bites in ONE palette. Verbatim: the chip at
+     the rail's foot is BLACK whenever the app is in dark mode (any spine) or
+     whenever the spine is mango (either palette) — and unchanged everywhere
+     else. Mango needs no split (`--kw-charcoal` is `--kw-charcoal` in both
+     palettes, same law as the rest of 7b), but paper and ink's LIGHT value is
+     today's chip — `--spine-paper-chip` / the raw `--kw-unlit-raised` a spine
+     block down — and their DARK value is the new, unconditional black. Kept
+     apart from `--spine-chip-fill` on purpose: that token also re-binds
+     `--btn-secondary-fill` / `--pill-fill` for anything else a route renders
+     inside the rail column (`screen-shell.tsx`'s `RAIL_COLUMN`), and the
+     client's ruling was about the member chip alone — repointing the shared
+     token would have blackened a button that was never shown to her. */
   --spine-ink-fill:        var(--kw-charcoal);
   --spine-ink-quiet-label: var(--ink-on-inverse-secondary);
   --spine-paper-fill:      var(--kw-soft-paper);
   --spine-paper-chip:      var(--kw-off-beige);
+  --spine-paper-member-fill: var(--kw-off-beige);
+  --spine-ink-member-fill:   var(--kw-unlit-raised);
 
   --ink-primary:     var(--foreground);
   --ink-tertiary:    var(--muted-foreground);
@@ -1179,6 +1196,11 @@
     --spine-ink-quiet-label: var(--muted-foreground);
     --spine-paper-fill:      var(--kw-unlit-raised);
     --spine-paper-chip:      var(--kw-unlit-quiet);
+    /* The member chip's own fill, dark. Client ruling, 2026-09-02: the chip is
+       BLACK in dark mode regardless of spine. Mango needs no dark half (see
+       §7b) — only these two. */
+    --spine-paper-member-fill: var(--kw-charcoal);
+    --spine-ink-member-fill:   var(--kw-charcoal);
     --hair-strong:          rgba(255, 254, 249, .24);
     /* The gridline ground (CH19 view 06): carry the alpha, flip the ink. */
     --hair-grid:            rgba(255, 254, 249, .10);
@@ -1296,6 +1318,11 @@
   --spine-ink-quiet-label: var(--muted-foreground);
   --spine-paper-fill:      var(--kw-unlit-raised);
   --spine-paper-chip:      var(--kw-unlit-quiet);
+  /* The member chip's own fill, dark. Client ruling, 2026-09-02: the chip is
+     BLACK in dark mode regardless of spine. Mango needs no dark half (see
+     §7b) — only these two. */
+  --spine-paper-member-fill: var(--kw-charcoal);
+  --spine-ink-member-fill:   var(--kw-charcoal);
   --hair-strong:          rgba(255, 254, 249, .24);
   /* The gridline ground (CH19 view 06): carry the alpha, flip the ink. */
   --hair-grid:            rgba(255, 254, 249, .10);
@@ -1375,6 +1402,16 @@
   --spine-chip-fill:   var(--spine-paper-chip);
   --spine-mark-fill:   var(--surface-inverse);
   --spine-mark-ink:    var(--ink-on-inverse);
+  /* THE MEMBER CHIP'S OWN FILL, SEPARATE FROM `--spine-chip-fill`, ADDED
+     2026-09-02. See §4's note beside `--spine-paper-member-fill` for why this
+     is its own pair rather than a repoint of the shared token: `--spine-chip-
+     fill` also feeds any button or pill a route renders inside the rail
+     column, and the client's ruling was scoped to the member chip alone.
+     `--spine-member-ink` reuses `--spine-ink` on paper and ink because it was
+     already the correct value in every palette this chip's fill now takes —
+     see the mango block below for the one spine where it was not. */
+  --spine-member-fill: var(--spine-paper-member-fill);
+  --spine-member-ink:  var(--spine-ink);
   /* GAPS-RULINGS.md R-4d — the rail's own section-divider hairline. The paper
      spine sits on soft paper like everything else that reads `--hair`, so it
      takes that token unchanged. */
@@ -1392,6 +1429,12 @@
   --spine-chip-fill:   var(--kw-unlit-raised);
   --spine-mark-fill:   var(--kw-off-beige);
   --spine-mark-ink:    var(--kw-charcoal);
+  /* See the paper block above: the member chip's own fill, kept apart from
+     `--spine-chip-fill`. `--spine-member-ink` reuses `--spine-ink` — off-beige
+     in both palettes here, which was already correct against both this
+     spine's own chip fill and its new dark black. */
+  --spine-member-fill: var(--spine-ink-member-fill);
+  --spine-member-ink:  var(--spine-ink);
   /* R-4d. The ink spine's fill is charcoal, so its hairline needs the INVERSE
      hairline (an off-beige alpha) to read at all — `--hair` itself would
      resolve to a charcoal-based alpha here and nearly vanish on its own
@@ -1438,6 +1481,16 @@
   --spine-chip-fill:   var(--kw-off-beige);
   --spine-mark-fill:   var(--kw-charcoal);
   --spine-mark-ink:    var(--kw-off-beige);
+  /* THE MEMBER CHIP'S OWN FILL, ADDED 2026-09-02 — CLIENT RULING, NOT D3/D5.
+     "The chip is black whenever the spine is mango, in either palette." No
+     dark half needed: `--kw-charcoal` does not move between palettes, same
+     law as every other name in this block. UNLIKE THE OTHER TEN NAMES HERE,
+     `--spine-member-ink` is NOT `--ink-on-accent` (this spine's `--spine-ink`)
+     — the member chip's fill just became the SAME charcoal that text already
+     was, so the text has to invert or vanish. `--kw-off-beige` is the pair
+     `--spine-active-ink` already uses against this exact fill two names up. */
+  --spine-member-fill: var(--kw-charcoal);
+  --spine-member-ink:  var(--kw-off-beige);
   /* R-4d, and the SAME rule `--spine-active-hover` states two names up: mango
      is #FED069 in both palettes, so anything drawn on it must be too. `--hair`
      flips with the palette (charcoal-based in light, off-beige-based in dark)
