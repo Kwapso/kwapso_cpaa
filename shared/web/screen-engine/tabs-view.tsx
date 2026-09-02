@@ -461,8 +461,19 @@ export function TabsView({
               // dot too and changing them was not asked for.
               variant === "line" ? (
                 shown === t.value ? (
+                  // A TRUE CIRCLE, NOT AN OVAL — `size-[1.125rem]` (18px, the
+                  // kit's own fixed square for this exact dot, TABS_COUNT_SKIN's
+                  // `line` entry in shared/ui/components/tabs/tabs.tsx) rather
+                  // than `h-4 min-w-4 px-1`: a height plus a MINIMUM width plus
+                  // horizontal padding sizes the box to its CONTENT, so "9" drew
+                  // a circle by accident and "96" stretched it into a stadium —
+                  // exactly the "rounded rectangle, not a circle" the client
+                  // flagged, since a fixed height with a floor-only width still
+                  // grows wider than tall the moment the label needs two digits.
+                  // Fixed on both axes, it stays round for any label this dot
+                  // has ever carried.
                   <span
-                    className="flex h-4 min-w-4 items-center justify-center rounded-pill bg-primary px-1 text-micro leading-none tabular-nums text-primary-foreground"
+                    className="inline-flex size-[1.125rem] items-center justify-center rounded-pill bg-primary text-micro leading-none tabular-nums text-primary-foreground"
                   >
                     {t.badge}
                   </span>
