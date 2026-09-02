@@ -99,12 +99,16 @@ const sortControlVariants = cva(["inline-flex min-w-0 items-center gap-2"], {
 });
 
 /* What this control changes about `SelectTrigger`, and nothing else: the
-   height (a toolbar control is 40 or 32, not the 44 form field) and the
-   read-only skin, which `Select` has no state for. Everything the two share —
-   the pill, the hairline, the open ink, the chevron — is `select.tsx`'s and
-   is not restated here. OVERRIDE 42 reaches this control through that file:
-   the resting edge is `--hair-strong`, disabled keeps 8%, and the hover
-   `select.tsx` used to draw is gone with nothing in its place. */
+   height (a toolbar control is 40 or 32, not the 44 form field), the
+   read-only skin, which `Select` has no state for, and — client, 2 Sep
+   2026 — the FIELD's outer shape, now that it shares one chip with the
+   direction control instead of standing beside it with a gap: this end
+   keeps the pill, the other end squares off where the two meet. Everything
+   else the two share — the hairline, the open ink, the chevron — is
+   `select.tsx`'s and is not restated here. OVERRIDE 42 reaches this control
+   through that file: the resting edge is `--hair-strong`, disabled keeps
+   8%, and the hover `select.tsx` used to draw is gone with nothing in its
+   place. */
 const fieldVariants = cva(["w-auto"], {
   variants: {
     size: {
@@ -123,18 +127,36 @@ const fieldVariants = cva(["w-auto"], {
           and the faint fill says the control is not yours right now. */
       readOnly: "cursor-default bg-hair-faint text-foreground shadow-none",
     },
+    /** `showDirection` reaching this half of the pair — see the file header.
+        A list with one natural order (`showDirection: false`) keeps the
+        field's own full pill, nothing squared off with nothing to meet it. */
+    fused: {
+      true: "rounded-s-pill rounded-e-none",
+      false: "",
+    },
   },
-  defaultVariants: { size: "default", state: "default" },
+  defaultVariants: { size: "default", state: "default", fused: false },
 });
 
+/* FUSED WITH THE FIELD (client, 2 Sep 2026) — her reference artifact draws
+   one seamless chip, not a bordered field with a bare icon floating beside
+   it on a gap. This half now takes the field's OWN drawing convention —
+   `select.tsx`'s resting/disabled/read-only hairline, the same background —
+   right up to the shared inner edge, and squares that edge off while the
+   field squares its matching one (`fused` above). Two 1px inset shadows
+   drawn on the exact same line read as one: no wrapper element duplicating
+   `select.tsx`'s state logic, just this control's own two halves agreeing
+   to draw the same border. Only the OUTER corner stays a pill. */
 const directionVariants = cva(
   [
     "grid shrink-0 cursor-pointer place-content-center",
-    "appearance-none rounded-pill border-0 bg-transparent",
+    "appearance-none rounded-e-pill rounded-s-none border-0 bg-background",
+    "shadow-[inset_0_0_0_0.0625rem_var(--hair-strong)]",
     "text-ink-secondary",
     "enabled:hover:bg-accent enabled:hover:text-foreground",
     "enabled:active:translate-y-[0.0625rem]",
-    "transition-[background-color,color,translate]",
+    "enabled:focus-visible:shadow-[inset_0_0_0_0.0625rem_var(--foreground)]",
+    "transition-[background-color,box-shadow,color,translate]",
     "duration-[var(--duration-colour)] ease-kwapso",
   ],
   {
@@ -145,10 +167,12 @@ const directionVariants = cva(
       },
       state: {
         default: "",
-        /** A fill and an ink. Never an opacity. */
-        disabled:
-          "cursor-not-allowed bg-[var(--btn-disabled-fill)] text-[var(--btn-disabled-label)]",
-        readOnly: "cursor-default text-ink-tertiary",
+        /** Mirrors the field's own disabled edge (override 42: `--border`
+            is the weak 8% stroke, never the resting 20%). */
+        disabled: "cursor-not-allowed shadow-[inset_0_0_0_0.0625rem_var(--border)] bg-hair-faint text-ink-disabled",
+        /** Mirrors the field's own read-only skin exactly — the hairline
+            goes entirely and the faint fill carries the state alone. */
+        readOnly: "cursor-default shadow-none bg-hair-faint text-foreground",
       },
     },
     defaultVariants: { size: "default", state: "default" },
@@ -333,63 +357,71 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
           {label}
         </label>
 
-        <span data-slot="sort-control-field" className="relative inline-flex min-w-0 items-center">
-          <Select value={currentValue} onValueChange={handleValue} disabled={inert}>
-            <SelectTrigger
-              id={fieldId}
-              data-slot="sort-control-select"
-              aria-busy={loading || undefined}
-              aria-labelledby={labelId}
-              className={cn(fieldVariants({ size, state }))}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            {/* The kit's own paper, in both modes. This is the whole of fix 4:
-                the list is `--popover` at the 24 radius under the overlay
-                shadow, not a surface the machine picked. */}
-            <SelectContent>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* THE PAIR, ONE CHIP — client, 2 Sep 2026. `sortControlVariants`'s
+            own `gap-2` still separates the LABEL from this group; inside it
+            the two halves sit with no gap at all, because they now draw one
+            continuous hairline between them rather than leaving room for a
+            border on each side of empty air (see `fieldVariants`'s `fused`
+            and `directionVariants`'s own header). */}
+        <span className="inline-flex min-w-0 items-center">
+          <span data-slot="sort-control-field" className="relative inline-flex min-w-0 items-center">
+            <Select value={currentValue} onValueChange={handleValue} disabled={inert}>
+              <SelectTrigger
+                id={fieldId}
+                data-slot="sort-control-select"
+                aria-busy={loading || undefined}
+                aria-labelledby={labelId}
+                className={cn(fieldVariants({ size, state, fused: showDirection }))}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              {/* The kit's own paper, in both modes. This is the whole of fix 4:
+                  the list is `--popover` at the 24 radius under the overlay
+                  shadow, not a surface the machine picked. */}
+              <SelectContent>
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Busy: the spinner sits OVER the field at the inline end, in front
-              of the chevron, and takes no pointer events. Only drawn while
-              loading — the chevron is `SelectTrigger`'s and stays its own. */}
-          {loading ? (
-            <span
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none absolute end-3 grid place-content-center",
-                "bg-hair-faint text-ink-tertiary",
-              )}
+            {/* Busy: the spinner sits OVER the field at the inline end, in front
+                of the chevron, and takes no pointer events. Only drawn while
+                loading — the chevron is `SelectTrigger`'s and stays its own. */}
+            {loading ? (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute end-3 grid place-content-center",
+                  "bg-hair-faint text-ink-tertiary",
+                )}
+              >
+                <Loader2 size={16} className="motion-spinner" />
+              </span>
+            ) : null}
+          </span>
+
+          {showDirection ? (
+            <button
+              type="button"
+              data-slot="sort-control-direction"
+              disabled={inert}
+              onClick={flipDirection}
+              className={directionVariants({ size, state })}
             >
-              <Loader2 size={16} className="motion-spinner" />
-            </span>
+              <DirectionGlyph size={glyphSize} aria-hidden="true" />
+              {/* The control's accessible name is its content, so it says both
+                  what the control is and which way the list is running now. */}
+              <span className="sr-only">
+                {directionLabel}
+                {": "}
+                {currentDirection === "asc" ? ascendingLabel : descendingLabel}
+              </span>
+            </button>
           ) : null}
         </span>
-
-        {showDirection ? (
-          <button
-            type="button"
-            data-slot="sort-control-direction"
-            disabled={inert}
-            onClick={flipDirection}
-            className={directionVariants({ size, state })}
-          >
-            <DirectionGlyph size={glyphSize} aria-hidden="true" />
-            {/* The control's accessible name is its content, so it says both
-                what the control is and which way the list is running now. */}
-            <span className="sr-only">
-              {directionLabel}
-              {": "}
-              {currentDirection === "asc" ? ascendingLabel : descendingLabel}
-            </span>
-          </button>
-        ) : null}
       </div>
     );
   },

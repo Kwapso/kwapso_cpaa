@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.2.17 — 2026-09-02
+
+### Changed — `SortControl`'s field and direction button fuse into one chip
+
+The client's reference artifact draws the sort control as one seamless chip;
+the built control drew the field's own full pill beside a borderless
+direction glyph, separated by a gap — two boxes, not one, and the artifact
+was explicit that this reads wrong. Both halves now draw the SAME resting/
+disabled/read-only hairline (`select.tsx`'s own convention, not restated
+elsewhere) right up to where they meet, and each squares off only its
+shared inner corner (`fieldVariants`'s new `fused` variant, on when
+`showDirection` is true) — two 1px inset shadows on the same line read as
+one border, with no wrapper duplicating `select.tsx`'s state logic and no
+change to `showDirection: false`'s field-alone shape. The two remain
+separately focusable and clickable (WCAG's two-hit-target reasoning this
+file already documents is unchanged) — only the seam between them is gone.
+
 ## v1.2.15 — 2026-09-01
 
 Five UI-level decisions the client confirmed against live `kwapso_system`
