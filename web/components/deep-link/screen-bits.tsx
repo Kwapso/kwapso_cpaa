@@ -336,7 +336,15 @@ export function ToolbarRow({
         // height reads as the same stadium shape every other pill in this
         // app already uses; the inline-start padding is slightly deeper
         // than the others so the search icon doesn't sit flush on the seam.
-        "flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
+        // `relative` — `filter-bar.tsx`'s own open panel anchors to THIS box
+        // via `position: absolute`/`top-full` (2 Sep 2026, second pass: a
+        // flex-sibling panel fed its own tall height into this pill's
+        // `rounded-pill`, drawing a giant oval; absolute positioning keeps
+        // the panel's height out of this box's model no matter how tall it
+        // gets, and `relative` here is what its `top-full`/`inset-x-0`
+        // measure against). See `filter-bar.tsx`'s header for the full
+        // account.
+        "relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
         className
       )}
     >
@@ -354,19 +362,15 @@ export function ToolbarRow({
       {search && (
         <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
       )}
-      {/* NO WRAPPING BOX HERE ANY MORE — `FilterBar` (`shared/web/screen-
-          engine/filter-bar.tsx`) now returns TWO top-level pieces: the chip
-          cluster (which wraps ITSELF in the same non-growing box every other
-          slot here uses) and, while its row is open, a full-width facet row
-          that has to reach the whole track's width, not just the width this
-          slot would otherwise cap it at. Rendering `{filters}` bare lets both
-          land as direct flex items of THIS row, so the open facet row's own
-          `w-full` finally means the whole pill rather than "auto" against an
-          indeterminate box (CSS Sizing §5.3 — the exact trap `filter-bar.tsx`'s
-          own header documents). A caller passing anything OTHER than
-          `<FilterBar>` here still works: a single React node bare in a flex
-          row behaves exactly as it did wrapped, since there is nothing else on
-          its line to steal width from. */}
+      {/* `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`) renders its
+          chip cluster inline here — a normal flex child, wrapped in its own
+          non-growing box internally, same as every other slot on this row —
+          and its OPEN panel out of flow entirely (`position: absolute`,
+          anchored to this div's own `relative` above), so `{filters}` bare is
+          correct for both: the chip cluster takes its place in the row like
+          any other node, and the panel simply isn't part of this flexbox's
+          layout math at all once it's open. A caller passing anything OTHER
+          than `<FilterBar>` here still works unchanged. */}
       {filters}
       {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
       {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}

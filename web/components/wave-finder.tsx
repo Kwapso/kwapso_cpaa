@@ -195,12 +195,16 @@ export function WaveFinder({
   // OWN toolbar uses for its `filters` slot (`shared/ui/components/
   // collection-frame/collection-frame.tsx`).
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+    <div className="relative flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
       {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
           like in your atifact": the reference artifact's search element is
           `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
           chips/sort/period after it to the track's far edge instead of
-          sitting immediately after a narrow box. */}
+          sitting immediately after a narrow box. `relative` on this track —
+          `filter-bar.tsx`'s own open panel anchors to it via `position:
+          absolute`/`top-full`, so its own tall height never feeds this
+          pill's `rounded-pill` (2 Sep 2026, second pass: it did, once, and
+          drew a giant oval). */}
       <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
         <SearchInput
           value={query.q}
@@ -213,14 +217,13 @@ export function WaveFinder({
           className="w-full"
         />
       </div>
-      {/* NO WRAPPING BOX AROUND `<FilterBar>` ANY MORE — it now returns two
-          top-level pieces (the chip cluster, and, while its row is open, a
-          full-width facet row) and the second one has to span this WHOLE
-          track, not the narrower box a wrapper here would cap it at (the same
-          CSS Sizing §5.3 trap `filter-bar.tsx`'s own header documents).
-          Rendering it bare lets both pieces land as direct flex items of the
-          track above, so the facet row's own `w-full` finally reaches the
-          real width. */}
+      {/* NO WRAPPING BOX AROUND `<FilterBar>` — its chip cluster renders
+          inline as a normal flex child (wrapping itself in a non-growing box
+          internally), and its own OPEN panel renders out of flow entirely,
+          `position: absolute` against this track's own `relative` above, so
+          the panel is never part of THIS flexbox's layout math and cannot
+          feed the pill's height. See `filter-bar.tsx`'s own header for the
+          full account, including the second pass that got here. */}
       <FilterBar
         facets={facets}
         values={{ accountId: query.accountId, status: query.status }}

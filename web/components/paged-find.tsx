@@ -372,11 +372,15 @@ export function PagedFind<T>({
 
   const toolbarAndRows = (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+      <div className="relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
         {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
             control sits inside one pill, `bg-background` against the card's
             own `bg-surface-panel`, not floating loose on the panel's bare
-            paper (client, 1 Sep 2026, pointing at her own reference artifact). */}
+            paper (client, 1 Sep 2026, pointing at her own reference artifact).
+            `relative` — `filter-bar.tsx`'s open panel anchors to THIS box via
+            `position: absolute`/`top-full`, so its own tall height (several
+            facets deep) never feeds this pill's `rounded-pill` (2 Sep 2026,
+            second pass: it did, once, and drew a giant oval). */}
         {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
             the filter row's "Clear all" — one control quietly owning two
             questions — and the kit's bar says "Clear filters" and now means
@@ -406,19 +410,16 @@ export function PagedFind<T>({
 
             NO WRAPPING BOX AROUND `<FilterBar>` (client ruling, 2026-09-02,
             superseding the wrapper this slot used to carry): `FilterBar`
-            (`shared/web/screen-engine/filter-bar.tsx`) now returns TWO
-            top-level pieces — the chip cluster, and, while its own row is
-            toggled open, a full-width facet row showing every facet at once.
-            The chip cluster still needs the "wrap a `w-full` root in a
-            non-growing box" technique this comment used to explain (a
-            percentage on an indeterminate box resolves as `auto`, CSS Sizing
-            §5.3) — and gets it, from its OWN wrapping div inside
-            `filter-bar.tsx` now, not from a box this file draws. The open
-            facet row needs the OPPOSITE: it has to reach this WHOLE toolbar
-            pill's width, which a wrapper here would cap it below. Rendering
-            `<FilterBar>` bare lets both pieces land as direct flex items of
-            the pill above, so each gets the width it actually needs. See
-            `filter-bar.tsx`'s own header for the full account. */}
+            (`shared/web/screen-engine/filter-bar.tsx`) renders its chip
+            cluster inline as a normal flex child — it wraps itself in a
+            non-growing box internally, the same "wrap a `w-full` root" trick
+            this comment used to explain (CSS Sizing §5.3) — and its own OPEN
+            panel out of flow entirely, `position: absolute` against this
+            div's own `relative` two lines up, so the panel is never part of
+            THIS flexbox's layout math at all and cannot feed the pill's
+            height. `<FilterBar>` bare is correct either way: in flow for the
+            chips, out of it for the panel. See `filter-bar.tsx`'s own header
+            for the full account, including the second pass that got here. */}
         {showFilters && (
           <FilterBar
             facets={facets}

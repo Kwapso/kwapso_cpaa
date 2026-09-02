@@ -39,52 +39,54 @@
 // holding every facet's own control, stacked one per line. The client, against
 // a confirmed mockup: the slot now toggles a SECOND ROW open directly under the
 // WHOLE toolbar, inside the same card/track — not a popover, not an overlay,
-// an actual sibling line that pushes the rows below it down. Nothing about the
-// facet controls THEMSELVES changed to do this: every facet was already
-// rendered by mapping `facets` once, in one place (`RangeFacet`/
-// `SearchableFacet`, below), so the panel already showed every facet's own
-// field at once — a per-facet SEARCH box included, for `SearchableFacet`'s own
-// query field (Waves' own comment: "an agency with 131 clients on staging
-// needs" its facet's own search). Moving that map from a `<PopoverContent>` to
-// a plain `<div>` changes NONE of that; only the toggle's mechanics and the
-// row's position changed. And nothing here inserts an "Apply" step: a pick
-// already called `onChange`/`pick` directly (see below), which is what the
-// client asked to keep — "the moment I select sth on a dropdown its applied."
+// an actual sibling line. Nothing about the facet controls THEMSELVES changed
+// to do this: every facet was already rendered by mapping `facets` once, in
+// one place (`RangeFacet`/`SearchableFacet`, below), so the panel already
+// showed every facet's own field at once — a per-facet SEARCH box included,
+// for `SearchableFacet`'s own query field (Waves' own comment: "an agency
+// with 131 clients on staging needs" its facet's own search). Moving that map
+// from a `<PopoverContent>` to a plain `<div>` changes NONE of that; only the
+// toggle's mechanics changed. And nothing here inserts an "Apply" step: a
+// pick already called `onChange`/`pick` directly (see below), which is what
+// the client asked to keep — "the moment I select sth on a dropdown its
+// applied."
 //
-// THE ROW MUST SPAN THE WHOLE TOOLBAR, SO THIS COMPONENT'S ROOT IS A FRAGMENT.
-// The chip cluster ("Filter"/count chip + active chips + "Clear filters") has
-// to keep sitting INLINE beside search/sort — exactly where it sits today —
-// while the open facet row has to span the FULL toolbar pill, including the
-// width search and sort occupy. Those are two different widths, so they cannot
-// be one child of the same non-growing wrapper the way the chip cluster alone
-// used to be: `ToolbarRow`/`PagedFind`/`WaveFinder` all wrap the chip cluster
-// in a `flex min-w-0 flex-wrap items-center gap-2` box precisely so that box's
-// own `w-full` (CSS Sizing §5.3: a percentage on an indeterminate box resolves
-// as `auto`) means "as wide as its content" rather than "the whole row" — the
-// the same technique those three files' own comments already document for
-// `SearchInput`/`FilterBar` inside `ToolbarRow`. Trapping the open row inside
-// that SAME box would cap it at the chip cluster's own width, not the
-// toolbar's. So this component returns the chip cluster and the open row as
-// TWO SEPARATE TOP-LEVEL ELEMENTS, and the three hosts render `{filters}` bare
-// (no wrapping box of their own any more) — each element then lands as its own
-// direct flex item of the REAL outer toolbar pill, and the open row's own
-// `w-full` finally means what it says, forcing `flex-wrap` to break it onto a
-// fresh line spanning the whole pill. See `ToolbarRow`, `PagedFind` and
-// `WaveFinder`'s own comments at their `filters` slot for the other half.
+// THE PANEL IS `position: absolute`, NOT A NORMAL-FLOW SIBLING — SECOND PASS,
+// SAME DAY. The first cut made the panel a genuine flex sibling of the chip
+// cluster, both landing as direct children of the toolbar's own pill (this
+// component's root was a `<>` fragment for exactly that). It solved WIDTH —
+// the panel's `w-full` finally meant the whole pill once nothing capped it —
+// and broke HEIGHT: the panel is tall (several facets deep, each several rows
+// of checkboxes), `flex-wrap` folded it onto a second line INSIDE the pill's
+// own box, and a `rounded-pill` box that tall draws a stadium wide enough to
+// read as a giant oval. Caught live on a screenshot, the client's own words
+// "what is this shit". A pill's radius is only ever right for a SHORT box;
+// keeping the panel out of normal flow entirely — `position: absolute` — is
+// what stops its height from ever reaching the pill's own box model, no
+// matter how many facets a future screen adds. `ToolbarRow`, `PagedFind` and
+// `WaveFinder` each mark their pill `relative` so the panel's `top-full`/
+// `inset-x-0` (see `filter-bar-row`'s own className below) has something to
+// measure against; see each of their comments at the `filters` slot for that
+// other half. The trade this makes, deliberately: an open panel now floats
+// ABOVE whatever is below it rather than pushing it down. Nothing here
+// re-flows a page's own scroll position or row count while the panel is
+// open, which the earlier flex-sibling shape could not promise either — a
+// facet row THAT tall would have pushed everything below the toolbar down
+// by however many lines it needed, on every screen, every time.
 //
 // ONE COMPOSITION CANNOT TAKE THIS SHAPE: the vendored kit's OWN
 // `CollectionFrame` (`shared/ui/components/collection-frame/collection-frame.tsx`,
 // R39 — hand-edits turn the build red) wraps whatever it is handed as `filters`
-// in exactly that same non-growing box, and that markup is the kit's, not
-// ours, so it cannot be changed here. Every screen reached through THAT panel
-// (`useKitPanel`, e.g. Member roles, Members, an account's own Apps/Sprints
-// tabs) still gets everything else this lane changed — no popover, an
-// immediate apply, the count on the trigger — the open row simply renders at
-// the width the kit's own toolbar allows a facet cluster rather than the
-// full-bleed second line the three bespoke toolbars can offer. A kit change to
-// let its `filters` slot opt out of that wrapper is the upstream fix, logged
-// for the design-kit pipeline; nothing here fakes it with a hack that would
-// only work by accident.
+// in a non-growing box with no `relative` of its own, and that markup is the
+// kit's, not ours, so it cannot be changed here. Every screen reached through
+// THAT panel (`useKitPanel`, e.g. Member roles, Members, an account's own
+// Apps/Sprints tabs) still gets everything else this lane changed — no
+// popover, an immediate apply, the count on the trigger — the open panel
+// simply anchors to that box's own edge rather than the full toolbar's,
+// which is a narrower absolute-positioning context but not a broken one. A
+// kit change to mark that wrapper `relative` (or drop it) is the upstream
+// fix, logged for the design-kit pipeline; nothing here fakes it with a hack
+// that would only work by accident.
 //
 // ── WHAT THE APP'S FACET CONTRACT IS, MEASURED RATHER THAN ASSUMED ───────────
 //
@@ -302,12 +304,33 @@ function FilterBar<T>({
       </div>
 
       {/* THE SECOND ROW — every facet, all at once, directly under the whole
-          toolbar (see the header for why this has to be a sibling of the chip
-          cluster above rather than something nested inside it). `flex-wrap`
-          so several facets read as a shelf on a wide screen and stack cleanly
-          on a narrow one; each facet is individually sized rather than left to
-          the kit's own `w-full` default (`SearchableFacet`'s root), which
-          would otherwise claim this whole row for the first facet alone. */}
+          toolbar. BUG, 2 Sep 2026, caught live on a screenshot the client
+          called "what is this shit": the first cut of this made the panel a
+          normal-flow FLEX SIBLING of the pill's other children, `w-full`d to
+          reach the toolbar's width. That worked for width, and broke height —
+          the panel is TALL (several facets, each several rows of checkboxes),
+          `flex-wrap` wrapped it onto a second line INSIDE the pill's own box,
+          and a `rounded-pill` (999px) box that tall draws a stadium wide
+          enough to read as a giant oval rather than a control. A pill's
+          radius is only ever right for a SHORT box; the fix is to keep this
+          panel OUT of the box whose radius that is, not to shrink the radius.
+          `position: absolute` does that: removed from normal flow entirely,
+          this panel cannot feed the pill's own height no matter how tall its
+          content gets, so the pill (`relative`, in `ToolbarRow`/`PagedFind`/
+          `WaveFinder`'s own track — see each of their comments at this slot)
+          stays exactly as tall as its own one-line content always was. `top-
+          full` anchors it to the pill's own bottom edge — the pill's
+          `relative` positioning is what `full` measures against — and
+          `inset-x-0` matches its width to the pill without needing the
+          `w-full`-against-an-indeterminate-box workaround this used to lean
+          on, because absolute sizing measures against the SAME containing
+          block regardless. `z-20` clears anything the row below might
+          otherwise paint over it, and `shadow-[var(--shadow-overlay)]` gives
+          it the kit's own floating-surface elevation, since it now visually
+          sits ABOVE the content below rather than pushing it down — a
+          deliberate trade, the one point of behaviour that changed along
+          with the geometry (see the header for why this trade is the right
+          one anyway: nothing here re-flows the page under an open panel). */}
       {open && (
         // NO `role="group"`/`aria-label` OF ITS OWN — the chip cluster above
         // already carries `role="group" aria-label="Filters"` (the kit's own
@@ -319,7 +342,7 @@ function FilterBar<T>({
         <div
           ref={panel}
           data-slot="filter-bar-row"
-          className="flex w-full basis-full flex-wrap items-start gap-4 pt-1"
+          className="absolute inset-x-0 top-full z-20 mt-2 flex flex-wrap items-start gap-4 rounded-[var(--radius)] bg-background p-4 shadow-[var(--shadow-overlay)]"
         >
           {facets.map((f) => {
             const val = values[f.field] ?? ""
