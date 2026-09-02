@@ -44,10 +44,12 @@ export type SessionUser = {
    * is the only way anybody can make the app bigger (UI-RULEBOOK S4, S5). */
   scale: string | null
   /** WHICH SPINE THE SIDEBAR IS PAINTED IN — ink, paper or mango
-   * (shared/spine.ts). Null means never chosen, which reads as paper — kept
-   * distinct from a deliberate choice of paper for the same reason `scale`
-   * is. It sits on the session rather than in one browser's storage so it
-   * follows the person between devices, exactly as `scale` does. */
+   * (shared/spine.ts). Null means never chosen, which reads as mango since the
+   * client's ruling of 2026-09-02 — kept distinct from a deliberate choice of
+   * mango for the same reason `scale` is, and it stays null for somebody who
+   * simply took the default on the onboarding screen. It sits on the session
+   * rather than in one browser's storage so it follows the person between
+   * devices, exactly as `scale` does. */
   spine: string | null
 }
 

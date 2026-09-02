@@ -306,6 +306,16 @@ both nav groups, ProfileMenu, the collapse toggle) re-homed as the `rail`
 node, byte-identical otherwise. `spine="paper"` is explicit — the shell's
 own default is `spine="mango"`, a later ruling this app hasn't adopted.
 
+> **Both spine sentences above are the record of 2026-08-31 and are no longer
+> current.** The spine became a per-person setting, so `app-shell.tsx` passes
+> `spine={spine}` rather than a literal; and on **2026-09-02 the client ruled
+> the default to mango** ("default spine to mango, but everyone can change it
+> during the onboarding or anytime at settings"), so the divergence this
+> paragraph names is gone — `DEFAULT_SPINE` and `ScreenShell`'s own default
+> are the same value again. The prop is still passed explicitly, because the
+> rail must paint what *this person* chose rather than what the shell would
+> guess. `shared/spine.ts` keeps the overturned argument in full.
+
 VERIFIED NAVIGATING, not at rest, because a bad prototype here looks fine
 in a still frame and only fails on navigation
 (`scripts/lane-shots/verify-screen-shell-appshell.mjs`): an `ElementHandle`

@@ -328,9 +328,10 @@ export function AppShell({
   // Settings (shared/web/spine-section.tsx) and persisted on the person's own
   // row exactly as `scale` is, so it follows them between devices. Unlike
   // scale this is an ordinary React prop rather than a document-level side
-  // effect: `toSpine` falls back to "paper" for null/unrecognised so a person
-  // who has never opened Settings keeps seeing exactly the rail they always
-  // had (shared/spine.ts).
+  // effect: `toSpine` falls back to the default for null/unrecognised, which
+  // has been MANGO since the client's ruling of 2026-09-02 — it was paper, to
+  // keep a person who had never opened Settings on the rail they already had,
+  // and that argument is recorded in shared/spine.ts where it was overturned.
   const spine = toSpine(active.user?.spine)
 
   // Desktop sidebar collapse (icon rail), remembered across sessions.
@@ -1158,17 +1159,19 @@ export function AppShell({
       </header>
 
       {/* THE SHELL. `spine={spine}` — the person's own Settings · Sidebar
-       * choice (shared/spine.ts, defaulting to "paper" for anyone who has
-       * never picked one, which is what this file hardcoded before the
-       * setting existed). `[data-spine="…"]` shares its block with bare
+       * choice (shared/spine.ts), which defaults to MANGO since the client's
+       * ruling of 2026-09-02 and is offered again at onboarding. It defaulted
+       * to paper before that, which is also what this file hardcoded before
+       * the setting existed. `[data-spine="…"]` shares its block with bare
        * `:root` in tokens.css only on paper, which is what let this file read
        * `--spine-fill` etc. directly for as long as it drew its own `<aside>`;
-       * on ink or mango those tokens genuinely repaint, which is the whole
-       * point. `ScreenShell`'s own default is `spine="mango"` (a later client
-       * ruling this app's SHELL has not adopted as a default — the person can
-       * still choose it), so it has to be named here rather than left to the
-       * shell's default. `rail={null}` below `md`, via the shell's own
-       * breakpoint law, is what already made this adoptable at all — see
+       * on any other spine those tokens genuinely repaint, which is the whole
+       * point. The prop is still named here rather than left to
+       * `ScreenShell`'s own default — the two agree on mango today, but the
+       * shell's default is a guess about a workspace and this is a fact about
+       * a PERSON, and the day someone changes one of them they must not
+       * silently change the other. `rail={null}` below `md`, via the shell's
+       * own breakpoint law, is what already made this adoptable at all — see
        * COMPOSITION-MISMATCHES.md, the ScreenShell-family entry. */}
       <ScreenShell
         /* `flex flex-col` + the `screen-shell-card` descendant rule —

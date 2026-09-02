@@ -604,10 +604,22 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // {what}…" and "No matches."), and both were already answered in all three
 // languages, so losing them moves no count — the net +1 is the new sentence
 // alone, on the same blocked translation path every raise above cites.
+// RAISED AGAIN, SAME DAY, 143 → 145: the spine is offered during onboarding
+// now (client ruling 2026-09-02, "default spine to mango, but everyone can
+// change it during the onboarding or anytime at settings"), so
+// web/app/onboarding/page.tsx says TWO new sentences — the set card's badge
+// ("Picked", 27.14's own word for the card Settings badges "In use") and the
+// field's help line ("You can change this later in Settings.", which is the
+// ruling's second clause said out loud to the person it is about). The three
+// spine option labels and descriptions are NOT new: onboarding draws the same
+// `SpineChoice` Settings draws, so it says the same six sentences the
+// catalogue already holds rather than a second set of its own. Same blocked
+// translation path every raise above cites — no environment here carries the
+// credential a real translation run needs. Real work owed, not debt hidden.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 143,
-  es: 143,
-  ca: 143,
+  de: 145,
+  es: 145,
+  ca: 145,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -2171,7 +2183,7 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
   "screens/not-found.tsx":
     "MISMATCH. `NotFoundScreen` is built for one record missing inside an otherwise-fine collection (its own header states this three times) — a record number chip, a real collection eyebrow/count and the collection's own header actions all stay drawn. This app's `<NotFound />` fires when a URL segment names no module at all, so there is no collection context to put in those slots. `screens/page-failure.tsx` is the composition that matches a real case here instead.",
   "screens/onboarding.tsx":
-    "MISMATCH. The kit's 3-step tour (who you are / how it should look / what you work on) has no analog: this app's real onboarding (`web/app/onboarding/page.tsx`) is a deliberately single-step name-and-photo form wired to closed-team-creation business logic (`TEAM_CREATION_CLOSED`, agency-vs-client bootstrap branching) the composition has no concept of.",
+    "MISMATCH. The kit's 3-step tour (who you are / how it should look / what you work on) has no analog: this app's real onboarding (`web/app/onboarding/page.tsx`) is a deliberately single-step form wired to closed-team-creation business logic (`TEAM_CREATION_CLOSED`, agency-vs-client bootstrap branching) the composition has no concept of. STILL A MISMATCH after 2026-09-02, when the client's spine ruling put an appearance choice on that screen: what the composition's step 2 offers is now offered, but as one field in the single form rather than as a step — its `AppearanceOptionGroup`/`SpinePicture` cards are the SUB-PRIMITIVES this app already reaches (`shared/web/spine-section.tsx`), and it is the STEPPER around them, plus a third step for work this app assigns rather than asks about, that stays unadopted.",
   "screens/portal-boot.tsx":
     "MISMATCH. Its 'booting' register is the same static `SignInSplash` this app rejected for `screens/splash.tsx` (see that entry); its 'boot failed' register is the same real condition `screens/page-failure.tsx` already covers, already adopted on the more specific textual match for a whole-page failure.",
   "screens/portal-home.tsx":
