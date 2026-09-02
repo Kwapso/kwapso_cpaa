@@ -25,10 +25,12 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { List } from "@shared/web/list-compat"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
@@ -357,7 +359,19 @@ export function SprintsScreen({
   })
   const [addOpen, setAddOpen] = React.useState(false)
 
-  if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>
+  if (sprintsQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the sprints.") }}
+        action={
+          <Button variant="secondary" onClick={() => sprintsQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const sprints = sprintsQ.data

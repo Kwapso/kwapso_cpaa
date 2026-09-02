@@ -28,6 +28,7 @@ import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view
 import { useRemembered } from "@shared/web/remembered"
 import { ChevronRight, Palette, Pencil } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { LegalDetailsDialog } from "@/components/legal-details-dialog"
 import { OverviewList } from "@/components/overview-list"
@@ -147,7 +148,19 @@ function TeamPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () => tenancy.members().then((r) => r.members))
 
   if (!canRead) return <p className="text-muted-foreground text-sm">{t("You can't see the team.")}</p>
-  if (membersQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the team.")}</p>
+  if (membersQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the team.") }}
+        action={
+          <Button variant="secondary" onClick={() => membersQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   return (
@@ -183,7 +196,19 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
   const total = useCachedValue<number>(totalKey("brand_assets", teamId))
 
   if (!canRead) return <p className="text-muted-foreground text-sm">{t("You can't see the brand library.")}</p>
-  if (assetsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the brand library.")}</p>
+  if (assetsQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the brand library.") }}
+        action={
+          <Button variant="secondary" onClick={() => assetsQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (assetsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const newest = assetsQ.data.filter((a) => a.active).slice(0, 6)

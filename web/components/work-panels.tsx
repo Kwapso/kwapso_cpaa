@@ -25,6 +25,7 @@ import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Ban, ChevronRight } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AppMark } from "@/components/app-tiles"
 import { LoadMore } from "@/components/load-more"
@@ -202,6 +203,7 @@ function PagedPanelBody<T>({
   restingData,
   restingError,
   errorText,
+  onRetry,
   onNew,
   newLabel,
   emptyTitle,
@@ -223,13 +225,30 @@ function PagedPanelBody<T>({
   restingData: T[] | undefined
   restingError: unknown
   errorText: string
+  /** Re-runs the resting read this panel already holds — every caller has its
+   * own `useCached` in hand (`q.refresh`), so a failed read is a real retry
+   * rather than a dead end. */
+  onRetry: () => void
   onNew?: () => void
   newLabel: string
   emptyTitle: string
   loadMoreLabel: string
   renderRows: (rows: T[]) => React.ReactNode
 }) {
-  if (restingError) return <p className="text-destructive text-sm">{errorText}</p>
+  const t = useT()
+  if (restingError)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: errorText }}
+        action={
+          <Button variant="secondary" onClick={onRetry}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (restingData === undefined) return <Skeleton variant="list" lines={3} />
   return (
     <PagedFind<T>
@@ -389,6 +408,7 @@ export function StoriesPanel({
       restingData={q.data}
       restingError={q.error}
       errorText={t("Couldn't load the work.")}
+      onRetry={() => q.refresh()}
       onNew={onNew}
       newLabel={t("New story")}
       // No import wiring here (composition 27.21's second button): the
@@ -494,7 +514,19 @@ export function SprintsPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the sprints.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   // BOUNDED (R14), like the top-level Sprints screen this mirrors: a sprint is
@@ -598,7 +630,19 @@ export function AppsPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the apps.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the apps.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   // BOUNDED (R14) — an account has tens of systems, not thousands, so this is
@@ -749,6 +793,7 @@ export function ProcessesPanel({
       restingData={q.data}
       restingError={q.error}
       errorText={t("Couldn't load the processes.")}
+      onRetry={() => q.refresh()}
       onNew={onNew}
       newLabel={t("Map a process")}
       // No `processes` import target — a map is drawn from inside the app
@@ -836,6 +881,7 @@ export function AppMeetingsPanel({
       restingData={q.data}
       restingError={q.error}
       errorText={t("Couldn't load the meetings.")}
+      onRetry={() => q.refresh()}
       onNew={onNew}
       newLabel={t("Arrange a meeting")}
       // The `meetings` import target is real, but it writes UNSCOPED rows —
@@ -959,6 +1005,7 @@ export function AppTicketsPanel({
       restingData={q.data}
       restingError={q.error}
       errorText={t("Couldn't load the tickets.")}
+      onRetry={() => q.refresh()}
       onNew={onNew}
       newLabel={t("Raise a ticket")}
       // No `help`/tickets import target exists.
@@ -1258,6 +1305,7 @@ export function TodosPanel({
         restingData={q.data}
         restingError={q.error}
         errorText={t("Couldn't load the inputs.")}
+        onRetry={() => q.refresh()}
         onNew={view === "open" ? onNew : undefined}
         newLabel={t("Ask for something")}
         // No import target for to-dos — they are asked of a client one at a

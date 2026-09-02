@@ -42,11 +42,13 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
@@ -251,7 +253,19 @@ export function AppsScreen({
   // vocabulary"). Don't reorder `views` below to match the kit's default.
   const [view, setView] = useRemembered<"tiles" | "list">("view", "tiles")
 
-  if (appsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the apps.")}</p>
+  if (appsQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the apps.") }}
+        action={
+          <Button variant="secondary" onClick={() => appsQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   // WHO AN APP MAY BE FILED UNDER, and WHICH STAGE — both derived from the

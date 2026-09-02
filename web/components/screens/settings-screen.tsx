@@ -65,10 +65,12 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { List } from "@shared/web/list-compat"
 import { ChevronRight } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AccessTokensSection } from "@/components/access-tokens"
 import { GoogleConnectionsSection } from "@/components/google-connections"
@@ -274,7 +276,16 @@ export function SettingsScreen({
                   {!can("team_members", "read") ? (
                     <NoAccess />
                   ) : membersQ.error ? (
-                    <p className="text-destructive text-sm">{t("Couldn't load members.")}</p>
+                    <ShapeStateBody
+                      shape="recordChrome"
+                      state="error"
+                      copy={{ errorTitle: t("Couldn't load members.") }}
+                      action={
+                        <Button variant="secondary" onClick={() => membersQ.refresh()}>
+                          {t("Try again")}
+                        </Button>
+                      }
+                    />
                   ) : !membersData || !membersRecipe ? (
                     <Skeleton variant="list" lines={4} />
                   ) : (
@@ -300,7 +311,16 @@ export function SettingsScreen({
                   {!can("member_roles", "read") ? (
                     <NoAccess />
                   ) : rolesQ.error ? (
-                    <p className="text-destructive text-sm">{t("Couldn't load roles.")}</p>
+                    <ShapeStateBody
+                      shape="recordChrome"
+                      state="error"
+                      copy={{ errorTitle: t("Couldn't load roles.") }}
+                      action={
+                        <Button variant="secondary" onClick={() => rolesQ.refresh()}>
+                          {t("Try again")}
+                        </Button>
+                      }
+                    />
                   ) : !rolesRecipe ? (
                     <Skeleton variant="list" lines={4} />
                   ) : (

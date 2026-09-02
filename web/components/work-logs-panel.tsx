@@ -40,6 +40,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { Pencil } from "@shared/ui/foundations/icons"
@@ -349,7 +350,19 @@ export function WorkLogsPanel({
     toast.success(t("Time logged."))
   }
 
-  if (logsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the time.")}</p>
+  if (logsQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the time.") }}
+        action={
+          <Button variant="secondary" onClick={() => refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (logsQ.data === undefined) return <Skeleton variant="list" lines={3} />
   // WHILE A PERSON IS PICKED, THE FILTERED READ IS THE LIST — its own cache
   // key and its own cursor, exactly the shape a paged narrowing takes

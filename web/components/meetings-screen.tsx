@@ -32,6 +32,7 @@ import {
   type ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 
@@ -310,7 +311,24 @@ export function MeetingsScreen({
   // EITHER READ FAILING IS THE SAME SENTENCE — whichever list this tab is
   // standing on, what the reader could not get is the meetings.
   if (meetingsQ.error || weekQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the meetings.") }}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              meetingsQ.refresh()
+              weekQ.refresh()
+            }}
+          >
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const loaded = meetingsQ.data
   const weekRows = weekQ.data

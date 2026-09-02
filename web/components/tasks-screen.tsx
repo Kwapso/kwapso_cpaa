@@ -22,9 +22,11 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { KpiProgress } from "@shared/ui/components/kpi-progress/kpi-progress"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type {
   ScreenActionContext,
   ScreenIntent,
@@ -267,7 +269,19 @@ export function TasksScreen({
     </section>
   )
 
-  if (tasksQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the tasks.")}</p>
+  if (tasksQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the tasks.") }}
+        action={
+          <Button variant="secondary" onClick={() => tasksQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (tasksQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const data = shapeTasks(tasksQ.data, lang)

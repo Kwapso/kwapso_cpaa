@@ -21,6 +21,7 @@ import { List } from "@shared/web/list-compat"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { ReceivedInvite } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -67,7 +68,18 @@ export function InvitationsPanel({ refresh }: { refresh: () => Promise<void> }) 
   }
 
   if (invitesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load your invites.")}</p>
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load your invites.") }}
+        action={
+          <Button variant="secondary" onClick={() => invitesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (invites === undefined) return <Skeleton variant="list" lines={2} />
 
   // Library List (flat surface + a fill to match the design language, per

@@ -38,6 +38,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ProcessSaving } from "@shared/workers/savings"
 import { tenancy } from "@/lib/api"
 import { useT } from "@shared/web/language"
@@ -244,12 +245,16 @@ export function StepsPanel({
       {shown.error ? (
         // A version that can't be read says so and offers the way back
         // — a skeleton that never resolves is the same screen as a hang.
-        <div className="flex flex-col items-start gap-2">
-          <p className="text-destructive text-sm">{t("Couldn't load that version.")}</p>
-          <Button variant="secondary" size="sm" onClick={() => onShowVersion(null)}>
-            {t("Show the current version")}
-          </Button>
-        </div>
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load that version.") }}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => onShowVersion(null)}>
+              {t("Show the current version")}
+            </Button>
+          }
+        />
       ) : shownSteps === undefined ? (
         <Skeleton variant="list" lines={4} />
       ) : stepView === "flow" ? (

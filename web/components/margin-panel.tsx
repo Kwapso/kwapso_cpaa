@@ -29,8 +29,10 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Banknote } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { tenancy } from "@/lib/api"
 import { InAppLink } from "@/components/in-app-link"
@@ -105,7 +107,19 @@ export function MarginPanel({
   // cannot name the accounts whose margins it moved (see live-resources.ts).
   const marginQ = useCached(marginKey(accountId), () => tenancy.margin(accountId))
 
-  if (marginQ.error) return <p className="text-destructive text-sm">{t("Couldn't work out the margin.")}</p>
+  if (marginQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't work out the margin.") }}
+        action={
+          <Button variant="secondary" onClick={() => marginQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (marginQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const m = marginQ.data
 

@@ -17,7 +17,9 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   ScreenRenderer,
@@ -222,7 +224,19 @@ export function StoriesScreen({
   const storyMarks = markMap(options.selectableValues, MARK_GROUP.story)
   const [storyOpen, setStoryOpen] = React.useState(false)
 
-  if (storiesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the work.")}</p>
+  if (storiesQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the work.") }}
+        action={
+          <Button variant="secondary" onClick={() => storiesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (storiesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const loaded = storiesQ.data

@@ -13,6 +13,7 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import {
   Select,
@@ -24,6 +25,7 @@ import {
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ChevronRight } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
 import { content as contentApi } from "@/lib/api"
@@ -206,7 +208,19 @@ export function ContactTicketsPanel({
       return r.tickets
     })
   )
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the tickets.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   if (q.data.length === 0)
     return (
@@ -302,7 +316,19 @@ export function ContactMeetingsPanel({
       return r.meetings
     })
   )
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the meetings.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   if (q.data.length === 0)
     return (

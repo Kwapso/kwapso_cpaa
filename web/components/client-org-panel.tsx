@@ -55,6 +55,7 @@ import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -326,9 +327,23 @@ export function ClientOrgPanel({
   // is never coming.
   if (failedToLoad)
     return (
-      <p className="text-destructive text-sm">
-        {t("That didn't load. Refresh the page, and tell us if it keeps happening.")}
-      </p>
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("That didn't load. Refresh the page, and tell us if it keeps happening.") }}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              deptQ.refresh()
+              rolesQ.refresh()
+              toolsQ.refresh()
+            }}
+          >
+            {t("Try again")}
+          </Button>
+        }
+      />
     )
   if (loading)
     return (

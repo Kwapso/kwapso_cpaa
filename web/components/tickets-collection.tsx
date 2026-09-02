@@ -92,6 +92,7 @@ import { Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useRemembered } from "@shared/web/remembered"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -355,7 +356,16 @@ export function TicketsCollection({
             </CollectionCard>
           ) : scopedQ.error ? (
             <CollectionCard attached>
-              <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
+              <ShapeStateBody
+                shape="collectionScreen"
+                state="error"
+                copy={{ errorTitle: t("Couldn't load the tickets.") }}
+                action={
+                  <Button variant="secondary" onClick={() => scopedQ.refresh()}>
+                    {t("Try again")}
+                  </Button>
+                }
+              />
             </CollectionCard>
           ) : scopedQ.data === undefined ? (
             <CollectionCard attached>

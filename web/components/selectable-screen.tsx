@@ -28,6 +28,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Headline } from "@shared/ui/components/typography/typography"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { Pencil, X, Check, Upload, Download, Power, Shield, ShieldOff } from "@shared/ui/foundations/icons"
 
 import type { SortOption } from "@shared/web/screen-engine/config"
@@ -469,7 +470,18 @@ export function SelectableScreen({
   }
 
   if (valuesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load dropdown values.")}</p>
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load dropdown values.") }}
+        action={
+          <Button variant="secondary" onClick={() => valuesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (valuesQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   // Bundled once so `GroupValues`/`ValueRow` take one prop instead of

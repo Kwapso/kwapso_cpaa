@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Ban, ClipboardCopy, Copy } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
@@ -143,7 +144,16 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       </p>
 
       {tokensQ.error ? (
-        <p className="text-destructive text-sm">{t("Couldn't load your tokens.")}</p>
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load your tokens.") }}
+          action={
+            <Button variant="secondary" onClick={() => tokensQ.refresh()}>
+              {t("Try again")}
+            </Button>
+          }
+        />
       ) : tokensQ.data === undefined ? (
         <Skeleton variant="list" lines={2} />
       ) : tokens.length === 0 ? (

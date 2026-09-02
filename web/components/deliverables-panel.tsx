@@ -43,6 +43,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Eye, EyeOff, Pencil, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -172,7 +173,19 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
     }
   }
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the deliverables.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the deliverables.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   const needle = find.trim().toLowerCase()

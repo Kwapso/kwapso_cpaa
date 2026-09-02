@@ -41,6 +41,9 @@ import { StaffPanel } from "@/components/staff-panel"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { SelectableDetailScreen } from "@/components/selectable-detail"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
+import { Button } from "@shared/ui/components/button/button"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+import { invalidate } from "@shared/web/store"
 import { LoadMore } from "@/components/load-more"
 import { tenancy } from "@/lib/api"
 import type { TaskView } from "@/lib/live-resources"
@@ -217,9 +220,20 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // one of them is worth waiting through.
     if (permsError)
       return (
-        <p className="text-destructive text-sm">
-          {t("We couldn't check what you're allowed to see. Refresh the page, and tell us if it keeps happening.")}
-        </p>
+        <ShapeStateBody
+          shape="collectionScreen"
+          state="error"
+          copy={{
+            errorTitle: t(
+              "We couldn't check what you're allowed to see. Refresh the page, and tell us if it keeps happening."
+            ),
+          }}
+          action={
+            <Button variant="secondary" onClick={() => invalidate(`my-perms:${teamId}`)}>
+              {t("Try again")}
+            </Button>
+          }
+        />
       )
     if (perms === undefined) return <Skeleton variant="list" lines={4} />
 

@@ -34,6 +34,7 @@ import { Input } from "@shared/ui/components/input/input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,7 +133,18 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   }
 
   if (ratesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load the internal rates.")}</p>
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the internal rates.") }}
+        action={
+          <Button variant="secondary" onClick={() => ratesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const rates = ratesQ.data
 
@@ -360,7 +372,19 @@ function RoleRateCard({ teamId }: { teamId: string }) {
     }
   }
 
-  if (ratesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the role rates.")}</p>
+  if (ratesQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the role rates.") }}
+        action={
+          <Button variant="secondary" onClick={() => ratesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const rates = ratesQ.data
   // Whole units in, whole cents out — the same conversion every price on this

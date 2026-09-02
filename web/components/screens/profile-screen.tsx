@@ -23,6 +23,7 @@ import { List } from "@shared/web/list-compat"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
 import { Mail } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { EmailChangeDialog } from "@/components/email-change-dialog"
 import { ProfileDialog } from "@/components/profile-dialog"
@@ -94,7 +95,16 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
             {t("Account activity")}
           </h2>
           {accountActivityQ.error ? (
-            <p className="text-destructive text-sm">{t("Couldn't load your activity.")}</p>
+            <ShapeStateBody
+              shape="recordChrome"
+              state="error"
+              copy={{ errorTitle: t("Couldn't load your activity.") }}
+              action={
+                <Button variant="secondary" onClick={() => accountActivityQ.refresh()}>
+                  {t("Try again")}
+                </Button>
+              }
+            />
           ) : accountActivityQ.data === undefined ? (
             <Skeleton variant="list" lines={3} />
           ) : (

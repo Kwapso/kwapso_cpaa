@@ -53,8 +53,9 @@ import { ApiFailure, dataOps } from "@/lib/api"
 import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { formatActivityWhen } from "@shared/web/format"
 import { usePermissions } from "@/lib/perms"
-import { useCached } from "@shared/web/store"
+import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 type Rejection = { file: string; row: number; reason: string }
 
@@ -171,7 +172,18 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   // ---- guards (wait for rights before judging — a loading `can` reads false) ----
   if (permsLoading && perms === undefined) return <Skeleton variant="list" lines={4} />
   if (perms === undefined)
-    return <p className="text-destructive text-sm">{t("Couldn't load your access rights. Refresh to try again.")}</p>
+    return (
+      <ShapeStateBody
+        shape="stepperHero"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load your access rights. Refresh to try again.") }}
+        action={
+          <Button variant="secondary" onClick={() => invalidate(`my-perms:${teamId}`)}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (!canImport)
     return (
       <p className="text-muted-foreground text-sm">

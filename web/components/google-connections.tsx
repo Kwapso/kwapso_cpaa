@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Ban, Pencil, Plus, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import {
   GOOGLE_SCOPED_SERVICES,
@@ -235,7 +236,16 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       )}
 
       {q.error ? (
-        <p className="text-destructive text-sm">{t("Couldn't load your Google connections.")}</p>
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load your Google connections.") }}
+          action={
+            <Button variant="secondary" onClick={() => q.refresh()}>
+              {t("Try again")}
+            </Button>
+          }
+        />
       ) : q.data === undefined ? (
         <Skeleton variant="list" lines={4} />
       ) : !q.data.ready ? (

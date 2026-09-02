@@ -41,6 +41,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Pencil, Power, RotateCcw } from "@shared/ui/foundations/icons"
 import { Gantt, GanttPeriodStepper, type GanttBar, type GanttLane } from "@shared/ui/components/gantt/gantt"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import {
@@ -316,7 +317,19 @@ export function WaveCollection({
   // A FAILED READ SAYS SO. A skeleton that never resolves is indistinguishable
   // from a screen that is merely slow, and the person waits for something that
   // is never coming.
-  if (wavesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the waves.")}</p>
+  if (wavesQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the waves.") }}
+        action={
+          <Button variant="secondary" onClick={() => wavesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (wavesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   // ON A CLIENT'S RECORD the list is narrowed before anything else is asked, so

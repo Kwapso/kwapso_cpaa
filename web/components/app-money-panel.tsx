@@ -31,6 +31,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Route } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { tenancy } from "@/lib/api"
 import { appMoneyKey } from "@/lib/live-resources"
@@ -53,7 +54,19 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
   const t = useT()
   const q = useCached<AppMoneyBack>(appMoneyKey(appId), () => tenancy.appMoney(appId))
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't work out what this app gives back.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't work out what this app gives back.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const view = q.data
 
