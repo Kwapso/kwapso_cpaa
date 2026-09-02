@@ -124,6 +124,7 @@ function ListToolbar({
         direction={sort.dir}
         onDirectionChange={(dir) => onSort({ ...sort, dir })}
         label={t("Sort by")}
+        hideLabel
       />
     </>
   )

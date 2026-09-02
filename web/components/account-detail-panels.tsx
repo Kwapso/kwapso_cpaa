@@ -176,6 +176,7 @@ export function ContactsPanel({
                 direction={sort.dir}
                 onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
                 label={t("Sort by")}
+                hideLabel
               />
             </>
           )
@@ -360,6 +361,7 @@ export function PortalAccessPanel({
                 direction={sort.dir}
                 onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
                 label={t("Sort by")}
+                hideLabel
               />
             </>
           )

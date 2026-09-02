@@ -553,6 +553,7 @@ export function SelectableScreen({
                     direction={sort.dir}
                     onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
                     label={t("Sort by")}
+                    hideLabel
                   />
                 </>
               )

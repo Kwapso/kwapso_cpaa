@@ -161,6 +161,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
                 direction={sort.dir}
                 onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
                 label={t("Sort by")}
+                hideLabel
               />
             </>
           )

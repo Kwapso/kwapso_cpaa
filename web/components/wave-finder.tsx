@@ -192,7 +192,7 @@ export function WaveFinder({
   // OWN toolbar uses for its `filters` slot (`shared/ui/components/
   // collection-frame/collection-frame.tsx`).
   return (
-    <div className="flex w-full flex-wrap items-center gap-2">
+    <div className="flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
       <SearchInput
         value={query.q}
         onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
@@ -231,6 +231,7 @@ export function WaveFinder({
         direction={query.dir}
         onDirectionChange={(dir) => onChange({ ...query, dir })}
         label={t("Sort by")}
+        hideLabel
       />
       {period}
       {view && onViewChange ? (

@@ -372,7 +372,11 @@ export function PagedFind<T>({
 
   const toolbarAndRows = (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+        {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
+            control sits inside one pill, `bg-background` against the card's
+            own `bg-surface-panel`, not floating loose on the panel's bare
+            paper (client, 1 Sep 2026, pointing at her own reference artifact). */}
         {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
             the filter row's "Clear all" — one control quietly owning two
             questions — and the kit's bar says "Clear filters" and now means

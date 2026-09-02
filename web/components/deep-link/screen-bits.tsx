@@ -324,12 +324,25 @@ export function ToolbarRow({
 }) {
   if (!search && !filters && !sort && !view && !actions) return null
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div
+      className={cn(
+        // THE TRACK — client, 1 Sep 2026, pointing at her own reference
+        // artifact: every control sits inside ONE visibly distinct pill,
+        // a step lighter than the panel it's drawn on (`bg-background`
+        // against the card's own `bg-surface-panel`), not floating loose
+        // chips on the panel's bare paper. `rounded-pill` at the row's own
+        // height reads as the same stadium shape every other pill in this
+        // app already uses; the inline-start padding is slightly deeper
+        // than the others so the search icon doesn't sit flush on the seam.
+        "flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
+        className
+      )}
+    >
       {search}
       {filters && <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>}
       {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
       {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
-      {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="ms-auto flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

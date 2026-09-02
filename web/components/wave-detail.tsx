@@ -405,6 +405,7 @@ export function WaveDetailScreen({
                             direction={sprintSort.dir}
                             onDirectionChange={(dir) => setSprintSort((s) => ({ ...s, dir }))}
                             label={t("Sort by")}
+                            hideLabel
                           />
                         </>
                       )

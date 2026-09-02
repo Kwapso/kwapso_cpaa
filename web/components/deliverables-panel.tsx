@@ -266,6 +266,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
               direction={sort.dir}
               onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
               label={t("Sort by")}
+              hideLabel
             />
           )
         }

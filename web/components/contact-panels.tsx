@@ -360,6 +360,7 @@ export function ContactMeetingsPanel({
                 direction={sort.dir}
                 onDirectionChange={(dir) => setSort({ dir })}
                 label={t("Sort by")}
+                hideLabel
               />
             </>
           }

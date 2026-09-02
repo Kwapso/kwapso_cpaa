@@ -85,7 +85,7 @@ function SourceChips({
        * row looked like unlabelled buttons. Styled like the app's other small
        * section captions (e.g. `google-connections.tsx`'s `t("Google")`
        * heading). */}
-      <span className="text-muted-foreground text-micro uppercase">{t("Reading from")}</span>
+      <span className="text-muted-foreground text-micro uppercase mt-2">{t("Reading from")}</span>
       <div
         className="flex flex-wrap items-center gap-1.5"
         role="group"
