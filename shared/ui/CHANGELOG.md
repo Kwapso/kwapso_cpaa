@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.2.22 — 2026-09-02
+
+### Changed — the rail's active row is an inset pill, not a full-bleed one
+
+Client, after the rounding itself finally landed: "allow a bit of blank
+space on the sides so it's not touching the edge." `ROW_EXPANDED` used to
+cancel the rail's own ambient `--rail-inset` with a negative inline margin
+to reach the column's true edge, then pay the inset back as padding so the
+icon/label still landed where an idle row's already sat. Dropping the
+cancel-and-respend leaves the row inside the same padding every other row
+already sits in — the blank space is exactly `--rail-inset`, the value the
+shell already publishes on the column, not a new number. `rounded-pill`
+and the row's height are unchanged; only the outer box's own bleed is
+gone. Two other passages in this file described the old full-bleed
+mechanic as current and were updated to match (the geometry summary's
+"FULL-BLEED" bullet, and the brand mark's own alignment comment); a third,
+the historical record of the square-vs-pill reversal, is left alone since
+it correctly describes what was true at the time.
+
 ## v1.2.21 — 2026-09-02
 
 ### Changed — the fused sort chip's order flipped: arrow on the left, field on the right

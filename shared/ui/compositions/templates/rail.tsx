@@ -262,14 +262,19 @@
    ─────────────────────────────────────────────────────────────────────────
    · WIDTH — "Fixed 208px" (26.02). The shell owns it (`RAIL_WIDTH`, 13rem);
      this file writes no width in its expanded form and fills the column.
-   · RADIUS — NONE, expanded. See the reversal above. The COLLAPSED row keeps
-     999: 27.8 and 27.1's tablet render both draw the icon rail as a column of
-     circles, "at the same circular size as the avatar", and a full-bleed
-     square inside a 32-wide column is not a thing the kit draws anywhere.
-   · "FULL-BLEED" — edge to edge of the rail's COLUMN, out through the shell's
-     own padding via `--rail-inset`. The label does not move when a row
-     lights: the row's inline padding is `--rail-inset + --space-3`, which is
-     exactly where an unlit row's label already sat.
+   · RADIUS — `rounded-pill`, both states. See the reversal above (the
+     expanded row was briefly square, then reversed live, repeatedly, by the
+     client). The COLLAPSED row has always kept 999: 27.8 and 27.1's tablet
+     render both draw the icon rail as a column of circles, "at the same
+     circular size as the avatar", and a square inside a 32-wide column is
+     not a thing the kit draws anywhere.
+   · "FULL-BLEED", RETIRED 2 Sep 2026 — the expanded row used to bleed edge to
+     edge of the rail's COLUMN, out through the shell's own padding via
+     `--rail-inset`; the client asked for "a bit of blank space on the sides"
+     instead, so it now sits inside that padding like every other row (see
+     `ROW_EXPANDED`'s own header). The label's own position is unaffected
+     either way — it was never on the negative margin, only the row's outer
+     box was.
    · COLLAPSED ICON — 26.02 says "the same 36px circular size as the avatar".
      THE AVATAR LADDER HAS NO 36. Ruling 30 states three sizes absolutely and
      they are 24 / 32 / 48. The caption's operative words are "the same size
@@ -469,30 +474,34 @@ const ROW_SHAPE = cn(
 );
 
 /**
- * Expanded: FULL-BLEED AND ROUNDED. Was square (26.02's dev note read an old
- * client screenshot as calling for a flush, corner-square row) — overruled
- * live, repeatedly, by the same client: the active row reads as a PILL, the
- * one shape this whole design system otherwise uses for every lit/selected
- * state (a tab's underline, a chip, a selected control). `rounded-pill` at
- * this row's own fixed height (`--control-height-button`) draws a stadium —
- * fully rounded top and bottom — which is the correct pill shape for a full-
- * bleed bar, not a contradiction of "full-bleed."
+ * Expanded: A PILL, INSET, NOT FULL-BLEED — client, 2 Sep 2026, after the
+ * rounding itself finally landed: "allow a bit of blank space on the sides
+ * so it's not touching the edge." This reverses "full-bleed" specifically,
+ * not the pill shape it was paired with.
  *
- * The negative inline margin is the shell's own `--rail-inset`, published on
- * the column for exactly this; the row then pays it back in padding, so the
- * label sits where an unlit row's label already sat and nothing shifts when
- * a row lights. No `w-full`: the row is a flex item in a stretching column,
- * so dropping the width lets the negative margins take it to both edges
- * instead of pushing a 100% box sideways.
+ * THE SPACE IS NOT A NEW NUMBER. This row used to CANCEL the rail's own
+ * ambient inset with a negative inline margin (`-mx-[var(--rail-inset)]`) to
+ * reach the column's true edge, then pay the inset back as padding so the
+ * icon/label still landed where an idle row's already sat. Dropping the
+ * cancel-and-respend entirely leaves the row inside the SAME padding every
+ * other row already sits in — the blank space this asks for is exactly
+ * `--rail-inset`, the value the shell already publishes on the column, read
+ * here by not fighting it rather than by naming it again. `px-[var(--space-
+ * 3)]` is the row's own internal breathing room around its icon/label,
+ * unchanged from what the old padding calc's "+ --space-3" term already
+ * added on top of the cancelled inset.
  *
- * `--rail-inset` carries a `0px` fallback so a rail rendered outside the
- * shell degrades to a plain flush row rather than to `NaN`.
+ * `rounded-pill` at this row's own fixed height (`--control-height-button`)
+ * still draws the same stadium — the earlier note that this shape "is the
+ * correct pill shape for a full-bleed bar" is retired, not the shape: a pill
+ * with air on both sides is the ordinary reading of the word, no longer one
+ * that needed defending against "full-bleed" specifically.
+ *
+ * No `w-full`: the row is a flex item in a stretching column, so it already
+ * fills the column's own content box (inside the ambient padding) without
+ * one.
  */
-const ROW_EXPANDED = cn(
-  "h-[var(--control-height-button)] w-auto rounded-pill",
-  "-mx-[var(--rail-inset,0px)]",
-  "px-[calc(var(--rail-inset,0px)+var(--space-3))]",
-);
+const ROW_EXPANDED = cn("h-[var(--control-height-button)] w-auto rounded-pill px-[var(--space-3)]");
 
 /**
  * Collapsed: "only its icon remains, centered in the rail, at the same …
@@ -1151,12 +1160,13 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
               /* ONE LEADING EDGE DOWN THE WHOLE COLUMN. The client's
                  reference aligns the lockup with the leading edge of the
                  destinations below it, not with the column's padding — and
-                 every other thing in this rail already sits at
-                 `--rail-inset + --space-3`: a row pays its inset back in
-                 padding after bleeding out through it, and a group heading
-                 writes the same `--space-3` directly. The head was the one
-                 block starting 12 to the left of everything else. Collapsed,
-                 the column centres instead and the inset would fight it. */
+                 every other thing in this rail already writes the same
+                 `--space-3` of its own, a group heading directly and an
+                 expanded row too (`ROW_EXPANDED`, since 2 Sep 2026 no longer
+                 bleeding past the ambient `--rail-inset` first). The head was
+                 the one block starting 12 to the left of everything else.
+                 Collapsed, the column centres instead and the inset would
+                 fight it. */
               isCollapsed ? "justify-center" : "px-[var(--space-3)]",
             )}
           >
