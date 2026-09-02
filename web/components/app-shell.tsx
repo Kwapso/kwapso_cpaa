@@ -171,7 +171,7 @@ function StandaloneNavItem({
     "[&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0",
     collapsed
       ? "size-[var(--avatar-md)] justify-center rounded-pill p-0"
-      : "h-[var(--control-height-button)] w-auto rounded-none -mx-[var(--rail-inset,0px)] px-[calc(var(--rail-inset,0px)+var(--space-3))]",
+      : "h-[var(--control-height-button)] w-auto rounded-pill -mx-[var(--rail-inset,0px)] px-[calc(var(--rail-inset,0px)+var(--space-3))]",
     active
       ? "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)] font-[var(--font-weight-medium)] hover:bg-[var(--spine-active-hover)]"
       // `--ink-secondary`, not `--spine-ink-quiet` — the same darker-chip
@@ -784,34 +784,34 @@ export function AppShell({
           />
         </div>
       ))}
-      {/* THE OWNER'S OVERRIDE, APP-SIDE ONLY — do not "fix" this back by
-          editing the kit. Rail's own `ROW_EXPANDED` (templates/rail.tsx,
-          ~line 483) is deliberately `rounded-none`: "FULL-BLEED AND SQUARE,
-          per 26.02's dev note and the client's screenshots" — the SAME
-          client ruled this square once already. Live on staging, 31 Aug
-          2026, he reversed that ruling: "on the navbar i prefer the rounded
-          version from before on the active one!" `shared/ui/` is vendored
-          and pinned (a hand-edit fails web/test/vendored-kit.test.ts), so
-          the wrapper just below reaches the kit's own stable hook —
-          `data-slot="rail-item"` plus the `data-active` attribute Rail sets
-          on the lit row — from OUTSIDE the vendored file, the same
-          descendant-selector pattern `auth-card.tsx` uses on
-          `data-slot="sign-in-content"`, so a design-sync re-pull never has
-          to notice this exists.
+      {/* THIS WRAPPER IS NOW BELT-AND-SUSPENDERS, KEPT ON PURPOSE. It used to
+          be the ONLY thing making Rail's own active row a pill, back when the
+          vendored kit's `ROW_EXPANDED` (templates/rail.tsx) was still
+          `rounded-none` and could not be hand-edited here (pinned; a hand-
+          edit fails web/test/vendored-kit.test.ts) — so this reached the
+          kit's own stable hook, `data-slot="rail-item"` plus the
+          `data-active` Rail sets on the lit row, from OUTSIDE the vendored
+          file. The kit shipped `rounded-pill` natively in `ROW_EXPANDED` as
+          of v1.2.16 (2026-09-02), so `<Rail>`'s own rows no longer need this
+          — it now just re-asserts a value the kit already draws. Left in
+          rather than deleted: a future design-sync that regresses the kit's
+          own value fails silent instead of square, and there is nothing to
+          re-derive if it does.
 
-          PILL, NOT `rounded-[var(--radius)]` — RE-DERIVED 31 Aug 2026 after
-          the client reported (again) that the active row reads as "not a
-          rounded pill/chip". A prior pass here left `rounded-[var(--radius)]`
-          (24px), reasoning that on this row's own 40px height
-          (`--control-height-button`) the browser's own corner-radius overlap
-          clamp already forces both ends down to a perfect 20px stadium —
-          true today, verified against tokens.css, but true only BECAUSE
-          24 happens to exceed 20; the class itself says "rounded rectangle"
-          and only reads as a pill by an arithmetic accident two tokens away
-          that neither says so nor is checked anywhere. `rounded-pill`
-          (999px, R31's own second radius — not a third one) says what it
-          means and stays a pill at any row height a future kit pull might
-          ship. Same override mechanism, same hook, only the value changes. */}
+          THE ACTUAL BUG THAT KEPT RECURRING WAS NEVER HERE — it was that
+          this div wraps ONLY `<Rail>` (below), and `StandaloneNavItem`'s
+          entries (Home, `homeStandalone.map` above) render BEFORE this div,
+          entirely outside it. Every prior pass fixed `<Rail>`'s own rows —
+          first this override, then the kit itself — and Home's separate,
+          hand-copied skin (this file's own `StandaloneNavItem`, which has
+          to duplicate the kit's row shape at all only because rail.tsx never
+          exports `ROW_EXPANDED`/`ROW_COLLAPSED` — see that function's own
+          header) kept its stale `rounded-none` untouched through both,
+          because nobody traced that Home takes neither code path. Fixed
+          2026-09-02 by matching `StandaloneNavItem`'s own literal to the
+          kit's current value. The durable fix — exporting the kit's row
+          constants so there is only one shape to drift — is still owed;
+          this stops the immediate bleeding. */}
       {/* `overflow-x-clip` HAS TO SIT HERE TOO, NOT JUST ON `railContent`
           ABOVE — measured live, 1 Sep 2026, after the client reported the
           rail scrolling sideways. This div sets `overflow-y-auto` and
