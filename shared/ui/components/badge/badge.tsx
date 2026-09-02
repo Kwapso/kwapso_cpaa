@@ -115,9 +115,17 @@ const badgeVariants = cva(
         /** `.kw-tag--forest` — forest fill, charcoal label. Lifts on dark. */
         success: "bg-success text-success-foreground",
         /**
-         * The kwapso palette holds no amber. `--warning` resolves to poppy by
-         * decision in tokens.css §3 — a warning badge is a danger badge until a
-         * kit ruling admits a distinct tone. Logged as GAPS.md BDG-1.
+         * RULED 2026-09-02. `--warning` is the client's new orange
+         * (`--kw-orange`, admitted the same day) and `--warning-foreground`
+         * is charcoal on it, at 7.79:1 — the accent law, in both palettes,
+         * with no dark half because the fill has none.
+         *
+         * Until that ruling this pair resolved to `--surface-quiet` /
+         * `--ink-secondary`, which is EXACTLY what `secondary` above draws:
+         * a warning chip and a quiet chip were the same pixels in both
+         * palettes, in one component offering them as two variants. Poppy is
+         * not involved and has not been since ruling 3B — `destructive`
+         * means blocked, and it means only that. Closes GAPS.md BDG-1.
          */
         warning: "bg-warning text-warning-foreground",
 

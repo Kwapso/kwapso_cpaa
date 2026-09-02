@@ -57,9 +57,9 @@ in both palettes. That is deliberate, not an omission.
 | `--destructive-foreground` | `--btn-destructive-label` | `#1A1918` | `#1A1918` | renamed · **charcoal, not white** |
 | `--success` | `--success` | `#1F9259` | `#2FB673` | kept · forest, lifting in dark |
 | `--success-foreground` | `--ink-on-accent` | `#1A1918` | `#1A1918` | renamed |
-| `--warning` | — | — | — | **no kwapso equivalent — §J-2** |
-| `--warning-foreground` | — | — | — | **§J-2** |
-| `--warning-strong` | — | — | — | **§J-2** |
+| `--warning` | `--kw-orange` | `#F7953E` | `#F7953E` | admitted 2026-09-02 · §J-2 |
+| `--warning-foreground` | `--ink-on-accent` | `#1A1918` | `#1A1918` | charcoal, at 7.79:1 · §J-2 |
+| `--warning-strong` | — | → `--ink-primary` | → `--ink-primary` | still unassigned · §J-2 |
 
 `--destructive-foreground` is the one row most likely to look like a bug and is
 not one. The kit's accent law is absolute: *"charcoal on EVERY accent, both
@@ -269,21 +269,31 @@ nowhere, and neither wash has a dark statement (logged as open gap **T12-3**).
 
 ### J-2 · `--warning` / `--warning-foreground` / `--warning-strong`
 
-**There is no warning colour in the kwapso palette.** Seven brand colours exist
-and none is amber. The kit assigns *overdue* to **Poppy** — "Blocked · overdue"
-— and ruling 26 states plainly that mango is the brand, not a status.
+**SETTLED 2026-09-02 by the client, and the alternative this section named is
+the one that happened.** The recommendation below closed with: *"The
+alternative — admitting an eighth brand colour — is a kit decision, not a build
+decision, and would need a new ruling."* The client released two, lavender
+`#B1A3CF` and orange `#F7953E`, and `--warning` takes the orange.
+
+`--warning` = `--kw-orange`, `--warning-foreground` = `--ink-on-accent`
+(charcoal, 7.79:1 — the palette's own admission rule). `--warning-strong` is
+the only one of the three still unassigned: it is the warning *word*, orange as
+text measures 2.23 on off-beige and 2.02 on soft paper, and nothing in the kit
+reads it.
+
+**The history, kept because two components still quote it.** There was no amber
+for most of this kit's life; the kit assigns *overdue* to **Poppy** and ruling
+26 states plainly that mango is the brand, not a status. The recommendation
+here was to fold warning into danger, which shipped and then failed side by side
+— "Blocked" and "Overdue" as one chip — so ruling 3B (2026-08-22) moved warning
+to the **quiet chip** instead. That was no better on measurement: it made
+`--warning` / `--warning-foreground` byte-identical to what
+`Badge variant="secondary"` draws. The orange ends both.
 
 The one place the kit uses mango as a warning is the unsaved-changes band:
 *"the one place mango appears as a band rather than a button."* That is a named
-composition treatment, not a status colour.
-
-This matters because `Badge` ships `variant="warning"` today.
-
-**Recommendation:** fold warning into danger — `--warning` = `--danger`,
-`--warning-foreground` = `--ink-on-accent`, `--warning-strong` = `--danger`.
-`<Badge variant="warning">` keeps working and renders poppy, which is what the
-kit already says overdue looks like. The alternative — admitting an eighth brand
-colour — is a kit decision, not a build decision, and would need a new ruling.
+composition treatment, not a status colour, and it is untouched — as is
+`Alert variant="warning"`'s mango dot, which reads `--primary`.
 
 ### J-3 · `--chart-4` / `--chart-5`
 
@@ -296,10 +306,23 @@ five-series chart has two indistinguishable pairs. That is a real legibility
 problem the commission is right to raise, and it cannot be fixed without
 admitting new colours.
 
-**Recommendation:** ship the cycle now so nothing renders blank, record it in
-`notDelivered`, and put "two more data-safe hues" to the kit as a ruling
-request. Tints of the existing three are the cheapest honest route and I would
-not pick them without your call.
+**SETTLED 2026-09-02.** The recommendation below — ship the cycle, record it,
+put "two more data-safe hues" to the kit as a ruling request — ran its course.
+The client released two colours and both are now series of their own:
+`--chart-4` = `--kw-lavender` `#B1A3CF`, `--chart-5` = `--kw-orange` `#F7953E`.
+Neither is a tint of the existing three, which is what this section said it
+would not pick without her call.
+
+Lavender takes 4 and orange takes 5 on hue distance: as HSL angles the five sit
+at poppy 7.9, orange 28.2, forest 150.3, sky 207.1, lavender 259.1, and orange
+is 20.3 from poppy against a minimum of 52.0 for every other pair. At 4, orange
+would neighbour poppy in every four-series chart; at 5 a chart only reaches it
+at five series. Neither takes a dark lift — both measure in `--kw-sky`'s band
+against a dark card (6.65 and 6.88 against sky's 7.68), not forest's (4.07).
+
+**Still owed, and not these two colours' doing:** the set is told apart by hue
+alone. Forest and poppy differ in luminance by a ratio of 1.00, lavender and
+orange by 1.03. Label every series directly; colour is never the only channel.
 
 ---
 

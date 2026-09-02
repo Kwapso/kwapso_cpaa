@@ -372,10 +372,13 @@ const REGISTER_MARK: Record<ScreenRegisterTone, React.ReactNode> = {
  *                      action renders `null` — nothing invented to fill a
  *                      hole, which is the system's rule everywhere.
  *  8. error          — `tone="error"`: the warning mark. Poppy is NOT used
- *                      for the mark: `--warning` is the quiet chip and poppy
- *                      means blocked, and a failed fetch is not a blocked
- *                      record. The mark takes tertiary ink with the rest of
- *                      the column. GAPS-COL3 SCR-4.
+ *                      for the mark: poppy means blocked, and a failed fetch
+ *                      is not a blocked record. Nor is `--warning`, which
+ *                      stopped being the quiet chip on 2026-09-02 and is now
+ *                      the client's orange — a register is a statement, not
+ *                      a chip, and this column carries no fill at all. The
+ *                      mark takes tertiary ink with the rest of the column.
+ *                      GAPS-COL3 SCR-4.
  *  9. selected       — does not apply.
  * 10. read-only      — always.
  *

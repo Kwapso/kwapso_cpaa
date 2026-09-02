@@ -859,8 +859,7 @@ are open questions with owners.
 
 | | State | What to do |
 |---|---|---|
-| **`--chart-4` / `--chart-5`** | Placeholders repeating `--chart-1` and `--chart-2`. A five-series chart shows two indistinguishable pairs. | Do not ship a five-series chart. Bundle the fix with the new brand colours. |
-| **`--warning`** | Provisionally the **quiet chip**, pending new colours. There is no amber in the kwapso palette. | A warning badge is currently visually identical to `Badge variant="secondary"`. The word carries the whole meaning. |
+| **`--warning-strong`** | The warning **word**. Still `--ink-primary`; nothing in the kit reads it. Orange as text measures 2.23 / 2.02 on the two light papers, so it cannot take the fill `--warning` took on 2026-09-02. | Do not write a warning in orange. The day a component needs a warning word, this token needs a client ruling. |
 | **`--hair-faint`** | Role disputed — line colour or surface? Two chapters of the kit assign it differently. | It is currently used as a *surface* (disabled and read-only field fills). `Separator` deliberately offers no `faint` variant so the dispute is not frozen by accident. |
 | **Icon artwork** | All 96 are **placeholder**. Names, React API, five sizes and `currentColor` wiring are final. | Build against the names. The swap is one command. |
 | **Fonts** | Saans and SerrifCondensed are named first in `--font-sans` / `--font-serif` with real fallback stacks. The files are not shipped — a licence question. | Nothing renders blank. Expect the fallback until the licence resolves. |

@@ -1,5 +1,171 @@
 # Changelog
 
+## v1.2.25 — 2026-09-02
+
+The client released two brand colours — lavender `#B1A3CF` and orange
+`#F7953E`, her own typed values — and they close the two oldest colour gaps in
+the file. Both were real defects and both were the same defect twice: a
+distinction the system draws in words, drawn in one colour on screen.
+
+`--chart-4` and `--chart-5` repeated `--chart-1` and `--chart-2`, so a
+four-series chart had one duplicated pair and a five-series chart had two.
+`--warning` and `--warning-foreground` resolved to `--surface-quiet` and
+`--ink-secondary`, which is *exactly* what `Badge variant="secondary"` already
+draws — measured live in `verify/accents/` at a contrast of **1.000 on both the
+fill and the ink, in both palettes**. `DataPreviewTable` draws that pair side by
+side: `unchanged` takes `secondary` and `changed` takes `warning`, and its own
+header reasons the two outcomes apart at length.
+
+Both hexes are written in `tokens.css` §2 and nowhere else. The client also
+attached a brand sheet drawing near-neighbours `#BDADD5` and `#F29436`; that
+difference is back with her and unresolved. Every use is a `var()` at one of the
+two names, so a correction is one line per colour.
+
+### Added — two accents, admitted against the palette's own rule
+
+§2 states the rule at its head: *"A new accent is admitted only if it carries
+charcoal type at both its light and its dark value."* Charcoal measures
+**7.53:1** on lavender and **7.79:1** on orange, against AA's 4.5. Each clears
+it at a single value, so neither has a second one — for scale, the four accents
+already in the file carry charcoal at mango 12.07, sky 8.69, forest 4.61 and
+poppy 4.59, which puts the two admitted today second and third in the palette.
+
+**Neither is a lift, and that is measured rather than reasoned by analogy.**
+Forest and poppy carry `-lift` hexes because their own values land at 4.07 and
+4.05 against a dark card; `--kw-sky` carries none and is not redefined in dark
+because it measures 7.68 there. Lavender and orange measure 6.65 and 6.88 — in
+sky's band, not forest's. A `-lift` would have been a hex invented against a
+number that already passes, and a value that does not flip between palettes is
+not given a dark half.
+
+**Neither is an ink.** As TEXT both fail on both light papers — lavender 2.31 on
+off-beige and 2.09 on soft paper, orange 2.23 and 2.02 — and both pass on a dark
+card at 6.65 and 6.88. Nothing writes a word in either colour.
+
+### Fixed — `--chart-4` and `--chart-5` are colours, not repeats
+
+`--chart-4` = `--kw-lavender`, `--chart-5` = `--kw-orange`.
+
+**The assignment is decided by hue distance**, because this palette's series are
+told apart by hue and not by lightness. As HSL angles: poppy 7.9, orange 28.2,
+forest 150.3, sky 207.1, lavender 259.1. Orange sits **20.3** from poppy, by far
+the tightest pair in the set — every other pair is at least 52.0 apart. So
+orange goes last, where a chart only reaches it at five series:
+
+| | series | closest pair that is actually adjacent |
+|---|---|---|
+| four series | sky · forest · poppy · lavender | 52.0 (sky/lavender, and they are not neighbours) |
+| five series | the above, then orange | 108.8 (poppy/lavender); 5 wraps to 1 at 178.9 |
+
+The reverse assignment stands poppy and orange side by side at 3 and 4, 20.3
+apart, in **every** four-series chart in the system.
+
+Neither takes a dark entry, for the reason above — 2 and 3 are re-pointed in
+dark at their lifts, 1 is not re-pointed at all, and these two follow 1.
+
+**An observation about the whole set, recorded and not solved.** Every mark in
+this palette is a pastel or mid-tone read against paper. On a light card: sky
+2.00, orange 2.23, lavender 2.31, forest 3.77, poppy 3.79; on a light panel each
+drops again (1.81 / 2.02 / 2.09 / 3.42 / 3.43). The already-shipped `--kw-sky`
+is the *lowest* of the five, so the two admitted today land above the bar in the
+file rather than under it — this is not a new defect and not these colours'
+doing. What is worth stating plainly is that the set separates on hue alone:
+forest and poppy differ in luminance by a ratio of **1.00** and lavender and
+orange by **1.03**, so in greyscale, in print, or to a reader with a
+colour-vision deficiency each of those pairs is one mark. A series in this
+system needs a direct label, a pattern or a shape as well as its colour. That is
+a charting rule and not a token.
+
+### Fixed — `--warning` is a colour again, and it is the orange
+
+The block this replaces was written as a holding position and named its own
+exit in its last line: *"The client is adding colours; when an amber or
+equivalent exists, `--warning` should take it and this block goes."* It exists.
+
+`--warning` = `--kw-orange`. `--warning-foreground` = `--ink-on-accent`, and
+**that half is not cosmetic** — it is the consumer the repoint would otherwise
+have broken. `--ink-secondary` is an ink tuned for paper; on the new fill it
+measures **4.00 in light**, under AA, and **1.48 in dark**, which is not a label,
+it is a stain. Charcoal measures 7.79 on the new fill in both palettes. Neither
+token takes a dark half, because the fill has none.
+
+**Every consumer, found and checked.** `badge.tsx`'s `variant="warning"` is the
+one and only place in `components/` or `compositions/` that reads either token,
+as `bg-warning text-warning-foreground`; it is fixed by the repoint and needed no
+edit beyond its comment. `DataPreviewTable` reaches it indirectly, mapping
+`changed` → `warning`, and gets the colour its own header always argued for.
+Nothing reads `--warning-strong` at all.
+
+**Poppy is untouched** and still means blocked and nothing else. Ruling 3B moved
+warning *off* poppy; this moves it off the quiet chip it was parked on, and 3B
+stands.
+
+**`--warning-strong` did not move, and that is a measurement rather than an
+omission.** It is the ink half — the warning *word*, not the fill — with zero
+call sites across the kit. Orange AS TEXT measures 2.23 on off-beige and 2.02 on
+soft paper, so pointing it at `--kw-orange` would ship a word nobody can read;
+minting it a darkened orange the way ruling 43 gave poppy `--kw-poppy-ink` would
+invent a hex the client never typed, for a consumer that does not exist. Ruling
+43 moved because every destructive word in the system was failing AA; nothing is
+failing here. It stays `--ink-primary` and stays the one flagged token in
+`manifest.json`'s `notDelivered` for this family.
+
+**One divergence, logged rather than settled.** `Alert variant="warning"` draws
+a **mango** dot — ch20's own drawing, restored by the 2026-08-26 fidelity
+re-audit under override 17 after it had once already followed this very token
+down to the quiet fill. It reads `--primary`, not `--warning`, so this ruling
+does not reach it. A warning *badge* is now orange and a warning *alert dot* is
+still mango: two components spelling one word in two colours. That needs a
+client ruling, not a repoint of a value the artifact states outright.
+
+### Considered and declined
+
+* **A lavender or orange status dot.** There are exactly six `--dot-*` tokens
+  and exactly six dot tones in `badge.tsx`; no state is without a colour, so a
+  seventh would be inventing a semantic rather than filling a gap.
+* **Splitting `--dot-shipped` from `--dot-done`.** They resolve identically
+  (forest, 3.77 against a light pill and 5.95 against a dark one) but that is
+  ruling 04's deliberate synonym — the system says "shipped" and the portal says
+  "Done" for one state — not a collapsed distinction.
+* **Moving `--info` or `--dot-review` off sky.** Sky also backs `--chart-1`, but
+  those are different token families and are never drawn against each other in
+  one view. Nothing collapses.
+* **`--pill-fill-building`'s mango dark fill.** Which accent it should be is
+  `GAPS-TRACK1.md` STA-1, an open client question that predates these colours.
+
+### Verified
+
+`verify/accents/` (Vite + React, port 5241, kept). Screenshots are useless in
+this environment — the Browser pane renders at roughly 42×46px whatever the
+viewport is emulated to — so nothing on that page is checked by eye.
+`window.__ACCENTS__()` reads every swatch out of `getComputedStyle` on the live
+element, flips `data-theme` on `<html>`, reads again, and returns both palettes
+as JSON. The page names tokens and never a hex; R32 holds inside the harness.
+
+Read back, light / dark: `--chart-4` `#B1A3CF` / `#B1A3CF` and `--chart-5`
+`#F7953E` / `#F7953E` through the real `bg-chart-*` utilities, against
+`--chart-2` and `--chart-3` flipping to their lifts as they always did; the
+warning badge `#F7953E` under `#1A1918` at **7.79 in both palettes**; and the
+old binding beside the quiet chip, which is the defect this release closes.
+
+That last one, stated as the numbers it actually was rather than as one
+headline — the first draft of this entry said "1.00 on fill and 1.00 on ink"
+and only half of that was true:
+
+| | fill | ink |
+|---|---|---|
+| light | 1.21 | 1.95 |
+| dark | **1.00** | 1.51 |
+
+In DARK the two chips were the same token — `--warning` and `--secondary` both
+resolved to `--kw-unlit-secondary`, so "Will change" and "Unchanged" in
+`DataPreviewTable` were one chip and the label carried the whole distinction.
+In LIGHT they were two pale beiges a fifth of a step apart: bad, but not the
+same colour. After: **2.02** light, **5.20** dark.
+
+`tokens.json` regenerated and diffed — `--check` runs the guards only and does
+not compare output. `unresolvedFlagged` falls 21 → 13. `npm run check` green.
+
 ## v1.2.24 — 2026-09-02
 
 Four of the five entries below existed already, as corrections written

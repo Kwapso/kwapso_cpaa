@@ -246,9 +246,9 @@ the dispute by accident. `GAPS.md` INP-4, SEP-2.
 | `--success` | `#20955B` | `#2FB673` | Forest. Shipped · healthy · done. |
 | `--success-foreground` | `#1A1918` | *same* | Charcoal. |
 | `--info` | `#89BCE6` | *same* | Sky. Informational. |
-| `--warning` **⚠** | → `--surface-quiet` | | **Provisional.** The quiet chip. |
-| `--warning-foreground` **⚠** | → `--ink-secondary` | | |
-| `--warning-strong` **⚠** | → `--ink-primary` | | |
+| `--warning` | `#F7953E` | *same* | Orange. Admitted 2026-09-02. Needs attention — **not** blocked. |
+| `--warning-foreground` | `#1A1918` | *same* | Charcoal, at 7.79:1. |
+| `--warning-strong` **⚠** | → `--ink-primary` | | The warning **word**. Still the primary ink — orange as text measures 2.23 / 2.02 on the two light papers. No consumer today. |
 
 ### What mango may and may not be
 
@@ -264,28 +264,41 @@ which is why an unqualified `<Badge>` is now quiet, ruled 2026-08-22 from
 
 **The neutral hover wash is `--accent`.** Never `--primary`.
 
-### ⚠ `--warning` is a holding position
+### `--warning` is the orange, as of 2026-09-02
 
-**There is no amber in the kwapso palette.** Seven brand colours and none of
-them is one. The kit assigns "overdue" to Poppy, and ruling 26 states mango is
-the brand, not a status.
+**The holding position is over.** For most of this kit's life there was no
+amber in the palette. The kit assigns "overdue" to Poppy, and ruling 26 states
+mango is the brand, not a status — so warning was first folded into poppy,
+which put "Blocked" and "Overdue" in one chip, and then on 2026-08-22 (ruling
+3B) dropped to the **quiet chip**, which gave it no colour at all.
 
-The first answer was to fold warning into poppy. Seen side by side, that put
-two different states in one colour — "Blocked" and "Overdue" were the same chip
-— which was worse than losing the colour. So on 2026-08-22 (ruling 3B) warning
-dropped to the **quiet chip**, and poppy now means blocked and nothing else.
+The quiet chip was worse than it read on paper. `--warning` was
+`--surface-quiet` and `--warning-foreground` was `--ink-secondary` — the exact
+two values `Badge variant="secondary"` already draws — so a warning chip and a
+quiet chip were the **same pixels** in both palettes. `DataPreviewTable` draws
+that pair side by side (`unchanged` → `secondary`, `changed` → `warning`).
 
-**What this means today:** `<Badge variant="warning">` and
-`<Badge variant="secondary">` render **identically**. The word carries the
-whole difference. `--warning-strong` has no distinct tone; it resolves to
-`--ink-primary` rather than inventing a deeper amber.
+The client released two colours on 2026-09-02 and `--warning` takes the orange,
+`#F7953E`. Charcoal on it measures **7.79:1**, which clears the palette's own
+admission rule, so `--warning-foreground` is `--ink-on-accent` and not the
+paper ink it was — that ink measures **4.00** on the new fill in light (under
+AA) and **1.48** in dark. The fill has one value, so neither token has a dark
+half.
 
-**This is provisional.** The client is adding colours. When an amber or
-equivalent exists, `--warning` takes it and the block goes.
+**Poppy is untouched** and still means blocked and nothing else; 3B stands.
 
-> Note: `badge.tsx`'s inline comment and `GAPS.md` BDG-1 both still describe
-> the *earlier* answer (warning → poppy). `tokens.css` §3 is current and this
-> table follows it.
+**`--warning-strong` did not move.** It is the ink half — the warning *word* —
+and nothing in `components/` or `compositions/` reads it. Orange as TEXT
+measures 2.23 on off-beige and 2.02 on soft paper, so pointing it at the new
+colour would ship an unreadable word, and minting it a darkened orange (the way
+ruling 43 gave poppy `--kw-poppy-ink`) would invent a hex the client never
+typed for a consumer that does not exist. It stays `--ink-primary`.
+
+> **One divergence, logged not settled.** `Alert variant="warning"` draws a
+> **mango** dot — ch20's own drawing, restored by the 2026-08-26 fidelity
+> re-audit under override 17. It reads `--primary`, not `--warning`, so this
+> ruling does not reach it. A warning *badge* is now orange and a warning
+> *alert dot* is mango. That needs a client ruling, not a repoint.
 
 ---
 
@@ -296,12 +309,34 @@ equivalent exists, `--warning` takes it and the block goes.
 | `--chart-1` | `#89BCE6` sky | *same* | |
 | `--chart-2` | `#20955B` forest | `#2FB673` | |
 | `--chart-3` | `#E94A32` poppy | `#F2634B` | |
-| `--chart-4` **⚠** | → `--chart-1` | | placeholder |
-| `--chart-5` **⚠** | → `--chart-2` | | placeholder |
+| `--chart-4` | `#B1A3CF` lavender | *same* | Admitted 2026-09-02. |
+| `--chart-5` | `#F7953E` orange | *same* | Admitted 2026-09-02. Last on purpose — see below. |
 | `--chart-negative` | `#E94A32` | `#F2634B` | A negative value or a downward delta. |
 
 **Two standing prohibitions.** Never mango — brand, not data. Never grey — it
 reads as disabled.
+
+**Why lavender is 4 and orange is 5.** As HSL angles the five sit at poppy 7.9,
+orange 28.2, forest 150.3, sky 207.1, lavender 259.1. Orange is **20.3** from
+poppy, by far the tightest pair; every other pair is at least 52.0 apart. Put
+orange at 4 and every four-series chart in the system stands poppy and orange
+side by side. Put it at 5 and a chart only reaches it at five series, where its
+neighbours are lavender (129.1) and — on the cycle back to 1 — sky (178.9).
+
+**Neither takes a dark lift.** 2 and 3 flip to `--kw-forest-lift` /
+`--kw-poppy-lift` because forest and poppy measure 4.07 and 4.05 against a dark
+card. 1 does not flip because sky measures 7.68. Lavender and orange measure
+6.65 and 6.88 — sky's band, so no lift, and no dark half.
+
+**What the whole set is weak at, and it is not new.** Every mark here is a
+pastel or mid-tone on paper. On a light card: sky 2.00, orange 2.23, lavender
+2.31, forest 3.77, poppy 3.79; on a light panel each drops again (1.81 / 2.02 /
+2.09 / 3.42 / 3.43). The already-shipped `--kw-sky` is the *lowest* of the
+five. And the series are told apart by hue alone — forest and poppy differ in
+luminance by a ratio of **1.00**, lavender and orange by **1.03** — so in
+greyscale, in print, or to a reader with a colour-vision deficiency each of
+those pairs is one mark. **Always label a series directly**; colour is never
+the only channel.
 
 **⚠ Four and five are placeholders.** The kit designs three series and says
 they cycle, so 4 and 5 repeat 1 and 2. **A five-series chart currently shows
@@ -796,13 +831,14 @@ change to the component.
 
 ## 17 · Everything unresolved, in one place
 
-Twenty tokens carry an unresolved flag in `tokens.json`. These are the ones
-that will bite you.
+Thirteen tokens carry an unresolved flag in `tokens.json` — eight fewer since
+2026-09-02, when the client's two new colours closed `--chart-4` / `--chart-5`
+and `--warning` / `--warning-foreground`. These are the ones that will bite
+you.
 
 | | State | What it means for you today |
 |---|---|---|
-| `--chart-4` · `--chart-5` | **Placeholder.** Repeat 1 and 2. | A five-series chart shows two indistinguishable pairs. Do not ship one. Bundled with the client's new colours. |
-| `--warning` · `--warning-foreground` · `--warning-strong` | **Provisional.** The quiet chip. | `Badge variant="warning"` is visually identical to `variant="secondary"`. The word carries the meaning. Revisit when the new palette lands. |
+| `--warning-strong` | **No consumer, and no colour.** Still `--ink-primary`. | The warning *word*. Orange as text is 2.23 / 2.02 on the two light papers, so it cannot take the new fill; nothing reads this token today. Needs a ruling the day something writes a warning in words. |
 | `--hair-faint` | **Role disputed.** Line or surface? | Used as a surface (disabled/read-only field fill). `Separator` offers no `faint` variant on purpose. Settle GAP-4 before relying on it. |
 | `--accent` in dark | **Derived**, not kit-stated. | The light wash with the ink flipped. Correct-looking, unconfirmed. |
 | `--measure-body` | Kit prose says 68, kit CSS says 62/66. | 62 taken. Three different reading measures exist across the kit — `GAPS.md` AB-1. |

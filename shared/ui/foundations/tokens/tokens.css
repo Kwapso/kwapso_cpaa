@@ -135,7 +135,7 @@
 
 /* ============================================================================
    2 · RAW PALETTE — internal
-   The seven official brand colours, the four unlit papers, the two lifted
+   The nine official brand colours, the four unlit papers, the two lifted
    accents. Never consumed by a component; §3 is the layer components read.
    A new accent is admitted only if it carries charcoal type at both its
    light and its dark value.
@@ -168,6 +168,38 @@
      poppy FILL, the destructive button and every poppy pill keep the
      artifact's own colour. Only --destructive-ink points here. */
   --kw-poppy-ink:    #C73F2B;   /* the destructive WORD, light only      */
+
+  /* CLIENT RULING, 2026-09-02 — TWO COLOURS ADMITTED, AT HER OWN TYPED VALUES.
+     The admission rule is the one stated at the head of this section: charcoal
+     type at both the light and the dark value. Each of these clears it at a
+     SINGLE value, so neither has a second one — charcoal on #B1A3CF measures
+     7.53:1 and on #F7953E 7.79:1, against AA's 4.5. For scale, the four
+     accents already here carry charcoal at mango 12.07, sky 8.69, forest 4.61
+     and poppy 4.59: the two admitted today sit between sky and mango and are
+     the second and third most generous grounds in the palette.
+
+     ONE HEX EACH, WRITTEN HERE AND NOWHERE ELSE. The client also attached a
+     brand sheet drawing near-neighbours #BDADD5 and #F29436; that difference
+     is flagged back to her and unresolved at the time of writing. These are
+     the values she typed. Every use below is a var() at one of these two
+     names, so a correction is one line per colour rather than a sweep.
+
+     NEITHER IS AN INK. As TEXT both fail AA on both light papers — lavender
+     2.31 on off-beige and 2.09 on soft paper, orange 2.23 and 2.02 — and both
+     pass on a dark card, 6.65 and 6.88. Nothing below writes a word in either
+     colour; §3's --warning-strong is the one place that was asked and
+     declined, and says so there.
+
+     NO LIFT FOR EITHER, MEASURED RATHER THAN REASONED BY ANALOGY. Forest and
+     poppy carry -lift hexes because their own values land at 4.07 and 4.05
+     against a dark card. --kw-sky carries none and is not redefined in dark
+     because it measures 7.68 there. These two are in sky's band and not
+     forest's: 6.65 and 6.88 on a dark card, 7.97 and 8.25 on the dark page.
+     A -lift here would be a hex invented against a number that already
+     passes, and the file's own rule is that a value which does not flip
+     between palettes is not given a dark half. */
+  --kw-lavender:     #B1A3CF;   /* admitted 2026-09-02 · chart series 4  */
+  --kw-orange:       #F7953E;   /* admitted 2026-09-02 · the warning fill*/
 
   /* Unlit papers — dark surfaces. Never grey. */
   --kw-unlit-page:   #141310;
@@ -280,34 +312,127 @@
   --success:              var(--kw-forest);
   --success-foreground:   var(--kw-charcoal);
 
-  /* ! GAP — there is no warning colour in the kwapso palette. Seven brand
-     colours and none is amber; the kit assigns "overdue" to Poppy, and
-     ruling 26 states mango is the brand, not a status. Folded into danger
-     by decision, so <Badge variant="warning"> renders poppy. --warning-strong
-     has no distinct tone until a ruling admits one; it resolves identically
-     rather than inventing a deeper amber.  -> notDelivered                  */
-  /* RULED 2026-08-22 (3B) — PROVISIONAL, revisit when the new palette lands.
-     Folding warning into poppy (the J-2 ruling) put two different states in
-     one colour: "Blocked" and "Overdue" were the same chip. Seen side by side
-     that was worse than losing the colour, so warning drops to the quiet chip
-     and poppy now means blocked and nothing else.
-     This is a holding position. The client is adding colours; when an amber
-     or equivalent exists, --warning should take it and this block goes. */
-  --warning:              var(--surface-quiet);
-  --warning-foreground:   var(--ink-secondary);
+  /* RULED 2026-09-02 — THE WARNING IS A COLOUR AGAIN, AND IT IS THE ORANGE.
+     The block this replaces was written as a holding position and named its
+     own exit in its last line: "The client is adding colours; when an amber
+     or equivalent exists, --warning should take it and this block goes."
+     It exists. This is that block going.
+
+     WHAT WAS ACTUALLY BROKEN, MEASURED — AND THE FIRST DRAFT OF THIS BLOCK
+     OVERSTATED IT, so the corrected numbers are the ones kept. It claimed
+     `warning` and `secondary` drew IDENTICAL chips in both palettes. Half
+     true, and the true half is bad enough on its own.
+
+     --warning resolved to --surface-quiet, --warning-foreground to
+     --ink-secondary. Against `Badge`'s `secondary` (--secondary /
+     --secondary-foreground), chip against chip:
+
+         dark   fill  #3A3833 vs #3A3833   1.00   THE SAME TOKEN
+                ink   #d5d1c9 vs #FFFEF9   1.51
+         light  fill  #E2DDD4 vs #F7F2EB   1.21
+                ink   #4a4946 vs #1A1918   1.95
+
+     So in DARK the two variants were painted on one paper — --surface-quiet
+     and --secondary both resolve to --kw-unlit-secondary — and only a shade
+     of label told them apart. In LIGHT they were two pale beiges a fifth of
+     a step from each other. Not one chip there; near enough to it that the
+     distinction did no work, and neither of them said WARNING in any palette,
+     which is the older half of the fault.
+
+     `DataPreviewTable` draws that pair side by side — `unchanged` takes
+     `secondary`, `changed` takes `warning` — so two outcomes its own header
+     reasons apart came out as the same quiet chip, and in dark literally so.
+     That is the defect. The missing amber was only ever the cause.
+
+     THE FILL is --kw-orange, at 7.79:1 under charcoal: the admission rule §2
+     states, cleared at the colour's single value, so it holds in both
+     palettes and takes no dark half. Poppy is untouched and still means
+     blocked and nothing else, which is 3B's ruling standing rather than
+     being reversed — 3B moved warning OFF poppy, and this moves it off the
+     quiet chip it was parked on.
+
+     THE LABEL HAD TO MOVE WITH IT, and it is the consumer this repoint would
+     otherwise have broken. --warning-foreground was --ink-secondary, an ink
+     tuned for paper; on the new fill it measures 4.00 in light — under AA's
+     4.5 — and 1.48 in dark, which is not a label, it is a stain. It becomes
+     --ink-on-accent at 7.79 in both palettes. Charcoal on every accent, no
+     exceptions.
+
+     --warning-strong DOES NOT MOVE, and that is measured rather than skipped.
+     It is the ink half — the WORD, not the fill — and nothing in this kit
+     reads it: zero call sites across components/ and compositions/, against
+     badge.tsx's `bg-warning text-warning-foreground`, which is the one and
+     only consumer of the pair above. Orange AS TEXT measures 2.23 on
+     off-beige and 2.02 on soft paper, so pointing this at --kw-orange would
+     ship a word nobody can read; minting it a darkened orange the way ruling
+     43 gave poppy --kw-poppy-ink would be inventing a hex the client never
+     typed, for a consumer that does not exist. Ruling 43 moved because every
+     destructive word in the system was failing; nothing is failing here. It
+     stays --ink-primary, and the day something writes a warning in words,
+     this is the token that needs a ruling.
+
+     WHAT DID NOT CHANGE, AND IS NOW A DIVERGENCE WORTH A RULING. `Alert`'s
+     `variant="warning"` dot is MANGO and stays mango: ch20's own drawing,
+     restored by the 2026-08-26 fidelity re-audit under override 17 after it
+     had once already followed THIS token down to the quiet fill. It reads
+     --primary, not --warning, so nothing here reaches it. Which leaves a
+     warning BADGE orange and a warning ALERT dot mango — two components
+     spelling one word in two colours. Logged for the client rather than
+     settled by repointing a value the artifact states outright.          */
+  --warning:              var(--kw-orange);
+  --warning-foreground:   var(--ink-on-accent);
   --warning-strong:       var(--ink-primary);
 
-  /* ---- Charts — sky, forest, poppy, cycling ----------------------------
+  /* ---- Charts — sky, forest, poppy, lavender, orange -------------------
      Never mango (brand, not data). Never grey (reads as disabled).
-     ! GAP — the kit designs three series and says they cycle. 4 and 5 are
-     placeholders repeating 1 and 2, so a five-series chart currently has two
-     indistinguishable pairs. Two dedicated hues need a kit ruling.
-     -> notDelivered                                                         */
+
+     RULED 2026-09-02 — THE TWO PLACEHOLDERS ARE FILLED. 4 and 5 repeated 1
+     and 2, so a four-series chart drew one duplicated pair and a five-series
+     chart drew two, and no reader could tell either apart. The client's two
+     new colours are the two dedicated hues the GAP asked for.
+
+     WHICH GOES WHERE IS DECIDED BY HUE DISTANCE, because this palette's
+     series are told apart by hue and not by lightness — see the last
+     paragraph. Measured as HSL angles: poppy 7.9, orange 28.2, forest 150.3,
+     sky 207.1, lavender 259.1. Orange sits 20.3 from poppy, by far the
+     tightest pair in the set; every other pair is at least 52.0 apart. So
+     orange goes LAST, where a chart only reaches it at five series, and
+     lavender takes 4:
+       4 series (1-4)  sky · forest · poppy · lavender
+                       closest pair anywhere in the set 52.0 (sky/lavender)
+       5 series (1-5)  the above, then orange
+                       closest NEIGHBOURING pair 108.8 (poppy/lavender);
+                       poppy and orange are never neighbours, and 5 wraps
+                       back to 1 at 178.9.
+     The reverse assignment stands poppy and orange side by side at 3 and 4,
+     20.3 apart, in every four-series chart in the system.
+
+     NO DARK HALF FOR EITHER, which is the call --kw-sky already carries. 2
+     and 3 are re-pointed in dark at --kw-forest-lift and --kw-poppy-lift
+     because forest and poppy measure 4.07 and 4.05 against a dark card. 1 is
+     not re-pointed at all, because sky measures 7.68 there. Lavender and
+     orange measure 6.65 and 6.88 — sky's band, not forest's — so a lift
+     would be a hex invented against a number that already passes, and a
+     value that does not flip between palettes gets no dark half.
+
+     WHAT THE WHOLE SET IS STILL WEAK AT, stated accurately because it is
+     neither new nor these two colours' doing. Every mark in this palette is
+     a pastel or a mid-tone read against paper. On a light card: sky 2.00,
+     orange 2.23, lavender 2.31, forest 3.77, poppy 3.79 — and each drops
+     again on a light panel (1.81 / 2.02 / 2.09 / 3.42 / 3.43). The already
+     shipped --kw-sky is the LOWEST of the five, so the two admitted today
+     land above the bar in the file rather than under it. And the set is told
+     apart by HUE ALONE: forest and poppy differ in luminance by a ratio of
+     1.00, lavender and orange by 1.03, so in greyscale, in print, or to a
+     reader with a colour-vision deficiency each of those pairs is one mark.
+     A series in this system needs a direct label, a pattern or a shape as
+     well as its colour. That is a charting rule and not a token, and it is
+     recorded here rather than solved here.                                */
   --chart-1:              var(--kw-sky);
   --chart-2:              var(--kw-forest);
   --chart-3:              var(--kw-poppy);
-  --chart-4:              var(--chart-1);   /* ! GAP placeholder */
-  --chart-5:              var(--chart-2);   /* ! GAP placeholder */
+  --chart-4:              var(--kw-lavender);
+  --chart-5:              var(--kw-orange);
   --chart-negative:       var(--kw-poppy);
 
   /* ---- Focus (kit ruling 24, reversed twice) ---------------------------
