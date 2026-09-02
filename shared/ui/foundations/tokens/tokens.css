@@ -310,13 +310,14 @@
   --chart-5:              var(--chart-2);   /* ! GAP placeholder */
   --chart-negative:       var(--kw-poppy);
 
-  /* ---- Focus (kit ruling 24, reversed) ---------------------------------
-     ONE global rule for every control: a 1px --focus outline held 2px off
-     the edge, on :focus-visible only, following the control's own radius.
-     No component defines its own ring; nothing focusable may set
+  /* ---- Focus (kit ruling 24, reversed twice) ---------------------------
+     ONE global rule for every control: a 1px --focus outline drawn FLUSH
+     against the edge, on :focus-visible only, following the control's own
+     radius. No component defines its own ring; nothing focusable may set
      outline: none. The px are deliberate — a ring must stay 1px at every
      text scale, and this is the file where a size is decided.
-     1px, not ruling 24's 2px: see override 4 on --focus-width below.      */
+     1px, not ruling 24's 2px: see override 4 on --focus-width below.
+     0 offset, not ruling 24's 2px: see the ruling on --focus-offset.      */
   --ring:                 var(--focus);
   --focus:                var(--kw-charcoal);
   /* The ring on an inverse surface. --focus is charcoal, and --surface-inverse
@@ -331,7 +332,33 @@
      because the artifact is unambiguous here and the appendix should be
      updated to match rather than left contradicting the build. */
   --focus-width:          1px;
-  --focus-offset:         2px;
+  /* RULED 2026-08-31 — 0, not 2px. The client, over a plain "Price sold"
+     text input: "when in select something you draw an overline bigger [than]
+     the already existing outline. do not do that. just change the color of
+     the existing outline. everywhere where you show the selected whatever."
+
+     THE FIX IS GEOMETRIC, NOT CHROMATIC. `--focus` is already the ink this
+     system uses for every other "selected" mark, so the colour was never the
+     bug. An `outline` paints OUTSIDE its border box by `outline-offset`,
+     while a field's own edge is an INSET shadow painted immediately inside
+     it (`input.tsx`: "the field's own hairline does not move" on focus,
+     review 1A · fix 4). At 2px those were two concentric lines with a
+     visible gap between them — precisely "an overline bigger than the
+     already existing outline", never a recolour of anything. At 0 the ring
+     lands on the border box the hairline is drawn against, so a focused
+     control reads as its own edge changing colour and weight IN PLACE.
+
+     --focus-width and --focus do not move: still 1px, still charcoal
+     (off-beige on an inverse ground), still :focus-visible only, still the
+     ONE rule §8 states for all 67 controls at once. Only where it is drawn
+     changed. Measured in verify/writeback/: on `Input`, ring-to-edge gap
+     0.000px (was 2.000px), and the ring still takes the control's own
+     radius. It stays px and stays on the PX_ALLOWED list — 0 is a size the
+     text-scale control must not grow, same as the width beside it.
+
+     Shipped downstream first as an app-side `:root` rebind and carried here
+     unchanged, so the two stop being two places. */
+  --focus-offset:         0px;
 
   /* ---- Shape (kit ruling 03) -------------------------------------------
      EXACTLY four radii exist: 24 on every box, 999 on every pill, 6 on
@@ -440,7 +467,8 @@
      stroke. A secondary button is a filled button in the other paper tone,
      which is why a header band and the buttons inside it are never the same
      paper tone. Keyboard focus adds the shared ring; that is the one
-     exception, and it is an outline at an offset, not a border.            */
+     exception, and it is an outline — drawn outside the border box, on
+     :focus-visible only — and not a border.                                */
   --btn-primary-fill:      var(--primary);
   --btn-primary-label:     var(--primary-foreground);
   --btn-primary-hover:     #F4BE4B;
@@ -1670,13 +1698,17 @@
    round shell — the reported bug.
 
    So the shell takes the ring and the bare node hands it over. Same
-   --focus-width (1px, override 4) at the same 2px offset — only the box it is
+   --focus-width (1px, override 4) at the same 0 offset — only the box it is
    drawn around changes. This
    is one of only two places in the system that write `outline: none` — the
    other is the read-only rule below — and it writes it on a node that is
    guaranteed to have a visible ring drawn around it by the rule immediately
-   above. Both are paired: 5 `data-focus-proxy` nodes, 5 `data-focus-shell`
-   ancestors, no orphans. */
+   above. Both are always paired and there are no orphans: three files mark
+   them — `search-input.tsx`, `filter-bar.tsx`'s facet field, and, since
+   2026-09-02, `agent-chat.tsx`'s composer. That composer is the same shape
+   (a decorated pill wrapped around a bare `<textarea>`) and was the one
+   composite control in the kit that had never been marked, so its ring drew
+   a rectangle INSIDE the pill a reader perceives as the field. */
 [data-focus-shell]:has([data-focus-proxy]:focus-visible) {
   outline: var(--focus-width) solid var(--focus);
   outline-offset: var(--focus-offset);

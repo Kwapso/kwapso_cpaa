@@ -65,7 +65,7 @@ the system app. Neither is forced by this repo; each sets `data-scale` itself.
 
 | Value | Where | Why it may not scale |
 |---|---|---|
-| `--focus-width: 2px` · `--focus-offset: 2px` | tokens.css §3 | A focus ring must stay 2px at every text scale; a ring that grew with the type would swamp a dense control. |
+| `--focus-width: 1px` · `--focus-offset: 0px` | tokens.css §3 | A focus ring must stay 1px at every text scale; a ring that grew with the type would swamp a dense control. The offset is 0 by client ruling (2026-08-31) and is on this list for the same reason — a size, and one that must not grow. Both diverge from kit ruling 24's 2 and 2; `tokens.css` §3 carries why. |
 | `--radius-pill: 999px` | tokens.css §4 | "Fully round" is not a measurement. |
 | shadow geometry | `--shadow-rest` / `-lifted` / `-overlay` | A drop shadow is not type and does not scale. |
 
@@ -360,7 +360,7 @@ reason. No `focus:ring-*`, `focus-visible:ring-*` or `ring-offset-*`.
 radius, because an outline follows border-radius for free. Keyboard shows it; a
 mouse does not, because `:focus-visible` is the browser's own judgement of
 that. Sixty-five components each writing their own ring is sixty-five chances
-for one of them to be 1px, or the wrong colour, or absent. And a single
+for one of them to be 2px, or the wrong colour, or absent. And a single
 `outline: none` — usually added to "clean up" a click — removes a control from
 keyboard use with no visible symptom for anyone using a mouse.
 

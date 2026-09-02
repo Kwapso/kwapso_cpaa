@@ -318,8 +318,8 @@ need a kit ruling, and the client is bundling it with the new brand colours.
 | `--focus` | `#1A1918` | `#FFFEF9` | The ring colour. |
 | `--ring` | → `--focus` | | Alias, for the Tailwind `ring` namespace. |
 | `--focus-inverse` | `#FFFEF9` | `#1A1918` | The ring **on an inverse surface**. |
-| `--focus-width` | `2px` | | Deliberately px — see below. |
-| `--focus-offset` | `2px` | | Deliberately px. |
+| `--focus-width` | `1px` | | Deliberately px — see below. |
+| `--focus-offset` | `0px` | | Deliberately px. |
 
 **You do not use these.** `tokens.css` §8 is one bare rule that rings every
 control in the system at once, at the control's own radius:
@@ -333,9 +333,22 @@ control in the system at once, at the control's own radius:
 
 No component defines a ring. Nothing sets `outline: none`.
 
-**Why the two px.** A ring must stay 2px at every text scale; a ring that grew
+**Why the two px.** A ring must stay 1px at every text scale; a ring that grew
 with the type would swamp a dense control. These are two of the three px values
-the build's `PX_ALLOWED` list permits.
+the build's `PX_ALLOWED` list permits, and a 0 is a size like any other — it
+must not grow either.
+
+**Why 1 and 0, when kit ruling 24 says 2 and 2.** Both are recorded overrides
+and both are the client's own call, drawn side by side and chosen. The width
+went to 1px on 2026-08-22 (B2, `verify/decisions.html`): they saw both and
+chose the thinner line. The offset went to 0 on 2026-08-31 — "when in select
+something you draw an overline bigger [than] the already existing outline. do
+not do that. just change the color of the existing outline. everywhere where
+you show the selected whatever." A field's own edge is an inset shadow drawn
+immediately INSIDE its border box, so a ring held 2px outside it read as a
+second, separate stroke rather than as that edge changing. At 0 the ring lands
+on the box the edge is drawn against and a focused control reads as its own
+outline recolouring in place. `tokens.css` §3 carries both rulings in full.
 
 **Why `--focus-inverse` exists.** `--focus` is charcoal and `--surface-inverse`
 **is** charcoal, so a control on a charcoal panel was drawing its ring at

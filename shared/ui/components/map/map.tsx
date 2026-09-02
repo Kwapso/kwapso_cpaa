@@ -80,9 +80,27 @@ import { imageVariants } from "../image/image";
 import { Loader2, TriangleAlert } from "../../foundations/icons";
 
 /**
- * Scripts and same-origin, nothing else — every embedded map provider needs
- * both and none of them needs form submission or top-level navigation from
- * inside the frame. Same default as `web-embed`; a call site may replace it.
+ * Scripts and same-origin, nothing else — a map provider's frame needs both
+ * (it runs its own script and reads its own cookies and storage for tiles and
+ * preferences) and none of them needs form submission or top-level navigation
+ * from inside the frame.
+ *
+ * IT IS NO LONGER `web-embed`'s DEFAULT, and the sentence that said it was is
+ * gone. `web-embed` dropped `allow-same-origin` on 2026-09-02, because the
+ * pair lets a SAME-ORIGIN framed document rewrite its own `sandbox` and
+ * reload out of it — and `web-embed`'s `src` is anything at all, including
+ * one of ours. This component's `src` is a third party's embed URL by
+ * definition (its own header: "a provider's embed URL, framed and
+ * sandboxed"), where the pair grants the provider its own storage and grants
+ * it nothing of ours.
+ *
+ * THAT IS A JUDGEMENT AND IT IS NOT RULED. It rests on `src` never being
+ * first-party, which nothing in the type system enforces. Whether this file
+ * should follow `web-embed` — closed by default, with an explicit
+ * `allowSameOrigin` for the providers that turn out to need it — is open, and
+ * it is not a change to make without a provider in front of you: the demo
+ * makes no network calls, so which providers actually break cannot be
+ * measured here. A call site may replace this wholesale today.
  */
 const DEFAULT_SANDBOX = "allow-scripts allow-same-origin";
 

@@ -513,9 +513,13 @@ function SourceChip({
  *                      whose every turn lit up as you read down it would be
  *                      unreadable, and a bubble is not a target.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once,
- *                      at the control's own radius. The composer, the send or
- *                      stop control, a source link and every action inside a
- *                      turn are all real controls already.
+ *                      at the control's own radius. The send or stop control,
+ *                      a source link and every action inside a turn are all
+ *                      real controls already. The composer is §8's OTHER
+ *                      case: a decorated pill around a bare field, so it
+ *                      carries `data-focus-shell` and its Textarea carries
+ *                      `data-focus-proxy` and the ring lands on the pill.
+ *                      Still §8's one rule; this file writes no ring.
  *  4. active/pressed — belongs to the controls: the 1-hairline nudge every
  *                      Button carries.
  *  5. disabled       — `disabled` on the composer: the field takes the
@@ -769,12 +773,28 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                       // `.kw-msg` — ruling 36's 62% cap, at every width above
                       // mobile. Below `sm:` it leaves a bubble too narrow to
                       // read, exactly as `chat.tsx` found.
-                      "flex max-w-[62%] min-w-0 items-end gap-2 max-sm:max-w-[85%]",
+                      //
+                      // `items-start`, NOT `items-end`. THE MARK RIDES THE
+                      // BUBBLE'S TOP — `chat.tsx`'s own row states the ruling
+                      // in its own words, "CH19 view 16 levels the 24 mark
+                      // with the TOP of the bubble", and this was the one
+                      // surface in the kit still drawing the older behaviour.
+                      // Bottom-aligning hides completely on a one-line reply
+                      // and only shows on a tall one, which is why it survived
+                      // to be reported from an app: on a long answer the mark
+                      // sat level with the bubble's BOTTOM, far from the first
+                      // line where a reader's eye actually starts.
+                      "flex max-w-[62%] min-w-0 items-start gap-2 max-sm:max-w-[85%]",
                       mine ? "flex-row-reverse self-end" : "self-start",
                     )}
                   >
                     {avatars ? (
-                      <span className="mb-1 flex-none">
+                      // No `mb-1`. It was the bottom-aligned row's nudge and
+                      // at `items-start` a cross-axis END margin moves the
+                      // mark nowhere — it only padded the row's own height on
+                      // a short turn. The mark is flush with the bubble's top,
+                      // which is what the ruling asks for.
+                      <span className="flex-none">
                         {mine ? userAvatar : (assistantAvatar ?? <AssistantMark />)}
                       </span>
                     ) : null}
@@ -905,10 +925,15 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
               data-side="theirs"
               role="status"
               aria-label={thinkingLabel}
-              className="flex max-w-[62%] min-w-0 items-end gap-2 self-start max-sm:max-w-[85%]"
+              /* The turn row's shape exactly, `items-start` included — the
+                 wait is a turn, and a rule that applied to one of them and
+                 not the other would be two rules. Its own dots are never
+                 tall enough to show the difference; that is not a reason for
+                 the row to disagree with the row above it. */
+              className="flex max-w-[62%] min-w-0 items-start gap-2 self-start max-sm:max-w-[85%]"
             >
               {avatars ? (
-                <span className="mb-1 flex-none">{assistantAvatar ?? <AssistantMark />}</span>
+                <span className="flex-none">{assistantAvatar ?? <AssistantMark />}</span>
               ) : null}
               <span
                 aria-hidden="true"
@@ -935,7 +960,28 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                own, so the same fact is measured instead — `autoGrow` reports
                the crossing and the radius follows it. One rule, two ways of
                learning the same thing, and neither component invents a second
-               shape. */
+               shape.
+
+               THE RING BELONGS TO THIS PILL, NOT TO THE BARE FIELD INSIDE IT.
+               The client, 1 Sep 2026, over the assistant's message field:
+               "when i select the text field, the 'select' outline is inside?
+               should outline the full component! but remember, this should
+               only change the color of the outline (like in the add/edit
+               screens)." The focusable node here is a BARE `<textarea>`
+               (`border-0`, `shadow-none`, no fill and no radius of its own,
+               five lines down), so the global ring drew a plain rectangle
+               sized to that textarea, sitting inside the rounded pill the
+               reader perceives as the field.
+
+               tokens.css §8 already names and solves this shape for every
+               OTHER composite control in the kit — the search pill, a facet's
+               typed field — and this composer was simply never marked. It is
+               marked now: the pill is the shell, the Textarea below is the
+               proxy, and the ring follows this element's own radius for free,
+               pill or stadium, because an outline always takes the radius of
+               the box it is drawn on. No ring is written here; §8 still owns
+               the only one. */
+            data-focus-shell=""
             className={cn(
               "flex min-w-0 items-end gap-2 bg-card pe-2 py-2",
               // THE INSET FOLLOWS THE SHAPE, for the same reason the radius does.
@@ -983,6 +1029,11 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
             ) : null}
 
             <Textarea
+              /* Hands its ring to the composer pill above. See tokens.css §8.
+                 On the INSTANCE and not in `textarea.tsx`, because a
+                 standalone Textarea IS its own visible box and already takes
+                 the ordinary per-element ring correctly. */
+              data-focus-proxy=""
               aria-label={composerLabel}
               placeholder={placeholder}
               value={text}

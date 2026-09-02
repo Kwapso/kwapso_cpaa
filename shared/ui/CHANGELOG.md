@@ -1,5 +1,196 @@
 # Changelog
 
+## v1.2.24 — 2026-09-02
+
+Four of the five entries below existed already, as corrections written
+downstream in the app's `shared/web/library-overrides.css` because a vendored,
+hash-pinned `shared/ui/` could not be hand-edited. Three of those blocks each
+carried the same closing sentence — "the real fix is upstream; delete this the
+day a synced tag ships it" — and none of them had ever travelled. They travel
+here. An override is a second place a decision lives, and that file's own
+header says what a second place costs: a rule written on 30 June was still
+fighting a library fix that had shipped in v0.13.0, and it tinted every card
+in both apps for nine days before anyone connected the two.
+
+### Changed — the focus ring is drawn ON the edge it answers for, not 2px beside it
+
+`--focus-offset` is `0px`. Client, 2026-08-31, over a plain "Price sold" text
+input: "when in select something you draw an overline bigger [than] the
+already existing outline. do not do that. just change the color of the
+existing outline. everywhere where you show the selected whatever."
+
+The fix is geometric and not chromatic — `--focus` is already the ink this
+system uses for every other "selected" mark, so the colour was never the bug.
+An `outline` paints outside its border box by `outline-offset`, while a
+field's own edge is an INSET shadow painted immediately inside that same box,
+and `input.tsx` says outright that the hairline does not move on focus (review
+1A · fix 4 stopped it moving on purpose). At 2px those were therefore two
+concentric strokes with a visible gap between them: precisely "an overline
+bigger than the already existing outline", never a recolour of anything. At 0
+the ring lands on the box the hairline is drawn against, so a focused control
+reads as its own edge changing colour and weight in place.
+
+`--focus-width` and `--focus` do not move: still 1px, still charcoal
+(off-beige on an inverse ground), still `:focus-visible` only, still §8's one
+rule for every control at once. Only where it is drawn changed. This is the
+SECOND override of kit ruling 24 — the width went to 1px on 2026-08-22 (B2) —
+and §3 now carries both rulings in full beside the values. `docs/TOKENS.md`
+and `docs/RULES.md` both stated `2px` for the width AND the offset; the width
+had been wrong in the docs since 22 Aug and both rows are corrected here.
+
+Measured in `verify/writeback/` §A, on a focused `Input`, both palettes: a
+`1px solid` outline at `outline-offset: 0px` on the control's own 999px
+radius, immediately outside the border box its own `0 0 0 1px inset` hairline
+is drawn inside. Rebinding the token back to `2px` on the live page moved the
+ring to `2px` and nothing else, which is the whole of the change.
+
+`rail.tsx`'s scroll gutter needed no edit and got none: it is written as
+`calc(var(--focus-offset) + var(--focus-width))` and states no literal, so it
+narrows from 3px to 1px and still clears the ring exactly.
+
+### Fixed — the assistant's mark rides the bubble's top, not its full height
+
+`AgentChat`'s turn row was `flex items-end`, which bottom-aligned the mark
+against the row's tallest child on every turn. A one-line reply hides this
+completely — there is only one line to align against either way — which is why
+it survived to be reported from an app, on a genuinely tall answer where the
+mark sat level with the bubble's BOTTOM rather than beside the first line a
+reader's eye starts at.
+
+The kit already drew this the other way one component over: `chat.tsx`'s own
+`Message` is `items-start` and states the ruling in its own words, "CH19 view
+16 levels the 24 mark with the TOP of the bubble". `AgentChat` was the one
+surface still drawing the older behaviour, so this is not a new rule — it is
+the already-ruled alignment reaching the last component that had not picked it
+up. The thinking turn takes the same row shape for the same reason; its own
+dots are never tall enough to show the difference, which is not a reason for
+two sibling rows to disagree.
+
+The avatar's `mb-1` went with it. It was the bottom-aligned row's nudge, and
+at `items-start` a cross-axis END margin moves the mark nowhere — it only
+padded the row's own height on a short turn.
+
+Measured in `verify/writeback/` §B on a 163.875px bubble: the mark's top is
+now 0.000px from the bubble's top. Forcing the old `items-end` + `mb-1` back
+on the live row puts it 141.125px lower, 4px clear of the bubble's bottom.
+Row height is 163.875px either way — the mark moved, the layout did not.
+
+### Fixed — the composer's ring belongs to the pill, not to the bare field inside it
+
+Client, 2026-09-01, over the assistant's message field: "when i select the
+text field, the 'select' outline is inside? should outline the full component!
+but remember, this should only change the color of the outline (like in the
+add/edit screens)."
+
+`AgentChat`'s composer is a decorated pill (`bg-card`, its own radius and
+padding) wrapped around a BARE `<textarea>` — `border-0`, `shadow-none`, no
+fill and no radius of its own. Focus lands on the textarea, which has no
+visible box, so the ring drew a plain rectangle sized to it, sitting inside
+the rounded pill the reader perceives as the field.
+
+`tokens.css` §8 has named and solved this shape since review 1A · fix 4, for
+`search-input.tsx` and `filter-bar.tsx`'s facet field: the bare node hands its
+ring to the shell it sits in through `:has()` and suppresses its own. This
+composer was simply never marked with either attribute. It is marked now —
+`data-focus-shell` on the pill, `data-focus-proxy` on the Textarea, on the
+INSTANCE and not in `textarea.tsx`, because a standalone Textarea is its own
+visible box and already rings correctly. No ring is written in the component;
+§8 still owns the only one, and §8's own tally of who carries the pair is
+updated rather than left one file short.
+
+Measured in `verify/writeback/` §C, with the textarea focused: the pill draws
+`1px solid rgb(26,25,24)` at offset 0 on its own `999px` radius across its
+full 487.5 × 45 box, and the textarea's own `outline-style` is `none` — its
+408.75 × 30 rectangle is no longer ringed. Typed to three lines, the ring
+follows the pill into the stadium radius without a second rule, because an
+outline always takes the radius of the box it is drawn on.
+
+### Fixed — `WebEmbed`'s sandbox default was the documented escape hatch
+
+`DEFAULT_SANDBOX` was `"allow-scripts allow-same-origin"` while the file's own
+header said "THE SANDBOX IS DEFAULTED CLOSED". The header was right about the
+intent and the code was the wrong half: the HTML standard says of this exact
+pair that framed content served from the embedder's origin can reach its own
+DOM through `window.parent`, rewrite its own `sandbox` attribute and reload
+itself out of the sandbox entirely. The default permitted the one thing the
+paragraph above it claimed to prevent.
+
+The default is now `allow-scripts` and nothing else, which puts the frame in
+an opaque origin — the thing that actually walls it off from this app's
+cookies, storage and DOM. It costs an ordinary third-party embed nothing: a
+video, a map or a form on somebody else's origin was already cross-origin and
+was never reading ours.
+
+The one legitimate need is an opt-in prop rather than a default. A first-party
+embed — our own page, needing its own storage — passes `allowSameOrigin`. A
+named boolean, not a hand-typed `sandbox` string, so the dangerous pair is one
+greppable word at the call site instead of a token buried in a string nobody
+re-reads, and the call site states the trust rather than inheriting it.
+
+A second untrue sentence went with it: the header claimed
+`sandbox={undefined}` removed the attribute entirely. It never did —
+`sandbox` was a defaulted parameter, so `undefined` is exactly the value that
+selects the default — and it is not wanted either. An unsandboxed frame is not
+a state "defaulted closed" can have. `sandbox` is no longer defaulted in the
+destructure (the default depends on `allowSameOrigin` now) and a call site's
+own string still replaces everything wholesale, empty string included.
+
+Measured in `verify/writeback/` §D, off the rendered `<iframe>`'s own
+attribute: default `allow-scripts`; with `allowSameOrigin`, `allow-scripts
+allow-same-origin`; with `sandbox="allow-forms"`, `allow-forms`.
+
+`map.tsx` carries the same pair and KEEPS it, deliberately: its `src` is a
+provider's embed URL by its own definition, where the pair grants the provider
+its own storage and grants it nothing of ours. Its comment said "same default
+as `web-embed`", which is no longer true and is rewritten — including the part
+that is a judgement and not a ruling, since nothing in the type system makes
+that `src` third-party. Whether it should follow is logged there, unruled: the
+demo makes no network calls, so which providers actually break without
+`allow-same-origin` cannot be measured in this repo.
+
+### Fixed — the right is called `create`, and the matrix called it `add`
+
+`PermissionMatrix` shipped `RIGHTS = ["see", "add", "edit", "delete"]` and
+`WRITE_RIGHTS = ["add", "edit", "delete"]`. The client SAID "add" on
+2026-08-24 and the ids were transcribed straight out of that sentence, but the
+application that enforces these switches has one name for the right and it is
+`create` — `shared/workers/gating.ts` types it `"read" | "create" | "edit" |
+"delete"`, the sheet stores `can_create`, and the glossary's own definition of
+an access right reads "read, create, edit, or delete". An id is a key two
+systems match on, not a transcript.
+
+The label follows the id rather than keeping a second word for the same
+switch, which was already this file's own stated rule — "keeping a second set
+of words for the same four things is how two lists drift" — and had been
+broken by this id since the day it was written. The slot letters stay four
+distinct initials: S · C · E · D. The demo's own permission data and section
+summary move with it, and the header's three passages that spelled the order
+"see · add · edit · delete" are corrected rather than left describing a build
+that no longer exists.
+
+`see` is left alone and the divergence is recorded rather than tidied away:
+the enforcing name for that one is `read`, it was not asked for, and it is a
+word in front of a reader where `Create` versus `Add` is not.
+
+Measured in `verify/writeback/` §E, off the rendered grid: the slot letters
+read S · C · E · D, the legend reads "See · Create · Edit · Delete", and a
+slot's accessible name reads "Owner · Accounts · Create: held".
+
+**Downstream note.** The app maps both vocabularies in one place
+(`web/components/role-detail.tsx`, `RIGHT_TO_KIT` / `KIT_TO_RIGHT`). Its
+`create: "add"` / `add: "create"` halves become `create: "create"` /
+`create: "create"` when this tag is vendored, and `KIT_TO_RIGHT`'s type will
+not compile until they do.
+
+### Housekeeping — `tokens.json` caught up on two tokens it had never seen
+
+Rebuilding the generated file for `--focus-offset` also picked up
+`--spine-paper-member-fill` and `--spine-ink-member-fill`, which have been in
+`tokens.css` since the spine work and had never reached the JSON. Nothing
+flagged it, because `build-tokens.mjs --check` runs the four guards and does
+not diff the emitted file against the one on disk — worth knowing, since the
+same silence would hide the next one. Declared count 279 → 281.
+
 ## v1.2.23 — 2026-09-02
 
 ### Fixed — the rail's collapse toggle and member chip no longer scroll with the entries

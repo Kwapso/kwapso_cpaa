@@ -230,8 +230,8 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
            control it sits on ... focus shape always follows the control's own
            shape." The focusable node here is the bare inner input, which has
            no box and no radius, so the ring used to draw a RECTANGLE inside
-           this pill. The shell takes the ring instead (tokens.css §8) — same
-           2px at the same 2px offset, on the shape the reader sees. */
+           this pill. The shell takes the ring instead (tokens.css §8) — the
+           same 1px at the same 0 offset, on the shape the reader sees. */
         data-focus-shell=""
         data-readonly={readOnly ? "true" : undefined}
         className={cn(searchShellVariants({ state }), className)}

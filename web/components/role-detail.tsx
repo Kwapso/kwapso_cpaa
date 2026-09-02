@@ -171,13 +171,17 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     )
 
   // SERVER ⇄ KIT rights vocabulary. The app's sheet says read/create; the kit
-  // ruled its four ids are the client's own words, see/add (the older
-  // view/create vocabulary is gone from it on purpose). One mapping here, both
+  // says see/create. Three of the four now agree: the kit called the second
+  // right `add` until v1.2.24, when it took the word every enforcing surface
+  // here already uses (shared/workers/gating.ts's `Right`, the glossary), so
+  // `create` maps to itself. `see`/`read` is the one that still differs and
+  // deliberately so — the kit's id is the word in front of a reader, and
+  // `read` is the word the gate is written in. One mapping here, both
   // directions, so neither side ever learns the other's words.
-  const RIGHT_TO_KIT = { read: "see", create: "add", edit: "edit", delete: "delete" } as const
+  const RIGHT_TO_KIT = { read: "see", create: "create", edit: "edit", delete: "delete" } as const
   const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
     see: "read",
-    add: "create",
+    create: "create",
     edit: "edit",
     delete: "delete",
   }

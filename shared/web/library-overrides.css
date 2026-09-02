@@ -62,7 +62,24 @@
  * subtler and left the same bug for somebody to find again in November.
  *
  * BEFORE YOU ADD AN OVERRIDE HERE, check whether the library already does what
- * you want. This one was fighting a fix that had already shipped. */
+ * you want. This one was fighting a fix that had already shipped.
+ *
+ * ── AND THE LOOP CLOSED ONCE, ON 2026-09-02 ───────────────────────────────
+ *
+ * Three overrides lived here between 31 Aug and 2 Sep, each ending in its own
+ * "delete this the day the kit ships it" line: `--focus-offset: 0px`, the
+ * AgentChat composer's focus ring, and `items-start` on an AgentChat turn.
+ * All three were client rulings on kit behaviour rather than app behaviour, so
+ * all three were owed upstream from the day they were written — and none had
+ * moved. An audit found them sitting here with their own instructions
+ * unfollowed, which is the exact failure the post-mortem above describes,
+ * caught earlier this time.
+ *
+ * The kit shipped all three in v1.2.24 and the blocks were deleted the same
+ * day. What made it work was not noticing harder: the client made it a
+ * standing rule that an approved fix goes back to the kit BEFORE the next
+ * thing, and `npm run kit:drift` now reports what the app has changed since
+ * the last sync. A note that says "logged for Aurora" is not a mechanism. */
 
 /* ── shared/web IS A SOURCE, AND TAILWIND HAD NEVER BEEN TOLD ──────────────
  *
@@ -134,155 +151,4 @@ html {
 
 body[data-scroll-locked] {
   margin-right: 0 !important;
-}
-
-/* ── THE FOCUS RING SITS ON THE BORDER IT ANSWERS FOR, NOT BESIDE IT ───────
- *
- * The client, 31 Aug 2026, over a screenshot of a plain "Price sold" text
- * input: "when in select something you draw an overline bigger [than] the
- * already existing outline. do not do that. just change the color of the
- * existing outline. everywhere where you show the selected whatever."
- *
- * THE MECHANISM, read out of tokens.css §8 rather than guessed. The one
- * global focus rule is a CSS `outline`, and an `outline` paints OUTSIDE its
- * element's border box by `outline-offset` — 2px, kit ruling 24 as reversed
- * by override 4. A control's own edge is a separate line and does not move:
- * input.tsx draws it as an inset box-shadow and says outright "the field's
- * own hairline does not move" on focus (review 1A · fix 4 deliberately
- * stopped it moving, because moving it TOO read as a second thick stroke
- * back when the two lines sat only 2px apart). So focusing any bordered
- * control drew two concentric lines: the control's own faint edge, and a
- * second, darker ring floating 2px outside it — which is precisely "an
- * overline bigger than the already existing outline," never a recolour of
- * anything.
- *
- * THE FIX IS GEOMETRIC, NOT CHROMATIC. `--focus` (`--kw-charcoal`) is already
- * the same ink this system uses for every other "selected" mark — the
- * inverse fill on a chosen calendar day, `--foreground` on an active tab's
- * underline, the ink select.tsx already recolours its own hairline to on
- * focus — so the colour was never the bug. Zeroing `--focus-offset` pulls
- * the ring back onto the border box it was floating 2px off. It now sits
- * flush against the control's own edge (immediately outside an inset
- * hairline, which is drawn immediately inside it) instead of beside it with
- * a visible gap, so a focused control reads as its own edge changing colour
- * and weight in place — what the client asked for — rather than as a second
- * shape appearing next to it. `--focus-width` and `--focus` are untouched:
- * the ring is still 1px, still charcoal (off-beige on an inverse ground),
- * still `:focus-visible` only, still the ONE rule tokens.css §8 states for
- * every control at once. This only moves where it is drawn.
- *
- * WHY HERE, NOT IN THE KIT. `shared/ui/` is vendored and pinned
- * (VERSION.json); editing tokens.css by hand fails
- * web/test/vendored-kit.test.ts's content hash. `--focus-offset` is a value
- * the kit's own `:focus-visible` rule READS, not a rule this file
- * duplicates, so rebinding it on `:root` here — after tokens.css imports, so
- * it wins the cascade — reaches every control the kit draws (fields,
- * buttons, tabs, the DatePicker's trigger and day cells, the composite
- * `data-focus-shell` controls) with no component touched. Same shape as the
- * scroll-lock fix above: an app-side correction to a value the vendored file
- * only reads. The real fix belongs upstream in design-mothership; delete
- * this the day a synced tag carries `--focus-offset: 0` on its own. */
-:root {
-  --focus-offset: 0px;
-}
-
-/* ── A COMPOSITE CONTROL'S RING BELONGS TO THE SHAPE, NOT THE BARE FIELD ───
- *
- * THE CLIENT, 1 Sep 2026, over the assistant's message field: "when i select
- * the text field, the 'select' outline is inside? should outline the full
- * component! but remember, this should only change the color of the outline
- * (like in the add/edit screens)."
- *
- * THE MECHANISM IS ALREADY DOCUMENTED, one section up in this same file, and
- * in tokens.css §8: `--focus-offset: 0` pulls the ring flush against
- * whatever element is FOCUSED. For an ordinary field that element already IS
- * the visible box (its own border, its own radius), so the ring lands on the
- * right shape automatically. AgentChat's composer
- * (shared/ui/components/agent-chat/agent-chat.tsx, `data-slot=
- * "agent-chat-composer"`) is a DIFFERENT shape: a decorated pill
- * (`bg-card`, `rounded-pill`/`rounded-[var(--radius)]`, its own padding)
- * wrapped around a BARE `<textarea>` (`border-0`, no fill, no radius of its
- * own — `data-slot="textarea"`). Focus lands on the textarea, which has no
- * visible box of its own, so the ring drew a plain rectangle sized to the
- * textarea's own small border box, sitting INSIDE the rounded pill the
- * reader actually perceives as "the field" — precisely "the outline is
- * inside, should outline the full component."
- *
- * TOKENS.CSS §8 ALREADY NAMES THIS SHAPE AND ALREADY SOLVES IT, for its own
- * five pairs of `data-focus-shell` / `data-focus-proxy` nodes (the search
- * pill, a facet's typed field, the command palette's query line…): the
- * proxy — the bare focusable node — hands its ring to the shell it sits
- * inside, via `:has()`, and suppresses its own. AgentChat's composer was
- * simply never marked with either data attribute, so it never got the fix
- * every OTHER composite control in the kit already has.
- *
- * Reproduced here with the SLOTS AgentChat already carries rather than the
- * kit's own two data attributes, because adding `data-focus-shell` /
- * `data-focus-proxy` means editing the vendored file (VERSION.json,
- * web/test/vendored-kit.test.ts) — the composer pill plays the shell, its
- * own Textarea plays the proxy, and the relationship is scoped to exactly
- * that pairing so no OTHER Textarea in the app (a real standalone field,
- * which already IS its own visible box and already gets the ordinary
- * per-element ring correctly) is touched. Same tokens as tokens.css §8's own
- * rule (`--focus-width`, `--focus`, `--focus-offset`) — ONLY the colour and
- * width move if those ever do, same as the client asked for "just change
- * the color of the existing outline. everywhere." The ring follows the
- * pill's own `rounded-pill`/`rounded-[var(--radius)]` automatically: an
- * `outline` always takes its own element's radius, and the element it is
- * now drawn on IS the shape the reader sees.
- *
- * Logged for Aurora: the real fix is `data-focus-shell` /
- * `data-focus-proxy` on the kit's own composer, the day it ships this
- * becomes dead code. */
-[data-slot="agent-chat-composer"]:has([data-slot="textarea"]:focus-visible) {
-  outline: var(--focus-width) solid var(--focus);
-  outline-offset: var(--focus-offset);
-}
-
-[data-slot="agent-chat-composer"] [data-slot="textarea"]:focus-visible {
-  outline: none;
-}
-
-/* ── AN AVATAR RIDES A BUBBLE'S TOP, NOT ITS FULL HEIGHT ───────────────────
- *
- * THE REPORT: on a long, multi-line assistant reply, the mark outside the
- * bubble sat level with the bubble's own BOTTOM — reading as though it had
- * been centred against the whole tall box, rather than beside the first
- * line of the answer the way it does on a short one.
- *
- * THE MECHANISM. `AgentChat`'s own turn row (agent-chat.tsx,
- * `data-slot="agent-chat-turn"`) is `flex items-end gap-2` — bottom-aligns
- * the avatar against the row's tallest child on every turn, short or long.
- * A one-line reply hides this completely (there is only one line to align
- * against either way), which is exactly why it went unnoticed until a
- * genuinely tall bubble made the gap between "beside the last line" and
- * "beside the FIRST line, where a reader's eye actually starts" visible.
- *
- * THE KIT ALREADY DRAWS THIS THE OTHER WAY, ONE COMPONENT OVER: `chat.tsx`'s
- * own `Message` — the person-to-person thread the artifact calls CH19 view
- * 16 — is `items-start`, and its own comment states the ruling outright:
- * "levels the 24 mark with the TOP of the bubble." `AgentChat` is the one
- * component that never picked that up. So this is not a new rule invented
- * for the assistant panel; it is the ALREADY-RULED alignment, applied to the
- * one kit surface that was still drawing the older behaviour — which is why
- * it belongs here rather than as a one-off override inside whichever panel
- * happens to render `AgentChat` today. Any future call site gets it for
- * free, and so does the "thinking" turn below (the same row shape, so the
- * same rule, even though its own content is never tall enough to show it).
- *
- * `align-items: flex-start` and the kit's own `.items-end` utility carry the
- * same specificity (one class each), so source order decides — this file is
- * imported after the kit's generated utilities in both front doors' own
- * globals.css, so this line wins without `!important`.
- *
- * WHY HERE, NOT IN THE KIT. `shared/ui/` is vendored and pinned
- * (VERSION.json); hand-editing `agent-chat.tsx` fails
- * web/test/vendored-kit.test.ts's content hash. Same shape as the two
- * overrides above: a value the vendored component's own class list carries,
- * rebound from outside it. Logged for Aurora: the real fix is `items-end` →
- * `items-start` on `AgentChat`'s turn row upstream, the day it ships this
- * becomes dead code. */
-[data-slot="agent-chat-turn"],
-[data-slot="agent-chat-thinking"] {
-  align-items: flex-start;
 }
