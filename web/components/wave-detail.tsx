@@ -386,7 +386,7 @@ export function WaveDetailScreen({
                             value={sprintQuery}
                             onChange={(e) => setSprintQuery(e.target.value)}
                             placeholder={t("Search sprints in this wave…")}
-                            className="w-full sm:w-56"
+                            className="flex-1"
                             aria-label={t("Search sprints in this wave")}
                           />
                           <SortControl

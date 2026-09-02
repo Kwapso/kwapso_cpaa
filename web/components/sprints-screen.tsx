@@ -416,7 +416,7 @@ export function SprintsScreen({
             // (screens.ts's `sprintsListRecipe`) — one search box in one
             // collection's words, wherever it appears.
             placeholder={t("Search sprints…")}
-            className="w-56"
+            className="w-full"
           />
         }
         filters={

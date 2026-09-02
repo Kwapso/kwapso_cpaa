@@ -196,16 +196,23 @@ export function WaveFinder({
   // collection-frame/collection-frame.tsx`).
   return (
     <div className="flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
-      <SearchInput
-        value={query.q}
-        onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
-        // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
-        // "Clear all", which was one control quietly owning two questions; the
-        // kit's bar says "Clear filters" and now means only that.
-        onClear={() => onChange({ ...query, q: "" })}
-        placeholder={t("Search waves…")}
-        className="w-full sm:w-56"
-      />
+      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+          like in your atifact": the reference artifact's search element is
+          `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
+          chips/sort/period after it to the track's far edge instead of
+          sitting immediately after a narrow box. */}
+      <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+        <SearchInput
+          value={query.q}
+          onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
+          // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
+          // "Clear all", which was one control quietly owning two questions; the
+          // kit's bar says "Clear filters" and now means only that.
+          onClear={() => onChange({ ...query, q: "" })}
+          placeholder={t("Search waves…")}
+          className="w-full"
+        />
+      </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <FilterBar
           facets={facets}

@@ -142,7 +142,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search modules…")}
-                className="w-full sm:w-56"
+                className="flex-1"
                 aria-label={t("Search modules")}
               />
               <SortControl

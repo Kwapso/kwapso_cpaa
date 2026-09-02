@@ -411,6 +411,18 @@ function CollectionFrame<T>({
   // itself, which is the thing this is a predicate about.)
   const narrowed = query.trim() !== "" || Object.keys(facetValues).length > 0
 
+  // GENUINELY EMPTY, READ EARLY — client, 2 Sep 2026, verbatim: "NEVER
+  // TOOLBAR ON EMPTY COLLECTION." Nothing to search, filter or sort when
+  // there is nothing in the collection AND nothing is narrowing it — the
+  // toolbar used to stay drawn above `CollectionEmptyState` regardless (only
+  // the create button was ever suppressed here, see below), which is a
+  // search box and a sort control offered over zero rows. Computed once,
+  // ahead of `searchBox`/`filterBar`/`sortControl`, so both render paths
+  // this file draws (the kit-panel branch below, and the app-drawn-header
+  // branch further down) suppress the same three controls from the same
+  // one answer instead of two copies of the same condition.
+  const isEmptyState = state === "ready" && filtered.length === 0 && !narrowed
+
   const showFilterBar = config.userFilter && config.filterFacets.length > 0
   const showSort = config.sortable && config.sortOptions.length > 0
   const showHeader =
@@ -500,7 +512,12 @@ function CollectionFrame<T>({
     const searchPlaceholder = config.showCount
       ? config.searchPlaceholder.replace(/^Search\b/i, (m) => `${m} ${filtered.length}`)
       : config.searchPlaceholder
-    const searchBox = config.searchable ? (
+    // `!isEmptyState` on all three (client, 2 Sep 2026, verbatim: "NEVER
+    // TOOLBAR ON EMPTY COLLECTION") — nothing to search, filter or sort
+    // over zero rows with nothing narrowing them. `showFilterBar`/`showSort`
+    // still gate on the recipe's own config first; this is a second,
+    // independent reason to draw nothing, not a replacement for it.
+    const searchBox = config.searchable && !isEmptyState ? (
       <SearchInput
         defaultValue={query}
         onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
@@ -508,7 +525,7 @@ function CollectionFrame<T>({
         placeholder={searchPlaceholder}
       />
     ) : null
-    const filterBar = showFilterBar ? (
+    const filterBar = showFilterBar && !isEmptyState ? (
       <FilterBar
         facets={config.filterFacets}
         values={facetValues}
@@ -523,7 +540,7 @@ function CollectionFrame<T>({
     // between the actual view switcher and "the sub-tab picker are controls"
     // — this frame has no view switcher, so `SortControl` takes the slot
     // rather than inventing a sixth one the component does not offer.
-    const sortControl = showSort ? (
+    const sortControl = showSort && !isEmptyState ? (
       <SortControl
         options={config.sortOptions}
         value={sortBy}
@@ -532,8 +549,10 @@ function CollectionFrame<T>({
         onDirectionChange={setSortDir}
       />
     ) : null
-    // GENUINELY EMPTY SUPPRESSES THE TOOLBAR'S OWN + BUTTON. Below, the
-    // GENUINELY-EMPTY branch draws `CollectionEmptyState`'s own "Add the
+    // GENUINELY EMPTY SUPPRESSES THE TOOLBAR'S OWN + BUTTON (`isEmptyState`,
+    // computed once above alongside `narrowed` — now also what gates
+    // `searchBox`/`filterBar`/`sortControl` themselves, see there). Below,
+    // the GENUINELY-EMPTY branch draws `CollectionEmptyState`'s own "Add the
     // first" — a labelled button carrying the identical `createAction`. The
     // toolbar's icon-only + button pinned to the panel's `actions` slot
     // (composition 27.1's toolbar contract: "search, then filters, then view
@@ -542,7 +561,6 @@ function CollectionFrame<T>({
     // exists to prevent. It stays for every OTHER state — loading, error,
     // no-results (`narrowed`), and a populated collection — where the empty
     // body is not the one being drawn.
-    const isEmptyState = state === "ready" && filtered.length === 0 && !narrowed
     const createButton = createAction && !isEmptyState ? createActionButton(createAction) : null
 
     return (

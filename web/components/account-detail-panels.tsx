@@ -147,7 +147,7 @@ export function ContactsPanel({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search contacts…")}
-                className="w-full sm:w-56"
+                className="flex-1"
                 aria-label={t("Search contacts")}
               />
               <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
@@ -329,7 +329,7 @@ export function PortalAccessPanel({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search logins…")}
-                className="w-full sm:w-56"
+                className="flex-1"
                 aria-label={t("Search logins")}
               />
               <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>

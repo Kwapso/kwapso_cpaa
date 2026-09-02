@@ -98,7 +98,7 @@ function ListToolbar({
         value={query}
         onChange={(e) => onQuery(e.target.value)}
         placeholder={placeholder}
-        className="w-full sm:w-56"
+        className="flex-1"
         aria-label={placeholder}
       />
       <Select value={status} onValueChange={(v) => onStatus(v as ActiveFilter)}>

@@ -147,7 +147,7 @@ export function StakeholdersPanel({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("Search people on this…")}
-              className="w-full sm:w-56"
+              className="w-full"
               aria-label={t("Search people on this")}
             />
           }

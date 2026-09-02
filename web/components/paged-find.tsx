@@ -381,13 +381,24 @@ export function PagedFind<T>({
             the filter row's "Clear all" — one control quietly owning two
             questions — and the kit's bar says "Clear filters" and now means
             only that. */}
-        <SearchInput
-          value={text}
-          onChange={(e) => setText(e.currentTarget.value)}
-          onClear={() => setText("")}
-          placeholder={placeholder}
-          className="w-56"
-        />
+        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+            like in your atifact": the reference artifact's search element is
+            `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
+            chips/sort/count/actions after it to the track's far edge instead
+            of sitting immediately after a narrow box. Wrapped, the same
+            technique this file's own comment below already argues for a
+            `w-full` child: a `flex-1` box here claims the row's remaining
+            width, and only then does the plain `w-full` `SearchInput` inside
+            fill exactly that box. */}
+        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+          <SearchInput
+            value={text}
+            onChange={(e) => setText(e.currentTarget.value)}
+            onClear={() => setText("")}
+            placeholder={placeholder}
+            className="w-full"
+          />
+        </div>
         {/* THE FACET CHIPS, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
             ruling, 2026-09-01, the toolbar spec Aurora approved that night
             against a real Tickets mockup: search, then the facet chips, then

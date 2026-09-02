@@ -340,7 +340,20 @@ export function ToolbarRow({
         className
       )}
     >
-      {search}
+      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+          like in your atifact": her reference artifact's search element is
+          `flex: 1 1 auto`, not a fixed width, so it is what pushes
+          filters/sort/view/actions to the track's far edge rather than
+          leaving them clustered right after a narrow box. `flex-1` here does
+          that job regardless of what width class the search element itself
+          carries (a caller's own `w-full` fills this box; one still asking
+          for a fixed width would be overridden by this wrapper's own basis
+          the same way `filters` below already normalizes a `w-full` child –
+          see PagedFind's note on why a wrapped `w-full` child sizes to the
+          wrapper and not the row). */}
+      {search && (
+        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
+      )}
       {filters && <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>}
       {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
       {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}

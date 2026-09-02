@@ -138,7 +138,7 @@ export function CompaniesPanel({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search companies…")}
-                className="w-full sm:w-56"
+                className="flex-1"
                 aria-label={t("Search companies")}
               />
               <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
@@ -242,7 +242,7 @@ export function ContactTicketsPanel({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search tickets…")}
-                className="w-full sm:w-56"
+                className="flex-1"
                 aria-label={t("Search tickets")}
               />
               {statuses.length > 1 && (
@@ -332,7 +332,7 @@ export function ContactMeetingsPanel({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search meetings…")}
-                className="w-full sm:w-56"
+                className="flex-1"
                 aria-label={t("Search meetings")}
               />
               <SortControl

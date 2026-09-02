@@ -528,7 +528,7 @@ export function SelectableScreen({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={t("Search values…")}
-                    className="w-full sm:w-56"
+                    className="flex-1"
                     aria-label={t("Search dropdown values")}
                   />
                   <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>

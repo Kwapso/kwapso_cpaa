@@ -398,7 +398,7 @@ export function AppsScreen({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search apps…")}
-                className="w-full sm:w-56"
+                className="w-full"
               />
             )
           }

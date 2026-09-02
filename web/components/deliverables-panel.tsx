@@ -230,7 +230,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
               value={find}
               onChange={(e) => setFind(e.target.value)}
               placeholder={t("Search what we handed over…")}
-              className="w-full sm:w-56"
+              className="w-full"
               aria-label={t("Search what we handed over…")}
             />
           )
