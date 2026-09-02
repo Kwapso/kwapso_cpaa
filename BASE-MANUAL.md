@@ -1,4 +1,4 @@
-# The Brimba Base, how it works, and why
+# The Kwapso System Base, how it works, and why
 
 This is the narrative that ties the whole base together. Every other doc is a
 close-up: [ARCHITECTURE.md](ARCHITECTURE.md) is the locked decisions,
@@ -15,7 +15,7 @@ is downstream of them: **stay lean**, and **obey the Laws of the Base**.
 
 ## 1 · The shape
 
-Brimba is eight Cloudflare Workers, a two-tier database, and two static web apps the
+The Kwapso System is eight Cloudflare Workers, a two-tier database, and two static web apps the
 workers serve, the agency screens and the client portal. Nothing more. The count does
 not grow with the number of teams or users, it grows only when you add a genuinely new
 capability, which is exactly what the eighth (the portal's own front door) was.
@@ -112,13 +112,13 @@ UI primitives and collections come from `shared/ui/`, imported as
 from them. The library was the npm package `@kwapso/ui`, installed from a
 separate repo, until it was **vendored into this repo on 2026-08-22**, because
 the re-theme needs to change what a component IS and not only what colour it is —
-and since **2026-08-25 the vendored copy is PINNED**: `github.com/Kwapso/design`
+and since **2026-08-25 the vendored copy is PINNED**: `github.com/Kwapso/kwapso-ui-ux`
 at the tag in `shared/ui/VERSION.json`, with a hand-edit under `shared/ui/`
 turning the build red (`web/test/vendored-kit.test.ts`).
 **The two layers did not merge, only the address changed:** a primitive is
 generic, app-agnostic lego, and a control that only makes sense in this product
 still belongs in `web/components/`. If a primitive needs changing, change it
-upstream in `Kwapso/design`, tag it, and pull it with `scripts/sync-design.mjs`
+upstream in `Kwapso/kwapso-ui-ux`, tag it, and pull it with `scripts/sync-design.mjs`
 (UI-GAPS.md is the list of what the kit still cannot do); `shared/ui/README.md`
 says why in full. Screens are one client-resolved shell
 (`web/components/deep-link-screen.tsx`) rendering recipes from `web/lib/screens.ts`
@@ -128,7 +128,7 @@ at `/t/<teamId>/<module>/<id>` URLs.
 
 ## 2 · The spine, permissions
 
-Everything in Brimba routes through one gate. This is the single most important
+Everything in the Kwapso System routes through one gate. This is the single most important
 thing to understand, because it is what makes the AI agent safe, what makes deep
 links safe, and what a new module plugs into on day one.
 
@@ -389,7 +389,7 @@ the registry exists to prevent.
 
 ## 5 · Fork the base for a new product (ERP, portal, CRM…)
 
-Brimba is not an app, it's the **foundation** you start a new product on. When you
+The Kwapso System is not an app, it's the **foundation** you start a new product on. When you
 build, say, an ERP or a client portal, you inherit login, teams, member roles +
 permissions, invites, emails, live-sync, the screen engine, the CSV import, and the
 AI agent **for free**, and you add your product's own modules on top. Here's the
@@ -474,7 +474,7 @@ for some products and wrong for others.
 
 **What a new product must NOT do.** Don't hand-roll a second copy of a component that
 `shared/ui/` already ships, and don't hand-edit the one in `shared/ui/` either —
-`shared/ui/` is a PINNED dependency of `github.com/Kwapso/design` (the tag is in
+`shared/ui/` is a PINNED dependency of `github.com/Kwapso/kwapso-ui-ux` (the tag is in
 `shared/ui/VERSION.json`), a hand-edit turns the build red
 (`web/test/vendored-kit.test.ts`), and a kit change is made upstream, tagged, and
 pulled with `scripts/sync-design.mjs`. Don't add a public worker (only the two

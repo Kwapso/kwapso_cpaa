@@ -36,22 +36,48 @@ export function shouldFollow(o: { first: boolean; mine: boolean; nearBottom: boo
   return o.first || o.mine || o.nearBottom
 }
 
-/** Is the reader already at the end of the page? */
+/** WHICH BOX THE THREAD IS IN — and it is no longer the same answer on both
+ * doors, which is why this is a function and not two lines inlined twice.
+ *
+ * THE AGENCY DOOR STOPPED SCROLLING THE DOCUMENT ON 2026-09-02. `ScreenShell`
+ * (kit v1.2.28) draws the window `h-dvh overflow-hidden` and gives the card's
+ * body its own scroller, published as `[data-slot="screen-shell-body"]`. So on
+ * that door the thread is the PANE, and `window.scrollY` is permanently 0 —
+ * every reply would have been read as "the reader is at the top, busy", and
+ * nothing would ever have followed again. Silent: no error, no yank, just a
+ * conversation that stopped moving.
+ *
+ * THE PORTAL DOOR STILL SCROLLS THE DOCUMENT. `portal-shell.tsx` lays out with
+ * `min-h-[100svh]` and lets the page scroll, exactly as the sentence this
+ * comment replaces described, and the reasoning it gave is still true THERE:
+ * the thread IS the page, a nested scroller would trap a thumb on a phone, and
+ * scrolling the document to its end puts the sticky bottom nav back in its
+ * natural place under the composer.
+ *
+ * So the box is asked for rather than assumed, and both doors get the same
+ * behaviour out of whichever one they have. `null` means the document, which is
+ * also what the login screen, onboarding and the error boundary have. */
+function threadBox(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-slot="screen-shell-body"]')
+}
+
+/** Is the reader already at the end of the thread's own scroller? */
 function atPageBottom(): boolean {
+  const box = threadBox()
+  if (box) return box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK
   const doc = document.documentElement
   return doc.scrollHeight - window.scrollY - window.innerHeight <= FOLLOW_SLACK
 }
 
-/** Scroll the PAGE, not an inner box. Both shells lay out with `min-h-[100svh]`
- * and let the document scroll, so the thread IS the page — a nested scroller
- * would trap a thumb on a phone and leave the portal's sticky bottom nav
- * floating over the last reply. Scrolling the document to its end puts that nav
- * back in its natural place under the composer, where a chat app has it. */
+/** Scroll whichever box holds the thread, never an inner one. See `threadBox`. */
 function scrollToNewest(smooth: boolean) {
-  window.scrollTo({
-    top: document.documentElement.scrollHeight,
-    behavior: smooth ? "smooth" : "auto",
-  })
+  const behavior = smooth ? "smooth" : "auto"
+  const box = threadBox()
+  if (box) {
+    box.scrollTo({ top: box.scrollHeight, behavior })
+    return
+  }
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior })
 }
 
 /** Keep the newest message in view. Pass the last message's id (null while the

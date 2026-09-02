@@ -501,10 +501,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             </>
           )}
           // THE ONE CARD — toolbar, then rows, exactly the reference's
-          // [panel: toolbar, body]. `attached`: zero gap to the tabs above
-          // (this file's `tabs` slot, not the outer column's `gap-4`), the
-          // same join `SectionWithCreate`'s own `folderTabs` slot draws.
-          wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+          // [panel: toolbar, body]. Zero gap to the tabs above (this file's
+          // `tabs` slot, not the outer column's `gap-4`), the same join
+          // `SectionWithCreate`'s own `folderTabs` slot draws.
+          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
         >
           {(found) => {
             const rows = found.active ? found.rows : loaded

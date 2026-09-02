@@ -15,7 +15,7 @@ export type Env = {
    * lib/google.ts `frontDoors`. */
   PORTAL_ORIGIN: string
   /** Verified-sender from-address for transactional email
-   * (e.g. "noreply@updates.swiftstruck.com"). */
+   * (e.g. "noreply@updates.kwapso.com"). */
   EMAIL_FROM: string
 
   // Secrets (wrangler secret put) — optional until the user provides them.

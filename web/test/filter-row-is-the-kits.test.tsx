@@ -40,14 +40,14 @@ import * as React from "react"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FacetOption, FilterFacet } from "@shared/web/screen-engine/config"
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
 
 const ROOT = join(__dirname, "..", "..")
 const ADAPTER = "shared/web/screen-engine/filter-bar.tsx"
 const KIT_FILTER_BAR = "@shared/ui/components/filter-bar/filter-bar"
-const KIT_SELECT = "@shared/ui/components/select/select"
+const KIT_COMPACT_FACET = "CompactFacet"
 
 const adapterSource = () => readFileSync(join(ROOT, ADAPTER), "utf8")
 const kitSource = (rel: string) => readFileSync(join(ROOT, "shared", "ui", rel), "utf8")
@@ -94,25 +94,59 @@ const FACETS: FilterFacet[] = [
 ]
 
 /** The bar as a screen holds it: the selection is the SCREEN's state, which is
- * the only way `onChange` can be observed doing what it says. */
+ * the only way `onChange` can be observed doing what it says.
+ *
+ * RENDERS `pill` AND `panel` AS PLAIN SIBLINGS (v1.2.27's `useFilterBar`
+ * split) — correct for these standalone tests, which only ever query by ROLE
+ * across the whole document rather than caring where the pill sits relative
+ * to a track. `ToolbarRowHarness` below is the one that cares. */
 function Harness({ facets = FACETS }: { facets?: FilterFacet[] }) {
   const [values, setValues] = React.useState<Record<string, string>>({})
+  const { pill, panel } = useFilterBar({
+    facets,
+    values,
+    data: [],
+    onChange: (field, value) =>
+      setValues((s) => {
+        const next = { ...s }
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setValues({}),
+  })
   return (
     <>
-      <FilterBar
-        facets={facets}
-        values={values}
-        data={[]}
-        onChange={(field, value) =>
-          setValues((s) => {
-            const next = { ...s }
-            if (value === "") delete next[field]
-            else next[field] = value
-            return next
-          })
-        }
-        onClearFacets={() => setValues({})}
-      />
+      {pill}
+      {panel}
+      <span data-testid="values">{JSON.stringify(values)}</span>
+    </>
+  )
+}
+
+/** THE SAME HOOK, WIRED THE WAY A REAL SCREEN WIRES IT: `pill` to
+ * `<ToolbarRow>`'s own `filters` slot, `panel` to its separate `toolbarPanel`
+ * slot — never both folded into one `filters` node, which is exactly the
+ * shape a plain `<Harness />` could no longer stand in for once the pill and
+ * the panel became two values instead of one component's own markup. */
+function ToolbarRowHarness({ facets = FACETS }: { facets?: FilterFacet[] }) {
+  const [values, setValues] = React.useState<Record<string, string>>({})
+  const { pill, panel } = useFilterBar({
+    facets,
+    values,
+    data: [],
+    onChange: (field, value) =>
+      setValues((s) => {
+        const next = { ...s }
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setValues({}),
+  })
+  return (
+    <>
+      <ToolbarRow search={<input aria-label="Search" />} filters={pill} toolbarPanel={panel} />
       <span data-testid="values">{JSON.stringify(values)}</span>
     </>
   )
@@ -122,11 +156,20 @@ function Harness({ facets = FACETS }: { facets?: FilterFacet[] }) {
  * pressing the slot again would toggle it shut.
  *
  * TWO OPENINGS, NOT ONE, since the facets became compact fields (2026-09-02):
- * the PANEL opens off the "Filter" pill, and then the facet's own `Select`
- * opens off its trigger — on `pointerdown`, which is the one event Radix's
- * trigger listens for, so a `click` here would open nothing and every
- * assertion below would pass by never running. That is the failure this whole
- * file exists to refuse.
+ * the PANEL opens off the "Filter" pill, and then the facet's own trigger
+ * opens its own popover.
+ *
+ * THE TRIGGER IS A BUTTON, NOT A COMBOBOX (v1.2.27, `CompactFacet`). It used
+ * to be the kit's `Select`, whose trigger claims `role="combobox"` and opens
+ * on `pointerdown` — the one event Radix's `Select` trigger listens for, so a
+ * bare `click` used to open nothing. Adopting `CompactFacet` swapped that for
+ * the kit's own disclosure-button trigger over a Radix `Popover`
+ * (`CompactFacet`'s own doc: "NOT A COMBOBOX, deliberately... it does not
+ * claim `role="combobox"` the way `SelectTrigger` does"), and `Popover`'s own
+ * trigger opens on a plain `click` (`@radix-ui/react-popover`'s own
+ * `onClick`), not `pointerdown` — so this now finds a plain `button`, the only
+ * one inside the facet's own `role="group"` (the group holds nothing but its
+ * label and this trigger), and clicks it the ordinary way.
  *
  * The list is PORTALLED, so the option is found on `screen` rather than inside
  * the facet's own group; the facet is still addressed by its heading first, so
@@ -134,12 +177,7 @@ function Harness({ facets = FACETS }: { facets?: FilterFacet[] }) {
 async function pick(label: string, option: string) {
   if (screen.queryAllByRole("group", { name: label }).length === 0) openPanel()
   const facet = await screen.findByRole("group", { name: label })
-  fireEvent.pointerDown(within(facet).getByRole("combobox"), {
-    button: 0,
-    ctrlKey: false,
-    pointerId: 1,
-    pointerType: "mouse",
-  })
+  fireEvent.click(within(facet).getByRole("button"))
   const listbox = await screen.findByRole("listbox")
   fireEvent.click(within(listbox).getByRole("option", { name: option }))
 }
@@ -165,19 +203,21 @@ describe("the app's filter row is the design kit's", () => {
         `${ADAPTER} must draw the kit's ${name} — that is the whole point of this file`
       ).toBe(true)
     expect(adapter).toContain(KIT_FILTER_BAR)
-    // THE COMPACT FACET FIELD IS THE KIT'S `Select` (client ruling,
-    // 2026-09-02). It used to be the kit's `SearchableFacet`, an
-    // always-expanded heading + search pill + checkbox list, which is what her
-    // screenshot caught hanging under the Apps toolbar where her artifact
-    // draws one short field reading "Any client". The kit's filter-bar file
-    // ships no compact facet, so the adapter composes one from the kit's own
-    // select — and the assertion moves with it rather than being dropped,
-    // because the thing this file refuses is a HAND-ROLLED control, not a
-    // particular kit export. A `SelectTrigger` written out here in divs would
-    // look identical and be exactly the regression of 2026-08-27 again.
+    // THE COMPACT FACET FIELD IS THE KIT'S OWN `CompactFacet` (v1.2.27). It
+    // used to be the kit's `SearchableFacet`, an always-expanded heading +
+    // search pill + checkbox list, which is what her screenshot caught
+    // hanging under the Apps toolbar where her artifact draws one short field
+    // reading "Any client" — then a hand-assembled compact field built out of
+    // the kit's bare `Select` (client ruling, 2026-09-02), because the kit's
+    // filter-bar file shipped no compact facet of its own yet. It does now:
+    // the assertion moves with it rather than being dropped, because the
+    // thing this file refuses is a HAND-ROLLED or hand-ASSEMBLED control, not
+    // a particular kit export. A `SelectTrigger` (or a `CompactFacet`
+    // look-alike) written out here in divs would look identical and be
+    // exactly the regression of 2026-08-27 again.
     expect(
-      adapter.includes(KIT_SELECT),
-      `${ADAPTER}'s compact facet must be the kit's Select, never a hand-rolled trigger`
+      adapter.includes(KIT_COMPACT_FACET),
+      `${ADAPTER}'s compact facet must be the kit's own CompactFacet, never a hand-rolled or hand-assembled trigger`
     ).toBe(true)
 
     // …and NOBODY declares a control of their own under one of those names,
@@ -373,12 +413,10 @@ describe("the app's filter row is the design kit's", () => {
     // out, so "the pill's height does not change" is proved the only way that
     // is honest here — the track's subtree is byte-identical open and closed,
     // and the panel is not in it.
-    render(
-      <ToolbarRow search={<input aria-label="Search" />} filters={<Harness />} />
-    )
+    render(<ToolbarRowHarness />)
 
-    const column = document.querySelector('[data-slot="filter-panel-column"]')
-    expect(column, "the toolbar must be wrapped in a filter-panel column").toBeTruthy()
+    const column = document.querySelector('[data-slot="toolbar-row-column"]')
+    expect(column, "the toolbar must be wrapped in its own column").toBeTruthy()
     const track = column!.firstElementChild as HTMLElement
     expect(
       track.className,
@@ -420,13 +458,19 @@ describe("the app's filter row is the design kit's", () => {
     expect(track.outerHTML).toBe(closed)
   })
 
-  it("EVERY PILL TRACK THAT HOSTS THE BAR PUBLISHES A PANEL OUTLET", () => {
-    // The panel renders IN PLACE when no host published an outlet, which is
-    // correct for a plain block and for the harnesses above — and is pass
-    // one's shape, so a `rounded-pill` host that forgets the column gets the
-    // giant oval back. Censused off the disk rather than hand-listed: the
-    // hosts were found by grep the last time this row moved, that grep found
-    // four, and this census found three more the same day.
+  it("EVERY `useFilterBar` CALL RENDERS BOTH ITS PILL AND ITS PANEL", () => {
+    // SUPERSEDED, v1.2.27. This census used to police the app's own
+    // `FilterPanelColumn`/`FilterPanelProvider` system — a `<FilterBar>` drawn
+    // with nowhere to publish its panel's outlet reproduced pass one's giant
+    // oval. That whole mechanism is gone: `useFilterBar` returns `{ pill,
+    // panel }` as two ordinary values, and a caller places each directly
+    // where it belongs (`filters`/`toolbarPanel` on `ToolbarRow` or the kit's
+    // `CollectionFrame`, or two plain siblings for a hand-built track). There
+    // is no longer a "did this file wrap its track in a column" question to
+    // ask; there is a NEW one with the identical failure mode — a host that
+    // destructures `panel` and never renders it drops the ruling just as
+    // silently as an orphaned `<FilterBar>` used to, because the panel simply
+    // never appears. Censused the same way, off the disk.
     const files = sourceFiles(["web", "web-portal", "shared/web"].map((d) => join(ROOT, d)), {
       extensions: [".tsx"],
       relativeTo: ROOT,
@@ -435,49 +479,37 @@ describe("the app's filter row is the design kit's", () => {
       .filter((f) => f.rel !== ADAPTER)
       .map((f) => ({ rel: f.rel, src: stripComments(f.source) }))
 
-    const publishes = (src: string) => /<FilterPanel(?:Column|Provider)[\s/>]/.test(src)
-    const draws = (src: string) => /<FilterBar[\s/>]/.test(src)
+    const CALL =
+      /const\s*\{\s*pill\s*(?::\s*(\w+))?\s*,\s*panel\s*(?::\s*(\w+))?\s*\}\s*=\s*useFilterBar\(/g
 
-    // i · A BAR DRAWN HERE has somewhere to put its panel — either an outlet
-    //     in this file, or a `filters={…}` slot, which hands the bar to a
-    //     toolbar whose own file answers for it (`ToolbarRow`, the kit's
-    //     `CollectionFrame`). Most screens are the second kind and should be:
-    //     a screen does not own toolbar geometry.
-    const orphaned = files
-      .filter((f) => draws(f.src) && !publishes(f.src) && !/filters=\{/.test(f.src))
-      .map((f) => f.rel)
+    const offenders: string[] = []
+    let scanned = 0
+    for (const f of files) {
+      for (const m of f.src.matchAll(CALL)) {
+        scanned++
+        const pillName = m[1] ?? "pill"
+        const panelName = m[2] ?? "panel"
+        const afterDecl = f.src.slice(m.index + m[0].length)
+        if (!new RegExp(`\\b${pillName}\\b`).test(afterDecl))
+          offenders.push(`${f.rel}: pill (\`${pillName}\`) is destructured but never rendered`)
+        if (!new RegExp(`\\b${panelName}\\b`).test(afterDecl))
+          offenders.push(`${f.rel}: panel (\`${panelName}\`) is destructured but never rendered`)
+      }
+    }
+    expect(scanned, "the useFilterBar census found nothing — it has stopped matching").toBeGreaterThan(2)
     expect(
-      orphaned,
-      `these draw <FilterBar> outside a toolbar slot and publish no outlet, so its open ` +
-        `panel lands wherever the pill is:\n  ${orphaned.join("\n  ")}`
-    ).toEqual([])
-
-    // ii · AND EVERY PILL TRACK THAT CARRIES FILTERS publishes one, because
-    //      the `rounded-pill` box is the one the panel's height must never
-    //      reach. This is the clause that would have failed on pass one.
-    const pillHosts = files.filter(
-      (f) => /rounded-pill/.test(f.src) && (draws(f.src) || /\{filters\}/.test(f.src))
-    )
-    expect(
-      pillHosts.length,
-      "found no pill toolbar hosting the filter bar — the census broke"
-    ).toBeGreaterThan(2)
-    const unwrapped = pillHosts.filter((f) => !publishes(f.src)).map((f) => f.rel)
-    expect(
-      unwrapped,
-      `these draw a rounded-pill toolbar around the filter bar with no column under it. ` +
-        `An open panel would grow the pill's own box and draw it as a giant oval (2 Sep ` +
-        `2026). Wrap the track in <FilterPanelColumn>:\n  ${unwrapped.join("\n  ")}`
+      offenders,
+      `these hosts call useFilterBar and drop one of its two values on the floor:\n  ${offenders.join("\n  ")}`
     ).toEqual([])
   })
 
   it("THE FILTER PILL'S BOX IS THE SORT AND VIEW PILLS' BOX", () => {
     // CLIENT RULING, 2026-09-02, verbatim: "the filter button-pill it's still
-    // differnet than the other 2. fix and uniform it". Both ends of this are
-    // DERIVED from the kit's own source, so it cannot pass by agreeing with a
-    // number somebody typed here: the sort and view pills draw through the
-    // kit's `SelectTrigger` and take its padding and its type step, and
-    // `ViewSwitch` is where the weight is written down.
+    // differnet than the other 2. fix and uniform it". SUPERSEDED, v1.2.27:
+    // the kit closed the gap upstream in its own `CHIP_ADD`, so this test's
+    // job flipped from "the app-side override matches the kit" to "the
+    // app-side override is gone, because the kit needs none". Both ends are
+    // still DERIVED from the kit's own source rather than a number typed here.
     const trigger = kitSource("components/select/select.tsx")
     const view = kitSource("components/collection-frame/view-switch.tsx")
     const kitBar = kitSource("components/filter-bar/filter-bar.tsx")
@@ -494,19 +526,19 @@ describe("the app's filter row is the design kit's", () => {
     expect(addChip, "the kit's CHIP_ADD could not be read — the derivation broke").toBeTruthy()
 
     for (const cls of [padding!, "text-sm", weight!]) {
-      // ROT-CHECK. The upstream fix is for the kit's own chip to take these
-      // three the way it already took its height and its fill; the day it
-      // does, this override is dead code and must go rather than sit here
-      // restating what the kit now says.
+      // THE KIT NOW STATES ALL THREE ITSELF (v1.2.27) — the fix this test used
+      // to wait for. An app-side override of any of them would be three lines
+      // free to drift out of step with the very thing they claim to match.
       expect(
         addChip!.includes(cls),
-        `the kit's CHIP_ADD now carries \`${cls}\` itself — delete the app-side ` +
-          `override in ${ADAPTER}, the gap it was closing is closed`
-      ).toBe(false)
+        `the kit's CHIP_ADD no longer carries \`${cls}\` — the upstream fix ` +
+          `regressed, or the derivation broke`
+      ).toBe(true)
       expect(
-        adapter,
-        `the Filter pill must match the sort and view pills on \`${cls}\``
-      ).toContain(`[&_[data-slot=filter-bar-add]]:${cls}`)
+        adapter.includes(`filter-bar-add]]:${cls}`),
+        `\`${cls}\` is the kit's job on all three pills since v1.2.27 — it must ` +
+          `not be restated in ${ADAPTER}`
+      ).toBe(false)
     }
 
     // WHAT THE KIT ALREADY AGREES ON IS NOT RESTATED. Height, radius and fill

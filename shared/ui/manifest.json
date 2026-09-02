@@ -964,7 +964,9 @@
       "exports": [
         "FilterBar",
         "RangeFacet",
-        "SearchableFacet"
+        "SearchableFacet",
+        "CompactFacet",
+        "FacetLabel"
       ],
       "props": {
         "state": [
@@ -3862,6 +3864,26 @@
       "item": "A non-editorial quote register on ArticleBody",
       "reason": "ArticleBody draws every `blockquote` as ruling 13's pull-quote — SerrifCondensed at the h3 step on --tracking-serif, 24px, `my-[var(--space-8)]`, \"one per page\" by editorial rule — and there is no second register and no way to opt out: the treatment is unconditional descendant CSS on the root, and ArticleBodyProps carries no variant for it. The kit's law-book does not rule on quotes at all: `blockquote` appears in none of docs/RULES.md, PATTERN.md, BUILD-A-COMPONENT.md, BUILD-A-SCREEN.md or TOKENS.md, and the only other component that draws one (typography's `Headline as=\"blockquote\"`) is documented as the same pull-quote. THE CASE THAT HAS NO ANSWER: a quoted reply inside a ticket or a meeting note — several per page, none of them editorial. `notes.tsx` names \"a quoted reply\" as a fully-composed row a call site supplies, which is the kit's model for a THREAD; it does not cover a quote a person typed mid-prose inside one body, which is what a consuming app receives when its editor emits HTML.",
       "recommendation": "A second register on ArticleBody, selected by a prop, for a quote that is a QUOTED PASSAGE rather than an editorial pull-quote — sans, body step, quiet ink, marked by a rule rather than by the serif — with the editorial rule kept as the default so nothing that draws a pull-quote today changes. Which of the two is the default, and what the non-editorial one looks like, is a design decision and is why this is logged rather than guessed (BUILD-A-COMPONENT: \"A logged gap is fine. A guess that looks like law is not.\"). The kwapso app is holding a one-line app-side override against this entry and deletes it the day the register ships.",
+      "severity": "known-limitation"
+    },
+    {
+      "item": "A chip row that mixes the toolbar pill's type step with CH11's",
+      "reason": "The client's ruling of 2026-09-02 — \"the filter button-pill it's still differnet than the other 2. fix and uniform it\" — was applied to `CHIP_ADD` alone, which is the \"+ filter\" slot the toolbar draws beside `SortControl` and `ViewSwitch`. It is now 14/500 on 18 of inline padding, matching `selectTriggerVariants`. `filterChipVariants` — a REMOVABLE facet chip, and the \"Clear filters\" control that shares its drawing — was NOT moved: those are CH11's `.kw-chip`, drawn at badge type (12) on `px-3` in the fragment `filter-bar.tsx` cites, and the ruling names one pill against \"the other 2\", which is the add slot against sort and view. A chip is not one of the other 2, and re-deciding CH11 needs its own ruling rather than a designer's inference from a ruling about something else. Measured on verify/toolbar-writeback, light and dark: add slot 13.125px/500 at 16.875px inline padding, chip and Clear 11.25px/400 at 11.25px (a 15px root; 14/500/18 and 12/400/12 at 16).",
+      "recommendation": "Ask the client whether a bar drawing BOTH chips and the add slot should carry two type steps in one row. The consuming app does not hit it today — its own ruling of the same day is that active filters are reported as a count inside the pill and never as chips, so its row holds exactly one pill — which is why this is logged rather than guessed at. If the answer is one step, the move is `filterChipVariants` and the Clear control to `text-sm`/`--space-4h`, and CH11's badge chip survives only where a chip sits inside a facet's results.",
+      "severity": "known-limitation",
+      "owner": "client"
+    },
+    {
+      "item": "A MULTI-SELECT compact facet",
+      "reason": "`CompactFacet` (added 2026-09-02) holds ONE value or none, and `SearchableFacet` stays the multi-select drawing. A compact facet shows its value IN ITS TRIGGER, and a trigger holding a set has to summarise it — \"3 selected\", or a truncated run of names. Neither wording exists in the kit, and CH11's own answer to \"several values are on\" is the chip row `FilterBar` already draws. Inventing a summary string here would bake an untranslatable sentence into a component and would look like law.",
+      "recommendation": "Open a client ruling on what a compact facet says when several options are on, then either add a `multiple` mode to `CompactFacet` or state that the multi-select case is `SearchableFacet` plus the chip row. Both consuming surfaces are single-value today (one value per query parameter), so nothing is blocked.",
+      "severity": "known-limitation",
+      "owner": "client"
+    },
+    {
+      "item": "Arrow-key navigation inside a facet's option list",
+      "reason": "Both `SearchableFacet` and `CompactFacet` draw their options as a `role=\"listbox\"` of real `<button>`s, which is reachable and operable by Tab and Enter and is rung by tokens.css section 8 at each row's own radius — but it does not implement the roving-tabindex arrow-key pattern a native listbox has. `SearchableFacet` has shipped this way since it landed; `CompactFacet` matches it deliberately rather than introducing a second keyboard model for the same list. Radix's `Select` has the pattern, and is not usable here: its typeahead consumes the keystrokes a search field inside the panel needs, which is the whole reason a compact facet could not simply be a `Select` (the gap this version closed).",
+      "recommendation": "One roving-tabindex helper for the facet list, applied to both facets in the same pass so they cannot diverge. Not attempted here: it is a behaviour change to a shipped component and belongs in its own change with its own verification, not folded into a write-back.",
       "severity": "known-limitation"
     }
   ],

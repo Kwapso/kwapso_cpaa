@@ -1,12 +1,12 @@
 # AGENTIC-IMPORT.md, agent-driven, multi-table data import (LOCKED 2026-07-04)
 
 The vision, in one line: **a user dumps their old system's exports (CSV/XLSX) and
-Brimba ingests them**, the agent normalizes the data, maps their columns onto our
+the Kwapso System ingests them**, the agent normalizes the data, maps their columns onto our
 fields, orders interdependent tables, resolves foreign keys, rejects what it
 honestly can't, and writes every row **through the same gated door a person uses**
 so the audit trail is identical. No weeks of manual re-entry.
 
-This is a **base capability**: every app built on Brimba (an ERP with
+This is a **base capability**: every app built on the Kwapso System (an ERP with
 products → locations → inventory, a portal with clients → matters → documents)
 inherits it by declaring its targets. This doc is the locked contract.
 
@@ -50,7 +50,7 @@ upload N files ─▶ AGENT ANALYZES ─▶ PLAN (review) ─▶ one confirm ─
 ```
 
 1. **Upload**, one or many files into a **batch**. `.xlsx` is converted to CSV
-   **client-side** by Brimba's own zero-dependency reader (`web/lib/xlsx-to-csv.ts`:
+   **client-side** by the Kwapso System's own zero-dependency reader (`web/lib/xlsx-to-csv.ts`:
    hand-parsed ZIP + browser-native `DecompressionStream` + DOMParser. SheetJS was
    never bundled, its npm build carries a HIGH advisory); first sheet only, no
    formulas evaluated, date cells arrive as Excel serial numbers. The worker only

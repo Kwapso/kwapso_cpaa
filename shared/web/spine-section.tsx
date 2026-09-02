@@ -1,6 +1,6 @@
 "use client"
 
-// THE SIDEBAR'S COLOUR — three cards, shown not described, exactly the shape
+// THE SIDEBAR'S COLOUR — two cards, shown not described, exactly the shape
 // the kit's own Appearance panel draws Theme in (26.05, "a choice that
 // changes how the app looks is never a row of pills … one card per option: a
 // small picture of the thing itself, the option's name, one line of prose,
@@ -8,12 +8,23 @@
 // of this section, are the same cards now too — `theme-section.tsx` and
 // `scale-section.tsx` copy this file's shape rather than reinventing it.
 //
+// THREE BECAME TWO, v1.2.28. Client ruling, 2026-09-02, verbatim (it overturns
+// the count in D3, "offer teh threee!"): "default spine to mango, but everyone
+// can change it during the onboarding or anytime at settings" — the kit cut
+// `ink` and `paper` the same day and shipped ONE muted rail, `quiet`, in their
+// place. The two cards below are `SpinePicture`'s own `"quiet" | "mango"`
+// union now, and the copy is the kit's, verbatim, from
+// `compositions/screens/settings.tsx`'s `SPINES` — new words, not the old
+// three trimmed to two: with the choice down to a name and its opposite, the
+// caption stopped describing a FILL ("Charcoal spine, mango active row.") and
+// started describing what the choice is like to live with.
+//
 // THE CARDS ARE THE KIT'S OWN, not reinvented. `AppearanceOptionGroup` and
 // `SpinePicture` are `compositions/screens/settings.tsx`'s own sub-primitives
 // — COMPOSITION-MISMATCHES.md names both reusable standalone (`options`, a
 // sub-primitive, not the route itself"): the ROUTE around them (`SettingsRoute`,
 // its six-tab shape) is what this app has deliberately not adopted, never
-// these two parts. The three cards below read exactly as they would inside
+// these two parts. The two cards below read exactly as they would inside
 // the kit's own Settings composition, words and pictures both.
 //
 // OPTIMISTIC, THEN PERSISTED — `ScaleSection`'s own shape, directly above
@@ -32,10 +43,10 @@
 //
 // THE CARDS ARE DRAWN IN TWO PLACES NOW, FROM ONE `SpineChoice`. The other is
 // the onboarding screen, which is the "during the onboarding" half of the same
-// ruling. Two copies of three labels and three descriptions is exactly the
+// ruling. Two copies of two labels and two descriptions is exactly the
 // drift R34 exists to stop and that no law catches inside a component, so the
 // group is exported and the SECTION around it — heading, prose, save-on-press
-// — is what stays here. Onboarding wants none of those three: it has no room
+// — is what stays here. Onboarding wants none of those: it has no room
 // for a heading of its own, and its choice rides the form's one submit rather
 // than saving on press.
 
@@ -80,26 +91,20 @@ export function SpineChoice({
 }) {
   const { t } = useLanguage()
 
-  /* 26.05's own Sidebar cards, verbatim — transcribed from settings.tsx's
+  /* settings.tsx's own Sidebar cards, verbatim — transcribed from its
      SPINES, the words this app has not adopted the route to draw itself. */
   const options: readonly AppearanceOption[] = [
     {
-      value: "ink",
-      label: t("Ink"),
-      description: t("Charcoal spine, mango active row."),
-      picture: <SpinePicture spine="ink" />,
-    },
-    {
-      value: "paper",
-      label: t("Paper"),
-      description: t("Soft-paper spine, the quiet one."),
-      picture: <SpinePicture spine="paper" />,
-    },
-    {
       value: "mango",
       label: t("Mango"),
-      description: t("Full brand spine, charcoal active row."),
+      description: t("Warm colour down the sidebar. Easy to find your place."),
       picture: <SpinePicture spine="mango" />,
+    },
+    {
+      value: "quiet",
+      label: t("Quiet"),
+      description: t("A calm sidebar that lets the work stand out."),
+      picture: <SpinePicture spine="quiet" />,
     },
   ]
 
@@ -154,7 +159,7 @@ export function SpineSection({
     <section className={className}>
       <h2 className="text-lg font-medium">{t("Sidebar")}</h2>
       <p className="text-muted-foreground mt-1 text-sm">
-        {t("The spine can be ink, paper or mango. The rest of the app does not change.")}
+        {t("The spine can be mango or quiet. The rest of the app does not change.")}
       </p>
       <SpineChoice
         className="mt-4"

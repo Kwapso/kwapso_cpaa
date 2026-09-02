@@ -196,8 +196,10 @@ lib/           the cn helper and use-has-room
 compositions/  the client: "everything currently compositions/xyz is
                compositions (and then sections inside of it)"
   templates/   15 — the SHAPE of a screen with nothing product-specific in
-               it. MainScreen, DetailScreen, the shell, the rail. THIS IS
-               WHAT THE KIT SHIPS INSTEAD OF ONE FILE PER COLLECTION
+               it. ScreenShell — THE screen since the 2026-09-02 collapse —
+               the rail, and the eleven that stand on them. MainScreen and
+               DetailScreen survive as deprecated adapters over the shell.
+               THIS IS WHAT THE KIT SHIPS INSTEAD OF ONE FILE PER COLLECTION
   screens/     17 — the finished pages the client named as exceptions:
                home, settings, profile, onboarding, brand, company hub, the
                external doors

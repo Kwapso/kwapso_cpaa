@@ -9,10 +9,39 @@
 // `Tabs` / `TabsList` / `TabsTrigger` / `TabsContent` — behaviour is the
 // app's, every pixel is the kit's.
 //
-// Two deliberate translations, both the kit's rulings rather than ours:
-//  · `variant: "pill"` no longer exists (kit tabs are `line` | `folder`; the
-//    review ruled pill was a segmented control wearing a tab's name). A config
-//    asking for "pill" renders `line`.
+// THE FOLDER SHAPE IS GONE, v1.2.28. CLIENT RULING, 2026-09-02, verbatim:
+// "the whole concept of folders as tabs gets killed. All the current folders
+// as tabs we have will become line tabs. Completely kill and remove folder
+// tabs… I don't want any dead body around… the only tabs that we will have
+// are the line tabs because folders will only be used for the breadcrumbs."
+// The kit's own `TabsVariant` is a one-member union now (`"line"`,
+// `components/tabs/tabs.tsx`) — `folder` moved house to the breadcrumb
+// silhouette (`components/breadcrumbs/breadcrumb-folders.tsx`) and did not
+// come here with it, and the kit no longer accepts a `variant` prop on
+// `TabsList`/`TabsTrigger` at all (there is nothing left to differ from the
+// root). `TabsConfig.variant` follows suit below: one value, `"line"`, kept
+// as a field for the same reason the kit still types a one-member union
+// rather than dropping it — a call site that tries to write anything else
+// fails to compile instead of drifting quietly, and `web/test/rules.test.ts`
+// keeps a rot-check that nobody writes it explicitly at all any more, since
+// there is exactly one value and one place it is decided.
+//
+// AND EVERY TAB NOW CARRIES AN ICON, THE SAME RULE THE LINE STRIP ALWAYS HAD.
+// Client ruling, 2026-09-02, verbatim: "yes, they should have icons. They
+// should be exactly like the line tabs. We will only have one variation of
+// tabs with icons, exactly as they are already lined up." `tabIcon` below
+// used to refuse an icon outright for a folder strip, on the owner's own
+// ruling (kept in full beneath it, marked SUPERSEDED rather than deleted,
+// same discipline shared/spine.ts uses for an overturned argument) — that
+// branch is gone along with the shape it was drawn for: every tab resolves
+// the one vocabulary now, the same path a line tab always used.
+//
+// Two further deliberate translations, both the kit's rulings rather than
+// ours:
+//  · `variant: "pill"` no longer exists (kit tabs were `line` | `folder`
+//    before this; the review ruled pill was a segmented control wearing a
+//    tab's name). A config asking for "pill" is refused the same way "folder"
+//    now is — see `TabsConfig.variant` below.
 //  · Counts and tags are QUIET TEXT, never badges — ch14: "counts are quiet,
 //    never badges". The old `badgeVariant` colour is therefore not drawn.
 //
@@ -58,32 +87,21 @@ export interface TabItem {
 /** Every field is required on purpose — see ARCHITECTURE.md "Configuration". */
 export interface TabsConfig extends BaseConfig {
   tabs: TabItem[]
-  /** "line" | "folder" are the kit's; "pill" is accepted and drawn as "line". */
-  variant: "pill" | "line" | "folder"
+  /** The kit draws one shape now, "line" — `pill` and `folder` are both
+   * retired (pill first; folder at v1.2.28, see the header). A one-member
+   * union rather than a dropped field, for the same reason the kit's own
+   * `TabsVariant` still types it: a call site that tries to write anything
+   * else fails to compile instead of drifting quietly. It is DECIDED ONCE,
+   * in `defaultTabsConfig` below — `web/test/rules.test.ts` keeps the
+   * rot-check that no call site writes it again. */
+  variant: "line"
   fullWidth: boolean
 }
 
 export const defaultTabsConfig: TabsConfig = {
   ...defaultBaseConfig,
   tabs: [],
-  /**
-   * FOLDER, and it is the DEFAULT rather than a per-screen choice.
-   *
-   * The kit draws the brand's own folder silhouette for a tab strip — chapter
-   * 24.3 for tabs and 24.6 for record chrome — so a record's tabs and a
-   * collection's tabs are both that shape. This value used to be `line`,
-   * written before the folder existed, and sixteen screens then hard-coded
-   * `line` on top of it. The result was the folder appearing on three screens
-   * and nowhere else, which reads as a design system that does not propagate.
-   * It propagated fine; the decision had simply been made sixteen times.
-   *
-   * THE RULE, so the next strip does not have to guess: a strip that switches
-   * between RECORDS or between COLLECTIONS takes the folder and says nothing
-   * here. A strip that filters WITHIN one collection is not a folder — it has
-   * no card of its own to be attached to — and says `variant: "line"` with a
-   * reason beside it. There are two of those, and they are the only two.
-   */
-  variant: "folder",
+  variant: "line",
   fullWidth: false,
 }
 
@@ -94,19 +112,22 @@ export function kitIcon(name: string): React.ReactNode {
   return Glyph ? React.createElement(Glyph, { size: 16 }) : null
 }
 
-/** THE TAB VOCABULARY — one icon per tab identity, wherever a LINE strip draws
- * one (a folder strip draws none at all — see `tabIcon` below).
+/** THE TAB VOCABULARY — one icon per tab identity, on every strip. Every tab
+ * carries one now (client ruling, 2026-09-02, see the header) — there is no
+ * shape left in this app that draws none.
  *
- * The owner's rule (25 Aug 2026) was that every folder tab carries an icon;
- * the owner reversed that rule (31 Aug 2026, repeated a second time for
- * emphasis: "folder tabs have no icons — fix"), so this table now only feeds
- * a LINE tab's icon. It is kept (rather than deleted) because the identity it
- * encodes — "the same tab means the same icon on every screen" — still holds
- * for the line-tab case (a record's own sub-tabs), and because a future
- * reversal should not have to reconstruct the vocabulary from scratch.
+ * SUPERSEDED, 2026-09-02 — kept in full rather than deleted, same discipline
+ * shared/spine.ts uses for an overturned argument: "The owner's rule (25 Aug
+ * 2026) was that every folder tab carries an icon; the owner reversed that
+ * rule (31 Aug 2026, repeated a second time for emphasis: 'folder tabs have
+ * no icons — fix'), so this table now only feeds a LINE tab's icon." The
+ * folder shape that reversal was ABOUT is itself retired now (the client
+ * killed it the same week icons came back for good), so there is nothing
+ * left for the reversal to apply to — every strip is a line strip, and a
+ * line tab has always resolved this table.
  *
- * A value outside the table keeps the call site's icon on a line strip. Every
- * name in it is proved drawable by web/test/icon-vocabulary.test.ts. */
+ * A value outside the table keeps the call site's own icon. Every name in it
+ * is proved drawable by web/test/icon-vocabulary.test.ts. */
 export const TAB_ICONS: Record<string, IconName> = {
   overview: "info",
   activity: "history",
@@ -180,11 +201,17 @@ export const TAB_ICONS: Record<string, IconName> = {
   choices: "list-checks",
 }
 
-/** What a tab actually draws. A FOLDER TAB NEVER DRAWS ONE — the owner's 31
- * Aug 2026 ruling, stated twice: "folder tabs have no icons — fix." A line
- * tab still resolves the vocabulary first, then the call site's own icon. */
-function tabIcon(t: TabItem, variant: "line" | "folder"): React.ReactNode {
-  if (variant === "folder") return null
+/** What a tab actually draws. Every tab resolves an icon now: the vocabulary
+ * first, then the call site's own icon.
+ *
+ * SUPERSEDED, 2026-09-02 — this function used to take a `variant` and refuse
+ * an icon outright on a folder strip: "A FOLDER TAB NEVER DRAWS ONE — the
+ * owner's 31 Aug 2026 ruling, stated twice: 'folder tabs have no icons —
+ * fix.'" Kept in full for the same reason the vocabulary comment above keeps
+ * the ruling it superseded: the folder shape that ruling was about is
+ * retired, so the branch it drew is gone WITH the shape rather than merely
+ * unreachable. */
+function tabIcon(t: TabItem): React.ReactNode {
   const named = TAB_ICONS[t.value]
   if (named) return kitIcon(named)
   if (typeof t.icon === "string") {
@@ -206,7 +233,14 @@ function tabIcon(t: TabItem, variant: "line" | "folder"): React.ReactNode {
  * ReactNode parameter here for a button to hide inside, only the three things
  * a tab strip actually needs, so the slot itself renders `<TabsView>` and
  * nothing a caller passes in can end up beside it. Structural, not
- * documented. */
+ * documented.
+ *
+ * THE NAME OUTLASTED THE SHAPE IT WAS COINED FOR. This strip drew the folder
+ * silhouette when the type was named; it draws the one line shape now (see
+ * this file's header), the same as every other strip in the app. Renaming it
+ * would touch six pass sites and nine `<CollectionCard attached>` call sites
+ * for a word only, so it stays `FolderTabStrip` — a collection's own tab
+ * strip, never a record's inner one, exactly as documented above. */
 export type FolderTabStrip = {
   config: TabsConfig
   value: string
@@ -243,24 +277,20 @@ export type FolderTabStrip = {
  * assumed it did.
  *
  * `sticky`/`top`/`z-10`/`bg-background` LAND ON `<Tabs>` ITSELF, NOT ON
- * `[role=tablist]` — measured live, not guessed, after the first cut of this
- * fix (sticky on the tablist, matching `STICKY_TABS`'s own pattern exactly)
- * did nothing at all: the tab strip just scrolled away with the page.
- * `renderFolderTabs` never hands `TabsView` a `renderPanel` ("A COLLECTION'S
- * OWN TAB STRIP, AND NOTHING ELSE," this file's own type doc for
- * `FolderTabStrip`), so `<Tabs>` here has exactly one child — the tablist —
- * and is therefore exactly as tall as it is. A `position: sticky` element's
- * stuck RANGE is bounded by its own containing block, which for a flex child
- * is the flex container itself; `<Tabs>` being no taller than the tablist it
- * holds leaves that range at zero, so the browser never has room to hold it
- * in place, no matter how correct the computed `top` is. `SectionWithCreate`'s
- * and `PagedFind`'s own wrapping `<div>` — the ACTUAL sibling of the tab strip
- * and the collection rows beneath it — is tall enough (it spans the whole
- * scrollable section), and `<Tabs>` is its direct child, so moving the sticky
- * declaration up one level, onto `<Tabs>`, gives the browser that ancestor's
- * real height to stick within. Visually identical either way — `<Tabs>` holds
- * nothing but the tablist here, so a sticky `<Tabs>` and a sticky tablist
- * paint the same pixels — but only one of them has anywhere to go. */
+ * `[role=tablist]` — measured live, not guessed: `<Tabs>` here has exactly
+ * one child (the tablist — this strip never hands `TabsView` a `renderPanel`,
+ * "A COLLECTION'S OWN TAB STRIP, AND NOTHING ELSE," this file's own type doc
+ * for `FolderTabStrip`), and is therefore exactly as tall as it is. A
+ * `position: sticky` element's stuck RANGE is bounded by its own containing
+ * block, which for a flex child is the flex container itself; `<Tabs>` being
+ * no taller than the tablist it holds leaves that range at zero, so the
+ * browser never has room to hold it in place, no matter how correct the
+ * computed `top` is. `SectionWithCreate`'s and `PagedFind`'s own wrapping
+ * `<div>` — the ACTUAL sibling of the tab strip and the collection rows
+ * beneath it — is tall enough (it spans the whole scrollable section), and
+ * `<Tabs>` is its direct child, so the sticky declaration lands one level up,
+ * on `<Tabs>`, giving the browser that ancestor's real height to stick
+ * within. */
 export const STICKY_FOLDER_TABS =
   "bg-background sticky top-[var(--collection-tabs-top,0px)] z-10 " +
   "[&>[role=tablist]]:self-start"
@@ -285,10 +315,12 @@ export function renderFolderTabs(strip: FolderTabStrip | undefined): React.React
   )
 }
 
-/** CLIENT RULING, 1 Sep 2026 — three fixes to the LINE strip (a record's own
- * detail-screen sub-tabs), app-side overrides on the kit's `Tabs` (vendored,
- * pinned, CLAUDE.md R39 — reached through `[&_[data-slot=…]]:` the same
- * pattern `web/components/auth-card.tsx` documents, never a kit hand-edit).
+/** CLIENT RULING, 1 Sep 2026 — three fixes to the LINE strip, app-side
+ * overrides on the kit's `Tabs` (vendored, pinned, CLAUDE.md R39 — reached
+ * through `[&_[data-slot=…]]:` the same pattern `web/components/auth-card.tsx`
+ * documents, never a kit hand-edit). Unconditional now that line is the only
+ * strip this file ever draws (it applied only to the line strip already, so
+ * v1.2.28's retirement of folder changes nothing about the rule itself).
  *
  * 1. THE UNDERLINE'S THICKNESS, SETTLED AT THREE STEPS. The kit draws the
  *    active tab's mark at `0.125rem` (2px) — both where it is drawn TWICE, the
@@ -330,55 +362,38 @@ const LINE_ACTIVE_MATCH =
   "[&_[data-slot=tabs-trigger][data-state=active]]:!shadow-[inset_0_-0.1875rem_0_var(--foreground)] " +
   "[&_[data-slot=tabs-indicator]]:!h-[0.1875rem]"
 
-/** CLIENT RULING, 1 Sep 2026 — the FOLDER strip's own label (a collection
- * screen's own tabs) reads a size smaller than the LINE strip's
- * (`text-caption`, 0.8125rem / 13px, vs `text-sm`, 0.875rem / 14px —
- * `tabs.tsx` `TRIGGER_SKIN`, tokens.css). The client wants one size across
- * both, keeping the LINE strip exactly as it is, so this repoints only the
- * FOLDER trigger's font-size/line-height/letter-spacing to the line strip's
- * own `--text-sm` triad rather than touching the vendored `text-caption`
- * step everywhere else it is used (a badge, a meta line). App-side, not a
- * kit edit, for the same R39 reason as `LINE_ACTIVE_MATCH` above. */
-const FOLDER_LABEL_SIZE_MATCH =
-  "[&_[data-slot=tabs-trigger]]:![font-size:var(--text-sm)] " +
-  "[&_[data-slot=tabs-trigger]]:![line-height:var(--text-sm--line-height)] " +
-  "[&_[data-slot=tabs-trigger]]:![letter-spacing:var(--text-sm--letter-spacing)]"
-
 /** CLIENT RULING, 1 Sep 2026 (screenshot + "this was on the pdf I fed you long
  * ago") — "apart from colour, also play with the weight of the fonts": on
- * BOTH strips the active tab should read visibly HEAVIER than its neighbours,
- * not merely a different colour.
+ * the tab strip the active tab should read visibly HEAVIER than its
+ * neighbours, not merely a different colour.
  *
  * It reads like a two-line fix and is really a one-line one, because the
  * "active is heavier" half was never missing. The kit's own vendored
  * `tabs.tsx` already forces the ACTIVE trigger to
- * `font-[var(--font-weight-medium)]` (500) on both variants
- * (`TRIGGER_SELECTED.line/.folder`, `TRIGGER_SELECTED_WITH_INDICATOR.line/
- * .folder`) — that part shipped with the kit and needs no override here.
+ * `font-[var(--font-weight-medium)]` (500) (`TRIGGER_SELECTED.line`,
+ * `TRIGGER_SELECTED_WITH_INDICATOR.line`) — that part shipped with the kit
+ * and needs no override here.
  *
- * The missing half is the RESTING side. Neither `TRIGGER_SKIN.line` nor
- * `TRIGGER_SKIN.folder` sets a font-weight at all, so a resting tab inherits
- * the page's ordinary, unset weight — which computes to the CSS default,
- * `400`. And this system's Saans face ships exactly two weights, 300 and 500
- * (tokens.css's own `@font-face` block, and its comment: "the weight numbers
- * are not assumptions, each file's OS/2 usWeightClass was read off the
- * binary"). `400` is not one of them, and the CSS font-matching algorithm's
- * own rule for a desired weight in [400, 500] is to check weights ABOVE it
- * first, up to and including 500 — so an unset `400` request silently resolves
- * to the SAME `500` (Medium) face the active tab explicitly asks for. Both
- * states were already painting the identical Medium face; only the ink
- * differed, exactly as reported. There is nothing to un-pick on the active
- * side, only a resting weight to actually state, on both variants (the kit
- * never states one on either).
+ * The missing half is the RESTING side. `TRIGGER_SKIN.line` sets no
+ * font-weight at all, so a resting tab inherits the page's ordinary, unset
+ * weight — which computes to the CSS default, `400`. And this system's Saans
+ * face ships exactly two weights, 300 and 500 (tokens.css's own `@font-face`
+ * block, and its comment: "the weight numbers are not assumptions, each
+ * file's OS/2 usWeightClass was read off the binary"). `400` is not one of
+ * them, and the CSS font-matching algorithm's own rule for a desired weight in
+ * [400, 500] is to check weights ABOVE it first, up to and including 500 — so
+ * an unset `400` request silently resolves to the SAME `500` (Medium) face the
+ * active tab explicitly asks for. Both states were already painting the
+ * identical Medium face; only the ink differed, exactly as reported. There is
+ * nothing to un-pick on the active side, only a resting weight to actually
+ * state (the kit never states one).
  *
  * Forced to `var(--font-weight-normal)` (300, this font's only lighter face)
  * so a resting tab visibly drops to Light rather than quietly riding along at
  * Medium — the same two named weights the kit's own active-tab rule already
  * reaches for, so the pairing is Light/Medium everywhere a tab strip renders,
  * never a third, invented step. App-side, not a kit edit, for the same R39
- * reason as `LINE_ACTIVE_MATCH` above; unconditional on variant, because the
- * bug it fixes is the kit's shared `TRIGGER_SKIN` gap and not a per-variant
- * one. */
+ * reason as `LINE_ACTIVE_MATCH` above. */
 const TAB_RESTING_WEIGHT =
   "[&_[data-slot=tabs-trigger][data-state=inactive]]:!font-[var(--font-weight-normal)]"
 
@@ -401,7 +416,6 @@ export function TabsView({
   const visible = useIsVisible(config)
   if (!visible) return null
 
-  const variant = config.variant === "pill" ? "line" : config.variant
   const fallback = config.tabs[0]?.value
 
   // A CONTROLLED VALUE NAMING A TAB THAT IS NOT HERE DRAWS NOTHING — no trigger
@@ -426,13 +440,7 @@ export function TabsView({
       value={shown}
       defaultValue={defaultValue ?? fallback}
       onValueChange={onValueChange}
-      variant={variant}
-      className={cn(
-        className,
-        TAB_RESTING_WEIGHT,
-        variant === "line" && LINE_ACTIVE_MATCH,
-        variant === "folder" && FOLDER_LABEL_SIZE_MATCH,
-      )}
+      className={cn(className, TAB_RESTING_WEIGHT, LINE_ACTIVE_MATCH)}
     >
       <TabsList className={cn(config.fullWidth && "flex w-full")}>
         {config.tabs.map((t) => (
@@ -441,121 +449,46 @@ export function TabsView({
             value={t.value}
             className={cn(config.fullWidth && "flex-1")}
           >
-            {tabIcon(t, variant)}
+            {tabIcon(t)}
             {t.label}
             {t.badge !== "" && (
-              // LINE VS FOLDER, SPLIT HERE — client ruling, 2026-08-31,
-              // confirmed against a rendered side-by-side (the record-tabs
-              // spec this file's own screen-engine callers point at): on a
-              // LINE strip's active tab (a record's own section switch), the
-              // count sits inside a small, fully-rounded MANGO dot with
-              // primary-ink (charcoal) text — the same brand-fill/charcoal-
-              // text pairing every other mango surface in the kit uses
-              // (`--primary` / `--primary-foreground`, tokens.css), never an
-              // invented pair. An inactive LINE tab's count stays plain
-              // secondary-ink text with NO shape behind it — no circle, no
-              // pill, nothing. The ruling was given specifically about a
-              // record's line tabs; a FOLDER strip's own quiet-vs-ink count
-              // (ch14: "counts are quiet, never badges") is UNCHANGED below,
-              // since nothing said a collection's folder tabs should grow a
-              // dot too and changing them was not asked for.
-              variant === "line" ? (
-                shown === t.value ? (
-                  // A TRUE CIRCLE, NOT AN OVAL — `size-[1.125rem]` (18px, the
-                  // kit's own fixed square for this exact dot, TABS_COUNT_SKIN's
-                  // `line` entry in shared/ui/components/tabs/tabs.tsx) rather
-                  // than `h-4 min-w-4 px-1`: a height plus a MINIMUM width plus
-                  // horizontal padding sizes the box to its CONTENT, so "9" drew
-                  // a circle by accident and "96" stretched it into a stadium —
-                  // exactly the "rounded rectangle, not a circle" the client
-                  // flagged, since a fixed height with a floor-only width still
-                  // grows wider than tall the moment the label needs two digits.
-                  // Fixed on both axes, it stays round for any label this dot
-                  // has ever carried.
-                  <span
-                    className="inline-flex size-[1.125rem] items-center justify-center rounded-pill bg-primary text-micro leading-none tabular-nums text-primary-foreground"
-                  >
-                    {t.badge}
-                  </span>
-                ) : (
-                  <span className="text-micro tabular-nums text-ink-secondary">{t.badge}</span>
-                )
-              ) : (
+              // ONE STRIP NOW, SO ONE COUNT TREATMENT — client ruling,
+              // 2026-08-31, confirmed against a rendered side-by-side (the
+              // record-tabs spec this file's own screen-engine callers point
+              // at): the active tab's count sits inside a small, fully-rounded
+              // MANGO dot with primary-ink (charcoal) text — the same
+              // brand-fill/charcoal-text pairing every other mango surface in
+              // the kit uses (`--primary` / `--primary-foreground`,
+              // tokens.css), never an invented pair. An inactive tab's count
+              // stays plain secondary-ink text with NO shape behind it — no
+              // circle, no pill, nothing. This used to be split by variant
+              // (a folder strip's own count stayed quiet-vs-ink with no dot at
+              // all, ch14: "counts are quiet, never badges"); with the folder
+              // shape retired (v1.2.28) there is only the one strip left, and
+              // it takes the treatment the ruling was actually about.
+              shown === t.value ? (
+                // A TRUE CIRCLE, NOT AN OVAL — `size-[1.125rem]` (18px, the
+                // kit's own fixed square for this exact dot, TABS_COUNT_SKIN's
+                // `line` entry in shared/ui/components/tabs/tabs.tsx) rather
+                // than `h-4 min-w-4 px-1`: a height plus a MINIMUM width plus
+                // horizontal padding sizes the box to its CONTENT, so "9" drew
+                // a circle by accident and "96" stretched it into a stadium —
+                // exactly the "rounded rectangle, not a circle" the client
+                // flagged, since a fixed height with a floor-only width still
+                // grows wider than tall the moment the label needs two digits.
+                // Fixed on both axes, it stays round for any label this dot
+                // has ever carried.
                 <span
-                  className={cn(
-                    "text-micro tabular-nums",
-                    shown === t.value ? "text-ink" : "text-ink-secondary"
-                  )}
+                  className="inline-flex size-[1.125rem] items-center justify-center rounded-pill bg-primary text-micro leading-none tabular-nums text-primary-foreground"
                 >
                   {t.badge}
                 </span>
+              ) : (
+                <span className="text-micro tabular-nums text-ink-secondary">{t.badge}</span>
               )
             )}
           </TabsTrigger>
         ))}
-        {/* THE FOLD CAP — restores ch14's inactive-tab-behind-the-card look on
-            a strip STICKY_FOLDER_TABS has made sticky, for the bare-strip case
-            (`FolderTabStrip`/`renderFolderTabs`, `!renderPanel`) where the card
-            is a SEPARATE element the caller owns (`CollectionCard`), not this
-            component's own `TabsContent`.
-
-            THE BUG (Aurora, 1 Sep 2026, screenshot: "the inactive tab should
-            be behind the folder body! now it's in front"). The kit's own
-            three-number stacking (`tabs.tsx` `TRIGGER_SKIN.folder`) reads an
-            inactive trigger at `z-[1]`, an active one at `z-[3]`, and asks the
-            CARD to sit at `z-[2]` between them — `CollectionCard`'s own
-            `attached` prop does exactly that. That only works when the two
-            triggers and the card are compared in ONE shared stacking context,
-            which held until tonight's sticky fix: `position: sticky` on
-            `<Tabs>` (`STICKY_FOLDER_TABS`) unconditionally opens a NEW stacking
-            context on `<Tabs>` — true regardless of z-index value, sticky and
-            fixed are the two positions that always do this — so from the
-            CARD's side of that boundary, the whole strip now paints as ONE
-            opaque unit at `<Tabs>`'s own z (10), never at its children's 1/2/3.
-            Card (z-2) can no longer land BETWEEN the two triggers; it is
-            either wholly above the strip or wholly below it, and it has to
-            stay wholly below (z-10) or the ACTIVE tab would lose its own
-            attached look the instant the strip scrolls and the card's top
-            edge slides underneath it. Confirmed live (`elementFromPoint`
-            hit-testing on a byte-for-byte reproduction of this DOM/CSS): removing
-            `z-10`, or lowering it, does not recover the 1-2-3 order — it only
-            trades "both tabs paint over the card" for "both tabs paint under
-            it", because the whole opaque unit still moves as one.
-
-            THE FIX. Stop asking an element OUTSIDE that new stacking context
-            to referee it. This span is a THIRD trigger-strip child, so it
-            shares `<Tabs>`'s own local context with the two real triggers —
-            the 1-2-3 comparison happens again, just entirely inside the
-            boundary sticky drew, with no dependency on the external card's
-            position or z-index at all. `absolute`+`bottom-0`, sized to
-            `--folder-tab-overlap` (the same room `TRIGGER_SKIN.folder`'s own
-            `pb-[var(--folder-tab-overlap)]` reserves and `LIST_SKIN.folder`'s
-            `mb-[calc(var(--folder-tab-overlap)*-1)]` pulls the real card up
-            into), painted in `--kw-folder-live` — the identical custom
-            property the active trigger's own `FOLDER_SHAPE_FILL.live` and the
-            kit's `TabsContent` panel both read — so its top edge is
-            indistinguishable from the real card's paper the instant the two
-            touch (zero gap, per `SectionWithCreate`'s own "no gap: the join").
-            `rounded-t-[var(--radius)]` matches the card's own top corners so
-            it reads as the same rounded-rectangle continuing, not a seam.
-            `z-[2]` between the triggers' own `z-[1]`/`z-[3]` reproduces ch14's
-            three papers; `pointer-events-none`+`aria-hidden` because it draws
-            nothing a person interacts with or should hear about — the card
-            underneath is still the thing anyone reads or clicks.
-
-            Scoped to `folder` + no `renderPanel`: a folder strip WITH a
-            `renderPanel` already carries its own kit-drawn `TabsContent`
-            (z-2) inside this same `<Tabs>`, so the 1-2-3 order was never
-            broken there — the card and both triggers already share `<Tabs>`'s
-            one context, sticky or not — and adding a second z-2 layer would
-            be pure redundancy. */}
-        {variant === "folder" && !renderPanel && (
-          <span
-            aria-hidden="true"
-            data-slot="tabs-folder-fold-cap"
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[var(--folder-tab-overlap)] rounded-t-[var(--radius)] bg-[var(--kw-folder-live)]"
-          />
-        )}
       </TabsList>
       {renderPanel &&
         config.tabs.map((t) => (

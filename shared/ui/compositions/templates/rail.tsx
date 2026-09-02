@@ -720,8 +720,21 @@ export interface RailProps
    * `Isotype` picks its cut from a prop rather than from CSS, so the one
    * decision that cannot be made in the stylesheet is made here. A call site
    * that supplies its own rail node and its own spine passes both.
+   *
+   * TWO VALUES SINCE 2026-09-02, NOT THREE. The client cut the spines to
+   * QUIET and MANGO; `ink` and `paper` are retired and are not aliased. It
+   * costs this file one branch: `ink` was the only ground that was dark in
+   * BOTH palettes and therefore the only one that needed the permanently
+   * reversed `unlit` cut. Quiet's ground follows the palette (#F7F2EB light,
+   * #1C1B18 dark), which is exactly what the `paper` CUT already tracks, so
+   * quiet takes it and the third branch is gone rather than re-homed.
+   *
+   * NOTE THE TWO VOCABULARIES THAT STILL SHARE A WORD. `paper` below is a
+   * `brand.tsx` CUT — which artwork file to load — and it is unrelated to
+   * the retired `paper` SPINE. The cut keeps its name; the spine has lost
+   * its own.
    */
-  spine?: "ink" | "paper" | "mango";
+  spine?: "quiet" | "mango";
 
   /**
    * The head of the rail. `null` draws none. Defaults to the real artwork —
@@ -763,6 +776,19 @@ export interface RailProps
    * both already collapsed with no visible toggle, and chapter 15's icon rail
    * carries the only "collapse" word in the document. So the state is always
    * reachable through `collapsed` and the control is opt-in.
+   *
+   * **AND IT STAYS OFF FOREVER NOW, ON A CLIENT APPROVAL OF 2026-09-02.** The
+   * shell draws the collapse control instead — the edge handle on the ground's
+   * leading rim (`screen-shell.tsx`) — so this rail's FOOT holds only the
+   * member chip again, which is what 27.1 and 27.26 draw there. The prop is
+   * left typed and left drawing nothing when it is not asked for, because the
+   * kit is vendored into two applications this repo cannot see and deleting a
+   * prop is a build break for a change that is purely visual. Nothing in this
+   * repo passes it. **Do not turn it on:** two collapse controls for one
+   * state, one of them inside the thing it collapses, is the affordance the
+   * client replaced.
+   *
+   * @deprecated Superseded by `ScreenShell`'s edge handle, 2026-09-02.
    */
   collapsible?: boolean;
   /** The collapse control's names. Verbs, not product words. */
@@ -1067,7 +1093,7 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
       groups = PLACEHOLDER_GROUPS,
       current = PLACEHOLDER_CURRENT,
       onSelect,
-      spine = "paper",
+      spine = "quiet",
       mark,
       wordmark = null,
       tagline = null,
@@ -1108,10 +1134,19 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
        the media query would load the reversed artwork onto #FED069. `brand`
        is the field that always draws the black cut, in both palettes, which
        is also the accent law ("charcoal on every accent, no exceptions").
-       `unlit` is the always-reversed field the charcoal spine needs in both
-       palettes; only `paper` swaps with the theme, and only the paper spine
-       is a ground that actually swaps. */
-    const markField = spine === "ink" ? "unlit" : spine === "mango" ? "brand" : "paper";
+       The `paper` CUT swaps with the theme, and QUIET is the ground that
+       actually swaps — #F7F2EB in light, #1C1B18 in dark — so it takes that
+       cut and gets the right artwork in both palettes for free.
+
+       THE THIRD BRANCH IS GONE WITH THE THIRD SPINE, 2026-09-02. It read
+       `spine === "ink" ? "unlit"`, and `unlit` is the ALWAYS-reversed cut: it
+       existed because `ink` was the one ground that stayed dark while the
+       palette went light, so a theme-following cut would have put black
+       artwork on charcoal. Quiet has no such problem — its ground follows the
+       palette by definition — so `unlit` is not re-homed onto it. The cut
+       still exists in `brand.tsx` for anything else standing on a fixed dark
+       ground; nothing in this file reaches for it now. */
+    const markField = spine === "mango" ? "brand" : "paper";
 
     /* WHETHER THE EXPANDED ROWS DRAW AN ICON COLUMN — one decision for the
        whole rail, taken here, so a single glyph-less destination cannot pull

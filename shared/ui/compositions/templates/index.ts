@@ -20,27 +20,33 @@
    change what any template does.
 
    THE FIFTEEN
-     0  ScreenShell         · screen-shell.tsx — the GROUND AND TWO PAPERS
-                              every screen in both doors sits on. The page, the
-                              header band and the body are all OFF-BEIGE; the
-                              only soft paper is the RAIL and the PANEL. It
-                              is numbered 0 because it is under the others
-                              rather than beside them.
-     0a MainScreen          · main-screen.tsx   — "in the navbar"
-     0b DetailScreen        · detail-screen.tsx — one record, read (no
-                              breadcrumb — override 73)
-     0c Rail                · rail.tsx — THE NAVBAR ITSELF. The third region
-                              of the shell, beside the two screens that fill
-                              in the header band. It is here and not in
-                              `controls/` for the same reason `ScreenShell`
-                              is: both screens share it UNCHANGED and neither
-                              owns it, it composes controls rather than
-                              drawing, and it needs designing once and applies
-                              forty times. A control draws one control; this
-                              arranges a whole region of a screen.
-        The client's own two words for the kit's "list page" and "detail
-        page". They are the shell with the three things that differ between
-        them filled in, and nothing else; `SHELL.md`'s table is exhaustive.
+     0  ScreenShell         · screen-shell.tsx — THE ONE SCREEN. The ground,
+                              the two flat columns, the one floating card, and
+                              every slot that varies between a top-level
+                              collection and a record. It is numbered 0
+                              because it is under the others rather than
+                              beside them.
+     0a MainScreen          · main-screen.tsx   — DEPRECATED ADAPTER
+     0b DetailScreen        · detail-screen.tsx — DEPRECATED ADAPTER
+     0c Rail                · rail.tsx — THE NAVBAR ITSELF. The second region
+                              of the shell. It is here and not in `controls/`
+                              for the same reason `ScreenShell` is: every
+                              screen shares it UNCHANGED and none owns it, it
+                              composes controls rather than drawing, and it
+                              needs designing once and applies forty times. A
+                              control draws one control; this arranges a whole
+                              region of a screen.
+
+     0a AND 0b COLLAPSED INTO 0 ON 2026-09-02, ON A CLIENT RULING: "Let's
+     completely get rid of these three variations. Let's just do one shell,
+     and then let's just explain that there are variations for the title if
+     it's main screen with no parents or not. Also, just define which pages
+     have a footer." `SHELL.md`'s three differences and the fourth nobody had
+     counted — the figure strip — are four SLOTS on `ScreenShell` now, and
+     every ruling either file's header carried has moved into
+     `screen-shell.tsx` rather than been summarised there. The two names
+     survive as adapters that map old prop names onto those slots and decide
+     nothing; a screen written today composes `ScreenShell`.
 
      1  RecordChrome        · record-chrome.tsx
      2  CollectionScreen    · collection-screen.tsx
@@ -83,25 +89,27 @@
    need none.
    ========================================================================= */
 
-/* 0 · ScreenShell — a ground and two papers, established by counting chapter
-   27's own assembled screens: the frame is off-beige 87 times out of 87 and
-   the rail is soft paper 28 out of 28. The header band is off-beige on the
-   client's ruling of 2026-08-24, which is the one place this shell departs
-   from the artifact. `SHELL.md` carries the counts and the departure.
-   `ScreenSpine` is exported beside the shell because a route that sets a
-   spine should not have to reach into the module for its type. */
-export { ScreenShell, RAIL_WIDTH } from "./screen-shell";
+/* 0 · ScreenShell — THE ONE SCREEN. A ground and two papers, established by
+   counting chapter 27's own assembled screens: the frame is off-beige 87
+   times out of 87 and the rail is soft paper 28 out of 28. The header band is
+   off-beige on the client's ruling of 2026-08-24, which is the one place this
+   shell departs from the artifact. `SHELL.md` carries the counts and the
+   departure. Since 2026-09-02 it also carries the four slots that vary — the
+   derived title step, the identity chips, the bare figure strip and the
+   declared footer. `ScreenSpine` is exported beside it because a route that
+   sets a spine should not have to reach into the module for its type. */
+export { ScreenShell, RAIL_WIDTH, ASIDE_WIDTH } from "./screen-shell";
 export type { ScreenShellProps, ScreenSpine } from "./screen-shell";
 
-/* 0a · MainScreen — a screen that is in the navbar. Eyebrow with a count,
-   folder tabs, a bare figure strip, the mango `+`, and never a footer. */
+/* 0a · MainScreen — DEPRECATED. A mapping from a collection screen's old prop
+   names onto `ScreenShell`'s slots, plus the `CollectionFrame` that was never
+   the shell's. It decides nothing. Compose `ScreenShell` directly. */
 export { MainScreen } from "./main-screen";
 export type { MainScreenProps } from "./main-screen";
 
-/* 0b · DetailScreen — one record, read. No breadcrumb and no eyebrow band
-   (override 73): the title leads the body pane, the identity chips sit
-   directly under it — black ID chip first, then the collection chip — the
-   mango `Edit` rides the title's row, underline tabs, the charcoal footer. */
+/* 0b · DetailScreen — DEPRECATED. The same mapping for a record, plus the
+   `RecordChrome` that was never the shell's. It decides nothing. Compose
+   `ScreenShell` directly. */
 export { DetailScreen } from "./detail-screen";
 export type { DetailScreenProps } from "./detail-screen";
 

@@ -353,17 +353,16 @@ export function TasksScreen({
         // The progress bar SUMMARISES the collection, so it sits above the card
         // and outside it.
         aboveCard={progressBar}
-        // The six views are the card's own FOLDER tabs: six filters on one kind
-        // of record, which is the kit's own test for the shape ("if the tab
-        // shows the same kind of record with a filter on it, it is a folder
-        // tab"). They draw flush against the card, so the tabs read as attached
-        // to the list they scope rather than floating above it. TABS ALONE
-        // now (client ruling, 2026-08-31, correcting the earlier fix that
-        // shared this row with "New task") — see the button below instead.
+        // The six views are the card's own tab strip: six filters on one kind
+        // of record, drawn flush against the card the way `FolderTabStrip`
+        // always has (the name predates v1.2.28's retirement of the folder
+        // SHAPE — see tabs-view.tsx's header — the slot's own rule, "tabs
+        // alone, nothing beside them," is unchanged). TABS ALONE now (client
+        // ruling, 2026-08-31, correcting the earlier fix that shared this row
+        // with "New task") — see the button below instead.
         folderTabs={{
           config: {
             ...defaultTabsConfig,
-            variant: "folder",
             tabs: TASK_TABS.map((tab) => ({
               value: tab.value,
               label: t(tab.label),

@@ -109,16 +109,18 @@
      the ORDER stayed the frame's. It is forwarded here rather than left
      unreachable, because the override's own words forbid the alternative — a
      call site "smuggling a control into `filters`".
-   · TABS ARE THE FOLDER SHAPE, AND IT IS PASSED, NOT INHERITED. Client
-     ruling E, 2026-08-22, verbatim: "folder tabs are for main screens, line
-     tabs for detail screens." A collection is a main screen — a list, a wall,
-     a landing screen — so `tabsVariant="folder"` is written here rather than
-     left to `CollectionFrame`'s default, because the ruling is a fact about
-     THIS shape and a reader of this file should not have to open the frame to
-     learn it. `RecordChrome` is the other side of the same ruling and stays
-     `line`. Agrees with ch27.1 ("figures, folder tabs, then the collection
-     panel") and with ch27.13 ("folder tabs belong to collections and main
-     screens only").
+   · THERE IS ONE TAB SHAPE AND THIS FILE STATES NOTHING ABOUT IT. Under
+     ruling E of 2026-08-22 ("folder tabs are for main screens, line tabs for
+     detail screens") a collection was a main screen and this file wrote
+     `tabsVariant="folder"` rather than leaning on `CollectionFrame`'s
+     default, so the ruling would be legible in the file it governed. The
+     client retired the folder tab variant on 2026-09-02 — "the only tabs that
+     we will have are the line tabs because folders will only be used for the
+     breadcrumbs" — so there is no shape to choose, no prop to pass and
+     nothing for a reader to have to look up. CH27.1's "figures, folder tabs,
+     then the collection panel" and CH27.13's "folder tabs belong to
+     collections and main screens only" are both stale by one word; their
+     ORDER is not, and the frame still enforces it.
    · THERE IS NO INK FOOTER ON THIS SHAPE, AND THAT IS NOT AN OMISSION.
      CH27.8's charcoal two-column card ends a RECORD detail page — "every
      detail page ends with the charcoal card … it appears once per record". A
@@ -215,7 +217,7 @@ export interface CollectionScreenProps<TRow>
   /** The figure strip. A `StatStrip`. A collection may drop it (ch27.1). */
   figures?: React.ReactNode;
 
-  /** The subsets. Every folder tab could be written as a filter — that is the test. */
+  /** The subsets. Every tab could be written as a filter — that is the test. */
   tabs?: CollectionFrameTab[];
   /** Controlled tab. */
   tab?: string;

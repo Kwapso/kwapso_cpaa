@@ -1,6 +1,6 @@
 # Error handling & logging, the ruleset (LOCKED 2026-06-17)
 
-How Brimba (and every app on this base) handles failures: **never swallow an
+How the Kwapso System (and every app on this base) handles failures: **never swallow an
 error silently**; capture it *with context* and send it somewhere queryable, so
 a crash is visible without the user having to report it.
 
@@ -106,7 +106,7 @@ environment (staging and production errors never mix), cross-team by design
 ## Analysing the store, the `error_analyst` skill
 
 The store is the data; **`error_analyst`** (a global skill) is how you read it at
-scale. It's platform-aware (it finds where errors live, this table on Brimba,
+scale. It's platform-aware (it finds where errors live, this table on the Kwapso System,
 Supabase/CloudWatch/etc. on another app), **clusters rows by root cause** (ten rows
 with one signature = one bug seen ten times), flags **first-of-its-kind vs
 recurring** (and, for a recurrence after a fix, digs up the prior `resolution_note`

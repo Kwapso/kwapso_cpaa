@@ -141,7 +141,7 @@ async function proveTeamDatabase(db, name) {
   ).map((r) => r.name)
   if (found.length !== FINGERPRINT.length)
     throw new Error(
-      `REFUSING to write to ${name} (${db}): not a Brimba team schema. Has: ${found.join(", ") || "(none)"}. ` +
+      `REFUSING to write to ${name} (${db}): not a kwapso team schema. Has: ${found.join(", ") || "(none)"}. ` +
         `This Cloudflare account is shared with other companies.`
     )
 }

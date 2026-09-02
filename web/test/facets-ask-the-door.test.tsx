@@ -105,22 +105,21 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
  * its own heading, so a test cannot pass by operating an identically-named word
  * in the facet beside it.
  *
- * THE FACET'S OWN FIELD OPENS SECOND (2026-09-02, the compact-field ruling —
- * see the header). Radix's select trigger listens for `pointerdown` and
- * nothing else, so a `click` here would open nothing and every assertion in
- * this file would pass over a door that was never asked. Its list is
+ * THE FACET'S OWN FIELD OPENS SECOND. It used to be the kit's `Select`,
+ * whose trigger listens for `pointerdown` and claims `role="combobox"`, so a
+ * bare `click` opened nothing. `CompactFacet` (v1.2.27, the compact-field
+ * ruling — see the header) is a plain disclosure button over a Radix
+ * `Popover` instead (`CompactFacet`'s own doc: "NOT A COMBOBOX,
+ * deliberately"), and `Popover`'s own trigger opens on an ordinary `click`
+ * (`@radix-ui/react-popover`'s own `onClick`) — so this now finds a plain
+ * `button`, the only one inside the facet's own group. Its list is
  * PORTALLED, which is why the option is found on `screen` and not inside the
  * facet's own group. */
 async function pick(label: string, option: string) {
   if (screen.queryAllByRole("group", { name: label }).length === 0)
     fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
   const facet = await screen.findByRole("group", { name: label })
-  fireEvent.pointerDown(within(facet).getByRole("combobox"), {
-    button: 0,
-    ctrlKey: false,
-    pointerId: 1,
-    pointerType: "mouse",
-  })
+  fireEvent.click(within(facet).getByRole("button"))
   const listbox = await screen.findByRole("listbox")
   await waitFor(() => expect(within(listbox).getAllByRole("option").length).toBeGreaterThan(0))
   fireEvent.click(within(listbox).getByRole("option", { name: option }))

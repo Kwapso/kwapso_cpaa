@@ -134,7 +134,7 @@ export function ContactsScreen({
             value: contactsTab,
             onValueChange: (v) => go(sectionPath, v === "grouped" ? {} : { tab: v }),
           }}
-          wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
         >
           {(found) => {
             const rows = found.active ? found.rows : loaded

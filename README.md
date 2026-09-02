@@ -234,10 +234,10 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     silent gap that reads like nobody looked.
 11. The UI comes ONLY from the component library, which is vendored **in this
     repo** at `shared/ui/` and imported as `@shared/ui/…` — and it is a PINNED
-    dependency: `github.com/Kwapso/design` at the tag in `shared/ui/VERSION.json`,
+    dependency: `github.com/Kwapso/kwapso-ui-ux` at the tag in `shared/ui/VERSION.json`,
     pulled by `scripts/sync-design.mjs`. A hand-edit under `shared/ui/` turns the
     build red (`web/test/vendored-kit.test.ts` recomputes the content hash), so a
-    kit change is made upstream in `Kwapso/design`, tagged, and pulled. (It was
+    kit change is made upstream in `Kwapso/kwapso-ui-ux`, tagged, and pulled. (It was
     the npm package `@kwapso/ui` until 2026-08-22, then an editable copy for three
     days, then pinned on 2026-08-25.) Missing a component? Close the gap upstream —
     never one-off UI in `web/`, and never a hand-build under `shared/ui/`;

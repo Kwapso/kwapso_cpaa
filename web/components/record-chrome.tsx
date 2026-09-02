@@ -21,8 +21,17 @@
 //                       (see "the footer" section below, fixed 2026-08-31).
 //
 // The two sticky layers do not fight: the shell owns z-20 (L6) and everything
-// here takes z-10. `--shell-top` is published by app-shell — the mobile bar's own
-// height, zero on desktop — so a record pins UNDER the app bar, not behind it.
+// here takes z-10, so the phone's app bar still passes over both.
+//
+// THEY PIN TO THE CARD'S BODY NOW, NOT TO THE WINDOW (kit v1.2.28, 2026-09-02).
+// `ScreenShell` draws the page `h-dvh overflow-hidden` and makes the card's
+// body its one scroller, so `top-0` here is the top of the PANE — which is
+// below the phone's app bar already, and below the breadcrumb strip and the
+// header band on every width. That is why nothing in this file offsets itself
+// by `--shell-top` any more: the offset existed because the document was the
+// scroller and the bar floated over its top edge, and neither half of that
+// sentence is true. `--shell-top` is still published by app-shell and is now
+// read by exactly one thing, the shell's own inset for that bar.
 
 import * as React from "react"
 
@@ -54,27 +63,31 @@ import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { useCondensedTitle, CondensedTitleBar, usePublishCondensedHeight } from "@/components/condensed-title"
 
 /* -------------------------- the record tab strip --------------------------
-   Client ruling, 2026-08-31, verbatim: "Detail screens are using the
-   folder-tab design, but that style belongs to main screens only. Detail
-   screens should use the line (underline) tabs." Concrete case: the App
-   detail screen (Overview / Sprints / Stories / Stakeholders) was drawing
-   folder tabs, because every detail screen's own `TabsView` config spreads
+   SUPERSEDED, v1.2.28 — the ruling this constant was built to enforce no
+   longer has an opposite to enforce against. Client ruling, 2026-08-31,
+   verbatim, kept for the record: "Detail screens are using the folder-tab
+   design, but that style belongs to main screens only. Detail screens should
+   use the line (underline) tabs." Concrete case: the App detail screen
+   (Overview / Sprints / Stories / Stakeholders) was drawing folder tabs,
+   because every detail screen's own `TabsView` config spread
    `defaultTabsConfig` (tabs-view.tsx) with no `variant` override, and that
-   default is `"folder"` — correct for a COLLECTION's own strip (a main
-   screen switching between records, or between collections), wrong for a
-   RECORD's own top-level strip switching between the SAME record's sections.
-   `RecordDetail`'s own internal tab prop already draws `variant="line"` for
-   exactly this reason (record-detail.tsx: "client ruling E … a record IS the
-   detail screen, so `line` is stated rather than inherited"); every detail
-   screen in this app hands its tabs to `RecordScreen`'s `children` instead
-   (see this file's own header, "THE TABS GO IN panel, NOT tabs"), so that kit
-   default never reached them. ONE constant, spread by every record's own
-   tabsConfig, is the fix — not a per-file `variant: "line"` written twelve
-   times, which is how the folder default drifted onto every one of them in
-   the first place. A strip that filters WITHIN one collection (Open/Done,
-   Overdue/List/Calendar) is a different case and keeps `defaultTabsConfig`
-   untouched — this constant is only for a RECORD's own section strip. */
-export const RECORD_TABS_CONFIG: TabsConfig = { ...defaultTabsConfig, variant: "line" }
+   default was `"folder"` then — correct for a COLLECTION's own strip, wrong
+   for a RECORD's own top-level strip. ONE constant, spread by every record's
+   own tabsConfig, was the fix — not a per-file `variant: "line"` written
+   twelve times, which is how the folder default drifted onto every one of
+   them in the first place.
+
+   The kit killed the folder shape entirely on 2026-09-02 (tabs-view.tsx's own
+   header has the client's words), so `defaultTabsConfig` is `"line"` now too
+   — there is no longer a wrong default to escape, and this constant is
+   therefore identical to `defaultTabsConfig` by value. It stays as its own
+   name rather than being deleted in favour of the shared one: fourteen detail
+   screens already import it BY NAME as "the record's own tab config," which
+   is a real distinction even though the two constants currently agree — a
+   future main-screen ruling that changes `defaultTabsConfig` again should not
+   have to hunt down twelve detail screens that were quietly relying on the
+   collection default matching the record one by coincidence. */
+export const RECORD_TABS_CONFIG: TabsConfig = { ...defaultTabsConfig }
 
 /* ------------------------------ the overflow ------------------------------ */
 
@@ -346,8 +359,8 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
  * THE TABS GO IN `panel`, NOT `tabs`. `RecordDetail` carries a tab strip of its
  * own and draws it only when `tabs` is non-empty (record-detail.tsx:681, :761), so
  * handing it our `children` as the panel gives exactly ONE strip — the app's
- * `TabsView`, which is already kit-drawn and already knows folder from line. Two
- * strips on one screen is the defect this lane exists to remove, not to move.
+ * `TabsView`, which is kit-drawn throughout. Two strips on one screen is the
+ * defect this lane exists to remove, not to move.
  *
  * THE EYEBROW COMES BACK, NARROWER — CLIENT RULING, 2026-08-31, REFINING
  * OVERRIDE 73 RATHER THAN REVERSING IT. Reviewing the live detail pages again,
@@ -1274,19 +1287,18 @@ const PANEL_BELOW_TABS =
  * own horizontal ladder, never the header-shaped problem the vertical side
  * was.
  *
- * CHANGELOG — the flush-cap shape a FOLDER-variant strip still wants,
- * preserved here as a pointer rather than a second unused export: cancel the
- * panel's inset on three sides (`-mx -mt px pt`, matching `CardContent`'s
- * own ladder exactly, not overshooting) and take the panel's own top radius
- * (`rounded-t-[var(--radius)]`), so the strip reads as a cap flush with the
+ * CHANGELOG, SUPERSEDED v1.2.28 — the flush-cap shape a FOLDER-variant strip
+ * used to want, kept here as a historical pointer rather than a second unused
+ * export, back when the folder shape existed to want it: cancel the panel's
+ * inset on three sides (`-mx -mt px pt`, matching `CardContent`'s own ladder
+ * exactly, not overshooting) and take the panel's own top radius
+ * (`rounded-t-[var(--radius)]`), so the strip read as a cap flush with the
  * card underneath, cut clean from the soft-paper body below it. No record
- * screen hands a folder-variant strip through here today — a main/collection
- * screen's own folder strip already has its OWN way to draw exactly that
- * attachment (`web/components/deep-link/screen-bits.tsx`'s
- * `SectionWithCreate` `folderTabs` slot, `CollectionCard
- * attached={Boolean(folderTabs)}`) — so reach for that seam rather than
- * rebuilding the escape trick here if a record's own strip ever needs the
- * folder shape.
+ * screen ever hands a folder-variant strip through here — there is no such
+ * variant left to hand (tabs-view.tsx's own header has the client's
+ * 2026-09-02 ruling that killed it), and `CollectionCard`'s own `attached`
+ * prop, the seam this paragraph used to point a future reader at, went with
+ * it.
  *
  * TWO MORE FIXES, 2026-09-01, BOTH IN THE SAME `-mx`/`px` PAIR ABOVE.
  *

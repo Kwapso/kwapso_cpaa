@@ -27,7 +27,7 @@ import * as React from "react"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
-import { FilterBar, FilterPanelColumn } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
@@ -163,14 +163,16 @@ export function WaveFinder({
             field: "accountId",
             label: t("Client"),
             control: "select" as const,
-            // No `searchable` flag: a facet declares its OPTIONS and nothing
-            // about how they are picked over (`FilterFacet`, config.ts).
-            // Whether the panel offers a search field is one decision in one
-            // place — and since 2 Sep 2026 the answer is no: a facet is a
-            // compact `Select` (client ruling, filter-bar.tsx's own header),
-            // which scrolls and takes type-ahead. This is the list that pays
-            // for that — an agency with 131 clients on staging — and the
-            // toolbar's own search box beside it is untouched.
+            // No `searchable` flag here: a facet declares its OPTIONS and
+            // nothing about how they are picked over (`FilterFacet`,
+            // config.ts) — whether the panel offers a search field is one
+            // decision in one place, `filter-bar.tsx`'s own `SEARCHABLE_PAST`
+            // threshold, measured off this facet's own resolved option count.
+            // This is the exact list that threshold exists for — an agency
+            // with 131 clients on staging, more than the kit's own `Select`
+            // (2026-09-02 through v1.2.26) could search, only scroll — the
+            // kit's `CompactFacet` (v1.2.27) answers it now, and the toolbar's
+            // own search box beside it is untouched.
             options: clients.map((a) => ({ value: a.id, label: a.name })),
           },
         ]
@@ -186,6 +188,19 @@ export function WaveFinder({
     },
   ]
 
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values: { accountId: query.accountId, status: query.status },
+    // Empty on purpose: both facets carry their own options, so there is
+    // nothing for the bar to derive from the rows on screen — and a client
+    // whose only wave is filtered out must not vanish from the filter.
+    data: [],
+    onChange: (field, value) => onChange({ ...query, [field]: value }),
+    onClearFacets: () =>
+      onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir }),
+    resultCount,
+  })
+
   // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
   // approved that night, which supersedes this file's own earlier reasoning
   // below). The filter bar used to be drawn as this row's own sibling BELOW
@@ -199,12 +214,13 @@ export function WaveFinder({
   return (
     // THE COLUMN — client ruling, 2 Sep 2026, third pass: "the expanded
     // toolbar shoudl not be an overlay, but literaly expand the space".
-    // `FilterBar`'s open panel renders into the outlet this column publishes
-    // BENEATH the track, so it takes real space and pushes the waves down, and
-    // its height feeds THIS box rather than the pill's — which is the whole of
-    // why the track keeps its shape (`filter-bar.tsx`'s header has the oval
-    // that taught it, and the absolute-panel pass this replaces).
-    <FilterPanelColumn className="w-full">
+    // `filterPanel` (v1.2.27's `useFilterBar` split) renders BENEATH the
+    // track as a plain sibling, so it takes real space and pushes the waves
+    // down, and its height feeds THIS box rather than the pill's — which is
+    // the whole of why the track keeps its shape (`filter-bar.tsx`'s header
+    // has the oval that taught it, and the absolute-panel pass this
+    // replaces).
+    <div className="flex w-full min-w-0 flex-col gap-2">
     <div className="flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
       {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
           like in your atifact": the reference artifact's search element is
@@ -223,26 +239,16 @@ export function WaveFinder({
           className="w-full"
         />
       </div>
-      {/* NO WRAPPING BOX AROUND `<FilterBar>` — its "Filter" pill renders
-          inline as a normal flex child (wrapping itself in a non-growing box
-          internally), and its open PANEL renders into the column above rather
-          than into this row. The pill says a COUNT and never the filters
-          themselves — client, 2026-09-02: "when activce filters, do not
-          display them in the toolbar. only a count niside the filter pill".
-          See `filter-bar.tsx`'s own header for the full account. */}
-      <FilterBar
-        facets={facets}
-        values={{ accountId: query.accountId, status: query.status }}
-        // Empty on purpose: both facets carry their own options, so there is
-        // nothing for the bar to derive from the rows on screen — and a client
-        // whose only wave is filtered out must not vanish from the filter.
-        data={[]}
-        onChange={(field, value) => onChange({ ...query, [field]: value })}
-        onClearFacets={() =>
-          onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
-        }
-        resultCount={resultCount}
-      />
+      {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
+          normal flex child (wrapping itself in a non-growing box internally),
+          and its open PANEL is the separate `filterPanel` value, rendered
+          into the column below rather than into this row — the split
+          `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
+          never the filters themselves — client, 2026-09-02: "when activce
+          filters, do not display them in the toolbar. only a count niside
+          the filter pill". See `filter-bar.tsx`'s own header for the full
+          account. */}
+      {filterPill}
       <SortControl
         options={[
           { value: "newest", label: t("Newest first") },
@@ -272,6 +278,7 @@ export function WaveFinder({
       ) : null}
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
-    </FilterPanelColumn>
+    {filterPanel}
+    </div>
   )
 }

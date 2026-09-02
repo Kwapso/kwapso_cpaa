@@ -1,10 +1,10 @@
-# PLATFORMS.md, where the base can run (Cloudflare recommended; the top-10 mapped)
+# PLATFORMS.md, where the base can run (Cloudflare recommended; eight others mapped)
 
-Brimba is **built for Cloudflare** and the `new-app` skill stands it up there end to
+The Kwapso System is **built for Cloudflare** and the `new-app` skill stands it up there end to
 end (one prompt + a few credentials). But the base is deliberately built on **seams**,
 a small set of swappable interfaces where it touches the platform, so it can be
 *ported* to any major cloud. This doc is the honest, thorough map: what each pillar of
-the base needs, which service on each of the top-10 providers backs it, and how big a
+the base needs, which service on each of eight other providers backs it, and how big a
 port really is.
 
 > **The recommendation, plainly.** Use **Cloudflare**. It is the native stack: per-team
@@ -21,7 +21,7 @@ port really is.
 The base leans on exactly five platform capabilities. Everything else is portable app
 code. A port = back these five with the target platform's primitives.
 
-| # | Pillar | What Brimba uses (Cloudflare) | The one seam file to swap |
+| # | Pillar | What the Kwapso System uses (Cloudflare) | The one seam file to swap |
 |---|--------|-------------------------------|----------------------------|
 | 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`), the ONLY place SQL runs |
 | 2 | **The live layer** | the `TeamChannel` **Durable Object** fans out change pings | `shared/workers/realtime.ts` (`publishChange`), the ONLY broadcast seam |
@@ -39,13 +39,13 @@ Two more are **already provider-agnostic seams** (swap by config, no port):
 **The multi-tenancy decision is the crux of any port.** Cloudflare gives cheap
 database-per-team (D1). On a Postgres platform you choose one of: **row-level security
 with a `team_id`** (recommended, one database, a policy per table), **schema-per-team**
-(stronger isolation, heavier ops), or **database-per-team** (closest to Brimba, most
+(stronger isolation, heavier ops), or **database-per-team** (closest to the Kwapso System, most
 expensive). The base's data door (`d1-rest.ts`) is where that choice lands, rewrite
 that one seam and the 8 workers keep working unchanged.
 
 ---
 
-## 2 · The master map, the 5 pillars across the top-10 providers
+## 2 · The master map, the 5 pillars across eight other providers
 
 Effort is for the *whole* port: **Turnkey** (a skill does it), **Moderate** (days),
 **Heavy** (weeks, most primitives exist, the wiring is the work).
@@ -54,7 +54,6 @@ Effort is for the *whole* port: **Turnkey** (a skill does it), **Moderate** (day
 |---|---|---|---|---|---|---|---|
 | **Cloudflare** ⭐ | Workers | **D1** (DB/team) | **Durable Objects** | R2 | Workers static | Workers AI / Anthropic | **Turnkey** (`new-app`) |
 | **Fly.io** | Machines (containers) | **LiteFS** (SQLite/team) or Fly Postgres | a WebSocket server on a Machine | Tigris (S3-API) | serve from app | any (Anthropic) | Moderate |
-| **Vercel** | Vercel Functions | Vercel Postgres (Neon) + RLS | Ably / Pusher / Upstash | Vercel Blob | **native (Next.js)** | AI SDK (any) | Moderate |
 | **Netlify** | Netlify Functions | Neon / Supabase + RLS | Ably / Pusher | Netlify Blobs | **native (Next.js)** | any | Moderate |
 | **Render** | Web Services (containers) | Render Postgres + RLS | a WebSocket service | Render Disks / S3 | Render Static | any | Moderate |
 | **DigitalOcean** | App Platform / Functions | Managed Postgres + RLS | a WebSocket service | Spaces (S3-API) | App Platform static | any / DO GenAI | Moderate |
@@ -89,7 +88,7 @@ rewrite. In rough effort order:
    private/internal, which is what keeps `/internal/*`, the agent and the act-as-user
    surface unreachable from outside.
 5. **Serve the static web bundle** (`web/out`) from the platform's static host (native
-   on Vercel/Netlify; a bucket+CDN elsewhere).
+   on Netlify; a bucket+CDN elsewhere).
 6. **Point the config seams**: the email sender and `AGENT_MODEL`. No code.
 7. **Re-run the gates**: `npm run check` (the app code is unchanged, so the Laws in
    RULES.md still hold), then the platform's own smoke.
@@ -110,15 +109,11 @@ is measured against it.
 **Fly.io. Moderate, closest port.** The only other stack that can keep the
 **SQLite-database-per-team** model, via **LiteFS** (replicated SQLite). Run the workers
 as one or a few Machines; the live layer is a small WebSocket process. If you love the
-Brimba data model but not Cloudflare, this is the shortest hop.
+Kwapso System's data model but not Cloudflare, this is the shortest hop.
 
-**Vercel. Moderate, best web fit.** Next.js is native (the static export or full SSR).
-You add the missing pieces from partners: Vercel Postgres (Neon) with **RLS** for
-tenancy, Vercel Blob for storage, and a realtime partner (Ably/Pusher/Upstash) for the
-live seam. The 8 workers become Vercel Functions. Email via Resend (a Vercel partner).
-
-**Netlify. Moderate.** Like Vercel for the web + functions; bring Neon/Supabase for the
-DB (RLS), Netlify Blobs for storage, Ably/Pusher for realtime.
+**Netlify. Moderate.** Next.js is native (the static export or full SSR). Bring
+Neon/Supabase for the DB (RLS), Netlify Blobs for storage, and a realtime partner
+(Ably/Pusher/Upstash) for the live seam. The 8 workers become Netlify Functions.
 
 **Render / DigitalOcean. Moderate.** Container platforms: run the workers as
 services, managed Postgres + RLS for tenancy, a WebSocket service for the live layer,
@@ -127,7 +122,7 @@ and S3-compatible storage (Spaces on DO). Straightforward, ops-simple, no edge.
 **Supabase. Moderate–Heavy, natural data fit.** Postgres + **RLS** is the textbook
 multi-tenant model, and **Supabase Realtime** maps cleanly onto the `publishChange`
 seam. Compute is **Edge Functions** (Deno), the 8 workers port to Deno handlers.
-Caveats: Supabase doesn't host a static SPA well (host `web/out` on Vercel/Netlify), and
+Caveats: Supabase doesn't host a static SPA well (host `web/out` on Netlify), and
 you'd likely adopt **Supabase Auth** in place of the custom email-OTP (a bigger change
 than the other seams). Its own AI story is thin, point `AGENT_MODEL` at Anthropic.
 
@@ -153,11 +148,11 @@ or Anthropic for the agent, Azure Communication Services for email.
 
 - **Cloudflare is one prompt** (`new-app`), recommended, and the only turnkey path
   today.
-- **Every other top-10 provider is a real port**, but a *bounded* one: reimplement the
+- **Every other provider here is a real port**, but a *bounded* one: reimplement the
   five seams in §1 (mostly the data door + the live seam), re-home the compute, and the
   entire app. Laws, permission spine, screen engine, agent, runs unchanged.
 - **The single biggest decision** on any non-Cloudflare port is the tenancy model
-  (§1): database-per-team (Brimba-native; keep it on Fly+LiteFS) vs. **Postgres + RLS**
+  (§1): database-per-team (native to the Kwapso System; keep it on Fly+LiteFS) vs. **Postgres + RLS**
   (the pragmatic default everywhere else).
 - If you want a **turnkey** experience on another provider, that means building a
   `new-app`-equivalent for it (a skill per platform), a project in its own right. Until

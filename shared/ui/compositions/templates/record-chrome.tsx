@@ -126,14 +126,16 @@
    · THE PORTAL SHOWS NO INTERNAL NOTE. `onAddNote` on `door="portal"` warns
      in development, beside the stage-count check and for the same reason —
      both are leaks of the operations side into a client's page.
-   · THE TAB STRIP IS THE UNDERLINE STRIP, AND IT IS NOW STATED. Client ruling
-     E, 2026-08-22, verbatim: "folder tabs are for main screens, line tabs for
-     detail screens." A record is the detail screen, so `RecordDetail` passes
-     `variant="line"` explicitly instead of leaning on a default — the default
-     is no longer safe to lean on, because `CollectionFrame` now defaults to
-     `folder` for main screens. The ruling agrees with ch27.13 and overrides
-     ch24.3, which draws folder tabs on a record. SHP-3 in GAPS-SHAPES.md and
-     REC-1 in GAPS-COL3.md are both settled by it; see GAPS-RULINGS.md.
+   · THE TAB STRIP IS THE UNDERLINE STRIP, AND IT IS NOW THE ONLY ONE. Ruling
+     E of 2026-08-22 ("folder tabs are for main screens, line tabs for detail
+     screens") made a record STATE its shape, because `CollectionFrame`
+     defaulted to the other one. The client retired the folder tab variant
+     entirely on 2026-09-02 — "the only tabs that we will have are the line
+     tabs because folders will only be used for the breadcrumbs" — so
+     `RecordDetail` states nothing and cannot draw anything else. CH27.13 is
+     vindicated a second time and CH24.3's folder tabs on a record are twice
+     stale. SHP-3 in GAPS-SHAPES.md and REC-1 in GAPS-COL3.md stay settled;
+     see GAPS-RULINGS.md.
    · THE PORTAL SHOWS THREE STAGES, NOT SEVEN (ruling 04). `door="portal"`
      says so in development rather than silently drawing seven to a client.
    · A REGION THE READER MAY NOT SEE RENDERS NOTHING. `actionsVisible`,

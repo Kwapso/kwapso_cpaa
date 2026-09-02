@@ -186,12 +186,13 @@ export function StepsPanel({
           <TabsView
             config={{
               ...defaultTabsConfig,
-              // A LINE. This switches the VIEW of the steps already
-              // chosen by the folder above it — it is inside that
-              // tab, not beside it — and a folder tab is drawn with
-              // feet that attach to a card. Two folders stacked put
-              // one strip's feet through the other's toolbar.
-              variant: "line" as const,
+              // No override needed any more — `defaultTabsConfig` draws the
+              // one line shape itself since v1.2.28 (tabs-view.tsx's header).
+              // This still switches the VIEW of the steps already chosen by
+              // the strip above it — nested rather than beside it, and in a
+              // separate file from that outer strip since 26 Aug 2026, which
+              // is why web/test/rules.test.ts's two-strips-stacked census
+              // (it counts `<TabsView` per FILE) has nothing to catch here.
               tabs: [
                 { value: "list", label: t("List"), icon: "list", badge: "", badgeVariant: "" as const },
                 { value: "flow", label: t("Flow"), icon: "git-branch", badge: "", badgeVariant: "" as const },

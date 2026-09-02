@@ -153,7 +153,7 @@ export interface HomeRouteProps
    */
   onFigureSelect?: (id: string) => void;
 
-  /** The folder tabs. Every one could be written as a filter — that is the test. */
+  /** The tabs. Every one could be written as a filter — that is the test. */
   tabs?: CollectionFrameTab[];
   /** Which tab is on. */
   tab?: string;

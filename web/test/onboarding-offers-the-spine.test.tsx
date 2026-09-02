@@ -130,22 +130,29 @@ describe("the ruling's first half — mango is what an unset spine means", () =>
 })
 
 describe("the ruling's second half — the choice is on the onboarding screen", () => {
-  it("draws all three, with the default already set", async () => {
+  it("draws both, with the default already set", async () => {
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
 
-    expect(spineCards()).toHaveLength(3)
+    expect(spineCards()).toHaveLength(2)
     expect(checkedOf("Mango")).toBe("true")
-    expect(checkedOf("Ink")).toBe("false")
-    expect(checkedOf("Paper")).toBe("false")
+    expect(checkedOf("Quiet")).toBe("false")
   })
 
   it("opens on the spine this person already has, not on the default", async () => {
+    me.mockResolvedValue({ user: { ...fresh, spine: "quiet" } })
+    render(<OnboardingPage />)
+    await screen.findByLabelText(/first name/i)
+
+    expect(checkedOf("Quiet")).toBe("true")
+  })
+
+  it("maps a retired spine (ink/paper) to quiet, explicitly", async () => {
     me.mockResolvedValue({ user: { ...fresh, spine: "ink" } })
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
 
-    expect(checkedOf("Ink")).toBe("true")
+    expect(checkedOf("Quiet")).toBe("true")
   })
 })
 
@@ -172,21 +179,21 @@ describe("what the submit posts", () => {
   it("saves a moved choice, once, as part of the same press", async () => {
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
-    fireEvent.click(card("Ink"))
+    fireEvent.click(card("Quiet"))
     // Pressing a card must not save on its own — that is Settings' contract,
     // and here it would persist a preference for somebody who may walk away
     // from a form they have not finished.
     expect(setSpine).not.toHaveBeenCalled()
 
     await fillAndSubmit()
-    await waitFor(() => expect(setSpine).toHaveBeenCalledWith("ink"))
+    await waitFor(() => expect(setSpine).toHaveBeenCalledWith("quiet"))
     expect(setSpine).toHaveBeenCalledTimes(1)
   })
 
   it("saves the spine BEFORE the photo upload and the invite acceptance", async () => {
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
-    fireEvent.click(card("Paper"))
+    fireEvent.click(card("Quiet"))
     await fillAndSubmit()
 
     await waitFor(() => expect(bootstrap).toHaveBeenCalled())
@@ -204,7 +211,7 @@ describe("what the submit posts", () => {
     setSpine.mockRejectedValue(new Error("nope"))
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
-    fireEvent.click(card("Ink"))
+    fireEvent.click(card("Quiet"))
     await fillAndSubmit()
 
     await waitFor(() => expect(setSpine).toHaveBeenCalled())

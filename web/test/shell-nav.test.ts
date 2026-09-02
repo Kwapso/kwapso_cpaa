@@ -113,45 +113,74 @@ describe("the one shell — no reload on in-app navigation", () => {
 })
 
 describe("the shell's own chrome stays on screen", () => {
-  // The sidebar's LAST row — profile, theme, collapse — is placed with `mt-auto`,
-  // i.e. "the bottom of the rail". That is only the bottom of the WINDOW while the
-  // rail is exactly one window tall. As a bare flex child it stretches to the
-  // tallest column instead, so on a long list the row sat at the bottom of a
-  // several-thousand-pixel document and left the screen the moment the rows
-  // arrived — visible on Home (short) and nowhere else. Height + sticky are what
-  // make `mt-auto` mean what it reads as.
-  // FOUND BY THE ELEMENT, NOT BY ITS TAG. This used to slice from `<aside`,
-  // which stopped meaning anything the day the rail moved inside the kit's
-  // ScreenShell and became a plain node in the shell's own column — the
-  // PROPERTY held and the test failed anyway, which is a test measuring its
-  // method rather than its subject. The rail is now identified by what makes
-  // it the rail: one element carrying all three of the behaviours below. The
-  // breakpoint prefix is gone with the `<aside>` too — the shell drops the
-  // rail below `md` itself, so the classes no longer need `md:` to say so.
+  // The sidebar's LAST row — the account menu — is placed at the bottom of the
+  // rail. That is only the bottom of the WINDOW while the rail is exactly one
+  // window tall, and for a year it was not: the rail was a bare flex child that
+  // stretched to the tallest column, so on a long list the row sat at the bottom
+  // of a several-thousand-pixel document and left the screen the moment the rows
+  // arrived — visible on Home (short) and nowhere else.
+  //
+  // THE MECHANISM CHANGED ON 2026-09-02 AND THE PROPERTY DID NOT, which is
+  // exactly the distinction this block got wrong once already (it used to slice
+  // from `<aside`, and failed the day the rail moved inside the kit's
+  // ScreenShell while the property held perfectly). It then pinned the FIX —
+  // `sticky top-0 h-[100svh]` — which is a mechanism too, and one the kit has
+  // now taken over: `ScreenShell` draws the page `h-dvh overflow-hidden` and
+  // the rail column is a flex item of a full-height row, so the column IS one
+  // window tall by construction and there is nothing behind the rail left to
+  // pin against. A `sticky` rail in a page that cannot scroll is a class doing
+  // nothing.
+  //
+  // SO THIS ASKS FOR THE PROPERTY IN THE ONLY FORM THAT SURVIVES A RESHAPE:
+  // the rail's own node FILLS the column it is given (rather than sizing to its
+  // content, which is what put the account menu off screen), and the nav inside
+  // it scrolls on its own. Both are read off the one element that carries them.
   const railClasses = () => {
     const src = read("components/app-shell.tsx")
     const line = src
       .split("\n")
-      .find((l) => l.includes("sticky") && l.includes("h-[100svh]") && l.includes("overflow-y-auto"))
+      .find((l) => l.includes("data-rail-collapsed") === false && l.includes("flex min-h-0 flex-1 flex-col"))
     expect(
       line,
-      "one element must carry the rail's height, its pinning and its own scroll — whatever tag draws it"
+      "one element must fill the shell's rail column — whatever tag draws it"
     ).toBeDefined()
     return line ?? ""
   }
 
-  it("the desktop rail is exactly one window tall, and pinned there", () => {
+  it("the desktop rail fills the shell's column, which is exactly one window tall", () => {
     const cls = railClasses()
-    expect(cls, "the rail must be one window tall — without it, it stretches to the page")
-      .toMatch(/h-\[100svh\]/)
-    expect(cls, "the rail must stay pinned as the main column scrolls").toMatch(/sticky/)
+    // `flex-1` is main-axis growth inside the column's own flex column — a real
+    // height, not a percentage that needs a definite ancestor. `min-h-0` is what
+    // lets the nav below it overflow instead of flooring the whole rail to its
+    // content, and it is half of why the account row cannot be pushed off.
+    expect(cls, "the rail must grow into the column — without it, it sizes to its content")
+      .toMatch(/flex-1/)
+    expect(cls, "…and must be allowed to be shorter than its content, or nothing inside can scroll")
+      .toMatch(/min-h-0/)
+    // AND THE PAGE ITSELF MUST NOT BE THE THING THAT SCROLLS. The rail's height
+    // is the kit's now, and it is only one window tall because the shell's page
+    // level does not move. A rail that went back to pinning itself to a
+    // scrolling document would be the old bug wearing the new mechanism.
+    // COMMENT-STRIPPED, because this file EXPLAINS the mechanism it no longer
+    // uses — a prose mention of the old class pair would fail a check about
+    // what the file draws.
+    const drawn = stripComments(read("components/app-shell.tsx"))
+    expect(
+      drawn,
+      "the rail must not re-grow a viewport height of its own — the shell's column already is one"
+    ).not.toMatch(/h-\[100svh\][^"]*overflow-y-auto/)
   })
 
   it("a rail taller than the window scrolls inside itself, not off the bottom", () => {
     // Every new module adds a nav row. Past ~a dozen on a short screen the rail
     // overflows, and without this the bottom row is clipped exactly as before.
-    expect(railClasses(), "the rail must scroll internally once the nav outgrows it")
-      .toMatch(/overflow-y-auto/)
+    // The scroller is the NAV's own wrapper (the test below), not the rail node
+    // — Home and the account menu sit outside it on purpose — so what is
+    // asserted here is that the rail node itself does NOT scroll: a second
+    // scroller around the first would let the whole column move and take the
+    // account row with it.
+    expect(railClasses(), "the rail node must not become a scroller of its own")
+      .not.toMatch(/overflow-y-(auto|scroll)/)
   })
 
   // THE NAV CONTENTS ARE THE KIT'S `Rail` NOW (R45) — the hand-rolled

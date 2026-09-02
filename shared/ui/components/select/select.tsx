@@ -99,7 +99,8 @@ const selectTriggerVariants = cva(
     // 14/300 — the control label step.
     "text-sm font-[var(--font-weight-light)] whitespace-nowrap cursor-pointer",
 
-    // The chosen value must not push the chevron out of the pill.
+    // The chosen value must not push the chevron — or, on a `hideChevron`
+    // trigger, whatever else the call site put beside it — out of the pill.
     "[&>span]:min-w-0 [&>span]:truncate [&>span]:text-start",
 
     // Nothing chosen yet: the placeholder is tertiary ink, exactly as a text
@@ -169,10 +170,33 @@ export interface SelectTriggerProps
    * `aria-invalid` reaches the same skin without this prop.
    */
   error?: boolean;
+  /**
+   * Draw NO chevron. Off by default, so a field keeps CH09's
+   * `.kw-selectwrap__chevron` and every existing call site is untouched.
+   *
+   * Client, 2026-09-02, verbatim: *"on the sort, rmeove the chevron after the
+   * word. i know its a button"* and *"same on views - rmeove the chevron"*.
+   * The two that opt in are the TOOLBAR pills — `SortControl`'s field and
+   * `ViewSwitch` — which the client has spent this week matching to the
+   * filter chip, a pill that never carried a caret. In that row they read as
+   * buttons, and she says so.
+   *
+   * THE OPT-OUT HAS TO LIVE HERE. The glyph is `SelectPrimitive.Icon`'s, so
+   * no utility at a call site can take it away: `[&>svg]:hidden` would leave
+   * this trigger's `gap-2` and the icon's 16 of room behind, and the pill
+   * would keep the width of a chevron it no longer draws. Not rendering it is
+   * the only way the room goes with it.
+   *
+   * The base is `justify-between`, so a trigger left holding ONE child puts
+   * that child at the inline start on its own. A call site that puts a SECOND
+   * child in — `ViewSwitch`'s leading view icon — says `justify-start` itself.
+   */
+  hideChevron?: boolean;
 }
 
 /**
- * The closed control: a field pill with a chevron.
+ * The closed control: a field pill with a chevron — unless `hideChevron`, the
+ * opt-out the two toolbar pills take (see the prop).
  *
  * TEN STATES
  *  1. default        — page fill, one hairline at `--hair-strong`, pill,
@@ -219,14 +243,14 @@ export interface SelectTriggerProps
  *  touch-scrollable, and a sheet would be a second drawing of the same
  *  control. Logged as GAPS-B.md SLC-4.
  *
- * RTL — safe. `px-*` is padding-inline, the chevron is placed by
- * `justify-between` rather than by a side, and Radix mirrors the list's
- * alignment from `dir`.
+ * RTL — safe. `px-*` is padding-inline, the chevron — when it is drawn at all
+ * — is placed by `justify-between` rather than by a side, and Radix mirrors
+ * the list's alignment from `dir`.
  */
 const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
->(({ className, children, error, "aria-invalid": ariaInvalid, ...props }, ref) => {
+>(({ className, children, error, hideChevron = false, "aria-invalid": ariaInvalid, ...props }, ref) => {
   const invalid = error ?? (ariaInvalid === true || ariaInvalid === "true");
 
   return (
@@ -241,12 +265,14 @@ const SelectTrigger = React.forwardRef<
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon asChild>
-        {/* `--icon-button` (16) on `--ink-secondary`, as `.kw-selectwrap__chevron`
-            draws it. The colour is set by the cva so the disabled skin can
-            reach it. */}
-        <ChevronDown className="size-[var(--icon-button)] shrink-0" />
-      </SelectPrimitive.Icon>
+      {hideChevron ? null : (
+        <SelectPrimitive.Icon asChild>
+          {/* `--icon-button` (16) on `--ink-secondary`, as `.kw-selectwrap__chevron`
+              draws it. The colour is set by the cva so the disabled skin can
+              reach it. */}
+          <ChevronDown className="size-[var(--icon-button)] shrink-0" />
+        </SelectPrimitive.Icon>
+      )}
     </SelectPrimitive.Trigger>
   );
 });

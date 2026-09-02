@@ -36,12 +36,14 @@
    So, settled by the drawing and not by taste:
 
      · IT IS A DROPDOWN, NOT A SEGMENTED CONTROL AND NOT A ROW OF ICON
-       BUTTONS. One pill, showing the CURRENT view's name, with a caret. The
-       repo's transcriptions read it the same way — INVENTORY-1 calls it the
-       "view-switch dropdown"; INVENTORY-3's region table calls it "a paper
-       `Board ▾` view-switch pill". A `ToggleGroup` was proposed on
-       `verify/decide-2.html` §D7-5; it is not what the chapter draws, and the
-       drawing wins.
+       BUTTONS. One pill, showing the CURRENT view's name. (The chapter draws
+       a caret after the name; the client removed it on 2026-09-02 — see THE
+       PILL'S CONTENTS below. What the drawing settles is the CONTROL, and a
+       dropdown is still what this is.) The repo's transcriptions read it the
+       same way — INVENTORY-1 calls it the "view-switch dropdown";
+       INVENTORY-3's region table calls it "a paper `Board ▾` view-switch
+       pill". A `ToggleGroup` was proposed on `verify/decide-2.html` §D7-5; it
+       is not what the chapter draws, and the drawing wins.
      · IT IS A PAPER PILL, NOT A FIELD. In CH19's own toolbar row the SEARCH
        pill carries `box-shadow: inset 0 0 0 1px var(--hair)` and this one
        carries none — the chapter draws the distinction twice in one row. So
@@ -62,6 +64,42 @@
        `CollectionFrame`'s slot 4 and the frame already places it. CH27.13:
        "Toolbar order never changes: search, then filters, then view switcher,
        then actions pinned right."
+
+   ─────────────────────────────────────────────────────────────────────────
+   THE PILL'S CONTENTS — CLIENT, 2026-09-02, OVERRIDING THE CHAPTER'S CARET
+   ─────────────────────────────────────────────────────────────────────────
+   Two rulings, one breath, both verbatim:
+
+     "same on views - rmeove the chevron"
+
+     "on the view, on the left of teh word, add an icon inside tha pill that
+      represents the view (we will map this later, so far put a random icon)
+      same positio as the arrow on the left of srot, but without the splitted
+      pill"
+
+   So the pill is now [icon, label] where the chapter drew [label, caret].
+
+     · THE CARET GOES. `hideChevron` on `SelectTrigger` — the opt-out lives
+       there because the glyph is `SelectPrimitive.Icon`'s and no class at
+       this call site could take its RESERVED ROOM with it. `SortControl`'s
+       field took the same ruling in the same breath, so the toolbar's three
+       pills — filter chip, sort chip, view pill — stay one family, and that
+       family is now caret-free throughout. The filter chip never had one.
+     · THE ICON ARRIVES, LEADING, INSIDE THE ONE PILL. "Same position as the
+       arrow on the left of sort" is about WHERE, and the client closes the
+       door on the rest herself: "but without the splitted pill". So this
+       control does NOT grow a segment, a divider or a second rounding — no
+       `rounded-s-*`, no fused edge, nothing of `SortControl`'s two-half
+       geometry. One pill, `justify-start`, the trigger's own `gap-2` between
+       glyph and word.
+     · THE SIZE IS THE KIT'S, NOT A LITERAL. `size={16}` resolves through
+       `icon-base.tsx`'s SIZE_TOKEN to `var(--icon-16)`, which is what
+       `--icon-button` also is — the same 16 the caret it replaces was drawn
+       at, so the pill's width does not move: 16 of glyph and 8 of gap out,
+       16 of glyph and 8 of gap in. Measured: verify/toolbar-trio.
+     · THE GLYPH IS A PLACEHOLDER AND THE API IS THE POINT. See
+       `CollectionViewOption.icon` — the mapping is the client's and it is
+       not made here.
 
    ─────────────────────────────────────────────────────────────────────────
    WHICH VIEWS IT OFFERS IS DATA, AND IT IS THE CALL SITE'S
@@ -152,6 +190,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../select/select";
+import { ViewGrid } from "../../foundations/icons";
+
+/* THE PLACEHOLDER GLYPH, AND IT IS ONLY THAT.
+
+   Client, 2026-09-02: *"we will map this later, so far put a random icon"*.
+   `ViewGrid` is the kit's most view-shaped neutral and it is drawn for EVERY
+   view until a mapping arrives, on purpose: one glyph repeated down the
+   toolbar reads as "not yet assigned", where four different glyphs invented
+   here would read as a decided mapping and would have to be un-decided later.
+   The mapping is product vocabulary — which body is the table, which is the
+   board, which is the calendar — and inventing that is a thing this project
+   has already been corrected for. See `CollectionViewOption.icon`. */
+const PLACEHOLDER_VIEW_ICON = <ViewGrid size={16} />;
 
 export interface CollectionViewOption {
   /** Stable key, passed back to `onValueChange`. */
@@ -163,6 +214,35 @@ export interface CollectionViewOption {
    * site, where the data is.
    */
   label: string;
+  /**
+   * The glyph that stands for THIS view, drawn leading the label inside the
+   * pill when this is the current view.
+   *
+   * **THE MAPPING IS NOT MADE YET AND IT IS NOT THIS FILE'S.** Client,
+   * 2026-09-02, verbatim: *"add an icon inside tha pill that represents the
+   * view (we will map this later, so far put a random icon)"*. Until she maps
+   * them, every view that leaves this undefined falls back to the SAME
+   * placeholder (`ViewGrid`) — deliberately, so an unmapped toolbar reads as
+   * unmapped rather than as a mapping someone here chose.
+   *
+   * It is per-VIEW rather than one icon on the control because that is what
+   * "represents the view" means: the glyph has to change when the body does.
+   * So the mapping, when it comes, is data at the call site and no component
+   * changes —
+   *
+   * ```tsx
+   * const VIEWS = [
+   *   { value: "table",    label: "Table",    icon: <Table2Columns size={16} /> },
+   *   { value: "board",    label: "Board",    icon: <ViewColumns3 size={16} /> },
+   *   { value: "calendar", label: "Calendar", icon: <Calendar size={16} /> },
+   * ];
+   * ```
+   *
+   * — any of the kit's glyphs, at the 16 delivery size, which resolves to
+   * `--icon-16` through `icon-base.tsx` rather than to a literal. The names
+   * above are an EXAMPLE of the shape, not a proposal for the mapping.
+   */
+  icon?: React.ReactNode;
   /** Offered but not available right now. A fill and an ink, never an opacity. */
   disabled?: boolean;
 }
@@ -211,8 +291,10 @@ export interface ViewSwitchProps
  * The toolbar's view switcher: one paper pill naming the current body.
  *
  * TEN STATES
- *  1. default        — a paper pill, the current view's name at weight 500,
- *                      and the caret. CH19 and CH27.24 draw the same pill.
+ *  1. default        — a paper pill: the current view's glyph, then its name
+ *                      at weight 500. NO caret, and the glyph is a
+ *                      PLACEHOLDER — both client, 2026-09-02, see the header.
+ *                      CH19 and CH27.24 draw the same pill otherwise.
  *  2. hover          — the secondary button's own wash,
  *                      `--btn-secondary-hover`. Same as the `Export` pill
  *                      standing beside it, because it is the same skin.
@@ -230,8 +312,9 @@ export interface ViewSwitchProps
  *                      offering one view is chrome; `/meetings` already made
  *                      that call and this generalises it.
  *  8. error          — does not apply. Nothing here fetches.
- *  9. selected       — the current view. It is the pill's own label, and
- *                      `SelectItem` draws the tick on the open row.
+ *  9. selected       — the current view. It is the pill's own label AND the
+ *                      pill's own glyph, and `SelectItem` draws the tick on
+ *                      the open row.
  * 10. read-only      — a collection whose body may not be swapped is passed
  *                      one view, so state 7 already covers it. Nothing is
  *                      dimmed to say so.
@@ -252,17 +335,34 @@ const ViewSwitch = React.forwardRef<HTMLButtonElement, ViewSwitchProps>(
        `/meetings`'s standing decision made general. Zero is the same case. */
     if (views.length < 2) return null;
 
+    /* The glyph belongs to the view ON SCREEN, so it is looked up from
+       `value` rather than held in state — the pill has no memory of its own
+       and `value` is the only truth about which body is showing (see the
+       prop). An unmapped view falls back to the placeholder, which is the
+       whole toolbar today. */
+    const currentIcon = views.find((v) => v.value === value)?.icon ?? PLACEHOLDER_VIEW_ICON;
+
     return (
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger
           ref={ref}
           data-slot="view-switch"
           aria-label={label}
+          /* NO CARET — client, 2026-09-02: "same on views - rmeove the
+             chevron". See the header for why the opt-out is a prop on
+             `SelectTrigger` and not a class here. */
+          hideChevron
           className={cn(
             /* What this control changes about `SelectTrigger`, and nothing
-               else. Everything unlisted — the pill radius, the caret, the
-               open ink, the disabled fill — is `select.tsx`'s and is not
-               restated here.
+               else. Everything unlisted — the pill radius, the open ink, the
+               disabled fill — is `select.tsx`'s and is not restated here.
+
+               · ALIGNMENT. `justify-start`. The base is `justify-between`,
+                 which is right for a field holding [value, caret] and wrong
+                 for a pill holding [glyph, label]: between would push the two
+                 to opposite ends of the pill instead of setting the glyph
+                 beside the word. `SortControl`'s field needs no such override
+                 — it has one child left, and one child starts at the start.
 
                · WIDTH. `w-auto`: the pill is as wide as the view's name, not
                  a form field filling a column. `SortControl` makes the same
@@ -284,7 +384,7 @@ const ViewSwitch = React.forwardRef<HTMLButtonElement, ViewSwitchProps>(
                  `SelectTrigger`'s own base is 300, so it has to be said here;
                  `button.tsx` already ships 500, so the neighbouring pills
                  match rather than contrast. See the header. */
-            "w-auto min-w-0 h-[var(--control-height-button)]",
+            "w-auto min-w-0 h-[var(--control-height-button)] justify-start",
             "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
             "enabled:hover:bg-[var(--btn-secondary-hover)]",
             "font-[var(--font-weight-medium)]",
@@ -292,6 +392,25 @@ const ViewSwitch = React.forwardRef<HTMLButtonElement, ViewSwitchProps>(
           )}
           {...props}
         >
+          {/* THE VIEW'S GLYPH, LEADING, INSIDE THE ONE PILL — client,
+              2026-09-02. Sized from `--icon-16` on the box AND on whatever
+              the call site passed, so a mapped icon that forgot its `size`
+              still lands at the kit's 16 rather than at an SVG's own 24. Ink
+              is the cva's `[&_svg]:text-ink-secondary`, which is where the
+              caret's colour came from and is why the disabled skin still
+              reaches it. `aria-hidden`: `aria-label` names the control and
+              `SelectValue` says which view, so the glyph is decoration and
+              must not be read as a third thing. */}
+          <span
+            aria-hidden="true"
+            data-slot="view-switch-icon"
+            className={cn(
+              "inline-flex size-[var(--icon-16)] shrink-0 items-center justify-center",
+              "[&_svg]:size-[var(--icon-16)]",
+            )}
+          >
+            {currentIcon}
+          </span>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

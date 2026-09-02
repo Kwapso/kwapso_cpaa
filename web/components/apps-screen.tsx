@@ -50,7 +50,7 @@ import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
 import {
   ScreenRenderer,
@@ -253,21 +253,6 @@ export function AppsScreen({
   // vocabulary"). Don't reorder `views` below to match the kit's default.
   const [view, setView] = useRemembered<"tiles" | "list">("view", "tiles")
 
-  if (appsQ.error)
-    return (
-      <ShapeStateBody
-        shape="collectionScreen"
-        state="error"
-        copy={{ errorTitle: t("Couldn't load the apps.") }}
-        action={
-          <Button variant="secondary" onClick={() => appsQ.refresh()}>
-            {t("Try again")}
-          </Button>
-        }
-      />
-    )
-  if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
   // WHO AN APP MAY BE FILED UNDER, and WHICH STAGE — both derived from the
   // WHOLE collection (never `matching`/`shown`), so a facet's own options never
   // vanish as another control narrows the list (the same rule FilterBar's own
@@ -275,12 +260,20 @@ export function AppsScreen({
   // options … so choices don't vanish as you filter"). "Ours" (no account) has
   // no facet value of its own — an empty facet value already means "off" — the
   // same limit WaveFinder's client facet accepts for the same field.
+  //
+  // COMPUTED AHEAD OF THE TWO EARLY RETURNS BELOW (`appsQ.data ?? []`), so
+  // `useFilterBar` — a HOOK — can be called unconditionally alongside every
+  // other hook here, same discipline `shared/web/screen-engine/
+  // collection-frame.tsx` keeps for its own `useFilterBar` call. A `<FilterBar>`
+  // COMPONENT could mount and unmount freely with the loading state; a hook
+  // cannot skip renders the same way.
+  const loadedApps = appsQ.data ?? []
   const clientOptions = Array.from(
-    new Set(appsQ.data.filter((a): a is AppRow & { accountId: string } => Boolean(a.accountId)).map((a) => a.accountId))
+    new Set(loadedApps.filter((a): a is AppRow & { accountId: string } => Boolean(a.accountId)).map((a) => a.accountId))
   )
     .map((id) => ({ value: id, label: accountNames.get(id) ?? t("A client") }))
     .sort((a, b) => a.label.localeCompare(b.label))
-  const usedStages = new Set(appsQ.data.map((a) => a.stage).filter((s): s is string => Boolean(s)))
+  const usedStages = new Set(loadedApps.map((a) => a.stage).filter((s): s is string => Boolean(s)))
   const stageOptions = APP_STAGES.filter((s) => usedStages.has(s.name)).map((s) => ({
     value: s.name,
     label: t(s.name),
@@ -296,8 +289,8 @@ export function AppsScreen({
   // this split is counted in the browser does not excuse it from being honest.
   const needle = query.trim().toLowerCase()
   let matching = needle
-    ? appsQ.data.filter((a) => a.name.toLowerCase().includes(needle))
-    : appsQ.data
+    ? loadedApps.filter((a) => a.name.toLowerCase().includes(needle))
+    : loadedApps
   // …THEN THE FACETS, same reason: the badges below must count what a facet
   // left too, not just what the search box left.
   if (facetValues.accountId) matching = matching.filter((a) => a.accountId === facetValues.accountId)
@@ -310,6 +303,38 @@ export function AppsScreen({
   // has no business in the counts above. groupByStage still decides which
   // heading each tile lands under; this decides the order INSIDE one.
   const shown = [...preSort].sort((a, b) => compareApps(a, b, sort.by, accountNames, sort.dir))
+
+  // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
+  // (v1.2.27), used below only once the data has actually loaded.
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values: facetValues,
+    data: loadedApps,
+    onChange: (field, value) =>
+      setFacetValues((prev) => {
+        const next = { ...prev }
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setFacetValues({}),
+    resultCount: matching.length,
+  })
+
+  if (appsQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the apps.") }}
+        action={
+          <Button variant="secondary" onClick={() => appsQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   // THE LIST VIEW'S ROWS — the SAME `shown` array Tiles renders below, shaped
   // once for `appsListRecipe` ("apps.list", web/lib/screens.ts). No second
@@ -357,7 +382,6 @@ export function AppsScreen({
   const inactiveBadge = formatCount(inactive.length)
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "folder" as const,
     tabs: [
       { value: "active", label: t("Active"), icon: "app-window", badge: activeBadge, badgeVariant: "" as const },
       { value: "inactive", label: t("Inactive"), icon: "archive", badge: inactiveBadge, badgeVariant: "" as const },
@@ -401,9 +425,10 @@ export function AppsScreen({
             this row's own sibling below it — the client's screenshot of
             exactly this screen ("Search apps… / Sort by / Name" on one row, a
             stranded dashed "Filter" chip under it) — so it is a slot of the
-            row now instead of a second row beside it. Options come from the
-            WHOLE collection (see above), so narrowing by one facet never
-            hides the other's choices. */}
+            row now instead of a second row beside it; its open panel is the
+            separate `toolbarPanel` slot (v1.2.27's `useFilterBar` split).
+            Options come from the WHOLE collection (see above), so narrowing
+            by one facet never hides the other's choices. */}
         <ToolbarRow
           className="mb-4"
           search={
@@ -416,25 +441,8 @@ export function AppsScreen({
               />
             )
           }
-          filters={
-            appsQ.data.length > 0 && (
-              <FilterBar
-                facets={facets}
-                values={facetValues}
-                data={appsQ.data}
-                onChange={(field, value) =>
-                  setFacetValues((prev) => {
-                    const next = { ...prev }
-                    if (value === "") delete next[field]
-                    else next[field] = value
-                    return next
-                  })
-                }
-                onClearFacets={() => setFacetValues({})}
-                resultCount={matching.length}
-              />
-            )
-          }
+          filters={appsQ.data.length > 0 && filterPill}
+          toolbarPanel={appsQ.data.length > 0 && filterPanel}
           sort={
             appsQ.data.length > 0 && (
               <SortControl

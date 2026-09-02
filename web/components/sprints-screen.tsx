@@ -32,7 +32,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
 import {
   ScreenRenderer,
@@ -359,6 +359,45 @@ export function SprintsScreen({
   })
   const [addOpen, setAddOpen] = React.useState(false)
 
+  // COMPUTED AHEAD OF THE TWO EARLY RETURNS BELOW (`sprintsQ.data ?? []`), so
+  // `useFilterBar` — a HOOK — can be called unconditionally alongside every
+  // other hook here, the same discipline `apps-screen.tsx`'s own call keeps.
+  const loadedSprints = sprintsQ.data ?? []
+  const today = todayKey()
+  const byKind = new Map(kinds.map((k) => [k.value, k]))
+  // OVERVIEW AND CALENDAR BOTH DRAW FROM THIS, narrowed but never re-fetched —
+  // see the header note above `selectSprints`.
+  const narrowedSprints = selectSprints(loadedSprints, sprintQuery, today)
+  const sprintFacets: FilterFacet[] = [
+    {
+      field: "state",
+      // SAME WORD the "All sprints" tab's own filter uses for this column
+      // (screens.ts's `sprintsListRecipe`) — one vocabulary for one idea (R34).
+      label: t("Status"),
+      control: "select",
+      options: SPRINT_STATES.map((st) => ({ value: st, label: t(STATE_HEADING[st]) })),
+    },
+    {
+      field: "kind",
+      // SAME WORD the sprint form's own field uses for this column
+      // (sprint-form-dialog.tsx's `typeField`).
+      label: t("Type"),
+      control: "select",
+      options: sprintKindOptions(loadedSprints, byKind, lang, t("No type said")),
+    },
+  ]
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets: sprintFacets,
+    values: { state: sprintQuery.state, kind: sprintQuery.kind },
+    // Empty on purpose: both facets carry their own options above, derived
+    // off the WHOLE collection rather than the narrowed one — see
+    // `sprintKindOptions`'s own note on why.
+    data: [],
+    onChange: (field, value) => setSprintQuery((q) => ({ ...q, [field]: value })),
+    onClearFacets: () => setSprintQuery((q) => ({ ...q, state: "", kind: "" })),
+    resultCount: narrowedSprints.length,
+  })
+
   if (sprintsQ.error)
     return (
       <ShapeStateBody
@@ -375,8 +414,6 @@ export function SprintsScreen({
   if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const sprints = sprintsQ.data
-  const today = todayKey()
-  const byKind = new Map(kinds.map((k) => [k.value, k]))
   // The same map the Overview groups read, in the shape `RecordMark` wants.
   const kindMarks = new Map(kinds.filter((k) => k.mark).map((k) => [k.value, k.mark as string]))
   // The glyph for the STATE a sprint is in, keyed by the heading word itself —
@@ -384,29 +421,7 @@ export function SprintsScreen({
   const stateMarks = markMap(selectableQ.data, MARK_GROUP.sprintStatus)
   const data = shapeSprints(sprints, today, lang, kindMarks)
   const listRecipe = withDataDrivenCollection(recipe, data.rows)
-
-  // OVERVIEW AND CALENDAR BOTH DRAW FROM THIS, narrowed but never re-fetched —
-  // see the header note above `selectSprints`.
-  const narrowedSprints = selectSprints(sprints, sprintQuery, today)
   const askingSprints = sprintQueryIsActive(sprintQuery)
-  const sprintFacets: FilterFacet[] = [
-    {
-      field: "state",
-      // SAME WORD the "All sprints" tab's own filter uses for this column
-      // (screens.ts's `sprintsListRecipe`) — one vocabulary for one idea (R34).
-      label: t("Status"),
-      control: "select",
-      options: SPRINT_STATES.map((st) => ({ value: st, label: t(STATE_HEADING[st]) })),
-    },
-    {
-      field: "kind",
-      // SAME WORD the sprint form's own field uses for this column
-      // (sprint-form-dialog.tsx's `typeField`).
-      label: t("Type"),
-      control: "select",
-      options: sprintKindOptions(sprints, byKind, lang, t("No type said")),
-    },
-  ]
   // THE TOOLBAR ITSELF, shared by both bespoke tabs. Only where there is
   // something to search — a box over an empty collection cannot do anything,
   // so an empty sprints list falls back to the bare button-only toolbar it
@@ -416,8 +431,9 @@ export function SprintsScreen({
   // approved that night). `filters` used to be a `<FilterBar>` rendered as
   // this row's own sibling below it — the same shape her Apps screenshot
   // caught (search+actions on one row, a stranded filter chip under it) —
-  // so it is `<ToolbarRow>`'s own `filters` slot now (screen-bits.tsx),
-  // never a second row this call site draws for itself.
+  // so it is `<ToolbarRow>`'s own `filters` slot now (screen-bits.tsx), and
+  // its open panel is the separate `toolbarPanel` slot (v1.2.27's
+  // `useFilterBar` split) — never a second row this call site draws itself.
   const sprintToolbar =
     sprints.length > 0 ? (
       <ToolbarRow
@@ -433,19 +449,8 @@ export function SprintsScreen({
             className="w-full"
           />
         }
-        filters={
-          <FilterBar
-            facets={sprintFacets}
-            values={{ state: sprintQuery.state, kind: sprintQuery.kind }}
-            // Empty on purpose: both facets carry their own options above,
-            // derived off the WHOLE collection rather than the narrowed one —
-            // see `sprintKindOptions`'s own note on why.
-            data={[]}
-            onChange={(field, value) => setSprintQuery((q) => ({ ...q, [field]: value }))}
-            onClearFacets={() => setSprintQuery((q) => ({ ...q, state: "", kind: "" }))}
-            resultCount={narrowedSprints.length}
-          />
-        }
+        filters={filterPill}
+        toolbarPanel={filterPanel}
         actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
       />
     ) : (
@@ -458,7 +463,6 @@ export function SprintsScreen({
   const badge = formatCount(total)
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "folder" as const,
     tabs: [
       {
         value: "overview",

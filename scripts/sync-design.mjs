@@ -2,7 +2,7 @@
 /**
  * sync-design.mjs — pull the kwapso design system into shared/ui/ at a tag.
  *
- * The kit at github.com/Kwapso/design is a DEPENDENCY, vendored rather than
+ * The kit at github.com/Kwapso/kwapso-ui-ux is a DEPENDENCY, vendored rather than
  * installed, so that `npm ci` and the Cloudflare build never need private-repo
  * credentials. This script is the only door new kit code enters through:
  *
@@ -90,7 +90,7 @@ const main = async () => {
 
   const tmp = mkdtempSync(join(tmpdir(), "kwapso-design-"))
   try {
-    console.log(`sync-design: cloning Kwapso/design at ${tag} …`)
+    console.log(`sync-design: cloning Kwapso/kwapso-ui-ux at ${tag} …`)
     execSync(`git clone --quiet --depth 1 --branch ${tag} ${REPO} ${tmp}/kit`, { stdio: "inherit" })
     const sha = execSync(`git -C ${tmp}/kit rev-parse HEAD`).toString().trim()
 

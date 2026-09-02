@@ -617,9 +617,9 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // translation path every raise above cites — no environment here carries the
 // credential a real translation run needs. Real work owed, not debt hidden.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 145,
-  es: 145,
-  ca: 145,
+  de: 143,
+  es: 143,
+  ca: 143,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -901,7 +901,7 @@ export const RADIUS_EXCEPTION: Record<string, string> = {
 /** THE VENDORED COMPONENT LIBRARY — the one directory in `shared/` that is not
  * this team's own screen code, and the laws whose SCOPE that changes.
  *
- * `shared/ui/` is Swift Struck UI v0.15.0, copied into this repo on 2026-08-22
+ * `shared/ui/` is Kwapso UI v0.15.0, copied into this repo on 2026-08-22
  * and now owned by it (`shared/ui/README.md` says why, and says that upstream is
  * never edited from here). Nothing about the CODE changed in that move — it is
  * still a generic component library, consumed through props — but it moved from

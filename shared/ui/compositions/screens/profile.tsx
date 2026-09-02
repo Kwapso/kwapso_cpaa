@@ -97,10 +97,13 @@ export interface ProfileRouteProps
      screen is in the navbar; a detail screen has breadcrumbs." Settings is in
      the navbar. It has no breadcrumb, no record, no identity chip row, no
      number pill and no charcoal footer, so nothing about it is a detail
-     screen — and `SHELL.md`'s "Record sub-views and Settings" sentence, which
-     puts Settings on the underline strip, is an exception ON THE TAB AXIS
-     ONLY and not a reclassification. `MainScreen` takes `tabsVariant="line"`
-     for exactly this screen and no other.
+     screen. `SHELL.md`'s "Record sub-views and Settings" sentence, which put
+     Settings on the underline strip, WAS an exception on the tab axis only
+     and never a reclassification; since 2026-09-02 it is not even that —
+     the client retired the folder tab variant, `MainScreen` has no
+     `tabsVariant` to take, and the underline strip is the only strip. The
+     paragraph is kept because the classification it argues for is what puts
+     this route on `MainScreen` at all.
 
      Before this the route returned `FormScreen surface="page"`, which is a
      bare `div` with `gap-6` on it: no page, no screen card, no rail and no

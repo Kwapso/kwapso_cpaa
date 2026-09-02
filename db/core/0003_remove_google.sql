@@ -1,4 +1,4 @@
--- Google login was parked (2026-06-12): a BRIMBA scope decision — the generic
+-- Google login was parked (2026-06-12): the Kwapso System's scope decision — the generic
 -- base narrowed to email one-time codes only. Not a security finding.
 -- google_sub was a UNIQUE column, which SQLite can't drop in place — so the
 -- users table is rebuilt without it (standard SQLite column-removal pattern).
@@ -11,8 +11,8 @@
 -- back: the identity key is the verified EMAIL, so a person who used a code
 -- yesterday and Google today is one row, and there is no second key to keep in
 -- step. See ARCHITECTURE.md §5 for the flow and OPERATIONS.md for the secrets.
--- The Brimba base itself may still be email-only; kwapso is the fork that
--- turned Google back on.
+-- The generic Kwapso System base may still default to email-only; this
+-- deployment is what turned Google back on.
 
 PRAGMA defer_foreign_keys = true;
 

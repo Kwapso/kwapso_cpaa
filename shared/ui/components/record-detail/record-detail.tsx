@@ -767,12 +767,14 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
         {/* ---- Regions 2 and 3 ------------------------------------------ */}
         {visibleTabs.length > 0 ? (
           <Tabs
-            /* Client ruling E, 2026-08-22: "folder tabs are for main screens,
-               line tabs for detail screens." A record IS the detail screen,
-               so `line` is stated rather than inherited — the frame that
-               draws collections now defaults to `folder`, and a default is
-               not where a ruling should live. Settles REC-1. */
-            variant="line"
+            /* `variant="line"` USED TO BE STATED HERE and is deleted, not
+               moved: under ruling E of 2026-08-22 ("folder tabs are for main
+               screens, line tabs for detail screens") a record had to say
+               which of two shapes it took, because `CollectionFrame`
+               defaulted to the other one. The client retired the folder
+               variant on 2026-09-02 and there is one shape left, so the line
+               is redundant — "I don't want any dead body around". REC-1 stays
+               settled; there is simply nothing left to settle it against. */
             value={tab}
             defaultValue={defaultTab ?? visibleTabs[0].value}
             onValueChange={onTabChange}

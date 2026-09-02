@@ -1,6 +1,6 @@
 # Durable Objects, the live layer and the one lock (LOCKED 2026-06-15; ROW-LEVEL 2026-06-22)
 
-Brimba uses two Durable Object classes today, both inside the **realtime**
+The Kwapso System uses two Durable Object classes today, both inside the **realtime**
 worker (fact updated 26 Aug 2026: this sentence said "exactly one" from the day
 it was locked until `TeamInterest` shipped in August 2026). `TeamChannel` is the
 live "switchboard"; `TeamInterest` is the per-team interest registry beside it —
@@ -522,7 +522,7 @@ changed; the client earns the *content* through the same door it always uses.
 
 `TeamChannel` is pub/sub; it is **not** in any write path and serializes nothing.
 The *other* use of a DO, as a **lock** for contended, atomic writes, is a
-separate decision governed by [CONCURRENCY.md](CONCURRENCY.md). Brimba's base
+separate decision governed by [CONCURRENCY.md](CONCURRENCY.md). The Kwapso System's base
 modules use **zero** DO locks today; here is the rule for when a future module
 would need one.
 
@@ -569,7 +569,7 @@ read-modify-write genuinely matters. The DO handles its requests one at a time
 (single-threaded); apply the **operation** inside it ("decrement by 2", not "set
 to 7") and **persist before you ack**. Cross-entity transactions use a
 coordinator + idempotency keys. This is reserved for genuine hot counters, most
-writes never need it, and Brimba's base has none.
+writes never need it, and the Kwapso System's base has none.
 
 ### The decision table
 

@@ -68,7 +68,7 @@
 
 import * as React from "react"
 
-import { FilterBar, FilterPanelColumn } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
@@ -213,25 +213,30 @@ export function PagedFind<T>({
   fixed?: FindQuery
   /**
    * Rendered BEFORE the toolbar row, OUTSIDE whatever `wrap` boxes the toolbar
-   * and the rendered rows in — a folder tab strip that must sit OUTSIDE that
-   * box with no gap, the way a folder tab's own negative-margin overlap needs
-   * a real, adjacent sibling to melt into (tabs-view.tsx: "any gap here would
-   * pull them apart"). A `FolderTabStrip` (config/value/onValueChange), never
-   * a `ReactNode` — see this file's header comment for why the shape changed:
-   * the slot renders `<TabsView>` from it, so a caller cannot fold an action
-   * button in beside the tabs the way `renderAbove`'s old render-prop shape
-   * once let one in for a few hours (client ruling, 2026-08-31: the toolbar's
-   * own action buttons live in `actions` below, never beside the tab strip).
-   * `undefined` where a collection has no tab strip at all (Knowledge).
+   * and the rendered rows in, with no gap between this and that box. Before
+   * v1.2.28 that zero gap was load-bearing — a folder tab's own negative-margin
+   * overlap needed a real, adjacent sibling to melt into (tabs-view.tsx: "any
+   * gap here would pull them apart") — the folder shape is gone now
+   * (tabs-view.tsx's own header has the client's 2026-09-02 ruling that killed
+   * it) and the flush look is kept on its own merits, the way `screen-bits.tsx`'s
+   * twin `folderTabs` slot documents. A `FolderTabStrip` (config/value/
+   * onValueChange), never a `ReactNode` — see this file's header comment for
+   * why the shape changed: the slot renders `<TabsView>` from it, so a caller
+   * cannot fold an action button in beside the tabs the way `renderAbove`'s old
+   * render-prop shape once let one in for a few hours (client ruling,
+   * 2026-08-31: the toolbar's own action buttons live in `actions` below,
+   * never beside the tab strip). `undefined` where a collection has no tab
+   * strip at all (Knowledge).
    */
   tabs?: FolderTabStrip
   /**
    * Boxes the toolbar row(s) and the rendered rows together. Identity (no box)
    * by default — every existing call site keeps its current, naked toolbar.
    * Pass a `CollectionCard`-shaped wrapper to read the toolbar and the list as
-   * ONE panel, e.g. when a folder tab strip above (`tabs`) needs a real,
-   * zero-gap card to attach to (screen-bits.tsx's own `CollectionCard`,
-   * `attached`).
+   * ONE panel, e.g. when a tab strip above (`tabs`) wants a zero-gap card
+   * directly beneath it (screen-bits.tsx's own `CollectionCard`; its `attached`
+   * prop that used to matter here was retired the same day as the folder
+   * shape it was reaching over — see that file's own doc).
    */
   wrap?: (toolbarAndRows: React.ReactNode) => React.ReactNode
   /**
@@ -370,17 +375,35 @@ export function PagedFind<T>({
   // itself, never a narrowing that would need this.
   const queryString = active ? `?${new URLSearchParams(query).toString()}` : ""
 
+  // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
+  // (v1.2.27), used below only when `showFilters` is true.
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values,
+    // Empty on purpose: every facet above carries its own options, so there
+    // is nothing for the bar to derive from the rows on screen.
+    data: [],
+    onChange: (field, value) => {
+      const next = { ...values }
+      if (value === "") delete next[field]
+      else next[field] = value
+      setValues(next)
+    },
+    onClearFacets: () => setValues({}),
+    resultCount: total,
+  })
+
   const toolbarAndRows = (
     <div className="flex w-full flex-col gap-4">
       {/* THE COLUMN — client ruling, 2 Sep 2026, third pass: "the expanded
           toolbar shoudl not be an overlay, but literaly expand the space".
-          `FilterBar`'s open panel renders into the outlet this column
-          publishes BENEATH the track below, so it takes real space and pushes
+          `filterPanel` (v1.2.27's `useFilterBar` split) renders BENEATH the
+          track below as a plain sibling, so it takes real space and pushes
           the rows down, and its height feeds THIS box rather than the pill's
           (which is what a `rounded-pill` box cannot survive — see
           `filter-bar.tsx`'s header for the oval, and for the absolute-panel
           pass this replaces). */}
-      <FilterPanelColumn>
+      <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
         {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
             control sits inside one pill, `bg-background` against the card's
@@ -416,29 +439,16 @@ export function PagedFind<T>({
             themselves — client, 2026-09-02: "when activce filters, do not
             display them in the toolbar. only a count niside the filter pill".
 
-            NO WRAPPING BOX AROUND `<FilterBar>` (client ruling, 2026-09-02,
-            superseding the wrapper this slot used to carry): it wraps its own
-            pill in a non-growing box internally, the same "wrap a `w-full`
-            root" trick this comment used to explain (CSS Sizing §5.3), and
-            renders its open PANEL into the column above rather than into this
-            row. `<FilterBar>` bare is correct for both halves. */}
-        {showFilters && (
-          <FilterBar
-            facets={facets}
-            values={values}
-            // Empty on purpose: every facet above carries its own options, so
-            // there is nothing for the bar to derive from the rows on screen.
-            data={[]}
-            onChange={(field, value) => {
-              const next = { ...values }
-              if (value === "") delete next[field]
-              else next[field] = value
-              setValues(next)
-            }}
-            onClearFacets={() => setValues({})}
-            resultCount={total}
-          />
-        )}
+            NO WRAPPING BOX AROUND THE PILL (client ruling, 2026-09-02,
+            superseding the wrapper this slot used to carry): `filterPill`
+            wraps itself in a non-growing box internally, the same "wrap a
+            `w-full` root" trick this comment used to explain (CSS Sizing
+            §5.3). Its open PANEL is the SEPARATE `filterPanel` value below,
+            never folded into this row — the split `useFilterBar` itself
+            returns (v1.2.27), replacing the single component whose OWN
+            markup this row and the column below it used to share through a
+            portal. */}
+        {showFilters && filterPill}
         {/* THE ORDER, after search and the facet chips because the three are
             asked with the same gesture — you type, you narrow, then you say
             what order. What it changes is what the DOOR is asked, so the
@@ -480,7 +490,8 @@ export function PagedFind<T>({
           <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
         )}
       </div>
-      </FilterPanelColumn>
+      {showFilters && filterPanel}
+      </div>
 
       {children({
         active,
@@ -506,12 +517,13 @@ export function PagedFind<T>({
   )
 
   // ZERO GAP, on purpose — the same reason `screen-bits.tsx`'s own `folderTabs`
-  // slot draws its column with no `gap-4`: a folder tab strip pulled down by
-  // `--folder-tab-overlap` needs its ACTUAL next sibling to be the panel it
-  // melts into, and a `gap` here (even the outer column's) would put daylight
-  // back between them. A caller with no `tabs` gets one more `<div>` around
-  // exactly the markup this returned before — no gap to apply with a single
-  // child, so nothing moves.
+  // slot draws its column with no `gap-4`: the strip sits flush against the
+  // panel below it (before v1.2.28 this was load-bearing for a folder tab's
+  // `--folder-tab-overlap` pull to melt into its actual next sibling; the
+  // folder shape is gone now and the flush look is kept on its own merits —
+  // see `tabs`'s own doc above). A caller with no `tabs` gets one more `<div>`
+  // around exactly the markup this returned before — no gap to apply with a
+  // single child, so nothing moves.
   return (
     <div className="flex w-full flex-col">
       {renderFolderTabs(tabs)}

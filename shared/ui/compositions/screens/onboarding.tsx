@@ -179,8 +179,9 @@ export interface OnboardingRouteProps
   /** Theme changed. */
   onThemeChange?: (value: string) => void;
   /**
-   * Which spine is picked — ink, paper or mango. p27 draws the Sidebar group
-   * between Theme and Text size; override 56 makes mango the default.
+   * Which spine is picked — `mango` or `quiet` (client ruling 2026-09-02).
+   * p27 draws the Sidebar group between Theme and Text size; override 56
+   * makes mango the default.
    */
   spine?: string;
   /** Spine changed. */
@@ -331,25 +332,24 @@ const THEMES: readonly AppearanceOption[] = [
   },
 ];
 
-/* p27's Sidebar group — previously missing from this step entirely. */
+/* p27's Sidebar group — previously missing from this step entirely, and TWO
+   options since the client's ruling of 2026-09-02 cut D3's three to Mango and
+   Quiet. Same captions as `settings.tsx`'s, shortened the way every other
+   caption on this step is: 27.14 is the same words under pressure, a
+   truncation and not a second vocabulary. Fills are not described — the two
+   names carry the colour, so the line says what the choice is like instead. */
 const SPINES: readonly AppearanceOption[] = [
-  {
-    value: "ink",
-    label: "Ink",
-    description: "Charcoal spine, mango row.",
-    picture: <SpinePicture spine="ink" />,
-  },
-  {
-    value: "paper",
-    label: "Paper",
-    description: "Soft-paper spine, quiet.",
-    picture: <SpinePicture spine="paper" />,
-  },
   {
     value: "mango",
     label: "Mango",
-    description: "Full brand spine.",
+    description: "Warm, and easy to find.",
     picture: <SpinePicture spine="mango" />,
+  },
+  {
+    value: "quiet",
+    label: "Quiet",
+    description: "Calm, and out of the way.",
+    picture: <SpinePicture spine="quiet" />,
   },
 ];
 

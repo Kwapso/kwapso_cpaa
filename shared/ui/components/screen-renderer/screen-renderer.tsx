@@ -173,9 +173,11 @@ export interface ScreenTab {
   /** What the tab says. A node, so a count can ride along. */
   label: React.ReactNode;
   /**
-   * A live count beside the label, drawn by `TabsCount` — ch14's quiet
-   * number here, since `ScreenRenderer` always states `variant="folder"`
-   * (ruling E). Zero renders nothing.
+   * A live count beside the label, drawn by `TabsCount` — R-4a's line count:
+   * quiet tertiary text at rest, a small circular mango fill on the ACTIVE
+   * tab. It used to be ch14's quiet number, because this file stated
+   * `variant="folder"` under ruling E; the folder tab was retired on
+   * 2026-09-02 and the count came with it. Zero renders nothing.
    */
   count?: number;
   /** The tab's own body. Absent, the screen's `body` is shown for every tab. */
@@ -977,19 +979,17 @@ const ScreenRenderer = React.forwardRef<HTMLDivElement, ScreenRendererProps>(
           ) : null}
 
           {/* ---- Tabs → toolbar → body → footer. -------------------------
-              CLIENT RULING E, 2026-08-22: "folder tabs are for main screens,
-              line tabs for detail screens." ScreenRenderer draws ch19
-              COLLECTION VIEWS ONLY — the toolbar contract quoted at the top
-              of this file (search, filters, actions, view switch) is the
-              main-screen contract, and this component has no record/detail
-              mode at all. So `folder` is stated here rather than left to
-              `Tabs`'s own generic default, which is `line` (right for the
-              majority of `Tabs` consumers, wrong for this one). Leaving it
-              unstated was the exact regression `CollectionFrame` already
-              closed for itself — see that file's `tabsVariant` default. */}
+              CLIENT RULING, 2026-09-02: "the only tabs that we will have are
+              the line tabs because folders will only be used for the
+              breadcrumbs." This file used to state `variant="folder"` here,
+              under ruling E of 2026-08-22 ("folder tabs are for main screens,
+              line tabs for detail screens"), because `ScreenRenderer` draws
+              ch19 COLLECTION VIEWS ONLY and has no record/detail mode at all.
+              With one tab shape left there is nothing to state and no
+              regression to close by stating it; the whole argument for saying
+              it out loud went with the second variant. */}
           {tabs && tabs.length > 0 ? (
             <Tabs
-              variant="folder"
               value={tab}
               defaultValue={defaultTab ?? tabs[0].value}
               onValueChange={onTabChange}
@@ -1000,11 +1000,13 @@ const ScreenRenderer = React.forwardRef<HTMLDivElement, ScreenRendererProps>(
                   <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
                     {item.label}
                     {/* FIX, matching the bug override 45 already fixed once
-                        in `CollectionFrame`: this strip is always
-                        `variant="folder"` (see the block above), and ch14's
-                        "counts are quiet, never badges" forbids the `Badge`
-                        chip that used to sit here. `TabsCount` draws the
-                        quiet number for the resolved variant on its own. */}
+                        in `CollectionFrame`: a `Badge` chip used to sit here,
+                        which is a filled chip inside a tab. `TabsCount` draws
+                        the count's one shape on its own. The rule it broke was
+                        ch14's "counts are quiet, never badges" — the FOLDER
+                        chapter's, and the folder tab is retired; R-4a's line
+                        count is not a badge either, so the fix stands on the
+                        newer ruling. */}
                     <TabsCount count={item.count} />
                   </TabsTrigger>
                 ))}

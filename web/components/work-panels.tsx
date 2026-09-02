@@ -1107,14 +1107,13 @@ export function TodosPanel({
   }
 
   // The two piles, as the library's own strip (R3 — never a hand-rolled toggle).
-  // `line` rather than the folder shape, for the reason tickets-collection.tsx
-  // gives at its own: the kit's folder tab is drawn to be attached to the card
-  // below it, and this panel's list has no card of its own.
+  // No override needed any more — `defaultTabsConfig` draws the one line shape
+  // itself since v1.2.28 retired the folder variant this used to opt out of
+  // (tabs-view.tsx's header has the ruling).
   const tabs = (
     <TabsView
       config={{
         ...defaultTabsConfig,
-        variant: "line",
         tabs: [
           {
             value: "open",

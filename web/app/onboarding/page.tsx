@@ -9,7 +9,7 @@
 // spine to mango, but everyone can change it during the onboarding or anytime
 // at settings". This screen is the "during the onboarding" half; Settings ·
 // Appearance is the other. STILL ONE SCREEN: the flow's own comment calls it a
-// locked flow, and a second step to hold three cards would trade a one-screen
+// locked flow, and a second step to hold the cards would trade a one-screen
 // sign-up for a wizard in exchange for nothing — the kit's own three-step
 // OnboardingRoute is exempted for exactly that mismatch (COMPOSITION_EXEMPT,
 // "screens/onboarding.tsx"), and adding the step it describes would be
@@ -29,12 +29,13 @@
 // a second vocabulary on the same question Settings already answers — which is
 // exactly what `SpineChoice` was extracted to prevent. The kit's own
 // onboarding composition reaches the same conclusion independently: its step 2
-// draws `AppearanceOptionGroup` with these three `SpinePicture` cards.
+// draws `AppearanceOptionGroup` with these `SpinePicture` cards — two of them
+// now, since v1.2.28 cut `ink` and `paper` to one muted rail, `quiet`.
 //
 // SO THE SCREEN IS TALLER, AND THAT IS THE PRICE, PAID KNOWINGLY. The kit's
 // group is `repeat(auto-fit, minmax(13.125rem, 1fr))` above a 45rem VIEWPORT,
 // and this column is `max-w-sm` (24rem) — two 13.125rem tracks do not fit, so
-// on a desktop the three cards resolve to one column of full-width picture
+// on a desktop the two cards resolve to one column of full-width picture
 // cards (~3.625rem of picture each) rather than the compact rows a phone gets
 // below 45rem. The main is `min-h-[100svh]` and not `h-`, so it grows and the
 // page scrolls; nothing is clipped. Worth a look on a real screen before this
@@ -86,7 +87,7 @@ const lastNameField = { ...defaultFieldConfig, label: "Last name", required: tru
 /* R33's sanctioned way out: `label:`/`helpText:` on an object that spreads a
    field config is translated on the way to the screen by shared/web/field.tsx,
    because `t` is a hook and this is a module-level constant. "Sidebar" is the
-   word Settings · Appearance heads the same three cards with — one thing, one
+   word Settings · Appearance heads the same two cards with — one thing, one
    name (R34). The help line is the client's own second clause said out loud:
    nobody should feel they are deciding something now that they cannot undo. */
 const spineField = {

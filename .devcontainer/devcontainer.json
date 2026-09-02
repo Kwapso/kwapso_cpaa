@@ -1,5 +1,5 @@
 {
-  "name": "kwapso / Brimba",
+  "name": "kwapso",
 
   // Node 22 — the SAME version .nvmrc pins and .github/workflows/ci.yml runs.
   // Three places now name it; if you bump one, bump all three or the container

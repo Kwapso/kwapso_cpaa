@@ -2850,137 +2850,76 @@ describe("closing a form is not a decision to discard it", () => {
   })
 })
 
-// THE TAB SHAPE IS ONE DECISION, NOT SIXTEEN.
+// THE TAB SHAPE IS ONE DECISION, NOT SIXTEEN — AND NOW NOT EVEN TWO.
 //
 // The owner, seeing the folder on three screens and the old flat strip on the
 // rest: "if we change tabs in one central place… it should have changed
 // everywhere. If this is not done then the entire way we have built our design
 // system is incorrect."
 //
-// The architecture was fine — one TabsView, one kit Tabs control, one `variant`.
-// What was wrong is that sixteen screens had hard-coded `variant: "line"` before
-// the folder existed, so the central value governed nothing. It is the DEFAULT
-// now, for a COLLECTION's own strip (a main screen switching between records,
-// or between collections).
-//
-// AMENDED 2026-08-31 — THE CLIENT, verbatim: "Detail screens are using the
-// folder-tab design, but that style belongs to main screens only. Detail
-// screens should use the line (underline) tabs." This is the same ruling
-// `RecordDetail`'s own internal tab strip already states explicitly
-// (record-detail.tsx: "client ruling E … a record IS the detail screen, so
-// `line` is stated rather than inherited"), just reaching the twelve detail
-// screens that hand their tabs to `RecordScreen`'s `children` instead of that
-// prop, and so never got the memo — the App detail screen's Overview / Sprints
-// / Stories strip was drawing folder tabs, because every one of them spread
-// `defaultTabsConfig` (the COLLECTION default) with no override. So a screen
-// that wants a line now has THREE reasons, not two: a strip filtering WITHIN a
-// collection (no card to attach to), and — new — a RECORD's own top-level
-// section strip, which is `web/components/record-chrome.tsx`'s
-// `RECORD_TABS_CONFIG` (ONE constant, spread by every detail screen's own
-// tabsConfig, so the decision is made once rather than twelve times — exactly
-// the defect this describe block exists to catch).
+// This block used to enforce a THREE-WAY split (folder default for a
+// collection's own strip, `variant: "line"` for a strip filtering WITHIN one
+// collection, `RECORD_TABS_CONFIG`'s own `line` for a record's top-level
+// strip). SUPERSEDED, v1.2.28 — CLIENT RULING, 2026-09-02, verbatim: "the
+// whole concept of folders as tabs gets killed. All the current folders as
+// tabs we have will become line tabs. Completely kill and remove folder
+// tabs… the only tabs that we will have are the line tabs" — so the split
+// this block checked is gone along with the shape on one side of it.
+// `defaultTabsConfig` is `"line"` now, full stop, and there is nothing left
+// to override it WITH: `TabsConfig.variant` is a one-member union
+// (tabs-view.tsx), so a call site that still tries to write its own value
+// fails to compile — this describes the census that also catches the same
+// mistake AT THE SOURCE, before a build even runs.
 describe("a tab strip's shape is decided in one place", () => {
-  it("tab-shape: the default is the folder", () => {
+  it("tab-shape: the default (and only) value is line", () => {
     const src = stripComments(read(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx")))
     const decl = src.slice(src.indexOf("defaultTabsConfig: TabsConfig"))
-    expect(decl.slice(0, decl.indexOf("}") + 1), "the one default must be the folder").toContain('variant: "folder"')
+    expect(decl.slice(0, decl.indexOf("}") + 1), "the kit draws one shape now — line").toContain('variant: "line"')
   })
 
-  it("tab-shape: only the inner filter strips and the record strip override it", () => {
-    const allowed = new Set([
-      "web/components/tickets-collection.tsx",
-      "web/components/meetings-screen.tsx",
-      // ACCOUNTS' COMPANIES/ALL STRIP IS NOT ON THIS LIST, and that is a
-      // correction, not an oversight. It was added here for a day (client
-      // ruling, 2026-08-31, annotating a screenshot of this exact screen: the
-      // search/sort/filter toolbar moved to sit BETWEEN the strip and the
-      // list) on the assumption that ANY intervening element breaks the
-      // folder tab's attachment the way it does for tickets-collection.tsx and
-      // meetings-screen.tsx above. Checked rather than trusted (client, same
-      // day, first on losing the shape entirely — "bring back the rounded
-      // active tabs!" — then on a reference screenshot of the kit's own
-      // collection composition, tabs flush against the SAME card as the
-      // toolbar, zero gap): the strip switches between COLLECTIONS (all
-      // accounts vs. just the companies), which is `defaultTabsConfig`'s own
-      // folder case, not the "filters WITHIN one collection" case the two
-      // lines above are for. tickets-collection.tsx's and meetings-screen.tsx's
-      // toolbars sit in the outer flex column, a real gap away from their
-      // card, which is genuinely fatal to the attachment; Accounts' toolbar
-      // now renders through `PagedFind`'s own `renderAbove`/`wrap` slots
-      // (paged-find.tsx), which put the tab strip and the card in ONE
-      // zero-gap column of their own, the same join `SectionWithCreate`'s
-      // `folderTabs` slot draws for apps-screen.tsx/sprints-screen.tsx/
-      // tasks-screen.tsx below. So the strip is back to saying nothing here,
-      // same as any other collection-switching strip.
-      // The steps view switch (List / Flow / Compare) sits INSIDE the Steps
-      // folder tab. Two folders stacked put one strip's feet through the
-      // other's toolbar — seen on a phone the moment the default flipped.
-      // It moved out of `process-detail.tsx` with the panel it belongs to on
-      // 26 Aug 2026; the reason above is unchanged, only the address.
-      "web/components/process/steps-panel.tsx",
-      // The to-do panel's Open / Done pair, and the same sentence as the two
-      // above: it is a strip filtering WITHIN a collection, and the panel it
-      // sits in has no card of its own to attach a folder to. It is also
-      // routinely mounted INSIDE a record's folder strip (a client's To-dos
-      // tab), which is exactly the stacking the steps-panel line describes.
-      "web/components/work-panels.tsx",
-      // RECORD_TABS_CONFIG — the ONE seam every detail screen's own top-level
-      // tab strip spreads (help/role/sprint/wave/contact/selectable/account/
-      // meeting/knowledge/app/story/task/process detail), per the client's
-      // 2026-08-31 ruling above. A record's OWN section strip is a line; a
-      // MAIN screen's strip (switching between records or collections) stays
-      // the folder default untouched.
-      "web/components/record-chrome.tsx",
-    ])
-    const offenders: string[] = []
-    let scanned = 0
+  it("tab-shape: no call site writes its own variant any more — there is nothing left to choose", () => {
     const files = [
       ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
       ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
     ]
-    for (const f of files) {
-      const rel = f.path.replace(ROOT + "/", "")
-      if (!/variant:\s*"line"/.test(read(f.path))) continue
-      scanned++
-      if (!allowed.has(rel)) offenders.push(rel)
-    }
-    expect(scanned, "the override census found nothing — it has stopped matching").toBeGreaterThan(1)
+    expect(files.length, "the component census found no files — sourceFiles has stopped matching").toBeGreaterThan(50)
+    const offenders = files
+      .filter((f) => /variant:\s*["'](line|folder|pill)["']/.test(stripComments(read(f.path))))
+      .map((f) => f.path.replace(ROOT + "/", ""))
     expect(
       offenders,
-      `these screens opt out of the one tab shape. A collection's tabs are the ` +
-        `folder; a strip filtering INSIDE a collection, or a record's own top-level ` +
-        `strip, is a line: ${offenders.join(", ")}`
+      `these screens still hard-code a tab variant. The kit draws one shape ` +
+        `now (\`"line"\`, v1.2.28 killed \`folder\`, an earlier round killed ` +
+        `\`pill\`) and \`defaultTabsConfig\` already is it — nothing needs, or ` +
+        `is allowed, to say so again: ${offenders.join(", ")}`
     ).toEqual([])
-  })
-
-  it("tab-shape: nothing asks for a `pill`, which the kit does not draw", () => {
-    const offenders = [
-      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
-      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
-    ]
-      .filter((f) => /variant:\s*"pill"/.test(read(f.path)))
-      .map((f) => f.path.replace(ROOT + "/", ""))
-    expect(offenders, `\`pill\` is accepted and silently drawn as a line — say what you mean`).toEqual([])
   })
 })
 
-// TWO FOLDER STRIPS MUST NOT BE STACKED.
+// TWO TAB STRIPS MUST NOT BE STACKED.
 //
-// A folder tab is drawn with feet that attach to the card below it. Nest one
-// inside another and the inner strip's feet come through the outer one's
-// toolbar — which is exactly what happened on a phone the moment the folder
-// became the default, on the steps view switch. Derived rather than remembered:
-// a screen rendering more than one strip has an inner one, and an inner one is
-// a line.
+// A folder tab used to be drawn with feet that attach to the card below it —
+// nest one inside another and the inner strip's feet came through the outer
+// one's toolbar, exactly what happened on a phone the moment the folder
+// became the default, on the steps view switch. SUPERSEDED, v1.2.28: the
+// folder shape that failure mode was ABOUT is retired (tabs-view.tsx's own
+// header has the client's ruling), but the client's own words for this rule
+// were never about feet — "there can never be 2 rows of tabs, no folder
+// tabs, no line tabs. just never" — so two stacked LINE strips are exactly as
+// forbidden as two stacked folder ones were, with no shape-shaped escape
+// hatch. Derived rather than remembered: a screen rendering more than one
+// strip is the thing to catch, full stop, and the only way out is a reasoned,
+// rot-checked exception naming the screen — never a variant written on the
+// inner one, since there is only the one variant left to write.
 describe("a tab strip is not nested inside another one", () => {
-  /** SCREENS THE OWNER HAS RULED STACK TWO FOLDERS ANYWAY. Data, with the
+  /** SCREENS THE OWNER HAS RULED STACK TWO STRIPS ANYWAY. Data, with the
    * ruling that bought each one, rot-checked below so a pin whose screen no
    * longer stacks two strips turns the build red and the list can only shrink.
    *
-   * The rule above it stands and its reason is not stylistic: two folders
-   * stacked put one strip's feet through the other's toolbar, seen on a phone
-   * the moment the default flipped. An entry here is somebody accepting that
-   * cost with their eyes open, not a disagreement about whether it exists. */
+   * The rule above it stands and its reason is not stylistic: two strips
+   * stacked read as a design that does not know its own shape. An entry here
+   * is somebody accepting that cost with their eyes open, not a disagreement
+   * about whether it exists. */
   // EMPTY ON PURPOSE, since 2026-08-31. The one entry this ever held
   // (tickets-collection.tsx, on the owner's 2026-08-28 ruling to keep two
   // folder strips rather than move the inner one into the toolbar) was
@@ -2990,18 +2929,18 @@ describe("a tab strip is not nested inside another one", () => {
   // the screen was redesigned to one strip (the kind/stage tabs; the old
   // All-tickets/Archived strip is now the "Archived" filter in
   // COLLECTION_FILTERS, the same shape Accounts' own archive toggle already
-  // uses) rather than given a `line` inner tab to satisfy the rule below. An
+  // uses) rather than given an inner strip to satisfy the rule below. An
   // entry here again means somebody has re-accepted the stacked-strip cost
   // with their eyes open — which, after this ruling, means asking the client
   // first.
-  const TWO_FOLDERS_OK: Record<string, string> = {}
+  const TWO_STRIPS_OK: Record<string, string> = {}
 
-  it("tab-shape: any screen with two strips gives the inner one a line", () => {
+  it("tab-shape: any screen with two strips is a reasoned exception, never a default", () => {
     // THE SANITY CHECK IS ON FILE ENUMERATION, not on finding an offender.
     // Until 2026-08-31 this counted `<TabsView` occurrences and demanded at
     // least one file with two of them, because tickets-collection.tsx
     // genuinely had two and the count existing was the proof the regex still
-    // matched. That screen is the fix now (see TWO_FOLDERS_OK above), so the
+    // matched. That screen is the fix now (see TWO_STRIPS_OK above), so the
     // client's ruling means the RIGHT number of two-strip screens across the
     // whole app is zero — a census that finds none is the goal, not a broken
     // scan. What a broken scan actually looks like is `sourceFiles` walking
@@ -3013,7 +2952,7 @@ describe("a tab strip is not nested inside another one", () => {
     expect(files.length, "the component census found no files — sourceFiles has stopped matching").toBeGreaterThan(50)
 
     const offenders: string[] = []
-    const staleRulings = new Set(Object.keys(TWO_FOLDERS_OK))
+    const staleRulings = new Set(Object.keys(TWO_STRIPS_OK))
     let scanned = 0
     for (const f of files) {
       // stripComments first (31 Aug 2026) — the toolbar sweep's own
@@ -3025,24 +2964,22 @@ describe("a tab strip is not nested inside another one", () => {
       scanned++
       const rel = f.path.replace(ROOT + "/", "")
       staleRulings.delete(rel)
-      if (rel in TWO_FOLDERS_OK) continue
-      if (!/variant:\s*"line"/.test(src)) offenders.push(rel)
+      if (!(rel in TWO_STRIPS_OK)) offenders.push(rel)
     }
     expect(
       [...staleRulings],
-      "TWO_FOLDERS_OK names screens that no longer stack two strips — delete these"
+      "TWO_STRIPS_OK names screens that no longer stack two strips — delete these"
     ).toEqual([])
     expect(
       scanned,
       "a screen is rendering two <TabsView> strips — the client's ruling is " +
         "\"there can never be 2 rows of tabs … just never\", with no exceptions " +
         "clause, so this must stay zero. Either undo the stacking, or take the " +
-        "ruling back to the client and add a reasoned TWO_FOLDERS_OK line above."
+        "ruling back to the client and add a reasoned TWO_STRIPS_OK line above."
     ).toBe(0)
     expect(
       offenders,
-      `these screens stack two folder strips; the inner one switches a VIEW and takes ` +
-        `\`variant: "line"\`: ${offenders.join(", ")}`
+      `these screens stack two tab strips with no reasoned exception on file: ${offenders.join(", ")}`
     ).toEqual([])
   })
 })
@@ -3051,8 +2988,9 @@ describe("a tab strip is not nested inside another one", () => {
 //
 // The owner's rule (25 Aug 2026): a tab always carries an icon, and the same
 // tab means the same icon on every screen. TabsView enforces the rendering half
-// (TAB_ICONS wins over call sites, a folder tab falls back to the folder glyph
-// rather than shipping bare) — this census enforces the deciding half: a NEW
+// (TAB_ICONS wins over call sites; every tab draws an icon now, the one shape
+// left in the app always has — tabs-view.tsx's header has the client's own
+// 2026-09-02 ruling) — this census enforces the deciding half: a NEW
 // tab value must be given its own line in the vocabulary, so the fallback is a
 // net under a decision and never the decision itself. Derived, not remembered:
 // tab objects are the only shape in either app carrying `badgeVariant`, so the

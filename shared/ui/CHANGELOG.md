@@ -1,5 +1,907 @@
 # Changelog
 
+## v1.2.28 — 2026-09-02
+
+### Added — `BreadcrumbFolders`, the breadcrumb drawn as a strip of folder tabs
+
+Client, verbatim: *"REUSE THE EXISTING FOLDER TABS WITHOUT CHANGING ANYTHING ON
+THE SHAPE. Each path level is a folder tab, stacked left to right. Every tab
+before the last is the inactive color; the last (current location) is same
+color as the big content card in the middle, the main color — the same hover,
+and font weight rules apply as they already exist. Deeper paths just add more
+tabs."*
+
+`components/breadcrumbs/breadcrumb-folders.tsx`. It takes the SAME items array
+`Breadcrumbs` takes and renders `breadcrumb/`'s own parts — the `<nav>`
+landmark, the `<ol>`, the crumb `<li>`, `BreadcrumbLink`, `BreadcrumbPage` with
+`aria-current="page"`, and `BreadcrumbEllipsis` for the fold — so the trail a
+screen reader hears is unchanged and only the drawing is new.
+
+```
+<BreadcrumbFolders items={[…]} label? foldAfter?=4 ellipsisLabel? listClassName? />
+```
+
+**WHY `breadcrumbs/` AND NOT `breadcrumb/`.** `breadcrumb/`'s own header says
+what it is: seven parts, and *"it elides nothing — it renders exactly the
+crumbs it was written with."* A strip that folds its own middle is not that.
+`breadcrumbs/` is the array form, and it already *"owns the rule about when a
+deep trail collapses"* — so `collapse()` is exported from `breadcrumbs.tsx` and
+reused rather than re-derived. A second file in an existing folder also costs
+the demo nothing: `demo/content.tsx`'s guard is one folder → one slug and
+`gen-states.mjs` keys on the folder, so both TEN STATES blocks land under
+`breadcrumbs`. A new `components/breadcrumb-folder/` would have owed the demo a
+section.
+
+**THE FOLD.** Four levels render in full; at five or more everything between
+the first and the parent collapses into one `···` tab. The rule is the client's
+and the SHAPE of the fold is `collapse()`'s: the threshold is applied here
+(`items.length > foldAfter`) because `collapse` couples its threshold to its
+tail and the client's rule does not, but which crumbs survive and in what order
+is decided once. The `···` tab is a `DropdownMenuTrigger` wearing the rest
+fill, carrying `BreadcrumbEllipsis` — glyph `aria-hidden`, announced label
+outside that wrapper — and it OPENS what it hides: the elided crumbs as real
+`<a role="menuitem" href>` rows. `breadcrumb.tsx`'s own note on
+`BreadcrumbEllipsis` already said this is where an expandable elision belongs.
+
+**THE TWO PAPERS, AND WHERE THEY ARE RESOLVED.** `--kw-crumb-live:
+var(--surface-raised)` and `--kw-crumb-rest: var(--surface-panel)`, both on the
+`<nav>` — TAB-C1's mechanism, for TAB-C1's reason: a caller that rebinds
+`--surface-panel` around the strip must not be able to make the live tab and
+the card disagree. The live paper is the content card's own, by ruling;
+`screen-shell.tsx` paints that card `--surface-raised`, so that is the token
+and not `--card` and not `--spine-chip-fill` (the three agree in light and part
+company on the mango spine in dark). The rest paper is one step off it in the
+direction the palette already steps — the same step `screen-shell.tsx`'s CARD
+block makes when it rebinds a filled control on the card to soft paper
+(ruling 01) — so it is `--kw-soft-paper` in light and `--kw-unlit-panel` in
+dark, derived, with nothing per spine anywhere in the file.
+
+**THE LEADING TAB IS SQUARE ON ITS TOP-LEFT, DRAWN ADDITIVELY.**
+`FolderShape`'s top-left radius is a fixed 6.6 brand units at every size and is
+not a prop; squaring it in the path would be changing the silhouette, which the
+client forbade in the same breath as asking for the square corner. So the
+corner is FILLED IN: one `--folder-radius-lip` square of the shape's own
+`currentColor`, laid over the arc's exact bounding box (one brand unit is
+0.1rem and the arc runs x,y ∈ [0, 6.6], so 0.66rem covers it and nothing else).
+`folder.tsx` is untouched. Only the tab that leads the strip gets the patch,
+because that is the only tab whose corner the card below squares too.
+
+**MEASURED — `verify/breadcrumb-folder/`, kept.** A measuring harness, not a
+picture: the Browser pane renders it at about 42×46px whatever the viewport
+says, so every figure is `getComputedStyle` / `getBoundingClientRect` read off
+the live document and printed as JSON. At the harness's 15px root:
+
+```
+levels        1 → 1 tab, current "Clients"      · 1 square corner
+              2 → 2 tabs, no fold               · 1 square corner
+              4 → 4 tabs, no fold               · 1 square corner
+              6 → 4 tabs, folded, current last  · 1 square corner
+
+live tab      EQUAL to the card in all four cases:
+              quiet light  #FFFEF9 = #FFFEF9    quiet dark  #26241F = #26241F
+              mango light  #FFFEF9 = #FFFEF9    mango dark  #26241F = #26241F
+
+overlap       strip bottom − card top = 15.95px
+              --folder-tab-overlap    = 15.96px  (1.06375rem × 15; 17.02 at
+                                                  the 16px authoring base)
+tab height    44.53px = 2.96875rem × 15         (47.5 at the base)
+square patch  9.89 × 9.89px = 0.66rem × 15, colour equal to the shape's fill
+
+type/weight   rest 300 · --ink-secondary   live 500 · --foreground
+              13 (12.1875px) on BOTH — the size never moves between states
+```
+
+Rest fill against the ground the strip stands on (`--spine-fill`):
+
+```
+MANGO · LIGHT   ground #FED069 · rest #F7F2EB 1.306 · live #FFFEF9 1.440
+MANGO · DARK    ground #FED069 · rest #1C1B18 11.843 · live #26241F 10.661
+QUIET · LIGHT   ground #F7F2EB · rest #F7F2EB 1.000 · live #FFFEF9 1.103
+QUIET · DARK    ground #1C1B18 · rest #1C1B18 1.000 · live #26241F 1.111
+rest vs live    1.103 light, 1.111 dark — the same step the card has
+```
+
+**ONE FIGURE IS LOGGED, NOT FIXED, AND IT IS OWED A CLIENT RULING.** On the
+QUIET spine a resting tab measures **1.000** against the ground, in both
+palettes, because the quiet spine IS `--surface-panel` — tokens.css §7b says so
+in as many words, and that identity is the whole reason the client cut to two
+spines. A resting crumb there has no edge and reads as a label until it is
+hovered; the live tab still carries the strip at 1.103 / 1.111. The alternative
+is `--muted` (#FAF9F7 / #2F2D28, "inactive tabs, idle wells"), the kit's third
+paper and the retired folder tab's own idle fill: it clears the ground on quiet
+and costs mango-light, where rest and live would sit 1.021 apart instead of
+1.103. The client named soft paper, on mango, so soft paper is what this draws.
+`--kw-crumb-rest` is the one lever and needs no edit to this file.
+
+### Removed — the folder tab VARIANT. `TabsVariant` is line-only
+
+Client, verbatim: *"the whole concept of folders as tabs gets killed. All the
+current folders as tabs we have will become line tabs. Completely kill and
+remove folder tabs… I don't want any dead body around… the only tabs that we
+will have are the line tabs because folders will only be used for the
+breadcrumbs."*
+
+**The distinction, because it decides what was over-deleted and what was not:
+the folder TAB VARIANT died; the folder SHAPE lives.** `components/folder/`
+is byte-identical. `--folder-tab-overlap`, `--folder-tab-height`,
+`--folder-tab-min-width`, `--folder-shoulder` and `--folder-radius-lip` all
+stay, because the breadcrumb reads every one of them. No token was touched.
+
+`components/tabs/tabs.tsx` — `TabsVariant` is `"line"`. Gone with the second
+member: the `FolderShape` import, `LIST_SKIN.folder`, `TRIGGER_SKIN.folder`,
+`TRIGGER_SELECTED.folder`, `TRIGGER_SELECTED_WITH_INDICATOR.folder`,
+`TRIGGER_DISABLED.folder`, `FOLDER_SHAPE_FILL` (both halves), `INDICATOR_SKIN.
+folder`, `TABS_COUNT_SKIN.folder`, the `--kw-folder-live` / `--kw-folder-idle`
+pair on the root and its whole TAB-C1 block, the `gap-0` branch, the
+`resolved !== "folder"` half of the indicator's switch, the
+`:not([data-slot=folder-shape])` guard on the shared icon rule, and
+`TabsContent`'s card branch with TAB-C2's argument for it. Six `Record<
+TabsVariant, string>` maps became six constants, `TabsVariantContext` went with
+them, and the `variant` OVERRIDES on `TabsList` and `TabsTrigger` went too —
+both existed only to let one strip differ from its root. `variant` stays on
+`Tabs` and `TabsView` as the compile fence, exactly as the `pill` deletion left
+it: `variant="folder"` now fails to build rather than drifting.
+
+`TRIGGER_DISABLED` also lost its FILL. A line tab has no resting box, so
+`--btn-disabled-fill` was the silhouette's half of the pair and left with the
+silhouette; a dead tab is an ink and a cursor.
+
+**The default was the conversion.** `CollectionFrame.tabsVariant` defaulted to
+`"folder"` under ruling E, so every collection in the kit drew a folder strip
+through it. The prop is deleted, and with it the two rebindings that moved the
+shape's fills without editing `tabs.tsx` (`--card: var(--surface-panel)` on
+`Tabs`, `--surface-panel: var(--muted)` on `TabsList`) and the
+`rounded-t-[var(--radius)] bg-surface-page` band the strip stood on — removed
+rather than left inert, because an inert rebinding is what the next reader
+"fixes". Ruling J2's zero gap goes with them: the frame's stack takes its
+ordinary band gap at every density, because a line strip has no feet to hide.
+`ScreenRenderer` stopped stating `variant="folder"`, and the demo's own folder
+strip (`demo/sections/f-m.tsx`) and two-variant matrix (`t-z.tsx`) are one
+strip and one breadcrumb now.
+
+**The redundant `line`s are deleted, which is the "no dead body" half.**
+`RecordDetail` stated `variant="line"` so a record would not inherit the folder
+default; there is no folder default, so the line is gone. So are the two
+`verify/` harnesses' folder halves — `verify/tabs-hover/` keeps the line
+question it was built to answer, `verify/folder/` and `verify/kit-bc/` now show
+the lip crop in its one real consumer.
+
+**Ruling E is superseded, and the rule it stated is rewritten rather than
+deleted.** `SHELL.md`'s "TWO TAB SHAPES, NEVER MIXED, NEVER A THIRD ROW" is now
+"ONE TAB SHAPE, AND THE FOLDER IS THE BREADCRUMB", with the strip's geometry,
+its two papers and the fold stated there; `GAPS-RULINGS.md` R-2 carries a
+superseded banner naming every line of its own "what was done" that v1.2.28
+undoes. CH27.13 is vindicated twice over; CH24.3's folder tabs on a record are
+twice stale; CH27.1's "figures, folder tabs, then the collection panel" is
+stale by one word and its ORDER is not.
+
+### Fixed — `DropdownMenuItem asChild` crashed the tree
+
+Found by the breadcrumb's fold, which is a menu of links and has to be one.
+The row rendered `{leadingSlotOrNull}{children}`, which is TWO children even
+when the leading slot is `null` — and Radix's `asChild` routes through `Slot`,
+which throws *"Expected a single React element child"* on more than one. So
+`<DropdownMenuItem asChild><a … /></DropdownMenuItem>` unmounted the whole
+subtree, on a prop the component inherits from Radix and never removed. A row
+with no icon and no image now passes its child through alone. Written as a
+ternary rather than a fragment for the same reason a fragment would not have
+helped: a fragment around the pair is still a second child.
+
+
+### Changed — ONE SHELL. `MainScreen` and `DetailScreen` collapse into `ScreenShell`
+
+Client, verbatim: *"Let's completely get rid of these three variations. Let's
+just do one shell, and then let's just explain that there are variations for
+the title if it's main screen with no parents or not. Also, just define which
+pages have a footer."*
+
+She asked for the proposal validated rather than agreed with. **The kit already
+agreed, in writing, in both files.** `detail-screen.tsx`'s own header: *"`SHELL.md`'s
+table is exhaustive: a main screen and a detail screen differ in EXACTLY THREE
+PLACES … THE SHELL AND THE RAIL ARE IDENTICAL TO A MAIN SCREEN'S. Neither file
+draws either one: `ScreenShell` does, once, and both hand it the same rail."*
+`main-screen.tsx` carried the same sentence with the names swapped, and
+`SHELL.md`'s own section opened *"The shell above is identical on both."* Three
+named differences on one shared shape is a shape with three slots.
+
+**There are four, and the fourth is one nobody had counted: the FIGURE STRIP.**
+`SHELL.md`'s table has six rows and none is the figures; the client's list has
+four items and none is the figures. The table was not wrong — it compares what
+the two screens each draw in a shared region, and a record has no strip *and
+nothing in its place*, so there was no cell to fill. That is an absence, not a
+difference, and `record-chrome.tsx` had already made the identical argument
+about the stage progression. It is a slot now, and it is still DATA rather than
+a node, for `main-screen.tsx`'s own reason: `SHELL.md` says the strip lies BARE
+on the body pane, and a route handed a slot would have to remember
+`surface="bare"` forty times.
+
+**THE FOUR SLOTS.**
+
+| slot | a top-level collection | a record |
+|---|---|---|
+| title step | the door's own — h2 system, h3 portal | one rung down — h3 / h4 |
+| identity | — | `recordNumber` · `collectionLabel` · `chips`, **under** the title |
+| figures | the bare strip, first in the body | — |
+| footer | none | declared, and last in the body |
+
+**THE TITLE'S STEP IS DERIVED AND NO CALL SITE CAN NAME ONE.** The breadcrumb
+decides it: a one-tab trail is a top-level location. `ScreenShell` is told the
+trail's LENGTH — `breadcrumbDepth`, the same array the caller hands its
+breadcrumb strip, default 1 — and owns the mapping from a length to a step.
+`SHAPE_HEADING_SIZE` is imported unchanged for the root case, so the door's
+step is still the one number `ScreenRenderer`, `CollectionFrame` and
+`RecordChrome` all read; the only new typography in the file is one rung DOWN,
+and it is a relation rather than a size, which is how it can be written at all
+in a folder whose law is that no file in it writes a type step. The depth rule
+is "root or not", never one rung per crumb: `Title`'s ladder has three rungs
+and calm's nested step lands on the last of them, so a five-deep trail and a
+two-deep trail take the same step. **Measured**, at the product's own 15px root
+(ruling 18, not ruling 28's 16px authoring reference): depth 1 → `h2`, **30px**,
+tracking -0.6px; depth 2 → `h3`, **22.5px**, tracking -0.315px; no breadcrumb
+at all → `h2`, **30px**, because a screen with no trail has no parent.
+
+**WHY THE SHELL IS TOLD RATHER THAN LOOKING.** The `breadcrumb` slot stays a
+plain node — another agent's `BreadcrumbFolders` is what goes in it, and this
+change imports nothing from it. The shell will not inspect that node: its own
+rule, written before this change, is that *"a shell that inspected its children
+to police them would be guessing at element types across a `React.Fragment` and
+would be wrong the first time somebody wrapped their trail in a provider."*
+Counting `<li>`s in CSS is the same guess wearing a selector, and could not
+reach `Title`'s `size` prop anyway without the shell writing a type step by
+hand. So the caller states a fact about navigation, which is the caller's, and
+the shell owns the typography, which is not.
+
+**THE IDENTITY ROW KEEPS OVERRIDE 73 AND ENFORCES MORE OF IT THAN BEFORE.**
+The black ID chip first, then the collection chip, then the rest, on the line
+directly under the title — and the shell wraps the first two in
+`Badge variant="inverse"` and `Badge` itself rather than taking finished nodes,
+because *"the black chip is always the ID. we always use black chips for IDs"*
+is a rule and a slot would have made it a request. Measured on the record case:
+first chip fill **rgb(26, 25, 24)**, chip row top **11.25px** below the title's
+box (`--space-3` at the 15px root), `identityBelowTitle: true`.
+
+**ONE OF `detail-screen.tsx`'s CLAIMS WAS STALE AND IS CORRECTED, NOT CARRIED.**
+It said "the header band is left EMPTY" and that `RecordChrome` carries the
+title. That was override 73 read through August's shell, whose band sat under a
+breadcrumb-and-eyebrow bar — the bar the client told us to remove. There is no
+such bar: the trail left the band entirely on 2026-09-02 and lives on the
+GROUND as folder tabs. So a record's title and chips are in the BAND now, and
+override 73 is satisfied more literally than it was — *"the chips are directly
+underneath the title"*, *"the edit button should be aligned with the title"*,
+and no second bar anywhere. `RecordChrome` is no longer handed `title`,
+`recordNumber`, `collectionLabel`, `chips`, `tags`, `meta` or `actions`; it
+keeps the banner, the stages, the sub-view tabs, the panel and the audit
+footer, and `RecordDetail`'s own `Title` renders `null`, which is that
+component's documented empty state.
+
+**THE MANGO IS ONE MECHANISM, NOT TWO.** `SHELL.md`'s third difference was "the
+`+` on a main screen, `Edit` on a detail screen". Both are *the screen's one
+mango*, both stand at the inline end of the title's row, both drop below the
+narrow breakpoint. `onCreate` draws the glyph (26.01: "create is always the
+glyph, never the word"); `onEdit` draws the pencil AND the word (26.01's one
+stated exception). Passing both is two mangos, which ruling 26 forbids, so the
+shell keeps the create, drops the edit and warns in development — an
+enforcement neither template had. The four-reason argument that the header's
+`+` stays mango on the mango spine moved into `screen-shell.tsx` unabridged,
+including the one question it leaves open for the client.
+
+**THE FOOTER IS DECLARED.** `footer`, `footerVisible`, `narrowFooter`; last in
+the card's body, in normal flow, inside the same scroller as `children` —
+`SHELL.md`'s "in normal flow, once per record", drawn rather than asserted.
+**This is a real loss of enforcement and it is recorded as one:** "no footer
+slot on this shape" was how `MainScreen` made `SHELL.md`'s *"appears on zero
+main screens"* impossible to break, and with one shell a collection can reach
+the slot. The client asked for a declaration; a declaration you can make is one
+you can make wrongly. `SHELL.md` now says so at the footer section.
+
+### Changed — the card's top-left corner is square
+
+Client, choosing between the options put to her: *"I choose option 1 to square
+it."* The breadcrumb strip attaches to the card's leading edge and its leading
+tab is square on its own top-left, so the tab and the card read as one
+silhouette.
+
+**NO FIFTH RADIUS IS INVENTED.** Kit ruling 03 flattens the whole ladder onto
+`--radius` (24) and `rounded-pill` (999), and `docs/RULES.md` calls a fifth
+radius invented for one component a rejection. The card takes `--radius` on all
+four corners and then REMOVES one: `rounded-ss-none` is zero, and zero is the
+absence of a radius rather than a new one. Written as a removal after the
+radius, in that order, so the file reads as "the system's one box radius, minus
+one corner". `rounded-ss`, not `rounded-tl` — start-start, so the corner mirrors
+with the trail in RTL for free. **Measured**: start-start **0px**, the other
+three **22.5px** each (`--radius` at the 15px root), on all three harness cases.
+
+**TWO SQUARES, TWO OBJECTS, NOT ONE DRAWN TWICE.** `BreadcrumbFolders` fills its
+leading tab's arc in with a `--folder-radius-lip` patch, because the folder
+silhouette's corner is a fixed path it may not edit. The shell removes the
+CARD's corner, which is a CSS radius it owns. Different elements, different
+mechanisms, one joint; neither file draws the other's.
+
+**THE JOINT'S GEOMETRY IS THE SHELL'S HALF AND IT WAS WRONG.** The breadcrumb
+wrapper paid `pb-[var(--space-3)]`, which was right for a line of trail text
+floating above the card and is wrong for a strip that attaches: the strip
+carries its own `margin-block-end: calc(var(--folder-tab-overlap) * -1)`, and
+any padding here is subtracted from it — 12 against 15.96 would have left 3.96
+of the approved overlap. It is zero now. The wrapper also declares no
+`z-index`, no `isolate`, no `transform`, `opacity` or `filter`, so the strip's
+`z-[1]` / `z-[3]` resolve against the SCREEN's `isolate` around the card's new
+`z-[2]` — which is the contract `breadcrumb-folders.tsx` states in its own
+words (*"kept so a caller that draws its card at `z-[2]` gets ch14's 'clipped by
+the card edge' for the rest tabs and an attached live tab"*). This shell is that
+caller and now says so.
+
+### Added — `verify/one-shell/`
+
+Vite + React, port 5251, kept. Five cases: a top-level collection (one
+breadcrumb tab, big title, figures, no footer), a record (two tabs, the smaller
+title, identity chips under the title, a footer), a shell passing NONE of the
+optional slots, and then the same collection and the same record again through
+the two deprecated adapters — because "the adapters still produce the same
+screen" is a claim no type-check can hold. Screenshots are useless — the
+Browser pane renders it at roughly 42 × 46 px whatever is asked — so the page
+measures itself with
+`getComputedStyle`, `getBoundingClientRect` and `elementFromPoint` once
+`document.fonts.ready` resolves, and prints the readings as text. It gates on
+the fonts rather than on a frame deliberately: a hidden or throttled pane never
+services `requestAnimationFrame`, so a probe written against one prints
+"measuring…" forever in exactly the pane it runs in.
+
+The breadcrumb is a **stand-in and deliberately not `BreadcrumbFolders`** — the
+slot takes a plain node and the harness must not turn that into an import. It
+reproduces only the three things the real strip does to the joint: the negative
+`--folder-tab-overlap` margin, the `z-[1]` / `z-[3]` pair, and a squared leading
+corner.
+
+**Read off the live cascade at 1440 × 900, light, root 15px:**
+
+| | A collection | B record | C bare | D `MainScreen` | E `DetailScreen` |
+|---|---|---|---|---|---|
+| `data-title-step` | `h2` | `h3` | `h2` | `h2` | `h3` |
+| title font-size | 30px | 22.5px | 30px | 30px | 22.5px |
+| title tracking | -0.6px | -0.315px | -0.6px | -0.6px | -0.315px |
+| card radius start-start | **0px** | **0px** | **0px** | **0px** | **0px** |
+| card radius, other three | 22.5px | 22.5px | 22.5px | 22.5px | 22.5px |
+| card `z-index` | 2 | 2 | 2 | 2 | 2 |
+| breadcrumb slot `padding-bottom` | 0px | 0px | — | 0px | 0px |
+| breadcrumb slot `z-index` / `isolation` | auto / auto | auto / auto | — | auto / auto | auto / auto |
+| trail overlap onto the card | 15.95px | 15.95px | — | 15.95px | 15.95px |
+| lead tab's leading edge vs the card's | 0px | 0px | — | 0px | 0px |
+| hit 4px inside the card, under the live tab | tab | tab | — | tab | tab |
+| hit 4px inside the card, under a rest tab | — | **card** | — | — | **card** |
+| identity row present | false | true | false | false | true |
+| first chip's fill | — | `rgb(26, 25, 24)` | — | — | `rgb(26, 25, 24)` |
+| identity top − title bottom | — | **+11.25px** | — | — | **+11.25px** |
+| shell `footer` slot drawn | — | ✓ | — | — | — |
+| `RecordDetail`'s own footer drawn | — | — | — | — | ✓ |
+| figures / body stack | ✓ / ✓ | — / ✓ | — / — | ✓ / ✓ | — / — |
+
+**D matches A and E matches B on every design number**, which is the adapters
+proven rather than assumed. Their only two divergences are both correct and
+both expected: `DetailScreen` routes the record's footer through
+`RecordChrome` → `RecordDetail` rather than through the shell's slot (same
+region, same normal flow, one footer), and it therefore has one thing in the
+body and gets `children` alone rather than the stack.
+
+`--folder-tab-overlap` is `1.06375rem` = **15.96px at the product's 15px root**
+(17.02 at ruling 28's 16px authoring reference, which is the number the token's
+own comment states). The measured overlap of **15.95** is that value, so the
+strip lands exactly where it means to. The two hit tests are ch14's "clipped by
+the card edge" proven rather than reasoned about, and they **scroll the card
+into view first** — `elementFromPoint` is defined in viewport coordinates and
+returns `null` outside them, so a case below the fold answers "nothing is here",
+and a probe that read that as "the card won" printed a passing number for a test
+that never ran. It did, on the first run, for both adapter cases. The bare case
+reports no body stack, which is the shell drawing `children` alone in the padded
+body — byte-for-byte the markup it drew before the collapse.
+
+### Deprecated — `MainScreen` and `DetailScreen`
+
+Both survive, both keep their prop types, and **neither holds any design**. Each
+is a mapping from old prop names onto `ScreenShell`'s slots plus the one
+composition below the band that was never the shell's — `CollectionFrame` for a
+collection, `RecordChrome` for a record. Every ruling their headers carried was
+MOVED into `screen-shell.tsx`, unabridged, into a section named after it; their
+headers now carry a list of where each one went and nothing else.
+
+**The client said *"I don't want any dead body around"* about the folder tab
+variant and the same instinct applies — to the design, which is gone.** There is
+exactly one place a screen's shape is decided. What kept the two names alive is
+this file's own existing argument for `Rail.collapsible`: *"the kit is vendored
+into two applications this repo cannot see and removing a prop is a build break
+for a change that is purely visual."* Nineteen call sites in this repo import
+one of the two names, several of them in files under concurrent edit today.
+**Deleting them is owed**: one line each in `compositions/templates/index.ts`
+plus nineteen mechanical call-site rewrites.
+
+**Migration, for a caller of either.** No prop was removed or renamed, so
+nothing breaks. Two things about the RENDER moved:
+
+- `MainScreen` — the figure strip is placed by the shell rather than by
+  `CollectionFrame`: same place on the screen, one level up in the markup, and
+  the gap between it and the panel is the shell's `--space-6` / `--space-5`
+  instead of the frame's. `tabsVariant="folder"` is gone with the folder tab
+  variant the client retired the same day, so this file no longer passes it —
+  which is also the one `tsc` error that stood in the tree before this change.
+- `DetailScreen` — the record's title, identity chips, tags, meta and actions
+  move from the body pane into the header band. `RecordChrome` keeps the
+  banner, stages, tabs, panel and audit footer.
+
+A screen written today composes `ScreenShell` directly:
+`<ScreenShell breadcrumb={…} breadcrumbDepth={2} title={…} recordNumber={…}
+onEdit={…} footer={…}>`.
+
+**`ScreenShell.header` is deprecated too** and still works: passing it replaces
+the built band entirely, so there is one band either way and never two. Exactly
+two call sites still hand the shell a finished band —
+`demo/shapes/templates-0.tsx`'s catalogue specimen and `verify/shell-chat/`'s
+harness — and both are another session's files today. Each is a small,
+mechanical move to `title` / `eyebrow` / `actions` / `meta`, and it is owed.
+
+**NOT DONE, AND NAMED RATHER THAN LEFT TO BE FOUND.**
+
+- `SHELL.md`'s "THE TWO SCREENS" section is rewritten here as "ONE SCREEN, AND
+  FOUR SLOTS", editing around another agent's concurrent rewrite of its
+  tab-shape section rather than over it.
+- The nineteen `MainScreen` / `DetailScreen` call sites, the two `header` call
+  sites and the deletion of the two exports are all owed; none was attempted,
+  because each meant editing a file this pass did not own.
+- **`compositions/templates/record-route.tsx` composes `ScreenShell` and
+  `RecordChrome` directly with an empty band** — override 73's own fix, made
+  before the collapse existed — so the live record route still draws its title
+  and chips in the BODY while `DetailScreen` now draws them in the BAND. Two
+  spellings of a record, which is precisely what this change exists to remove.
+  It is one mechanical move (`title`, `recordNumber`, `collectionLabel`,
+  `chips`, `tags`, `meta`, `actions` up to the shell) and it was not made
+  because that file is under concurrent edit today.
+
+## v1.2.27 — 2026-09-02
+
+**Three gaps the app was working around, closed in the kit.** All three were
+approved on staging tonight and all three shipped there as app-side
+workarounds; the standing rule is that an approved fix goes back to the kit
+before anything else moves, so the app can now delete them. Verified in
+`verify/toolbar-writeback/` — a measuring harness, not a picture: every figure
+below is `getComputedStyle` / `getBoundingClientRect` read off the live
+document in both palettes.
+
+### Fixed — the "+ filter" pill was still not `SelectTrigger`'s box. Four measures, not one
+
+Client, verbatim, on the pills v1.2.20 had already been through once: *"the
+filter button-pill it's still differnet than the other 2. fix and uniform
+it"*. v1.2.20 moved four properties onto `CHIP_ADD` — `--control-height-button`
+(40), `--btn-secondary-fill`, `--btn-secondary-label`, `--btn-secondary-hover`
+— and stopped there. Measured off this repository's own source, four were
+left, and they are why the three pills still did not read as one family:
+
+| | `CHIP_ADD` before | `SelectTrigger` |
+|---|---|---|
+| inline padding | 12 (`px-3`) | **18** (`--space-4h`) |
+| type step | 12 (`--text-badge`) | **14** (`--text-sm`) |
+| leading | 1 (`leading-none`) | **1.45** (`--text-sm`'s own) |
+| weight | inherited (300 / 400) | **500** (`--font-weight-medium`, `ViewSwitch`'s override) |
+
+`CHIP_ADD` now takes `px-[var(--space-4h)]`, `text-sm` and
+`font-[var(--font-weight-medium)]`. `leading-none` is REMOVED rather than
+restated as 1.45: `text-sm` already carries `--text-sm--line-height`, and the
+`leading-none` on top of it was the whole reason this pill's string was set
+solid where the other two were not.
+
+Measured on the real toolbar ground (`collectionPanelVariants`' soft paper with
+`--btn-secondary-fill` re-resolved to off-beige), Filter / Sort / View, at the
+harness's 15px root:
+
+```
+height             MATCH 37.5px      (2.5rem)
+padding-inline     MATCH 16.875px    (1.125rem)   was 11.25px on Filter
+font-size          MATCH 13.125px    (0.875rem)   was 11.25px
+line-height        MATCH 19.0312px   (×1.45)      was 11.25px
+font-weight        MATCH 500                      was 400
+background         MATCH  light rgb(255,254,249) · dark rgb(38,36,31)
+radius             999 on all three (Sort is a fused pair: each half flat on
+                   the joined edge, the silhouette 999 999 999 999)
+```
+
+**`filterChipVariants` deliberately did NOT move.** A removable facet chip, and
+the "Clear filters" control that shares its drawing, stay at `--text-badge` on
+`px-3` — measured 11.25px / 400. Those are CH11's `.kw-chip`, drawn at badge
+type in the fragment `filter-bar.tsx` cites, and the ruling names "the filter
+button-pill" against "the other 2", which is the add slot against `SortControl`
+and `ViewSwitch`. A chip is not one of the other 2. The consequence — a bar
+drawing both chips and the add slot now carries two type steps in one row — is
+logged on the register rather than hidden, with the client question it needs.
+
+### Added — `CompactFacet`, the short facet that is also searchable
+
+`FilterBar` shipped two facets and neither is short: `SearchableFacet` is
+always expanded (heading, search pill, every option as a checkbox row) and
+`RangeFacet` is two numeric fields. A toolbar or a filter panel that wants ONE
+FIELD reading "Any client" had nothing to reach for, so the consuming app
+composed one out of the kit's `Select` — and `FacetLabel` was private to this
+file, so its two classes were written out again over there.
+
+**The cost was a feature, and it was measured.** A `Select` scrolls and takes
+typeahead; it does not SEARCH. The app's Waves screen filters 131 clients, and
+the day that facet became a compact select those 131 became a plain scroll —
+the one thing `SearchableFacet`'s search pill exists to prevent. Neither facet
+could be short AND searchable, so the app had to choose, and choosing short
+dropped the search.
+
+`CompactFacet` is a trigger over the same filtered list `SearchableFacet`
+draws. `searchable` defaults to **false** — a facet over eight words does not
+need a search field. It reuses rather than redraws: `selectTriggerVariants` for
+the closed field (literally the recipe the sort and view pills are drawn
+through), `FacetRegister` for busy / empty / failed, and — new in this version
+— `FACET_OPTION_ROW` and `FacetSearch`, two shared pieces `SearchableFacet` was
+rewired onto in the same pass, so the two facets cannot draw two different
+lists. The panel is `PopoverContent` sized by `selectContentClasses`' own rule:
+never narrower than the field, free to grow to its longest option, capped by
+the width Radix measured.
+
+`FacetLabel` is now **exported**, and the export is the point: it was the
+private constant a consuming app had to copy.
+
+One value or none, not a set — `SearchableFacet` stays the multi-select
+drawing. A compact facet shows its value in its trigger, and a trigger holding
+a set has to summarise it ("3 selected"), which is a wording the kit has not
+been given. Logged, not guessed. It is also not a `combobox`: the trigger is a
+disclosure button over a `listbox`, because the text input inside is a search
+over the options and not the value, and announcing the two as one control would
+tell a screen-reader reader that typing sets the facet.
+
+Measured, light and dark: closed field 41.25px tall (`--control-height-input`)
+at 16.875px inline padding, 13.125px / 300 — CH09's field step, NOT the toolbar
+pills' 500, because a facet is a field and lives in the panel the Filter pill
+opens. `size="dense"` gives 30px for a column of facets inside that panel. The
+open panel measures exactly the trigger's width (195px against a 195px field),
+`--space-2h` inset, 22.5px radius, the overlay shadow; the searchable one draws
+the 30px search pill and 132 rows (131 clients plus the "Any client" row) in a
+210px list that scrolls; the plain one draws no search pill and 3 rows. The two
+closed facets put no panel in the document at all.
+
+### Added — `CollectionFrame` grows a `toolbarPanel` slot, between the toolbar and the rows
+
+Client, verbatim: *"the expanded toolbar shoudl not be an overlay, but literaly
+expand the space"*. A filter panel opened off the toolbar's own pill has to
+push the rows down. This frame owns every line of markup between its toolbar
+and its body, so there was nowhere in flow for such a panel to land: the app
+wrapped the whole frame in a context provider, published a DOM node as the
+first child of the body and `createPortal`'d the panel into it — roughly 90
+lines of shipped app code to reach a position the component can simply offer.
+
+`toolbarPanel` is that position. A placement and not a drawing, exactly as
+`band` and `period` are, drawn only when a node is passed. This is the SECOND
+use of override 28's precedent (2026-08-23, "the contract can grow a slot"),
+and the header says so rather than leaving a reader to wonder: the region order
+inside the panel is now **band → toolbar → toolbar panel → rows → pager**.
+
+Measured, two identical frames side by side, one with the slot filled:
+
+```
+slot position           static          (an overlay would be absolute)
+slot between toolbar
+  and body               true           and a sibling of the body
+panel column row-gap    18.75px
+toolbar → body, shut    18.75px         the gap alone
+toolbar → body, open   157.50px
+body pushed down by    138.75px         = 120 slot height + 18.75 gap
+```
+
+**And the `filters` wrapper keeps no `position`, which is the answer rather
+than an omission.** The question came in as "anything a host puts in `filters`
+has nothing to anchor against". It does not need one: the ruling above is that
+a toolbar control's panel expands the space, so its place is `toolbarPanel`, in
+flow — and adding `relative` there would publish the anchor for exactly the
+shape the ruling refuses, in the one file a call site cannot edit. Everything
+that legitimately floats off a control in this system is Radix-portalled and
+positions itself against its own trigger; a positioned ancestor is not what any
+of them read. The wrapper stays, though, because it earns its three utilities:
+`gap-2` is what holds a multi-control `filters` slot at the chip measure rather
+than the toolbar's `gap-3`, `flex-wrap` is what lets a long facet row break
+instead of pushing the view switch off the line, and `min-w-0` is what lets it
+shrink at all. Measured `position: static` on the live frame.
+
+### What the consuming app can now delete
+
+`shared/web/screen-engine/filter-bar.tsx`'s `FILTER_PILL_MATCHES_THE_OTHER_TWO`
+override (four classes on the adapter's wrapper), its `SelectFacet` and the
+`ANY_VALUE` sentinel under it, its hand-copied `FacetLabel` classes, and the
+`FilterPanelProvider` / `FilterPanelOutlet` / `createPortal` machinery that
+existed only to reach a position `toolbarPanel` now names. Its rot-check —
+`web/test/filter-row-is-the-kits.test.tsx`, "THE FILTER PILL'S BOX IS THE SORT
+AND VIEW PILLS' BOX" — is designed to go red on this version and will: it
+asserts `CHIP_ADD` does NOT contain the three classes it now contains.
+
+### Not delivered, logged on the register
+
+Three entries added to `manifest.json` → `notDelivered`: the mixed type steps
+in a chip row (needs a client ruling), a multi-select compact facet (needs a
+summary wording the kit has not been given), and arrow-key navigation inside a
+facet's option list (a behaviour change to a shipped component, and its own
+change rather than a rider on a write-back).
+
+## v1.2.26 — 2026-09-02
+
+**The client cut the three sidebar spines to two: MANGO and QUIET.** `ink` and
+`paper` cease to exist as spines. Mango is untouched, down to the byte. Quiet's
+two grounds are her own, chosen off rendered screenshots — light `#F7F2EB`,
+dark `#1C1B18` — and they are the first and third of today's three spine
+fills, one taken from paper-in-light and one from ink-in-dark.
+
+**Those two values cost no new hex, because they already had a name.** They are
+`--surface-panel` in each palette exactly. So the quiet spine is not a new pair
+of colours: it is the system's own **panel → raised** elevation step, worn by
+the rail. `--spine-fill` is `--surface-panel`, the chip one rung off it is
+`--surface-raised`, and the floating content card beside the rail is
+`--surface-raised` too.
+
+### Why she cut to two — the number, measured
+
+The old paper spine's dark fill was `--kw-unlit-raised` `#26241F`, which is
+also what `--card` resolves to in dark. A content card floating on that rail
+measured **1.000** against it: no edge at all, in the one place the shell has
+nothing but a shadow to fall back on. `screen-shell.tsx` had already routed
+this as a token fact rather than a layout one. Quiet takes the ink spine's dark
+ground instead, and the step comes back — **measured live in `verify/spines/`,
+ground versus card on all three grounds the system now has:**
+
+| ground | rail | card | ground vs card |
+|---|---|---|---|
+| quiet · light | `#F7F2EB` | `#FFFEF9` | **1.103** |
+| quiet · dark | `#1C1B18` | `#26241F` | **1.111** |
+| mango · light | `#FED069` | `#FFFEF9` | **1.440** |
+| mango · dark | `#FED069` | `#26241F` | **10.661** |
+| *(was)* paper · dark | `#26241F` | `#26241F` | *1.000* |
+
+Quiet's step is the same size in both palettes, which the three-spine
+arrangement never managed: paper stepped 1.103 in light and 1.000 in dark.
+
+### Removed — four flip-halves, and a fifth renamed
+
+§4 carried six "halves that flip" for the spines. Four had no consumer once
+their spine went, and `grep` over the kit is what proved it — each was read by
+exactly one `[data-spine=…]` block and nothing else:
+
+| token | only consumer | outcome |
+|---|---|---|
+| `--spine-ink-fill` | `[data-spine="ink"]`, and `settings.tsx`'s picture *of* the ink spine | removed |
+| `--spine-ink-quiet-label` | `[data-spine="ink"]` (twice) | removed |
+| `--spine-ink-member-fill` | `[data-spine="ink"]` | removed |
+| `--spine-paper-fill` | `[data-spine="paper"]` | removed → `var(--surface-panel)` |
+| `--spine-paper-chip` | `[data-spine="paper"]` | removed → `var(--surface-raised)` |
+| `--spine-paper-member-fill` | `[data-spine="paper"]` | **renamed** `--spine-quiet-member-fill` |
+
+`--spine-paper-chip` only ever meant *"the paper one rung off the spine"* —
+27.1 draws a `var(--card)` chip on a `var(--sheet)` rail. Once the rail **is**
+the panel, one rung off it is the raised paper by definition, in both palettes,
+with no half to state. Light is byte-identical at `#FFFEF9`; dark moves
+`#2F2D28` → `#26241F` because the ground moved `#26241F` → `#1C1B18` underneath
+it. The step against the rail is 1.127 before, **1.111** after.
+
+**One half survives, and it is the one the client's own ruling forces.** The
+member-chip ruling of 2026-09-02 — *the chip at the rail's foot is BLACK
+whenever the app is in dark mode (any spine) or whenever the spine is mango
+(either palette)* — bites in one palette only, so quiet needs a light value
+(`--surface-raised`, `#FFFEF9`, today's chip) and a dark one (`--kw-charcoal`).
+Mango still needs no dark half. `--spine-quiet-member-fill` resolves to exactly
+what `--spine-paper-member-fill` resolved to: `#FFFEF9` / `#1A1918`.
+
+### Changed — bare `:root` keeps the quiet values, for two better reasons
+
+`:root` and `[data-spine="quiet"]` share a block, as `:root` and
+`[data-spine="paper"]` used to. The old reason was thin — paper happened to be
+first. Two hold it now, and neither is *"mango is the default"*, which is a
+settings default (override 56) and not a stylesheet fallback:
+
+- **Quiet is the only spine statable in the absence of a ground.** Every value
+  in the block resolves through `--surface-panel`, `--foreground` and `--hair`,
+  so on bare `:root` it is simply *"the rail is a panel"*, correct in either
+  palette with nothing stamped. Mango's block is palette-independent literals
+  chosen *for* a mango ground; on bare `:root` it would paint every unshelled
+  rail brand yellow and rebind `--btn-secondary-fill` to off-beige inside it.
+- **It is the safe landing for a stale value.** An account whose stored spine is
+  still `"ink"` or `"paper"` matches no block, inherits `:root`, and paints
+  **quiet** rather than nothing. Verified in `verify/spines/`: a specimen
+  stamped `data-spine="paper"` reads back all thirteen names identical to
+  quiet's. There is no transitional alias anywhere in the file and no token is
+  left defined for a spine that no longer exists — the cascade does the job.
+
+### Changed — Settings and onboarding, and a picture that cannot drift
+
+`SpinePicture` **stamps `data-spine` and reads `--spine-fill`** instead of
+switching on a name and reaching for a token per spine. The old version had to
+be edited in three places to follow this ruling, and two of the tokens it named
+no longer exist. Stamping the attribute the real screen stamps makes the
+picture resolve through tokens.css §7b itself — the same cascade the real rail
+paints from — so it is correct by construction, and a future spine needs no
+change there at all.
+
+**The captions are new, and they are no longer 26.05's.** The old three
+described fills — *"Charcoal spine, mango active row."*, *"Soft-paper spine,
+the quiet one."* — which worked when the reader was choosing between three
+colours and the caption told her which. With two options named Mango and Quiet,
+the name carries the colour and the caption has nothing left to add by
+repeating it, so these say what the choice is like to live with:
+
+| | Settings | Onboarding |
+|---|---|---|
+| **Mango** | Warm colour down the sidebar. Easy to find your place. | Warm, and easy to find. |
+| **Quiet** | A calm sidebar that lets the work stand out. | Calm, and out of the way. |
+
+The field's help line goes with them: *"Two looks for the sidebar. The rest of
+the app does not change."*
+
+### Every name in the quiet block, both palettes
+
+| token | light | dark | why |
+|---|---|---|---|
+| `--spine-fill` | `#F7F2EB` | `#1C1B18` | `--surface-panel`. The client's two chosen grounds, and one token states both. |
+| `--spine-ink` | `#1A1918` | `#FFFEF9` | `--foreground`. 15.763 / 17.056 on the rail. |
+| `--spine-ink-quiet` | `#5F5D59` | `#BDB9B1` | `--muted-foreground`. 5.899 / 8.807. |
+| `--spine-ink-disabled` | `#A8A59F` | `#76746F` | `--btn-disabled-label`. 2.206 / 3.689 — exempt from contrast, but a real step under the quiet tier in both. |
+| `--spine-active-fill` | `#FED069` | `#FED069` | The caption law: the active row is mango on this spine. |
+| `--spine-active-ink` | `#1A1918` | `#1A1918` | `--ink-on-accent`. 12.072 on the row, both. |
+| `--spine-active-hover` | `#F4BE4B` | `#F4BE4B` | `--btn-primary-hover`, declared in light only, so it does not flip — which is what a mango row under a charcoal label needs. 10.294 both. |
+| `--spine-chip-fill` | `#FFFEF9` | `#26241F` | `--surface-raised`, one rung off the rail: 1.103 / 1.111. |
+| `--spine-mark-fill` | `#1A1918` | `#FFFEF9` | `--surface-inverse`. 15.763 / 17.056 against the rail. |
+| `--spine-mark-ink` | `#FFFEF9` | `#1A1918` | `--ink-on-inverse`. 17.386 on the plate, both. |
+| `--spine-member-fill` | `#FFFEF9` | `#1A1918` | `--spine-quiet-member-fill` — the client's black-in-dark chip. |
+| `--spine-member-ink` | `#1A1918` | `#FFFEF9` | `--spine-ink`, already correct on both fills: 17.386 either way. |
+| `--spine-hair` | `rgba(26,25,24,.08)` | `rgba(255,254,249,.12)` | `--hair`, unchanged and needing no inverse half: the quiet spine **is** `--surface-panel`, the ground everything else that reads `--hair` stands on. 1.172 / 1.430 composited. |
+
+### Logged, not fixed
+
+- **The black member chip on the quiet rail in dark measures 1.019** — the
+  chip's shape all but disappears and only its label carries (17.386). Not new
+  and not a consequence of this cut: `#1C1B18` was the ink spine's dark ground,
+  the chip was black on it under the same 2026-09-02 member ruling, and 1.019
+  is what the client was looking at when she chose this ground. On the old
+  paper spine's `#26241F` it measured 1.132.
+- **A blocked row and a quiet row rest at the same ink on the mango spine.**
+  Unchanged; the other half of that note left with the ink spine, because quiet
+  keeps `--btn-disabled-label` and keeps its two tiers apart in both palettes.
+
+### Verify
+
+`verify/spines/` — Vite + React, one palette per load (`?t=dark`), four
+specimens: quiet, mango, bare `:root`, and a stale `data-spine="paper"`. Each
+draws a rail from `var(--spine-*)` and a content card at `--surface-raised` on
+the same ground. Every figure above is read back with `getComputedStyle` from
+the real cascade and the ratio computed in the page from those values;
+`window.__spines` carries the whole table. **Nothing here is verified by
+looking** — the Browser pane renders the harness at roughly 42×46px whatever is
+done to it. The rails are drawn in the harness rather than imported, because
+`rail.tsx` and `screen-shell.tsx` were being rewritten while it was written and
+their `spine` prop type still spells the old three values.
+
+### Changed — `ScreenShell` is the chat shape: the ground is the spine, and only the content floats
+
+Client-approved, same day. Until today the rail sat in a **filled column**
+inside an off-beige screen card and `--spine-fill` painted that column alone.
+It now paints the **whole window**, and the content is the one thing on it with
+a radius and an elevation.
+
+- `--spine-fill` and `--spine-ink` move **out of `RAIL_COLUMN` and onto the
+  PAGE and the SCREEN**. The rail column's class list drops from five classes
+  to one (`p-[var(--rail-inset)]`); measured live, its own `background-color`
+  goes `rgb(247,242,235)` → `rgba(0,0,0,0)`. **Not one class in `rail.tsx`
+  changed for this**, because the rail never named a colour — what it reads
+  (`--spine-ink`, `--spine-chip-fill`, `--spine-active-*`) simply arrives from
+  a higher ancestor.
+- The two chip rebindings (`--btn-secondary-fill` / `--pill-fill` →
+  `--spine-chip-fill`) move up with the fill, so anything standing on the
+  ground — the member chip, a control in the aside, the breadcrumb — resolves
+  the same way the rail's own contents already did.
+- **The content becomes a floating card**: `--surface-raised`,
+  `rounded-[var(--radius)]`, `shadow-[var(--shadow-lifted)]`. The header band
+  and the body live inside it and the two page-side rebindings
+  (`--btn-secondary-fill` / `--pill-fill` → `--surface-panel`, ruling 01) move
+  down onto it with the off-beige, so a call site sees the identical value it
+  saw before.
+- **The shadow is named, not aliased.** `--shadow-lg` is the same value; the
+  alias reads as a rung on a size ladder and this is not a size. Measured
+  ground-to-card: **quiet 1.103 light / 1.111 dark, mango 1.440 / 10.661**. On
+  quiet the shadow is carrying the card's edge, not agreeing with it.
+- **Full viewport height, no page scroll.** `page` draws `100dvh` with
+  `overflow: hidden`; three scrollers live inside it. Measured at 1440×560 with
+  every scroller driven to its maximum: `document.scrollHeight` stays equal to
+  `clientHeight` (560) and `window.scrollY` stays 0, while the rail's `<nav>`
+  travels 602, the card's body 1126 and the aside 242 — and the breadcrumb, the
+  header band, the member chip and both handles move **0.00px**. v1.2.23's
+  pinned foot is preserved and the header band is now pinned the same way.
+
+### Added — a third column (`aside`), a breadcrumb slot, and the two edge handles
+
+- **`aside`** — the assistant's column, flat on the same ground, mirroring the
+  rail. **Additive**: omit it (or pass `null`) and there is no column, no
+  gutter and no handle on that side. `ASIDE_WIDTH` is exported at `23.75rem`
+  (380 at ruling 28's reference), reusing ch19's stated `max-width: 380px`
+  rather than coining a number; **logged as owed** — the kit states no docked
+  assistant width.
+- **`breadcrumb`** — a slot on the ground, above the card, aligned to its
+  leading edge (measured: both at x 217.5 wide, x 22.5 narrow). It **carries
+  navigation text and nothing else** — a client rule, stated at the prop, not
+  enforced in code, because a shell that inspected its children to police them
+  would be guessing at element types. It takes `--spine-ink` by inheritance.
+- **The edge handles.** A **3 × 34px** rounded bar in a **20 × 44px** invisible
+  `<button>`, hover thickening to 5 × 44 on `--duration-colour` (120ms,
+  `ease-kwapso`). **Position is the whole affordance** — outer rim when open,
+  the column's inner edge when shut — so the bar always stands on the side the
+  column will travel toward. No chevron: three pixels will not hold one.
+- **The colour is `--spine-ink` and may never be a fixed charcoal.** Measured:
+  a literal `#1A1918` on quiet's dark ground `#1C1B18` is **1.019**, an
+  invisible control. `--spine-ink` measures **12.072** on mango, **15.763** on
+  quiet-light and **17.056** on quiet-dark.
+- **The geometry is in px, and that is a deliberate departure from ruling 28's
+  rem.** 44 is a WCAG 2.5.5 target-size minimum, stated in CSS pixels, and must
+  not shrink to 35.75 at `data-scale="small"`; a 3px bar is a hairline, and the
+  kit already writes those in px (`--focus-width: 1px`). Everything else the
+  shell draws stays on the rem ladder, because all of it is measure.
+- **The rail's foot toggle goes away.** `Rail.collapsible` is `@deprecated`,
+  stays off and is not removed — the kit is vendored into two applications this
+  repo cannot see. The rail's footer holds only the member chip again.
+
+### Changed — `ScreenSpine` is `"quiet" | "mango"`, and `Rail` loses a branch
+
+Fulfilling this version's own "the `spine` prop type still spells the old
+three". `screen-shell.tsx` and `rail.tsx` both narrow to the two live names,
+and `Rail`'s `markField` drops from three branches to one:
+`spine === "mango" ? "brand" : "paper"`. The `unlit` cut is **not re-homed onto
+quiet** — it existed because `ink` was the one ground that stayed dark while
+the palette went light, and quiet's ground follows the palette by definition.
+`demo/shapes/templates-0.tsx` and `verify/spine-colors/` drop to two spines
+(the latter from a 6-cell grid to 4; it still measures a live question).
+TypeScript now rejects `"ink"` / `"paper"` at a call site while the cascade
+still forgives a stale stored one, which is the right way round.
+
+### Verify — `verify/shell-chat/`
+
+Vite + React, **one case per URL** (`?rail=`, `?aside=`, `?spine=`, `?t=`,
+`?mode=`), because the shell claims `100dvh` and stacking cases down one page
+would give each a height the product does not have. `window.__shellProbe()` is
+installed by the page itself so it survives navigation. **Nothing is verified
+by looking** — the pane renders at roughly 42×46px. Measured at 1440×900,
+against the kit's own 15px root (ruling 18), so `13rem` reads 195:
+
+| case | rail handle hit | aside handle hit | aside column | card |
+|---|---|---|---|---|
+| both open | **0 → 20** (window's leading rim) | **1420 → 1440** (trailing rim) | 1083.75, w 356.25 | x 217.5, w 843.75 |
+| both shut | **55 → 75** (collapsed column's inner edge, 75) | **1417.5 → 1437.5** (gutter's inner side) | **absent from the DOM**; dock = 22.5, the gutter alone | x 97.5, **w 1320** |
+| rail open · aside shut | 0 → 20 | 1417.5 → 1437.5 | absent | w 1200 |
+| rail shut · aside open | 55 → 75 | 1420 → 1440 | 1083.75, w 356.25 | w 963.75 |
+
+The bar is **3.00 × 34.00** and the hit area **20.00 × 44.00** in every case, on
+both spines and both palettes; both are `rounded-pill`, so the global
+`:focus-visible` ring lands on the 20 × 44 target and never on the bar. **The
+rail's handle travels 55px** between its two states and the aside's 2.5px —
+the aside's small delta is the gutter and the target being nearly the same
+width, and its real signal is the column itself arriving.
+
+**The hover step is verified from the emitted rule, not by hovering.** The pane
+reports `:hover` on the element but does not recalculate hover styles — a
+hand-injected `.group:hover … { height: 44px }` does not apply either — so the
+harness reads `.group-hover\:h-\[44px\]:is(:where(.group):hover *) { height:
+44px }` and its width twin out of the stylesheet, inside a `@media (hover:
+hover)` that matches, and reads `transition-property: height, width` /
+`0.12s` / `cubic-bezier(0.16, 1, 0.3, 1)` off the bar.
+
+**The rail's rows are unchanged, and that is a diff rather than a claim.**
+`verify/shell-chat/before-shell.tsx` is a frozen v1.2.25 copy of the shell,
+rendered against the same `Rail`. Across **all 20 rows**, x, width, height,
+y-relative-to-the-nav's-scroll-origin, `background-color`, `color`,
+`font-weight`, `border-radius` and `padding-left` are **identical — zero
+differences**. The column is x 0, w 195, padding 22.5 in both; the member chip
+keeps its rect, its `#FFFEF9` fill and its 999 radius. The only computed
+difference anywhere in the rail is the column's own `background-color`, which
+is the change.
+
+**Narrow (380 × 800): both docks are `display: none`,** both handles collapse
+to zero rects and leave the accessibility tree with them, and the card keeps
+the ground's gutter on all four sides (x 22.5 → 357.5) with the breadcrumb
+aligned to it. **That is the answer for `aside` on a phone: it is dropped, like
+the rail, and no drawer is grown** — a drawer is a hamburger by another name,
+and ch19 already gives the assistant a floating, non-modal form that needs no
+column.
+
 ## v1.2.25 — 2026-09-02
 
 The client released two brand colours — lavender `#B1A3CF` and orange

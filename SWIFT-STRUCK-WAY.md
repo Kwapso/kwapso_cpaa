@@ -41,16 +41,16 @@ so a fix lands once and every product inherits it. This app took the other road 
 component IS, not only what colour it is — and a token remap cannot turn a bordered
 button into a borderless one. On 2026-08-25 the fork settled into its final shape:
 `shared/ui/` is a **pinned** copy of the kwapso design kit,
-`github.com/Kwapso/design`, at the tag in `shared/ui/VERSION.json`, pulled by
+`github.com/Kwapso/kwapso-ui-ux`, at the tag in `shared/ui/VERSION.json`, pulled by
 `scripts/sync-design.mjs`, with a hand-edit under it turning the build red
 (`web/test/vendored-kit.test.ts`). So this app does NOT edit its components in
-place: a kit change is made upstream in `Kwapso/design`, tagged, and pulled — a
+place: a kit change is made upstream in `Kwapso/kwapso-ui-ux`, tagged, and pulled — a
 new upstream, chosen deliberately, not the old package regained.
 
 **The rule that holds in every arrangement: a vendored copy is never pushed back.**
 Other Swift Struck products are live on the old package, and nothing here is
 PR'd or "synced back" to it. If you find a genuine bug from that lineage, report
-it there in its own words; kwapso's own fix goes through `Kwapso/design`.
+it there in its own words; kwapso's own fix goes through `Kwapso/kwapso-ui-ux`.
 
 ## The ship pipeline
 Local → GitHub → staging (deploy ends with an automated smoke that must pass) →

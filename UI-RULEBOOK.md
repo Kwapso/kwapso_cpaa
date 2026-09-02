@@ -1757,7 +1757,7 @@ bottom of a scrolling sheet. This app has 31 different words for the same act. S
    Two reasons now, where this book was written with one. The kit is a PINNED
    dependency since 2026-08-25 — a hand-edit under `shared/ui/` turns the build red
    (`web/test/vendored-kit.test.ts`), and a component change is made upstream in
-   `github.com/Kwapso/design`, tagged, and pulled — and, the original reason, this
+   `github.com/Kwapso/kwapso-ui-ux`, tagged, and pulled — and, the original reason, this
    is a *rearrangement* rule book: every rule in
    it is implementable from `web/`, `web-portal/` and `shared/` without touching a
    component. If you reach a rule you cannot express that way, stop: either the rule is

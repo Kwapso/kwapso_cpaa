@@ -43,7 +43,7 @@ export type SessionUser = {
    * between devices, and because the viewport is locked against pinch-zoom this
    * is the only way anybody can make the app bigger (UI-RULEBOOK S4, S5). */
   scale: string | null
-  /** WHICH SPINE THE SIDEBAR IS PAINTED IN — ink, paper or mango
+  /** WHICH SPINE THE SIDEBAR IS PAINTED IN — mango or quiet
    * (shared/spine.ts). Null means never chosen, which reads as mango since the
    * client's ruling of 2026-09-02 — kept distinct from a deliberate choice of
    * mango for the same reason `scale` is, and it stays null for somebody who

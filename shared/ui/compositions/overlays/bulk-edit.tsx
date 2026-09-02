@@ -79,7 +79,7 @@
    selection STATE plus an overlay, and `SHELL.md` gives selection its own
    treatment rather than a screen of its own. But the collection UNDER the
    overlay is an ordinary main screen: it is in the navbar, it has an eyebrow
-   with a count, folder tabs and a toolbar. So it is drawn by `MainScreen`
+   with a count, tabs and a toolbar. So it is drawn by `MainScreen`
    rather than assembled here.
 
    It used to hand `eyebrow` and `heading` straight to a bare
@@ -681,7 +681,7 @@ function BulkEditScreen({
     >
       {/* THE COLLECTION BEHIND THE OVERLAY, ON THE MODEL. `MainScreen` draws
           the four levels and puts the eyebrow and the title in the header
-          band; the folder tabs and the toolbar are the panel's own first rows,
+          band; the tabs and the toolbar are the panel's own first rows,
           one level down. See the header block on why this is not a bare
           `CollectionFrame`. */}
       <MainScreen

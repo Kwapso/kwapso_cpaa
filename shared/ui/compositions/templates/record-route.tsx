@@ -439,7 +439,7 @@ function RecordRoute({
     {
       value: "activity",
       label: words.tabActivity,
-      /* A quiet count, never the folder shape (ch27.13). */
+      /* A quiet count (ch27.13, and since 2026-09-02 the only shape). */
       count: activity.length,
       content: (
         <List

@@ -1,6 +1,6 @@
 # Concurrency, the race-safety ruleset (LOCKED 2026-06-17)
 
-How Brimba (and every app on this base) stays correct when two people act at the
+How the Kwapso System (and every app on this base) stays correct when two people act at the
 **same instant**. The trap: a check and the write that depends on it run as
 separate steps, so two requests both pass the check and both write, e.g. two
 admins demoted at once leaving the team with **zero** admins.

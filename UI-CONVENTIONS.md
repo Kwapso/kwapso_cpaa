@@ -1,6 +1,6 @@
 # UI-CONVENTIONS.md. UI conventions (enforced)
 
-This is the law-book for **how Brimba's screens are built**, the counterpart to
+This is the law-book for **how the Kwapso System's screens are built**, the counterpart to
 ARCHITECTURE.md (the workers + data layer) on the client side. Most of what's here
 is not a style preference; it is **machine-checked**. A change that breaks a UI law
 turns `npm run check` red, exactly like breaking a worker seam.
@@ -25,12 +25,12 @@ are simply kept in the same box now.
 
 ## 1. The library is lego. Never re-implement it in the host
 
-Brimba's primitives and collections come from **`shared/ui/`**, a directory in this
+The Kwapso System's primitives and collections come from **`shared/ui/`**, a directory in this
 repository. Both front ends, `web/` and `web-portal/`, import from that one place.
 
 **One name, said once:** the library is **`shared/ui/`**, and every import path
 starts with **`@shared/ui/`**, the alias both front doors map to `shared/*` in their
-`tsconfig.json`. It is the **kwapso design system** — `github.com/Kwapso/design`,
+`tsconfig.json`. It is the **kwapso design system** — `github.com/Kwapso/kwapso-ui-ux`,
 vendored at the tag in `shared/ui/VERSION.json` by `scripts/sync-design.mjs` — and it
 is a PINNED DEPENDENCY, not this repo's screen code: `web/test/vendored-kit.test.ts`
 recomputes a content hash over every delivered byte on every check, so a hand-edit
@@ -83,7 +83,7 @@ forking anything by editing a component now, you are editing this app's own code
    putting it in `shared/ui/` is the mistake this section exists to prevent.
 2. **Change the component upstream, and delete the workaround it replaces.** The kit
    is a pinned dependency — a hand-edit under `shared/ui/` turns the build red
-   (`web/test/vendored-kit.test.ts`) — so the fix is made in `Kwapso/design`,
+   (`web/test/vendored-kit.test.ts`) — so the fix is made in `Kwapso/kwapso-ui-ux`,
    tagged, and pulled with `scripts/sync-design.mjs`; the workaround dies here in
    the same commit as the pull. A
    host-side override that stands in for a component fix is debt with an owner,
@@ -99,7 +99,7 @@ forking anything by editing a component now, you are editing this app's own code
    library fix it was standing in for and tinted every card in both apps for nine days.
    The whole story is in the header of `shared/web/library-overrides.css`, which is
    now empty of component overrides on purpose.
-4. **The upstream is `github.com/Kwapso/design`, and it is WHERE a fix goes.**
+4. **The upstream is `github.com/Kwapso/kwapso-ui-ux`, and it is WHERE a fix goes.**
    Patch off the tag in `shared/ui/VERSION.json`, tag the fix, and pull it —
    never "fix it here anyway", because here is a pinned copy the hash guard
    protects. (The retired lineage, `@swift-struck/ui` → `@kwapso/ui`, is a
@@ -750,7 +750,7 @@ alive underneath, that's the "immovable, contentless page" feel.
 
 ## 8. Checklist, before you ship a UI change
 
-- [ ] New primitive-shaped control? **Build it upstream in `Kwapso/design`, tag, and
+- [ ] New primitive-shaped control? **Build it upstream in `Kwapso/kwapso-ui-ux`, tag, and
       pull** (`scripts/sync-design.mjs`) — `shared/ui/` is a PINNED dependency and a
       hand-edit under it turns the build red (`web/test/vendored-kit.test.ts`). A
       kwapso-only control belongs in `web/components/`; never keep a second copy of

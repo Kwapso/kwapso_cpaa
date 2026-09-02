@@ -155,7 +155,7 @@ async function proveTeamDatabase(db, name) {
   )
   if (rows.length !== FINGERPRINT.length)
     throw new Error(
-      `REFUSING TO READ ${name} (${db}): it does not carry a Brimba team schema. ` +
+      `REFUSING TO READ ${name} (${db}): it does not carry a kwapso team schema. ` +
         `This account is shared with another company. Stopping.`
     )
 }

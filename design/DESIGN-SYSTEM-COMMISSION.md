@@ -96,7 +96,7 @@ runtime, no styled-components, no icon font.
 ## 3 · Repository shape
 
 ```
-swift-struck-design/
+kwapso-ui-ux/
   package.json
   manifest.json               ← machine-readable contract (section 12)
   README.md
@@ -488,7 +488,7 @@ instead of after the work has shipped.
 
 ```jsonc
 {
-  "name": "swift-struck-design",
+  "name": "kwapso-ui-ux",
   "version": "1.0.0",
   "tokens": {
     "declared": ["--background", "--foreground", "…"],

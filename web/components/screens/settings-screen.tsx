@@ -240,8 +240,8 @@ export function SettingsScreen({
                     reached mid-task rather than a settings page. */}
                 <ThemeSection />
 
-                {/* THE SIDEBAR'S COLOUR — ink, paper or mango (client ruling
-                    D3). Persisted the same way Scale is, on the person's own
+                {/* THE SIDEBAR'S COLOUR — mango or quiet (client ruling
+                    D3, cut from three to two at v1.2.28). Persisted the same way Scale is, on the person's own
                     row, so it follows them between devices. `app-shell.tsx`
                     reads this same field to paint the real rail. */}
                 <SpineSection

@@ -389,16 +389,18 @@ export function MeetingsScreen({
         // both moved to this the same day, then all three corrected the same
         // day once the action shared the tabs' row: "never align the button
         // with the tabs — that button belongs in the right of the toolbar,
-        // part of the toolbar"): a FOLDER strip, not `line` — it sits directly
-        // above the toolbar's own card (`wrap` below) with zero gap, the same
-        // join Tickets draws, so it reads as attached rather than floating
-        // above a search box on the base background. `tabs` is a
-        // `FolderTabStrip`, which carries nothing but the tabs BY SHAPE now;
-        // "New meeting" moved to `actions`, at the right of the toolbar itself.
+        // part of the toolbar"): a `FolderTabStrip`, not a bare node — it sits
+        // directly above the toolbar's own card (`wrap` below) with zero gap,
+        // the same join Tickets draws, so it reads as attached rather than
+        // floating above a search box on the base background. (The strip
+        // draws the one line shape now, v1.2.28 — see tabs-view.tsx's header —
+        // the zero-gap join is unchanged, it was never about the folder SHAPE,
+        // only about there being no button beside it.) `tabs` carries nothing
+        // but the tabs BY TYPE now; "New meeting" moved to `actions`, at the
+        // right of the toolbar itself.
         tabs={{
           config: {
             ...defaultTabsConfig,
-            variant: "folder",
             tabs: [
               {
                 value: "week",
@@ -434,7 +436,7 @@ export function MeetingsScreen({
         // Tickets draw (`collection-content.tsx`'s and `tickets-collection.tsx`'s
         // own `wrap`): zero gap to the tab row above, which is this file's own
         // `tabs` slot rather than a second `gap-*` here.
-        wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+        wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
       >
         {(found) => {
           // WHICH ROWS THIS TAB IS SHOWING. A find answers over the whole meetings list

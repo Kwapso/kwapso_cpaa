@@ -1,6 +1,6 @@
 # RULES.md, the Laws of the Base (machine-checked)
 
-These are the **laws** every part of Brimba (and anything built on top of it) must
+These are the **laws** every part of the Kwapso System (and anything built on top of it) must
 obey. They are not style suggestions, each one is enforced by a real test, so a
 change that breaks a law turns the build **red**. This is how an agreed rule
 actually sticks instead of quietly slipping over time.

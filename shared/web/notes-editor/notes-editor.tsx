@@ -1,5 +1,5 @@
 // MOVED FROM THE OLD LIBRARY when shared/ui became the vendored design kit
-// (Kwapso/design). This is a rich-text EDITOR — contentEditable, sanitised
+// (Kwapso/kwapso-ui-ux). This is a rich-text EDITOR — contentEditable, sanitised
 // HTML in and out — which is BEHAVIOUR, so it lives app-side. The kit ships a
 // component also called Notes (controls/notes), and it is a different thing: a
 // read-only stack of remark rows. Same word, two components; this one keeps

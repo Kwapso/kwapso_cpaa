@@ -95,7 +95,7 @@ if (!TEST_LOGIN_KEY && !dryRun) {
   process.exit(1)
 }
 
-const OWNER_EMAIL = process.env.SEED_OWNER_EMAIL ?? "alaap@swiftstruck.com"
+const OWNER_EMAIL = process.env.SEED_OWNER_EMAIL ?? "alaap@kwapso.com"
 
 for (const [file, why] of [
   [SOURCE, "Run `node scripts/glide-transform.mjs` first — it turns the pulled Glide rows into the shape this reads."],

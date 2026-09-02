@@ -1,7 +1,7 @@
-# BOOTSTRAP.md, rebuild Brimba from zero on a fresh Cloudflare account
+# BOOTSTRAP.md, rebuild the Kwapso System from zero on a fresh Cloudflare account
 
 This is the **day-zero runbook**. Assume you have *only this repository* and an
-empty Cloudflare account, and you want a running Brimba, staging first, then
+empty Cloudflare account, and you want the Kwapso System running, staging first, then
 production. Every command is here, in order. If you follow it top to bottom you
 end with a live base you can sign into and build on.
 
@@ -10,7 +10,7 @@ end with a live base you can sign into and build on.
 > point of this file. When something here disagrees with reality, **ARCHITECTURE.md
 > is the master** and OPERATIONS.md holds the live deploy config.
 
-> **The mental model in one paragraph.** Brimba is **eight Cloudflare Workers** behind
+> **The mental model in one paragraph.** The Kwapso System is **eight Cloudflare Workers** behind
 > **two public doors**, the agency gateway (`web/`) and the client portal's gateway
 > (`web-portal/`). The other six are private. Global identity/billing lives in **one
 > core D1 database** (`kwapso-core`), reached by the native `env.DB` binding. Every
@@ -68,7 +68,7 @@ who issues each credential; these are the ones that block this runbook:
   else in the base stands up without it; the assistant refuses, in words.
 
 ```bash
-git clone <this-repo> brimba && cd brimba
+git clone <this-repo> kwapso && cd kwapso
 npm install            # every dependency from npm; the UI library is already here, in shared/ui
 npm run check          # sanity: lint + TypeScript across every workspace + the full test suite
 npx wrangler login     # authenticate wrangler to your Cloudflare account
@@ -555,7 +555,7 @@ prereqs → npm install → wrangler login → npm run check
   → verify BOTH doors → (repeat for production, owner-gated)
 ```
 
-If you can run this list, you can rebuild Brimba from nothing. To then *build a new
+If you can run this list, you can rebuild the Kwapso System from nothing. To then *build a new
 product on it*, read **BASE-MANUAL.md → "Fork the base for a new product"** and
 **BUILD-A-MODULE.md**.
 

@@ -1,11 +1,32 @@
-// THE SIDEBAR SPINE — ink, paper or mango. Client ruling D3 puts all three in
-// Settings · Appearance; this file is the twin of shared/scale.ts: the
-// allow-list a door validates against, and the fallback an unset or
-// unrecognised value reads as.
+// THE SIDEBAR SPINE — mango or quiet. Client ruling D3 puts both in Settings ·
+// Appearance; this file is the twin of shared/scale.ts: the allow-list a door
+// validates against, and the fallback an unset or unrecognised value reads as.
 //
-// MANGO IS THE FALLBACK. OVERRULED 2026-09-02, AND THE ARGUMENT IT OVERTURNED
-// IS KEPT HERE RATHER THAN DELETED, because a default that changed under
-// people is exactly the thing the next reader will arrive suspicious about.
+// THREE BECAME TWO, v1.2.28. CLIENT RULING, 2026-09-02, verbatim (it overturns
+// the count in D3, "offer teh threee!"): "default spine to mango, but everyone
+// can change it during the onboarding or anytime at settings" — the kit cut
+// `ink` and `paper` the same day and shipped ONE muted rail, `quiet`, in their
+// place. `SPINE_VALUES` and the `Spine` union below are `"mango" | "quiet"`
+// now; `ink` and `paper` are not a third and fourth option that happen to be
+// unused, they no longer exist as choices at all.
+//
+// A PERSON WHO CHOSE ink OR paper MUST LAND ON quiet, EXPLICITLY, and that is
+// the whole reason `toSpine` below is not the one-line fallback it looks like
+// it could be. `isSpine` now refuses "ink" and "paper" — they are not in
+// `SPINE_VALUES` — so the OLD `toSpine` (an unrecognised value falls back to
+// `DEFAULT_SPINE`) would silently move every person who deliberately picked
+// the muted rail onto the loud one, because the default those two years ago
+// was never mango. `toSpine` therefore checks the two retired values FIRST
+// and sends them to `quiet` by name, before the allow-list even runs. Nobody
+// who chose the quiet rail asked for the brand one; the mapping is the fix,
+// the fallback below it is for a value that was never a spine at all.
+//
+// MANGO IS STILL THE FALLBACK for null, undefined, or genuine garbage — that
+// half of the ruling did not move. The argument that used to run the other
+// way (paper as the fallback, so a person who never opened Settings keeps the
+// rail they always had) is kept below rather than deleted, because a default
+// that changed under people once is exactly the thing the next reader arrives
+// suspicious about.
 //
 // THE ARGUMENT THAT WAS MADE, in the words it was made in: paper is the
 // fallback, not the kit's own `screen-shell.tsx` default of mango (override
@@ -30,8 +51,8 @@
 // which is the "during the onboarding" half, and where skipping it means
 // exactly this constant) and changed at any time in Settings · Appearance
 // (shared/web/spine-section.tsx). The redesign the old paragraph feared is one
-// nobody can undo; this one is three cards away on the first screen of the
-// product and three more in Settings for ever after.
+// nobody can undo; this one is two cards away on the first screen of the
+// product and two more in Settings for ever after.
 //
 // THE DIVERGENCE FROM THE KIT IS THEREFORE GONE. This file deliberately
 // disagreed with `screen-shell.tsx`'s own `spine="mango"` default; it no longer
@@ -46,20 +67,26 @@
 // carry none — the allow-list lives here, the door validates against it, and
 // an unrecognised value falls back rather than throws (db/core/0028_user_spine.sql).
 
-export type Spine = "ink" | "paper" | "mango"
+export type Spine = "mango" | "quiet"
 
-export const SPINE_VALUES: readonly Spine[] = ["ink", "paper", "mango"]
+export const SPINE_VALUES: readonly Spine[] = ["mango", "quiet"]
 
 export const DEFAULT_SPINE: Spine = "mango"
 
-/** Is this a spine kwapso offers? The door's allow-list. */
+/** Is this a spine kwapso offers TODAY? The door's allow-list. `ink` and
+ * `paper` are deliberately not here — see the header — a stored row can still
+ * hold either, `toSpine` is where that gets resolved. */
 export function isSpine(value: unknown): value is Spine {
   return typeof value === "string" && (SPINE_VALUES as readonly string[]).includes(value)
 }
 
-/** The spine a stored value means, falling back to mango (the client's ruling
- * of 2026-09-02 — see the header). A bad or missing value costs a person their
+/** The spine a stored value means. Retired first: a person who chose `ink` or
+ * `paper` before v1.2.28 lands on `quiet`, explicitly and by name — the muted
+ * rail they picked, never the fallback (see the header for why that matters).
+ * Anything else unrecognised, or missing, falls back to mango (the client's
+ * ruling of 2026-09-02). A bad or missing value costs a person their
  * preferred rail; it can never cost them a screen. */
 export function toSpine(value: string | null | undefined): Spine {
+  if (value === "ink" || value === "paper") return "quiet"
   return isSpine(value) ? value : DEFAULT_SPINE
 }

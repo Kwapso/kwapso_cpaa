@@ -605,7 +605,7 @@ function ImportScreen({
        breadcrumb. But `SHELL.md`'s table is the definition, and on all three
        of the differences it names this screen is a main screen: an eyebrow
        and a heading, no identity chip row and no record number, and NO
-       FOOTER. A collection is allowed to drop its folder tabs and its figure
+       FOOTER. A collection is allowed to drop its tabs and its figure
        strip; a record cannot drop its identity. So it is `MainScreen` with
        nothing in the collection slots, and the rail keeps the parent
        collection lit exactly as it does on every other main screen.

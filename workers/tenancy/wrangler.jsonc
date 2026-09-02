@@ -70,7 +70,7 @@
     // ARCHITECTURE §7 gives: an alarm nobody receives is a table, and the thing
     // that turns it back into a table is somebody forgetting to set this.
     // Unset is not a crash — the cron records that nobody was told (R12).
-    "ALERT_TO": "alaap@swiftstruck.com,alaap@kwapso.com"
+    "ALERT_TO": "alaap@kwapso.com"
   },
   // Nightly 80%-size alarms (03:10 UTC) — the locked sharding machinery.
   "triggers": { "crons": ["10 3 * * *"] },
@@ -135,7 +135,7 @@
         // Staging alarms go to the same place. Deliberately not silenced: staging
         // is where a broken alarm path is supposed to be discovered, and an
         // environment that never mails is one nobody notices is unwired.
-        "ALERT_TO": "alaap@swiftstruck.com,alaap@kwapso.com"
+        "ALERT_TO": "alaap@kwapso.com"
       },
       "triggers": { "crons": ["10 3 * * *"] }
     }

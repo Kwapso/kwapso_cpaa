@@ -469,13 +469,27 @@ export function DeepLinkScreen() {
   // main screens!" — the SHELL.md line this whole override answers to is "a
   // main screen is in the navbar; a detail screen has breadcrumbs."
   //
-  // So the trail is built ONLY when there is somewhere for it to lead BACK
-  // FROM: a record is actually open (`recordId`), or the screen sits nested
-  // inside an ancestor record that a plain nav item cannot reach on its own
-  // (`trail.length > 1` — a client's own Sprints list, say). A flat
-  // collection at the top of its section has nothing above it and nothing
-  // beside it that a crumb would say better than the title already does.
-  const showCrumbs = Boolean(recordId) || trail.length > 1
+  // OVERTURNED 2026-09-03, AND THE OBJECT IT REFUSED NO LONGER EXISTS.
+  // The ruling above killed a TEXT BREADCRUMB BAR that sat above the content
+  // and repeated the sidebar in words. That bar is gone. What sits there now
+  // is the card's own folder tab: the trail is drawn as a strip of folder
+  // tabs whose LAST tab is filled with the card's own paper and joined to it,
+  // so the tab is not a sign pointing at the card — it is the card's edge,
+  // the way a tab on a paper folder is part of the folder.
+  //
+  // Aurora, shown that exact case drawn (a top-level collection with one tab
+  // reading "Apps" over a card titled "Apps"): "On a top-level collection, we
+  // would only have one tab, and that's correct. There would be nothing on
+  // the left. That's correct." Said twice, of a mockup, after being told in
+  // as many words that every top-level screen would gain a tab it does not
+  // have today.
+  //
+  // SO EVERY SCREEN CARRIES ITS TRAIL, and a top-level one carries a trail of
+  // one. The old ruling's own test in `web/test/nested-routes.test.ts` moves
+  // with it. Its author's objection — that a crumb repeated what the sidebar
+  // already said — is recorded rather than deleted, because it still applies
+  // to any future attempt to put a second, textual trail back on a screen.
+  const showCrumbs = true
   const crumbs = showCrumbs
     ? buildCrumbs({
         levels: route.levels,

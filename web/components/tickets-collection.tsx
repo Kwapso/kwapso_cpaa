@@ -15,7 +15,7 @@
 // description above is the fossil of that: "sub-tabs … beneath the existing …
 // strip"). The owner had ruled, 2026-08-28, to keep both rather than move one
 // into the toolbar ("there's no way out .. lets' keep 2 tabs but both as the
-// folder tabs" — `web/test/rules.test.ts`'s `TWO_FOLDERS_OK` carried that
+// folder tabs" — `web/test/rules.test.ts`'s `TWO_STRIPS_OK` carried that
 // ruling). The CLIENT overruled it the next business day, verbatim: "there can
 // never be 2 rows of tabs, no folder tabs, no line tabs. just never." Not a
 // narrower version of the 28 Aug ruling — the opposite of it — so this is a
@@ -53,11 +53,12 @@
 // identical defect the same day and fixed it the identical way
 // (`collection-content.tsx`, `accountTabs`): `<PagedFind>`'s `wrap` boxes the
 // toolbar AND the rows in one `CollectionCard`, and the tab strip sits directly
-// above it with zero gap so the folder tab's own pulled-down feet
-// (`--folder-tab-overlap`) melt into the card rather than showing themselves
-// on the base background — see `web/test/rules.test.ts`'s "tab-shape: only the
-// inner filter strips and the record strip override it", which names this
-// exact join for Accounts. Tickets now draws the same join.
+// above it with zero gap. Before v1.2.28 that gap had to stay zero so the
+// folder tab's own pulled-down feet (`--folder-tab-overlap`) melted into the
+// card rather than showing on the base background; the folder shape is gone
+// now (tabs-view.tsx's own header has the client's 2026-09-02 ruling) and the
+// flush join is kept on its own merits. Tickets and Accounts draw the same
+// join.
 //
 // THE TOOLBAR GAINS A FILTER AND A CREATE BUTTON, the two pieces the old
 // search-and-sort-only bar was missing next to Accounts' fixed one: the
@@ -251,12 +252,11 @@ export function TicketsCollection({
   // question — a ticket's stage in the archive, not its kind or lifecycle stage.
   const tabsConfig = {
     ...defaultTabsConfig,
-    // THE FOLDER. Client ruling E: "folder tabs are for main screens, line tabs
-    // for detail screens", and ch27.13: "folder tabs belong to collections and
-    // main screens only". Tickets is a collection on a main screen, and this is
-    // now its ONLY strip — the shape a single folder tab strip on a main
-    // screen has always had (Tasks, Sprints, Apps, Accounts). Inherited rather
-    // than spelled: `defaultTabsConfig` is already the folder.
+    // Tickets is a collection on a main screen, and this is now its ONLY
+    // strip — the one shape a tab strip draws anywhere in the app since
+    // v1.2.28 (Tasks, Sprints, Apps, Accounts included; tabs-view.tsx's own
+    // header has the ruling). Inherited rather than spelled: `defaultTabsConfig`
+    // already is it.
     tabs: [
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
@@ -307,18 +307,19 @@ export function TicketsCollection({
             "Raise ticket" had moved to share the tab row — "never align the
             button with the tabs … that button belongs in the right of the
             toolbar, part of the toolbar". So the strip carries nothing but
-            the tabs, and whatever follows attaches to it with ZERO gap, so
-            the folder tab's own pulled-down feet (`--folder-tab-overlap`,
-            tabs-view.tsx) melt into that panel instead of showing on the base
-            background. This column carries no `gap-*` for exactly that
-            reason — the same join `SectionWithCreate`'s `folderTabs` slot
+            the tabs, and whatever follows attaches to it with ZERO gap. Before
+            v1.2.28 that gap had to stay zero for the folder tab's own
+            pulled-down feet to melt into the panel below rather than showing
+            on the base background; the folder shape is gone now
+            (tabs-view.tsx's own header) and the flush look is kept on its own
+            merits — the same join `SectionWithCreate`'s `folderTabs` slot
             draws for apps-screen.tsx/sprints-screen.tsx/tasks-screen.tsx, and
             `PagedFind`'s `wrap` now draws for Accounts. */}
         <div className="flex flex-col">
           <TabsView config={tabsConfig} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
 
           {facet === TRIAGE ? (
-            <CollectionCard attached>
+            <CollectionCard>
               {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. Triage is a
                   queue, not a `<PagedFind>` toolbar, so there is no search/sort
                   row to share — but "Raise ticket" still lives below the tabs
@@ -349,14 +350,14 @@ export function TicketsCollection({
                `byAccount` facet, never drawn before tonight; Where the
                tickets are sitting is `TicketStagesCard`, MOVED here from
                below the list (see the note there) rather than duplicated. */
-            <CollectionCard attached>
+            <CollectionCard>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TicketsByAccountCard teamId={teamId} />
                 <TicketStagesCard teamId={teamId} />
               </div>
             </CollectionCard>
           ) : scopedQ.error ? (
-            <CollectionCard attached>
+            <CollectionCard>
               <ShapeStateBody
                 shape="collectionScreen"
                 state="error"
@@ -369,7 +370,7 @@ export function TicketsCollection({
               />
             </CollectionCard>
           ) : scopedQ.data === undefined ? (
-            <CollectionCard attached>
+            <CollectionCard>
               <Skeleton variant="list" lines={4} />
             </CollectionCard>
           ) : (
@@ -435,7 +436,7 @@ export function TicketsCollection({
               // (`collection-content.tsx`'s own `wrap`): zero gap to the tab row
               // above, which is this component's own flex column rather than a
               // second `gap-*` here.
-              wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+              wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
             >
               {(found) => {
                 const rows = found.active ? found.rows : scopedQ.data

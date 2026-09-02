@@ -14,7 +14,7 @@ field guide to the sharp edges those decisions leave behind.
 
 ## 1 · The static-export SPA: ONE shell, all navigation soft (no reload in-app)
 
-**The trap.** Brimba ships as a Next.js **static export** (`web/out`, served by
+**The trap.** The Kwapso System ships as a Next.js **static export** (`web/out`, served by
 the gateway) with **no service worker**. In a static export the framework router
 has no data file for an arbitrary deep path, so a `router.push` to one is a
 **full-page reload** (session re-check, every screen refetches, the in-memory

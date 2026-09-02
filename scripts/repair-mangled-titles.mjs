@@ -130,7 +130,7 @@ async function sql(db, statement, params = []) {
  * databases comes from THIS environment's core `teams` table, so a database the
  * other company owns is never even named here. And then each one must still
  * PROVE ITSELF from its own `sqlite_master`: four tables that only a current
- * Brimba team database has together. The other company's production database
+ * kwapso team database has together. The other company's production database
  * shares exactly one of them (`help_threads`, from an older fork), which is why
  * the test is the conjunction and not any single table. */
 const FINGERPRINT = ["knowledge_sources", "knowledge_chunks", "internal_rates", "google_sources"]
@@ -143,7 +143,7 @@ async function proveTeamDatabase(db, name) {
   const found = rows.map((r) => r.name).sort()
   if (found.length !== FINGERPRINT.length) {
     throw new Error(
-      `REFUSING TO WRITE to ${name} (${db}): it does not carry a Brimba team schema.\n` +
+      `REFUSING TO WRITE to ${name} (${db}): it does not carry a kwapso team schema.\n` +
         `  expected all of: ${[...FINGERPRINT].sort().join(", ")}\n` +
         `  it has:          ${found.join(", ") || "(none of them)"}\n` +
         `  This account is shared with another company. Stopping.`

@@ -1,6 +1,6 @@
 # Search & filters, the ruleset (DESIGNED 2026-06-18)
 
-How Brimba (and every app on this base) searches and filters records across
+How the Kwapso System (and every app on this base) searches and filters records across
 collections. Glide configured this at the component level and searched "anything
 shown on the detail screen"; we keep that feel but make it **layered** so it
 stays cheap for small lists and scales to large record counts. Search/filter is

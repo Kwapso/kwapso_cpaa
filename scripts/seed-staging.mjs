@@ -105,12 +105,13 @@ const TEAM_NAME = "Kwapso"
 
 /** THE OWNER'S ADDRESS IS A KWAPSO ONE, and it is not a preference.
  *
- * kwapso is its own company; Swift Struck is the studio that built the base it
- * runs on. Seeding under a swiftstruck.com address put the whole history in a
- * team the owner's real login could not reach, and left him staring at an empty
- * app under a team of the same name. Every address this script derives — both
- * client-portal testers are plus-addresses of this one — follows from here, so
- * this line is the only one that has to be right.
+ * Kwapso the company and this base used to carry two different names before
+ * the rename, and seeding under the base's old, differently-domained address
+ * put the whole history in a team the owner's real login could not reach, and
+ * left him staring at an empty app under a team of the same name. Every
+ * address this script derives — both client-portal testers are plus-addresses
+ * of this one — follows from here, so this line is the only one that has to be
+ * right.
  *
  * `ownInbox` derives its allow-list from this too, which is what stops the seed
  * ever emailing a real client. */
@@ -330,8 +331,8 @@ const OURS = {
  * than a comment should discourage. */
 const [OWNER_LOCAL, OWNER_DOMAIN] = OWNER_EMAIL.toLowerCase().split("@")
 const ownInbox = (email) => {
-  // Split, don't pattern-match: `startsWith("alaap+") && endsWith("@swiftstruck.com")`
-  // also says yes to alaap+x@somewhere-else.com@swiftstruck.com. The address has
+  // Split, don't pattern-match: `startsWith("alaap+") && endsWith("@kwapso.com")`
+  // also says yes to alaap+x@somewhere-else.com@kwapso.com. The address has
   // to have exactly one @, the domain has to BE the owner's, and the local part
   // has to be theirs or a plus-address of theirs.
   const parts = String(email ?? "").toLowerCase().split("@")

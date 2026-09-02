@@ -75,7 +75,7 @@ export const auth = {
       body: JSON.stringify({ scale }),
     }),
 
-  /** Which colour the sidebar paints in — ink, paper or mango. Its own door
+  /** Which colour the sidebar paints in — mango or quiet. Its own door
    * beside `setScale`, and for the same reason: this must not be refused
    * because a name is missing, and must not post a name back. */
   setSpine: (spine: string) =>

@@ -6,7 +6,10 @@
    THE ONE SENTENCE
    "What opens behind '+ filter' when one chip is not enough. It is a panel
    over the collection, it reads as prose, and its output is either the
-   toolbar's chips or a saved view that becomes a folder tab."
+   toolbar's chips or a saved view that becomes a tab."
+   (The kit's own sentence says "folder tab"; the folder tab variant was
+   retired on 2026-09-02 and a saved view becomes a line tab now. The
+   MECHANIC — a saved view arrives on the strip — is untouched.)
 
    DESIGN SOURCE — "Kwapso UI Kit.dc.html" chapter 27.33, verbatim:
 
@@ -61,9 +64,9 @@
      the query and the list disagreed.
    · REMOVING IS ONE PRESS PER ROW. Every condition owns an ×; the toolbar
      chip owns the × that clears the lot. Both are always drawn.
-   · SAVING SAYS WHO IT AFFECTS. "Saving adds a folder tab for everyone on
-     this collection" sits beside the control that does it, not in a
-     confirmation after the fact.
+   · SAVING SAYS WHO IT AFFECTS. "Saving adds a tab for everyone on this
+     collection" sits beside the control that does it, not in a confirmation
+     after the fact. (The kit wrote "folder tab"; see the head.)
    · ONE MANGO, AND IT IS "Show 6". Clear is a text button and Save as a tab
      is paper: saving is not the primary act, applying is.
    · THERE IS NO `door` PROP. The portal has no builder.
@@ -75,7 +78,7 @@
    THIS COMPOSITION AS A WHOLE IS NEITHER OF THE TWO SCREENS — 27.33 is "a
    panel over the collection", and the panel is the subject. But the
    collection UNDER it is an ordinary main screen: it is in the navbar, it has
-   an eyebrow with a count, folder tabs and a toolbar. So it is drawn by
+   an eyebrow with a count, tabs and a toolbar. So it is drawn by
    `MainScreen` rather than assembled here.
 
    It used to hand `eyebrow` and `heading` straight to a bare
@@ -248,7 +251,7 @@ const DEFAULT_LABELS: FilterBuilderLabels = {
   addCondition: "Condition",
   outOfScope:
     'Groups and "or" are out of scope: two saved views are clearer than one nested filter.',
-  savingAffects: "Saving adds a folder tab for everyone on this collection.",
+  savingAffects: "Saving adds a tab for everyone on this collection.",
   clear: "Clear",
   saveAsTab: "Save as a tab",
   closeLabel: "Close",
@@ -384,7 +387,7 @@ export interface FilterBuilderScreenProps
 
   /** Drop every condition. */
   onClear?: () => void;
-  /** Turn the conditions into a folder tab for everyone. */
+  /** Turn the conditions into a tab for everyone. */
   onSaveAsTab?: () => void;
   /** Apply them as toolbar chips. THE ONE MANGO. */
   onShow?: () => void;
@@ -623,7 +626,7 @@ function FilterBuilderScreen({
     >
       {/* THE COLLECTION BEHIND THE PANEL, ON THE MODEL. `MainScreen` draws the
           four levels and puts the eyebrow and the title in the header band;
-          the folder tabs and the toolbar are the panel's own first rows, one
+          the tabs and the toolbar are the panel's own first rows, one
           level down. See the header block on why this is not a bare
           `CollectionFrame`. */}
       <MainScreen
