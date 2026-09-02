@@ -27,13 +27,13 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Pencil, Power, RotateCcw, Search, UserMinus } from "@shared/ui/foundations/icons"
+import { Pencil, Power, RotateCcw, UserMinus } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
@@ -382,19 +382,13 @@ export function WaveDetailScreen({
                     search={
                       sprints.length > 1 && (
                         <>
-                          <div className="relative w-full sm:w-56">
-                            <Search
-                              className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                              aria-hidden
-                            />
-                            <Input
-                              value={sprintQuery}
-                              onChange={(e) => setSprintQuery(e.target.value)}
-                              placeholder={t("Search sprints in this wave…")}
-                              className="h-9 pl-8"
-                              aria-label={t("Search sprints in this wave")}
-                            />
-                          </div>
+                          <SearchInput
+                            value={sprintQuery}
+                            onChange={(e) => setSprintQuery(e.target.value)}
+                            placeholder={t("Search sprints in this wave…")}
+                            className="w-full sm:w-56"
+                            aria-label={t("Search sprints in this wave")}
+                          />
                           <SortControl
                             options={[
                               { value: "startsOn", label: t("Starts") },

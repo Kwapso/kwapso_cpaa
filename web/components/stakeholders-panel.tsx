@@ -28,8 +28,8 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
-import { ChevronRight, Search } from "@shared/ui/foundations/icons"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { RecordMark } from "@shared/web/record-mark"
@@ -143,19 +143,13 @@ export function StakeholdersPanel({
       {ours.length + theirs.length > 1 && (
         <ToolbarRow
           search={
-            <div className="relative w-full sm:w-56">
-              <Search
-                className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                aria-hidden
-              />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("Search people on this…")}
-                className="h-9 pl-8"
-                aria-label={t("Search people on this")}
-              />
-            </div>
+            <SearchInput
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("Search people on this…")}
+              className="w-full sm:w-56"
+              aria-label={t("Search people on this")}
+            />
           }
         />
       )}

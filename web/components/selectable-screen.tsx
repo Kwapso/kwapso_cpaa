@@ -16,6 +16,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { cn } from "@shared/ui/lib/utils"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import {
   Select,
   SelectContent,
@@ -27,7 +28,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Headline } from "@shared/ui/components/typography/typography"
-import { Pencil, X, Check, Upload, Download, Power, Search, Shield, ShieldOff } from "@shared/ui/foundations/icons"
+import { Pencil, X, Check, Upload, Download, Power, Shield, ShieldOff } from "@shared/ui/foundations/icons"
 
 import type { SortOption } from "@shared/web/screen-engine/config"
 import type { SelectableValue } from "@shared/types"
@@ -523,19 +524,13 @@ export function SelectableScreen({
             search={
               values.length > 0 && (
                 <>
-                  <div className="relative w-full sm:w-56">
-                    <Search
-                      className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                      aria-hidden
-                    />
-                    <Input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder={t("Search values…")}
-                      className="h-9 pl-8"
-                      aria-label={t("Search dropdown values")}
-                    />
-                  </div>
+                  <SearchInput
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("Search values…")}
+                    className="w-full sm:w-56"
+                    aria-label={t("Search dropdown values")}
+                  />
                   <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
                     <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
                       <SelectValue />

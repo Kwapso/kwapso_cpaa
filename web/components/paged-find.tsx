@@ -459,13 +459,16 @@ export function PagedFind<T>({
                 : fill(matches.many, { count: formatSearchTotal(total) })}
           </span>
         )}
-        {/* THE ROW'S OWN ACTIONS, PINNED RIGHT — `ml-auto` rather than a
-            `justify-between` on the row, so search/filters/sort/the match count
-            stay grouped on the left and the actions land at the far edge
-            whatever else is showing (client ruling, 2026-08-31: rightmost,
-            part of the toolbar, never beside the tab strip). */}
+        {/* THE ROW'S OWN ACTIONS, LAST IN THE ROW — client, 2 Sep 2026,
+            correcting the `ml-auto` this slot carried until then. Her
+            reference artifact never stretches the track open to park the
+            button at its far edge; it is just the last chip in the same
+            left-packed cluster as search/filters/sort/the match count
+            (still rightmost of what's showing, part of the toolbar, never
+            beside the tab strip — the 2026-08-31 ruling — just not pushed
+            there by a growing gap). */}
         {actions && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
+          <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
         )}
       </div>
 

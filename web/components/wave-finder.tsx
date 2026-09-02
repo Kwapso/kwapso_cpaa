@@ -141,14 +141,17 @@ export function WaveFinder({
    * or a Timeline whose data fits inside six months passes nothing here and
    * this slot draws empty air rather than a control with nowhere to go. */
   period?: React.ReactNode
-  /** THE ROW'S OWN ACTION BUTTONS ("Sell a wave"…), pinned to the far right of
-   * THIS toolbar's first line — the same `ml-auto` slot `<PagedFind>`'s own
-   * `actions` draws, so a bare collection's toolbar and a paged one's read as
-   * the same control in two places. Waves is the one bounded, single-view
-   * collection whose search/sort/filter is a component of its own rather than
-   * the frame's, so the button lives HERE, beside search and sort, instead of
-   * in a row of its own above this one (client ruling, 2026-08-31: an action
-   * button never gets a separate row from the toolbar it belongs to). */
+  /** THE ROW'S OWN ACTION BUTTONS ("Sell a wave"…), last in THIS toolbar's
+   * first line — the same slot `<PagedFind>`'s own `actions` draws, so a
+   * bare collection's toolbar and a paged one's read as the same control in
+   * two places. No longer pushed to the far edge with `ml-auto` (client,
+   * 2 Sep 2026: her reference artifact packs it as the last chip in the
+   * same left-clustered row, not stretched open to the far side). Waves is
+   * the one bounded, single-view collection whose search/sort/filter is a
+   * component of its own rather than the frame's, so the button lives HERE,
+   * beside search and sort, instead of in a row of its own above this one
+   * (client ruling, 2026-08-31: an action button never gets a separate row
+   * from the toolbar it belongs to). */
   actions?: React.ReactNode
 }) {
   const t = useT()
@@ -245,7 +248,7 @@ export function WaveFinder({
           label={t("View")}
         />
       ) : null}
-      {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

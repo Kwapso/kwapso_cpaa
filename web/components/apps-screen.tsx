@@ -42,7 +42,7 @@
 
 import * as React from "react"
 
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
@@ -50,7 +50,6 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
-import { Search } from "@shared/ui/foundations/icons"
 import {
   ScreenRenderer,
   type ScreenActionContext,
@@ -395,18 +394,12 @@ export function AppsScreen({
           className="mb-4"
           search={
             appsQ.data.length > 0 && (
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search apps…")}
-                  className="pl-8"
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search apps…")}
+                className="w-full sm:w-56"
+              />
             )
           }
           filters={

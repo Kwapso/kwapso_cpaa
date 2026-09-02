@@ -298,7 +298,7 @@ export function ToolbarRow({
 }: {
   /** A search box, or any other left-aligned control. Omitted where the tab
    * body has none (Sprints' Overview/Calendar, Tasks' Calendar, Tickets'
-   * Triage) — the row is then the actions alone, still pinned right. */
+   * Triage) — the row is then the actions alone. */
   search?: React.ReactNode
   /** The active-facet chips + "+ filter" affordance (`FilterBar`), between
    * `search` and `sort` — the same position the design kit's own toolbar
@@ -315,10 +315,12 @@ export function ToolbarRow({
    * (`ViewSwitch` itself already renders nothing for fewer than two views,
    * so a caller can pass it unconditionally once it has more than one). */
   view?: React.ReactNode
-  /** THE ROW'S OWN ACTION BUTTONS (New/Import/Export…), pinned to the far
-   * right — the same `ml-auto` `PagedFind`'s own toolbar uses for its
-   * `actions` slot, so a bounded collection's bare toolbar and a paged one's
-   * read as the same control in two places. */
+  /** THE ROW'S OWN ACTION BUTTONS (New/Import/Export…), last in the row —
+   * client, 2 Sep 2026, correcting the `ml-auto` this slot carried until
+   * then: her reference artifact never stretches the track open to park the
+   * button at its far edge, it just sits as the last chip in the same
+   * left-packed cluster as search/filters/sort/view. `PagedFind`'s own
+   * `actions` slot matches, for the same reason. */
   actions?: React.ReactNode
   className?: string
 }) {
@@ -342,7 +344,7 @@ export function ToolbarRow({
       {filters && <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>}
       {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
       {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
-      {actions && <div className="ms-auto flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

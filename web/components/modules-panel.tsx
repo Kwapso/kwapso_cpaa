@@ -41,11 +41,11 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power, Search } from "@shared/ui/foundations/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -138,19 +138,13 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
         search={
           modules.length > 0 && (
             <>
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search modules…")}
-                  className="h-9 pl-8"
-                  aria-label={t("Search modules")}
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search modules…")}
+                className="w-full sm:w-56"
+                aria-label={t("Search modules")}
+              />
               <SortControl
                 options={[
                   { value: "name", label: t("Name") },

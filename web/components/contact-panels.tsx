@@ -13,7 +13,7 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import {
   Select,
   SelectContent,
@@ -23,7 +23,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { ChevronRight, Search } from "@shared/ui/foundations/icons"
+import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
 import { content as contentApi } from "@/lib/api"
@@ -134,19 +134,13 @@ export function CompaniesPanel({
         <ToolbarRow
           search={
             <>
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search companies…")}
-                  className="h-9 pl-8"
-                  aria-label={t("Search companies")}
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search companies…")}
+                className="w-full sm:w-56"
+                aria-label={t("Search companies")}
+              />
               <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
                 <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
                   <SelectValue />
@@ -244,19 +238,13 @@ export function ContactTicketsPanel({
         <ToolbarRow
           search={
             <>
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search tickets…")}
-                  className="h-9 pl-8"
-                  aria-label={t("Search tickets")}
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search tickets…")}
+                className="w-full sm:w-56"
+                aria-label={t("Search tickets")}
+              />
               {statuses.length > 1 && (
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
@@ -340,19 +328,13 @@ export function ContactMeetingsPanel({
         <ToolbarRow
           search={
             <>
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search meetings…")}
-                  className="h-9 pl-8"
-                  aria-label={t("Search meetings")}
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search meetings…")}
+                className="w-full sm:w-56"
+                aria-label={t("Search meetings")}
+              />
               <SortControl
                 options={[{ value: "startsAt", label: t("When") }]}
                 value="startsAt"

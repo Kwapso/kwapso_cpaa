@@ -43,7 +43,7 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import {
   Select,
   SelectContent,
@@ -54,7 +54,7 @@ import {
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power, Search } from "@shared/ui/foundations/icons"
+import { Pencil, Power } from "@shared/ui/foundations/icons"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -94,19 +94,13 @@ function ListToolbar({
   const t = useT()
   return (
     <>
-      <div className="relative w-full sm:w-56">
-        <Search
-          className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-          aria-hidden
-        />
-        <Input
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder={placeholder}
-          className="h-9 pl-8"
-          aria-label={placeholder}
-        />
-      </div>
+      <SearchInput
+        value={query}
+        onChange={(e) => onQuery(e.target.value)}
+        placeholder={placeholder}
+        className="w-full sm:w-56"
+        aria-label={placeholder}
+      />
       <Select value={status} onValueChange={(v) => onStatus(v as ActiveFilter)}>
         <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
           <SelectValue />

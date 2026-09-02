@@ -38,7 +38,7 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -226,11 +226,11 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
       <ToolbarRow
         search={
           q.data.length > 0 && (
-            <Input
+            <SearchInput
               value={find}
               onChange={(e) => setFind(e.target.value)}
               placeholder={t("Search what we handed over…")}
-              className="w-full sm:max-w-xs"
+              className="w-full sm:w-56"
               aria-label={t("Search what we handed over…")}
             />
           )

@@ -21,7 +21,7 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import {
   Select,
   SelectContent,
@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@shared/ui/components/select/select"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
-import { Ban, KeyRound, Link2, Power, Search, UserMinus } from "@shared/ui/foundations/icons"
+import { Ban, KeyRound, Link2, Power, UserMinus } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
@@ -143,19 +143,13 @@ export function ContactsPanel({
         search={
           links.length > 0 && (
             <>
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search contacts…")}
-                  className="h-9 pl-8"
-                  aria-label={t("Search contacts")}
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search contacts…")}
+                className="w-full sm:w-56"
+                aria-label={t("Search contacts")}
+              />
               <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
                 <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
                   <SelectValue />
@@ -331,19 +325,13 @@ export function PortalAccessPanel({
         search={
           portalUsers.length > 0 && (
             <>
-              <div className="relative w-full sm:w-56">
-                <Search
-                  className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("Search logins…")}
-                  className="h-9 pl-8"
-                  aria-label={t("Search logins")}
-                />
-              </div>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search logins…")}
+                className="w-full sm:w-56"
+                aria-label={t("Search logins")}
+              />
               <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
                 <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
                   <SelectValue />
