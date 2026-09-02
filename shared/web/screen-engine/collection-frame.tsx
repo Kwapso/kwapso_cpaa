@@ -525,6 +525,11 @@ function CollectionFrame<T>({
         placeholder={searchPlaceholder}
       />
     ) : null
+    // `modal` no longer passed through: `FilterBar` dropped its Popover
+    // entirely (client ruling, 2026-09-02 — see filter-bar.tsx's own header),
+    // so there is no floating surface left here for a Dialog's scroll lock to
+    // fight with. `modal` still gates the mobile Sort popover below, which is
+    // unrelated and unchanged.
     const filterBar = showFilterBar && !isEmptyState ? (
       <FilterBar
         facets={config.filterFacets}
@@ -533,7 +538,6 @@ function CollectionFrame<T>({
         onChange={setFacet}
         onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
         resultCount={filtered.length}
-        modal={modal}
       />
     ) : null
     // THE VIEW-SWITCH SLOT, BY THE KIT'S OWN PRECEDENT: CH27.13 shares it
@@ -670,6 +674,8 @@ function CollectionFrame<T>({
               className="w-44"
             />
           ) : null
+          // `modal` no longer passed: `FilterBar` has no Popover left to gate
+          // (see the `useKitPanel` branch's own note above).
           const filterBar = showFilterBar ? (
             <FilterBar
               facets={config.filterFacets}
@@ -678,7 +684,6 @@ function CollectionFrame<T>({
               onChange={setFacet}
               onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
               resultCount={filtered.length}
-              modal={modal}
             />
           ) : null
           const sortControl = showSort ? (

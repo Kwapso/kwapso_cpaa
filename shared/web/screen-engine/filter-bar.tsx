@@ -22,12 +22,7 @@
 // row of CHIPS — one per facet currently on, each removable, with a dashed
 // "+ filter" slot at the end and a "Clear filters" after that. Her facet
 // controls are always-EXPANDED panels (a heading, a search pill, a checkbox
-// list), not triggers; that is right in a panel and wrong in a toolbar, where
-// three of them would put 300px of chrome above every collection in the app,
-// permanently. So the composition is the one her props are cut for: the CHIPS
-// are the permanent surface, and the "+ filter" slot opens the facet controls
-// in a kit Popover. What is on is always visible and always removable in one
-// press; what is not on costs one line of the screen.
+// list), not triggers.
 //
 // THE CHIPS ARE NOT MANGO, and that is the ruling this lane exists to carry.
 // The old row drew a selected facet as `Badge variant="default"` — measured
@@ -37,6 +32,59 @@
 // raised paper with primary ink, elevation doing the work. Her treatment wins.
 // Nothing in this file passes a colour at all, which is the only way to keep
 // that true.
+//
+// ── THE POPOVER IS GONE — CLIENT RULING, 2026-09-02 ──────────────────────────
+//
+// Until tonight the "+ filter"/count slot opened a floating, portaled Popover
+// holding every facet's own control, stacked one per line. The client, against
+// a confirmed mockup: the slot now toggles a SECOND ROW open directly under the
+// WHOLE toolbar, inside the same card/track — not a popover, not an overlay,
+// an actual sibling line that pushes the rows below it down. Nothing about the
+// facet controls THEMSELVES changed to do this: every facet was already
+// rendered by mapping `facets` once, in one place (`RangeFacet`/
+// `SearchableFacet`, below), so the panel already showed every facet's own
+// field at once — a per-facet SEARCH box included, for `SearchableFacet`'s own
+// query field (Waves' own comment: "an agency with 131 clients on staging
+// needs" its facet's own search). Moving that map from a `<PopoverContent>` to
+// a plain `<div>` changes NONE of that; only the toggle's mechanics and the
+// row's position changed. And nothing here inserts an "Apply" step: a pick
+// already called `onChange`/`pick` directly (see below), which is what the
+// client asked to keep — "the moment I select sth on a dropdown its applied."
+//
+// THE ROW MUST SPAN THE WHOLE TOOLBAR, SO THIS COMPONENT'S ROOT IS A FRAGMENT.
+// The chip cluster ("Filter"/count chip + active chips + "Clear filters") has
+// to keep sitting INLINE beside search/sort — exactly where it sits today —
+// while the open facet row has to span the FULL toolbar pill, including the
+// width search and sort occupy. Those are two different widths, so they cannot
+// be one child of the same non-growing wrapper the way the chip cluster alone
+// used to be: `ToolbarRow`/`PagedFind`/`WaveFinder` all wrap the chip cluster
+// in a `flex min-w-0 flex-wrap items-center gap-2` box precisely so that box's
+// own `w-full` (CSS Sizing §5.3: a percentage on an indeterminate box resolves
+// as `auto`) means "as wide as its content" rather than "the whole row" — the
+// the same technique those three files' own comments already document for
+// `SearchInput`/`FilterBar` inside `ToolbarRow`. Trapping the open row inside
+// that SAME box would cap it at the chip cluster's own width, not the
+// toolbar's. So this component returns the chip cluster and the open row as
+// TWO SEPARATE TOP-LEVEL ELEMENTS, and the three hosts render `{filters}` bare
+// (no wrapping box of their own any more) — each element then lands as its own
+// direct flex item of the REAL outer toolbar pill, and the open row's own
+// `w-full` finally means what it says, forcing `flex-wrap` to break it onto a
+// fresh line spanning the whole pill. See `ToolbarRow`, `PagedFind` and
+// `WaveFinder`'s own comments at their `filters` slot for the other half.
+//
+// ONE COMPOSITION CANNOT TAKE THIS SHAPE: the vendored kit's OWN
+// `CollectionFrame` (`shared/ui/components/collection-frame/collection-frame.tsx`,
+// R39 — hand-edits turn the build red) wraps whatever it is handed as `filters`
+// in exactly that same non-growing box, and that markup is the kit's, not
+// ours, so it cannot be changed here. Every screen reached through THAT panel
+// (`useKitPanel`, e.g. Member roles, Members, an account's own Apps/Sprints
+// tabs) still gets everything else this lane changed — no popover, an
+// immediate apply, the count on the trigger — the open row simply renders at
+// the width the kit's own toolbar allows a facet cluster rather than the
+// full-bleed second line the three bespoke toolbars can offer. A kit change to
+// let its `filters` slot opt out of that wrapper is the upstream fix, logged
+// for the design-kit pipeline; nothing here fakes it with a hack that would
+// only work by accident.
 //
 // ── WHAT THE APP'S FACET CONTRACT IS, MEASURED RATHER THAN ASSUMED ───────────
 //
@@ -68,11 +116,6 @@ import {
   SearchableFacet,
   type FilterChip,
 } from "@shared/ui/components/filter-bar/filter-bar"
-import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from "@shared/ui/components/popover/popover"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 
@@ -83,9 +126,9 @@ import { formatRange, parseRange } from "./range"
 /** BUG FIX, 2026-08-31 — client: pill hover must move the pill's own FILL,
  * never just its text. The kit's `FilterBar` (vendored, `shared/ui/
  * components/filter-bar/filter-bar.tsx`, CLAUDE.md R39, do not hand-edit)
- * draws two chip-shaped buttons whose hover is text-only: the dashed
- * "+ filter" slot (`CHIP_ADD`: `text-ink-tertiary enabled:hover:text-
- * foreground`, no background rule at all) and "Clear filters" (reuses
+ * draws two chip-shaped buttons whose hover is text-only: the "+ filter"/count
+ * slot (`CHIP_ADD`: `text-ink-tertiary enabled:hover:text-foreground`, no
+ * background rule at all) and "Clear filters" (reuses
  * `filterChipVariants({state:"default"})`'s `bg-[var(--surface-raised)]`
  * plus that same text-only hover). The removable chip's own label button
  * already gets this right (`CHIP_LABEL_INTERACTIVE`: `enabled:hover:bg-
@@ -135,7 +178,6 @@ function FilterBar<T>({
   onChange,
   onClearFacets,
   resultCount,
-  modal,
   className,
 }: {
   facets: FilterFacet[]
@@ -144,7 +186,9 @@ function FilterBar<T>({
   /** The FULL data — distinct values are derived from it when a facet omits
    * `options` (so choices don't vanish as you filter). */
   data: T[]
-  /** Empty `value` clears that facet. */
+  /** Empty `value` clears that facet. Called the moment a value is picked —
+   * there is no "Apply" step, on the row exactly as there was none on the
+   * popover it replaces. */
   onChange: (field: string, value: string) => void
   /** Drop every facet at once. NOT the search box: the kit's control says
    * "Clear filters" and now means exactly that. What somebody typed is cleared
@@ -155,14 +199,15 @@ function FilterBar<T>({
   onClearFacets: () => void
   /** Announced politely to screen readers when results change. */
   resultCount?: number
-  /** Set `true` when the bar can render inside a Dialog/Sheet. The facet panel
-   *  is portaled out of the dialog, so the dialog's scroll lock would otherwise
-   *  kill wheel/touch scrolling inside an open facet list. See popover.tsx. */
-  modal?: boolean
+  /** Applied to the chip cluster's own wrapping box — NOT to the open facet
+   * row, which has to reach the toolbar's full width regardless of what a
+   * caller passes here. No call site uses this today. */
   className?: string
 }) {
-  // Hooks before the early return so hook order stays stable.
   const t = useT()
+  /** Is the second row open? Replaces the old Popover's own `open` state —
+   * same idea (a facet's controls are hidden until asked for), a plain toggle
+   * instead of a floating, portaled surface. */
   const [open, setOpen] = React.useState(false)
   /** WHAT A PICKED VALUE IS CALLED, remembered from the moment it was picked.
    * A facet over ROWS takes its options from what the screen is holding, so an
@@ -171,49 +216,15 @@ function FilterBar<T>({
    * are captured where they are known and never go stale, because the value
    * they belong to cannot change under them. */
   const said = React.useRef<Record<string, string>>({})
-  /** WHERE FOCUS GOES BACK TO — the node that opened the panel, remembered by
-   * hand. Radix hands focus back to a TRIGGER, and the trigger here is the
-   * kit's own "+ filter" chip, inside markup we do not write. A browser that
-   * does not focus a button on click (Safari) simply restores nothing, which is
-   * what it does today. */
-  const opener = React.useRef<HTMLElement | null>(null)
+  /** THE OPEN ROW ITSELF — focus lands on its first control the moment it
+   * appears, since (unlike the popover it replaces) nothing here traps focus
+   * or needs to hand it back: the "Filter" chip never unmounts, so leaving the
+   * row open or closed never moves focus anywhere the reader didn't ask for. */
   const panel = React.useRef<HTMLDivElement>(null)
   const wasOpen = React.useRef(false)
-  /** A dismissal that came from a click SOMEWHERE ELSE. Focus is not dragged
-   * back from wherever the person just chose to put it — they clicked the
-   * search box because they want to type in it. */
-  const leftIt = React.useRef(false)
-
-  /** FOCUS IS PLACED FROM THE OPEN STATE, IN BOTH DIRECTIONS, AND THE REASON IS
-   * A MEASUREMENT RATHER THAN A PREFERENCE.
-   *
-   * Radix moves focus into an anchored surface from FocusScope's MOUNT effect
-   * and back out from its UNMOUNT effect. In this app a closed popover NEVER
-   * UNMOUNTS: measured 2026-08-27, the node stays in the document at
-   * `data-state="closed"` long after its 140ms exit animation has finished, and
-   * the kit's own `SortControl` — which this lane did not touch — leaves the
-   * same residue on the same page, so it is the primitive's and not this
-   * composition's. Logged for the kit.
-   *
-   * Both halves therefore fire exactly ONCE, on the first open, and never
-   * again. The first half was easy to miss and the second half was worse than
-   * that: a check that focus came back to the "+ filter" chip PASSED while the
-   * panel was not taking focus at all, because focus had never left the chip to
-   * be restored to it. Two broken halves reading as one working whole.
-   *
-   * The consequence lands hardest here, which is why the mitigation is here:
-   * every facet lives behind this one panel, so on a second open a keyboard
-   * reader would be left standing on the chip with every control portaled to
-   * the end of the document. Opening and closing are a state change this file
-   * owns, so the focus is placed from it — and it stays correct if the kit is
-   * fixed, because Radix's own handlers refuse to move focus when there is no
-   * trigger to move it to. */
   React.useEffect(() => {
-    if (open) {
+    if (open && !wasOpen.current) {
       panel.current?.querySelector<HTMLElement>("input, button")?.focus()
-    } else if (wasOpen.current) {
-      if (!leftIt.current) opener.current?.focus()
-      leftIt.current = false
     }
     wasOpen.current = open
   }, [open])
@@ -247,8 +258,8 @@ function FilterBar<T>({
       // so the whole sentence is given rather than left to fall back to the
       // generic "Remove filter" for every chip on the row.
       removeLabel: t("Remove filter: {what}", { what: `${f.label}: ${words}` }),
-      // "Re-open the facet this chip stands for" — every facet lives in the one
-      // panel, so re-opening the panel IS that.
+      // Re-open the row this chip belongs to, if it is not open already —
+      // every facet lives in the one row, so opening the row IS re-opening it.
       onSelect: () => setOpen(true),
     })
   }
@@ -264,43 +275,51 @@ function FilterBar<T>({
     onChange(f.field, chosen)
   }
 
+  // THE "FILTER" CHIP'S OWN LABEL. The bare word while the row is open (it is
+  // its own explanation once the fields are in front of you), and the bare
+  // word while nothing is on — a count only earns its place once BOTH "there
+  // is something to report" and "the row that would show it is shut" are
+  // true. `chips.length` is the SAME source `KitFilterBar` already reads to
+  // decide whether "Clear filters" is worth drawing at all (`hasChips` in the
+  // kit's own file) — reusing it here rather than a second tally is the
+  // point: there is exactly one definition of "how many facets are active" in
+  // this row, not one per control that cares.
+  const addFilterLabel =
+    !open && chips.length > 0 ? t("Filter ({count})", { count: chips.length }) : t("Filter")
+
   return (
-    <div className={cn("flex w-full min-w-0 flex-col gap-2", FILTER_BAR_HOVER_FILL, className)}>
-      <Popover open={open} onOpenChange={setOpen} modal={modal}>
-        <PopoverAnchor asChild>
-          <KitFilterBar
-            label={t("Filters")}
-            filters={chips}
-            onRemove={(field) => onChange(field, "")}
-            onClear={onClearFacets}
-            clearLabel={t("Clear filters")}
-            addFilterLabel={t("Filter")}
-            onAddFilter={() => {
-              opener.current = document.activeElement as HTMLElement | null
-              setOpen((o) => !o)
-            }}
-          />
-        </PopoverAnchor>
-        <PopoverContent
+    <>
+      <div className={cn("flex min-w-0 flex-wrap items-center gap-2", FILTER_BAR_HOVER_FILL, className)}>
+        <KitFilterBar
+          label={t("Filters")}
+          filters={chips}
+          onRemove={(field) => onChange(field, "")}
+          onClear={onClearFacets}
+          clearLabel={t("Clear filters")}
+          addFilterLabel={addFilterLabel}
+          onAddFilter={() => setOpen((o) => !o)}
+        />
+      </div>
+
+      {/* THE SECOND ROW — every facet, all at once, directly under the whole
+          toolbar (see the header for why this has to be a sibling of the chip
+          cluster above rather than something nested inside it). `flex-wrap`
+          so several facets read as a shelf on a wide screen and stack cleanly
+          on a narrow one; each facet is individually sized rather than left to
+          the kit's own `w-full` default (`SearchableFacet`'s root), which
+          would otherwise claim this whole row for the first facet alone. */}
+      {open && (
+        // NO `role="group"`/`aria-label` OF ITS OWN — the chip cluster above
+        // already carries `role="group" aria-label="Filters"` (the kit's own
+        // `KitFilterBar` root), and each facet inside here names ITSELF
+        // (`RangeFacet`/`SearchableFacet`'s own `role="group"
+        // aria-labelledby=…`). A second "Filters, group" landmark wrapping
+        // both would tell a screen reader the same thing twice for no reason;
+        // this div is layout only.
+        <div
           ref={panel}
-          align="start"
-          onInteractOutside={() => {
-            leftIt.current = true
-          }}
-          // ONE COLUMN at every width, because the kit's panel already caps
-          // itself against the viewport (popover.tsx). Facets side by side
-          // would need a breakpoint here and a second measure on a phone; a
-          // column needs neither and reads the same on both.
-          //
-          // AND A CEILING OF ITS OWN, measured rather than guessed: four facets
-          // at the kit's own list height is an 834px panel, which does not fit
-          // a 900px window — Radix flips it above the anchor, fails to fit it
-          // there either, and the panel opens with its top off the screen. How
-          // much of a screen a filter panel may take is the COMPOSITION's
-          // decision (the primitive only knows the viewport), so it is made
-          // here, in the viewport's own units, and the surface's `overflow-y`
-          // does the rest.
-          className="flex max-h-[min(70vh,32rem)] w-[20rem] flex-col gap-[var(--space-5)]"
+          data-slot="filter-bar-row"
+          className="flex w-full basis-full flex-wrap items-start gap-4 pt-1"
         >
           {facets.map((f) => {
             const val = values[f.field] ?? ""
@@ -309,44 +328,51 @@ function FilterBar<T>({
             if (f.control === "range") {
               const { min, max } = parseRange(val)
               return (
-                <RangeFacet
-                  key={f.field}
-                  label={f.label}
-                  minLabel={t("Min")}
-                  maxLabel={t("Max")}
-                  min={f.min}
-                  max={f.max}
-                  step={f.step}
-                  value={{ min, max }}
-                  onValueChange={(next) => onChange(f.field, formatRange(next.min, next.max))}
-                  // A bound BELOW its own floor is a range that can only ever
-                  // match nothing, and the kit already draws the state — the
-                  // old row had no way to say it and quietly answered "none".
-                  error={min != null && max != null && min > max}
-                  errorLabel={t("The first number must be lower than the second.")}
-                />
+                <div key={f.field} className="min-w-[12rem]">
+                  <RangeFacet
+                    label={f.label}
+                    minLabel={t("Min")}
+                    maxLabel={t("Max")}
+                    min={f.min}
+                    max={f.max}
+                    step={f.step}
+                    value={{ min, max }}
+                    onValueChange={(next) => onChange(f.field, formatRange(next.min, next.max))}
+                    // A bound BELOW its own floor is a range that can only ever
+                    // match nothing, and the kit already draws the state — the
+                    // old row had no way to say it and quietly answered "none".
+                    error={min != null && max != null && min > max}
+                    errorLabel={t("The first number must be lower than the second.")}
+                  />
+                </div>
               )
             }
 
             return (
-              <SearchableFacet
-                key={f.field}
-                label={f.label}
-                options={optionsFor(f)}
-                value={val ? [val] : []}
-                onValueChange={(next) => pick(f, next)}
-                searchLabel={t("Search {what}…", { what: f.label.toLowerCase() })}
-                emptyLabel={t("No matches.")}
-              />
+              <div key={f.field} className="min-w-[12rem] max-w-xs flex-1">
+                <SearchableFacet
+                  label={f.label}
+                  options={optionsFor(f)}
+                  value={val ? [val] : []}
+                  onValueChange={(next) => pick(f, next)}
+                  searchLabel={t("Search {what}…", { what: f.label.toLowerCase() })}
+                  emptyLabel={t("No matches.")}
+                  // Six rows fits comfortably beside its siblings on the row
+                  // rather than the popover's own taller ceiling — a facet
+                  // that needs more room still SEARCHES rather than scrolling
+                  // a long, cramped list (Waves' own "131 clients" case).
+                  maxHeight="12rem"
+                />
+              </div>
             )
           })}
-        </PopoverContent>
-      </Popover>
+        </div>
+      )}
 
       <span aria-live="polite" className="sr-only">
         {resultCount != null ? t("{count} results", { count: resultCount }) : ""}
       </span>
-    </div>
+    </>
   )
 }
 

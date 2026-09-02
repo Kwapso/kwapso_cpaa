@@ -213,21 +213,27 @@ export function WaveFinder({
           className="w-full"
         />
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <FilterBar
-          facets={facets}
-          values={{ accountId: query.accountId, status: query.status }}
-          // Empty on purpose: both facets carry their own options, so there is
-          // nothing for the bar to derive from the rows on screen — and a client
-          // whose only wave is filtered out must not vanish from the filter.
-          data={[]}
-          onChange={(field, value) => onChange({ ...query, [field]: value })}
-          onClearFacets={() =>
-            onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
-          }
-          resultCount={resultCount}
-        />
-      </div>
+      {/* NO WRAPPING BOX AROUND `<FilterBar>` ANY MORE — it now returns two
+          top-level pieces (the chip cluster, and, while its row is open, a
+          full-width facet row) and the second one has to span this WHOLE
+          track, not the narrower box a wrapper here would cap it at (the same
+          CSS Sizing §5.3 trap `filter-bar.tsx`'s own header documents).
+          Rendering it bare lets both pieces land as direct flex items of the
+          track above, so the facet row's own `w-full` finally reaches the
+          real width. */}
+      <FilterBar
+        facets={facets}
+        values={{ accountId: query.accountId, status: query.status }}
+        // Empty on purpose: both facets carry their own options, so there is
+        // nothing for the bar to derive from the rows on screen — and a client
+        // whose only wave is filtered out must not vanish from the filter.
+        data={[]}
+        onChange={(field, value) => onChange({ ...query, [field]: value })}
+        onClearFacets={() =>
+          onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
+        }
+        resultCount={resultCount}
+      />
       <SortControl
         options={[
           { value: "newest", label: t("Newest first") },

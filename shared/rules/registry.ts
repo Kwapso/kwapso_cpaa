@@ -587,10 +587,14 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // carries the credential a real translation run needs — the same blocked
 // path every prior raise in this file cites: ANTHROPIC_API_KEY or a
 // Cloudflare Workers-AI token). Real work still owed, not debt hidden.
+//
+// RAISED AGAIN, SAME DAY, 140 → 141: the filter row's own "Filter" chip
+// gained a count ("Filter (3)") once it carries active facets and the row
+// is closed — one new interpolated string, same blocked translation path.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 140,
-  es: 140,
-  ca: 140,
+  de: 141,
+  es: 141,
+  ca: 141,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

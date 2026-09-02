@@ -402,44 +402,39 @@ export function PagedFind<T>({
         {/* THE FACET CHIPS, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
             ruling, 2026-09-01, the toolbar spec Aurora approved that night
             against a real Tickets mockup: search, then the facet chips, then
-            "+ Filter", then sort, then create, pinned right). This used to be
-            a full-width sibling BELOW this row — the same two-row shape her
-            Apps screenshot caught — on the reasoning that the kit's own
-            `FilterBar` (`shared/ui/components/filter-bar/filter-bar.tsx`)
-            hard-codes `w-full` on its root and so "can never sit beside
-            `SearchInput`/`SortControl`". That reasoning did not survive
-            contact with the two OTHER places this exact bug was fixed in the
-            same pass (`screen-bits.tsx`'s `ToolbarRow` and this file's
-            sibling fix in `collection-frame.tsx`'s legacy header): a `w-full`
-            child only claims the WHOLE row when it is a DIRECT child of it.
-            Wrapped first in its own non-growing flex box — `min-w-0`, no
-            `w-full` of its OWN — the wrapper's width is resolved from its
-            CONTENT before the child's `100%` has anything to resolve
-            against (a percentage on an indeterminate box is treated as
-            `auto` for that computation, CSS Sizing §5.3), so the wrapper sizes
-            to the chip row's actual content width, and only THEN does the
-            `w-full` child fill exactly that box rather than the row. Same
-            technique, same reason, third call site — no adapter change and
-            no kit change (R39) needed, because the kit was never the thing
-            forcing the second row. */}
+            "+ Filter", then sort, then create, pinned right).
+
+            NO WRAPPING BOX AROUND `<FilterBar>` (client ruling, 2026-09-02,
+            superseding the wrapper this slot used to carry): `FilterBar`
+            (`shared/web/screen-engine/filter-bar.tsx`) now returns TWO
+            top-level pieces — the chip cluster, and, while its own row is
+            toggled open, a full-width facet row showing every facet at once.
+            The chip cluster still needs the "wrap a `w-full` root in a
+            non-growing box" technique this comment used to explain (a
+            percentage on an indeterminate box resolves as `auto`, CSS Sizing
+            §5.3) — and gets it, from its OWN wrapping div inside
+            `filter-bar.tsx` now, not from a box this file draws. The open
+            facet row needs the OPPOSITE: it has to reach this WHOLE toolbar
+            pill's width, which a wrapper here would cap it below. Rendering
+            `<FilterBar>` bare lets both pieces land as direct flex items of
+            the pill above, so each gets the width it actually needs. See
+            `filter-bar.tsx`'s own header for the full account. */}
         {showFilters && (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <FilterBar
-              facets={facets}
-              values={values}
-              // Empty on purpose: every facet above carries its own options, so
-              // there is nothing for the bar to derive from the rows on screen.
-              data={[]}
-              onChange={(field, value) => {
-                const next = { ...values }
-                if (value === "") delete next[field]
-                else next[field] = value
-                setValues(next)
-              }}
-              onClearFacets={() => setValues({})}
-              resultCount={total}
-            />
-          </div>
+          <FilterBar
+            facets={facets}
+            values={values}
+            // Empty on purpose: every facet above carries its own options, so
+            // there is nothing for the bar to derive from the rows on screen.
+            data={[]}
+            onChange={(field, value) => {
+              const next = { ...values }
+              if (value === "") delete next[field]
+              else next[field] = value
+              setValues(next)
+            }}
+            onClearFacets={() => setValues({})}
+            resultCount={total}
+          />
         )}
         {/* THE ORDER, after search and the facet chips because the three are
             asked with the same gesture — you type, you narrow, then you say

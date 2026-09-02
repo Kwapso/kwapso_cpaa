@@ -354,7 +354,20 @@ export function ToolbarRow({
       {search && (
         <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
       )}
-      {filters && <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>}
+      {/* NO WRAPPING BOX HERE ANY MORE — `FilterBar` (`shared/web/screen-
+          engine/filter-bar.tsx`) now returns TWO top-level pieces: the chip
+          cluster (which wraps ITSELF in the same non-growing box every other
+          slot here uses) and, while its row is open, a full-width facet row
+          that has to reach the whole track's width, not just the width this
+          slot would otherwise cap it at. Rendering `{filters}` bare lets both
+          land as direct flex items of THIS row, so the open facet row's own
+          `w-full` finally means the whole pill rather than "auto" against an
+          indeterminate box (CSS Sizing §5.3 — the exact trap `filter-bar.tsx`'s
+          own header documents). A caller passing anything OTHER than
+          `<FilterBar>` here still works: a single React node bare in a flex
+          row behaves exactly as it did wrapped, since there is nothing else on
+          its line to steal width from. */}
+      {filters}
       {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
       {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
