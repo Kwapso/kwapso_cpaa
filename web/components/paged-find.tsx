@@ -442,6 +442,7 @@ export function PagedFind<T>({
             onValueChange={(by) => setSortBy(by)}
             direction={sortDir ?? landsOn}
             onDirectionChange={(dir) => setSortDir(dir)}
+            hideLabel
           />
         )}
         {/* THE FILTERED TOTAL — the exact server count of the question being
