@@ -163,9 +163,14 @@ export function WaveFinder({
             field: "accountId",
             label: t("Client"),
             control: "select" as const,
-            // No `searchable` flag any more: the kit's facet carries its own
-            // search field, which an agency with 131 clients on staging needs
-            // and a two-word one does not mind having.
+            // No `searchable` flag: a facet declares its OPTIONS and nothing
+            // about how they are picked over (`FilterFacet`, config.ts).
+            // Whether the panel offers a search field is one decision in one
+            // place — and since 2 Sep 2026 the answer is no: a facet is a
+            // compact `Select` (client ruling, filter-bar.tsx's own header),
+            // which scrolls and takes type-ahead. This is the list that pays
+            // for that — an agency with 131 clients on staging — and the
+            // toolbar's own search box beside it is untouched.
             options: clients.map((a) => ({ value: a.id, label: a.name })),
           },
         ]

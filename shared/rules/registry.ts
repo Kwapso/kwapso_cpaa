@@ -595,10 +595,19 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // RAISED AGAIN, SAME DAY, 141 → 142: ThemeSection's card press gained a
 // success toast ("Theme changed.") to match SpineSection and ScaleSection,
 // which already confirm their own presses this way.
+//
+// RAISED AGAIN, SAME DAY, 142 → 143: the filter panel's facets became compact
+// fields (client ruling against her own artifact — see
+// shared/web/screen-engine/filter-bar.tsx), so each one says what it says while
+// nothing is picked: "Any {what}", ONE new interpolated string. Two strings
+// left the catalogue in the same change (the expanded facet's own "Search
+// {what}…" and "No matches."), and both were already answered in all three
+// languages, so losing them moves no count — the net +1 is the new sentence
+// alone, on the same blocked translation path every raise above cites.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 142,
-  es: 142,
-  ca: 142,
+  de: 143,
+  es: 143,
+  ca: 143,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

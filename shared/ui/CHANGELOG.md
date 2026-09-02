@@ -1,5 +1,48 @@
 # Changelog
 
+## v1.2.23 — 2026-09-02
+
+### Fixed — the rail's collapse toggle and member chip no longer scroll with the entries
+
+Client, verbatim: "when i svroll down the expand/collpase button in navbar
+also moved. make sure this does not happen."
+
+`Rail` (`rail.tsx`) scoped no scroll region of its own anywhere — the file
+contained no `overflow-y-auto` and no `min-h-0` before today. Its `<nav>`
+carried `flex-1` and nothing else, so a rail with more entries than fit
+simply grew past the bottom of its column, and the only box a consuming
+application could then put `overflow-y-auto` on was the whole `<Rail>`,
+foot included. That is why the collapse toggle and the member chip — real
+siblings AFTER the `<nav>`, already structurally at the foot — travelled
+upward with the list.
+
+The scroll is the composition's now, and it is the `<nav>`'s: `min-h-0`
+(without which `flex-1` still floors that item at its content's height and
+nothing can ever overflow) plus `overflow-y-auto`. The toggle and the chip
+sit outside the scroller and cannot move, in both rail states. The rail
+root also gained `max-h-full` alongside its existing `min-h-full`, so the
+rail is EXACTLY its column wherever the column has a height to be exact
+about; against an auto-height parent 100% resolves against nothing and the
+rail grows exactly as it always did.
+
+The `<nav>` also takes a `calc(--focus-offset + --focus-width)` negative
+margin and an equal padding. That is not spacing: a scroll container clips
+its other axis too, and tokens.css §8 rings every control off its edge, so
+a focused row against the new box's edges would have had its ring sliced.
+The two cancel exactly — 212 elements across the harness's three static
+cases were compared before and after, and the only computed difference in
+any of them is that padding/margin pair on the `<nav>`, which paints
+nothing. No row shape, no active pill, no spine colour, no chip styling, no
+token moved.
+
+`verify/rail/` gains a `scroll` case: two height-bounded columns, expanded
+and collapsed, each with more entries than fit and each keeping the
+application's own outer `overflow-y-auto` in place, because the fix has to
+hold with that wrapper still there. Measured on it, scrollTop 0 → max: the
+toggle and the chip move 0px in both states while the rows move the full
+675px (expanded) / 472px (collapsed). Before the fix the same probe moved
+the toggle and the chip 630px / 473px, in lockstep with the rows.
+
 ## v1.2.22 — 2026-09-02
 
 ### Changed — the rail's active row is an inset pill, not a full-bleed one

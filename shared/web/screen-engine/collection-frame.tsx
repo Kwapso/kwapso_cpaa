@@ -530,15 +530,32 @@ function CollectionFrame<T>({
     // so there is no floating surface left here for a Dialog's scroll lock to
     // fight with. `modal` still gates the mobile Sort popover below, which is
     // unrelated and unchanged.
+    // WRAPPED IN A `relative` BOX, and that box is the whole point of the
+    // wrapper — `FilterBar`'s open panel is `position: absolute` with
+    // `top-full`/`inset-x-0` (filter-bar.tsx, 2 Sep 2026: a flex-sibling
+    // panel fed its own height into the toolbar's `rounded-pill` and drew a
+    // giant oval), so it anchors to the nearest POSITIONED ancestor. The kit's
+    // own frame wraps whatever it is handed here in `<div className="flex
+    // min-w-0 flex-wrap items-center gap-2">` with no `position` of its own
+    // (`shared/ui/components/collection-frame/collection-frame.tsx`, R39 — a
+    // hand-edit there turns the build red), and nothing above it is positioned
+    // either, so without this the panel would measure against the initial
+    // containing block and land at the wrong width in the wrong place. This
+    // anchor is narrower than the toolbar — it is only the filters slot — so
+    // the panel carries its own `min-w-*` to keep a usable measure; marking
+    // the kit's own wrapper `relative` is the upstream fix, logged for the
+    // design-kit pipeline.
     const filterBar = showFilterBar && !isEmptyState ? (
-      <FilterBar
-        facets={config.filterFacets}
-        values={facetValues}
-        data={data}
-        onChange={setFacet}
-        onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
-        resultCount={filtered.length}
-      />
+      <div className="relative flex min-w-0 items-center">
+        <FilterBar
+          facets={config.filterFacets}
+          values={facetValues}
+          data={data}
+          onChange={setFacet}
+          onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
+          resultCount={filtered.length}
+        />
+      </div>
     ) : null
     // THE VIEW-SWITCH SLOT, BY THE KIT'S OWN PRECEDENT: CH27.13 shares it
     // between the actual view switcher and "the sub-tab picker are controls"
@@ -729,8 +746,14 @@ function CollectionFrame<T>({
                   share a line with the search box, so it is the one
                   legitimate second line here — connected to the row above
                   it rather than floating disconnected from "the toolbar",
-                  and never present when there is nothing to filter. */}
-              <div className="flex flex-col gap-2 sm:hidden">
+                  and never present when there is nothing to filter.
+                  `relative` — `filter-bar.tsx`'s OPEN panel is `position:
+                  absolute` with `top-full`/`inset-x-0` (2 Sep 2026: a
+                  flex-sibling panel fed its height into the toolbar pill and
+                  drew a giant oval), so it measures against the nearest
+                  positioned ancestor; this block is it, which puts the panel
+                  under the whole phone header at the header's own width. */}
+              <div className="relative flex flex-col gap-2 sm:hidden">
                 <div className="flex items-center gap-2">
                   {config.searchable ? (
                     <SearchInput
@@ -797,8 +820,16 @@ function CollectionFrame<T>({
                   keeps it beside search+filters on this one row; "stacked"
                   (default) keeps it on its own row below, exactly as before
                   this fix — that split is a title/sort decision this bug is
-                  not about, and it stays untouched. */}
-              <div className="hidden sm:block">
+                  not about, and it stays untouched.
+                  `relative` is the OTHER half of `filter-bar.tsx`'s open
+                  panel, which is `position: absolute` with
+                  `top-full`/`inset-x-0` so its own height can never feed a
+                  toolbar's box model (2 Sep 2026: it did, once, and drew a
+                  giant oval). It is marked on THIS block rather than on
+                  either layout's inner row so the panel measures against the
+                  whole desktop header in both — under "stacked" that means it
+                  opens below the sort row instead of over it. */}
+              <div className="relative hidden sm:block">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {titleBlock}

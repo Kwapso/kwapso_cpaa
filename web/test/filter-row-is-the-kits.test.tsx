@@ -32,6 +32,7 @@ import type { FacetOption, FilterFacet } from "@shared/web/screen-engine/config"
 const ROOT = join(__dirname, "..", "..")
 const ADAPTER = "shared/web/screen-engine/filter-bar.tsx"
 const KIT_FILTER_BAR = "@shared/ui/components/filter-bar/filter-bar"
+const KIT_SELECT = "@shared/ui/components/select/select"
 
 /** Radix measures itself and captures the pointer; jsdom does neither, and
  * without these a panel never opens — which would make every assertion below
@@ -99,29 +100,64 @@ function Harness({ facets = FACETS }: { facets?: FilterFacet[] }) {
 }
 
 /** Open the facet panel and choose a word. The panel opens once and stays open;
- * pressing the slot again would toggle it shut. */
+ * pressing the slot again would toggle it shut.
+ *
+ * TWO OPENINGS, NOT ONE, since the facets became compact fields (2026-09-02):
+ * the PANEL opens off the "Filter" chip, and then the facet's own `Select`
+ * opens off its trigger — on `pointerdown`, which is the one event Radix's
+ * trigger listens for, so a `click` here would open nothing and every
+ * assertion below would pass by never running. That is the failure this whole
+ * file exists to refuse.
+ *
+ * The list is PORTALLED, so the option is found on `screen` rather than inside
+ * the facet's own group; the facet is still addressed by its heading first, so
+ * a test cannot pass by operating the facet beside it. */
 async function pick(label: string, option: string) {
-  if (screen.queryAllByRole("listbox").length === 0)
-    fireEvent.click(screen.getByRole("button", { name: "Filter" }))
+  if (screen.queryAllByRole("group", { name: label }).length === 0)
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
   const facet = await screen.findByRole("group", { name: label })
-  fireEvent.click(within(facet).getByRole("option", { name: option }))
+  fireEvent.pointerDown(within(facet).getByRole("combobox"), {
+    button: 0,
+    ctrlKey: false,
+    pointerId: 1,
+    pointerType: "mouse",
+  })
+  const listbox = await screen.findByRole("listbox")
+  fireEvent.click(within(listbox).getByRole("option", { name: option }))
 }
 
 const chips = () => document.querySelectorAll('[data-slot="filter-chip"]')
 
 describe("the app's filter row is the design kit's", () => {
-  it("draws all three of the kit's own controls, and declares none of its own", () => {
+  it("every control in the filter row is one the kit draws, and none is ours", () => {
     const adapter = readFileSync(join(ROOT, ADAPTER), "utf8")
-    for (const name of ["FilterBar as KitFilterBar", "RangeFacet", "SearchableFacet"])
+    for (const name of ["FilterBar as KitFilterBar", "RangeFacet"])
       expect(
         adapter.includes(name),
         `${ADAPTER} must draw the kit's ${name} — that is the whole point of this file`
       ).toBe(true)
     expect(adapter).toContain(KIT_FILTER_BAR)
+    // THE COMPACT FACET FIELD IS THE KIT'S `Select` (client ruling,
+    // 2026-09-02). It used to be the kit's `SearchableFacet`, an
+    // always-expanded heading + search pill + checkbox list, which is what her
+    // screenshot caught hanging under the Apps toolbar where her artifact
+    // draws one short field reading "Any client". The kit's filter-bar file
+    // ships no compact facet, so the adapter composes one from the kit's own
+    // select — and the assertion moves with it rather than being dropped,
+    // because the thing this file refuses is a HAND-ROLLED control, not a
+    // particular kit export. A `SelectTrigger` written out here in divs would
+    // look identical and be exactly the regression of 2026-08-27 again.
+    expect(
+      adapter.includes(KIT_SELECT),
+      `${ADAPTER}'s compact facet must be the kit's Select, never a hand-rolled trigger`
+    ).toBe(true)
 
     // …and NOBODY declares a control of their own under one of those names,
     // which is the exact shape the app shipped for months. Read off the disk,
     // not off a hand-list: the last one was three files nobody had listed.
+    // `SelectFacet` is on the list for the same reason the other three are —
+    // it is the adapter's own name for the compact field, and a second one
+    // anywhere else would be the same drift under a newer word.
     const roots = ["web", "web-portal", "shared/web"].map((d) => join(ROOT, d))
     const declared: string[] = []
     for (const f of sourceFiles(roots, {
@@ -131,7 +167,7 @@ describe("the app's filter row is the design kit's", () => {
     })) {
       if (f.rel === ADAPTER) continue
       const src = stripComments(f.source)
-      for (const name of ["FilterBar", "SearchableFacet", "RangeFacet"])
+      for (const name of ["FilterBar", "SearchableFacet", "RangeFacet", "SelectFacet"])
         if (new RegExp(`\\b(?:function|const|class)\\s+${name}\\b`).test(src))
           declared.push(`${f.rel}: ${name}`)
     }
@@ -204,8 +240,14 @@ describe("the app's filter row is the design kit's", () => {
     await pick("Type", "A note")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"note"}'))
     expect(chips().length, "one facet, one chip").toBe(1)
-    // …and picking the word that is already on CLEARS it.
-    await pick("Type", "A note")
+    // …and TURNING THE FACET OFF is its own row, "Any type", which is what the
+    // field says while nothing is on. It used to be "pick the word that is
+    // already on"; a compact select (2026-09-02) has no such gesture — picking
+    // the chosen row again is a no-op in every select in the app, and inventing
+    // an exception here would make this one control behave unlike the rest. The
+    // value that reaches the caller is still `""`, never the sentinel the row
+    // carries so Radix will accept it.
+    await pick("Type", "Any type")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe("{}"))
     expect(chips().length).toBe(0)
   })

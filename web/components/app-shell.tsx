@@ -171,7 +171,19 @@ function StandaloneNavItem({
     "[&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0",
     collapsed
       ? "size-[var(--avatar-md)] justify-center rounded-pill p-0"
-      : "h-[var(--control-height-button)] w-auto rounded-pill -mx-[var(--rail-inset,0px)] px-[calc(var(--rail-inset,0px)+var(--space-3))]",
+      // Transcribed from the kit's own `ROW_EXPANDED` (rail.tsx), which stopped
+      // bleeding to the rail's true edge in v1.2.22 — the client asked for the
+      // active pill to keep "a bit of blank space on the sides". Home is the
+      // one destination outside any group, so it is drawn here rather than by
+      // the rail composition, and the kit exports no row-shape constant to
+      // import; keeping the two in step is manual until it does.
+      //
+      // (Spelling the composition's name in prose here, rather than as its JSX
+      // tag, is deliberate: web/test/shell-nav.test.ts finds the rail by the
+      // first index of that tag in this file's source and measures the distance
+      // to the profile menu, so a mention in a comment above the real element
+      // moves the anchor 40k characters and fails the test.)
+      : "h-[var(--control-height-button)] w-auto rounded-pill px-[var(--space-3)]",
     active
       ? "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)] font-[var(--font-weight-medium)] hover:bg-[var(--spine-active-hover)]"
       // `--ink-secondary`, not `--spine-ink-quiet` — the same darker-chip
@@ -820,37 +832,26 @@ export function AppShell({
           initial `visible` as `auto` instead the moment its OTHER axis is
           anything but `visible` (so a lone `overflow-y-auto` quietly becomes
           `overflow-y-auto overflow-x-auto`, not `overflow-y-auto
-          overflow-x-visible`). Every `<Rail>` row bleeds full-width through
-          its own `-mx-[var(--rail-inset)]` (the same full-bleed trick
-          `railContent` cancels for itself two levels up with a matching
-          negative margin + padding).
+          overflow-x-visible`).
 
-          `-mx-[var(--rail-inset)] px-[var(--rail-inset)]` BELOW RE-SPEND THAT
-          INSET HERE TOO — found 2 Sep 2026 chasing a client report of a
-          SQUARE active row under a grouped section ("Apps" under "Build"),
-          reproducible after a hard cache clear (not caching), row shape
-          confirmed fine both in source and in the deployed bundle
-          (`ROW_EXPANDED`, rail.tsx, genuinely `rounded-pill`). The earlier
-          cut of this comment stopped at "name `overflow-x` explicitly",
-          reasoning only about the SCROLL bug — but `overflow-x-clip` clips
-          anything past this box's own padding edge, and this div had no
-          padding: the inset was spent two levels up, on `railContent`, not
-          next to `<Rail>` itself. So the row bled its inset (24px,
-          comfortable) past ITS immediate container to reach the true column
-          edge — exactly where `rounded-pill`'s curve lives on a 40px pill
-          (20px radius, inside that 24px band) — and this div's clip boundary
-          sat 24px short of that, at the row's PRE-bleed edge: the curve was
-          cut away whole, which is why the corner read flat rather than
-          "less round". Confirmed by reproducing this class chain in
-          isolation and measuring both boxes (clip box narrower than the row
-          box by exactly `--rail-inset` per side before this fix, identical
-          after). `StandaloneNavItem` (Home) never hit this — it renders
-          directly inside `railContent`, whose own padding already sits where
-          its bleed expects it. Re-spending the inset here matches that same
-          cancel-and-respend, one level closer in, so `overflow-x-clip` still
-          does only the job it was added for: no sideways scroll, and nothing
-          left to clip. */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-clip -mx-[var(--rail-inset)] px-[var(--rail-inset)]">
+          THIS DIV USED TO RE-SPEND `--rail-inset` (`-mx-[…] px-[…]`), AND NO
+          LONGER NEEDS TO. That pair was added 2 Sep 2026 for a client report
+          of a SQUARE active row under a grouped section ("Apps" under
+          "Build"): back then every `<Rail>` row bled full-width through its
+          own `-mx-[var(--rail-inset)]`, and `overflow-x-clip` clips anything
+          past THIS box's padding edge — which sat 24px short of where the
+          bled row's `rounded-pill` curve actually lived, so the curve was cut
+          away whole and the corner read flat. Cancelling and re-spending the
+          inset here moved the clip boundary out to meet it.
+
+          The kit then removed the bleed outright in v1.2.22 (the client's
+          next ruling on the same row: "allow a bit of blank space on the
+          sides"), so `ROW_EXPANDED` is a plain inset pill now and nothing in
+          `<Rail>` reaches past this box at all. The pair had become a
+          geometric no-op sitting on top of a reason that no longer existed,
+          which is the shape a future reader mis-copies. `overflow-x-clip`
+          stays: it is still doing the one job it was added for. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-clip">
         <div className="[&_[data-slot=rail-item][data-active]]:rounded-pill">
         <Rail
           // See the comment on `closedGroups` above: `defaultOpen` is read once

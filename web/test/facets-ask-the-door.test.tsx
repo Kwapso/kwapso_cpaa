@@ -22,12 +22,15 @@
 // reordered nothing at all. None of them asked whether anything moves when
 // somebody presses the thing. This file asks nothing else.
 //
-// THE CONTROL IS THE DESIGN KIT'S NOW (2026-08-27), and this file changed with
-// it in exactly one place: `pick` below. It used to drive two different code
-// paths — past eight options the old row drew a cmdk popover, under it a Radix
-// Select, so one facet opened on a click and the other on a pointerdown. The
-// kit draws ONE facet control, a heading over a search pill over a checkbox
-// list, and every facet in the app is that. What is asserted underneath has not
+// THE CONTROL IS THE DESIGN KIT'S NOW (2026-08-27), and this file has changed
+// with it in exactly one place both times: `pick` below. It used to drive two
+// different code paths — past eight options the old row drew a cmdk popover,
+// under it a Radix Select, so one facet opened on a click and the other on a
+// pointerdown. The kit's own `SearchableFacet` replaced both with one
+// always-expanded list. Then the client ruled that list out (2026-09-02: her
+// artifact draws one short field reading "Any client", not a search box over
+// every client), so a facet is the kit's `Select` inside the same panel, and
+// `pick` opens two things instead of one. What is asserted underneath has not
 // moved a line: operate the real control, read what the door was asked.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -99,14 +102,28 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
  * panel is opened once and the second `pick` in a test finds it already open —
  * pressing the slot again would TOGGLE it shut, which is the one way this
  * helper could quietly stop operating anything. The facet is then addressed by
- * its own heading, so a test cannot pass by clicking an identically-named word
- * in the facet beside it. */
+ * its own heading, so a test cannot pass by operating an identically-named word
+ * in the facet beside it.
+ *
+ * THE FACET'S OWN FIELD OPENS SECOND (2026-09-02, the compact-field ruling —
+ * see the header). Radix's select trigger listens for `pointerdown` and
+ * nothing else, so a `click` here would open nothing and every assertion in
+ * this file would pass over a door that was never asked. Its list is
+ * PORTALLED, which is why the option is found on `screen` and not inside the
+ * facet's own group. */
 async function pick(label: string, option: string) {
-  if (screen.queryAllByRole("listbox").length === 0)
-    fireEvent.click(screen.getByRole("button", { name: "Filter" }))
+  if (screen.queryAllByRole("group", { name: label }).length === 0)
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
   const facet = await screen.findByRole("group", { name: label })
-  await waitFor(() => expect(within(facet).getAllByRole("option").length).toBeGreaterThan(0))
-  fireEvent.click(within(facet).getByRole("option", { name: option }))
+  fireEvent.pointerDown(within(facet).getByRole("combobox"), {
+    button: 0,
+    ctrlKey: false,
+    pointerId: 1,
+    pointerType: "mouse",
+  })
+  const listbox = await screen.findByRole("listbox")
+  await waitFor(() => expect(within(listbox).getAllByRole("option").length).toBeGreaterThan(0))
+  fireEvent.click(within(listbox).getByRole("option", { name: option }))
 }
 
 const shownKey = () => screen.getByTestId("listkey").textContent as string

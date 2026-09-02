@@ -268,18 +268,16 @@ export function AddButton({
  * Two call sites is two chances to draw that shape by hand, so it is a slot of
  * this component now, the same way `search` and `actions` already are.
  *
- * `filters` (and `sort`) are wrapped in their own non-growing flex box rather
- * than rendered bare: `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`)
- * renders `w-full` internally — the kit's own chip row is meant to claim a
- * full line when it is the ONLY thing on it — and a bare `w-full` child inside
- * this flex row would claim the rest of the line for itself and push
- * `actions` onto a line of its own, which is the same two-row shape one level
- * down. The kit's OWN toolbar (`shared/ui/components/collection-frame/
- * collection-frame.tsx`) wraps its `filters` slot the identical way for the
- * identical reason (`<div className="flex min-w-0 flex-wrap items-center
- * gap-2">{filters}</div>`) — this is that same wrapper, so a bounded
- * collection's bare toolbar and the kit panel's own toolbar read as the same
- * control in two places.
+ * `sort` and `view` are wrapped in their own non-growing flex box rather than
+ * rendered bare, so a child that asks for `w-full` fills the WRAPPER instead
+ * of claiming the rest of this row and pushing `actions` onto a line of its
+ * own — the same two-row shape one level down. `filters` is NOT wrapped here,
+ * and that is deliberate rather than an omission: `FilterBar`
+ * (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own chip
+ * cluster in exactly that non-growing box internally, and its OPEN panel is
+ * `position: absolute` against this track's `relative` — so a wrapper here
+ * would add a second identical box round the chips and a narrower anchor
+ * under the panel, and buy nothing. See the `{filters}` slot below.
  *
  * FIVE NAMED SLOTS, NOT A HARDCODED ROW. Each is independently optional (a
  * caller with no facets passes no `filters`, exactly as one with no search

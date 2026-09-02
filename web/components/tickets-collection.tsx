@@ -199,11 +199,12 @@ export function TicketsCollection({
   // help-form-dialog.tsx's own account picker was rewritten off of ("offered
   // the newest fifty companies and had no opinion about the rest"). This facet
   // inherits that same limitation rather than fixing it: a live, searched
-  // facet option list is a capability `SearchableFacet` does not have today
+  // facet option list is a capability no facet control in this app has today
   // (shared/web/screen-engine/filter-bar.tsx's own header says the async
-  // option-provider was removed as dead code, and re-adding it is outside this
-  // fix's remit). Filed as a known gap rather than silently shipped as if it
-  // were complete.
+  // option-provider was removed as dead code, and — since 2 Sep 2026 — that a
+  // facet is a compact `Select`, which scrolls and type-aheads but does not
+  // search; re-adding a searched one is outside this fix's remit). Filed as a
+  // known gap rather than silently shipped as if it were complete.
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () =>
     tenancy.accounts().then((r) => r.accounts)
   )

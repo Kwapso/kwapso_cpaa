@@ -1019,8 +1019,13 @@ function RailRow({ item, active, collapsed, reserveIcon, onSelect }: RowProps) {
  *                      Collapsed, a tooltip carries the label as well.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once,
  *                      and every entry in here is a real `<a>` or `<button>`.
- *                      An expanded row is square now, so its ring is square:
- *                      the global rule follows the control's own radius.
+ *                      The ring follows the control's own radius, so an
+ *                      expanded row rings as a pill — square until v1.2.22,
+ *                      when `ROW_EXPANDED` became one (this line said "square
+ *                      now" for a day after it stopped being true). The nav
+ *                      that holds these rows scrolls, and a scroll container
+ *                      clips: it keeps a `--focus-offset` + `--focus-width`
+ *                      pad so a ring on the first or last row is not sliced.
  *  4. active/pressed — the 1px downward nudge AND NOTHING ELSE. 26.01: "Press
  *                      state is a 1px downward translate, no color flash."
  *                      Never on a blocked row.
@@ -1139,7 +1144,17 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
              the SHELL paints it, on the column, because the spine has to run
              the column's full height and reach edges this component sits
              inside the padding of. */
-          "flex min-h-full min-w-0 flex-1 flex-col gap-[var(--space-6)]",
+          /* AND IT MAY NOT GROW PAST THE COLUMN EITHER. `min-h-full` alone
+             says "at least the column's height"; a rail with more entries
+             than fit then quietly says "and as much more as I like", which
+             pushes the toggle and the chip out of the bottom of the spine and
+             leaves the application no box to scroll but this whole component.
+             Capping at the same 100% makes the rail EXACTLY its column
+             wherever the column has a height to be exact about, and where it
+             has not (an auto-height parent), 100% resolves against nothing
+             and the rail grows exactly as it always did. What gives instead
+             is the nav below, which is now the one thing here that scrolls. */
+          "flex max-h-full min-h-full min-w-0 flex-1 flex-col gap-[var(--space-6)]",
           isCollapsed && "w-[var(--avatar-md)] flex-none items-center",
           className,
         )}
@@ -1207,13 +1222,45 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
           </div>
         ) : null}
 
-        {/* THE ENTRIES. `flex-1` so the member chip is pinned to the foot at
-            every height, which is what every in-situ screen draws. */}
+        {/* THE ENTRIES — AND THE ONLY THING IN THIS COLUMN THAT SCROLLS.
+
+            `flex-1` so the toggle and the member chip are pinned to the foot
+            at every height, which is what every in-situ screen draws.
+
+            AND `min-h-0` + `overflow-y-auto`, SINCE 2026-09-02, BECAUSE THE
+            FOOT WAS NOT ACTUALLY PINNED. Client, verbatim: "when i svroll
+            down the expand/collpase button in navbar also moved. make sure
+            this does not happen." Until today this component scoped NO scroll
+            region of its own anywhere, so a rail with more entries than fit
+            had to be scrolled by the APPLICATION — and the only box an
+            application can reach is the whole `Rail`, foot included, which is
+            precisely why the toggle and the chip travelled with the list.
+            Owning the scroll here is the fix, and it belongs here: only this
+            file knows which of its children are the list and which are the
+            foot. `min-h-0` is half of it and not optional — `flex-1` alone
+            still floors this item at its content's height (`min-height:auto`
+            is a flex item's default), so without it nothing can ever overflow
+            and `overflow-y-auto` would never fire. The toggle and the chip
+            are siblings AFTER this element, so they are structurally outside
+            the scroller and cannot move, expanded or collapsed.
+
+            THE GUTTER IS NOT SPACING, AND IT IS NOT A NEW NUMBER. A scroll
+            container clips its OTHER axis too (CSS: `visible` computes to
+            `auto` opposite a non-`visible` value), and tokens.css §8 rings
+            every control at once with a `--focus-width` line held
+            `--focus-offset` off its edge — so a focused row against any of
+            this box's four edges would have its ring sliced off. The negative
+            margin and the equal padding cancel each other exactly, so the
+            entries' content box is the byte-for-byte one they already sat in
+            and every gap in this column is unchanged; only the clip moved out
+            of the ring's way. */}
         <nav
           data-slot="rail-nav"
           aria-label={label}
           className={cn(
-            "flex min-w-0 flex-1 flex-col gap-[var(--space-5)]",
+            "flex min-h-0 min-w-0 flex-1 flex-col gap-[var(--space-5)] overflow-y-auto",
+            "-m-[calc(var(--focus-offset)_+_var(--focus-width))]",
+            "p-[calc(var(--focus-offset)_+_var(--focus-width))]",
             isCollapsed && "items-center gap-[var(--space-3)]",
           )}
         >
