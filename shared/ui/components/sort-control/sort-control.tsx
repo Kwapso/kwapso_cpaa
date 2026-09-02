@@ -57,6 +57,17 @@
    · Every string is a prop with a default: "Sort by", "Ascending",
      "Descending", and the direction control's own name.
 
+   ORDER FLIP (client, 2026-09-02) — verbatim: "on the sort by, cange the
+   ordre: so on tge left of the fused we have the arrow and on the right the
+   value and dropdow." The chip's DOM order is now [direction, field]: the
+   arrow button first, the field (value + chevron) second. Rounding follows
+   the DOM, not the words "left"/"right" — `directionVariants` now owns
+   `rounded-s-pill rounded-e-none` (its outer corner is the chip's START) and
+   `fieldVariants`'s `fused` variant now owns `rounded-e-pill rounded-s-none`
+   (its outer corner is the chip's END). Reasoned in logical terms so this
+   still mirrors correctly under `dir="rtl"` — see the RTL paragraph on
+   `SortControl` itself, updated to match.
+
    RENDERING CONTEXT
    `"use client"`. It holds the uncontrolled key and direction, and attaches
    handlers.
@@ -152,9 +163,11 @@ const fieldVariants = cva(["w-auto"], {
     },
     /** `showDirection` reaching this half of the pair — see the file header.
         A list with one natural order (`showDirection: false`) keeps the
-        field's own full pill, nothing squared off with nothing to meet it. */
+        field's own full pill, nothing squared off with nothing to meet it.
+        Since the ORDER FLIP (client, 2026-09-02) the field is the SECOND
+        (end) half of the chip, so it is the END corner that stays a pill. */
     fused: {
-      true: "rounded-s-pill rounded-e-none",
+      true: "rounded-e-pill rounded-s-none",
       false: "",
     },
   },
@@ -163,9 +176,11 @@ const fieldVariants = cva(["w-auto"], {
 
 /* FUSED WITH THE FIELD (client, 2 Sep 2026) — her reference artifact draws
    one seamless chip, not a bordered field with a bare icon floating beside
-   it on a gap. Only the OUTER corner stays a pill (`rounded-e-pill
-   rounded-s-none`); the shared inner edge squares off against the field's
-   matching edge (`fused` on `fieldVariants` above).
+   it on a gap. Only the OUTER corner stays a pill — `rounded-s-pill
+   rounded-e-none` since the ORDER FLIP the same day (see the file header)
+   made this control the FIRST (start) half of the chip; the shared inner
+   edge squares off against the field's matching edge (`fused` on
+   `fieldVariants` above).
 
    THE RESTING SKIN IS NOW THE FIELD'S NEW ONE, NOT `select.tsx`'s — same
    ruling, same day, second half. This half used to mirror the CH09 field
@@ -187,7 +202,7 @@ const fieldVariants = cva(["w-auto"], {
 const directionVariants = cva(
   [
     "grid shrink-0 cursor-pointer place-content-center",
-    "appearance-none rounded-e-pill rounded-s-none border-0",
+    "appearance-none rounded-s-pill rounded-e-none border-0",
     "enabled:active:translate-y-[0.0625rem]",
     "enabled:focus-visible:shadow-[inset_0_0_0_0.0625rem_var(--foreground)]",
     "transition-[background-color,box-shadow,color,translate]",
@@ -300,11 +315,18 @@ export interface SortControlProps
  *  toolbar scrolls — that is the composition's decision and `FilterBar` states
  *  the same answer for the same reason.
  *
- * RTL — safe, and this is the component where it matters most: the chevron
- * and the direction control both sit at the INLINE end (`justify-between`,
- * `end-*`, DOM order), so both move to the visual start in Arabic, Urdu and
- * Persian, and Radix mirrors the list's own alignment from `dir`. The up/down
- * arrows are vertical and mean the same thing in every script.
+ * RTL — safe, and this is the component where it matters most. Since the
+ * ORDER FLIP (client, 2026-09-02) the chip is [direction, field] in DOM
+ * order: the direction control sits at the chip's inline START
+ * (`rounded-s-pill`, first child, no literal side), and the field's own
+ * chevron stays at ITS inline end (`SelectTrigger`'s `justify-between`,
+ * unaffected by the outer reorder because it lives inside the field, not
+ * beside it). Reasoned in logical properties throughout, so in Arabic, Urdu
+ * and Persian the whole chip mirrors: logical start is the visual RIGHT, so
+ * the arrow renders on the right and the field (value + chevron) on the
+ * left — the same mirrored relationship LTR readers see reversed. Radix
+ * mirrors the list's own alignment from `dir`. The up/down arrows are
+ * vertical and mean the same thing in every script.
  */
 const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
   (
@@ -402,6 +424,25 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
             border on each side of empty air (see `fieldVariants`'s `fused`
             and `directionVariants`'s own header). */}
         <span className="inline-flex min-w-0 items-center">
+          {showDirection ? (
+            <button
+              type="button"
+              data-slot="sort-control-direction"
+              disabled={inert}
+              onClick={flipDirection}
+              className={directionVariants({ size, state })}
+            >
+              <DirectionGlyph size={glyphSize} aria-hidden="true" />
+              {/* The control's accessible name is its content, so it says both
+                  what the control is and which way the list is running now. */}
+              <span className="sr-only">
+                {directionLabel}
+                {": "}
+                {currentDirection === "asc" ? ascendingLabel : descendingLabel}
+              </span>
+            </button>
+          ) : null}
+
           <span data-slot="sort-control-field" className="relative inline-flex min-w-0 items-center">
             <Select value={currentValue} onValueChange={handleValue} disabled={inert}>
               <SelectTrigger
@@ -440,25 +481,6 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
               </span>
             ) : null}
           </span>
-
-          {showDirection ? (
-            <button
-              type="button"
-              data-slot="sort-control-direction"
-              disabled={inert}
-              onClick={flipDirection}
-              className={directionVariants({ size, state })}
-            >
-              <DirectionGlyph size={glyphSize} aria-hidden="true" />
-              {/* The control's accessible name is its content, so it says both
-                  what the control is and which way the list is running now. */}
-              <span className="sr-only">
-                {directionLabel}
-                {": "}
-                {currentDirection === "asc" ? ascendingLabel : descendingLabel}
-              </span>
-            </button>
-          ) : null}
         </span>
       </div>
     );

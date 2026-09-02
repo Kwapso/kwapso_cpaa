@@ -327,21 +327,36 @@ export const SpinePicture = ({ spine }: { spine: "ink" | "paper" | "mango" }) =>
   </span>
 );
 
-/** The scale pictures: the same record row, read at 13, 15 and 17. The kit
-    draws the row card as sheet paper inside a hairline, top-aligned, 2px
-    between lines — title 12/14/16 over metadata 10/12/14 in tertiary ink. */
+/** The scale pictures: the SAME record row — one title, one line of
+    metadata, nothing added or removed — read at 12/10, 14/12 and 16/14.
+
+    CLIENT, 2026-09-02, verbatim: "the representation is worng, chnaging
+    the size chnages the size of the text, not how much data is show. so
+    your display is wrong." She was right, and specifically about this
+    file: the picture used to answer "compact" with a SECOND metadata line
+    ("Sprint 24 · shipped") and "large" with a SHORTER one (just "Status",
+    the "· 4 open" dropped) — so scrubbing the setting looked like it
+    changed how much the app shows, when the mechanism it depicts
+    (`shared/scale.ts` in kwapso_system, the OTHER repo) sets a single root
+    font size and nothing else: type and spacing move together because
+    every size in the theme is `rem`, and no row is ever added or taken
+    away. This picture now draws exactly that and only that — identical
+    content at every step, with the block's own GAP and PADDING scaling
+    alongside the type sizes (not just the two text lines), so "spacing
+    gets bigger too" is visible, never a different amount of content. */
 export const ScalePicture = ({
   step,
 }: {
   step: "compact" | "default" | "large";
 }) => {
-  const size = step === "compact" ? 12 : step === "default" ? 14 : 16;
-  const lines =
-    step === "compact"
-      ? ["Status · 4 open", "Sprint 24 · shipped"]
-      : step === "default"
-        ? ["Status · 4 open"]
-        : ["Status"];
+  const titleSize = step === "compact" ? 12 : step === "default" ? 14 : 16;
+  const metaSize = titleSize - 2;
+  /* Gap and padding step with the type, in the same proportion — the
+     picture's stand-in for "spacing scales with text", not just the two
+     lines themselves. Values in rem, matching every other measure here. */
+  const gap = step === "compact" ? 0.0625 : step === "default" ? 0.125 : 0.1875;
+  const padX = step === "compact" ? 0.625 : step === "default" ? 0.75 : 0.875;
+  const padY = step === "compact" ? 0.5 : step === "default" ? 0.625 : 0.75;
   return (
     <span
       className={cn(
@@ -349,25 +364,24 @@ export const ScalePicture = ({
         /* The scale picture keeps its 58 band even on narrow — the kit
            never draws it at 40, and three lines of specimen type cannot
            stand in a 40px band; the words truncate instead. */
-        "h-[3.625rem] flex-col gap-[0.125rem] bg-surface-panel px-3 py-2.5 shadow-[var(--hairline)]",
+        "h-[3.625rem] flex-col bg-surface-panel shadow-[var(--hairline)]",
       )}
+      style={{ gap: `${gap}rem`, padding: `${padY}rem ${padX}rem` }}
       aria-hidden="true"
     >
       <span
         className="truncate font-[var(--font-weight-medium)] text-foreground"
-        style={{ fontSize: `${size / 16}rem`, lineHeight: 1.3 }}
+        style={{ fontSize: `${titleSize / 16}rem`, lineHeight: 1.3 }}
       >
         Record title
       </span>
-      {lines.map((line) => (
-        <span
-          key={line}
-          className="truncate text-ink-tertiary"
-          style={{ fontSize: `${(size - 2) / 16}rem`, lineHeight: 1.35 }}
-        >
-          {line}
-        </span>
-      ))}
+      {/* ONE line, EVERY step — see the header above. */}
+      <span
+        className="truncate text-ink-tertiary"
+        style={{ fontSize: `${metaSize / 16}rem`, lineHeight: 1.35 }}
+      >
+        Status · 4 open
+      </span>
     </span>
   );
 };

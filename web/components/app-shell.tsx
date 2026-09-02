@@ -823,14 +823,34 @@ export function AppShell({
           overflow-x-visible`). Every `<Rail>` row bleeds full-width through
           its own `-mx-[var(--rail-inset)]` (the same full-bleed trick
           `railContent` cancels for itself two levels up with a matching
-          negative margin + padding), and THIS wrapper never re-spends that
-          inset the way `railContent` does — so `<Rail>`'s own content is
-          genuinely wider than this div's box, the auto-converted `overflow-
-          x` had real overflow to answer, and `element.scrollLeft` moved on a
-          real drag, not just in theory. `overflow-x-clip` names the axis
-          explicitly instead of leaving it to default, so nothing here can
-          scroll sideways again no matter what a future row adds. */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-clip">
+          negative margin + padding).
+
+          `-mx-[var(--rail-inset)] px-[var(--rail-inset)]` BELOW RE-SPEND THAT
+          INSET HERE TOO — found 2 Sep 2026 chasing a client report of a
+          SQUARE active row under a grouped section ("Apps" under "Build"),
+          reproducible after a hard cache clear (not caching), row shape
+          confirmed fine both in source and in the deployed bundle
+          (`ROW_EXPANDED`, rail.tsx, genuinely `rounded-pill`). The earlier
+          cut of this comment stopped at "name `overflow-x` explicitly",
+          reasoning only about the SCROLL bug — but `overflow-x-clip` clips
+          anything past this box's own padding edge, and this div had no
+          padding: the inset was spent two levels up, on `railContent`, not
+          next to `<Rail>` itself. So the row bled its inset (24px,
+          comfortable) past ITS immediate container to reach the true column
+          edge — exactly where `rounded-pill`'s curve lives on a 40px pill
+          (20px radius, inside that 24px band) — and this div's clip boundary
+          sat 24px short of that, at the row's PRE-bleed edge: the curve was
+          cut away whole, which is why the corner read flat rather than
+          "less round". Confirmed by reproducing this class chain in
+          isolation and measuring both boxes (clip box narrower than the row
+          box by exactly `--rail-inset` per side before this fix, identical
+          after). `StandaloneNavItem` (Home) never hit this — it renders
+          directly inside `railContent`, whose own padding already sits where
+          its bleed expects it. Re-spending the inset here matches that same
+          cancel-and-respend, one level closer in, so `overflow-x-clip` still
+          does only the job it was added for: no sideways scroll, and nothing
+          left to clip. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-clip -mx-[var(--rail-inset)] px-[var(--rail-inset)]">
         <div className="[&_[data-slot=rail-item][data-active]]:rounded-pill">
         <Rail
           // See the comment on `closedGroups` above: `defaultOpen` is read once

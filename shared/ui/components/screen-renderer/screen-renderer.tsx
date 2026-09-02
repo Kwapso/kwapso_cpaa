@@ -264,6 +264,17 @@ export interface ScreenRegisterProps
   /** Which register. `loading` draws skeleton lines, not a spinner. */
   tone?: ScreenRegisterTone;
   /**
+   * CH21's own eyebrow line, above the mark and the title — SCR-4's own
+   * comment below used to log this as missing; it is not, any more. Undefined
+   * draws none. On `tone="error"` it is led by the 7px poppy dot
+   * (`.t21-dot`, `--dot-status`), transcribed from `form.tsx`'s local
+   * `Register` — the ONE place in the kit that already drew this correctly —
+   * so the two do not keep two different pictures of the same chapter.
+   * Ruling 26: the dot never speaks alone, so it only ever appears beside
+   * these words, never on its own.
+   */
+  eyebrow?: React.ReactNode;
+  /**
    * The mark over the title. `undefined` takes the tone's own default icon;
    * `null` draws none — a register inside a small panel is better bare.
    */
@@ -311,8 +322,23 @@ export interface ScreenRegisterProps
    So the three marks were invented, and they are gone. `mark` stays a prop
    with its documented `null` / node contract, so a caller that wants one
    still passes one; what changes is that the kit no longer draws a picture
-   the artifact never drew. The EYEBROW half of CH21's register is still
-   missing here and needs a new prop, so it is logged, not smuggled in. */
+   the artifact never drew.
+
+   THE EYEBROW HALF, CLOSED 2026-09-02. This paragraph used to end "The
+   EYEBROW half of CH21's register is still missing here and needs a new
+   prop, so it is logged, not smuggled in" — and that gap is exactly what the
+   client meant, verbatim, weeks later and about a different symptom: "but i
+   gave you a specific design inside a card, you took it only partially."
+   27 call sites in the other repo were moved onto `ShapeStateBody` (which
+   renders THIS component) for their load-failure state, and every one of
+   them lost the eyebrow her reference card showed next to a small red dot —
+   because this component never drew one. `form.tsx` had already drawn it
+   correctly, transcribed straight off chapter 21, in a LOCAL `Register` of
+   its own (`.t21-dot`, `--dot-status`, poppy, leading the micro uppercase
+   words); it simply never reached this shared one. `eyebrow` above is that
+   same recipe, moved here so the two components stop disagreeing about one
+   chapter. The dot is scoped to `tone="error"` — ch21 draws it on the
+   FAILURE register only; the other three carry an eyebrow with no dot. */
 const REGISTER_MARK: Record<ScreenRegisterTone, React.ReactNode> = {
   loading: null,
   empty: null,
@@ -365,6 +391,7 @@ const ScreenRegister = React.forwardRef<HTMLDivElement, ScreenRegisterProps>(
     {
       className,
       tone = "empty",
+      eyebrow,
       mark,
       title,
       description,
@@ -400,6 +427,7 @@ const ScreenRegister = React.forwardRef<HTMLDivElement, ScreenRegisterProps>(
     const resolvedMark = mark === undefined ? REGISTER_MARK[tone] : mark;
     const bare =
       resolvedMark === null &&
+      eyebrow === undefined &&
       title === undefined &&
       description === undefined &&
       action === undefined &&
@@ -427,8 +455,30 @@ const ScreenRegister = React.forwardRef<HTMLDivElement, ScreenRegisterProps>(
         )}
         {...props}
       >
+        {eyebrow !== undefined && eyebrow !== null ? (
+          /* Transcribed from `form.tsx`'s local `Register` — see the note on
+             `eyebrow` above. `text-micro` sets the step, the leading and the
+             tracking but not the weight, same as there. */
+          <span
+            data-slot="screen-register-eyebrow"
+            className="inline-flex items-center gap-[var(--space-2h)]"
+          >
+            {tone === "error" ? (
+              <span
+                aria-hidden="true"
+                className="size-[var(--dot-status)] shrink-0 rounded-pill bg-destructive"
+              />
+            ) : null}
+            <span className="text-micro font-[var(--font-weight-medium)] uppercase text-ink-tertiary">
+              {eyebrow}
+            </span>
+          </span>
+        ) : null}
         {resolvedMark ? (
-          <span data-slot="screen-register-mark" className="text-ink-tertiary">
+          <span
+            data-slot="screen-register-mark"
+            className={cn("text-ink-tertiary", eyebrow !== undefined && eyebrow !== null && "mt-3")}
+          >
             {resolvedMark}
           </span>
         ) : null}

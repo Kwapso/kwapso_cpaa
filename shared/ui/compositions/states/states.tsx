@@ -102,6 +102,14 @@ export interface ShapeStateCopy {
   noResultsTitle: string;
   /** ch27.22: name the cause, not the absence. */
   noResultsDescription: string;
+  /**
+   * CH21's failure eyebrow, led by the poppy dot `ScreenRegister` now draws
+   * for `tone="error"` — added 2026-09-02, see `ShapeStateBody`'s own header.
+   * `form.tsx`'s own default for the identical register is "Load failed";
+   * kept here for the same reason PATTERN §7 wants every string named rather
+   * than repeated as a literal at each of the eleven shapes.
+   */
+  errorEyebrow: string;
   /** Ruling 06's block-level failure. */
   errorTitle: string;
   /** What to do next, in one line. */
@@ -116,6 +124,7 @@ export interface ShapeStateCopy {
    a request." Where the kit draws no copy — the assistant, the portal home —
    the sentence is written to the same law (say what happened, then the one
    next step, ch21's subtitle) and logged in GAPS-SHAPES.md. */
+const ERROR_EYEBROW = "Load failed";
 const ERROR_TITLE = "We can't show this right now";
 const ERROR_BODY = "Try again, or come back in a moment.";
 const RETRY = "Retry";
@@ -128,6 +137,7 @@ function copyFor(partial: Partial<ShapeStateCopy>): ShapeStateCopy {
     emptyDescription: "",
     noResultsTitle: "No matches",
     noResultsDescription: "Close a filter to see more.",
+    errorEyebrow: ERROR_EYEBROW,
     errorTitle: ERROR_TITLE,
     errorDescription: ERROR_BODY,
     retryLabel: RETRY,
@@ -257,7 +267,16 @@ export interface ShapeStateBodyProps
  *  5. disabled       — does not apply. There is nothing here to switch off.
  *  6. loading        — `tone="loading"`: skeleton lines, never a spinner.
  *  7. empty          — `tone="empty"`, or `noResults` when `filtered`.
- *  8. error          — `tone="error"`, ruling 06's sentence and a Retry.
+ *  8. error          — `tone="error"`: CH21's poppy-dot eyebrow
+ *                      (`words.errorEyebrow`, "Load failed" by default),
+ *                      ruling 06's sentence, and whatever `action` the call
+ *                      site passes — `ScreenRegister`'s own action row is a
+ *                      `flex flex-wrap` slot, so a Retry AND a secondary
+ *                      Copy/text action both fit one `action` node (a
+ *                      fragment of two `Button`s), the same shape as a
+ *                      single retry. 2026-09-02: closed against a client
+ *                      reference card that showed both the dot and a two-
+ *                      button row; see `ScreenRegister`'s own header.
  *  9. selected       — does not apply.
  * 10. read-only      — does not apply.
  *
@@ -304,6 +323,7 @@ function ShapeStateBody({
     <ScreenRegister
       data-slot="shape-state-body"
       tone={tone}
+      eyebrow={tone === "error" ? words.errorEyebrow : undefined}
       title={title}
       description={description}
       action={action}

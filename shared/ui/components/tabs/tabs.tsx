@@ -233,6 +233,17 @@ const TRIGGER_SKIN: Record<TabsVariant, string> = {
     // TAB-B3.
     "text-sm text-ink-secondary",
     "enabled:hover:text-foreground",
+    // "SAME WEIGHTS AS NAVBAR" — CLIENT RULING 2026-09-02, second half. The
+    // hover-preview fix below made hover and active agree; it never made the
+    // RESTING tab agree with the rail's own `ROW_IDLE`
+    // (`compositions/templates/rail.tsx`), which states its idle weight
+    // explicitly as `--font-weight-light`. Without a class here the trigger
+    // carried NO font-weight at all — a `<button>` inherits `font: inherit`
+    // from Preflight, and nothing in this file or `text-sm` ever set one — so
+    // the computed weight was the browser's default 400, a THIRD value the
+    // rail never draws. Naming it explicitly makes idle/hover/active on a tab
+    // read the identical three numbers (300/500/500) the rail's nav rows do.
+    "font-[var(--font-weight-light)]",
     // WEIGHT AS A THIRD SIGNAL, CLIENT RULING 2026-09-02 — colour is
     // untouched (the rule above is unchanged); hover on an inactive trigger
     // ALSO previews the active weight, `--font-weight-medium`, the same token
@@ -259,7 +270,15 @@ const TRIGGER_SKIN: Record<TabsVariant, string> = {
     "pb-[var(--folder-tab-overlap)] ps-5",
     "pe-[calc(var(--folder-shoulder)_+_var(--space-3h))]",
     "gap-[var(--space-2h)]",
-    // 13/300 with a quiet secondary label — 24.3's inactive tab.
+    // 13/300 with a quiet secondary label — 24.3's inactive tab. The "/300"
+    // used to be aspiration, not code: `text-caption` (below) is a kwapso
+    // step covering size, line-height and letter-spacing only — see its own
+    // token block in tokens.css — and carries no weight, so this trigger
+    // reached rest with none set at all. "SAME WEIGHTS AS NAVBAR", CLIENT
+    // RULING 2026-09-02, second half: the rail's `ROW_IDLE`
+    // (`compositions/templates/rail.tsx`) states its idle weight explicitly
+    // as `--font-weight-light`, and a folder tab now does the same, so 24.3's
+    // own "300" is finally a class and not just a comment.
     //
     // The resting ink is an arbitrary PROPERTY, not `text-ink-secondary`, and
     // that is not a style choice. tailwind-merge does not know that
@@ -270,6 +289,7 @@ const TRIGGER_SKIN: Record<TabsVariant, string> = {
     // the size survives, and it still de-duplicates against the disabled ink
     // so the two can never race on equal specificity (PATTERN §4).
     "text-caption [color:var(--ink-secondary)]",
+    "font-[var(--font-weight-light)]",
     "enabled:hover:text-foreground",
     // WEIGHT AS A THIRD SIGNAL, CLIENT RULING 2026-09-02 — colour is
     // untouched (the rule above is unchanged); hover on an inactive trigger

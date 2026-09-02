@@ -1,5 +1,125 @@
 # Changelog
 
+## v1.2.21 — 2026-09-02
+
+### Changed — the fused sort chip's order flipped: arrow on the left, field on the right
+
+Client, verbatim: "on the sort by, cange the ordre: so on tge left of the
+fused we have the arrow and on the right the value and dropdow." The chip's
+DOM order in `SortControl` (`sort-control.tsx`) is now `[direction, field]` —
+the arrow button first, the field (value + chevron) second — reversing the
+order set the same day in v1.2.20's fusion.
+
+Rounding was reasoned in logical terms throughout, not swapped by literal
+side: `directionVariants` now carries `rounded-s-pill rounded-e-none` (its
+outer corner is the chip's START, since it is now the first half) and
+`fieldVariants`'s `fused` variant carries `rounded-e-pill rounded-s-none`
+(its outer corner is now the chip's END). The file's own RTL paragraph is
+rewritten to match: the direction control sits at the chip's inline start,
+the field's own chevron stays at ITS inline end via `SelectTrigger`'s
+`justify-between`, unaffected by the outer reorder.
+
+Verified in `verify/sort-chip/`, extended with an explicit `dir="rtl"` row.
+Read back via `getBoundingClientRect` and computed `border-radius`: in LTR
+the direction control sits left of the field with `border-radius: 999px 0 0
+999px` against the field's `0 999px 999px 0` (one seamless pill, rounded
+outer corners only); in RTL the two swap physical sides (direction right of
+field) and each one's rounded corner follows it, confirming the reorder is
+driven by logical properties and not hardcoded sides. Separately confirmed,
+and NOT part of this fix: `SelectTrigger`'s own corner is governed by Radix,
+which stamps `dir="ltr"` on itself absent a mounted `DirectionProvider` —
+`demo/App.tsx` already documents this as a pre-existing, out-of-scope
+limitation (client ruling 10: the system is LTR-only). That limitation
+existed identically before this reorder, just mirrored to the other corner,
+and is unrelated to the swap.
+
+### Changed — tabs now use the rail's exact idle/active font weights, not just its hover preview
+
+Client: tabs should use "the same weights as in navbar." The rail's own
+`ROW_IDLE` (`compositions/templates/rail.tsx`) states an idle row's weight
+explicitly as `--font-weight-light` (300) and its active row (and an
+inactive row's hover) as `--font-weight-medium` (500). Tabs
+(`components/tabs/tabs.tsx`) already got the HOVER half of this right
+tonight — `enabled:hover:font-[var(--font-weight-medium)]` on both
+variants — but the RESTING state carried no weight class at all. A
+`<button>` inherits `font: inherit` from Preflight and nothing in
+`text-sm`/`text-caption` sets a weight, so an idle tab's computed weight was
+the browser's default 400 — a third value the rail never draws.
+
+`TRIGGER_SKIN.line` and `TRIGGER_SKIN.folder` both now carry
+`font-[var(--font-weight-light)]` at rest, alongside the untouched hover and
+active rules, so a tab's idle/hover/active sequence reads the identical
+three numbers (300/500/500) the rail's nav rows do.
+
+Verified in `verify/tabs-hover/`, extended with `data-probe` attributes and
+a live computed-`font-weight` readout. Read back via
+`getComputedStyle(...).fontWeight`: idle tabs read `300` and active tabs
+read `500` in both `line` and `folder`, matching the rail exactly. The
+hover rule was confirmed present and correctly compiled — `.enabled\:hover\
+:font-\[var\(--font-weight-medium\)\]:enabled:hover { font-weight:
+var(--font-weight-medium); }` — in the built stylesheet; genuine `:hover`
+could not be triggered reliably through this session's browser automation,
+but the compiled rule and token are identical to the one the rail already
+uses and already ships.
+
+### Investigated — `ScalePicture`'s three states drew a different AMOUNT of content, not just a different size
+
+Client, verbatim: "the representation is worng, chnaging the size chnages
+the size of the text, not how much data is show. so your display is
+wrong." Confirmed: `ScalePicture` (`compositions/screens/settings.tsx`) drew
+"compact" with a SECOND metadata line ("Sprint 24 · shipped"), "default"
+with one, and "large" with a SHORTER one (just "Status", the "· 4 open"
+dropped) — so scrubbing the setting looked like it changed how much the
+app shows. `shared/scale.ts` (kwapso_system) confirms the real mechanism is
+a single root font-size per step; it never adds, removes or shortens a row.
+
+Redrawn to show the SAME content — one title, one metadata line, word for
+word — at three point sizes (12/10, 14/12, 16/14), with the block's own gap
+and padding stepping up alongside the type so "spacing scales too" is
+visible without touching content.
+
+Verified in `verify/scale-picture/`: reads back each step's rendered text
+nodes. All three arrays are identical (`["Record title", "Status · 4
+open"]`); computed `font-size`/`gap`/`padding` increase monotonically
+compact → default → large.
+
+### Fixed — the error register was missing the eyebrow and dot the client's own reference card showed
+
+Client: "but i gave you a specific design inside a card, you took it only
+partially" — about the 27 call sites in kwapso_system moved onto
+`ShapeStateBody` for their load-failure state. Her reference card ("LOAD
+FAILED") showed a small red dot beside an uppercase eyebrow, a bold title,
+a description, and TWO buttons (Retry + a plain-text Copy) side by side.
+
+Traced `ShapeStateBody` (`compositions/states/states.tsx`) into
+`ScreenRegister` (`components/screen-renderer/screen-renderer.tsx`) and
+found the eyebrow was genuinely absent — `screen-renderer.tsx`'s own SCR-4
+comment already logged it: "The EYEBROW half of CH21's register is still
+missing here and needs a new prop, so it is logged, not smuggled in." The
+kit had already drawn it correctly once, in `form.tsx`'s own LOCAL
+`Register` (chapter 21's failure eyebrow: a 7px poppy dot, `--dot-status`,
+`bg-destructive`, then an uppercase micro word at weight 500) — it had
+simply never reached the shared component `ShapeStateBody` renders through.
+The two-button action row needed no fix: `ScreenRegister`'s `action` slot is
+already a `flex flex-wrap` row, so a Retry and a secondary Copy both fit one
+`action` node exactly as a single button does — the 27 call sites passing
+only one plain button is a call-site choice in the other repo, not a kit
+limitation, and is not this repo's to fix.
+
+Added `eyebrow` to `ScreenRegisterProps`, transcribed straight off
+`form.tsx`'s own recipe, with the poppy dot scoped to `tone="error"` only
+(the other three registers get an eyebrow with no dot, matching chapter
+21). Added `errorEyebrow` to `ShapeStateCopy` (default "Load failed",
+matching `form.tsx`'s own default for the identical register), wired into
+`ShapeStateBody`'s call to `ScreenRegister`.
+
+Verified in `verify/state-error/`, rendering `ShapeStateBody` at
+`state="error"` inside a `--surface-panel` card with a Retry + "Copy error
+code" action pair. Screenshot shows the dot, the "LOAD FAILED" eyebrow, the
+bold title, the description and both buttons side by side, matching the
+reference. Read back the dot's own computed `background-color`:
+`rgb(233, 74, 50)` — exactly `--kw-poppy` / `#E94A32`.
+
 ## v1.2.20 — 2026-09-02
 
 ### Changed — Filter and Sort brought to the toolbar's one pill, matching `ViewSwitch` exactly
