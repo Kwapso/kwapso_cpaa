@@ -469,19 +469,27 @@ const ROW_SHAPE = cn(
 );
 
 /**
- * Expanded: FULL-BLEED AND SQUARE, per 26.02's dev note and the client's
- * screenshots. The negative inline margin is the shell's own `--rail-inset`,
- * published on the column for exactly this; the row then pays it back in
- * padding, so the label sits where an unlit row's label already sat and
- * nothing shifts when a row lights. No `w-full`: the row is a flex item in a
- * stretching column, so dropping the width lets the negative margins take it
- * to both edges instead of pushing a 100% box sideways.
+ * Expanded: FULL-BLEED AND ROUNDED. Was square (26.02's dev note read an old
+ * client screenshot as calling for a flush, corner-square row) — overruled
+ * live, repeatedly, by the same client: the active row reads as a PILL, the
+ * one shape this whole design system otherwise uses for every lit/selected
+ * state (a tab's underline, a chip, a selected control). `rounded-pill` at
+ * this row's own fixed height (`--control-height-button`) draws a stadium —
+ * fully rounded top and bottom — which is the correct pill shape for a full-
+ * bleed bar, not a contradiction of "full-bleed."
+ *
+ * The negative inline margin is the shell's own `--rail-inset`, published on
+ * the column for exactly this; the row then pays it back in padding, so the
+ * label sits where an unlit row's label already sat and nothing shifts when
+ * a row lights. No `w-full`: the row is a flex item in a stretching column,
+ * so dropping the width lets the negative margins take it to both edges
+ * instead of pushing a 100% box sideways.
  *
  * `--rail-inset` carries a `0px` fallback so a rail rendered outside the
  * shell degrades to a plain flush row rather than to `NaN`.
  */
 const ROW_EXPANDED = cn(
-  "h-[var(--control-height-button)] w-auto rounded-none",
+  "h-[var(--control-height-button)] w-auto rounded-pill",
   "-mx-[var(--rail-inset,0px)]",
   "px-[calc(var(--rail-inset,0px)+var(--space-3))]",
 );
