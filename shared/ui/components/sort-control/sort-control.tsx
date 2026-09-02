@@ -48,10 +48,12 @@
    · Focus is the one global rule (tokens.css §8). The field moves its own
      HAIRLINE to ink on focus, which is a fill colour and not a ring.
    · Disabled is a fill and an ink — the field's hairline at 8%, a step down
-     from the resting 20% (override 42), and `--accent` withdrawn from the
-     direction button. Neither is an opacity and neither is mango. The FIELD
-     has no hover at all; the direction button, which is a button and not a
-     field, keeps its `--accent` wash.
+     from the resting 20% (override 42), and the hover withdrawn from both
+     halves. Neither is an opacity and neither is mango. AT REST, both halves
+     now answer to `--btn-secondary-hover` — client, 2026-09-02: the field
+     took `ViewSwitch`'s pill, hover included, so the chip no longer has a
+     field half with no hover standing next to a button half with `--accent`'s.
+     See `fieldVariants` and `directionVariants`'s own headers.
    · Every string is a prop with a default: "Sort by", "Ascending",
      "Descending", and the direction control's own name.
 
@@ -104,11 +106,30 @@ const sortControlVariants = cva(["inline-flex min-w-0 items-center gap-2"], {
    2026 — the FIELD's outer shape, now that it shares one chip with the
    direction control instead of standing beside it with a gap: this end
    keeps the pill, the other end squares off where the two meet. Everything
-   else the two share — the hairline, the open ink, the chevron — is
-   `select.tsx`'s and is not restated here. OVERRIDE 42 reaches this control
-   through that file: the resting edge is `--hair-strong`, disabled keeps
-   8%, and the hover `select.tsx` used to draw is gone with nothing in its
-   place. */
+   else the two share — the open ink, the chevron — is `select.tsx`'s and is
+   not restated here.
+
+   THE RESTING FILL IS NO LONGER `select.tsx`'s CH09 FIELD SKIN — a second,
+   later ruling the same day. Client, verbatim: "all the components in
+   toolbar (the sort, the filter, the view) i want them in the same pill
+   aspect exactly. match filter and sort to the existing view selector
+   component (i am happy with how that is)". `ViewSwitch` draws through this
+   same `SelectTrigger` and overrides exactly this: `--btn-secondary-fill`,
+   `shadow-none` (no hairline), `--btn-secondary-hover` on hover, weight 500.
+   Until this ruling the field kept `select.tsx`'s own bordered-field skin —
+   `bg-background`, the `--hair-strong` hairline, weight 300, no hover — which
+   was CH09's own field law and correct for a lone select, but is a visibly
+   different pill from `ViewSwitch` standing next to it: a different
+   background token (`--background` against `--btn-secondary-fill`, the same
+   colour only by coincidence in light mode and NOT in dark, where `--card`
+   and `--background` split), a hairline `ViewSwitch` has none of, and no
+   hover where `ViewSwitch` has one. Overriding it here — rather than
+   defaulting `state: "default"` to the empty string `select.tsx` already
+   gives every other trigger — is what the client's "match ... exactly"
+   asks for. `select.tsx`'s OPEN/FOCUS ink hairline is untouched: it is
+   `enabled:focus:`- and `enabled:data-[state=open]:`-scoped, so `shadow-none`
+   here only drops the RESTING edge, exactly as `ViewSwitch`'s own header
+   documents for its own copy of this override. */
 const fieldVariants = cva(["w-auto"], {
   variants: {
     size: {
@@ -119,7 +140,9 @@ const fieldVariants = cva(["w-auto"], {
     },
     /** Mutually exclusive. Resolved once, in JS, below. */
     state: {
-      default: "",
+      /** `ViewSwitch`'s own pill, restated here — see the note above. */
+      default:
+        "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)] enabled:hover:bg-[var(--btn-secondary-hover)] font-[var(--font-weight-medium)]",
       /** A fill and an ink. `SelectTrigger`'s own `disabled:` rules do the rest. */
       disabled: "",
       /** Busy: the value has not arrived, so it may not be changed. The
@@ -140,20 +163,31 @@ const fieldVariants = cva(["w-auto"], {
 
 /* FUSED WITH THE FIELD (client, 2 Sep 2026) — her reference artifact draws
    one seamless chip, not a bordered field with a bare icon floating beside
-   it on a gap. This half now takes the field's OWN drawing convention —
-   `select.tsx`'s resting/disabled/read-only hairline, the same background —
-   right up to the shared inner edge, and squares that edge off while the
-   field squares its matching one (`fused` above). Two 1px inset shadows
-   drawn on the exact same line read as one: no wrapper element duplicating
-   `select.tsx`'s state logic, just this control's own two halves agreeing
-   to draw the same border. Only the OUTER corner stays a pill. */
+   it on a gap. Only the OUTER corner stays a pill (`rounded-e-pill
+   rounded-s-none`); the shared inner edge squares off against the field's
+   matching edge (`fused` on `fieldVariants` above).
+
+   THE RESTING SKIN IS NOW THE FIELD'S NEW ONE, NOT `select.tsx`'s — same
+   ruling, same day, second half. This half used to mirror the CH09 field
+   hairline the field wore (`bg-background`, `--hair-strong`, `--accent`
+   hover): two 1px inset shadows on the exact same line, reading as one
+   continuous border. Now that the field itself has moved to `ViewSwitch`'s
+   borderless `--btn-secondary-fill` pill (see `fieldVariants`'s header), a
+   hairline mirrored from the field's OLD skin would put a border back on one
+   half of a chip that no longer has one on the other — the seam the fusion
+   was written to erase would reappear on this side alone. So this half now
+   mirrors the field's CURRENT skin instead: the same `--btn-secondary-fill`,
+   `shadow-none` at rest, and `--btn-secondary-hover` in place of the
+   `--accent` wash, so a hover anywhere on the chip answers in the one colour
+   the whole pill now stands on. The things that make this control a BUTTON
+   and not a field are untouched: the active-press nudge, and the
+   focus-visible ink shadow, which is this control's own fill-coloured
+   answer to the global ring (tokens.css §8), not a border it borrows from
+   the field. */
 const directionVariants = cva(
   [
     "grid shrink-0 cursor-pointer place-content-center",
-    "appearance-none rounded-e-pill rounded-s-none border-0 bg-background",
-    "shadow-[inset_0_0_0_0.0625rem_var(--hair-strong)]",
-    "text-ink-secondary",
-    "enabled:hover:bg-accent enabled:hover:text-foreground",
+    "appearance-none rounded-e-pill rounded-s-none border-0",
     "enabled:active:translate-y-[0.0625rem]",
     "enabled:focus-visible:shadow-[inset_0_0_0_0.0625rem_var(--foreground)]",
     "transition-[background-color,box-shadow,color,translate]",
@@ -166,7 +200,9 @@ const directionVariants = cva(
         sm: "size-[var(--control-height-dense)]",
       },
       state: {
-        default: "",
+        /** `ViewSwitch`'s own pill, restated here — see the note above. */
+        default:
+          "shadow-none bg-[var(--btn-secondary-fill)] text-ink-secondary enabled:hover:bg-[var(--btn-secondary-hover)] enabled:hover:text-foreground",
         /** Mirrors the field's own disabled edge (override 42: `--border`
             is the weak 8% stroke, never the resting 20%). */
         disabled: "cursor-not-allowed shadow-[inset_0_0_0_0.0625rem_var(--border)] bg-hair-faint text-ink-disabled",
@@ -225,10 +261,12 @@ export interface SortControlProps
  * TEN STATES
  *  1. default        — the field with the current key, the chevron at the
  *                      inline end, the direction control beside it.
- *  2. hover          — does not apply to the FIELD half. CH09 draws no hover
- *                      on a field and the 20% the old one promoted to is now
- *                      the resting edge (override 42). `--accent` on the
- *                      direction control. Named tokens, not opacities.
+ *  2. hover          — `--btn-secondary-hover` on BOTH halves, client,
+ *                      2026-09-02: the field took `ViewSwitch`'s pill, hover
+ *                      included, so the fused chip answers in one colour
+ *                      wherever it is hovered rather than a field half with
+ *                      none and a button half with `--accent`'s. Named
+ *                      tokens, not opacities.
  *  3. focus-visible  — NOT here. tokens.css §8 rings the field and the
  *                      direction control at the pill radius. The field also
  *                      moves its own hairline to ink, which is a fill colour.

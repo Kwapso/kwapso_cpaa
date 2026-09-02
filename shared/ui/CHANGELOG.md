@@ -1,5 +1,55 @@
 # Changelog
 
+## v1.2.20 — 2026-09-02
+
+### Changed — Filter and Sort brought to the toolbar's one pill, matching `ViewSwitch` exactly
+
+Client, verbatim: "all the components in toolbar (the sort, the filter, the
+view) i want them in the same pill aspect exactly. match filter and sort to
+the existing view selector component (i am happy with how that is)."
+`ViewSwitch` was the reference: `--control-height-button` (40) tall,
+`--btn-secondary-fill` solid with no hairline, `--btn-secondary-hover` on
+hover, weight 500 — `select.tsx`'s trigger, overridden exactly that way.
+Measured against it, `FilterBar`'s chips and `SortControl`'s field were both
+off, in different ways.
+
+`FilterBar`'s three toolbar-row pills (`filterChipVariants` — an applied
+facet chip and the "Clear filters" control it's shared with — and `CHIP_ADD`,
+the "+ filter" idle affordance) all took `--control-height-pill` (26, `.kw-
+chip`'s own drawn height, right for a chip inside a facet's results but short
+for this row) and `--surface-raised` for their fill — a token that happens to
+equal `--btn-secondary-fill` in light mode only, and visibly splits from it in
+dark. `CHIP_ADD` also carried "the one bordered control in the system": a
+dashed `1px dashed var(--hair-strong)` outline, ch26's drawn "not yet set"
+cue. The client's ruling is explicit that this dash goes too. All three now
+take `--control-height-button`, `--btn-secondary-fill`, `--btn-secondary-
+label`, and `CHIP_ADD` gains `--btn-secondary-hover` on hover and drops its
+border entirely.
+
+`SortControl`'s field (`fieldVariants`) was already the right height, but
+still wore `select.tsx`'s CH09 field skin wholesale: `bg-background`, a
+resting `--hair-strong` hairline, weight 300, no hover — correct for a lone
+select, and a visibly different pill from `ViewSwitch` standing next to it.
+It now overrides the same four properties `ViewSwitch` does. The direction
+button fused to it (`directionVariants`, the 2 Sep fusion) mirrored the
+field's OLD skin to draw one continuous hairline across both halves; mirroring
+that same skin now that the field has moved would have put the hairline back
+on one side of a chip built specifically to erase it, so the direction half
+was brought to the same `--btn-secondary-fill`/`shadow-none`/`--btn-secondary-
+hover` skin instead of a bare hairline mirror. Its own active-press nudge and
+focus-visible ink shadow are untouched.
+
+`RangeFacet` and `SearchableFacet` draw no toolbar-row pills of their own —
+their fields and search pill live inside a facet's popover, not the bar —
+and are unchanged.
+
+Verified in `verify/toolbar-pills/`: Search, Filter (idle and one facet
+picked), the fused Sort chip and `ViewSwitch` rendered on the real toolbar
+ground (`collectionPanelVariants`'s panel, not a generic `.bg-surface-panel`),
+in both palettes. Computed `height`/`background-color`/`box-shadow` now read
+identical across all five controls in both light and dark; before this
+change they matched only by light-mode coincidence.
+
 ## v1.2.19 — 2026-09-02
 
 ### Added — three more client rulings on the rail and on tabs: the member chip's fill, weight as a third nav signal, and hover-weight on tab labels

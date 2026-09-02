@@ -5,11 +5,15 @@
    DESIGN SOURCE
    · design-mothership/specimens/_fragments/t11.css → `.kw-chip`,
      `.kw-chip__x`, `.kw-chip--add`, read alongside t11-chips.html. This is
-     the core reference: an active facet is a KIT-DRAWN CHIP — a raised pill
-     at the 26 pill height, badge type, `--space-3` of inline-start padding
-     and `--space-1` at the inline end, with an 18 circle on the `--hair` fill
-     as its remove control. "+ Filter" is the same chip with its ink dropped a
-     tier, and that is the drawing "Clear filters" reuses.
+     the core reference: an active facet is a KIT-DRAWN CHIP — badge type,
+     `--space-3` of inline-start padding and `--space-1` at the inline end,
+     with an 18 circle on the `--hair` fill as its remove control. The pill's
+     OWN height and fill were brought to `--control-height-button` /
+     `--btn-secondary-fill` by client ruling 2026-09-02 — see `CHIP_ADD`'s own
+     header — so this chapter's 26-tall raised pill is carried for the
+     padding and the remove-control drawing only, not for the height or the
+     fill. "+ Filter" is the same chip, and that is the drawing "Clear
+     filters" reuses.
    · design-mothership/specimens/_fragments/t11-gaps.md → T11-4 records that
      the chip's end padding is unstated and that `--space-1` was the choice.
      Carried, not re-decided.
@@ -29,10 +33,10 @@
    THE LAW THIS FILE OBEYS
    · Chips and facet pills take `--radius-pill`. Marks take `--radius-select`
      (6). Nothing here takes a fifth radius.
-   · A chip here is NEUTRAL — raised paper, primary ink — so it may carry
-     nothing coloured. Ruling 26 forbids an edge on a coloured pill; these
-     are not coloured, and they still carry none, because the kit draws
-     them on the raised fill with elevation doing the work.
+   · A chip here is NEUTRAL — `--btn-secondary-fill`, the same paper
+     `ViewSwitch` and `SortControl`'s field stand on, and `--btn-secondary-
+     label` ink — so it may carry nothing coloured. Ruling 26 forbids an edge
+     on a coloured pill; these are not coloured, and they still carry none.
    · Mango appears nowhere in this file. A selected facet is not a brand fill,
      and the neutral hover is `--accent`.
    · A REMOVABLE CHIP HAS TWO FOCUS TARGETS. When a chip is selectable the
@@ -85,8 +89,16 @@ import { Check, Loader2, Search, SearchX, TriangleAlert, X } from "../../foundat
 const filterChipVariants = cva(
   [
     "inline-flex shrink-0 items-center gap-1",
-    // 26 tall · full pill · badge type, and it never wraps.
-    "h-[var(--control-height-pill)] rounded-pill whitespace-nowrap",
+    /* 40 tall — `--control-height-button`, the toolbar's standing control
+       height. Client, 2026-09-02, verbatim: "all the components in toolbar
+       (the sort, the filter, the view) i want them in the same pill aspect
+       exactly. match filter and sort to the existing view selector
+       component". This chip used to take the shorter `--control-height-pill`
+       (26) — `.kw-chip`'s own drawn height, and correct for a chip sitting
+       INSIDE a facet's results, but this bar draws it in the TOOLBAR row
+       beside `SortControl` and `ViewSwitch`, and the client wants the row to
+       read as one family of pills, not two heights. */
+    "h-[var(--control-height-button)] rounded-pill whitespace-nowrap",
     "text-badge leading-none",
     // 4 at the inline end, holding the remove control off the edge (T11-4).
     "pe-1",
@@ -96,8 +108,19 @@ const filterChipVariants = cva(
     variants: {
       /** Mutually exclusive. Resolved once, in JS, at each call. */
       state: {
-        /** Raised paper, primary ink — the kit's resting chip. */
-        default: "bg-[var(--surface-raised)] text-ink-primary",
+        /** THE SAME PAPER `ViewSwitch` STANDS ON, not the raised chip's own
+            `--surface-raised`. `--btn-secondary-fill` is the token this
+            toolbar's ground already re-resolves for every other pill in the
+            row (`collection-frame.tsx`'s panel: "a control in the toolbar
+            stands on soft paper, so its fill is the other tone — off-beige"),
+            so taking it here instead of a second, unrelated token is what
+            makes the two same-looking in every ground and every palette, not
+            only the light one where `--surface-raised` and `--btn-secondary-
+            fill` happen to agree. No hairline, matching `ViewSwitch`'s own
+            "fill and no hairline" — `select.tsx`'s field border was never on
+            this chip either, so nothing is removed here that this file drew;
+            it is stated for the reader comparing the two. */
+        default: "bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
         /** A fill and an ink. Never an opacity, never a faded chip. */
         disabled: "cursor-not-allowed bg-hair-faint text-ink-disabled",
       },
@@ -119,35 +142,44 @@ const CHIP_LABEL =
 const CHIP_LABEL_INTERACTIVE =
   "cursor-pointer appearance-none border-0 bg-transparent enabled:hover:bg-accent";
 
-/* `.kw-chip--add` — the "+ filter" slot, and the one bordered control in the
-   system.
+/* `.kw-chip--add` — the "+ filter" slot.
 
    FLT-C1. CH11 draws this chip in its "Filter chips — removable" block, at the
    end of the applied row, and the build had no slot for it at all: the only
    thing rendered after the chips was `Clear`, wearing a comment that named
    `.kw-chip--add` for a control that is not it.
 
-   THE DASH. ch26, verbatim: 'Dashed "+ filter" — the one exception. A dashed
-   outline signals "not yet set" for an empty filter slot. This is the only
-   bordered control in the system; don't extend the pattern elsewhere.' That is
-   the only statement in the artifact of what this control IS, so it is taken.
-   Recorded honestly, because a later reader will check: CH11, which DRAWS the
-   chip, gives it no edge in any of its 88 declarations, and ch26 draws nothing
-   at all. The stroke used is the artifact's own dashed stroke — `1px dashed
-   var(--hair2)`, the declaration CH16 writes on the dropzone — rather than a
-   new one, so nothing is invented either way. Flagged for a ruling.
+   THE DASH IS GONE — CLIENT RULING, 2026-09-02, OVERRIDING ch26. This used to
+   be "the one bordered control in the system": a dashed `1px dashed
+   var(--hair-strong)` outline at the shorter `--control-height-pill`, on the
+   ch26 reading that a dash signals "not yet set" for an empty filter slot.
+   The client's own words this round: "all the components in toolbar (the
+   sort, the filter, the view) i want them in the same pill aspect exactly.
+   match filter and sort to the existing view selector component (i am happy
+   with how that is)" — verbatim, and explicit that Filter is to match View
+   "full stop", dashed idle affordance included. CH11 itself never drew this
+   chip with an edge in any of its 88 declarations (recorded honestly above,
+   before this ruling, for the reader checking); ch26 is the only source for
+   the dash, and this ruling is the client overriding it. What stands now is
+   `ViewSwitch`'s own drawing: `--control-height-button` (40) tall,
+   `--btn-secondary-fill` solid, no hairline, `--btn-secondary-hover` on
+   hover, `--btn-secondary-label` ink — the same pill as every other chip in
+   this file and the same pill `SortControl`'s field wears.
 
    Symmetrical padding, because unlike a removable chip there is no control to
-   hold off the inline end, and the ink drops one tier: this is a slot that is
-   not yet set, not a facet that is on. */
+   hold off the inline end. The ink no longer drops a tier on its own — it is
+   the same `--btn-secondary-label` as the rest of the family, which is what
+   "the same pill aspect exactly" asks for; the slot still reads as "not yet
+   set" because it is the only chip with no remove control and no facet name,
+   not because of a fainter ink. */
 const CHIP_ADD = [
-  "inline-flex h-[var(--control-height-pill)] shrink-0 items-center gap-1",
+  "inline-flex h-[var(--control-height-button)] shrink-0 items-center gap-1",
   "cursor-pointer appearance-none rounded-pill whitespace-nowrap px-3",
   "text-badge leading-none",
-  "border border-dashed border-[var(--hair-strong)] bg-transparent",
-  "text-ink-tertiary enabled:hover:text-foreground",
+  "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
+  "enabled:hover:bg-[var(--btn-secondary-hover)]",
   "transition-colors duration-[var(--duration-colour)] ease-kwapso",
-  "disabled:cursor-not-allowed disabled:border-[var(--hair)] disabled:text-ink-disabled",
+  "disabled:cursor-not-allowed disabled:bg-hair-faint disabled:text-ink-disabled",
 ];
 
 /** `.kw-chip__x` — an 18 circle on the hairline fill. The second focus target. */
