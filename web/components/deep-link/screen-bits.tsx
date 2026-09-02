@@ -57,6 +57,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/t
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { FilterPanelColumn } from "@shared/web/screen-engine/filter-bar"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -273,11 +274,10 @@ export function AddButton({
  * of claiming the rest of this row and pushing `actions` onto a line of its
  * own — the same two-row shape one level down. `filters` is NOT wrapped here,
  * and that is deliberate rather than an omission: `FilterBar`
- * (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own chip
- * cluster in exactly that non-growing box internally, and its OPEN panel is
- * `position: absolute` against this track's `relative` — so a wrapper here
- * would add a second identical box round the chips and a narrower anchor
- * under the panel, and buy nothing. See the `{filters}` slot below.
+ * (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own pill in
+ * exactly that non-growing box internally, so a wrapper here would add a
+ * second identical box round it and buy nothing. See the `{filters}` slot
+ * below.
  *
  * FIVE NAMED SLOTS, NOT A HARDCODED ROW. Each is independently optional (a
  * caller with no facets passes no `filters`, exactly as one with no search
@@ -298,10 +298,11 @@ export function ToolbarRow({
    * body has none (Sprints' Overview/Calendar, Tasks' Calendar, Tickets'
    * Triage) — the row is then the actions alone. */
   search?: React.ReactNode
-  /** The active-facet chips + "+ filter" affordance (`FilterBar`), between
-   * `search` and `sort` — the same position the design kit's own toolbar
-   * contract fixes (search → filters → … → actions). Omitted wherever a
-   * screen has no facets, exactly like `search`. */
+  /** The "Filter" pill (`FilterBar`), between `search` and `sort` — the same
+   * position the design kit's own toolbar contract fixes (search → filters →
+   * … → actions). Omitted wherever a screen has no facets, exactly like
+   * `search`. It says a COUNT and never the filters themselves (client
+   * ruling, 2 Sep 2026), and its open panel lands under this whole track. */
   filters?: React.ReactNode
   /** The sort control, after `filters` and before the pinned-right
    * `actions` — a `SortControl`, typically. Omitted wherever a screen has
@@ -324,56 +325,59 @@ export function ToolbarRow({
 }) {
   if (!search && !filters && !sort && !view && !actions) return null
   return (
-    <div
-      className={cn(
-        // THE TRACK — client, 1 Sep 2026, pointing at her own reference
-        // artifact: every control sits inside ONE visibly distinct pill,
-        // a step lighter than the panel it's drawn on (`bg-background`
-        // against the card's own `bg-surface-panel`), not floating loose
-        // chips on the panel's bare paper. `rounded-pill` at the row's own
-        // height reads as the same stadium shape every other pill in this
-        // app already uses; the inline-start padding is slightly deeper
-        // than the others so the search icon doesn't sit flush on the seam.
-        // `relative` — `filter-bar.tsx`'s own open panel anchors to THIS box
-        // via `position: absolute`/`top-full` (2 Sep 2026, second pass: a
-        // flex-sibling panel fed its own tall height into this pill's
-        // `rounded-pill`, drawing a giant oval; absolute positioning keeps
-        // the panel's height out of this box's model no matter how tall it
-        // gets, and `relative` here is what its `top-full`/`inset-x-0`
-        // measure against). See `filter-bar.tsx`'s header for the full
-        // account.
-        "relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
-        className
-      )}
-    >
-      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-          like in your atifact": her reference artifact's search element is
-          `flex: 1 1 auto`, not a fixed width, so it is what pushes
-          filters/sort/view/actions to the track's far edge rather than
-          leaving them clustered right after a narrow box. `flex-1` here does
-          that job regardless of what width class the search element itself
-          carries (a caller's own `w-full` fills this box; one still asking
-          for a fixed width would be overridden by this wrapper's own basis
-          the same way `filters` below already normalizes a `w-full` child –
-          see PagedFind's note on why a wrapped `w-full` child sizes to the
-          wrapper and not the row). */}
-      {search && (
-        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
-      )}
-      {/* `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`) renders its
-          chip cluster inline here — a normal flex child, wrapped in its own
-          non-growing box internally, same as every other slot on this row —
-          and its OPEN panel out of flow entirely (`position: absolute`,
-          anchored to this div's own `relative` above), so `{filters}` bare is
-          correct for both: the chip cluster takes its place in the row like
-          any other node, and the panel simply isn't part of this flexbox's
-          layout math at all once it's open. A caller passing anything OTHER
-          than `<FilterBar>` here still works unchanged. */}
-      {filters}
-      {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
-      {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-    </div>
+    // THE COLUMN, AND WHY THE TRACK IS ONLY ITS FIRST CHILD (client ruling,
+    // 2 Sep 2026, third pass: "the expanded toolbar shoudl not be an overlay,
+    // but literaly expand the space"). `FilterBar`'s open panel renders into
+    // an outlet this column publishes, BENEATH the track — so it takes real
+    // space and pushes the collection down, while the pill below keeps its own
+    // fixed shape because the panel's height feeds THIS box and never the
+    // pill's. The two passes that got here — a flex-sibling panel inside the
+    // pill (which drew a giant oval) and an absolutely-positioned one (which
+    // floated over the rows) — are written up in `filter-bar.tsx`'s header.
+    // The column costs nothing when the panel is shut: its outlet is
+    // `display: contents`, so `gap-2` has nothing to space.
+    <FilterPanelColumn>
+      <div
+        className={cn(
+          // THE TRACK — client, 1 Sep 2026, pointing at her own reference
+          // artifact: every control sits inside ONE visibly distinct pill,
+          // a step lighter than the panel it's drawn on (`bg-background`
+          // against the card's own `bg-surface-panel`), not floating loose
+          // chips on the panel's bare paper. `rounded-pill` at the row's own
+          // height reads as the same stadium shape every other pill in this
+          // app already uses; the inline-start padding is slightly deeper
+          // than the others so the search icon doesn't sit flush on the seam.
+          "flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
+          className
+        )}
+      >
+        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+            like in your atifact": her reference artifact's search element is
+            `flex: 1 1 auto`, not a fixed width, so it is what pushes
+            filters/sort/view/actions to the track's far edge rather than
+            leaving them clustered right after a narrow box. `flex-1` here does
+            that job regardless of what width class the search element itself
+            carries (a caller's own `w-full` fills this box; one still asking
+            for a fixed width would be overridden by this wrapper's own basis
+            the same way `filters` below already normalizes a `w-full` child –
+            see PagedFind's note on why a wrapped `w-full` child sizes to the
+            wrapper and not the row). */}
+        {search && (
+          <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
+        )}
+        {/* `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`) renders its
+            "Filter" pill inline here — a normal flex child, wrapped in its own
+            non-growing box internally, same as every other slot on this row —
+            and its OPEN panel into the outlet the `FilterPanelColumn` above
+            publishes UNDER this track, so `{filters}` bare is correct for
+            both. A caller passing anything OTHER than `<FilterBar>` here still
+            works unchanged; it simply leaves the outlet empty. */}
+        {filters}
+        {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
+        {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+    </FilterPanelColumn>
   )
 }
 

@@ -68,7 +68,7 @@
 
 import * as React from "react"
 
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { FilterBar, FilterPanelColumn } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
@@ -372,15 +372,21 @@ export function PagedFind<T>({
 
   const toolbarAndRows = (
     <div className="flex w-full flex-col gap-4">
-      <div className="relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+      {/* THE COLUMN — client ruling, 2 Sep 2026, third pass: "the expanded
+          toolbar shoudl not be an overlay, but literaly expand the space".
+          `FilterBar`'s open panel renders into the outlet this column
+          publishes BENEATH the track below, so it takes real space and pushes
+          the rows down, and its height feeds THIS box rather than the pill's
+          (which is what a `rounded-pill` box cannot survive — see
+          `filter-bar.tsx`'s header for the oval, and for the absolute-panel
+          pass this replaces). */}
+      <FilterPanelColumn>
+      <div className="flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
         {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
             control sits inside one pill, `bg-background` against the card's
             own `bg-surface-panel`, not floating loose on the panel's bare
-            paper (client, 1 Sep 2026, pointing at her own reference artifact).
-            `relative` — `filter-bar.tsx`'s open panel anchors to THIS box via
-            `position: absolute`/`top-full`, so its own tall height (several
-            facets deep) never feeds this pill's `rounded-pill` (2 Sep 2026,
-            second pass: it did, once, and drew a giant oval). */}
+            paper (client, 1 Sep 2026, pointing at her own reference
+            artifact). */}
         {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
             the filter row's "Clear all" — one control quietly owning two
             questions — and the kit's bar says "Clear filters" and now means
@@ -403,23 +409,19 @@ export function PagedFind<T>({
             className="w-full"
           />
         </div>
-        {/* THE FACET CHIPS, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
+        {/* THE FILTER PILL, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
             ruling, 2026-09-01, the toolbar spec Aurora approved that night
-            against a real Tickets mockup: search, then the facet chips, then
-            "+ Filter", then sort, then create, pinned right).
+            against a real Tickets mockup: search, then filters, then sort,
+            then create, pinned right). It says a COUNT and never the filters
+            themselves — client, 2026-09-02: "when activce filters, do not
+            display them in the toolbar. only a count niside the filter pill".
 
             NO WRAPPING BOX AROUND `<FilterBar>` (client ruling, 2026-09-02,
-            superseding the wrapper this slot used to carry): `FilterBar`
-            (`shared/web/screen-engine/filter-bar.tsx`) renders its chip
-            cluster inline as a normal flex child — it wraps itself in a
-            non-growing box internally, the same "wrap a `w-full` root" trick
-            this comment used to explain (CSS Sizing §5.3) — and its own OPEN
-            panel out of flow entirely, `position: absolute` against this
-            div's own `relative` two lines up, so the panel is never part of
-            THIS flexbox's layout math at all and cannot feed the pill's
-            height. `<FilterBar>` bare is correct either way: in flow for the
-            chips, out of it for the panel. See `filter-bar.tsx`'s own header
-            for the full account, including the second pass that got here. */}
+            superseding the wrapper this slot used to carry): it wraps its own
+            pill in a non-growing box internally, the same "wrap a `w-full`
+            root" trick this comment used to explain (CSS Sizing §5.3), and
+            renders its open PANEL into the column above rather than into this
+            row. `<FilterBar>` bare is correct for both halves. */}
         {showFilters && (
           <FilterBar
             facets={facets}
@@ -478,6 +480,7 @@ export function PagedFind<T>({
           <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
         )}
       </div>
+      </FilterPanelColumn>
 
       {children({
         active,

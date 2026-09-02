@@ -27,7 +27,7 @@ import * as React from "react"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { FilterBar, FilterPanelColumn } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
@@ -191,25 +191,26 @@ export function WaveFinder({
   // below). The filter bar used to be drawn as this row's own sibling BELOW
   // it — the same shape her Apps screenshot caught: search+sort(+actions) on
   // one line, the filter chips stranded on a second, disconnected one. The
-  // kit's chip row is still exactly what it always was (a full-width strip on
-  // its own, which is why it is wrapped in a non-growing flex box below
-  // rather than dropped in bare — a bare `w-full` child would still claim the
-  // rest of the line and push `actions` onto a line of its own, the same
-  // fault one level down), it is simply a FLEX ITEM of this one row now
-  // instead of a sibling block underneath it, the same technique the kit's
+  // CONTROL is a flex item of this one row now, the same technique the kit's
   // OWN toolbar uses for its `filters` slot (`shared/ui/components/
-  // collection-frame/collection-frame.tsx`).
+  // collection-frame/collection-frame.tsx`). What is NOT in the row is its
+  // open panel, and that is a different question with a different answer —
+  // see the column below.
   return (
-    <div className="relative flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+    // THE COLUMN — client ruling, 2 Sep 2026, third pass: "the expanded
+    // toolbar shoudl not be an overlay, but literaly expand the space".
+    // `FilterBar`'s open panel renders into the outlet this column publishes
+    // BENEATH the track, so it takes real space and pushes the waves down, and
+    // its height feeds THIS box rather than the pill's — which is the whole of
+    // why the track keeps its shape (`filter-bar.tsx`'s header has the oval
+    // that taught it, and the absolute-panel pass this replaces).
+    <FilterPanelColumn className="w-full">
+    <div className="flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
       {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
           like in your atifact": the reference artifact's search element is
-          `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
-          chips/sort/period after it to the track's far edge instead of
-          sitting immediately after a narrow box. `relative` on this track —
-          `filter-bar.tsx`'s own open panel anchors to it via `position:
-          absolute`/`top-full`, so its own tall height never feeds this
-          pill's `rounded-pill` (2 Sep 2026, second pass: it did, once, and
-          drew a giant oval). */}
+          `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
+          pill/sort/period after it to the track's far edge instead of sitting
+          immediately after a narrow box. */}
       <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
         <SearchInput
           value={query.q}
@@ -222,13 +223,13 @@ export function WaveFinder({
           className="w-full"
         />
       </div>
-      {/* NO WRAPPING BOX AROUND `<FilterBar>` — its chip cluster renders
+      {/* NO WRAPPING BOX AROUND `<FilterBar>` — its "Filter" pill renders
           inline as a normal flex child (wrapping itself in a non-growing box
-          internally), and its own OPEN panel renders out of flow entirely,
-          `position: absolute` against this track's own `relative` above, so
-          the panel is never part of THIS flexbox's layout math and cannot
-          feed the pill's height. See `filter-bar.tsx`'s own header for the
-          full account, including the second pass that got here. */}
+          internally), and its open PANEL renders into the column above rather
+          than into this row. The pill says a COUNT and never the filters
+          themselves — client, 2026-09-02: "when activce filters, do not
+          display them in the toolbar. only a count niside the filter pill".
+          See `filter-bar.tsx`'s own header for the full account. */}
       <FilterBar
         facets={facets}
         values={{ accountId: query.accountId, status: query.status }}
@@ -271,5 +272,6 @@ export function WaveFinder({
       ) : null}
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
+    </FilterPanelColumn>
   )
 }
